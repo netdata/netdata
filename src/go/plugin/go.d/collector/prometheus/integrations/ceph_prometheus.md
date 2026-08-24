@@ -499,25 +499,12333 @@ The following alerts are available:
 
 ## Metrics
 
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+The built-in Prometheus profiles on this page define 569 curated charts across
+the primary and applicable supporting profiles.
+The catalogue is generated from the same profile design and runtime chart contracts used by the Agent.
 
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
 
-Untyped metrics (have no '# TYPE') processing:
+<details open data-prometheus-profile-catalog>
+<summary>Curated profile coverage (569 charts)</summary>
 
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
 
-**The rest are ignored**.
+<details open data-prometheus-profile>
+<summary>Ceph — 569 charts</summary>
+
+
+Curated cluster, daemon, service, storage, client, and protocol metrics from Ceph Prometheus endpoints.
+
+
+<details data-prometheus-profile-family>
+<summary>Capacity (3 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Object Health (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Objects</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `objects`
+- **Dimensions:** `degraded`, `misplaced`, `unfound`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_num_objects_degraded`
+- `ceph_num_objects_misplaced`
+- `ceph_num_objects_unfound`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Overall Cluster Space (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `bytes`
+- **Dimensions:** `bytes`, `used_bytes`, `used_raw_bytes`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_cluster_total_bytes`
+- `ceph_cluster_total_used_bytes`
+- `ceph_cluster_total_used_raw_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Space by Device Class (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph device class
+- **Units:** `bytes`
+- **Dimensions:** `bytes`, `used_bytes`, `used_raw_bytes`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_cluster_by_class_total_bytes`
+- `ceph_cluster_by_class_total_used_bytes`
+- `ceph_cluster_by_class_total_used_raw_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>CephFS (104 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Metadata (2 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Filesystem Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph data pools and fs id and metadata pool and name
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_fs_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>MDS Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph version and fs id and hostname and public addr and rank
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>SMB (1 chart)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph netbiosname and share and smb version and subvolume and subvolume group and volume
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_smb_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>MDS (90 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Attribute and Layout Mutation Latency (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `rmxattr_latency`, `setattr_latency`, `setdirlayout_latency`, `setfilelock_latency`, `setlayout_latency`, `setxattr_latency`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_mds_server_req_rmxattr_latency_count`
+- `ceph_mds_server_req_setattr_latency_count`
+- `ceph_mds_server_req_setdirlayout_latency_count`
+- `ceph_mds_server_req_setfilelock_latency_count`
+- `ceph_mds_server_req_setlayout_latency_count`
+- `ceph_mds_server_req_setxattr_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `rmxattr_latency`, `setattr_latency`, `setdirlayout_latency`, `setfilelock_latency`, `setlayout_latency`, `setxattr_latency`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_mds_server_req_rmxattr_latency_sum`
+- `ceph_mds_server_req_setattr_latency_sum`
+- `ceph_mds_server_req_setdirlayout_latency_sum`
+- `ceph_mds_server_req_setfilelock_latency_sum`
+- `ceph_mds_server_req_setlayout_latency_sum`
+- `ceph_mds_server_req_setxattr_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Capabilities (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Capabilities</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `capabilities`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_caps`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Capability Messages</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `messages/s`
+- **Dimensions:** `handle_client_cap_release`, `handle_client_caps`, `handle_client_caps_dirty`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_handle_client_cap_release`
+- `ceph_mds_handle_client_caps`
+- `ceph_mds_handle_client_caps_dirty`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Capability-Throttled Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests/s`
+- **Dimensions:** `server_cap_acquisition_throttle`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_server_cap_acquisition_throttle`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Capability-Revoke Evictions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `clients/s`
+- **Dimensions:** `server_cap_revoke_eviction`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_server_cap_revoke_eviction`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inodes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_inodes_with_caps`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inode Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_handle_inode_file_caps`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `ceph_cap_op_flush_ack`, `ceph_cap_op_flushsnap_ack`, `ceph_cap_op_grant`, `ceph_cap_op_revoke`, `ceph_cap_op_trunc`, `process_request_cap_release`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_mds_ceph_cap_op_flush_ack`
+- `ceph_mds_ceph_cap_op_flushsnap_ack`
+- `ceph_mds_ceph_cap_op_grant`
+- `ceph_mds_ceph_cap_op_revoke`
+- `ceph_mds_ceph_cap_op_trunc`
+- `ceph_mds_process_request_cap_release`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Journal (8 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_log_jlat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_log_jlat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Current Journal Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events`
+- **Dimensions:** `ev`, `evexd`, `evexg`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_log_ev`
+- `ceph_mds_log_evexd`
+- `ceph_mds_log_evexg`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Large Journal Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `evlrg`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_log_evlrg`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Journal Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `evadd`, `evex`, `evtrm`, `replayed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_mds_log_evadd`
+- `ceph_mds_log_evex`
+- `ceph_mds_log_evtrm`
+- `ceph_mds_log_replayed`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Journal Positions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `position`
+- **Dimensions:** `expos`, `rdpos`, `wrpos`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_log_expos`
+- `ceph_mds_log_rdpos`
+- `ceph_mds_log_wrpos`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Journal Segments</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `segments/s`
+- **Dimensions:** `segadd`, `segex`, `segtrm`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_log_segadd`
+- `ceph_mds_log_segex`
+- `ceph_mds_log_segtrm`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Journal Segments</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `segments`
+- **Dimensions:** `seg`, `segexd`, `segexg`, `segmjr`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_mds_log_seg`
+- `ceph_mds_log_segexd`
+- `ceph_mds_log_segexg`
+- `ceph_mds_log_segmjr`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Metadata Cache Directory (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Discovery Messages</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `messages/s`
+- **Dimensions:** `handle_discover`, `send_discover`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_cache_dir_handle_discover`
+- `ceph_mds_cache_dir_send_discover`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Discovery Attempts</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `attempts/s`
+- **Dimensions:** `try_discover`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_cache_dir_try_discover`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Replication Directives</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `directives/s`
+- **Dimensions:** `update`, `update_receipt`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_cache_dir_update`
+- `ceph_mds_cache_dir_update_receipt`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Metadata Cache Internal Requests (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Inode Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `inodestats`, `quiesce_inode`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_cache_ireq_inodestats`
+- `ceph_mds_cache_ireq_quiesce_inode`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `exportdir`, `flush`, `fragmentdir`, `fragstats`, `quiesce_path`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_mds_cache_ireq_exportdir`
+- `ceph_mds_cache_ireq_flush`
+- `ceph_mds_cache_ireq_fragmentdir`
+- `ceph_mds_cache_ireq_fragstats`
+- `ceph_mds_cache_ireq_quiesce_path`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `scrubs/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_cache_ireq_enqueue_scrub`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Metadata Cache Recovery (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Current Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `items`
+- **Dimensions:** `strays`, `delayed`, `enqueuing`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_cache_num_strays`
+- `ceph_mds_cache_num_strays_delayed`
+- `ceph_mds_cache_num_strays_enqueuing`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `created`, `enqueued`, `migrated`, `reintegrated`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_mds_cache_strays_created`
+- `ceph_mds_cache_strays_enqueued`
+- `ceph_mds_cache_strays_migrated`
+- `ceph_mds_cache_strays_reintegrated`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Files</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `files`
+- **Dimensions:** `enqueued`, `prioritized`, `processing`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_cache_num_recovering_enqueued`
+- `ceph_mds_cache_num_recovering_prioritized`
+- `ceph_mds_cache_num_recovering_processing`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>File Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `files/s`
+- **Dimensions:** `completed`, `started`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_cache_recovery_completed`
+- `ceph_mds_cache_recovery_started`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Metadata Cache Uninline (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `started`, `succeeded`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_cache_uninline_started`
+- `ceph_mds_cache_uninline_succeeded`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_cache_uninline_write_failed`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Namespace Mutation Latency (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `create_latency`, `link_latency`, `mkdir_latency`, `mknod_latency`, `rename_latency`, `rmdir_latency`, `symlink_latency`, `unlink_latency`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_mds_server_req_create_latency_count`
+- `ceph_mds_server_req_link_latency_count`
+- `ceph_mds_server_req_mkdir_latency_count`
+- `ceph_mds_server_req_mknod_latency_count`
+- `ceph_mds_server_req_rename_latency_count`
+- `ceph_mds_server_req_rmdir_latency_count`
+- `ceph_mds_server_req_symlink_latency_count`
+- `ceph_mds_server_req_unlink_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `create_latency`, `link_latency`, `mkdir_latency`, `mknod_latency`, `rename_latency`, `rmdir_latency`, `symlink_latency`, `unlink_latency`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_mds_server_req_create_latency_sum`
+- `ceph_mds_server_req_link_latency_sum`
+- `ceph_mds_server_req_mkdir_latency_sum`
+- `ceph_mds_server_req_mknod_latency_sum`
+- `ceph_mds_server_req_rename_latency_sum`
+- `ceph_mds_server_req_rmdir_latency_sum`
+- `ceph_mds_server_req_symlink_latency_sum`
+- `ceph_mds_server_req_unlink_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Namespace Traversal (6 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Directory-Fragment Lifecycle</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `dirfrags/s`
+- **Dimensions:** `dir_fetch_complete`, `dir_merge`, `dir_split`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_dir_fetch_complete`
+- `ceph_mds_dir_merge`
+- `ceph_mds_dir_split`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Namespace Traversals</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `traversals/s`
+- **Dimensions:** `traverse`, `traverse_dir_fetch`, `traverse_discover`, `traverse_forward`, `traverse_lock`, `traverse_remote_ino`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_mds_traverse`
+- `ceph_mds_traverse_dir_fetch`
+- `ceph_mds_traverse_discover`
+- `ceph_mds_traverse_forward`
+- `ceph_mds_traverse_lock`
+- `ceph_mds_traverse_remote_ino`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inode Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_openino_peer_discover`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Key Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `keys/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_dir_fetch_keys`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_traverse_hit`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `dir_commit`, `openino_backtrace_fetch`, `openino_dir_fetch`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_dir_commit`
+- `ceph_mds_openino_backtrace_fetch`
+- `ceph_mds_openino_dir_fetch`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Purge Queue (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Current Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `items`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_purge_queue_pq_item_in_journal`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Executed Purge Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_purge_queue_pq_executed_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Purge Operations in Flight</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations`
+- **Dimensions:** `ops`, `high_water`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_purge_queue_pq_executing_ops`
+- `ceph_purge_queue_pq_executing_ops_high_water`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Executed Purge Tasks</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `tasks/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_purge_queue_pq_executed`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Purge Tasks in Flight</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `tasks`
+- **Dimensions:** `executing`, `high_water`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_purge_queue_pq_executing`
+- `ceph_purge_queue_pq_executing_high_water`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Rank Migration (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `exported`, `imported`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_exported`
+- `ceph_mds_imported`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inode Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `exported_inodes`, `imported_inodes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_exported_inodes`
+- `ceph_mds_imported_inodes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Read Request Latency (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `blockdiff_latency`, `getattr_latency`, `getfilelock_latency`, `getvxattr_latency`, `lookup_latency`, `lookuphash_latency`, `lookupino_latency`, `lookupname_latency`, `lookupparent_latency`, `lookupsnap_latency`, `open_latency`, `readdir_latency`
+<details><summary>Source metric selectors (12)</summary>
+
+
+- `ceph_mds_server_req_blockdiff_latency_count`
+- `ceph_mds_server_req_getattr_latency_count`
+- `ceph_mds_server_req_getfilelock_latency_count`
+- `ceph_mds_server_req_getvxattr_latency_count`
+- `ceph_mds_server_req_lookup_latency_count`
+- `ceph_mds_server_req_lookuphash_latency_count`
+- `ceph_mds_server_req_lookupino_latency_count`
+- `ceph_mds_server_req_lookupname_latency_count`
+- `ceph_mds_server_req_lookupparent_latency_count`
+- `ceph_mds_server_req_lookupsnap_latency_count`
+- `ceph_mds_server_req_open_latency_count`
+- `ceph_mds_server_req_readdir_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `blockdiff_latency`, `getattr_latency`, `getfilelock_latency`, `getvxattr_latency`, `lookup_latency`, `lookuphash_latency`, `lookupino_latency`, `lookupname_latency`, `lookupparent_latency`, `lookupsnap_latency`, `open_latency`, `readdir_latency`
+<details><summary>Source metric selectors (12)</summary>
+
+
+- `ceph_mds_server_req_blockdiff_latency_sum`
+- `ceph_mds_server_req_getattr_latency_sum`
+- `ceph_mds_server_req_getfilelock_latency_sum`
+- `ceph_mds_server_req_getvxattr_latency_sum`
+- `ceph_mds_server_req_lookup_latency_sum`
+- `ceph_mds_server_req_lookuphash_latency_sum`
+- `ceph_mds_server_req_lookupino_latency_sum`
+- `ceph_mds_server_req_lookupname_latency_sum`
+- `ceph_mds_server_req_lookupparent_latency_sum`
+- `ceph_mds_server_req_lookupsnap_latency_sum`
+- `ceph_mds_server_req_open_latency_sum`
+- `ceph_mds_server_req_readdir_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Request Handling and State (14 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_reply_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_reply_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Connected Clients</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and fs name and id
+- **Units:** `clients`
+- **Dimensions:** `client_metrics_num_clients`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_client_metrics_num_clients`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Queued Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests`
+- **Dimensions:** `q`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_q`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `reply`, `server_handle_client_session`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_reply`
+- `ceph_mds_server_handle_client_session`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_slow_reply`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Files</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `files`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_root_rfiles`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inodes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes`
+- **Dimensions:** `inodes`, `bottom`, `pin_tail`, `pinned`, `top`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_mds_inodes`
+- `ceph_mds_inodes_bottom`
+- `ceph_mds_inodes_pin_tail`
+- `ceph_mds_inodes_pinned`
+- `ceph_mds_inodes_top`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Expired Inodes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `expired`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_inodes_expired`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Load</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `load`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_load_cent`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `forward`, `request`, `server_dispatch_client_request`, `server_dispatch_server_request`, `server_handle_client_request`, `server_handle_peer_request`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_mds_forward`
+- `ceph_mds_request`
+- `ceph_mds_server_dispatch_client_request`
+- `ceph_mds_server_dispatch_server_request`
+- `ceph_mds_server_handle_client_request`
+- `ceph_mds_server_handle_peer_request`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Snapshots</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `snapshots`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_root_rsnaps`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_root_rbytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Subtrees</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `subtrees`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_subtrees`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrubbing (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Scrubbed Inodes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `dir_base_inodes`, `dir_inodes`, `file_inodes`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_scrub_dir_base_inodes`
+- `ceph_mds_scrub_dir_inodes`
+- `ceph_mds_scrub_file_inodes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Backtrace Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `backtraces/s`
+- **Dimensions:** `backtrace_fetch`, `backtrace_repaired`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_scrub_backtrace_fetch`
+- `ceph_mds_scrub_backtrace_repaired`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Repaired Inotables</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inotables/s`
+- **Dimensions:** `inotable_repaired`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_scrub_inotable_repaired`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Applied Scrub Tags</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `tags/s`
+- **Dimensions:** `set_tag`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_scrub_set_tag`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Directory-Fragment Recursive-Stat Updates</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `dirfrags/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_scrub_dirfrag_rstats`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Snapshot Mutation Latency (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `lssnap_latency`, `mksnap_latency`, `renamesnap_latency`, `rmsnap_latency`, `snapdiff_latency`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_mds_server_req_lssnap_latency_count`
+- `ceph_mds_server_req_mksnap_latency_count`
+- `ceph_mds_server_req_renamesnap_latency_count`
+- `ceph_mds_server_req_rmsnap_latency_count`
+- `ceph_mds_server_req_snapdiff_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `lssnap_latency`, `mksnap_latency`, `renamesnap_latency`, `rmsnap_latency`, `snapdiff_latency`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_mds_server_req_lssnap_latency_sum`
+- `ceph_mds_server_req_mksnap_latency_sum`
+- `ceph_mds_server_req_renamesnap_latency_sum`
+- `ceph_mds_server_req_rmsnap_latency_sum`
+- `ceph_mds_server_req_snapdiff_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Memory (9 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Capabilities</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `capabilities`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_mem_cap`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Capability Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `capabilities/s`
+- **Dimensions:** `minus`, `plus`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_mem_cap_minus`
+- `ceph_mds_mem_cap_plus`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Dentries</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `dentries`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_mem_dn`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Dentry Cache Churn</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `dentries/s`
+- **Dimensions:** `minus`, `plus`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_mem_dn_minus`
+- `ceph_mds_mem_dn_plus`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Directories</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `directories`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_mem_dir`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Directory Cache Churn</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `directories/s`
+- **Dimensions:** `minus`, `plus`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_mem_dir_minus`
+- `ceph_mds_mem_dir_plus`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inodes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_mem_ino`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inode Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `inodes/s`
+- **Dimensions:** `minus`, `plus`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_mem_ino_minus`
+- `ceph_mds_mem_ino_plus`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `heap`, `rss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_mem_heap`
+- `ceph_mds_mem_rss`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Sessions (6 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Duration and Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_sessions_avg_session_uptime`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `add`, `remove`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_sessions_session_add`
+- `ceph_mds_sessions_session_remove`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Average Session Load</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `load`
+- **Dimensions:** `average_load`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_sessions_average_load`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Total Session Load</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `load`
+- **Dimensions:** `total_load`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_sessions_total_load`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Metadata-Threshold Evictions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `sessions/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_sessions_mdthresh_evicted`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Sessions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `sessions`
+- **Dimensions:** `session`, `sessions_open`, `sessions_stale`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_sessions_session_count`
+- `ceph_mds_sessions_sessions_open`
+- `ceph_mds_sessions_sessions_stale`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Clients (8 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Capability Access Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `accesses/s`
+- **Dimensions:** `hits`, `misses`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_per_client_cap_hits`
+- `ceph_mds_per_client_cap_miss`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Dentry Lease Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `lookups/s`
+- **Dimensions:** `hits`, `misses`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_per_client_dentry_lease_hits`
+- `ceph_mds_per_client_dentry_lease_miss`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Average Operation Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `seconds`
+- **Dimensions:** `read`, `write`, `metadata`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mds_per_client_avg_read_latency`
+- `ceph_mds_per_client_avg_write_latency`
+- `ceph_mds_per_client_avg_metadata_latency`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Open Files</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `files`
+- **Dimensions:** `open`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_per_client_opened_files`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inode State</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `inodes`
+- **Dimensions:** `open`, `total`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_per_client_opened_inodes`
+- `ceph_mds_per_client_total_inodes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pinned Inode Capabilities</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `capabilities`
+- **Dimensions:** `pinned`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mds_per_client_pinned_icaps`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Reported I/O Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `operations/s`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_per_client_total_read_ops`
+- `ceph_mds_per_client_total_write_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Reported I/O Volume</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and client and rank and mds filesystem key
+- **Units:** `bytes/s`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mds_per_client_total_read_size`
+- `ceph_mds_per_client_total_write_size`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Mirror (11 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Service (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Mirrored Filesystems</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `filesystems`
+- **Dimensions:** `mirrored`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_mirrored_filesystems`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mirroring Enable Failures</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `failures/s`
+- **Dimensions:** `failures`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_mirror_enable_failures`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Filesystems (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Mirroring Peers</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and filesystem
+- **Units:** `peers`
+- **Dimensions:** `peers`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_mirrored_filesystems_mirroring_peers`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mirrored Directories</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and filesystem
+- **Units:** `directories`
+- **Dimensions:** `directories`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_mirrored_filesystems_directory_count`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Peers (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Snapshot Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `snapshots/s`
+- **Dimensions:** `synced`, `deleted`, `renamed`, `failed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_cephfs_mirror_peers_snaps_synced`
+- `ceph_cephfs_mirror_peers_snaps_deleted`
+- `ceph_cephfs_mirror_peers_snaps_renamed`
+- `ceph_cephfs_mirror_peers_sync_failures`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Sync-Time Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `snapshots/s`
+- **Dimensions:** `snapshots`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_peers_avg_sync_time_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Sync Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_peers_avg_sync_time_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Sync Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `bytes/s`
+- **Dimensions:** `bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_peers_sync_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Last Sync Timestamps</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `seconds since epoch`
+- **Dimensions:** `started`, `ended`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_cephfs_mirror_peers_last_synced_start`
+- `ceph_cephfs_mirror_peers_last_synced_end`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Last Sync Duration</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `seconds`
+- **Dimensions:** `duration`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_peers_last_synced_duration`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Last Sync Size</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid
+- **Units:** `bytes`
+- **Dimensions:** `bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephfs_mirror_peers_last_synced_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Cluster Overview (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph method
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_prometheus_collect_duration_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph method
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_prometheus_collect_duration_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Current Work</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `items`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cluster_osd_blocklist_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Occupation</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph instance and db device and device and device ids and devices and wal device
+- **Units:** `{status}`
+- **Dimensions:** `occupation`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_disk_occupation`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Human</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph instance and device
+- **Units:** `{status}`
+- **Dimensions:** `human`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_disk_occupation_human`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Control Plane (17 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Cephadm (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph daemon name and hostname and service name and service type
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cephadm_daemon_status`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Manager (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Metadata</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph version and hostname
+- **Units:** `{status}`
+- **Dimensions:** `metadata`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mgr_metadata`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Status</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `{status}`
+- **Dimensions:** `status`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mgr_status`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Manager Modules (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph name
+- **Units:** `{status}`
+- **Dimensions:** `can_run`, `status`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mgr_module_can_run`
+- `ceph_mgr_module_status`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Monitor (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Cluster Summary</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `monitors`
+- **Dimensions:** `total`, `in_quorum`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mon_metadata`
+- `ceph_mon_quorum_status`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Metadata</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph version and hostname and public addr and rank
+- **Units:** `monitors`
+- **Dimensions:** `metadata`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mon_metadata`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Quorum Status</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `monitors`
+- **Dimensions:** `quorum_status`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mon_quorum_status`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Paxos (10 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Byte Measurement Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `measurements/s`
+- **Dimensions:** `begin_bytes`, `collect_bytes`, `commit_bytes`, `share_state_bytes`, `store_state_bytes`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_paxos_begin_bytes_count`
+- `ceph_paxos_collect_bytes_count`
+- `ceph_paxos_commit_bytes_count`
+- `ceph_paxos_share_state_bytes_count`
+- `ceph_paxos_store_state_bytes_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Byte Measurement</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `begin_bytes`, `collect_bytes`, `commit_bytes`, `share_state_bytes`, `store_state_bytes`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_paxos_begin_bytes_sum`
+- `ceph_paxos_collect_bytes_sum`
+- `ceph_paxos_commit_bytes_sum`
+- `ceph_paxos_share_state_bytes_sum`
+- `ceph_paxos_store_state_bytes_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Key Measurement Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `measurements/s`
+- **Dimensions:** `begin_keys`, `collect_keys`, `commit_keys`, `share_state_keys`, `store_state_keys`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_paxos_begin_keys_count`
+- `ceph_paxos_collect_keys_count`
+- `ceph_paxos_commit_keys_count`
+- `ceph_paxos_share_state_keys_count`
+- `ceph_paxos_store_state_keys_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Key Measurement</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `keys/s`
+- **Dimensions:** `begin_keys`, `collect_keys`, `commit_keys`, `share_state_keys`, `store_state_keys`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_paxos_begin_keys_sum`
+- `ceph_paxos_collect_keys_sum`
+- `ceph_paxos_commit_keys_sum`
+- `ceph_paxos_share_state_keys_sum`
+- `ceph_paxos_store_state_keys_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `begin_latency`, `collect_latency`, `commit_latency`, `new_pn_latency`, `refresh_latency`, `store_state_latency`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_paxos_begin_latency_count`
+- `ceph_paxos_collect_latency_count`
+- `ceph_paxos_commit_latency_count`
+- `ceph_paxos_new_pn_latency_count`
+- `ceph_paxos_refresh_latency_count`
+- `ceph_paxos_store_state_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `begin_latency`, `collect_latency`, `commit_latency`, `new_pn_latency`, `refresh_latency`, `store_state_latency`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_paxos_begin_latency_sum`
+- `ceph_paxos_collect_latency_sum`
+- `ceph_paxos_commit_latency_sum`
+- `ceph_paxos_new_pn_latency_sum`
+- `ceph_paxos_refresh_latency_sum`
+- `ceph_paxos_store_state_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `new_pn`, `refresh`, `restart`, `share_state`, `start_leader`, `start_peon`, `store_state`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_paxos_new_pn`
+- `ceph_paxos_refresh`
+- `ceph_paxos_restart`
+- `ceph_paxos_share_state`
+- `ceph_paxos_start_leader`
+- `ceph_paxos_start_peon`
+- `ceph_paxos_store_state`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `accept_timeout`, `collect_timeout`, `lease_ack_timeout`, `lease_timeout`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_paxos_accept_timeout`
+- `ceph_paxos_collect_timeout`
+- `ceph_paxos_lease_ack_timeout`
+- `ceph_paxos_lease_timeout`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Paxos Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `begin`, `collect`, `commit`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_paxos_begin`
+- `ceph_paxos_collect`
+- `ceph_paxos_commit`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Collected Uncommitted Values</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `values/s`
+- **Dimensions:** `collect_uncommitted`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_paxos_collect_uncommitted`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Health (4 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Cluster Status (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_health_status`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Daemon Health (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Health Metric Count</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and type
+- **Units:** `items`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_daemon_health_metrics`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Health Checks (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph name
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_health_detail`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Slow Operations (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Slow Operations</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `operations`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_healthcheck_slow_ops`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>OSDs (76 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Capacity and State (6 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Cluster Flags (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `{status}`
+- **Dimensions:** `nodeep_scrub`, `nodown`, `noin`, `noout`, `norebalance`, `noscrub`, `noup`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_osd_flag_nodeep_scrub`
+- `ceph_osd_flag_nodown`
+- `ceph_osd_flag_noin`
+- `ceph_osd_flag_noout`
+- `ceph_osd_flag_norebalance`
+- `ceph_osd_flag_noscrub`
+- `ceph_osd_flag_noup`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Fullness Thresholds (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Ratios</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `ratio`
+- **Dimensions:** `full_ratio`, `nearfull_ratio`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_full_ratio`
+- `ceph_osd_nearfull_ratio`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph back iface and ceph daemon and ceph version and cluster addr and device class and front iface and hostname and objectstore and public addr
+- **Units:** `OSDs`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>OSD State (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Cluster Summary</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `OSDs`
+- **Dimensions:** `total`, `up`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_metadata`
+- `ceph_osd_up`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD State</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `OSDs`
+- **Dimensions:** `in`, `up`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_in`
+- `ceph_osd_up`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD Weight</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `ratio`
+- **Dimensions:** `weight`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_weight`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Overview (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `milliseconds`
+- **Dimensions:** `apply_latency_ms`, `commit_latency_ms`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_apply_latency_ms`
+- `ceph_osd_commit_latency_ms`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Client IO (9 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `op_before_dequeue_op_lat`, `op_before_queue_op_lat`, `op_latency`, `op_prepare_latency`, `op_process_latency`, `op_r_latency`, `op_r_prepare_latency`, `op_r_process_latency`, `op_rw_latency`, `op_rw_prepare_latency`, `op_rw_process_latency`, `op_w_latency`, `op_w_prepare_latency`, `op_w_process_latency`, `subop_latency`, `subop_pull_latency`, `subop_push_latency`, `subop_w_latency`
+<details><summary>Source metric selectors (18)</summary>
+
+
+- `ceph_osd_op_before_dequeue_op_lat_count`
+- `ceph_osd_op_before_queue_op_lat_count`
+- `ceph_osd_op_latency_count`
+- `ceph_osd_op_prepare_latency_count`
+- `ceph_osd_op_process_latency_count`
+- `ceph_osd_op_r_latency_count`
+- `ceph_osd_op_r_prepare_latency_count`
+- `ceph_osd_op_r_process_latency_count`
+- `ceph_osd_op_rw_latency_count`
+- `ceph_osd_op_rw_prepare_latency_count`
+- `ceph_osd_op_rw_process_latency_count`
+- `ceph_osd_op_w_latency_count`
+- `ceph_osd_op_w_prepare_latency_count`
+- `ceph_osd_op_w_process_latency_count`
+- `ceph_osd_subop_latency_count`
+- `ceph_osd_subop_pull_latency_count`
+- `ceph_osd_subop_push_latency_count`
+- `ceph_osd_subop_w_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `op_before_dequeue_op_lat`, `op_before_queue_op_lat`, `op_latency`, `op_prepare_latency`, `op_process_latency`, `op_r_latency`, `op_r_prepare_latency`, `op_r_process_latency`, `op_rw_latency`, `op_rw_prepare_latency`, `op_rw_process_latency`, `op_w_latency`, `op_w_prepare_latency`, `op_w_process_latency`, `subop_latency`, `subop_pull_latency`, `subop_push_latency`, `subop_w_latency`
+<details><summary>Source metric selectors (18)</summary>
+
+
+- `ceph_osd_op_before_dequeue_op_lat_sum`
+- `ceph_osd_op_before_queue_op_lat_sum`
+- `ceph_osd_op_latency_sum`
+- `ceph_osd_op_prepare_latency_sum`
+- `ceph_osd_op_process_latency_sum`
+- `ceph_osd_op_r_latency_sum`
+- `ceph_osd_op_r_prepare_latency_sum`
+- `ceph_osd_op_r_process_latency_sum`
+- `ceph_osd_op_rw_latency_sum`
+- `ceph_osd_op_rw_prepare_latency_sum`
+- `ceph_osd_op_rw_process_latency_sum`
+- `ceph_osd_op_w_latency_sum`
+- `ceph_osd_op_w_prepare_latency_sum`
+- `ceph_osd_op_w_process_latency_sum`
+- `ceph_osd_subop_latency_sum`
+- `ceph_osd_subop_pull_latency_sum`
+- `ceph_osd_subop_push_latency_sum`
+- `ceph_osd_subop_w_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `op_in_bytes`, `op_out_bytes`, `op_r_out_bytes`, `op_rw_in_bytes`, `op_rw_out_bytes`, `op_w_in_bytes`, `subop_in_bytes`, `subop_push_in_bytes`, `subop_w_in_bytes`
+<details><summary>Source metric selectors (9)</summary>
+
+
+- `ceph_osd_op_in_bytes`
+- `ceph_osd_op_out_bytes`
+- `ceph_osd_op_r_out_bytes`
+- `ceph_osd_op_rw_in_bytes`
+- `ceph_osd_op_rw_out_bytes`
+- `ceph_osd_op_w_in_bytes`
+- `ceph_osd_subop_in_bytes`
+- `ceph_osd_subop_push_in_bytes`
+- `ceph_osd_subop_w_in_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations in Progress</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_op_wip`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_subop_push`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_slow_ops_slow_ops_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_op_cache_hit`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `objects/s`
+- **Dimensions:** `op_delayed_degraded`, `op_delayed_unreadable`, `replica_read_redirect_missing`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_op_delayed_degraded`
+- `ceph_osd_op_delayed_unreadable`
+- `ceph_osd_replica_read_redirect_missing`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `op`, `op_r`, `op_rw`, `op_w`, `replica_read`, `replica_read_redirect_conflict`, `replica_read_served`, `subop_pull`, `subop_w`, `tier_proxy_read`, `tier_proxy_write`
+<details><summary>Source metric selectors (11)</summary>
+
+
+- `ceph_osd_op`
+- `ceph_osd_op_r`
+- `ceph_osd_op_rw`
+- `ceph_osd_op_w`
+- `ceph_osd_replica_read`
+- `ceph_osd_replica_read_redirect_conflict`
+- `ceph_osd_replica_read_served`
+- `ceph_osd_subop_pull`
+- `ceph_osd_subop_w`
+- `ceph_osd_tier_proxy_read`
+- `ceph_osd_tier_proxy_write`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Recovery (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `backfill_queue_latency`, `backfill_remove_queue_latency`, `context_queue_latency`, `pull_queue_latency`, `push_queue_latency`, `push_reply_queue_latency`, `queue_latency`, `scan_queue_latency`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_l_osd_recovery_backfill_queue_latency_count`
+- `ceph_osd_l_osd_recovery_backfill_remove_queue_latency_count`
+- `ceph_osd_l_osd_recovery_context_queue_latency_count`
+- `ceph_osd_l_osd_recovery_pull_queue_latency_count`
+- `ceph_osd_l_osd_recovery_push_queue_latency_count`
+- `ceph_osd_l_osd_recovery_push_reply_queue_latency_count`
+- `ceph_osd_l_osd_recovery_queue_latency_count`
+- `ceph_osd_l_osd_recovery_scan_queue_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `backfill_queue_latency`, `backfill_remove_queue_latency`, `context_queue_latency`, `pull_queue_latency`, `push_queue_latency`, `push_reply_queue_latency`, `queue_latency`, `scan_queue_latency`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_l_osd_recovery_backfill_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_backfill_remove_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_context_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_pull_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_push_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_push_reply_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_queue_latency_sum`
+- `ceph_osd_l_osd_recovery_scan_queue_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_recovery_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_recovery_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>PG Rebuild Duration Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `duration measurements/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_recoverystate_perf_pg_rebuild_duration_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>PG Rebuild Accumulated Duration</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_recoverystate_perf_pg_rebuild_duration_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>PG Rebuild Duration Range</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds`
+- **Dimensions:** `maximum`, `minimum`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_recoverystate_perf_pg_rebuild_max_secs`
+- `ceph_recoverystate_perf_pg_rebuild_min_secs`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Runtime (27 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `flush_lat`, `promote_lat`, `r_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_osd_tier_flush_lat_count`
+- `ceph_osd_osd_tier_promote_lat_count`
+- `ceph_osd_osd_tier_r_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `flush_lat`, `promote_lat`, `r_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_osd_tier_flush_lat_sum`
+- `ceph_osd_osd_tier_promote_lat_sum`
+- `ceph_osd_osd_tier_r_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Value Measurement Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `measurements/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_osd_map_cache_miss_low_avg_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Value Measurement</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `value/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_osd_map_cache_miss_low_avg_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_push_out_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CRC Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `cached_crc`, `cached_crc_adjusted`, `missed_crc`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_cached_crc`
+- `ceph_osd_cached_crc_adjusted`
+- `ceph_osd_missed_crc`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tier-Agent Actions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `actions/s`
+- **Dimensions:** `agent_evict`, `agent_wake`, `tier_clean`, `tier_delay`, `tier_dirty`, `tier_evict`, `tier_promote`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_osd_agent_evict`
+- `ceph_osd_agent_wake`
+- `ceph_osd_tier_clean`
+- `ceph_osd_tier_delay`
+- `ceph_osd_tier_dirty`
+- `ceph_osd_tier_evict`
+- `ceph_osd_tier_promote`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Copy-From Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `copyfrom`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_copyfrom`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD-Map Messages</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `messages/s`
+- **Dimensions:** `map_messages`, `messages_delayed_for_map`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_map_messages`
+- `ceph_osd_messages_delayed_for_map`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD-Map Epochs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `epochs/s`
+- **Dimensions:** `map_message_epochs`, `map_message_epoch_dups`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_map_message_epochs`
+- `ceph_osd_map_message_epoch_dups`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Placement-Group Updates</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `updates/s`
+- **Dimensions:** `osd_pg_biginfo`, `osd_pg_fastinfo`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_osd_pg_biginfo`
+- `ceph_osd_osd_pg_fastinfo`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Total Placement-Group Updates</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `placement group updates/s`
+- **Dimensions:** `total`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_osd_pg_info`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pushes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `pushes/s`
+- **Dimensions:** `push`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_push`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Suboperations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `suboperations/s`
+- **Dimensions:** `subop`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_subop`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failed Tier Flush Attempts</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `attempts/s`
+- **Dimensions:** `tier_flush_fail`, `tier_try_flush_fail`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_tier_flush_fail`
+- `ceph_osd_tier_try_flush_fail`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Watch Timeouts</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `watches/s`
+- **Dimensions:** `watch_timeouts`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_watch_timeouts`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD-Map Buffer-Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `osd_map_bl_cache_hit`, `osd_map_bl_cache_miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_osd_map_bl_cache_hit`
+- `ceph_osd_osd_map_bl_cache_miss`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Decoded OSD-Map Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `osd_map_cache_hit`, `osd_map_cache_miss`, `osd_map_cache_miss_low`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_osd_map_cache_hit`
+- `ceph_osd_osd_map_cache_miss`
+- `ceph_osd_osd_map_cache_miss_low`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tier Whiteouts</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `whiteouts/s`
+- **Dimensions:** `tier_whiteout`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_tier_whiteout`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Skipped Objects</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `objects/s`
+- **Dimensions:** `agent_skip`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_agent_skip`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object-Context Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `object_ctx_cache_hit`, `object_ctx_cache`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_object_ctx_cache_hit`
+- `ceph_osd_object_ctx_cache_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tier Flush Attempts</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `attempts/s`
+- **Dimensions:** `agent_flush`, `tier_flush`, `tier_try_flush`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_agent_flush`
+- `ceph_osd_tier_flush`
+- `ceph_osd_tier_try_flush`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pulls</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `pulls/s`
+- **Dimensions:** `pull`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_pull`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `PGs`
+- **Dimensions:** `numpg`, `primary`, `removing`, `replica`, `stray`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_osd_numpg`
+- `ceph_osd_numpg_primary`
+- `ceph_osd_numpg_removing`
+- `ceph_osd_numpg_replica`
+- `ceph_osd_numpg_stray`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `bytes`, `avail`, `used`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_osd_stat_bytes`
+- `ceph_osd_stat_bytes_avail`
+- `ceph_osd_stat_bytes_used`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Heartbeat Peers</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `peers`
+- **Dimensions:** `heartbeat_to_peers`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_heartbeat_to_peers`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD Load Average</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `load`
+- **Dimensions:** `loadavg`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_osd_loadavg`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrubbing Ceph 19 (8 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Elapsed Time (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Elapsed-Time Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `scrubs/s`
+- **Dimensions:** `dp_ec_failed_scrubs_elapsed`, `dp_ec_successful_scrubs_elapsed`, `dp_repl_failed_scrubs_elapsed`, `dp_repl_successful_scrubs_elapsed`, `sh_ec_failed_scrubs_elapsed`, `sh_ec_successful_scrubs_elapsed`, `sh_repl_failed_scrubs_elapsed`, `sh_repl_successful_scrubs_elapsed`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_failed_scrubs_elapsed_count`
+- `ceph_osd_scrub_dp_ec_successful_scrubs_elapsed_count`
+- `ceph_osd_scrub_dp_repl_failed_scrubs_elapsed_count`
+- `ceph_osd_scrub_dp_repl_successful_scrubs_elapsed_count`
+- `ceph_osd_scrub_sh_ec_failed_scrubs_elapsed_count`
+- `ceph_osd_scrub_sh_ec_successful_scrubs_elapsed_count`
+- `ceph_osd_scrub_sh_repl_failed_scrubs_elapsed_count`
+- `ceph_osd_scrub_sh_repl_successful_scrubs_elapsed_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Reservation Elapsed-Time Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `reservations/s`
+- **Dimensions:** `dp_ec_failed_reservations_elapsed`, `dp_ec_successful_reservations_elapsed`, `dp_repl_failed_reservations_elapsed`, `dp_repl_successful_reservations_elapsed`, `sh_ec_failed_reservations_elapsed`, `sh_ec_successful_reservations_elapsed`, `sh_repl_failed_reservations_elapsed`, `sh_repl_successful_reservations_elapsed`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_failed_reservations_elapsed_count`
+- `ceph_osd_scrub_dp_ec_successful_reservations_elapsed_count`
+- `ceph_osd_scrub_dp_repl_failed_reservations_elapsed_count`
+- `ceph_osd_scrub_dp_repl_successful_reservations_elapsed_count`
+- `ceph_osd_scrub_sh_ec_failed_reservations_elapsed_count`
+- `ceph_osd_scrub_sh_ec_successful_reservations_elapsed_count`
+- `ceph_osd_scrub_sh_repl_failed_reservations_elapsed_count`
+- `ceph_osd_scrub_sh_repl_successful_reservations_elapsed_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Scrub Elapsed Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `seconds/s`
+- **Dimensions:** `dp_ec_failed_scrubs_elapsed`, `dp_ec_successful_scrubs_elapsed`, `dp_repl_failed_scrubs_elapsed`, `dp_repl_successful_scrubs_elapsed`, `sh_ec_failed_scrubs_elapsed`, `sh_ec_successful_scrubs_elapsed`, `sh_repl_failed_scrubs_elapsed`, `sh_repl_successful_scrubs_elapsed`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_failed_scrubs_elapsed_sum`
+- `ceph_osd_scrub_dp_ec_successful_scrubs_elapsed_sum`
+- `ceph_osd_scrub_dp_repl_failed_scrubs_elapsed_sum`
+- `ceph_osd_scrub_dp_repl_successful_scrubs_elapsed_sum`
+- `ceph_osd_scrub_sh_ec_failed_scrubs_elapsed_sum`
+- `ceph_osd_scrub_sh_ec_successful_scrubs_elapsed_sum`
+- `ceph_osd_scrub_sh_repl_failed_scrubs_elapsed_sum`
+- `ceph_osd_scrub_sh_repl_successful_scrubs_elapsed_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Reservation Elapsed Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `seconds/s`
+- **Dimensions:** `dp_ec_failed_reservations_elapsed`, `dp_ec_successful_reservations_elapsed`, `dp_repl_failed_reservations_elapsed`, `dp_repl_successful_reservations_elapsed`, `sh_ec_failed_reservations_elapsed`, `sh_ec_successful_reservations_elapsed`, `sh_repl_failed_reservations_elapsed`, `sh_repl_successful_reservations_elapsed`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_failed_reservations_elapsed_sum`
+- `ceph_osd_scrub_dp_ec_successful_reservations_elapsed_sum`
+- `ceph_osd_scrub_dp_repl_failed_reservations_elapsed_sum`
+- `ceph_osd_scrub_dp_repl_successful_reservations_elapsed_sum`
+- `ceph_osd_scrub_sh_ec_failed_reservations_elapsed_sum`
+- `ceph_osd_scrub_sh_ec_successful_reservations_elapsed_sum`
+- `ceph_osd_scrub_sh_repl_failed_reservations_elapsed_sum`
+- `ceph_osd_scrub_sh_repl_successful_reservations_elapsed_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Outcomes (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `scrubs/s`
+- **Dimensions:** `dp_ec_failed_scrubs`, `dp_ec_num_scrubs_started`, `dp_ec_successful_scrubs`, `dp_repl_failed_scrubs`, `dp_repl_num_scrubs_started`, `dp_repl_successful_scrubs`, `sh_ec_failed_scrubs`, `sh_ec_num_scrubs_started`, `sh_ec_successful_scrubs`, `sh_repl_failed_scrubs`, `sh_repl_num_scrubs_started`, `sh_repl_successful_scrubs`
+<details><summary>Source metric selectors (12)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_failed_scrubs`
+- `ceph_osd_scrub_dp_ec_num_scrubs_started`
+- `ceph_osd_scrub_dp_ec_successful_scrubs`
+- `ceph_osd_scrub_dp_repl_failed_scrubs`
+- `ceph_osd_scrub_dp_repl_num_scrubs_started`
+- `ceph_osd_scrub_dp_repl_successful_scrubs`
+- `ceph_osd_scrub_sh_ec_failed_scrubs`
+- `ceph_osd_scrub_sh_ec_num_scrubs_started`
+- `ceph_osd_scrub_sh_ec_successful_scrubs`
+- `ceph_osd_scrub_sh_repl_failed_scrubs`
+- `ceph_osd_scrub_sh_repl_num_scrubs_started`
+- `ceph_osd_scrub_sh_repl_successful_scrubs`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Reservations (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Replicas in Reservation</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `replicas`
+- **Dimensions:** `dp_ec_replicas_in_reservation`, `dp_repl_replicas_in_reservation`, `sh_ec_replicas_in_reservation`, `sh_repl_replicas_in_reservation`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_replicas_in_reservation`
+- `ceph_osd_scrub_dp_repl_replicas_in_reservation`
+- `ceph_osd_scrub_sh_ec_replicas_in_reservation`
+- `ceph_osd_scrub_sh_repl_replicas_in_reservation`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scrubs Past Reservation</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `scrubs/s`
+- **Dimensions:** `dp_ec_num_scrubs_past_reservation`, `dp_repl_num_scrubs_past_reservation`, `sh_ec_num_scrubs_past_reservation`, `sh_repl_num_scrubs_past_reservation`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_num_scrubs_past_reservation`
+- `ceph_osd_scrub_dp_repl_num_scrubs_past_reservation`
+- `ceph_osd_scrub_sh_ec_num_scrubs_past_reservation`
+- `ceph_osd_scrub_sh_repl_num_scrubs_past_reservation`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Reservation Process Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `reservations/s`
+- **Dimensions:** `dp_ec_reservation_process_aborted`, `dp_ec_reservation_process_failure`, `dp_ec_reservation_process_skipped`, `dp_repl_reservation_process_aborted`, `dp_repl_reservation_process_failure`, `dp_repl_reservation_process_skipped`, `sh_ec_reservation_process_aborted`, `sh_ec_reservation_process_failure`, `sh_ec_reservation_process_skipped`, `sh_repl_reservation_process_aborted`, `sh_repl_reservation_process_failure`, `sh_repl_reservation_process_skipped`
+<details><summary>Source metric selectors (12)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_reservation_process_aborted`
+- `ceph_osd_scrub_dp_ec_reservation_process_failure`
+- `ceph_osd_scrub_dp_ec_reservation_process_skipped`
+- `ceph_osd_scrub_dp_repl_reservation_process_aborted`
+- `ceph_osd_scrub_dp_repl_reservation_process_failure`
+- `ceph_osd_scrub_dp_repl_reservation_process_skipped`
+- `ceph_osd_scrub_sh_ec_reservation_process_aborted`
+- `ceph_osd_scrub_sh_ec_reservation_process_failure`
+- `ceph_osd_scrub_sh_ec_reservation_process_skipped`
+- `ceph_osd_scrub_sh_repl_reservation_process_aborted`
+- `ceph_osd_scrub_sh_repl_reservation_process_failure`
+- `ceph_osd_scrub_sh_repl_reservation_process_skipped`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrubbing Ceph 20 (11 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Elapsed Time (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Elapsed-Time Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `scrubs/s`
+- **Dimensions:** `failed_scrubs_ec_elapsed`, `failed_scrubs_replicated_elapsed`, `successful_scrubs_ec_elapsed`, `successful_scrubs_replicated_elapsed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_failed_scrubs_ec_elapsed_count`
+- `ceph_osd_failed_scrubs_replicated_elapsed_count`
+- `ceph_osd_successful_scrubs_ec_elapsed_count`
+- `ceph_osd_successful_scrubs_replicated_elapsed_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Reservation Elapsed-Time Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `reservations/s`
+- **Dimensions:** `scrub_ec_failed_reservations_elapsed`, `scrub_ec_successful_reservations_elapsed`, `scrub_replicated_failed_reservations_elapsed`, `scrub_replicated_successful_reservations_elapsed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_ec_failed_reservations_elapsed_count`
+- `ceph_osd_scrub_ec_successful_reservations_elapsed_count`
+- `ceph_osd_scrub_replicated_failed_reservations_elapsed_count`
+- `ceph_osd_scrub_replicated_successful_reservations_elapsed_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Scrub Elapsed Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `failed_scrubs_ec_elapsed`, `failed_scrubs_replicated_elapsed`, `successful_scrubs_ec_elapsed`, `successful_scrubs_replicated_elapsed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_failed_scrubs_ec_elapsed_sum`
+- `ceph_osd_failed_scrubs_replicated_elapsed_sum`
+- `ceph_osd_successful_scrubs_ec_elapsed_sum`
+- `ceph_osd_successful_scrubs_replicated_elapsed_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Reservation Elapsed Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `scrub_ec_failed_reservations_elapsed`, `scrub_ec_successful_reservations_elapsed`, `scrub_replicated_failed_reservations_elapsed`, `scrub_replicated_successful_reservations_elapsed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_ec_failed_reservations_elapsed_sum`
+- `ceph_osd_scrub_ec_successful_reservations_elapsed_sum`
+- `ceph_osd_scrub_replicated_failed_reservations_elapsed_sum`
+- `ceph_osd_scrub_replicated_successful_reservations_elapsed_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Interference and Scheduling (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Client Write Interference</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `writes/s`
+- **Dimensions:** `ec_io_blocked`, `ec_io_intersects`, `replicated_io_blocked`, `replicated_io_intersects`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_ec_io_blocked`
+- `ceph_osd_scrub_ec_io_intersects`
+- `ceph_osd_scrub_replicated_io_blocked`
+- `ceph_osd_scrub_replicated_io_intersects`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Outcomes (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `scrubs/s`
+- **Dimensions:** `failed_scrubs_ec`, `failed_scrubs_replicated`, `num_scrubs_started_ec`, `num_scrubs_started_replicated`, `successful_scrubs_ec`, `successful_scrubs_replicated`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_osd_failed_scrubs_ec`
+- `ceph_osd_failed_scrubs_replicated`
+- `ceph_osd_num_scrubs_started_ec`
+- `ceph_osd_num_scrubs_started_replicated`
+- `ceph_osd_successful_scrubs_ec`
+- `ceph_osd_successful_scrubs_replicated`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Reservations (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Replicas in Reservation</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `replicas`
+- **Dimensions:** `ec_replicas_in_reservation`, `replicated_replicas_in_reservation`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_scrub_ec_replicas_in_reservation`
+- `ceph_osd_scrub_replicated_replicas_in_reservation`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scrubs Past Reservation</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `scrubs/s`
+- **Dimensions:** `num_scrubs_past_reservation_ec`, `num_scrubs_past_reservation_replicated`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_num_scrubs_past_reservation_ec`
+- `ceph_osd_num_scrubs_past_reservation_replicated`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Reservation Process Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `reservations/s`
+- **Dimensions:** `scrub_ec_reservation_process_aborted`, `scrub_ec_reservation_process_failure`, `scrub_ec_reservation_process_skipped`, `scrub_ec_reservations_completed`, `scrub_replicated_reservation_process_aborted`, `scrub_replicated_reservation_process_failure`, `scrub_replicated_reservation_process_skipped`, `scrub_replicated_scrub_reservations_completed`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_scrub_ec_reservation_process_aborted`
+- `ceph_osd_scrub_ec_reservation_process_failure`
+- `ceph_osd_scrub_ec_reservation_process_skipped`
+- `ceph_osd_scrub_ec_reservations_completed`
+- `ceph_osd_scrub_replicated_reservation_process_aborted`
+- `ceph_osd_scrub_replicated_reservation_process_failure`
+- `ceph_osd_scrub_replicated_reservation_process_skipped`
+- `ceph_osd_scrub_replicated_scrub_reservations_completed`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrub Work (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `ec_read_bytes`, `replicated_read_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_scrub_ec_read_bytes`
+- `ceph_osd_scrub_replicated_read_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Calls</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `calls/s`
+- **Dimensions:** `ec_getattr_cnt`, `ec_read_cnt`, `ec_stats_cnt`, `replicated_getattr_cnt`, `replicated_read_cnt`, `replicated_stats_cnt`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_osd_scrub_ec_getattr_cnt`
+- `ceph_osd_scrub_ec_read_cnt`
+- `ceph_osd_scrub_ec_stats_cnt`
+- `ceph_osd_scrub_replicated_getattr_cnt`
+- `ceph_osd_scrub_replicated_read_cnt`
+- `ceph_osd_scrub_replicated_stats_cnt`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrubbing Common Work (7 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Interference and Scheduling (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Object-Lock Waits</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `waits/s`
+- **Dimensions:** `dp_ec_locked_object`, `dp_repl_locked_object`, `sh_ec_locked_object`, `sh_repl_locked_object`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_locked_object`
+- `ceph_osd_scrub_dp_repl_locked_object`
+- `ceph_osd_scrub_sh_ec_locked_object`
+- `ceph_osd_scrub_sh_repl_locked_object`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Chunk Selection Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `chunks/s`
+- **Dimensions:** `dp_ec_chunk_busy`, `dp_ec_chunk_selected`, `dp_repl_chunk_busy`, `dp_repl_chunk_selected`, `sh_ec_chunk_busy`, `sh_ec_chunk_selected`, `sh_repl_chunk_busy`, `sh_repl_chunk_selected`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_chunk_busy`
+- `ceph_osd_scrub_dp_ec_chunk_selected`
+- `ceph_osd_scrub_dp_repl_chunk_busy`
+- `ceph_osd_scrub_dp_repl_chunk_selected`
+- `ceph_osd_scrub_sh_ec_chunk_busy`
+- `ceph_osd_scrub_sh_ec_chunk_selected`
+- `ceph_osd_scrub_sh_repl_chunk_busy`
+- `ceph_osd_scrub_sh_repl_chunk_selected`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scrub Preemptions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `preemptions/s`
+- **Dimensions:** `dp_ec_preemptions`, `dp_repl_preemptions`, `sh_ec_preemptions`, `sh_repl_preemptions`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_preemptions`
+- `ceph_osd_scrub_dp_repl_preemptions`
+- `ceph_osd_scrub_sh_ec_preemptions`
+- `ceph_osd_scrub_sh_repl_preemptions`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Client Writes Blocked by Scrub</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `writes/s`
+- **Dimensions:** `dp_ec_write_blocked_by_scrub`, `dp_repl_write_blocked_by_scrub`, `sh_ec_write_blocked_by_scrub`, `sh_repl_write_blocked_by_scrub`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_write_blocked_by_scrub`
+- `ceph_osd_scrub_dp_repl_write_blocked_by_scrub`
+- `ceph_osd_scrub_sh_ec_write_blocked_by_scrub`
+- `ceph_osd_scrub_sh_repl_write_blocked_by_scrub`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Reservations (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Completed Scrub Reservations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and level and pooltype
+- **Units:** `reservations/s`
+- **Dimensions:** `dp_ec_scrub_reservations_completed`, `dp_repl_scrub_reservations_completed`, `sh_ec_scrub_reservations_completed`, `sh_repl_scrub_reservations_completed`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_osd_scrub_dp_ec_scrub_reservations_completed`
+- `ceph_osd_scrub_dp_repl_scrub_reservations_completed`
+- `ceph_osd_scrub_sh_ec_scrub_reservations_completed`
+- `ceph_osd_scrub_sh_repl_scrub_reservations_completed`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrub Work (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `omapget_bytes`, `omapgetheader_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_scrub_omapget_bytes`
+- `ceph_osd_scrub_omapgetheader_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OMAP Scrub Calls</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `calls/s`
+- **Dimensions:** `omapget_cnt`, `omapgetheader_cnt`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_scrub_omapget_cnt`
+- `ceph_osd_scrub_omapgetheader_cnt`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Hardware (6 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Processors (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>CPU Cores</summary>
+
+
+- **Entity scope:** Ceph node CPU and processor inventory identity
+- **Units:** `cpu cores`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_hardware_cpu_cores`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Cooling (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Fan Speed</summary>
+
+
+- **Entity scope:** Ceph node fan
+- **Units:** `fan revolutions per minute`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_hardware_fan_rpm`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Health (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Hardware Health</summary>
+
+
+- **Entity scope:** Ceph node hardware component
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_hardware_health`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Memory (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Memory Module Capacity</summary>
+
+
+- **Entity scope:** Ceph node memory module and type
+- **Units:** `bytes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_hardware_memory_capacity_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Storage (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Storage Device Capacity</summary>
+
+
+- **Entity scope:** Ceph node storage device and inventory identity
+- **Units:** `bytes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_hardware_storage_capacity_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Temperature (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Sensor Temperature</summary>
+
+
+- **Entity scope:** Ceph node temperature sensor
+- **Units:** `Celsius`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_hardware_temperature_celsius`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Object Gateway (53 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph version and hostname and instance id
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Global Operations (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `operations/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_copy_obj_ops`
+- `ceph_rgw_op_del_bucket_ops`
+- `ceph_rgw_op_del_obj_ops`
+- `ceph_rgw_op_get_obj_ops`
+- `ceph_rgw_op_list_buckets_ops`
+- `ceph_rgw_op_list_obj_ops`
+- `ceph_rgw_op_put_obj_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Bytes</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `bytes/s`
+- **Dimensions:** `copy_obj`, `del_obj`, `get_obj`, `put_obj`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rgw_op_copy_obj_bytes`
+- `ceph_rgw_op_del_obj_bytes`
+- `ceph_rgw_op_get_obj_bytes`
+- `ceph_rgw_op_put_obj_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `operations/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_copy_obj_lat_count`
+- `ceph_rgw_op_del_bucket_lat_count`
+- `ceph_rgw_op_del_obj_lat_count`
+- `ceph_rgw_op_get_obj_lat_count`
+- `ceph_rgw_op_list_buckets_lat_count`
+- `ceph_rgw_op_list_obj_lat_count`
+- `ceph_rgw_op_put_obj_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `seconds/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_copy_obj_lat_sum`
+- `ceph_rgw_op_del_bucket_lat_sum`
+- `ceph_rgw_op_del_obj_lat_sum`
+- `ceph_rgw_op_get_obj_lat_sum`
+- `ceph_rgw_op_list_buckets_lat_sum`
+- `ceph_rgw_op_list_obj_lat_sum`
+- `ceph_rgw_op_put_obj_lat_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>User Operations (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph instance id and user and tenant
+- **Units:** `operations/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_per_user_copy_obj_ops`
+- `ceph_rgw_op_per_user_del_bucket_ops`
+- `ceph_rgw_op_per_user_del_obj_ops`
+- `ceph_rgw_op_per_user_get_obj_ops`
+- `ceph_rgw_op_per_user_list_buckets_ops`
+- `ceph_rgw_op_per_user_list_obj_ops`
+- `ceph_rgw_op_per_user_put_obj_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Bytes</summary>
+
+
+- **Entity scope:** Ceph instance id and user and tenant
+- **Units:** `bytes/s`
+- **Dimensions:** `copy_obj`, `del_obj`, `get_obj`, `put_obj`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rgw_op_per_user_copy_obj_bytes`
+- `ceph_rgw_op_per_user_del_obj_bytes`
+- `ceph_rgw_op_per_user_get_obj_bytes`
+- `ceph_rgw_op_per_user_put_obj_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph instance id and user and tenant
+- **Units:** `operations/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_per_user_copy_obj_lat_count`
+- `ceph_rgw_op_per_user_del_bucket_lat_count`
+- `ceph_rgw_op_per_user_del_obj_lat_count`
+- `ceph_rgw_op_per_user_get_obj_lat_count`
+- `ceph_rgw_op_per_user_list_buckets_lat_count`
+- `ceph_rgw_op_per_user_list_obj_lat_count`
+- `ceph_rgw_op_per_user_put_obj_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph instance id and user and tenant
+- **Units:** `seconds/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_per_user_copy_obj_lat_sum`
+- `ceph_rgw_op_per_user_del_bucket_lat_sum`
+- `ceph_rgw_op_per_user_del_obj_lat_sum`
+- `ceph_rgw_op_per_user_get_obj_lat_sum`
+- `ceph_rgw_op_per_user_list_buckets_lat_sum`
+- `ceph_rgw_op_per_user_list_obj_lat_sum`
+- `ceph_rgw_op_per_user_put_obj_lat_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Bucket Operations (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph instance id and bucket and tenant
+- **Units:** `operations/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_per_bucket_copy_obj_ops`
+- `ceph_rgw_op_per_bucket_del_bucket_ops`
+- `ceph_rgw_op_per_bucket_del_obj_ops`
+- `ceph_rgw_op_per_bucket_get_obj_ops`
+- `ceph_rgw_op_per_bucket_list_buckets_ops`
+- `ceph_rgw_op_per_bucket_list_obj_ops`
+- `ceph_rgw_op_per_bucket_put_obj_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Bytes</summary>
+
+
+- **Entity scope:** Ceph instance id and bucket and tenant
+- **Units:** `bytes/s`
+- **Dimensions:** `copy_obj`, `del_obj`, `get_obj`, `put_obj`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rgw_op_per_bucket_copy_obj_bytes`
+- `ceph_rgw_op_per_bucket_del_obj_bytes`
+- `ceph_rgw_op_per_bucket_get_obj_bytes`
+- `ceph_rgw_op_per_bucket_put_obj_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph instance id and bucket and tenant
+- **Units:** `operations/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_per_bucket_copy_obj_lat_count`
+- `ceph_rgw_op_per_bucket_del_bucket_lat_count`
+- `ceph_rgw_op_per_bucket_del_obj_lat_count`
+- `ceph_rgw_op_per_bucket_get_obj_lat_count`
+- `ceph_rgw_op_per_bucket_list_buckets_lat_count`
+- `ceph_rgw_op_per_bucket_list_obj_lat_count`
+- `ceph_rgw_op_per_bucket_put_obj_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph instance id and bucket and tenant
+- **Units:** `seconds/s`
+- **Dimensions:** `copy_obj`, `del_bucket`, `del_obj`, `get_obj`, `list_buckets`, `list_obj`, `put_obj`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rgw_op_per_bucket_copy_obj_lat_sum`
+- `ceph_rgw_op_per_bucket_del_bucket_lat_sum`
+- `ceph_rgw_op_per_bucket_del_obj_lat_sum`
+- `ceph_rgw_op_per_bucket_get_obj_lat_sum`
+- `ceph_rgw_op_per_bucket_list_buckets_lat_sum`
+- `ceph_rgw_op_per_bucket_list_obj_lat_sum`
+- `ceph_rgw_op_per_bucket_put_obj_lat_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Lifecycle (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Lifecycle Actions</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `actions/s`
+- **Dimensions:** `expire_current`, `expire_dm`, `expire_noncurrent`, `transition_current`, `transition_noncurrent`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_rgw_lc_expire_current`
+- `ceph_rgw_lc_expire_dm`
+- `ceph_rgw_lc_expire_noncurrent`
+- `ceph_rgw_lc_transition_current`
+- `ceph_rgw_lc_transition_noncurrent`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Aborted Multipart Uploads</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `uploads/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_lc_abort_mpu`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Lua (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Current Lua Virtual Machines</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `VMs`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_lua_current_vms`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Lua Script Executions</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `executions/s`
+- **Dimensions:** `success`, `failure`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_lua_script_ok`
+- `ceph_rgw_lua_script_fail`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Notifications (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Pending Notification Events</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `events`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_pubsub_push_pending`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Stored Events</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `events`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_pubsub_events`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `events/s`
+- **Dimensions:** `event_lost`, `event_triggered`, `push_ok`, `store_ok`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rgw_pubsub_event_lost`
+- `ceph_rgw_pubsub_event_triggered`
+- `ceph_rgw_pubsub_push_ok`
+- `ceph_rgw_pubsub_store_ok`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `events/s`
+- **Dimensions:** `push_failed`, `store_fail`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_pubsub_push_failed`
+- `ceph_rgw_pubsub_store_fail`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Missing Notification Configurations</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_pubsub_missing_conf`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Persistent Topics (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Persistent Topic Queue Length</summary>
+
+
+- **Entity scope:** Ceph instance id and topic
+- **Units:** `entries`
+- **Dimensions:** `entries`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_topic_persistent_topic_len`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Persistent Topic Queue Size</summary>
+
+
+- **Entity scope:** Ceph instance id and topic
+- **Units:** `bytes`
+- **Dimensions:** `bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_topic_persistent_topic_size`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Requests and Queue (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `operations/s`
+- **Dimensions:** `get_initial_lat`, `put_initial_lat`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_get_initial_lat_count`
+- `ceph_rgw_put_initial_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `seconds/s`
+- **Dimensions:** `get_initial_lat`, `put_initial_lat`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_get_initial_lat_sum`
+- `ceph_rgw_put_initial_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `bytes/s`
+- **Dimensions:** `get_b`, `put_b`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_get_b`
+- `ceph_rgw_put_b`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Queued and Active Requests</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `requests`
+- **Dimensions:** `qactive`, `qlen`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_qactive`
+- `ceph_rgw_qlen`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failed Requests</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `requests/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_failed_req`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Work</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `objects/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_gc_retire_object`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requests</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `requests/s`
+- **Dimensions:** `get`, `put`, `req`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rgw_get`
+- `ceph_rgw_put`
+- `ceph_rgw_req`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Cache (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Keystone Token Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `lookups/s`
+- **Dimensions:** `hit`, `miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_keystone_token_cache_hit`
+- `ceph_rgw_keystone_token_cache_miss`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>D4N Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `lookups/s`
+- **Dimensions:** `hit`, `miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_d4n_cache_hits`
+- `ceph_rgw_d4n_cache_misses`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>D4N Cache Evictions</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `evictions/s`
+- **Dimensions:** `eviction`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_d4n_cache_evictions`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `lookups/s`
+- **Dimensions:** `cache_hit`, `cache_miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rgw_cache_hit`
+- `ceph_rgw_cache_miss`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Multisite (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Replicated Objects</summary>
+
+
+- **Entity scope:** Ceph instance id and source zone
+- **Units:** `objects/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_data_sync_from_zone_fetch_bytes_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data Log Shard Delay</summary>
+
+
+- **Entity scope:** Ceph instance id, zone identities, shard id, and dynamic grammar identity
+- **Units:** `seconds`
+- **Dimensions:** `sync_delta`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rgw_sync_delta_sync_delta`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Byte Measurement</summary>
+
+
+- **Entity scope:** Ceph instance id and source zone
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_data_sync_from_zone_fetch_bytes_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph instance id and source zone
+- **Units:** `operations/s`
+- **Dimensions:** `lock_latency`, `poll_latency`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_data_sync_from_zone_lock_latency_count`
+- `ceph_data_sync_from_zone_poll_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph instance id and source zone
+- **Units:** `seconds/s`
+- **Dimensions:** `lock_latency`, `poll_latency`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_data_sync_from_zone_lock_latency_sum`
+- `ceph_data_sync_from_zone_poll_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Replication-Log Request Errors</summary>
+
+
+- **Entity scope:** Ceph instance id and source zone
+- **Units:** `requests/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_data_sync_from_zone_poll_errors`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Work</summary>
+
+
+- **Entity scope:** Ceph instance id and source zone
+- **Units:** `objects/s`
+- **Dimensions:** `errors`, `not_modified`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_data_sync_from_zone_fetch_errors`
+- `ceph_data_sync_from_zone_fetch_not_modified`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scheduling (11 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Queue Depth</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests`
+- **Dimensions:** `admin`, `auth`, `data`, `metadata`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_dmclock_admin_qlen`
+- `ceph_dmclock_auth_qlen`
+- `ceph_dmclock_data_qlen`
+- `ceph_dmclock_metadata_qlen`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Simple Throttler Outstanding Requests</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `requests`
+- **Dimensions:** `outstanding`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_simple_throttler_outstanding`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Simple Throttler Rejections</summary>
+
+
+- **Entity scope:** Ceph instance id
+- **Units:** `requests/s`
+- **Dimensions:** `throttled`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_simple_throttler_throttle`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Queued Request Cost</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `cost`
+- **Dimensions:** `admin`, `auth`, `data`, `metadata`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_dmclock_admin_cost`
+- `ceph_dmclock_auth_cost`
+- `ceph_dmclock_data_cost`
+- `ceph_dmclock_metadata_cost`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scheduled Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests/s`
+- **Dimensions:** `admin_reservation`, `admin_priority`, `auth_reservation`, `auth_priority`, `data_reservation`, `data_priority`, `metadata_reservation`, `metadata_priority`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_dmclock_admin_res`
+- `ceph_dmclock_admin_prio`
+- `ceph_dmclock_auth_res`
+- `ceph_dmclock_auth_prio`
+- `ceph_dmclock_data_res`
+- `ceph_dmclock_data_prio`
+- `ceph_dmclock_metadata_res`
+- `ceph_dmclock_metadata_prio`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Rejected and Cancelled Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests/s`
+- **Dimensions:** `admin_limited`, `admin_cancelled`, `auth_limited`, `auth_cancelled`, `data_limited`, `data_cancelled`, `metadata_limited`, `metadata_cancelled`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_dmclock_admin_limit`
+- `ceph_dmclock_admin_cancel`
+- `ceph_dmclock_auth_limit`
+- `ceph_dmclock_auth_cancel`
+- `ceph_dmclock_data_limit`
+- `ceph_dmclock_data_cancel`
+- `ceph_dmclock_metadata_limit`
+- `ceph_dmclock_metadata_cancel`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scheduled and Rejected Cost</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `cost/s`
+- **Dimensions:** `admin_reservation`, `admin_priority`, `admin_limited`, `admin_cancelled`, `auth_reservation`, `auth_priority`, `auth_limited`, `auth_cancelled`, `data_reservation`, `data_priority`, `data_limited`, `data_cancelled`, `metadata_reservation`, `metadata_priority`, `metadata_limited`, `metadata_cancelled`
+<details><summary>Source metric selectors (16)</summary>
+
+
+- `ceph_dmclock_admin_res_cost`
+- `ceph_dmclock_admin_prio_cost`
+- `ceph_dmclock_admin_limit_cost`
+- `ceph_dmclock_admin_cancel_cost`
+- `ceph_dmclock_auth_res_cost`
+- `ceph_dmclock_auth_prio_cost`
+- `ceph_dmclock_auth_limit_cost`
+- `ceph_dmclock_auth_cancel_cost`
+- `ceph_dmclock_data_res_cost`
+- `ceph_dmclock_data_prio_cost`
+- `ceph_dmclock_data_limit_cost`
+- `ceph_dmclock_data_cancel_cost`
+- `ceph_dmclock_metadata_res_cost`
+- `ceph_dmclock_metadata_prio_cost`
+- `ceph_dmclock_metadata_limit_cost`
+- `ceph_dmclock_metadata_cancel_cost`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Scheduling-Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests/s`
+- **Dimensions:** `admin_reservation`, `admin_priority`, `auth_reservation`, `auth_priority`, `data_reservation`, `data_priority`, `metadata_reservation`, `metadata_priority`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_dmclock_admin_res_latency_count`
+- `ceph_dmclock_admin_prio_latency_count`
+- `ceph_dmclock_auth_res_latency_count`
+- `ceph_dmclock_auth_prio_latency_count`
+- `ceph_dmclock_data_res_latency_count`
+- `ceph_dmclock_data_prio_latency_count`
+- `ceph_dmclock_metadata_res_latency_count`
+- `ceph_dmclock_metadata_prio_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Scheduling Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `admin_reservation`, `admin_priority`, `auth_reservation`, `auth_priority`, `data_reservation`, `data_priority`, `metadata_reservation`, `metadata_priority`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_dmclock_admin_res_latency_sum`
+- `ceph_dmclock_admin_prio_latency_sum`
+- `ceph_dmclock_auth_res_latency_sum`
+- `ceph_dmclock_auth_prio_latency_sum`
+- `ceph_dmclock_data_res_latency_sum`
+- `ceph_dmclock_data_prio_latency_sum`
+- `ceph_dmclock_metadata_res_latency_sum`
+- `ceph_dmclock_metadata_prio_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Throttled Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests/s`
+- **Dimensions:** `throttled`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_dmclock_scheduler_throttle`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Outstanding Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests`
+- **Dimensions:** `outstanding`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_dmclock_scheduler_outstanding`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Placement Groups (6 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Backfill (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `PGs`
+- **Dimensions:** `backfill_toofull`, `backfill_unfound`, `backfill_wait`, `backfilling`, `forced_backfill`, `remapped`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_pg_backfill_toofull`
+- `ceph_pg_backfill_unfound`
+- `ceph_pg_backfill_wait`
+- `ceph_pg_backfilling`
+- `ceph_pg_forced_backfill`
+- `ceph_pg_remapped`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Healthy State (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `PGs`
+- **Dimensions:** `active`, `clean`, `deep`, `pg_total`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_pg_active`
+- `ceph_pg_clean`
+- `ceph_pg_deep`
+- `ceph_pg_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Peering and Availability (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `PGs`
+- **Dimensions:** `activating`, `creating`, `down`, `incomplete`, `laggy`, `peered`, `peering`, `premerge`, `stale`, `unknown`, `wait`
+<details><summary>Source metric selectors (11)</summary>
+
+
+- `ceph_pg_activating`
+- `ceph_pg_creating`
+- `ceph_pg_down`
+- `ceph_pg_incomplete`
+- `ceph_pg_laggy`
+- `ceph_pg_peered`
+- `ceph_pg_peering`
+- `ceph_pg_premerge`
+- `ceph_pg_stale`
+- `ceph_pg_unknown`
+- `ceph_pg_wait`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Recovery Flags (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph cluster endpoint
+- **Units:** `{status}`
+- **Dimensions:** `nobackfill`, `norecover`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_osd_flag_nobackfill`
+- `ceph_osd_flag_norecover`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Recovery and Degradation (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `PGs`
+- **Dimensions:** `degraded`, `forced_recovery`, `recovering`, `recovery_toofull`, `recovery_unfound`, `recovery_wait`, `undersized`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_pg_degraded`
+- `ceph_pg_forced_recovery`
+- `ceph_pg_recovering`
+- `ceph_pg_recovery_toofull`
+- `ceph_pg_recovery_unfound`
+- `ceph_pg_recovery_wait`
+- `ceph_pg_undersized`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scrub and Repair State (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `PGs`
+- **Dimensions:** `failed_repair`, `inconsistent`, `repair`, `scrubbing`, `snaptrim`, `snaptrim_error`, `snaptrim_wait`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_pg_failed_repair`
+- `ceph_pg_inconsistent`
+- `ceph_pg_repair`
+- `ceph_pg_scrubbing`
+- `ceph_pg_snaptrim`
+- `ceph_pg_snaptrim_error`
+- `ceph_pg_snaptrim_wait`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Pools (15 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Capacity and Quotas (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Objects</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `objects`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_quota_objects`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Logical Pool Capacity</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `bytes`
+- **Dimensions:** `max_avail`, `quota_bytes`, `stored`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_pool_max_avail`
+- `ceph_pool_quota_bytes`
+- `ceph_pool_stored`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Raw Pool Capacity</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `bytes`
+- **Dimensions:** `avail_raw`, `bytes_used`, `stored_raw`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_pool_avail_raw`
+- `ceph_pool_bytes_used`
+- `ceph_pool_stored_raw`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Compression Space</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `bytes`
+- **Dimensions:** `compress_bytes_used`, `compress_under_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_pool_compress_bytes_used`
+- `ceph_pool_compress_under_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Utilization</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `percentage`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_percent_used`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Client IO (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `bytes/s`
+- **Dimensions:** `rd_bytes`, `wr_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_pool_rd_bytes`
+- `ceph_pool_wr_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `operations/s`
+- **Dimensions:** `rd`, `wr`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_pool_rd`
+- `ceph_pool_wr`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph application and compression mode and description and name and pool id and type
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Objects (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Objects</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `objects`
+- **Dimensions:** `dirty`, `objects`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_pool_dirty`
+- `ceph_pool_objects`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Recovery (6 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Current Throughput</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_recovering_bytes_per_sec`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Current Throughput</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `keys/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_recovering_keys_per_sec`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Current Throughput</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `objects/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_recovering_objects_per_sec`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Objects</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `objects`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_num_objects_recovered`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Work</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `objects/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_objects_repaired`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pool Capacity and Data Volume</summary>
+
+
+- **Entity scope:** Ceph pool id
+- **Units:** `bytes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_pool_num_bytes_recovered`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RBD Images (40 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>IO (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph image and namespace and pool
+- **Units:** `bytes/s`
+- **Dimensions:** `read_bytes`, `write_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_read_bytes`
+- `ceph_rbd_write_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph image and namespace and pool
+- **Units:** `operations/s`
+- **Dimensions:** `read_ops`, `write_ops`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_read_ops`
+- `ceph_rbd_write_ops`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Image Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph image name and pool id
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_image_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Latency (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph image and namespace and pool
+- **Units:** `operations/s`
+- **Dimensions:** `read_latency`, `write_latency`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_read_latency_count`
+- `ceph_rbd_write_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph image and namespace and pool
+- **Units:** `seconds/s`
+- **Dimensions:** `read_latency`, `write_latency`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_read_latency_sum`
+- `ceph_rbd_write_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Mirror Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and ceph version and hostname and id and instance id
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Client Images (15 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>I/O Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_image_rd`
+- `ceph_rbd_librbd_image_wr`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>I/O Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `bytes/s`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_image_rd_bytes`
+- `ceph_rbd_librbd_image_wr_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>I/O Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_image_rd_latency_count`
+- `ceph_rbd_librbd_image_wr_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated I/O Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `seconds/s`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_image_rd_latency_sum`
+- `ceph_rbd_librbd_image_wr_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Lifecycle Timestamps</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `seconds since epoch`
+- **Dimensions:** `opened`, `lock_acquired`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_image_opened_time`
+- `ceph_rbd_librbd_image_lock_acquired_time`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `discard`, `write_same`, `compare_and_write`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rbd_librbd_image_discard`
+- `ceph_rbd_librbd_image_ws`
+- `ceph_rbd_librbd_image_cmp`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data Operation Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `bytes/s`
+- **Dimensions:** `discard`, `write_same`, `compare_and_write`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rbd_librbd_image_discard_bytes`
+- `ceph_rbd_librbd_image_ws_bytes`
+- `ceph_rbd_librbd_image_cmp_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data Operation Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `discard`, `write_same`, `compare_and_write`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rbd_librbd_image_discard_latency_count`
+- `ceph_rbd_librbd_image_ws_latency_count`
+- `ceph_rbd_librbd_image_cmp_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Data Operation Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `seconds/s`
+- **Dimensions:** `discard`, `write_same`, `compare_and_write`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rbd_librbd_image_discard_latency_sum`
+- `ceph_rbd_librbd_image_ws_latency_sum`
+- `ceph_rbd_librbd_image_cmp_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Flush Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `flush`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_image_flush`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Flush Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `flush`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_image_flush_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Flush Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `seconds/s`
+- **Dimensions:** `flush`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_image_flush_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Snapshot Mutations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `create`, `remove`, `rollback`, `rename`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rbd_librbd_image_snap_create`
+- `ceph_rbd_librbd_image_snap_remove`
+- `ceph_rbd_librbd_image_snap_rollback`
+- `ceph_rbd_librbd_image_snap_rename`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Maintenance Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `operations/s`
+- **Dimensions:** `notify`, `resize`, `readahead`, `invalidate_cache`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rbd_librbd_image_notify`
+- `ceph_rbd_librbd_image_resize`
+- `ceph_rbd_librbd_image_readahead`
+- `ceph_rbd_librbd_image_invalidate_cache`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Readahead Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd image key
+- **Units:** `bytes/s`
+- **Dimensions:** `readahead`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_image_readahead_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Mirror (19 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Journal (8 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Journal Replay Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `entries/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_replay_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Image Journal Replay Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `entries/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_image_replay_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_replay_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Image Journal Replay Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_image_replay_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_replay_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Image Journal Replay Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_image_replay_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Journal Entries</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `entries/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_entries`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Journal Entries Queued for Replay</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `entries/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_journal_image_entries`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Snapshot Replication (11 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Snapshot Sync Latency Measurements — Image Sync Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `snapshots/s`
+- **Dimensions:** `image_sync_time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_sync_time_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Snapshot Sync Latency Measurements — Sync Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `snapshots/s`
+- **Dimensions:** `sync_time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_sync_time_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency — Image Sync Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `seconds/s`
+- **Dimensions:** `image_sync_time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_sync_time_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency — Sync Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `sync_time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_sync_time_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput — Image Sync Bytes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `bytes/s`
+- **Dimensions:** `image_sync_bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_sync_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput — Sync Bytes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `sync_bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_sync_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Last Snapshot Sync Duration</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `seconds`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_last_sync_time`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Last Snapshot Sync Size</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `bytes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_last_sync_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Snapshot Work — Image Snapshots</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `snapshots/s`
+- **Dimensions:** `image_snapshots`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_snapshots`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Snapshot Work — Snapshots</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `snapshots/s`
+- **Dimensions:** `snapshots`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_snapshots`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Timestamps</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and image and namespace and pool
+- **Units:** `seconds since epoch`
+- **Dimensions:** `local_timestamp`, `remote_timestamp`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_mirror_snapshot_image_local_timestamp`
+- `ceph_rbd_mirror_snapshot_image_remote_timestamp`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>BlueFS (18 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Allocation (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `db_alloc_lat`, `slow_alloc_lat`, `wal_alloc_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluefs_db_alloc_lat_count`
+- `ceph_bluefs_slow_alloc_lat_count`
+- `ceph_bluefs_wal_alloc_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `db_alloc_lat`, `slow_alloc_lat`, `wal_alloc_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluefs_db_alloc_lat_sum`
+- `ceph_bluefs_slow_alloc_lat_sum`
+- `ceph_bluefs_wal_alloc_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Allocation Sizes and High-Water Marks</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `db`, `slow`, `wal`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluefs_alloc_unit_db`
+- `ceph_bluefs_alloc_unit_slow`
+- `ceph_bluefs_alloc_unit_wal`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Duration and Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds`
+- **Dimensions:** `db_max_lat`, `slow_max_lat`, `wal_max_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluefs_alloc_db_max_lat`
+- `ceph_bluefs_alloc_slow_max_lat`
+- `ceph_bluefs_alloc_wal_max_lat`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `fallback`, `size_fallback`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluefs_alloc_slow_fallback`
+- `ceph_bluefs_alloc_slow_size_fallback`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Compaction (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `lat`, `lock_lat`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluefs_compact_lat_count`
+- `ceph_bluefs_compact_lock_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `lat`, `lock_lat`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluefs_compact_lat_sum`
+- `ceph_bluefs_compact_lock_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluefs_log_compactions`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>IO and Files (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `flush_lat`, `fsync_lat`, `read_lat`, `read_random_lat`, `truncate_lat`, `unlink_lat`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_bluefs_flush_lat_count`
+- `ceph_bluefs_fsync_lat_count`
+- `ceph_bluefs_read_lat_count`
+- `ceph_bluefs_read_random_lat_count`
+- `ceph_bluefs_truncate_lat_count`
+- `ceph_bluefs_unlink_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `flush_lat`, `fsync_lat`, `read_lat`, `read_random_lat`, `truncate_lat`, `unlink_lat`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_bluefs_flush_lat_sum`
+- `ceph_bluefs_fsync_lat_sum`
+- `ceph_bluefs_read_lat_sum`
+- `ceph_bluefs_read_random_lat_sum`
+- `ceph_bluefs_truncate_lat_sum`
+- `ceph_bluefs_unlink_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `read_bytes`, `read_disk_bytes`, `read_disk_bytes_db`, `read_disk_bytes_slow`, `read_disk_bytes_wal`, `read_prefetch_bytes`, `read_random_buffer_bytes`, `read_random_bytes`, `read_random_disk_bytes`, `read_random_disk_bytes_db`, `read_random_disk_bytes_slow`, `read_random_disk_bytes_wal`, `write_bytes`
+<details><summary>Source metric selectors (13)</summary>
+
+
+- `ceph_bluefs_read_bytes`
+- `ceph_bluefs_read_disk_bytes`
+- `ceph_bluefs_read_disk_bytes_db`
+- `ceph_bluefs_read_disk_bytes_slow`
+- `ceph_bluefs_read_disk_bytes_wal`
+- `ceph_bluefs_read_prefetch_bytes`
+- `ceph_bluefs_read_random_buffer_bytes`
+- `ceph_bluefs_read_random_bytes`
+- `ceph_bluefs_read_random_disk_bytes`
+- `ceph_bluefs_read_random_disk_bytes_db`
+- `ceph_bluefs_read_random_disk_bytes_slow`
+- `ceph_bluefs_read_random_disk_bytes_wal`
+- `ceph_bluefs_write_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `log_write`, `read`, `read_disk`, `read_prefetch`, `read_random_buffer`, `read_random`, `read_random_disk`, `write`, `write_count_sst`, `write_count_wal`, `write_disk`
+<details><summary>Source metric selectors (11)</summary>
+
+
+- `ceph_bluefs_log_write_count`
+- `ceph_bluefs_read_count`
+- `ceph_bluefs_read_disk_count`
+- `ceph_bluefs_read_prefetch_count`
+- `ceph_bluefs_read_random_buffer_count`
+- `ceph_bluefs_read_random_count`
+- `ceph_bluefs_read_random_disk_count`
+- `ceph_bluefs_write_count`
+- `ceph_bluefs_write_count_sst`
+- `ceph_bluefs_write_count_wal`
+- `ceph_bluefs_write_disk_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Zero-Read Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `reads/s`
+- **Dimensions:** `candidate`, `errors`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluefs_read_zeros_candidate`
+- `ceph_bluefs_read_zeros_errors`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Space and Files (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Allocation Sizes and High-Water Marks</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `db`, `slow`, `wal`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluefs_max_bytes_db`
+- `ceph_bluefs_max_bytes_slow`
+- `ceph_bluefs_max_bytes_wal`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `bytes_written_slow`, `bytes_written_sst`, `bytes_written_wal`, `logged_bytes`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_bluefs_bytes_written_slow`
+- `ceph_bluefs_bytes_written_sst`
+- `ceph_bluefs_bytes_written_wal`
+- `ceph_bluefs_logged_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Files</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `files`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluefs_num_files`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>File Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `files/s`
+- **Dimensions:** `sst`, `wal`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluefs_files_written_sst`
+- `ceph_bluefs_files_written_wal`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `db_total_bytes`, `db_used_bytes`, `log_bytes`, `slow_total_bytes`, `slow_used_bytes`, `wal_total_bytes`, `wal_used_bytes`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_bluefs_db_total_bytes`
+- `ceph_bluefs_db_used_bytes`
+- `ceph_bluefs_log_bytes`
+- `ceph_bluefs_slow_total_bytes`
+- `ceph_bluefs_slow_used_bytes`
+- `ceph_bluefs_wal_total_bytes`
+- `ceph_bluefs_wal_used_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>BlueStore (51 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Allocation (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_allocator_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_allocator_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Allocation Unit</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `alloc_unit`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_alloc_unit`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Allocated Space</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `allocated`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_allocated`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Compression and Checksums (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `compress_lat`, `csum_lat`, `decompress_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluestore_compress_lat_count`
+- `ceph_bluestore_csum_lat_count`
+- `ceph_bluestore_decompress_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `compress_lat`, `csum_lat`, `decompress_lat`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluestore_compress_lat_sum`
+- `ceph_bluestore_csum_lat_sum`
+- `ceph_bluestore_decompress_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Compression Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `compress_rejected`, `compress_success`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_compress_rejected_count`
+- `ceph_bluestore_compress_success_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Compressed Extents</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `extents/s`
+- **Dimensions:** `extent_compress`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_extent_compress`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `compressed`, `allocated`, `original`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_bluestore_compressed`
+- `ceph_bluestore_compressed_allocated`
+- `ceph_bluestore_compressed_original`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>IO (11 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `read_lat`, `read_onode_meta_lat`, `read_wait_aio_lat`, `remove_lat`, `truncate_lat`, `write_lat`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_bluestore_read_lat_count`
+- `ceph_bluestore_read_onode_meta_lat_count`
+- `ceph_bluestore_read_wait_aio_lat_count`
+- `ceph_bluestore_remove_lat_count`
+- `ceph_bluestore_truncate_lat_count`
+- `ceph_bluestore_write_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `read_lat`, `read_onode_meta_lat`, `read_wait_aio_lat`, `remove_lat`, `truncate_lat`, `write_lat`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_bluestore_read_lat_sum`
+- `ceph_bluestore_read_onode_meta_lat_sum`
+- `ceph_bluestore_read_wait_aio_lat_sum`
+- `ceph_bluestore_remove_lat_sum`
+- `ceph_bluestore_truncate_lat_sum`
+- `ceph_bluestore_write_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `issued_deferred_write_bytes`, `submitted_deferred_write_bytes`, `write_big_bytes`, `write_big_skipped_bytes`, `write_pad_bytes`, `write_small_bytes`, `write_small_skipped_bytes`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_bluestore_issued_deferred_write_bytes`
+- `ceph_bluestore_submitted_deferred_write_bytes`
+- `ceph_bluestore_write_big_bytes`
+- `ceph_bluestore_write_big_skipped_bytes`
+- `ceph_bluestore_write_pad_bytes`
+- `ceph_bluestore_write_small_bytes`
+- `ceph_bluestore_write_small_skipped_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Read Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `reads/s`
+- **Dimensions:** `read_eio`, `reads_with_retries`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_read_eio`
+- `ceph_bluestore_reads_with_retries`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Slow Reads</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `reads/s`
+- **Dimensions:** `slow_read_onode_meta`, `slow_read_wait_aio`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_slow_read_onode_meta_count`
+- `ceph_bluestore_slow_read_wait_aio_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Slow AIO Waits</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `waits/s`
+- **Dimensions:** `slow_aio_wait`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_slow_aio_wait_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Skipped Blobs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `blobs/s`
+- **Dimensions:** `write_big_skipped_blobs`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_write_big_skipped_blobs`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Skipped Writes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `writes/s`
+- **Dimensions:** `write_small_skipped`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_write_small_skipped`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Write Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `writes/s`
+- **Dimensions:** `issued_deferred_writes`, `submitted_deferred_writes`, `write_big`, `write_big_deferred`, `write_new`, `write_small`, `write_small_pre_read`, `write_small_unused`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_bluestore_issued_deferred_writes`
+- `ceph_bluestore_submitted_deferred_writes`
+- `ceph_bluestore_write_big`
+- `ceph_bluestore_write_big_deferred`
+- `ceph_bluestore_write_new`
+- `ceph_bluestore_write_small`
+- `ceph_bluestore_write_small_pre_read`
+- `ceph_bluestore_write_small_unused`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Written Blobs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `blobs/s`
+- **Dimensions:** `write_big_blobs`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_write_big_blobs`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Penalty Reads</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `reads/s`
+- **Dimensions:** `write_penalty_read_ops`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_write_penalty_read_ops`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>OMAP (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `clear_lat`, `get_keys_lat`, `get_values_lat`, `lower_bound_lat`, `next_lat`, `seek_to_first_lat`, `upper_bound_lat`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_bluestore_omap_clear_lat_count`
+- `ceph_bluestore_omap_get_keys_lat_count`
+- `ceph_bluestore_omap_get_values_lat_count`
+- `ceph_bluestore_omap_lower_bound_lat_count`
+- `ceph_bluestore_omap_next_lat_count`
+- `ceph_bluestore_omap_seek_to_first_lat_count`
+- `ceph_bluestore_omap_upper_bound_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `clear_lat`, `get_keys_lat`, `get_values_lat`, `lower_bound_lat`, `next_lat`, `seek_to_first_lat`, `upper_bound_lat`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_bluestore_omap_clear_lat_sum`
+- `ceph_bluestore_omap_get_keys_lat_sum`
+- `ceph_bluestore_omap_get_values_lat_sum`
+- `ceph_bluestore_omap_lower_bound_lat_sum`
+- `ceph_bluestore_omap_next_lat_sum`
+- `ceph_bluestore_omap_seek_to_first_lat_sum`
+- `ceph_bluestore_omap_upper_bound_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `setheader_bytes`, `setkeys_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_omap_setheader_bytes`
+- `ceph_bluestore_omap_setkeys_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Open Iterators</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `iterators`
+- **Dimensions:** `iterator`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_omap_iterator_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mutation Calls</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `calls/s`
+- **Dimensions:** `setheader`, `setkeys`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_omap_setheader_count`
+- `ceph_bluestore_omap_setkeys_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Removed Key Ranges</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `ranges/s`
+- **Dimensions:** `rmkey_range`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_omap_rmkey_range_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Key Mutations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `keys/s`
+- **Dimensions:** `rmkeys`, `setkeys_records`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_omap_rmkeys_count`
+- `ceph_bluestore_omap_setkeys_records`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Onode Cache (6 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Onode Blobs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `blobs`
+- **Dimensions:** `onode_blobs`, `onode_spanning_blobs`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_onode_blobs`
+- `ceph_bluestore_onode_spanning_blobs`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Onode Extents</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `extents`
+- **Dimensions:** `onode_extents`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_onode_extents`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Onodes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `onodes`
+- **Dimensions:** `onodes`, `onodes_pinned`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_onodes`
+- `ceph_bluestore_onodes_pinned`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_onode_reshard`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Onode Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `hits`, `misses`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_onode_hits`
+- `ceph_bluestore_onode_misses`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Onode Shard Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `shard_hits`, `shard_misses`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_onode_shard_hits`
+- `ceph_bluestore_onode_shard_misses`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache Data (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_bluestore_pricache:data_committed_bytes`
+- `ceph_bluestore_pricache:data_pri0_bytes`
+- `ceph_bluestore_pricache:data_pri10_bytes`
+- `ceph_bluestore_pricache:data_pri11_bytes`
+- `ceph_bluestore_pricache:data_pri1_bytes`
+- `ceph_bluestore_pricache:data_pri2_bytes`
+- `ceph_bluestore_pricache:data_pri3_bytes`
+- `ceph_bluestore_pricache:data_pri4_bytes`
+- `ceph_bluestore_pricache:data_pri5_bytes`
+- `ceph_bluestore_pricache:data_pri6_bytes`
+- `ceph_bluestore_pricache:data_pri7_bytes`
+- `ceph_bluestore_pricache:data_pri8_bytes`
+- `ceph_bluestore_pricache:data_pri9_bytes`
+- `ceph_bluestore_pricache:data_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache KV (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_bluestore_pricache:kv_committed_bytes`
+- `ceph_bluestore_pricache:kv_pri0_bytes`
+- `ceph_bluestore_pricache:kv_pri10_bytes`
+- `ceph_bluestore_pricache:kv_pri11_bytes`
+- `ceph_bluestore_pricache:kv_pri1_bytes`
+- `ceph_bluestore_pricache:kv_pri2_bytes`
+- `ceph_bluestore_pricache:kv_pri3_bytes`
+- `ceph_bluestore_pricache:kv_pri4_bytes`
+- `ceph_bluestore_pricache:kv_pri5_bytes`
+- `ceph_bluestore_pricache:kv_pri6_bytes`
+- `ceph_bluestore_pricache:kv_pri7_bytes`
+- `ceph_bluestore_pricache:kv_pri8_bytes`
+- `ceph_bluestore_pricache:kv_pri9_bytes`
+- `ceph_bluestore_pricache:kv_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache KV Onode (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_bluestore_pricache:kv_onode_committed_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri0_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri10_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri11_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri1_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri2_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri3_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri4_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri5_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri6_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri7_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri8_bytes`
+- `ceph_bluestore_pricache:kv_onode_pri9_bytes`
+- `ceph_bluestore_pricache:kv_onode_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache Metadata (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_bluestore_pricache:meta_committed_bytes`
+- `ceph_bluestore_pricache:meta_pri0_bytes`
+- `ceph_bluestore_pricache:meta_pri10_bytes`
+- `ceph_bluestore_pricache:meta_pri11_bytes`
+- `ceph_bluestore_pricache:meta_pri1_bytes`
+- `ceph_bluestore_pricache:meta_pri2_bytes`
+- `ceph_bluestore_pricache:meta_pri3_bytes`
+- `ceph_bluestore_pricache:meta_pri4_bytes`
+- `ceph_bluestore_pricache:meta_pri5_bytes`
+- `ceph_bluestore_pricache:meta_pri6_bytes`
+- `ceph_bluestore_pricache:meta_pri7_bytes`
+- `ceph_bluestore_pricache:meta_pri8_bytes`
+- `ceph_bluestore_pricache:meta_pri9_bytes`
+- `ceph_bluestore_pricache:meta_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache Runtime (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `cache_bytes`, `heap_bytes`, `mapped_bytes`, `target_bytes`, `unmapped_bytes`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_bluestore_pricache_cache_bytes`
+- `ceph_bluestore_pricache_heap_bytes`
+- `ceph_bluestore_pricache_mapped_bytes`
+- `ceph_bluestore_pricache_target_bytes`
+- `ceph_bluestore_pricache_unmapped_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Space and Core State (10 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `clist_lat`, `kv_commit_lat`, `kv_final_lat`, `kv_flush_lat`, `kv_sync_lat`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_bluestore_clist_lat_count`
+- `ceph_bluestore_kv_commit_lat_count`
+- `ceph_bluestore_kv_final_lat_count`
+- `ceph_bluestore_kv_flush_lat_count`
+- `ceph_bluestore_kv_sync_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `clist_lat`, `kv_commit_lat`, `kv_final_lat`, `kv_flush_lat`, `kv_sync_lat`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_bluestore_clist_lat_sum`
+- `ceph_bluestore_kv_commit_lat_sum`
+- `ceph_bluestore_kv_final_lat_sum`
+- `ceph_bluestore_kv_flush_lat_sum`
+- `ceph_bluestore_kv_sync_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `hit_bytes`, `miss_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_bluestore_buffer_hit_bytes`
+- `ceph_bluestore_buffer_miss_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Current Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `items`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_buffers`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Blob Splits</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `blobs/s`
+- **Dimensions:** `blob_split`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_blob_split`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Garbage-Collection Merge Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `gc_merged`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_gc_merged`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Failure and Delay Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_slow_committed_kv_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Fragmentation</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `per mille`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_fragmentation_micros`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Buffer Cache Residency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `buffer_bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_buffer_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Logical Stored Data</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `stored`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_stored`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Transaction Pipeline (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `state_aio_wait_lat`, `state_deferred_aio_wait_lat`, `state_deferred_cleanup_lat`, `state_deferred_queued_lat`, `state_done_lat`, `state_finishing_lat`, `state_io_done_lat`, `state_kv_commiting_lat`, `state_kv_done_lat`, `state_kv_queued_lat`, `state_prepare_lat`, `txc_commit_lat`, `txc_submit_lat`, `txc_throttle_lat`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_bluestore_state_aio_wait_lat_count`
+- `ceph_bluestore_state_deferred_aio_wait_lat_count`
+- `ceph_bluestore_state_deferred_cleanup_lat_count`
+- `ceph_bluestore_state_deferred_queued_lat_count`
+- `ceph_bluestore_state_done_lat_count`
+- `ceph_bluestore_state_finishing_lat_count`
+- `ceph_bluestore_state_io_done_lat_count`
+- `ceph_bluestore_state_kv_commiting_lat_count`
+- `ceph_bluestore_state_kv_done_lat_count`
+- `ceph_bluestore_state_kv_queued_lat_count`
+- `ceph_bluestore_state_prepare_lat_count`
+- `ceph_bluestore_txc_commit_lat_count`
+- `ceph_bluestore_txc_submit_lat_count`
+- `ceph_bluestore_txc_throttle_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `state_aio_wait_lat`, `state_deferred_aio_wait_lat`, `state_deferred_cleanup_lat`, `state_deferred_queued_lat`, `state_done_lat`, `state_finishing_lat`, `state_io_done_lat`, `state_kv_commiting_lat`, `state_kv_done_lat`, `state_kv_queued_lat`, `state_prepare_lat`, `txc_commit_lat`, `txc_submit_lat`, `txc_throttle_lat`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_bluestore_state_aio_wait_lat_sum`
+- `ceph_bluestore_state_deferred_aio_wait_lat_sum`
+- `ceph_bluestore_state_deferred_cleanup_lat_sum`
+- `ceph_bluestore_state_deferred_queued_lat_sum`
+- `ceph_bluestore_state_done_lat_sum`
+- `ceph_bluestore_state_finishing_lat_sum`
+- `ceph_bluestore_state_io_done_lat_sum`
+- `ceph_bluestore_state_kv_commiting_lat_sum`
+- `ceph_bluestore_state_kv_done_lat_sum`
+- `ceph_bluestore_state_kv_queued_lat_sum`
+- `ceph_bluestore_state_prepare_lat_sum`
+- `ceph_bluestore_txc_commit_lat_sum`
+- `ceph_bluestore_txc_submit_lat_sum`
+- `ceph_bluestore_txc_throttle_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_bluestore_txc_count`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Exporter and Process (7 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Collection (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Collection Duration</summary>
+
+
+- **Entity scope:** Ceph function and host
+- **Units:** `seconds`
+- **Dimensions:** `duration`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_exporter_scrape_time`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Daemon Availability (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Daemon Socket State</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and hostname
+- **Units:** `{status}`
+- **Dimensions:** `reachable`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_daemon_socket_up`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Daemon Processes (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Page Faults</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `faults/s`
+- **Dimensions:** `minor`, `major`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_exporter_minflt_total`
+- `ceph_exporter_majflt_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Threads</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `threads`
+- **Dimensions:** `threads`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_exporter_num_threads`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CPU Utilization</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `percentage`
+- **Dimensions:** `utilization`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_exporter_cpu_usage`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CPU Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `values of label mode`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_exporter_cpu_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `virtual`, `resident`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_exporter_vm_size`
+- `ceph_exporter_resident_size`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Managers (1 chart)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Daemons (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `lookups/s`
+- **Dimensions:** `hit`, `miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_mgr_cache_hit`
+- `ceph_mgr_cache_miss`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Messenger (10 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>RDMA Errors</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `errors/s`
+- **Dimensions:** `rdmadispatcher_handshake_errors`, `rdmadispatcher_rx_total_wc_errors`, `rdmadispatcher_tx_retry_errors`, `rdmadispatcher_tx_total_wc_errors`, `rdmadispatcher_tx_wr_flush_errors`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_handshake_errors`
+- `ceph_AsyncMessenger_RDMADispatcher_rx_total_wc_errors`
+- `ceph_AsyncMessenger_RDMADispatcher_tx_retry_errors`
+- `ceph_AsyncMessenger_RDMADispatcher_tx_total_wc_errors`
+- `ceph_AsyncMessenger_RDMADispatcher_tx_wr_flush_errors`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Connection Timeouts</summary>
+
+
+- **Entity scope:** Ceph labeled worker ID with exactly one daemon-owner identity
+- **Units:** `connections/s`
+- **Dimensions:** `worker_msgr_connection_idle_timeouts`, `worker_msgr_connection_ready_timeouts`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_AsyncMessenger_Worker_msgr_connection_idle_timeouts`
+- `ceph_AsyncMessenger_Worker_msgr_connection_ready_timeouts`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Active Queue Pairs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `queue pairs`
+- **Dimensions:** `active_queue_pair`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_active_queue_pair`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Created Queue Pairs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `queue pairs/s`
+- **Dimensions:** `created_queue_pair`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_created_queue_pair`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>In-Flight Transmit Chunks</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `chunks`
+- **Dimensions:** `inflight_tx_chunks`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_inflight_tx_chunks`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Polling State</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `{status}`
+- **Dimensions:** `polling`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_polling`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Receive Buffers</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `buffers`
+- **Dimensions:** `rx_bufs_in_use`, `rx_bufs`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_rx_bufs_in_use`
+- `ceph_AsyncMessenger_RDMADispatcher_rx_bufs_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Asynchronous Events</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `events/s`
+- **Dimensions:** `async_last_wqe_events`, `total_async_events`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_async_last_wqe_events`
+- `ceph_AsyncMessenger_RDMADispatcher_total_async_events`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Work Completions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `completions/s`
+- **Dimensions:** `rx_total_wc`, `tx_total_wc`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_rx_total_wc`
+- `ceph_AsyncMessenger_RDMADispatcher_tx_total_wc`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Received FIN Messages</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `messages/s`
+- **Dimensions:** `rx_fin`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_AsyncMessenger_RDMADispatcher_rx_fin`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Monitors (3 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Daemons (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Elections</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `elections/s`
+- **Dimensions:** `election_call`, `election_lose`, `election_win`, `num_elections`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_mon_election_call`
+- `ceph_mon_election_lose`
+- `ceph_mon_election_win`
+- `ceph_mon_num_elections`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Sessions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `sessions`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_mon_num_sessions`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Session Churn</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `sessions/s`
+- **Dimensions:** `add`, `rm`, `trim`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_mon_session_add`
+- `ceph_mon_session_rm`
+- `ceph_mon_session_trim`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Runtime and Clients (85 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Objecter (21 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_op_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `seconds/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_op_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Submitted Top-Level Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_oplen_avg_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operation-Vector Entries</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `entries/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_oplen_avg_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `bytes/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_op_send_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Active Commands</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `commands`
+- **Dimensions:** `command_active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_command_active`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Active Lingering Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations`
+- **Dimensions:** `linger_active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_linger_active`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD-Map Epoch</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `epoch`
+- **Dimensions:** `map_epoch`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_map_epoch`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Objecter Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations`
+- **Dimensions:** `op_active`, `op_inflight`, `op_laggy`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_objecter_op_active`
+- `ceph_objecter_op_inflight`
+- `ceph_objecter_op_laggy`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Active Pool Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations`
+- **Dimensions:** `poolop_active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_poolop_active`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Active Pool-Stat Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `requests`
+- **Dimensions:** `poolstat_active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_poolstat_active`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Active StatFS Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `requests`
+- **Dimensions:** `statfs_active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objecter_statfs_active`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Commands</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `commands/s`
+- **Dimensions:** `command_resend`, `command_send`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objecter_command_resend`
+- `ceph_objecter_command_send`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Lingering Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations/s`
+- **Dimensions:** `linger_ping`, `linger_resend`, `linger_send`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_objecter_linger_ping`
+- `ceph_objecter_linger_resend`
+- `ceph_objecter_linger_send`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD Maps</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `maps/s`
+- **Dimensions:** `map_full`, `map_inc`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objecter_map_full`
+- `ceph_objecter_map_inc`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Object Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations/s`
+- **Dimensions:** `omap_del`, `omap_rd`, `omap_wr`, `op`, `op_pg`, `op_r`, `op_reply`, `op_resend`, `op_rmw`, `op_send`, `op_w`, `osdop_append`, `osdop_call`, `osdop_clonerange`, `osdop_cmpxattr`, `osdop_create`, `osdop_delete`, `osdop_getxattr`, `osdop_mapext`, `osdop_notify`, `osdop_other`, `osdop_pgls`, `osdop_pgls_filter`, `osdop_read`, `osdop_resetxattrs`, `osdop_rmxattr`, `osdop_setxattr`, `osdop_sparse_read`, `osdop_src_cmpxattr`, `osdop_stat`, `osdop_truncate`, `osdop_watch`, `osdop_write`, `osdop_writefull`, `osdop_writesame`, `osdop_zero`
+<details><summary>Source metric selectors (36)</summary>
+
+
+- `ceph_objecter_omap_del`
+- `ceph_objecter_omap_rd`
+- `ceph_objecter_omap_wr`
+- `ceph_objecter_op`
+- `ceph_objecter_op_pg`
+- `ceph_objecter_op_r`
+- `ceph_objecter_op_reply`
+- `ceph_objecter_op_resend`
+- `ceph_objecter_op_rmw`
+- `ceph_objecter_op_send`
+- `ceph_objecter_op_w`
+- `ceph_objecter_osdop_append`
+- `ceph_objecter_osdop_call`
+- `ceph_objecter_osdop_clonerange`
+- `ceph_objecter_osdop_cmpxattr`
+- `ceph_objecter_osdop_create`
+- `ceph_objecter_osdop_delete`
+- `ceph_objecter_osdop_getxattr`
+- `ceph_objecter_osdop_mapext`
+- `ceph_objecter_osdop_notify`
+- `ceph_objecter_osdop_other`
+- `ceph_objecter_osdop_pgls`
+- `ceph_objecter_osdop_pgls_filter`
+- `ceph_objecter_osdop_read`
+- `ceph_objecter_osdop_resetxattrs`
+- `ceph_objecter_osdop_rmxattr`
+- `ceph_objecter_osdop_setxattr`
+- `ceph_objecter_osdop_sparse_read`
+- `ceph_objecter_osdop_src_cmpxattr`
+- `ceph_objecter_osdop_stat`
+- `ceph_objecter_osdop_truncate`
+- `ceph_objecter_osdop_watch`
+- `ceph_objecter_osdop_write`
+- `ceph_objecter_osdop_writefull`
+- `ceph_objecter_osdop_writesame`
+- `ceph_objecter_osdop_zero`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Replica Reads</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `reads/s`
+- **Dimensions:** `replica_read_sent`, `replica_read_bounced`, `replica_read_completed`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_objecter_replica_read_sent`
+- `ceph_objecter_replica_read_bounced`
+- `ceph_objecter_replica_read_completed`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD Sessions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `sessions/s`
+- **Dimensions:** `osd_session_close`, `osd_session_open`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objecter_osd_session_close`
+- `ceph_objecter_osd_session_open`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pool Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `operations/s`
+- **Dimensions:** `poolop_resend`, `poolop_send`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objecter_poolop_resend`
+- `ceph_objecter_poolop_send`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pool-Stat and StatFS Requests</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `requests/s`
+- **Dimensions:** `poolstat_resend`, `poolstat_send`, `statfs_resend`, `statfs_send`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_objecter_poolstat_resend`
+- `ceph_objecter_poolstat_send`
+- `ceph_objecter_statfs_resend`
+- `ceph_objecter_statfs_send`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Sessions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and instance id
+- **Units:** `sessions`
+- **Dimensions:** `laggy`, `sessions`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objecter_osd_laggy`
+- `ceph_objecter_osd_sessions`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RBD Persistent Write Log (19 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Reads</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `reads/s`
+- **Dimensions:** `rd`, `hit_rd`, `part_hit_rd`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rbd_librbd_pwl_rd`
+- `ceph_rbd_librbd_pwl_hit_rd`
+- `ceph_rbd_librbd_pwl_part_hit_rd`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Writes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `writes/s`
+- **Dimensions:** `wr`, `wr_def`, `wr_def_lanes`, `wr_def_log`, `wr_def_buf`, `wr_overlap`, `wr_q_barrier`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_rbd_librbd_pwl_wr`
+- `ceph_rbd_librbd_pwl_wr_def`
+- `ceph_rbd_librbd_pwl_wr_def_lanes`
+- `ceph_rbd_librbd_pwl_wr_def_log`
+- `ceph_rbd_librbd_pwl_wr_def_buf`
+- `ceph_rbd_librbd_pwl_wr_overlap`
+- `ceph_rbd_librbd_pwl_wr_q_barrier`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Log Appends</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `appends/s`
+- **Dimensions:** `log_ops`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_pwl_log_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Cache and Image Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `operations/s`
+- **Dimensions:** `discard`, `aio_flush`, `aio_flush_def`, `ws`, `cmp`, `cmp_fails`, `internal_flush`, `invalidate`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_rbd_librbd_pwl_discard`
+- `ceph_rbd_librbd_pwl_aio_flush`
+- `ceph_rbd_librbd_pwl_aio_flush_def`
+- `ceph_rbd_librbd_pwl_ws`
+- `ceph_rbd_librbd_pwl_cmp`
+- `ceph_rbd_librbd_pwl_cmp_fails`
+- `ceph_rbd_librbd_pwl_internal_flush`
+- `ceph_rbd_librbd_pwl_invalidate`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Read Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `bytes/s`
+- **Dimensions:** `rd_bytes`, `rd_hit_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_pwl_rd_bytes`
+- `ceph_rbd_librbd_pwl_rd_hit_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Write Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `bytes/s`
+- **Dimensions:** `wr_bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_pwl_wr_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data-Operation Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `bytes/s`
+- **Dimensions:** `discard_bytes`, `ws_bytes`, `cmp_bytes`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rbd_librbd_pwl_discard_bytes`
+- `ceph_rbd_librbd_pwl_ws_bytes`
+- `ceph_rbd_librbd_pwl_cmp_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Log-Append Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `bytes/s`
+- **Dimensions:** `log_op_bytes_sum`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_pwl_log_op_bytes_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Read Request Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `requests/s`
+- **Dimensions:** `rd_latency_count`, `hit_rd_latency_count`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_pwl_rd_latency_count`
+- `ceph_rbd_librbd_pwl_hit_rd_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Log-Append Size Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `appends/s`
+- **Dimensions:** `log_op_bytes_count`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rbd_librbd_pwl_log_op_bytes_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Write Request Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `requests/s`
+- **Dimensions:** `req_arr_to_all_t_count`, `req_arr_to_dis_t_count`, `req_all_to_dis_t_count`, `wr_latency_count`, `caller_wr_latency_count`, `req_arr_to_all_nw_t_count`, `req_arr_to_dis_nw_t_count`, `req_all_to_dis_nw_t_count`, `wr_latency_nw_count`, `caller_wr_latency_nw_count`
+<details><summary>Source metric selectors (10)</summary>
+
+
+- `ceph_rbd_librbd_pwl_req_arr_to_all_t_count`
+- `ceph_rbd_librbd_pwl_req_arr_to_dis_t_count`
+- `ceph_rbd_librbd_pwl_req_all_to_dis_t_count`
+- `ceph_rbd_librbd_pwl_wr_latency_count`
+- `ceph_rbd_librbd_pwl_caller_wr_latency_count`
+- `ceph_rbd_librbd_pwl_req_arr_to_all_nw_t_count`
+- `ceph_rbd_librbd_pwl_req_arr_to_dis_nw_t_count`
+- `ceph_rbd_librbd_pwl_req_all_to_dis_nw_t_count`
+- `ceph_rbd_librbd_pwl_wr_latency_nw_count`
+- `ceph_rbd_librbd_pwl_caller_wr_latency_nw_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Log Operation Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `operations/s`
+- **Dimensions:** `op_alloc_t_count`, `op_dis_to_buf_t_count`, `op_dis_to_app_t_count`, `op_dis_to_cmp_t_count`, `op_buf_to_app_t_count`, `op_buf_to_bufc_t_count`, `op_app_to_cmp_t_count`, `op_app_to_appc_t_count`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_rbd_librbd_pwl_op_alloc_t_count`
+- `ceph_rbd_librbd_pwl_op_dis_to_buf_t_count`
+- `ceph_rbd_librbd_pwl_op_dis_to_app_t_count`
+- `ceph_rbd_librbd_pwl_op_dis_to_cmp_t_count`
+- `ceph_rbd_librbd_pwl_op_buf_to_app_t_count`
+- `ceph_rbd_librbd_pwl_op_buf_to_bufc_t_count`
+- `ceph_rbd_librbd_pwl_op_app_to_cmp_t_count`
+- `ceph_rbd_librbd_pwl_op_app_to_appc_t_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data Operation Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `operations/s`
+- **Dimensions:** `discard_lat_count`, `aio_flush_lat_count`, `ws_lat_count`, `cmp_lat_count`, `writeback_lat_count`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_rbd_librbd_pwl_discard_lat_count`
+- `ceph_rbd_librbd_pwl_aio_flush_lat_count`
+- `ceph_rbd_librbd_pwl_ws_lat_count`
+- `ceph_rbd_librbd_pwl_cmp_lat_count`
+- `ceph_rbd_librbd_pwl_writeback_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Transaction Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `transactions/s`
+- **Dimensions:** `append_tx_lat_count`, `retire_tx_lat_count`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_pwl_append_tx_lat_count`
+- `ceph_rbd_librbd_pwl_retire_tx_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Read Request Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `seconds/s`
+- **Dimensions:** `rd_latency_sum`, `hit_rd_latency_sum`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_pwl_rd_latency_sum`
+- `ceph_rbd_librbd_pwl_hit_rd_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Write Request Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `seconds/s`
+- **Dimensions:** `req_arr_to_all_t_sum`, `req_arr_to_dis_t_sum`, `req_all_to_dis_t_sum`, `wr_latency_sum`, `caller_wr_latency_sum`, `req_arr_to_all_nw_t_sum`, `req_arr_to_dis_nw_t_sum`, `req_all_to_dis_nw_t_sum`, `wr_latency_nw_sum`, `caller_wr_latency_nw_sum`
+<details><summary>Source metric selectors (10)</summary>
+
+
+- `ceph_rbd_librbd_pwl_req_arr_to_all_t_sum`
+- `ceph_rbd_librbd_pwl_req_arr_to_dis_t_sum`
+- `ceph_rbd_librbd_pwl_req_all_to_dis_t_sum`
+- `ceph_rbd_librbd_pwl_wr_latency_sum`
+- `ceph_rbd_librbd_pwl_caller_wr_latency_sum`
+- `ceph_rbd_librbd_pwl_req_arr_to_all_nw_t_sum`
+- `ceph_rbd_librbd_pwl_req_arr_to_dis_nw_t_sum`
+- `ceph_rbd_librbd_pwl_req_all_to_dis_nw_t_sum`
+- `ceph_rbd_librbd_pwl_wr_latency_nw_sum`
+- `ceph_rbd_librbd_pwl_caller_wr_latency_nw_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Log Operation Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `seconds/s`
+- **Dimensions:** `op_alloc_t_sum`, `op_dis_to_buf_t_sum`, `op_dis_to_app_t_sum`, `op_dis_to_cmp_t_sum`, `op_buf_to_app_t_sum`, `op_buf_to_bufc_t_sum`, `op_app_to_cmp_t_sum`, `op_app_to_appc_t_sum`
+<details><summary>Source metric selectors (8)</summary>
+
+
+- `ceph_rbd_librbd_pwl_op_alloc_t_sum`
+- `ceph_rbd_librbd_pwl_op_dis_to_buf_t_sum`
+- `ceph_rbd_librbd_pwl_op_dis_to_app_t_sum`
+- `ceph_rbd_librbd_pwl_op_dis_to_cmp_t_sum`
+- `ceph_rbd_librbd_pwl_op_buf_to_app_t_sum`
+- `ceph_rbd_librbd_pwl_op_buf_to_bufc_t_sum`
+- `ceph_rbd_librbd_pwl_op_app_to_cmp_t_sum`
+- `ceph_rbd_librbd_pwl_op_app_to_appc_t_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Data Operation Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `seconds/s`
+- **Dimensions:** `discard_lat_sum`, `aio_flush_lat_sum`, `ws_lat_sum`, `cmp_lat_sum`, `writeback_lat_sum`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_rbd_librbd_pwl_discard_lat_sum`
+- `ceph_rbd_librbd_pwl_aio_flush_lat_sum`
+- `ceph_rbd_librbd_pwl_ws_lat_sum`
+- `ceph_rbd_librbd_pwl_cmp_lat_sum`
+- `ceph_rbd_librbd_pwl_writeback_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Transaction Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and librbd pwl key
+- **Units:** `seconds/s`
+- **Dimensions:** `append_tx_lat_sum`, `retire_tx_lat_sum`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rbd_librbd_pwl_append_tx_lat_sum`
+- `ceph_rbd_librbd_pwl_retire_tx_lat_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Object Caches (6 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Cache Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and objectcacher key
+- **Units:** `operations/s`
+- **Dimensions:** `hit`, `miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objectcacher_cache_ops_hit`
+- `ceph_objectcacher_cache_ops_miss`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Cache Byte Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and objectcacher key
+- **Units:** `bytes/s`
+- **Dimensions:** `hit`, `miss`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_objectcacher_cache_bytes_hit`
+- `ceph_objectcacher_cache_bytes_miss`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Data Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and objectcacher key
+- **Units:** `bytes/s`
+- **Dimensions:** `read`, `written`, `flushed`, `overwritten_while_flushing`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_objectcacher_data_read`
+- `ceph_objectcacher_data_written`
+- `ceph_objectcacher_data_flushed`
+- `ceph_objectcacher_data_overwritten_while_flushing`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Blocked Writes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and objectcacher key
+- **Units:** `operations/s`
+- **Dimensions:** `operations`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objectcacher_write_ops_blocked`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Blocked Write Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and objectcacher key
+- **Units:** `bytes/s`
+- **Dimensions:** `bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objectcacher_write_bytes_blocked`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Blocked Write Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and objectcacher key
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_objectcacher_write_time_blocked`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Finishers (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Queued Callbacks</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and finisher key
+- **Units:** `callbacks`
+- **Dimensions:** `queued`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_finisher_queue_len`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Drained Completion Batches</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and finisher key
+- **Units:** `batches/s`
+- **Dimensions:** `completed`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_finisher_complete_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Completion Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and finisher key
+- **Units:** `seconds/s`
+- **Dimensions:** `latency`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_finisher_complete_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Throttles (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Utilization</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and throttle key
+- **Units:** `slots`
+- **Dimensions:** `val`, `max`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_throttle_val`
+- `ceph_throttle_max`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and throttle key
+- **Units:** `operations/s`
+- **Dimensions:** `get_started`, `get`, `get_or_fail_fail`, `get_or_fail_success`, `take`, `put`
+<details><summary>Source metric selectors (6)</summary>
+
+
+- `ceph_throttle_get_started`
+- `ceph_throttle_get`
+- `ceph_throttle_get_or_fail_fail`
+- `ceph_throttle_get_or_fail_success`
+- `ceph_throttle_take`
+- `ceph_throttle_put`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Slot Throughput</summary>
+
+
+- **Entity scope:** Ceph throttle key
+- **Units:** `slots/s`
+- **Dimensions:** `get_sum`, `take_sum`, `put_sum`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_throttle_get_sum`
+- `ceph_throttle_take_sum`
+- `ceph_throttle_put_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Waits</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and throttle key
+- **Units:** `waits/s`
+- **Dimensions:** `waits`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_throttle_wait_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Wait Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and throttle key
+- **Units:** `seconds/s`
+- **Dimensions:** `wait`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_throttle_wait_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Kernel Devices (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Discard Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and kernel device key
+- **Units:** `operations/s`
+- **Dimensions:** `discard`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_kernel_device_discard_op`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Discard Threads</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and kernel device key
+- **Units:** `threads`
+- **Dimensions:** `threads`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_kernel_device_discard_threads`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>mClock Shards (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Queue Depth</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and mclock shard
+- **Units:** `operations`
+- **Dimensions:** `immediate`, `client`, `recovery`, `best_effort`, `all_type`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_mclock_shard_mclock_immediate_queue_len`
+- `ceph_mclock_shard_mclock_client_queue_len`
+- `ceph_mclock_shard_mclock_recovery_queue_len`
+- `ceph_mclock_shard_mclock_best_effort_queue_len`
+- `ceph_mclock_shard_mclock_all_type_queue_len`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Messenger Workers (9 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Messages</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `messages/s`
+- **Dimensions:** `recv`, `send`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_recv_messages`
+- `ceph_async_messenger_worker_msgr_send_messages`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `bytes/s`
+- **Dimensions:** `recv`, `send`, `recv_encrypted`, `send_encrypted`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_recv_bytes`
+- `ceph_async_messenger_worker_msgr_send_bytes`
+- `ceph_async_messenger_worker_msgr_recv_encrypted_bytes`
+- `ceph_async_messenger_worker_msgr_send_encrypted_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Connections</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `connections`
+- **Dimensions:** `active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_active_connections`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Created Connections</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `connections/s`
+- **Dimensions:** `created`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_created_connections`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Worker Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `seconds/s`
+- **Dimensions:** `total`, `send`, `recv`, `fast_dispatch`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_running_total_time`
+- `ceph_async_messenger_worker_msgr_running_send_time`
+- `ceph_async_messenger_worker_msgr_running_recv_time`
+- `ceph_async_messenger_worker_msgr_running_fast_dispatch_time`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Send-Queue Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `messages/s`
+- **Dimensions:** `send_messages_queue`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_send_messages_queue_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Acknowledgement Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `acknowledgements/s`
+- **Dimensions:** `handle_ack`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_handle_ack_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Send-Queue Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `seconds/s`
+- **Dimensions:** `send_messages_queue`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_send_messages_queue_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Acknowledgement Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and messenger worker
+- **Units:** `seconds/s`
+- **Dimensions:** `handle_ack`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_worker_msgr_handle_ack_lat_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RDMA Workers (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>RDMA Transfer Errors</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rdma worker
+- **Units:** `errors/s`
+- **Dimensions:** `tx_no_mem`, `tx_parital_mem`, `tx_failed_post`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_async_messenger_rdma_worker_tx_no_mem`
+- `ceph_async_messenger_rdma_worker_tx_parital_mem`
+- `ceph_async_messenger_rdma_worker_tx_failed_post`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Chunk Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rdma worker
+- **Units:** `chunks/s`
+- **Dimensions:** `tx`, `rx`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_async_messenger_rdma_worker_tx_chunks`
+- `ceph_async_messenger_rdma_worker_rx_chunks`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rdma worker
+- **Units:** `bytes/s`
+- **Dimensions:** `tx`, `rx`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_async_messenger_rdma_worker_tx_bytes`
+- `ceph_async_messenger_rdma_worker_rx_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pending Connections</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rdma worker
+- **Units:** `connections`
+- **Dimensions:** `pending`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_async_messenger_rdma_worker_pending_sent_conns`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>DPDK Queues (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Packets</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `packets/s`
+- **Dimensions:** `receive`, `send`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_receive_packets`
+- `ceph_dpdk_queue_dpdk_send_packets`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `bytes/s`
+- **Dimensions:** `receive`, `send`, `receive_copy`, `send_copy`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_receive_bytes`
+- `ceph_dpdk_queue_dpdk_send_bytes`
+- `ceph_dpdk_queue_dpdk_receive_copy_bytes`
+- `ceph_dpdk_queue_dpdk_send_copy_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Packet Fragments</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `fragments/s`
+- **Dimensions:** `receive_fragments`, `send_fragments`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_receive_fragments`
+- `ceph_dpdk_queue_dpdk_send_fragments`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Copy and Linearize Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `operations/s`
+- **Dimensions:** `receive_copy_ops`, `send_copy_ops`, `receive_linearize_ops`, `send_linearize_ops`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_receive_copy_ops`
+- `ceph_dpdk_queue_dpdk_send_copy_ops`
+- `ceph_dpdk_queue_dpdk_receive_linearize_ops`
+- `ceph_dpdk_queue_dpdk_send_linearize_ops`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Receive Errors</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `errors/s`
+- **Dimensions:** `bad_checksum`, `no_memory`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_receive_bad_checksum_errors`
+- `ceph_dpdk_queue_dpdk_receive_no_memory_errors`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Last Batch Size</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `packets`
+- **Dimensions:** `receive`, `send`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_receive_last_bunch`
+- `ceph_dpdk_queue_dpdk_send_last_bunch`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Send Queue Depth</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk queue
+- **Units:** `packets`
+- **Dimensions:** `queued`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_dpdk_queue_dpdk_send_queue_length`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>DPDK Ports (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Multicast Packets</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk port
+- **Units:** `packets/s`
+- **Dimensions:** `received`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_dpdk_port_dpdk_device_receive_multicast_packets`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Receive Errors</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk port
+- **Units:** `errors/s`
+- **Dimensions:** `badcrc`, `total`, `dropped`, `nombuf`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_dpdk_port_dpdk_device_receive_badcrc_errors`
+- `ceph_dpdk_port_dpdk_device_receive_total_errors`
+- `ceph_dpdk_port_dpdk_device_receive_dropped_errors`
+- `ceph_dpdk_port_dpdk_device_receive_nombuf_errors`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Send Errors</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and dpdk port
+- **Units:** `errors/s`
+- **Dimensions:** `total`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_dpdk_port_dpdk_device_send_total_errors`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Service Identity (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Service Identity Metadata Sentinel</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and service unique id
+- **Units:** `identifier`
+- **Dimensions:** `present`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_service_unique_id`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RADOS Striper (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Metadata and Lock Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `update_metadata`, `update_allocated`, `update_size`, `update_version`, `shrink`, `lock`, `unlock`
+<details><summary>Source metric selectors (7)</summary>
+
+
+- `ceph_libcephsqlite_striper_update_metadata`
+- `ceph_libcephsqlite_striper_update_allocated`
+- `ceph_libcephsqlite_striper_update_size`
+- `ceph_libcephsqlite_striper_update_version`
+- `ceph_libcephsqlite_striper_shrink`
+- `ceph_libcephsqlite_striper_lock`
+- `ceph_libcephsqlite_striper_unlock`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Shrink Throughput</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes/s`
+- **Dimensions:** `bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_libcephsqlite_striper_shrink_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Memory Pools (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Memory Use</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `bloom_filter`, `bluestore_alloc`, `bluestore_cache_data`, `bluestore_cache_onode`, `bluestore_cache_meta`, `bluestore_cache_other`, `bluestore_cache_buffer`, `bluestore_extent`, `bluestore_blob`, `bluestore_shared_blob`, `bluestore_inline_bl`, `bluestore_fsck`, `bluestore_txc`, `bluestore_writing_deferred`, `bluestore_writing`, `bluefs`, `bluefs_file_reader`, `bluefs_file_writer`, `buffer_anon`, `buffer_meta`, `osd`, `osd_mapbl`, `osd_pglog`, `osdmap`, `osdmap_mapping`, `pgmap`, `mds_co`, `unittest_1`, `unittest_2`, `ec_extent_cache`
+<details><summary>Source metric selectors (30)</summary>
+
+
+- `ceph_mempool_bloom_filter_bytes`
+- `ceph_mempool_bluestore_alloc_bytes`
+- `ceph_mempool_bluestore_cache_data_bytes`
+- `ceph_mempool_bluestore_cache_onode_bytes`
+- `ceph_mempool_bluestore_cache_meta_bytes`
+- `ceph_mempool_bluestore_cache_other_bytes`
+- `ceph_mempool_bluestore_cache_buffer_bytes`
+- `ceph_mempool_bluestore_extent_bytes`
+- `ceph_mempool_bluestore_blob_bytes`
+- `ceph_mempool_bluestore_shared_blob_bytes`
+- `ceph_mempool_bluestore_inline_bl_bytes`
+- `ceph_mempool_bluestore_fsck_bytes`
+- `ceph_mempool_bluestore_txc_bytes`
+- `ceph_mempool_bluestore_writing_deferred_bytes`
+- `ceph_mempool_bluestore_writing_bytes`
+- `ceph_mempool_bluefs_bytes`
+- `ceph_mempool_bluefs_file_reader_bytes`
+- `ceph_mempool_bluefs_file_writer_bytes`
+- `ceph_mempool_buffer_anon_bytes`
+- `ceph_mempool_buffer_meta_bytes`
+- `ceph_mempool_osd_bytes`
+- `ceph_mempool_osd_mapbl_bytes`
+- `ceph_mempool_osd_pglog_bytes`
+- `ceph_mempool_osdmap_bytes`
+- `ceph_mempool_osdmap_mapping_bytes`
+- `ceph_mempool_pgmap_bytes`
+- `ceph_mempool_mds_co_bytes`
+- `ceph_mempool_unittest_1_bytes`
+- `ceph_mempool_unittest_2_bytes`
+- `ceph_mempool_ec_extent_cache_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Item Count</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `items`
+- **Dimensions:** `bloom_filter`, `bluestore_alloc`, `bluestore_cache_data`, `bluestore_cache_onode`, `bluestore_cache_meta`, `bluestore_cache_other`, `bluestore_cache_buffer`, `bluestore_extent`, `bluestore_blob`, `bluestore_shared_blob`, `bluestore_inline_bl`, `bluestore_fsck`, `bluestore_txc`, `bluestore_writing_deferred`, `bluestore_writing`, `bluefs`, `bluefs_file_reader`, `bluefs_file_writer`, `buffer_anon`, `buffer_meta`, `osd`, `osd_mapbl`, `osd_pglog`, `osdmap`, `osdmap_mapping`, `pgmap`, `mds_co`, `unittest_1`, `unittest_2`, `ec_extent_cache`
+<details><summary>Source metric selectors (30)</summary>
+
+
+- `ceph_mempool_bloom_filter_items`
+- `ceph_mempool_bluestore_alloc_items`
+- `ceph_mempool_bluestore_cache_data_items`
+- `ceph_mempool_bluestore_cache_onode_items`
+- `ceph_mempool_bluestore_cache_meta_items`
+- `ceph_mempool_bluestore_cache_other_items`
+- `ceph_mempool_bluestore_cache_buffer_items`
+- `ceph_mempool_bluestore_extent_items`
+- `ceph_mempool_bluestore_blob_items`
+- `ceph_mempool_bluestore_shared_blob_items`
+- `ceph_mempool_bluestore_inline_bl_items`
+- `ceph_mempool_bluestore_fsck_items`
+- `ceph_mempool_bluestore_txc_items`
+- `ceph_mempool_bluestore_writing_deferred_items`
+- `ceph_mempool_bluestore_writing_items`
+- `ceph_mempool_bluefs_items`
+- `ceph_mempool_bluefs_file_reader_items`
+- `ceph_mempool_bluefs_file_writer_items`
+- `ceph_mempool_buffer_anon_items`
+- `ceph_mempool_buffer_meta_items`
+- `ceph_mempool_osd_items`
+- `ceph_mempool_osd_mapbl_items`
+- `ceph_mempool_osd_pglog_items`
+- `ceph_mempool_osdmap_items`
+- `ceph_mempool_osdmap_mapping_items`
+- `ceph_mempool_pgmap_items`
+- `ceph_mempool_mds_co_items`
+- `ceph_mempool_unittest_1_items`
+- `ceph_mempool_unittest_2_items`
+- `ceph_mempool_ec_extent_cache_items`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Runtime (26 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Shared Daemon (25 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>KStore Transaction Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `transactions/s`
+- **Dimensions:** `kstore_state_done_lat`, `kstore_state_finishing_lat`, `kstore_state_kv_done_lat`, `kstore_state_kv_queued_lat`, `kstore_state_prepare_lat`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_KStore_state_done_lat_count`
+- `ceph_KStore_state_finishing_lat_count`
+- `ceph_KStore_state_kv_done_lat_count`
+- `ceph_KStore_state_kv_queued_lat_count`
+- `ceph_KStore_state_prepare_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Client Request Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `requests/s`
+- **Dimensions:** `client_lat`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_client_lat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Recovery-State Transition Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `state transitions/s`
+- **Dimensions:** `recoverystate_perf_activating_latency`, `recoverystate_perf_active_latency`, `recoverystate_perf_backfilling_latency`, `recoverystate_perf_clean_latency`, `recoverystate_perf_down_latency`, `recoverystate_perf_getinfo_latency`, `recoverystate_perf_getlog_latency`, `recoverystate_perf_getmissing_latency`, `recoverystate_perf_incomplete_latency`, `recoverystate_perf_initial_latency`, `recoverystate_perf_notbackfilling_latency`, `recoverystate_perf_notrecovering_latency`, `recoverystate_perf_peering_latency`, `recoverystate_perf_primary_latency`, `recoverystate_perf_recovered_latency`, `recoverystate_perf_recovering_latency`, `recoverystate_perf_replicaactive_latency`, `recoverystate_perf_repnotrecovering_latency`, `recoverystate_perf_reprecovering_latency`, `recoverystate_perf_repwaitbackfillreserved_latency`, `recoverystate_perf_repwaitrecoveryreserved_latency`, `recoverystate_perf_reset_latency`, `recoverystate_perf_start_latency`, `recoverystate_perf_started_latency`, `recoverystate_perf_stray_latency`, `recoverystate_perf_waitactingchange_latency`, `recoverystate_perf_waitlocalbackfillreserved_latency`, `recoverystate_perf_waitlocalrecoveryreserved_latency`, `recoverystate_perf_waitremotebackfillreserved_latency`, `recoverystate_perf_waitremoterecoveryreserved_latency`, `recoverystate_perf_waitupthru_latency`
+<details><summary>Source metric selectors (31)</summary>
+
+
+- `ceph_recoverystate_perf_activating_latency_count`
+- `ceph_recoverystate_perf_active_latency_count`
+- `ceph_recoverystate_perf_backfilling_latency_count`
+- `ceph_recoverystate_perf_clean_latency_count`
+- `ceph_recoverystate_perf_down_latency_count`
+- `ceph_recoverystate_perf_getinfo_latency_count`
+- `ceph_recoverystate_perf_getlog_latency_count`
+- `ceph_recoverystate_perf_getmissing_latency_count`
+- `ceph_recoverystate_perf_incomplete_latency_count`
+- `ceph_recoverystate_perf_initial_latency_count`
+- `ceph_recoverystate_perf_notbackfilling_latency_count`
+- `ceph_recoverystate_perf_notrecovering_latency_count`
+- `ceph_recoverystate_perf_peering_latency_count`
+- `ceph_recoverystate_perf_primary_latency_count`
+- `ceph_recoverystate_perf_recovered_latency_count`
+- `ceph_recoverystate_perf_recovering_latency_count`
+- `ceph_recoverystate_perf_replicaactive_latency_count`
+- `ceph_recoverystate_perf_repnotrecovering_latency_count`
+- `ceph_recoverystate_perf_reprecovering_latency_count`
+- `ceph_recoverystate_perf_repwaitbackfillreserved_latency_count`
+- `ceph_recoverystate_perf_repwaitrecoveryreserved_latency_count`
+- `ceph_recoverystate_perf_reset_latency_count`
+- `ceph_recoverystate_perf_start_latency_count`
+- `ceph_recoverystate_perf_started_latency_count`
+- `ceph_recoverystate_perf_stray_latency_count`
+- `ceph_recoverystate_perf_waitactingchange_latency_count`
+- `ceph_recoverystate_perf_waitlocalbackfillreserved_latency_count`
+- `ceph_recoverystate_perf_waitlocalrecoveryreserved_latency_count`
+- `ceph_recoverystate_perf_waitremotebackfillreserved_latency_count`
+- `ceph_recoverystate_perf_waitremoterecoveryreserved_latency_count`
+- `ceph_recoverystate_perf_waitupthru_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated KStore Transaction Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `kstore_state_done_lat`, `kstore_state_finishing_lat`, `kstore_state_kv_done_lat`, `kstore_state_kv_queued_lat`, `kstore_state_prepare_lat`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_KStore_state_done_lat_sum`
+- `ceph_KStore_state_finishing_lat_sum`
+- `ceph_KStore_state_kv_done_lat_sum`
+- `ceph_KStore_state_kv_queued_lat_sum`
+- `ceph_KStore_state_prepare_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Client Request Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `client_lat`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_client_lat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Recovery-State Transition Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `recoverystate_perf_activating_latency`, `recoverystate_perf_active_latency`, `recoverystate_perf_backfilling_latency`, `recoverystate_perf_clean_latency`, `recoverystate_perf_down_latency`, `recoverystate_perf_getinfo_latency`, `recoverystate_perf_getlog_latency`, `recoverystate_perf_getmissing_latency`, `recoverystate_perf_incomplete_latency`, `recoverystate_perf_initial_latency`, `recoverystate_perf_notbackfilling_latency`, `recoverystate_perf_notrecovering_latency`, `recoverystate_perf_peering_latency`, `recoverystate_perf_primary_latency`, `recoverystate_perf_recovered_latency`, `recoverystate_perf_recovering_latency`, `recoverystate_perf_replicaactive_latency`, `recoverystate_perf_repnotrecovering_latency`, `recoverystate_perf_reprecovering_latency`, `recoverystate_perf_repwaitbackfillreserved_latency`, `recoverystate_perf_repwaitrecoveryreserved_latency`, `recoverystate_perf_reset_latency`, `recoverystate_perf_start_latency`, `recoverystate_perf_started_latency`, `recoverystate_perf_stray_latency`, `recoverystate_perf_waitactingchange_latency`, `recoverystate_perf_waitlocalbackfillreserved_latency`, `recoverystate_perf_waitlocalrecoveryreserved_latency`, `recoverystate_perf_waitremotebackfillreserved_latency`, `recoverystate_perf_waitremoterecoveryreserved_latency`, `recoverystate_perf_waitupthru_latency`
+<details><summary>Source metric selectors (31)</summary>
+
+
+- `ceph_recoverystate_perf_activating_latency_sum`
+- `ceph_recoverystate_perf_active_latency_sum`
+- `ceph_recoverystate_perf_backfilling_latency_sum`
+- `ceph_recoverystate_perf_clean_latency_sum`
+- `ceph_recoverystate_perf_down_latency_sum`
+- `ceph_recoverystate_perf_getinfo_latency_sum`
+- `ceph_recoverystate_perf_getlog_latency_sum`
+- `ceph_recoverystate_perf_getmissing_latency_sum`
+- `ceph_recoverystate_perf_incomplete_latency_sum`
+- `ceph_recoverystate_perf_initial_latency_sum`
+- `ceph_recoverystate_perf_notbackfilling_latency_sum`
+- `ceph_recoverystate_perf_notrecovering_latency_sum`
+- `ceph_recoverystate_perf_peering_latency_sum`
+- `ceph_recoverystate_perf_primary_latency_sum`
+- `ceph_recoverystate_perf_recovered_latency_sum`
+- `ceph_recoverystate_perf_recovering_latency_sum`
+- `ceph_recoverystate_perf_replicaactive_latency_sum`
+- `ceph_recoverystate_perf_repnotrecovering_latency_sum`
+- `ceph_recoverystate_perf_reprecovering_latency_sum`
+- `ceph_recoverystate_perf_repwaitbackfillreserved_latency_sum`
+- `ceph_recoverystate_perf_repwaitrecoveryreserved_latency_sum`
+- `ceph_recoverystate_perf_reset_latency_sum`
+- `ceph_recoverystate_perf_start_latency_sum`
+- `ceph_recoverystate_perf_started_latency_sum`
+- `ceph_recoverystate_perf_stray_latency_sum`
+- `ceph_recoverystate_perf_waitactingchange_latency_sum`
+- `ceph_recoverystate_perf_waitlocalbackfillreserved_latency_sum`
+- `ceph_recoverystate_perf_waitlocalrecoveryreserved_latency_sum`
+- `ceph_recoverystate_perf_waitremotebackfillreserved_latency_sum`
+- `ceph_recoverystate_perf_waitremoterecoveryreserved_latency_sum`
+- `ceph_recoverystate_perf_waitupthru_latency_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Client Operation Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `client_fsync`, `client_rdlat`, `client_reply`, `client_wrlat`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_client_fsync_count`
+- `ceph_client_rdlat_count`
+- `ceph_client_reply_count`
+- `ceph_client_wrlat_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>SQLite VFS Operation Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `libcephsqlite_vfs_op_access`, `libcephsqlite_vfs_op_currenttime`, `libcephsqlite_vfs_op_delete`, `libcephsqlite_vfs_op_fullpathname`, `libcephsqlite_vfs_op_open`, `libcephsqlite_vfs_opf_checkreservedlock`, `libcephsqlite_vfs_opf_close`, `libcephsqlite_vfs_opf_devicecharacteristics`, `libcephsqlite_vfs_opf_filecontrol`, `libcephsqlite_vfs_opf_filesize`, `libcephsqlite_vfs_opf_lock`, `libcephsqlite_vfs_opf_read`, `libcephsqlite_vfs_opf_sectorsize`, `libcephsqlite_vfs_opf_sync`, `libcephsqlite_vfs_opf_truncate`, `libcephsqlite_vfs_opf_unlock`, `libcephsqlite_vfs_opf_write`
+<details><summary>Source metric selectors (17)</summary>
+
+
+- `ceph_libcephsqlite_vfs_op_access_count`
+- `ceph_libcephsqlite_vfs_op_currenttime_count`
+- `ceph_libcephsqlite_vfs_op_delete_count`
+- `ceph_libcephsqlite_vfs_op_fullpathname_count`
+- `ceph_libcephsqlite_vfs_op_open_count`
+- `ceph_libcephsqlite_vfs_opf_checkreservedlock_count`
+- `ceph_libcephsqlite_vfs_opf_close_count`
+- `ceph_libcephsqlite_vfs_opf_devicecharacteristics_count`
+- `ceph_libcephsqlite_vfs_opf_filecontrol_count`
+- `ceph_libcephsqlite_vfs_opf_filesize_count`
+- `ceph_libcephsqlite_vfs_opf_lock_count`
+- `ceph_libcephsqlite_vfs_opf_read_count`
+- `ceph_libcephsqlite_vfs_opf_sectorsize_count`
+- `ceph_libcephsqlite_vfs_opf_sync_count`
+- `ceph_libcephsqlite_vfs_opf_truncate_count`
+- `ceph_libcephsqlite_vfs_opf_unlock_count`
+- `ceph_libcephsqlite_vfs_opf_write_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Client Operation Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `client_fsync`, `client_rdlat`, `client_reply`, `client_wrlat`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_client_fsync_sum`
+- `ceph_client_rdlat_sum`
+- `ceph_client_reply_sum`
+- `ceph_client_wrlat_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated SQLite VFS Operation Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `libcephsqlite_vfs_op_access`, `libcephsqlite_vfs_op_currenttime`, `libcephsqlite_vfs_op_delete`, `libcephsqlite_vfs_op_fullpathname`, `libcephsqlite_vfs_op_open`, `libcephsqlite_vfs_opf_checkreservedlock`, `libcephsqlite_vfs_opf_close`, `libcephsqlite_vfs_opf_devicecharacteristics`, `libcephsqlite_vfs_opf_filecontrol`, `libcephsqlite_vfs_opf_filesize`, `libcephsqlite_vfs_opf_lock`, `libcephsqlite_vfs_opf_read`, `libcephsqlite_vfs_opf_sectorsize`, `libcephsqlite_vfs_opf_sync`, `libcephsqlite_vfs_opf_truncate`, `libcephsqlite_vfs_opf_unlock`, `libcephsqlite_vfs_opf_write`
+<details><summary>Source metric selectors (17)</summary>
+
+
+- `ceph_libcephsqlite_vfs_op_access_sum`
+- `ceph_libcephsqlite_vfs_op_currenttime_sum`
+- `ceph_libcephsqlite_vfs_op_delete_sum`
+- `ceph_libcephsqlite_vfs_op_fullpathname_sum`
+- `ceph_libcephsqlite_vfs_op_open_sum`
+- `ceph_libcephsqlite_vfs_opf_checkreservedlock_sum`
+- `ceph_libcephsqlite_vfs_opf_close_sum`
+- `ceph_libcephsqlite_vfs_opf_devicecharacteristics_sum`
+- `ceph_libcephsqlite_vfs_opf_filecontrol_sum`
+- `ceph_libcephsqlite_vfs_opf_filesize_sum`
+- `ceph_libcephsqlite_vfs_opf_lock_sum`
+- `ceph_libcephsqlite_vfs_opf_read_sum`
+- `ceph_libcephsqlite_vfs_opf_sectorsize_sum`
+- `ceph_libcephsqlite_vfs_opf_sync_sum`
+- `ceph_libcephsqlite_vfs_opf_truncate_sum`
+- `ceph_libcephsqlite_vfs_opf_unlock_sum`
+- `ceph_libcephsqlite_vfs_opf_write_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Monitors</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `monitors`
+- **Dimensions:** `num_mon`, `cluster_num_mon_quorum`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_cluster_num_mon`
+- `ceph_cluster_num_mon_quorum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSDs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `OSDs`
+- **Dimensions:** `num_osd`, `cluster_num_osd_in`, `cluster_num_osd_up`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_cluster_num_osd`
+- `ceph_cluster_num_osd_in`
+- `ceph_cluster_num_osd_up`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Pools</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `pools`
+- **Dimensions:** `num_pool`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cluster_num_pool`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OSD-Map Epoch</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `epoch`
+- **Dimensions:** `osd_epoch`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_cluster_osd_epoch`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Duration and Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds`
+- **Dimensions:** `mdavg`, `readavg`, `writeavg`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_client_mdavg`
+- `ceph_client_readavg`
+- `ceph_client_writeavg`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Invalidated Recovery Statistics</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `invalidations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_recoverystate_perf_stats_invalidated`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Objects</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `objects`
+- **Dimensions:** `object`, `degraded`, `misplaced`, `unfound`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_cluster_num_object`
+- `ceph_cluster_num_object_degraded`
+- `ceph_cluster_num_object_misplaced`
+- `ceph_cluster_num_object_unfound`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_ipv4_dpdk_ip_linearize_operations`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `num_bytes`, `osd_bytes`, `osd_bytes_avail`, `osd_bytes_used`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_cluster_num_bytes`
+- `ceph_cluster_osd_bytes`
+- `ceph_cluster_osd_bytes_avail`
+- `ceph_cluster_osd_bytes_used`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Placement Groups</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `PGs`
+- **Dimensions:** `cluster_num_pg`, `cluster_num_pg_active`, `cluster_num_pg_active_clean`, `cluster_num_pg_peering`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_cluster_num_pg`
+- `ceph_cluster_num_pg_active`
+- `ceph_cluster_num_pg_active_clean`
+- `ceph_cluster_num_pg_peering`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Client Latency Squared-Deviation Accumulators</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `microseconds²/s`
+- **Dimensions:** `client_mdsqsum`, `client_readsqsum`, `client_writesqsum`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_client_mdsqsum`
+- `ceph_client_readsqsum`
+- `ceph_client_writesqsum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OpenFileTable OMAP Mutations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `oft_omap_total_updates`, `oft_omap_total_removes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_oft_omap_total_updates`
+- `ceph_oft_omap_total_removes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Context Workers</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `workers`
+- **Dimensions:** `cct_total_workers`, `cct_unhealthy_workers`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_cct_total_workers`
+- `ceph_cct_unhealthy_workers`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OpenFileTable Objects</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `objects`
+- **Dimensions:** `oft_omap_total_objs`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_oft_omap_total_objs`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>OpenFileTable Key-Value Pairs</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `entries`
+- **Dimensions:** `oft_omap_total_kv_pairs`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_oft_omap_total_kv_pairs`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Slow Operations (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Slow Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_trackedop_slow_ops_count`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Storage Engine (21 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache Full (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_prioritycache:full_committed_bytes`
+- `ceph_prioritycache:full_pri0_bytes`
+- `ceph_prioritycache:full_pri10_bytes`
+- `ceph_prioritycache:full_pri11_bytes`
+- `ceph_prioritycache:full_pri1_bytes`
+- `ceph_prioritycache:full_pri2_bytes`
+- `ceph_prioritycache:full_pri3_bytes`
+- `ceph_prioritycache:full_pri4_bytes`
+- `ceph_prioritycache:full_pri5_bytes`
+- `ceph_prioritycache:full_pri6_bytes`
+- `ceph_prioritycache:full_pri7_bytes`
+- `ceph_prioritycache:full_pri8_bytes`
+- `ceph_prioritycache:full_pri9_bytes`
+- `ceph_prioritycache:full_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache Incremental (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_prioritycache:inc_committed_bytes`
+- `ceph_prioritycache:inc_pri0_bytes`
+- `ceph_prioritycache:inc_pri10_bytes`
+- `ceph_prioritycache:inc_pri11_bytes`
+- `ceph_prioritycache:inc_pri1_bytes`
+- `ceph_prioritycache:inc_pri2_bytes`
+- `ceph_prioritycache:inc_pri3_bytes`
+- `ceph_prioritycache:inc_pri4_bytes`
+- `ceph_prioritycache:inc_pri5_bytes`
+- `ceph_prioritycache:inc_pri6_bytes`
+- `ceph_prioritycache:inc_pri7_bytes`
+- `ceph_prioritycache:inc_pri8_bytes`
+- `ceph_prioritycache:inc_pri9_bytes`
+- `ceph_prioritycache:inc_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache KV (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `committed_bytes`, `pri0_bytes`, `pri10_bytes`, `pri11_bytes`, `pri1_bytes`, `pri2_bytes`, `pri3_bytes`, `pri4_bytes`, `pri5_bytes`, `pri6_bytes`, `pri7_bytes`, `pri8_bytes`, `pri9_bytes`, `reserved_bytes`
+<details><summary>Source metric selectors (14)</summary>
+
+
+- `ceph_prioritycache:kv_committed_bytes`
+- `ceph_prioritycache:kv_pri0_bytes`
+- `ceph_prioritycache:kv_pri10_bytes`
+- `ceph_prioritycache:kv_pri11_bytes`
+- `ceph_prioritycache:kv_pri1_bytes`
+- `ceph_prioritycache:kv_pri2_bytes`
+- `ceph_prioritycache:kv_pri3_bytes`
+- `ceph_prioritycache:kv_pri4_bytes`
+- `ceph_prioritycache:kv_pri5_bytes`
+- `ceph_prioritycache:kv_pri6_bytes`
+- `ceph_prioritycache:kv_pri7_bytes`
+- `ceph_prioritycache:kv_pri8_bytes`
+- `ceph_prioritycache:kv_pri9_bytes`
+- `ceph_prioritycache:kv_reserved_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Priority Cache Runtime (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `cache_bytes`, `heap_bytes`, `mapped_bytes`, `target_bytes`, `unmapped_bytes`
+<details><summary>Source metric selectors (5)</summary>
+
+
+- `ceph_prioritycache_cache_bytes`
+- `ceph_prioritycache_heap_bytes`
+- `ceph_prioritycache_mapped_bytes`
+- `ceph_prioritycache_target_bytes`
+- `ceph_prioritycache_unmapped_bytes`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RocksDB Compaction (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Compaction Work</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `compactions`
+- **Dimensions:** `queue_len`, `running`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rocksdb_compact_queue_len`
+- `ceph_rocksdb_compact_running`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Duration and Time</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rocksdb_compact_lasted`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Compactions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `compactions/s`
+- **Dimensions:** `compact`, `completed`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rocksdb_compact`
+- `ceph_rocksdb_compact_completed`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Compaction Queue Merges</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `merges/s`
+- **Dimensions:** `queue_merge`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rocksdb_compact_queue_merge`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RocksDB Requests (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `get_latency`, `submit_latency`, `submit_sync_latency`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rocksdb_get_latency_count`
+- `ceph_rocksdb_submit_latency_count`
+- `ceph_rocksdb_submit_sync_latency_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `get_latency`, `submit_latency`, `submit_sync_latency`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rocksdb_get_latency_sum`
+- `ceph_rocksdb_submit_latency_sum`
+- `ceph_rocksdb_submit_sync_latency_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>RocksDB Write Path (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Latency Measurements</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `delay_time`, `memtable_time`, `pre_and_post_time`, `wal_time`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rocksdb_rocksdb_write_delay_time_count`
+- `ceph_rocksdb_rocksdb_write_memtable_time_count`
+- `ceph_rocksdb_rocksdb_write_pre_and_post_time_count`
+- `ceph_rocksdb_rocksdb_write_wal_time_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Latency</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `seconds/s`
+- **Dimensions:** `delay_time`, `memtable_time`, `pre_and_post_time`, `wal_time`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_rocksdb_rocksdb_write_delay_time_sum`
+- `ceph_rocksdb_rocksdb_write_memtable_time_sum`
+- `ceph_rocksdb_rocksdb_write_pre_and_post_time_sum`
+- `ceph_rocksdb_rocksdb_write_wal_time_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Extensions (9 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>RocksDB Binned Cache (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Cache Memory</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rocksdb cache key
+- **Units:** `bytes`
+- **Dimensions:** `capacity`, `used`, `pinned`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_rocksdb_binned_cache_capacity`
+- `ceph_rocksdb_binned_cache_usage`
+- `ceph_rocksdb_binned_cache_pinned`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Cache Entries</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rocksdb cache key
+- **Units:** `entries`
+- **Dimensions:** `items`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rocksdb_binned_cache_elems`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Cache Insertions</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rocksdb cache key
+- **Units:** `insertions/s`
+- **Dimensions:** `insertions`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rocksdb_binned_cache_inserts`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Cache Lookups</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rocksdb cache key
+- **Units:** `lookups/s`
+- **Dimensions:** `lookups`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_rocksdb_binned_cache_lookups`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Cache Lookup Outcomes</summary>
+
+
+- **Entity scope:** Ceph ceph daemon and rocksdb cache key
+- **Units:** `lookups/s`
+- **Dimensions:** `hits`, `misses`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_rocksdb_binned_cache_hits`
+- `ceph_rocksdb_binned_cache_misses`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>External Block Devices (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>FCM Plugin State</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `{status}`
+- **Dimensions:** `fcm`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_extblkdev_fcm`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Device Size</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `physical`, `logical`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_extblkdev_dev_phy_size`
+- `ceph_extblkdev_dev_log_size`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Device Utilization</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `physical`, `logical`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_extblkdev_dev_phy_util`
+- `ceph_extblkdev_dev_log_util`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Partition Space</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `bytes`
+- **Dimensions:** `physical_size`, `logical_size`, `physical_available`, `logical_available`
+<details><summary>Source metric selectors (4)</summary>
+
+
+- `ceph_extblkdev_part_phy_size`
+- `ceph_extblkdev_part_log_size`
+- `ceph_extblkdev_part_phy_avail`
+- `ceph_extblkdev_part_log_avail`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Clients (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Client I/O Operations</summary>
+
+
+- **Entity scope:** Ceph ceph daemon
+- **Units:** `operations/s`
+- **Dimensions:** `metadata`, `read`, `write`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `ceph_client_mdops`
+- `ceph_client_rdops`
+- `ceph_client_wrops`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>NVMe-oF (17 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Block Devices (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Byte Throughput</summary>
+
+
+- **Entity scope:** Ceph bdev name
+- **Units:** `bytes/s`
+- **Dimensions:** `read_bytes`, `written_bytes`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_nvmeof_bdev_read_bytes_total`
+- `ceph_nvmeof_bdev_written_bytes_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Operations</summary>
+
+
+- **Entity scope:** Ceph bdev name
+- **Units:** `operations/s`
+- **Dimensions:** `reads_completed`, `writes_completed`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_nvmeof_bdev_reads_completed_total`
+- `ceph_nvmeof_bdev_writes_completed_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Space and Memory</summary>
+
+
+- **Entity scope:** Ceph bdev name
+- **Units:** `bytes`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_bdev_capacity_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata</summary>
+
+
+- **Entity scope:** Ceph NVMe-oF bdev name, block size, namespace, pool name, and RBD name
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_bdev_metadata`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Time</summary>
+
+
+- **Entity scope:** Ceph bdev name
+- **Units:** `seconds/s`
+- **Dimensions:** `read_seconds`, `write_seconds`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_nvmeof_bdev_read_seconds_total`
+- `ceph_nvmeof_bdev_write_seconds_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Gateways (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Collection Duration</summary>
+
+
+- **Entity scope:** Ceph method
+- **Units:** `seconds`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_rpc_method_seconds`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Time</summary>
+
+
+- **Entity scope:** Ceph name
+- **Units:** `seconds/s`
+- **Dimensions:** `values of label mode`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_reactor_seconds_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Namespace Count</summary>
+
+
+- **Entity scope:** One direct NVMe-oF exporter endpoint selected by the collector job
+- **Units:** `namespaces`
+- **Dimensions:** `namespace_count`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_namespace_count`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Hosts (2 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Host Connection State</summary>
+
+
+- **Entity scope:** Ceph gw name and host addr and host nqn and nqn
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_host_connection_state`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Keepalive Timeout State</summary>
+
+
+- **Entity scope:** Ceph NVMe-oF gateway name, host NQN, and subsystem NQN
+- **Units:** `{status}`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_host_keepalive_timeout`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Subsystems (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Configured Hosts</summary>
+
+
+- **Entity scope:** Ceph nqn
+- **Units:** `hosts`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_host_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Listener Interface Link Speed</summary>
+
+
+- **Entity scope:** Ceph device
+- **Units:** `Mbps`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_listener_iface_speed_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Listener Addresses</summary>
+
+
+- **Entity scope:** Ceph nqn
+- **Units:** `listeners`
+- **Dimensions:** `value`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_listener_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Namespaces</summary>
+
+
+- **Entity scope:** Ceph nqn
+- **Units:** `namespaces`
+- **Dimensions:** `nvmeof_subsystem_namespace_count`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_namespace_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Namespace Capacity</summary>
+
+
+- **Entity scope:** Ceph nqn
+- **Units:** `namespaces`
+- **Dimensions:** `count`, `limit`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `ceph_nvmeof_subsystem_namespace_count`
+- `ceph_nvmeof_subsystem_namespace_limit`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Metadata</summary>
+
+
+- **Entity scope:** Ceph NVMe-oF subsystem security/group/HA/model/NQN/serial metadata
+- **Units:** `{status}`
+- **Dimensions:** `metadata`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_metadata`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>State and Metadata — Namespace Metadata</summary>
+
+
+- **Entity scope:** Ceph NVMe-oF namespace metadata identity
+- **Units:** `{status}`
+- **Dimensions:** `namespace_metadata`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `ceph_nvmeof_subsystem_namespace_metadata`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+
+</details>
 
 
 
