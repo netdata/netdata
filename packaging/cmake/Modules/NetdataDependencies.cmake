@@ -118,7 +118,6 @@ pkg_check_modules(XENLIGHT xenlight)
 #
 
 pkg_check_modules(MONGOC libmongoc-1.0>=1.7)
-pkg_check_modules(SNAPPY snappy)
 
 #
 # Build inputs for a subproject we compile ourselves.
