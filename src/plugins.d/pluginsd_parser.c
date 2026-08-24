@@ -121,6 +121,7 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
         now_realtime_timeval(&tv);
 
     rrdset_timed_done(st, tv, pending_rrdset_next && *pending_rrdset_next ? true : false);
+    pluginsd_stream_receiver_timeout_chart_refresh(parser, st);
 
     return PARSER_RC_OK;
 }
@@ -549,6 +550,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
+        pluginsd_stream_receiver_timeout_chart_refresh(parser, st);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART, NULL);
@@ -939,6 +941,8 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
         rrdset_set_update_every_s(st, update_every);
         update_every = st->update_every;
     }
+
+    pluginsd_stream_receiver_timeout_chart_refresh(parser, st);
 
     timing_step(TIMING_STEP_BEGIN2_PARSE);
 

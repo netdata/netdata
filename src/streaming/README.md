@@ -222,21 +222,31 @@ Regularly evaluate the **health of your** streaming **setup**:
 
 With these settings, you can configure how your Child nodes send metrics to Parent nodes.
 
-| Setting                                         | Default                   | Description                                                         |
-|-------------------------------------------------|---------------------------|---------------------------------------------------------------------|
-| `enabled`                                       | `no`                      | Enables streaming. Set to `yes` to allow this node to send metrics. |
-| [`destination`](#destination)                   | (empty)                   | Defines one or more Parent nodes to send data to.                   |
-| `ssl skip certificate verification`             | `yes`                     | Accepts self-signed or expired SSL certificates.                    |
-| `CApath`                                        | `/etc/ssl/certs/`         | Directory for trusted SSL certificates.                             |
-| `CAfile`                                        | `/etc/ssl/certs/cert.pem` | File containing trusted certificates.                               |
-| `api key`                                       | (empty)                   | API key used by the Child to authenticate with the Parent.          |
-| `timeout`                                       | `1m`                      | Connection timeout duration.                                        |
-| `default port`                                  | `19999`                   | Default port for streaming if not specified in `destination`.       |
-| [`send charts matching`](#send-charts-matching) | `*`                       | Filters which charts are streamed.                                  |
-| `buffer size bytes`                             | `10485760`                | Buffer size (10MB by default). Increase for higher latencies.       |
-| `reconnect delay`                               | `5s`                      | Time before retrying connection to the Parent.                      |
-| `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                  |
-| `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a Parent using the H2O web server.    |
+| Setting                                         | Default                   | Description                                                                    |
+|-------------------------------------------------|---------------------------|--------------------------------------------------------------------------------|
+| `enabled`                                       | `no`                      | Enables streaming. Set to `yes` to allow this node to send metrics.            |
+| [`destination`](#destination)                   | (empty)                   | Defines one or more Parent nodes to send data to.                              |
+| `ssl skip certificate verification`             | `yes`                     | Accepts self-signed or expired SSL certificates.                               |
+| `CApath`                                        | `/etc/ssl/certs/`         | Directory for trusted SSL certificates.                                        |
+| `CAfile`                                        | `/etc/ssl/certs/cert.pem` | File containing trusted certificates.                                          |
+| `api key`                                       | (empty)                   | API key used by the Child to authenticate with the Parent.                     |
+| `enable compression`                            | `yes`                     | Enables compression for metrics sent by this Agent.                            |
+| `zstd compression level`                        | profile-dependent         | Overrides the profile's ZSTD compression level.                                |
+| `lz4 compression acceleration`                  | profile-dependent         | Overrides the profile's LZ4 compression acceleration.                          |
+| `brotli compression level`                      | profile-dependent         | Overrides the profile's Brotli compression level.                              |
+| `gzip compression level`                        | profile-dependent         | Overrides the profile's Gzip compression level.                                |
+| `timeout`                                       | `5m`                      | Sender connection and I/O timeout.                                             |
+| `default port`                                  | `19999`                   | Default port for streaming if not specified in `destination`.                  |
+| [`send charts matching`](#send-charts-matching) | `*`                       | Filters which charts are streamed.                                             |
+| `buffer size bytes`                             | `10485760`                | Buffer size (10MB by default). Increase for higher latencies.                  |
+| `reconnect delay`                               | `15s`                     | Time before retrying connection to the Parent.                                 |
+| `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                             |
+| `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a Parent using the H2O web server.               |
+
+The detected profile supplies the sender defaults. The `iot` and `parent` profiles use the fastest settings (ZSTD 1,
+LZ4 acceleration 9, Brotli 1, and Gzip 1); the `child` and `standalone` profiles use balanced settings (ZSTD 3, LZ4
+acceleration 1, Brotli 3, and Gzip 3). Each explicit compression option in `[stream]` overrides only its corresponding
+profile default.
 
 ### `[API_KEY]` Section (Parent Node Authentication)
 

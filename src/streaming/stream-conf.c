@@ -75,23 +75,152 @@ struct _stream_receive stream_receive = {
     }
 };
 
-void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
+static const struct {
+    compression_algorithm_t algorithm;
+    const char *setting;
+} sender_compression_level_settings[] = {
+    { COMPRESSION_ALGORITHM_BROTLI, "brotli compression level" },
+    { COMPRESSION_ALGORITHM_ZSTD,   "zstd compression level" },
+    { COMPRESSION_ALGORITHM_LZ4,    "lz4 compression acceleration" },
+    { COMPRESSION_ALGORITHM_GZIP,   "gzip compression level" },
+};
+
+static void stream_conf_resolve_sender_compression_levels(
+    struct config *config,
+    ND_COMPRESSION_PROFILE profile,
+    int levels[COMPRESSION_ALGORITHM_MAX]) {
+
     switch(profile) {
         default:
         case ND_COMPRESSION_DEFAULT:
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]      = 3;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]       = 1;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]    = 3;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]      = 3;
+            levels[COMPRESSION_ALGORITHM_ZSTD]      = 3;
+            levels[COMPRESSION_ALGORITHM_LZ4]       = 1;
+            levels[COMPRESSION_ALGORITHM_BROTLI]    = 3;
+            levels[COMPRESSION_ALGORITHM_GZIP]      = 3;
             break;
 
         case ND_COMPRESSION_FASTEST:
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]      = 1;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]       = 9;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]    = 1;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]      = 1;
+            levels[COMPRESSION_ALGORITHM_ZSTD]      = 1;
+            levels[COMPRESSION_ALGORITHM_LZ4]       = 9;
+            levels[COMPRESSION_ALGORITHM_BROTLI]    = 1;
+            levels[COMPRESSION_ALGORITHM_GZIP]      = 1;
             break;
     }
+
+    for(size_t i = 0; i < _countof(sender_compression_level_settings); i++) {
+        compression_algorithm_t algorithm = sender_compression_level_settings[i].algorithm;
+        levels[algorithm] = (int)inicfg_get_number(
+            config, CONFIG_SECTION_STREAM, sender_compression_level_settings[i].setting, levels[algorithm]);
+    }
+}
+
+void stream_conf_configure_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
+    stream_conf_resolve_sender_compression_levels(&stream_config, profile, stream_send.compression.levels);
+}
+
+int stream_conf_compression_levels_unittest(void) {
+    static const struct {
+        const char *name;
+        ND_COMPRESSION_PROFILE profile;
+        const char *configured[COMPRESSION_ALGORITHM_MAX];
+        int expected[COMPRESSION_ALGORITHM_MAX];
+    } tests[] = {
+        {
+            .name = "balanced defaults",
+            .profile = ND_COMPRESSION_DEFAULT,
+            .expected = {
+                [COMPRESSION_ALGORITHM_ZSTD] = 3,
+                [COMPRESSION_ALGORITHM_LZ4] = 1,
+                [COMPRESSION_ALGORITHM_GZIP] = 3,
+                [COMPRESSION_ALGORITHM_BROTLI] = 3,
+            },
+        },
+        {
+            .name = "fastest defaults",
+            .profile = ND_COMPRESSION_FASTEST,
+            .expected = {
+                [COMPRESSION_ALGORITHM_ZSTD] = 1,
+                [COMPRESSION_ALGORITHM_LZ4] = 9,
+                [COMPRESSION_ALGORITHM_GZIP] = 1,
+                [COMPRESSION_ALGORITHM_BROTLI] = 1,
+            },
+        },
+        {
+            .name = "partial zstd override",
+            .profile = ND_COMPRESSION_FASTEST,
+            .configured = {
+                [COMPRESSION_ALGORITHM_ZSTD] = "19",
+            },
+            .expected = {
+                [COMPRESSION_ALGORITHM_ZSTD] = 19,
+                [COMPRESSION_ALGORITHM_LZ4] = 9,
+                [COMPRESSION_ALGORITHM_GZIP] = 1,
+                [COMPRESSION_ALGORITHM_BROTLI] = 1,
+            },
+        },
+        {
+            .name = "all explicit overrides",
+            .profile = ND_COMPRESSION_DEFAULT,
+            .configured = {
+                [COMPRESSION_ALGORITHM_ZSTD] = "19",
+                [COMPRESSION_ALGORITHM_LZ4] = "7",
+                [COMPRESSION_ALGORITHM_GZIP] = "8",
+                [COMPRESSION_ALGORITHM_BROTLI] = "10",
+            },
+            .expected = {
+                [COMPRESSION_ALGORITHM_ZSTD] = 19,
+                [COMPRESSION_ALGORITHM_LZ4] = 7,
+                [COMPRESSION_ALGORITHM_GZIP] = 8,
+                [COMPRESSION_ALGORITHM_BROTLI] = 10,
+            },
+        },
+        {
+            .name = "unknown profile fallback",
+            .profile = (ND_COMPRESSION_PROFILE)255,
+            .expected = {
+                [COMPRESSION_ALGORITHM_ZSTD] = 3,
+                [COMPRESSION_ALGORITHM_LZ4] = 1,
+                [COMPRESSION_ALGORITHM_GZIP] = 3,
+                [COMPRESSION_ALGORITHM_BROTLI] = 3,
+            },
+        },
+    };
+
+    int errors = 0;
+
+    for(size_t i = 0; i < _countof(tests); i++) {
+        struct config config = APPCONFIG_INITIALIZER;
+        int levels[COMPRESSION_ALGORITHM_MAX] = { 0 };
+
+        for(size_t j = 0; j < _countof(sender_compression_level_settings); j++) {
+            compression_algorithm_t algorithm = sender_compression_level_settings[j].algorithm;
+            if(tests[i].configured[algorithm])
+                inicfg_set(&config, CONFIG_SECTION_STREAM, sender_compression_level_settings[j].setting,
+                           tests[i].configured[algorithm]);
+        }
+
+        stream_conf_resolve_sender_compression_levels(&config, tests[i].profile, levels);
+
+        for(size_t j = 0; j < _countof(sender_compression_level_settings); j++) {
+            compression_algorithm_t algorithm = sender_compression_level_settings[j].algorithm;
+            if(levels[algorithm] != tests[i].expected[algorithm]) {
+                fprintf(stderr,
+                        "STREAM CONF COMPRESSION TEST '%s': %s expected %d, got %d\n",
+                        tests[i].name,
+                        sender_compression_level_settings[j].setting,
+                        tests[i].expected[algorithm],
+                        levels[algorithm]);
+                errors++;
+            }
+        }
+
+        inicfg_free(&config);
+    }
+
+    if(!errors)
+        fprintf(stderr, "STREAM CONF COMPRESSION TESTS PASSED\n");
+
+    return errors;
 }
 
 static void stream_conf_load_internal() {
@@ -190,22 +319,6 @@ void stream_conf_load() {
     stream_send.compression.enabled =
         inicfg_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable compression",
                               stream_send.compression.enabled);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "brotli compression level",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "zstd compression level",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "lz4 compression acceleration",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "gzip compression level",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]);
 
     stream_send.parents.h2o = inicfg_get_boolean(
         &stream_config, CONFIG_SECTION_STREAM, "parent using h2o",

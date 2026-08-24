@@ -107,13 +107,18 @@ Children with retained data appear as **Stale** (or **Live** if actively streami
 
 **Parent detects child disconnection:**
 
-| Event                             | Detection Time  | Mechanism                                      |
-|-----------------------------------|-----------------|------------------------------------------------|
-| Child shuts down gracefully       | **Immediate**   | Socket close detected                          |
-| Child crashes or network drops    | **~60 seconds** | TCP keepalive probes (30s idle + 3×10s probes) |
-| Child silently stops sending data | **10 minutes**  | Idle activity timeout                          |
+| Event                             | Detection Time                         | Mechanism                                      |
+|-----------------------------------|----------------------------------------|------------------------------------------------|
+| Child shuts down gracefully       | **Immediate**                          | Socket close detected                          |
+| Child crashes or network drops    | **~60 seconds**                        | TCP keepalive probes (30s idle + 3×10s probes) |
+| Child silently stops sending data | **At least 10 minutes; cadence-aware** | Per-host idle activity timeout                 |
 
-These timings are hardcoded and not user-configurable.
+The silent-child timeout is `max(10 minutes, 2 × the minimum update interval)` across charts received from that host.
+The Parent retains the last learned minimum across reconnects and chart cleanup. Until a reconnect supplies its first
+chart definition, the Parent uses the larger of that retained minimum and the Child's handshake update interval.
+
+This timeout is automatic and not user-configurable. A Parent cannot infer a plugin-specific interval for a brand-new
+host before the unchanged Child sends its first chart definition; the 10-minute minimum applies until then.
 
 ### Standalone Agent Transitions
 

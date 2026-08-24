@@ -16,6 +16,7 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 #include "stream.h"
 #include "stream-thread.h"
 #include "stream-conf.h"
+#include "stream-receiver-timeout.h"
 #include "database/rrd.h"
 #include "plugins.d/plugins_d.h"
 
@@ -107,6 +108,7 @@ struct receiver_state {
     } exit;
 
     struct stream_receiver_config config;
+    int handshake_update_every;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     struct {

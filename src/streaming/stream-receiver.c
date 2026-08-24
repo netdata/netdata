@@ -1046,12 +1046,12 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
 
-        time_t timeout_s = 600;
+        uint64_t timeout_s = stream_receiver_timeout_seconds(&rpt->host->stream.rcv.timeout);
         if(unlikely(!rpt->thread.last_traffic_ut) && now_ut)
             rpt->thread.last_traffic_ut = now_ut;
         usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->thread.last_traffic_ut);
 
-        if(unlikely(idle_ut > (usec_t)timeout_s * USEC_PER_SEC &&
+        if(unlikely(stream_receiver_timeout_expired(&rpt->host->stream.rcv.timeout, idle_ut) &&
                      !rrdhost_receiver_replicating_charts(rpt->host))) {
 
             ND_LOG_STACK lgs[] = {
@@ -1074,10 +1074,10 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %" PRId64 " seconds - closing connection - "
+                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %" PRIu64 " seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, (int64_t)timeout_s,
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
                    stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
 
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT);

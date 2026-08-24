@@ -140,6 +140,8 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     RRDHOST *host = rrdhost; (void)host;
     RRDSET *st = rrdset;
 
+    stream_receiver_timeout_chart_forget(&host->stream.rcv.timeout, &st->stream.rcv.timeout);
+
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
     rrdset_finalize_collection(st, false);

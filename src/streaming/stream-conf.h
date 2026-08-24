@@ -97,7 +97,7 @@ bool stream_conf_is_key_type(const char *api_key, const char *type);
 bool stream_conf_api_key_is_enabled(const char *api_key, bool enabled);
 bool stream_conf_api_key_allows_client(const char *api_key, const char *client_ip);
 
-void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile);
+void stream_conf_configure_sender_compression_levels(ND_COMPRESSION_PROFILE profile);
 
 /**
  * Free stream configuration

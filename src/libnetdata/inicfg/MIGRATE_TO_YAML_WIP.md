@@ -1850,22 +1850,22 @@ Streaming configuration for parent-child node relationships
 | `CAfile` | string | Path to SSL certificate authority file for verifying parent node certificates. Used when streaming to parent with SSL/TLS enabled. |
 | `CApath` | string | Path to directory containing SSL certificate authority files for verifying parent certificates. Alternative to CAfile for systems with multiple CA certificates. |
 | `api key` | string | Authentication key for streaming to parent node. Must match a configured API key on the parent. Required for establishing streaming connections. |
-| `brotli compression level` | number | Brotli compression level (0-11). Higher values provide better compression but use more CPU. Default is 3. 0=fastest, 11=best compression. |
+| `brotli compression level` | number | Brotli compression level (0-11). Higher values provide better compression but use more CPU. Overrides the detected profile default. 0=fastest, 11=best compression. |
 | `buffer size` | size | Maximum size of the streaming buffer in bytes. Controls memory usage for outgoing data. Accepts units like MB, GB. Default is 10MB. |
 | `buffer size bytes` | number | Legacy option for buffer size in bytes. Use 'buffer size' instead for better readability with units. |
 | `default port` | number | Default port for connecting to parent node if not specified in destination. Default is 19999. |
 | `destination` | string | Parent node destination in format 'host:port' or 'host'. Multiple destinations separated by spaces for failover. First available parent is used. |
 | `enable compression` | boolean | Enable compression for streaming data. Reduces bandwidth but increases CPU usage. Default is yes. Negotiates best algorithm with parent. |
 | `enabled` | boolean | Enable streaming to parent node. Set to 'yes' to send data to configured destination. Default is no. |
-| `gzip compression level` | number | Gzip compression level (1-9). Higher values provide better compression but use more CPU. Default is 3. 1=fastest, 9=best compression. |
+| `gzip compression level` | number | Gzip compression level (1-9). Higher values provide better compression but use more CPU. Overrides the detected profile default. 1=fastest, 9=best compression. |
 | `initial clock resync iterations` | number | Number of iterations to sync clocks between parent and child before streaming starts. Helps ensure accurate timestamps. Default is 60. |
-| `lz4 compression acceleration` | number | LZ4 compression acceleration factor (1-9). Higher values mean faster compression but lower ratio. Default is 1. 9=fastest, 1=best compression. |
+| `lz4 compression acceleration` | number | LZ4 compression acceleration factor (1-9). Higher values mean faster compression but lower ratio. Overrides the detected profile default. 9=fastest, 1=best compression. |
 | `parent using h2o` | boolean | Set to 'yes' if parent is using H2O web server. Adjusts protocol handling for compatibility. Default is no. |
 | `reconnect delay` | duration | Delay in seconds before attempting to reconnect to the parent node after a connection failure. Default is 15 seconds. Minimum is 5 seconds. |
 | `send charts matching` | string | Pattern for selecting which charts to stream. Uses simple patterns with wildcards. Default is '*' (all charts). Example: 'system.* disk.*' |
 | `ssl skip certificate verification` | boolean | Skip SSL certificate verification when connecting to parent. WARNING: Insecure, use only for testing. Default is no. |
 | `timeout` | duration | Connection timeout in seconds for streaming operations. Applies to connection establishment and data transmission. Default is 300 seconds. |
-| `zstd compression level` | number | Zstandard compression level (1-22). Provides excellent compression with good speed. Default is 3. 1=fastest, 22=best compression. |
+| `zstd compression level` | number | Zstandard compression level (1-22). Provides excellent compression with good speed. Overrides the detected profile default. 1=fastest, 22=best compression. |
 
 ### Section `api_key`
 API key specific configuration for streaming receivers

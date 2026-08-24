@@ -169,5 +169,5 @@ void nd_profile_setup(void) {
 
     aral_optimal_malloc_page_size_set(nd_profile.max_page_size);
     netdata_conf_glibc_malloc_initialize(nd_profile.malloc_arenas, nd_profile.malloc_trim);
-    stream_conf_set_sender_compression_levels(nd_profile.stream_sender_compression);
+    stream_conf_configure_sender_compression_levels(nd_profile.stream_sender_compression);
 }
