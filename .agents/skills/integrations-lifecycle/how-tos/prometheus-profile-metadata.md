@@ -18,7 +18,10 @@ profile contribution must make a deliberate catalog disposition.
 - **Documentation projection:**
   `integrations/prometheus_profile_docs.py` joins each mapped profile's strict
   `PROFILE-DESIGN.yaml` with its runtime profile YAML. Generation fails if a
-  stock profile is unmapped or if a semantic view and runtime chart differ.
+  stock profile is unmapped or if a semantic view and runtime chart differ. The
+  public chart payload is an allowlist of context, title, family hierarchy,
+  units, dimensions, selectors, and entity scope. A profile-design view's
+  `question` remains internal authoring rationale and is not projected.
 - **Generic profile configuration:** the Prometheus collector metadata documents
   the `profiles` job option
   (`src/go/plugin/go.d/collector/prometheus/metadata.yaml:175-203`). That is
@@ -57,7 +60,9 @@ For every stock profile:
 4. Keep runtime profile YAML limited to collection behavior. Put the
    operator-facing profile `title` and `summary` in the strict
    `PROFILE-DESIGN.yaml` `documentation` block, and put the human activation
-   explanation on every support dependency's `activation` field.
+   explanation on every support dependency's `activation` field. Keep each
+   view's `question` as internal authoring rationale; do not expose it through
+   integration metadata or generated pages.
 5. Omit job `profiles` from application examples so they exercise default
    automatic selection. Do not copy proof-descriptor candidate/support
    composition into deployment configuration; exact proof composition isolates
@@ -82,7 +87,8 @@ For every stock profile:
 - Validate the edited `metadata.yaml` through `integrations/gen_integrations.py`.
 - Run `python3 -m unittest integrations.tests.test_prometheus_profile_docs` to
   enforce stock-profile reachability, exact view/chart/family parity, support
-  projection, inherited-YAML isolation, and generated markup hooks.
+  projection, the public chart-field allowlist, absence of internal questions,
+  inherited-YAML isolation, and generated markup hooks.
 - Regenerate the application integration page and, when the catalog gains or
   loses an entry, `src/collectors/COLLECTORS.md`.
 - Run `python3 integrations/gen_taxonomy.py --check-only`.

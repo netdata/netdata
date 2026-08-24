@@ -91,7 +91,7 @@ and compiling disagreements into failures.
 | Claim | Authority | Enforcement |
 |---|---|---|
 | Exporter registrations, types, components, label domains, lifecycle, availability, units, and source relationships | `SOURCE-SEMANTICS.yaml`, plus the optional mechanical source registry and its pinned public upstream evidence | Strict semantic load and static compilation |
-| Operator-facing profile documentation, questions, entity grain, identity, label treatment, reductions, exclusions, units, and presentation intent | `PROFILE-DESIGN.yaml` | Strict semantic load, static compilation, production reconciliation, and integration-documentation projection |
+| Profile documentation, internal operator questions, entity grain, identity, label treatment, reductions, exclusions, units, and presentation intent | `PROFILE-DESIGN.yaml` | Strict semantic load, static compilation, production reconciliation, and integration-documentation projection of the public subset |
 | Human rationale for the design | `OPERATOR-MODEL.md` | Human review; exact machine claims belong in the YAML contracts |
 | Realizable input environments, fixtures, lifecycle sequences, expected verdicts/findings, and coverage participation | `proof.yaml` | Strict proof descriptor load and replay verification |
 | Profile parsing, selection, relabeling, assembly, writer behavior, chart routing, and public wire identities | Production Prometheus, metrix, chartengine, and chartemit packages | Real production execution with opt-in structured facts |
@@ -105,6 +105,8 @@ Important boundaries:
   signal or chart ownership.
 - `PROFILE-DESIGN.yaml` is research-backed design input, not a serialization of the resulting profile. Its `documentation`
   block owns the operator-facing profile title and summary used by generated integration documentation.
+- A view's `question` is internal authoring rationale. Generated integration documentation MUST NOT publish it. The public
+  chart projection is limited to context, title, family hierarchy, units, dimensions, selectors, and entity scope.
 - `proof.yaml` contains independent expectations, not generated snapshots, counts, or content digests.
 - Production code is authoritative for behavior. Semantic contracts state what that behavior must mean for the profile.
 

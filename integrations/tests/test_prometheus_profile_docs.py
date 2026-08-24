@@ -44,6 +44,20 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         )
         self.assertEqual(sum(document['chart_count'] for document in self.catalog.values()), 994)
 
+        public_chart_fields = {
+            'context',
+            'title',
+            'family',
+            'units',
+            'dimensions',
+            'selectors',
+            'entity_scope',
+        }
+        for profile, document in self.catalog.items():
+            for chart in _profile_charts(document).values():
+                with self.subTest(profile=profile, context=chart['context']):
+                    self.assertEqual(set(chart), public_chart_fields)
+
         ceph_contexts = {
             chart['context']
             for family in self.catalog['ceph']['families']
@@ -128,7 +142,8 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         self.assertEqual(clean.count('data-prometheus-profile-chart'), 569)
         self.assertEqual(rich.count('<!-- prometheus-profile-chart -->'), 569)
         self.assertIn('Eligible metrics that are not covered by a curated chart', clean)
-        self.assertIn('Operator question:', clean)
+        self.assertNotIn('Operator question:', clean)
+        self.assertNotIn('Operator question:', rich)
         self.assertIn('Entity scope:', clean)
         self.assertIn('Source metric selectors', clean)
         self.assertIn('Managers (1 chart)', clean)
@@ -165,38 +180,6 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
                 block = clean[start:end if end != -1 else None]
                 self.assertEqual(block.count(f'`{dimension_name}`'), 1)
                 self.assertIn(f'<summary>Source metric selectors ({selector_count})</summary>', block)
-
-    def test_operator_questions_avoid_repeated_or_fragile_grammar(self):
-        vllm = _profile_charts(self.catalog['vllm'])
-        litellm = _profile_charts(self.catalog['litellm'])
-
-        self.assertFalse([
-            chart['question']
-            for chart in vllm.values()
-            if chart['question'].startswith('At what rate does ')
-        ])
-        self.assertFalse([
-            chart['question']
-            for chart in vllm.values()
-            if chart['question'].startswith('How is ') and chart['question'].endswith(' distributed?')
-        ])
-        self.assertFalse([
-            chart['question']
-            for chart in litellm.values()
-            if ' by ' in chart['question'] and ' report for each ' in chart['question']
-        ])
-        self.assertEqual(
-            vllm['request_lifecycle.parent_requests']['question'],
-            'What is the rate of change for parent requests?',
-        )
-        self.assertEqual(
-            vllm['request_lifecycle.requested_sequences']['question'],
-            'What is the distribution of requested sequences?',
-        )
-        self.assertEqual(
-            litellm['usage.end_user.spend']['question'],
-            'What is the LLM spend for each end user?',
-        )
 
     def test_generated_markdown_preserves_catalogue_hooks(self):
         markdown = (
