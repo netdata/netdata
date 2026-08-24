@@ -39,7 +39,7 @@ require (
 	github.com/lmittmann/tint v1.2.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-xmlrpc v0.0.3
-	github.com/miekg/dns v1.1.72
+	github.com/miekg/dns v1.1.73
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/prometheus/common v0.70.1
@@ -202,11 +202,9 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.48.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260720211330-0afa2a65878a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a // indirect
