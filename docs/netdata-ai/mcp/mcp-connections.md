@@ -109,7 +109,7 @@ See [Investigations](/docs/netdata-ai/investigations/index.md) and [Scheduled Re
 
 The **Custom MCP Server** option accepts any MCP endpoint that meets the following:
 
-- **Transport:** Streamable HTTP over HTTPS. Any path works — Netdata uses exactly the URL you configure. The optional standalone `GET` SSE stream is not used, so the server must be usable without it.
+- **Transport:** Streamable HTTP over HTTPS. Any path works — Netdata uses the exact URL you configure. The optional standalone `GET` SSE stream isn't used, so the server must work without it.
 - **Authentication:** the token you provide is sent as `Authorization: Bearer <token>` on every request, including discovery. It is stored encrypted.
 - **TLS:** a publicly trusted certificate is required. Netdata validates against the system trust store — private CAs and self-signed certificates are rejected.
 - **Reachability:** the hostname must resolve to a public IP address. Loopback, private (RFC1918/ULA), link-local, CGNAT and multicast addresses are refused, both when you save the configuration and again before each connection.
