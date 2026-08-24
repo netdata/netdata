@@ -327,25 +327,2342 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+The built-in Prometheus profiles on this page define 120 curated charts across
+the primary and applicable supporting profiles.
+The catalogue is generated from the same profile design and runtime chart contracts used by the Agent.
 
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
 
-Untyped metrics (have no '# TYPE') processing:
+<details open data-prometheus-profile-catalog>
+<summary>Curated profile coverage (120 charts)</summary>
 
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
 
-**The rest are ignored**.
+<details open data-prometheus-profile>
+<summary>vLLM — 103 charts</summary>
+
+
+Curated inference, scheduling, latency, token, cache, connector, engine, HTTP, and runtime metrics from vLLM and Ray.
+
+
+<details data-prometheus-profile-family>
+<summary>Request Lifecycle (15 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Corrupted Requests</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `requests/s`
+- **Dimensions:** `corrupted`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:corrupted_requests_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Time to First Token</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:time_to_first_token_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>End-to-End Request Latency</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:e2e_request_latency_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requests Reaching First Token</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:time_to_first_token_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Pre-Response Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:time_to_first_token_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed End-to-End Request Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:e2e_request_latency_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requested Sequences</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_params_n_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requested Sequence Volume</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `sequences/s`
+- **Dimensions:** `sequences`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_params_n_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requested Token Limit</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_params_max_tokens_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requested Token Limits Sum</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `token_limits`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_params_max_tokens_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Requests with Explicit Token Limit</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_params_max_tokens_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Maximum Generated Tokens</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_max_num_generation_tokens_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Maximum Generated Tokens Sum</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `maximums`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_max_num_generation_tokens_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Parent Requests</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_params_n_count`
+
+</details>
+
+
+</details>
+
+
+<details data-prometheus-profile-family>
+<summary>Outcomes (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Request Outcomes</summary>
+
+
+- **Entity scope:** model_name and engine and finished_reason
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_success_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Scheduler (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Request State</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `requests`
+- **Dimensions:** `running`, `waiting_capacity`, `waiting_deferred`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `vllm:num_requests_running`
+- `vllm:num_requests_waiting_by_reason{reason="capacity"}`
+- `vllm:num_requests_waiting_by_reason{reason="deferred"}`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Request Preemptions</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `preemptions/s`
+- **Dimensions:** `preemptions`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:num_preemptions_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Engine Sleep State</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `{status}`
+- **Dimensions:** `values of label sleep_state`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:engine_sleep_state`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Request Queue Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_queue_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Request Queue Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_queue_time_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Prefill (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Prompt Tokens by Source</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `values of label source`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:prompt_tokens_by_source_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Prompt Size</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_prompt_tokens_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Prefill Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_prefill_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Computed KV Tokens</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_prefill_kv_computed_tokens_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Request Prompt Volume</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `prompt_tokens`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_prompt_tokens_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Computed KV Token Volume</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `computed_tokens`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_prefill_kv_computed_tokens_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Request Prefill Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_prefill_time_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Decode (10 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Generated Tokens</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `generated`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:generation_tokens_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Output Size</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_generation_tokens_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Decode Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_decode_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inter-Token Latency</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:inter_token_latency_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mean Output-Token Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_time_per_output_token_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Output Token Volume</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `output_tokens`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_generation_tokens_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Request Decode Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_decode_time_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inter-Token Intervals</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `intervals/s`
+- **Dimensions:** `intervals`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:inter_token_latency_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Inter-Token Interval Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `intervals`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:inter_token_latency_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated Mean Output-Token Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `request_means`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_time_per_output_token_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Engine Execution (7 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Inference Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_inference_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Request Inference Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:request_inference_time_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tokens per Engine Step</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:iteration_tokens_total_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Engine Steps</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `steps/s`
+- **Dimensions:** `steps`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:iteration_tokens_total_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Engine Step Token Volume</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `tokens`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:iteration_tokens_total_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Estimated Compute per GPU</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `GFLOP/s/GPU`
+- **Dimensions:** `compute`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:estimated_flops_per_gpu_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Estimated Memory Bandwidth per GPU</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `GB/s/GPU`
+- **Dimensions:** `read`, `write`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:estimated_read_bytes_per_gpu_total`
+- `vllm:estimated_write_bytes_per_gpu_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>KV Cache (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>KV Cache Usage</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `percentage`
+- **Dimensions:** `used`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_cache_usage_perc`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Local Prefix Cache</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `queries`, `hits`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:prefix_cache_queries_total`
+- `vllm:prefix_cache_hits_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>External Prefix Cache</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `queries`, `hits`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:external_prefix_cache_queries_total`
+- `vllm:external_prefix_cache_hits_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Multimodal Cache</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `items/s`
+- **Dimensions:** `queries`, `hits`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:mm_cache_queries_total`
+- `vllm:mm_cache_hits_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>KV Cache Residency (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>KV Block Lifetime</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_block_lifetime_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Block Idle Time Before Eviction</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_block_idle_before_evict_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Block Reuse Gap</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_block_reuse_gap_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Cache Events</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `blocks/s`
+- **Dimensions:** `evictions`, `reuse_gaps`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_block_lifetime_seconds_count`
+- `vllm:kv_block_reuse_gap_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accumulated KV Residency Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `lifetime`, `idle_before_eviction`, `reuse_gap`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `vllm:kv_block_lifetime_seconds_sum`
+- `vllm:kv_block_idle_before_evict_seconds_sum`
+- `vllm:kv_block_reuse_gap_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>KV Offloading (18 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Load Size</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_load_size_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Store Size</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_store_size_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Transfer Operations</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `operations/s`
+- **Dimensions:** `loads`, `stores`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_load_size_count`
+- `vllm:kv_offload_store_size_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Transfer Throughput</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `bytes/s`
+- **Dimensions:** `loaded`, `stored`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_load_bytes_total`
+- `vllm:kv_offload_store_bytes_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed KV Offload Transfer Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `load`, `store`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_load_time_total`
+- `vllm:kv_offload_store_time_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Synchronous Lookup Delay</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_lookup_sync_delay_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Asynchronous Lookup Delay</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_lookup_async_delay_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Lookup Measurements</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `lookups/s`
+- **Dimensions:** `synchronous`, `asynchronous`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_lookup_sync_delay_seconds_count`
+- `vllm:kv_offload_lookup_async_delay_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Lookup Delay Accumulation</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `synchronous`, `asynchronous`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_lookup_sync_delay_seconds_sum`
+- `vllm:kv_offload_lookup_async_delay_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CPU KV Cache Usage</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `percentage`
+- **Dimensions:** `total`, `writes`, `reads`
+<details><summary>Source metric selectors (3)</summary>
+
+
+- `vllm:kv_offload_cpu_cache_usage_perc`
+- `vllm:kv_offload_cpu_cache_write_usage_perc`
+- `vllm:kv_offload_cpu_cache_read_usage_perc`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CPU KV Allocation Size</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_cpu_allocation_size_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CPU KV Allocation Measurements</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `allocations/s`
+- **Dimensions:** `allocations`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_cpu_allocation_size_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>CPU KV Allocation Volume</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `blocks/s`
+- **Dimensions:** `blocks`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_cpu_allocation_size_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>KV Offload Admission Outcomes</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `events/s`
+- **Dimensions:** `allocation_failures`, `stores_skipped`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_allocation_failure_total`
+- `vllm:kv_offload_stores_skipped_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tiered KV Offload Synchronous Lookup Delay</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tiered KV Offload Asynchronous Lookup Delay</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tiered KV Offload Lookup Measurements</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `lookups/s`
+- **Dimensions:** `synchronous`, `asynchronous`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_tiering_lookup_sync_delay_seconds_count`
+- `vllm:kv_offload_tiering_lookup_async_delay_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Tiered KV Offload Lookup Delay Accumulation</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `synchronous`, `asynchronous`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:kv_offload_tiering_lookup_sync_delay_seconds_sum`
+- `vllm:kv_offload_tiering_lookup_async_delay_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>NIXL Connector (10 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Transfer Duration</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_xfer_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Transfer Post Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_post_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Transfer Size</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_bytes_transferred_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Transfer Descriptors</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_num_descriptors_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Successful NIXL Transfers</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `transfers/s`
+- **Dimensions:** `transfers`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_xfer_time_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed NIXL Transfer Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `transfer`, `post`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:nixl_xfer_time_seconds_sum`
+- `vllm:nixl_post_time_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Transfer Throughput</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `bytes/s`
+- **Dimensions:** `transferred`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_bytes_transferred_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Descriptor Throughput</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `descriptors/s`
+- **Dimensions:** `descriptors`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_num_descriptors_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Failures</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `failures/s`
+- **Dimensions:** `transfers`, `notifications`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:nixl_num_failed_transfers_total`
+- `vllm:nixl_num_failed_notifications_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>NIXL Requests with Expired KV</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `requests/s`
+- **Dimensions:** `expired`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:nixl_num_kv_expired_reqs_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HF3FS Connector (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HF3FS Save Duration</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:hf3fs_save_duration_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HF3FS Load Duration</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:hf3fs_load_duration_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HF3FS Transfer Measurements</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `operations/s`
+- **Dimensions:** `saves`, `loads`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:hf3fs_save_duration_seconds_count`
+- `vllm:hf3fs_load_duration_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed HF3FS Transfer Time</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `seconds/s`
+- **Dimensions:** `saves`, `loads`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:hf3fs_save_duration_seconds_sum`
+- `vllm:hf3fs_load_duration_seconds_sum`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HF3FS Transfer Failures</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `failures/s`
+- **Dimensions:** `saves`, `loads`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:hf3fs_num_failed_save_total`
+- `vllm:hf3fs_num_failed_load_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Mooncake Connector (6 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Operation Timing (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Mooncake Store Operation Time</summary>
+
+
+- **Entity scope:** model_name and engine and operation and status
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:mooncake_store_operation_time_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mooncake Store Operations</summary>
+
+
+- **Entity scope:** model_name and engine and operation and status
+- **Units:** `operations/s`
+- **Dimensions:** `operations`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:mooncake_store_operation_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed Mooncake Store Operation Time</summary>
+
+
+- **Entity scope:** model_name and engine and operation and status
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:mooncake_store_operation_time_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Operation Volume (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Mooncake Store Key Throughput</summary>
+
+
+- **Entity scope:** model_name and engine and operation and status
+- **Units:** `keys/s`
+- **Dimensions:** `keys`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:mooncake_store_operation_keys_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mooncake Store Byte Throughput</summary>
+
+
+- **Entity scope:** model_name and engine and operation and status
+- **Units:** `bytes/s`
+- **Dimensions:** `bytes`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:mooncake_store_operation_bytes_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Mooncake Store Failed Keys</summary>
+
+
+- **Entity scope:** model_name and engine and operation and status
+- **Units:** `keys/s`
+- **Dimensions:** `failed`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:mooncake_store_operation_failed_keys_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Speculative Decoding (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Drafts</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `drafts/s`
+- **Dimensions:** `drafts`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:spec_decode_num_drafts_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Draft Token Outcomes</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `proposed`, `accepted`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:spec_decode_num_draft_tokens_total`
+- `vllm:spec_decode_num_accepted_tokens_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Accepted Tokens by Position</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `values of label position`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:spec_decode_num_accepted_tokens_per_pos_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Diffusion Decoding (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Diffusion Denoising Steps</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `steps/s`
+- **Dimensions:** `steps`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:diffusion_num_denoising_steps_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Diffusion Canvas Positions</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `positions/s`
+- **Dimensions:** `positions`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:diffusion_num_canvas_positions_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Diffusion Committed Tokens</summary>
+
+
+- **Entity scope:** model_name and engine
+- **Units:** `tokens/s`
+- **Dimensions:** `committed`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:diffusion_num_committed_tokens_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>WebSocket Service (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Active WebSocket Connections</summary>
+
+
+- **Entity scope:** collector job service
+- **Units:** `connections`
+- **Dimensions:** `active`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:websocket_connections_active`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>WebSocket Connection Lifecycle</summary>
+
+
+- **Entity scope:** collector job service
+- **Units:** `connections/s`
+- **Dimensions:** `opened`, `closed`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `vllm:websocket_connections_total`
+- `vllm:websocket_connection_duration_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>WebSocket Connection Duration</summary>
+
+
+- **Entity scope:** collector job service
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:websocket_connection_duration_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Completed WebSocket Connection Time</summary>
+
+
+- **Entity scope:** collector job service
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:websocket_connection_duration_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>Tool Parsing (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Tool Parser Invocations</summary>
+
+
+- **Entity scope:** model_name and request_type and mode and outcome
+- **Units:** `invocations/s`
+- **Dimensions:** `invocations`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `vllm:tool_call_parser_invocations_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile>
+<summary>FastAPI HTTP instrumentation — 9 charts</summary>
+
+
+Curated request outcomes, latency, in-progress work, measurements, and body traffic from instrumented FastAPI services.
+
+**Supporting profile for vLLM.** Included when the endpoint exposes vLLM's native HTTP transport metrics; Ray-only metrics do not activate it.
+
+<details data-prometheus-profile-family>
+<summary>FastAPI (9 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>HTTP Endpoints (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Outcomes</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `requests/s`
+- **Dimensions:** `values of label status`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_requests_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Duration</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Measurements</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Completed Request Time</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HTTP Service (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>High-Resolution HTTP Request Duration</summary>
+
+
+- **Entity scope:** instrumented FastAPI service
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_highr_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Measurements</summary>
+
+
+- **Entity scope:** instrumented FastAPI service
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_highr_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Completed Request Time</summary>
+
+
+- **Entity scope:** instrumented FastAPI service
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_highr_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HTTP In Progress (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Requests In Progress</summary>
+
+
+- **Entity scope:** FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled
+- **Units:** `requests`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_requests_inprogress`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HTTP Body Traffic (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Body Throughput</summary>
+
+
+- **Entity scope:** FastAPI HTTP route handler
+- **Units:** `bytes/s`
+- **Dimensions:** `request`, `response`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `http_request_size_bytes_sum`
+- `http_response_size_bytes_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile>
+<summary>Process runtime — 5 charts</summary>
+
+
+Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
+
+**Supporting profile for vLLM.** Included when the endpoint exposes vLLM's native process metrics; Ray-only metrics do not activate it.
+
+<details data-prometheus-profile-family>
+<summary>Process Runtime (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Process CPU Usage</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `cores`
+- **Dimensions:** `used`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_cpu_seconds_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Process Resident Memory</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `bytes`
+- **Dimensions:** `resident`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_resident_memory_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Process Virtual Memory</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `bytes`
+- **Dimensions:** `virtual`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_virtual_memory_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Open File Descriptors</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `fds`
+- **Dimensions:** `open`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_open_fds`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>File Descriptor Limit</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `fds`
+- **Dimensions:** `limit`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_max_fds`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile>
+<summary>Python garbage collection — 3 charts</summary>
+
+
+Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
+
+**Supporting profile for vLLM.** Included when the endpoint exposes vLLM's native Python garbage-collection metrics; Ray-only metrics do not activate it.
+
+<details data-prometheus-profile-family>
+<summary>Process Runtime (3 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Python GC (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Collected Objects</summary>
+
+
+- **Entity scope:** Python garbage-collector generation
+- **Units:** `objects/s`
+- **Dimensions:** `collected`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `python_gc_objects_collected_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Uncollectable Objects</summary>
+
+
+- **Entity scope:** Python garbage-collector generation
+- **Units:** `objects/s`
+- **Dimensions:** `uncollectable`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `python_gc_objects_uncollectable_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Collections</summary>
+
+
+- **Entity scope:** Python garbage-collector generation
+- **Units:** `collections/s`
+- **Dimensions:** `collections`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `python_gc_collections_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+
+</details>
 
 
 

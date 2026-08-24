@@ -32,6 +32,10 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+HAProxy can be monitored further using the following other integrations:
+
+- [HAProxy Prometheus](/src/go/plugin/go.d/collector/prometheus/integrations/haproxy_prometheus.md)
+
 ### Default Behavior
 
 #### Auto-Detection
