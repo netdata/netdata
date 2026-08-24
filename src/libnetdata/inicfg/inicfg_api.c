@@ -474,8 +474,11 @@ long long inicfg_get_number_range(struct config *root, const char *section, cons
 // The fixed-point format is preferred for readability, but it needs thousands of digits for
 // huge magnitudes (e.g. 1e100), which would be silently truncated to a completely different
 // number. When it does not fit, fall back to the exponential format, which always fits.
+// snprintf() is used (not snprintfz()) because it returns the length the value would need,
+// so truncation is detected without rejecting a value that fits exactly.
 static void inicfg_double_to_str(char *dst, size_t dst_size, NETDATA_DOUBLE value) {
-    if((size_t)snprintfz(dst, dst_size, "%0.5" NETDATA_DOUBLE_MODIFIER, value) >= dst_size - 1)
+    int len = snprintf(dst, dst_size, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    if(len < 0 || (size_t)len >= dst_size)
         snprintfz(dst, dst_size, NETDATA_DOUBLE_FORMAT_G, value);
 }
 

@@ -1960,7 +1960,8 @@ static int test_inicfg_double_values(void) {
 
     // NETDATA_DOUBLE values are formatted into fixed size buffers before being stored.
     // Huge magnitudes must not be silently truncated into a completely different number.
-    static const NETDATA_DOUBLE values[] = { 1.5, -0.25, 123456.789, 1e100, -1e100, 1e30 };
+    // 1e92 is the largest magnitude whose fixed-point form still fits; 1e93 is the first that does not.
+    static const NETDATA_DOUBLE values[] = { 1.5, -0.25, 123456.789, 1e30, 1e92, 1e93, 1e100, -1e100 };
     struct config cfg = APPCONFIG_INITIALIZER;
     int rc = 0;
 
@@ -1986,6 +1987,25 @@ static int test_inicfg_double_values(void) {
                     __FUNCTION__, value, got);
             rc = 1;
         }
+    }
+
+    // a value whose fixed-point form fills the buffer exactly must be kept in fixed-point
+    // (the internal buffer is 100 bytes, so 99 characters is an exact fit, not a truncation)
+    inicfg_set_double(&cfg, "unittest doubles", "exact fit", (NETDATA_DOUBLE)1e92);
+    const char *stored = inicfg_get(&cfg, "unittest doubles", "exact fit", "");
+    if(strlen(stored) != 99 || strchr(stored, 'e') || strchr(stored, 'E')) {
+        fprintf(stderr, "%s: exact fit stored as '%s' (%zu chars), expected 99 fixed-point characters\n",
+                __FUNCTION__, stored, strlen(stored));
+        rc = 1;
+    }
+
+    // one character more does not fit, so it must switch to the exponential format
+    inicfg_set_double(&cfg, "unittest doubles", "truncated", (NETDATA_DOUBLE)1e93);
+    stored = inicfg_get(&cfg, "unittest doubles", "truncated", "");
+    if(!strchr(stored, 'e') && !strchr(stored, 'E')) {
+        fprintf(stderr, "%s: too long value stored as '%s', expected the exponential format\n",
+                __FUNCTION__, stored);
+        rc = 1;
     }
 
     inicfg_free(&cfg);
