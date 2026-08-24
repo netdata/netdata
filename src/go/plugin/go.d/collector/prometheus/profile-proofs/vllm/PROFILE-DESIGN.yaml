@@ -808,7 +808,7 @@ views:
       omit: {}
   request_lifecycle.time_to_first_token:
     family: Request Lifecycle
-    question: How is time to first token distributed?
+    question: What is the distribution of time to first token?
     entity: model_engine_ray
     inputs:
       time_to_first_token:
@@ -824,7 +824,7 @@ views:
       omit: {}
   request_lifecycle.end_to_end_latency:
     family: Request Lifecycle
-    question: How is end-to-end request latency distributed?
+    question: What is the distribution of end-to-end request latency?
     entity: model_engine_ray
     inputs:
       end_to_end_latency:
@@ -888,7 +888,7 @@ views:
       omit: {}
   request_lifecycle.requested_sequences:
     family: Request Lifecycle
-    question: How is requested sequences distributed?
+    question: What is the distribution of requested sequences?
     entity: model_engine_ray
     inputs:
       requested_sequences:
@@ -920,7 +920,7 @@ views:
       omit: {}
   request_lifecycle.requested_token_limit:
     family: Request Lifecycle
-    question: How is requested token limit distributed?
+    question: What is the distribution of requested token limit?
     entity: model_engine_ray
     inputs:
       requested_token_limit:
@@ -968,7 +968,7 @@ views:
       omit: {}
   request_lifecycle.maximum_generated_tokens:
     family: Request Lifecycle
-    question: How is maximum generated tokens distributed?
+    question: What is the distribution of maximum generated tokens?
     entity: model_engine_ray
     inputs:
       maximum_generated_tokens:
@@ -1104,7 +1104,7 @@ views:
       omit: {}
   scheduler.queue_time:
     family: Scheduler
-    question: How is request queue time distributed?
+    question: What is the distribution of request queue time?
     entity: model_engine_ray
     inputs:
       queue_time:
@@ -1154,7 +1154,7 @@ views:
       omit: {}
   prefill.prompt_size:
     family: Prefill
-    question: How is prompt size distributed?
+    question: What is the distribution of prompt size?
     entity: model_engine_ray
     inputs:
       prompt_size:
@@ -1170,7 +1170,7 @@ views:
       omit: {}
   prefill.prefill_time:
     family: Prefill
-    question: How is prefill time distributed?
+    question: What is the distribution of prefill time?
     entity: model_engine_ray
     inputs:
       prefill_time:
@@ -1186,7 +1186,7 @@ views:
       omit: {}
   prefill.computed_kv_tokens:
     family: Prefill
-    question: How is computed kv tokens distributed?
+    question: What is the distribution of computed kv tokens?
     entity: model_engine_ray
     inputs:
       computed_kv_tokens:
@@ -1266,7 +1266,7 @@ views:
       omit: {}
   decode.output_size:
     family: Decode
-    question: How is output size distributed?
+    question: What is the distribution of output size?
     entity: model_engine_ray
     inputs:
       output_size:
@@ -1282,7 +1282,7 @@ views:
       omit: {}
   decode.decode_time:
     family: Decode
-    question: How is decode time distributed?
+    question: What is the distribution of decode time?
     entity: model_engine_ray
     inputs:
       decode_time:
@@ -1298,7 +1298,7 @@ views:
       omit: {}
   decode.inter_token_latency:
     family: Decode
-    question: How is inter-token latency distributed?
+    question: What is the distribution of inter-token latency?
     entity: model_engine_ray
     inputs:
       inter_token_latency:
@@ -1314,7 +1314,7 @@ views:
       omit: {}
   decode.mean_output_token_time:
     family: Decode
-    question: How is mean output-token time distributed?
+    question: What is the distribution of mean output-token time?
     entity: model_engine_ray
     inputs:
       mean_output_token_time:
@@ -1410,7 +1410,7 @@ views:
       omit: {}
   engine_execution.inference_time:
     family: Engine Execution
-    question: How is inference time distributed?
+    question: What is the distribution of inference time?
     entity: model_engine_ray
     inputs:
       inference_time:
@@ -1442,7 +1442,7 @@ views:
       omit: {}
   engine_execution.tokens_per_step:
     family: Engine Execution
-    question: How is tokens per engine step distributed?
+    question: What is the distribution of tokens per engine step?
     entity: model_engine_ray
     inputs:
       tokens_per_step:
@@ -1617,7 +1617,7 @@ views:
       omit: {}
   kv_cache_residency.block_lifetime:
     family: KV Cache Residency
-    question: How is kv block lifetime distributed?
+    question: What is the distribution of kv block lifetime?
     entity: model_engine_ray
     inputs:
       block_lifetime:
@@ -1633,7 +1633,7 @@ views:
       omit: {}
   kv_cache_residency.idle_before_eviction:
     family: KV Cache Residency
-    question: How is kv block idle time before eviction distributed?
+    question: What is the distribution of kv block idle time before eviction?
     entity: model_engine_ray
     inputs:
       idle_before_eviction:
@@ -1649,7 +1649,7 @@ views:
       omit: {}
   kv_cache_residency.reuse_gap:
     family: KV Cache Residency
-    question: How is kv block reuse gap distributed?
+    question: What is the distribution of kv block reuse gap?
     entity: model_engine_ray
     inputs:
       reuse_gap:
@@ -1709,7 +1709,7 @@ views:
       omit: {}
   kv_offloading.load_size:
     family: KV Offloading
-    question: How is kv offload load size distributed?
+    question: What is the distribution of kv offload load size?
     entity: model_engine_ray
     inputs:
       load_size:
@@ -1725,7 +1725,7 @@ views:
       omit: {}
   kv_offloading.store_size:
     family: KV Offloading
-    question: How is kv offload store size distributed?
+    question: What is the distribution of kv offload store size?
     entity: model_engine_ray
     inputs:
       store_size:
@@ -1801,7 +1801,7 @@ views:
       omit: {}
   kv_offloading.lookup_sync_delay:
     family: KV Offloading
-    question: How is kv offload synchronous lookup delay distributed?
+    question: What is the distribution of kv offload synchronous lookup delay?
     entity: model_engine_ray
     inputs:
       lookup_sync_delay:
@@ -1817,7 +1817,7 @@ views:
       omit: {}
   kv_offloading.lookup_async_delay:
     family: KV Offloading
-    question: How is kv offload asynchronous lookup delay distributed?
+    question: What is the distribution of kv offload asynchronous lookup delay?
     entity: model_engine_ray
     inputs:
       lookup_async_delay:
@@ -1902,7 +1902,7 @@ views:
       - display_conventions
   kv_offloading.cpu_allocation_size:
     family: KV Offloading
-    question: How is cpu kv allocation size distributed?
+    question: What is the distribution of cpu kv allocation size?
     entity: model_engine_ray
     inputs:
       cpu_allocation_size:
@@ -1970,7 +1970,7 @@ views:
       omit: {}
   kv_offloading.tiering_lookup_sync_delay:
     family: KV Offloading
-    question: How is tiered kv offload synchronous lookup delay distributed?
+    question: What is the distribution of tiered kv offload synchronous lookup delay?
     entity: model_engine_ray
     inputs:
       tiering_lookup_sync_delay:
@@ -1986,7 +1986,7 @@ views:
       omit: {}
   kv_offloading.tiering_lookup_async_delay:
     family: KV Offloading
-    question: How is tiered kv offload asynchronous lookup delay distributed?
+    question: What is the distribution of tiered kv offload asynchronous lookup delay?
     entity: model_engine_ray
     inputs:
       tiering_lookup_async_delay:
@@ -2042,7 +2042,7 @@ views:
       omit: {}
   nixl_connector.transfer_duration:
     family: NIXL Connector
-    question: How is nixl transfer duration distributed?
+    question: What is the distribution of nixl transfer duration?
     entity: model_engine_ray
     inputs:
       transfer_duration:
@@ -2058,7 +2058,7 @@ views:
       omit: {}
   nixl_connector.post_time:
     family: NIXL Connector
-    question: How is nixl transfer post time distributed?
+    question: What is the distribution of nixl transfer post time?
     entity: model_engine_ray
     inputs:
       post_time:
@@ -2074,7 +2074,7 @@ views:
       omit: {}
   nixl_connector.transfer_size:
     family: NIXL Connector
-    question: How is nixl transfer size distributed?
+    question: What is the distribution of nixl transfer size?
     entity: model_engine_ray
     inputs:
       transfer_size:
@@ -2090,7 +2090,7 @@ views:
       omit: {}
   nixl_connector.transfer_descriptors:
     family: NIXL Connector
-    question: How is nixl transfer descriptors distributed?
+    question: What is the distribution of nixl transfer descriptors?
     entity: model_engine_ray
     inputs:
       transfer_descriptors:
@@ -2210,7 +2210,7 @@ views:
       omit: {}
   hf3fs_connector.save_duration:
     family: HF3FS Connector
-    question: How is hf3fs save duration distributed?
+    question: What is the distribution of hf3fs save duration?
     entity: model_engine_ray
     inputs:
       save_duration:
@@ -2226,7 +2226,7 @@ views:
       omit: {}
   hf3fs_connector.load_duration:
     family: HF3FS Connector
-    question: How is hf3fs load duration distributed?
+    question: What is the distribution of hf3fs load duration?
     entity: model_engine_ray
     inputs:
       load_duration:
@@ -2302,7 +2302,7 @@ views:
       omit: {}
   mooncake_connector.timing.duration:
     family: Mooncake Connector/Operation Timing
-    question: How is mooncake store operation time distributed?
+    question: What is the distribution of mooncake store operation time?
     entity: connector_operation_status_ray
     inputs:
       duration:
@@ -2530,7 +2530,7 @@ views:
       omit: {}
   websocket_service.connection_duration:
     family: WebSocket Service
-    question: How is websocket connection duration distributed?
+    question: What is the distribution of websocket connection duration?
     entity: service
     inputs:
       connection_duration:

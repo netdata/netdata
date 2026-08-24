@@ -177,12 +177,21 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         ])
         self.assertFalse([
             chart['question']
+            for chart in vllm.values()
+            if chart['question'].startswith('How is ') and chart['question'].endswith(' distributed?')
+        ])
+        self.assertFalse([
+            chart['question']
             for chart in litellm.values()
             if ' by ' in chart['question'] and ' report for each ' in chart['question']
         ])
         self.assertEqual(
             vllm['request_lifecycle.parent_requests']['question'],
             'What is the rate of change for parent requests?',
+        )
+        self.assertEqual(
+            vllm['request_lifecycle.requested_sequences']['question'],
+            'What is the distribution of requested sequences?',
         )
         self.assertEqual(
             litellm['usage.end_user.spend']['question'],
