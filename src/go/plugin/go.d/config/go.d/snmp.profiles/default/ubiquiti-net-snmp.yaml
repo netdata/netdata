@@ -11,7 +11,7 @@ selector:
       include:
         - Linux UBNT
         - ui-ipq9574
-        - Ubiquiti UniFi UDR7
+        - UniFi UDR7
 
 metadata:
   device:
@@ -20,5 +20,5 @@ metadata:
         symbol:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
-          match_pattern: '^Ubiquiti UniFi UDR7([[:space:]]|$)'
+          match_pattern: '(?i)UniFi[[:space:]]+UDR7'
           match_value: 'UDR7'
