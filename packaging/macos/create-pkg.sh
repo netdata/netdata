@@ -4,7 +4,7 @@
 # Build the native macOS package from an already-built pkg-kind build tree.
 #
 # Usage: create-pkg.sh <build-dir> <distribution> <resources-dir> \
-#                     <identifier> <version> <output>
+#                     <scripts-dir> <identifier> <version> <output>
 #
 # Driven by the package-macos target NetdataMacOSPackage.cmake defines; the
 # arguments arrive from the configured build, not from a person. CPack's
@@ -18,12 +18,13 @@
 
 set -eu
 
-BUILD_DIR="${1:?usage: create-pkg.sh <build-dir> <distribution> <resources-dir> <identifier> <version> <output>}"
+BUILD_DIR="${1:?usage: create-pkg.sh <build-dir> <distribution> <resources-dir> <scripts-dir> <identifier> <version> <output>}"
 DISTRIBUTION="${2:?missing distribution}"
 RESOURCES="${3:?missing resources dir}"
-IDENTIFIER="${4:?missing identifier}"
-VERSION="${5:?missing version}"
-OUTPUT="${6:?missing output}"
+SCRIPTS="${4:?missing scripts dir}"
+IDENTIFIER="${5:?missing identifier}"
+VERSION="${6:?missing version}"
+OUTPUT="${7:?missing output}"
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd -P)"
 STAGING="${BUILD_DIR}/macos-pkg/root"
@@ -40,6 +41,7 @@ echo "create-pkg: running the payload artifact gate"
 echo "create-pkg: building the component package"
 pkgbuild \
     --root "${STAGING}" \
+    --scripts "${SCRIPTS}" \
     --identifier "${IDENTIFIER}" \
     --version "${VERSION}" \
     --install-location / \

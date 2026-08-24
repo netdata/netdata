@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# macOS package preinstall: stop a running Agent before the payload is
+# replaced. Runs as root under installer(8); must be strictly
+# non-interactive.
+
+LABEL="com.github.netdata"
+
+if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
+    /bin/launchctl bootout "system/${LABEL}" 2>/dev/null || true
+fi
+
+exit 0

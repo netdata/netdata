@@ -32,6 +32,26 @@ function(netdata_add_macos_package_target)
         configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/distribution.dist.in"
                        "${pkg_dir}/distribution.dist" @ONLY)
 
+        # The LaunchDaemon ships in the payload itself so the receipt tracks
+        # it. The destination is absolute on purpose - it is host-owned, not
+        # part of the /opt/netdata tree.
+        configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/netdata.plist.in"
+                       "${pkg_dir}/com.github.netdata.plist" @ONLY)
+        install(FILES "${pkg_dir}/com.github.netdata.plist"
+                COMPONENT netdata
+                DESTINATION /Library/LaunchDaemons)
+
+        # Maintainer scripts: strictly non-interactive, idempotent; pkgbuild
+        # requires them executable.
+        foreach(script preinstall postinstall)
+                configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/scripts/${script}.in"
+                               "${pkg_dir}/scripts/${script}" @ONLY)
+                file(CHMOD "${pkg_dir}/scripts/${script}"
+                     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                                 GROUP_READ GROUP_EXECUTE
+                                 WORLD_READ WORLD_EXECUTE)
+        endforeach()
+
         set(pkg_output "${CMAKE_BINARY_DIR}/packages/netdata-${NETDATA_PKG_VERSION}-macos-arm64.pkg")
 
         add_custom_target(package-macos
@@ -39,6 +59,7 @@ function(netdata_add_macos_package_target)
                         "${CMAKE_BINARY_DIR}"
                         "${pkg_dir}/distribution.dist"
                         "${pkg_dir}/resources"
+                        "${pkg_dir}/scripts"
                         "${NETDATA_PKG_IDENTIFIER}"
                         "${NETDATA_PKG_VERSION}"
                         "${pkg_output}"
