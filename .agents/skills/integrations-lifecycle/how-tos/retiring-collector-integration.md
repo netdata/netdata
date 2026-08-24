@@ -79,7 +79,8 @@ retarget historical redirects. Follow `.agents/skills/learn-site-structure/recip
 
 1. identify every redirect anchored to the deleted GitHub source;
 2. choose a live replacement or explicitly accept 404 behavior;
-3. track the cross-repository redirect surgery so it lands with or immediately after the deletion.
+3. check whether source-PR CI ingests Learn after regenerating pages. If it does, land the cross-repository redirect
+   surgery before the source deletion; otherwise land it no later than the deletion.
 
 ## 7. Validate the clean end state
 
