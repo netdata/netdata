@@ -412,406 +412,61 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-The built-in Prometheus profiles on this page define 17 curated charts across
-the primary and applicable supporting profiles.
-The catalogue is generated from the same profile design and runtime chart contracts used by the Agent.
+The built-in Prometheus profiles on this page map Prometheus metrics into
+17 curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 
 Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
 the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
 every metric that the collector can render.
 
-<details open data-prometheus-profile-catalog>
-<summary>Curated profile coverage (17 charts)</summary>
-
-
-<details open data-prometheus-profile>
-<summary>FastAPI HTTP instrumentation — 9 charts</summary>
-
+### FastAPI HTTP instrumentation
 
 Curated request outcomes, latency, in-progress work, measurements, and body traffic from instrumented FastAPI services.
 
 
-<details data-prometheus-profile-family>
-<summary>FastAPI (9 charts)</summary>
-
-
-
-<details data-prometheus-profile-family>
-<summary>HTTP Endpoints (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Request Outcomes</summary>
-
-
-- **Entity scope:** FastAPI HTTP endpoint and method
-- **Units:** `requests/s`
-- **Dimensions:** `values of label status`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_requests_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Request Duration</summary>
-
-
-- **Entity scope:** FastAPI HTTP endpoint and method
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_request_duration_seconds_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Request Measurements</summary>
-
-
-- **Entity scope:** FastAPI HTTP endpoint and method
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_request_duration_seconds_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Completed Request Time</summary>
-
-
-- **Entity scope:** FastAPI HTTP endpoint and method
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_request_duration_seconds_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>HTTP Service (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>High-Resolution HTTP Request Duration</summary>
-
-
-- **Entity scope:** instrumented FastAPI service
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_request_duration_highr_seconds_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Request Measurements</summary>
-
-
-- **Entity scope:** instrumented FastAPI service
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_request_duration_highr_seconds_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Completed Request Time</summary>
-
-
-- **Entity scope:** instrumented FastAPI service
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_request_duration_highr_seconds_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>HTTP In Progress (1 chart)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Requests In Progress</summary>
-
-
-- **Entity scope:** FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled
-- **Units:** `requests`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `http_requests_inprogress`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>HTTP Body Traffic (1 chart)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>HTTP Body Throughput</summary>
-
-
-- **Entity scope:** FastAPI HTTP route handler
-- **Units:** `bytes/s`
-- **Dimensions:** `request`, `response`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `http_request_size_bytes_sum`
-- `http_response_size_bytes_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-
-</details>
-
-<details open data-prometheus-profile>
-<summary>Process runtime — 5 charts</summary>
-
+#### FastAPI
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>http_requests_total</code> | FastAPI / HTTP Endpoints — HTTP Request Outcomes | <code>values of label status</code> | <code>requests/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_bucket</code> | FastAPI / HTTP Endpoints — HTTP Request Duration | <code>matching series</code> | <code>observations/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_count</code> | FastAPI / HTTP Endpoints — HTTP Request Measurements | <code>requests</code> | <code>requests/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_sum</code> | FastAPI / HTTP Endpoints — HTTP Completed Request Time | <code>time</code> | <code>seconds/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_highr_seconds_bucket</code> | FastAPI / HTTP Service — High-Resolution HTTP Request Duration | <code>matching series</code> | <code>observations/s</code> | instrumented FastAPI service |
+| <code>http_request_duration_highr_seconds_count</code> | FastAPI / HTTP Service — HTTP Request Measurements | <code>requests</code> | <code>requests/s</code> | instrumented FastAPI service |
+| <code>http_request_duration_highr_seconds_sum</code> | FastAPI / HTTP Service — HTTP Completed Request Time | <code>time</code> | <code>seconds/s</code> | instrumented FastAPI service |
+| <code>http_requests_inprogress</code> | FastAPI / HTTP In Progress — HTTP Requests In Progress | <code>requests</code> | <code>requests</code> | FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled |
+| <code>http_request_size_bytes_sum</code> | FastAPI / HTTP Body Traffic — HTTP Body Throughput | <code>request</code> | <code>bytes/s</code> | FastAPI HTTP route handler |
+| <code>http_response_size_bytes_sum</code> | FastAPI / HTTP Body Traffic — HTTP Body Throughput | <code>response</code> | <code>bytes/s</code> | FastAPI HTTP route handler |
+
+### Process runtime
 
 Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
 
 
-<details data-prometheus-profile-family>
-<summary>Process Runtime (5 charts)</summary>
+#### Process Runtime
 
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>process_cpu_seconds_total</code> | Process Runtime — Process CPU Usage | <code>used</code> | <code>cores</code> | collector job process |
+| <code>process_resident_memory_bytes</code> | Process Runtime — Process Resident Memory | <code>resident</code> | <code>bytes</code> | collector job process |
+| <code>process_virtual_memory_bytes</code> | Process Runtime — Process Virtual Memory | <code>virtual</code> | <code>bytes</code> | collector job process |
+| <code>process_open_fds</code> | Process Runtime — Open File Descriptors | <code>open</code> | <code>fds</code> | collector job process |
+| <code>process_max_fds</code> | Process Runtime — File Descriptor Limit | <code>limit</code> | <code>fds</code> | collector job process |
 
-<details data-prometheus-profile-chart>
-<summary>Process CPU Usage</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `cores`
-- **Dimensions:** `used`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_cpu_seconds_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Process Resident Memory</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `bytes`
-- **Dimensions:** `resident`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_resident_memory_bytes`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Process Virtual Memory</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `bytes`
-- **Dimensions:** `virtual`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_virtual_memory_bytes`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Open File Descriptors</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `fds`
-- **Dimensions:** `open`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_open_fds`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>File Descriptor Limit</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `fds`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_max_fds`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-</details>
-
-<details open data-prometheus-profile>
-<summary>Python garbage collection — 3 charts</summary>
-
+### Python garbage collection
 
 Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
 
 
-<details data-prometheus-profile-family>
-<summary>Process Runtime (3 charts)</summary>
+#### Process Runtime
 
-
-
-<details data-prometheus-profile-family>
-<summary>Python GC (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Collected Objects</summary>
-
-
-- **Entity scope:** Python garbage-collector generation
-- **Units:** `objects/s`
-- **Dimensions:** `collected`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `python_gc_objects_collected_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Uncollectable Objects</summary>
-
-
-- **Entity scope:** Python garbage-collector generation
-- **Units:** `objects/s`
-- **Dimensions:** `uncollectable`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `python_gc_objects_uncollectable_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Collections</summary>
-
-
-- **Entity scope:** Python garbage-collector generation
-- **Units:** `collections/s`
-- **Dimensions:** `collections`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `python_gc_collections_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-
-</details>
-
-
-</details>
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>python_gc_objects_collected_total</code> | Process Runtime / Python GC — Collected Objects | <code>collected</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_objects_uncollectable_total</code> | Process Runtime / Python GC — Uncollectable Objects | <code>uncollectable</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_collections_total</code> | Process Runtime / Python GC — Collections | <code>collections</code> | <code>collections/s</code> | Python garbage-collector generation |
 
 
 

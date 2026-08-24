@@ -117,7 +117,6 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [ASP.NET](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/asp.net.md) | This collector monitors ASP.NET applications. |
 | [Envoy](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/envoy/integrations/envoy.md) | This collector monitors Envoy proxies. |
 | [Gobetween](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/gobetween.md) | Track Gobetween load balancer metrics for optimized network traffic management and performance. |
-| [HAProxy](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/haproxy/integrations/haproxy.md) | This collector monitors HAProxy servers. |
 | [HAProxy Prometheus](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/haproxy_prometheus.md) | Monitor HAProxy process, frontend, listener, backend, server, and stick-table behavior through its Prometheus endpoint. |
 | [HTTPD](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/apache/integrations/httpd.md) | This collector monitors the activity and performance of Apache servers, and collects metrics such as the number of connections, workers, requests and more. |
 | [IIS](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/iis.md) | This collector monitors website requests and logins. |
