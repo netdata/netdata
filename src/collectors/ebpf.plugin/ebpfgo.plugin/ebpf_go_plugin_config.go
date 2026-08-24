@@ -17,6 +17,7 @@ const pluginPrimaryConfigFile = "ebpf.d.conf"
 // apply() merges a later file on top of an earlier one.
 type pluginConfigFile struct {
 	Cachestat                 *bool // [ebpf programs] cachestat key
+	Dcstat                    *bool // [ebpf programs] dcstat key
 	Socket                    *bool // [ebpf programs] socket key
 	DNS                       *bool // [ebpf programs] dns key
 	UpdateEvery               *int
@@ -47,7 +48,7 @@ func loadPluginConfigFiles() (pluginConfigFile, bool, error) {
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),
 		filepath.Join(userRoot, pluginPrimaryConfigFile),
 	} {
-		cfg, ok, err := parsePluginConfigFile(path)
+		cfg, ok, err := parsePluginConfigFile(path, false)
 		if err != nil {
 			return pluginConfigFile{}, false, err
 		}
@@ -71,13 +72,21 @@ func loadCollectorConfigFiles(legacyFile string) (pluginConfigFile, bool, error)
 
 	var merged pluginConfigFile
 	found := false
+	// `ebpf load mode = return` is warned about for every module except dcstat.
+	// The C dcstat module always attached both a kprobe and a kretprobe, so
+	// `return` was a no-op there rather than a request for behaviour this port
+	// dropped; warning about it would flag a config that was always redundant.
+	// The exemption is keyed on the module's own overlay file, but the [global]
+	// section of ebpf.d.conf is parsed under the same call, so a global `return`
+	// is also silent while dcstat is the module being loaded.
+	allowReturnLoadMode := legacyFile == dcstatLegacyConfigFile
 	for _, path := range []string{
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),
 		filepath.Join(stockRoot, legacyFile),
 		filepath.Join(userRoot, pluginPrimaryConfigFile),
 		filepath.Join(userRoot, legacyFile),
 	} {
-		cfg, ok, err := parsePluginConfigFile(path)
+		cfg, ok, err := parsePluginConfigFile(path, allowReturnLoadMode)
 		if err != nil {
 			return pluginConfigFile{}, false, err
 		}
@@ -105,7 +114,7 @@ func pluginConfigRoots() (userRoot, stockRoot string) {
 	return userRoot, stockRoot
 }
 
-func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
+func parsePluginConfigFile(path string, allowReturnLoadMode bool) (pluginConfigFile, bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -148,6 +157,14 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid cachestat %q, using default\n", path, value)
 				} else {
 					cfg.Cachestat = new(b)
+				}
+				found = true
+			case "dcstat":
+				b, ok := parseConfigBool(value)
+				if !ok {
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid dcstat %q, using default\n", path, value)
+				} else {
+					cfg.Dcstat = new(b)
 				}
 				found = true
 			case "socket":
@@ -260,10 +277,10 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 		case "ebpf load mode":
 			switch strings.ToLower(strings.TrimSpace(value)) {
 			case "entry":
-				// Supported legacy default; eBPFGo object flavor controls the
-				// actual attachment path.
 			case "return":
-				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: ebpf load mode %q is not supported by eBPFGo, using entry-compatible objects\n", path, value)
+				if !allowReturnLoadMode {
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: ebpf load mode %q is unsupported and ignored\n", path, value)
+				}
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf load mode %q, using default\n", path, value)
 			}
@@ -336,6 +353,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	if other.Cachestat != nil {
 		c.Cachestat = other.Cachestat
 	}
+	if other.Dcstat != nil {
+		c.Dcstat = other.Dcstat
+	}
 	if other.Socket != nil {
 		c.Socket = other.Socket
 	}
@@ -381,11 +401,6 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	if other.FlowTTL != nil {
 		c.FlowTTL = other.FlowTTL
 	}
-}
-
-//go:fix inline
-func stringPtr(v string) *string {
-	return new(v)
 }
 
 func parseConfigBool(value string) (bool, bool) {

@@ -529,6 +529,12 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md
           description: Rewrite, derive, or drop scraped Prometheus metrics and labels with Prometheus-compatible metric_relabel_configs rules before charts are built.
           keywords: [prometheus, relabeling, metric_relabel_configs, labels, collectors]
+
+      - meta:
+          label: Ceph
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/ceph/README.md
+          description: Deploy distributed Ceph monitoring with the MGR Prometheus module, ceph-exporter, the NVMe-oF gateway exporter, the Dashboard API collector, alerts, Parents, retention, and integrations.
+          keywords: [ceph, prometheus, mgr, exporter, dashboard, alerts, retention, parent, rgw, nvme-of]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics

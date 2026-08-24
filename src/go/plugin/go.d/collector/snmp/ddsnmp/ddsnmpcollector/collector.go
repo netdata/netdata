@@ -93,7 +93,7 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 		}
 
 		for k, v := range profDeviceMeta {
-			mergeMetaTagIfAbsent(meta, k, v)
+			ddsnmp.MergeMetaTag(meta, k, v)
 		}
 	}
 

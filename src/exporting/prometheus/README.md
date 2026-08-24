@@ -205,7 +205,7 @@ To expose them, append `variables=yes` to the URL.
 
 :::warning
 
-When enabled, `# TYPE` and `# HELP` lines repeat for every metric occurrence, violating [Prometheus specifications](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#comments-help-text-and-type-information).
+When enabled, `# TYPE` and `# HELP` lines repeat for every metric occurrence, violating [Prometheus specifications](https://prometheus.io/docs/instrumenting/exposition_formats/#comments-help-text-and-type-information).
 
 :::
 

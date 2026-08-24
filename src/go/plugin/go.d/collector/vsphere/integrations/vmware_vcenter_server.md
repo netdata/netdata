@@ -290,7 +290,7 @@ metrics.
 Metrics of hosts matching the selector will be collected.
 
 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern".
-- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
 - Syntax:
 
   ```yaml
@@ -307,7 +307,7 @@ Metrics of hosts matching the selector will be collected.
 Metrics of VMs matching the selector will be collected.
 
 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern/VM pattern".
-- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
 - Syntax:
 
   ```yaml
@@ -324,7 +324,7 @@ Metrics of VMs matching the selector will be collected.
 Metrics of datastores matching the selector will be collected.
 
 - Include pattern syntax: "/Datacenter pattern/Datastore pattern".
-- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
 - Syntax:
 
   ```yaml
@@ -340,7 +340,7 @@ Metrics of datastores matching the selector will be collected.
 Metrics of clusters and their resource pools matching the selector will be collected.
 
 - Include pattern syntax: "/Datacenter pattern/Cluster pattern".
-- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
 - Syntax:
 
   ```yaml

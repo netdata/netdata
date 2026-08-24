@@ -72,7 +72,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable old_stats plugin
 
-To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics).
+To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics).
 
 
 
@@ -91,7 +91,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | address | Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin. | 127.0.0.1:24242 | yes |
+| **Target** | address | Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics) plugin. | 127.0.0.1:24242 | yes |
 |  | timeout | Connection, read, write, and name resolution timeout (seconds). | 1 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 

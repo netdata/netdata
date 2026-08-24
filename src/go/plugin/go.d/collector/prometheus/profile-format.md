@@ -65,7 +65,7 @@ autogen:                    # optional. Controls fallback charts inside this
       - example_http_request_duration_seconds
 
 template:                   # REQUIRED. One chart-template group; at least one chart.
-  family: Example           # top-level dashboard menu section
+  family: Example           # optional root dashboard section; nested families remain required
   context_namespace: example  # context prefix; by convention the profile name
   groups:
     - family: Requests      # nested menu section: Example -> Requests
@@ -397,11 +397,17 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
 - **The template is a group, not a full spec.** The linked reference's examples show complete `charts.yaml` specs (a
   `version` plus a top-level `groups` list); a profile's `template` is one item of that `groups` list, written without
   the leading dash -- you author the *content of one group*: `family`, `context_namespace`, `metrics`, `charts`, nested
-  `groups`, and `chart_defaults`. `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not group fields
-  (`instances` and `label_promotion` can also be set once for a whole group via `chart_defaults`). The spec-level
+  `groups`, and `chart_defaults`. `priority`, `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not
+  group fields (`priority`, `instances`, and `label_promotion` can also be set once for a whole group via
+  `chart_defaults`). The spec-level
   `version` and `engine` fields are rejected. The collector wraps your group into its per-job spec, where autogeneration
   for uncovered metrics stays enabled. Configure conditional fallback through the profile-root `autogen.selector`, not
   a nested `engine`.
+- **Root `family` is optional.** Omit `template.family` when the template root is only a container and the resolved
+  application already provides the same navigation level. Its named child groups then become the top-level families.
+  Keep a meaningful root on reusable instrumentation profiles so their charts remain identifiable when composed into
+  another application. Nested groups still require `family`; a chart directly under a family-less root must set its own
+  `family`, so every emitted chart has a nonblank effective family.
 - **Set `context_namespace` at the template root to the profile name.** This is the group-level `context_namespace`
   field -- a profile has no separate top-level one; the collector supplies the `prometheus.<app>` prefix. The emitted
   context is `prometheus.<app>.<context_namespace>.<chart context>`, with the namespace segment dropped when it equals

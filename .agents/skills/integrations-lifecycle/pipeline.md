@@ -539,9 +539,11 @@ Repo path: `.github/workflows/check-markdown.yml`.
 1. Checkout the PR branch and the `netdata/learn` repo with
    `actions/checkout@v7`; the Agent checkout uses full history for
    the PR-diff taxonomy gate.
-2. Use `actions/setup-python@v7` with Python 3.10, create a virtual
-   environment, and install both Learn ingest requirements and
-   `./integrations/pip.sh` dependencies.
+2. Use `actions/setup-python@v7` with Python 3.13, create a virtual
+   environment, install Learn's compiled requirements with
+   `python -m pip install --require-hashes`, and install the
+   `./integrations/pip.sh` dependencies. Learn owns the ingestion runtime and
+   dependency lock; this downstream workflow must stay aligned with that contract.
 3. Set up Go from `netdata/src/go/go.mod`, then run the NPM and ibm.d
    source-metadata producers.
 4. Run `gen_integrations.py`.

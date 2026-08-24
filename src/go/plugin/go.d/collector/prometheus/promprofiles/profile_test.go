@@ -49,6 +49,22 @@ template:
           name: d0
 `,
 		},
+		"valid with transparent template root": {
+			yaml: `match: "a_*"
+template:
+  metrics:
+    - a_total
+  groups:
+    - family: Requests
+      charts:
+        - title: Title
+          context: ctx
+          units: count
+          dimensions:
+            - selector: a_total
+              name: d0
+`,
+		},
 		"valid chart aggregation": {
 			yaml: `match: "a_*"
 template:

@@ -1,4 +1,36 @@
-[% if entry.metrics.scopes %]
+[% if entry.metrics.profile_coverage %]
+
+## Metrics
+
+The built-in Prometheus profiles on this page map Prometheus metrics into
+[[ entry.metrics.profile_coverage.chart_count ]] curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
+
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
+
+[% for profile in entry.metrics.profile_coverage.profiles %]
+### [[ profile.title|e ]]
+
+[[ profile.summary ]]
+
+[% if profile.role == 'supporting' %]
+**Supporting profile for [[ profile.supported_by|e ]].** [[ profile.activation ]]
+[% endif %]
+
+[% for group in profile.metric_groups %]
+#### [[ group.name|e ]]
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+[% for row in group.rows %]
+| <code>[[ row.prometheus_metric|markdown_table_cell ]]</code> | [[ row.netdata_chart|markdown_table_cell ]] | <code>[[ row.dimension|markdown_table_cell ]]</code> | <code>[[ row.unit|markdown_table_cell ]]</code> | [[ row.scope|markdown_table_cell ]] |
+[% endfor %]
+
+[% endfor %]
+[% endfor %]
+[% elif entry.metrics.scopes %]
 
 ## Metrics
 

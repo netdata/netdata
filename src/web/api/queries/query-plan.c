@@ -283,6 +283,14 @@ static bool query_planer_plan_can_be_activated(QUERY_ENGINE_OPS *ops, size_t pla
     return query_plan_tier_is_valid(qm, qm->plan.array[plan_id].tier);
 }
 
+static void query_planer_set_expire_time(QUERY_ENGINE_OPS *ops, time_t expire_time) {
+    ops->current_plan_expire_time = expire_time;
+    ops->result_plan_expire_time_overflow = __builtin_add_overflow(
+        expire_time, ops->plan_switch_time_offset, &ops->result_plan_expire_time);
+    if(unlikely(ops->result_plan_expire_time_overflow))
+        ops->result_plan_expire_time = nd_time_t_max();
+}
+
 static void query_planer_set_active_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after __maybe_unused) {
     QUERY_METRIC *qm = ops->qm;
 
@@ -292,9 +300,9 @@ static void query_planer_set_active_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, 
     ops->current_plan = plan_id;
 
     if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
-        ops->current_plan_expire_time = qm->plan.array[plan_id + 1].after;
+        query_planer_set_expire_time(ops, qm->plan.array[plan_id + 1].after);
     else
-        ops->current_plan_expire_time = qm->plan.array[plan_id].before;
+        query_planer_set_expire_time(ops, qm->plan.array[plan_id].before);
 
     ops->plan_expanded_after = ops->plans[plan_id].expanded_after;
     ops->plan_expanded_before = ops->plans[plan_id].expanded_before;
@@ -319,7 +327,7 @@ bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point
 
         if (ops->current_plan >= qm->plan.used) {
             ops->current_plan = old_plan;
-            ops->current_plan_expire_time = ops->r->internal.qt->window.before;
+            query_planer_set_expire_time(ops, ops->r->internal.qt->window.before);
             // let the query run with current plan
             // we will not switch it
             return false;
@@ -330,7 +338,7 @@ bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point
 
     if(!query_planer_plan_can_be_activated(ops, ops->current_plan)) {
         ops->current_plan = old_plan;
-        ops->current_plan_expire_time = ops->r->internal.qt->window.before;
+        query_planer_set_expire_time(ops, ops->r->internal.qt->window.before);
         return false;
     }
 
@@ -512,10 +520,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r, QUERY_ENGINE_OPS_CACHE 
 }
 
 // the LATEST grouping asks for the most recent collected value; when the
-// query wants a single point and its window covers the metric's last stored
-// sample, the answer is the collector's cached last_stored_value - serve it
-// without building a query plan, so the storage engine is never touched.
-// options that change the value semantics (anomaly-bit, natural points,
+// query wants a single point and the metric's latest collection interval
+// reaches its window, the answer is the collector's cached last_stored_value -
+// serve it without building a query plan, so storage is never touched.
+// options that change the value semantics (anomaly-bit, resampling,
 // a pinned tier) fall back to the normal execution path.
 static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
@@ -529,9 +537,13 @@ static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
         (qt->window.options & (RRDR_OPTION_SELECTED_TIER|RRDR_OPTION_ANOMALY_BIT)))
         return false;
 
-    // the single output bucket spans (after, before]
+    // The single output bucket spans (after, before]. LATEST may use the live
+    // last observation until its next expected collection interval reaches
+    // the window, even when the stored endpoint itself precedes `after`.
     time_t db_last = ops->qm->tiers[0].db_last_time_s;
-    if(db_last <= qt->window.after || db_last > qt->window.before)
+    time_t db_update_every = ops->qm->tiers[0].db_update_every_s;
+    if(db_last > qt->window.before ||
+       nd_time_t_add_compare(db_last, db_update_every, qt->window.after) < 0)
         return false;
 
     // NAN when there is no live dimension (archived metric), or when the
@@ -560,10 +572,18 @@ QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache
         .r = r,
         .qm = query_metric(qt, query_metric_id),
         .tier_query_fetch = r->time_grouping.tier_query_fetch,
+        .point_mode = r->time_grouping.point_mode,
         .view_update_every = r->view.update_every,
         .query_granularity = (time_t)(r->view.update_every / r->view.group),
         .group_value_flags = RRDR_VALUE_NOTHING,
     };
+
+    if(qt->window.options & RRDR_OPTION_ANOMALY_BIT) {
+        ops->point_mode = QUERY_POINT_MODE_HOLD;
+    }
+
+    ops->plan_switch_time_offset =
+        ops->point_mode == QUERY_POINT_MODE_TOTAL ? ops->view_update_every : 0;
 
     if(query_latest_fast_path(r, ops))
         return ops;
@@ -757,6 +777,61 @@ static int query_plan_unittest_expect_ops_cache_is_local(void) {
             same_cache_reused ? "true" : "false",
             separate_cache_isolated ? "true" : "false");
     return 1;
+}
+
+static int query_plan_unittest_expect_result_expiry(void) {
+    QUERY_ENGINE_OPS ops = {
+        .plan_switch_time_offset = 60,
+    };
+
+    query_planer_set_expire_time(&ops, 100);
+    if(ops.current_plan_expire_time != 100 || ops.result_plan_expire_time != 160 ||
+       ops.result_plan_expire_time_overflow ||
+       query_result_plan_should_switch_plan(&ops, 159) ||
+       !query_result_plan_should_switch_plan(&ops, 160) ||
+       !query_result_plan_should_switch_plan(&ops, 161)) {
+        fprintf(stderr,
+                "FAILED query plan result expiry: expected 100/160/non-overflow with switch from 160 onward, "
+                "got %" PRIdMAX "/%" PRIdMAX "/%d and switches %d/%d/%d at 159/160/161\n",
+                (intmax_t)ops.current_plan_expire_time, (intmax_t)ops.result_plan_expire_time,
+                ops.result_plan_expire_time_overflow,
+                query_result_plan_should_switch_plan(&ops, 159),
+                query_result_plan_should_switch_plan(&ops, 160),
+                query_result_plan_should_switch_plan(&ops, 161));
+        return 1;
+    }
+
+    time_t maximum = nd_time_t_max();
+    query_planer_set_expire_time(&ops, maximum - 30);
+    if(ops.current_plan_expire_time != maximum - 30 || ops.result_plan_expire_time != maximum ||
+       !ops.result_plan_expire_time_overflow ||
+       query_result_plan_should_switch_plan(&ops, maximum)) {
+        fprintf(stderr,
+                "FAILED query plan unreachable result expiry: expected %" PRIdMAX "/%" PRIdMAX
+                "/overflow without switch, got %" PRIdMAX "/%" PRIdMAX "/%d with switch=%d\n",
+                (intmax_t)(maximum - 30), (intmax_t)maximum,
+                (intmax_t)ops.current_plan_expire_time, (intmax_t)ops.result_plan_expire_time,
+                ops.result_plan_expire_time_overflow,
+                query_result_plan_should_switch_plan(&ops, maximum));
+        return 1;
+    }
+
+    query_planer_set_expire_time(&ops, maximum - ops.plan_switch_time_offset);
+    if(ops.current_plan_expire_time != maximum - ops.plan_switch_time_offset ||
+       ops.result_plan_expire_time != maximum || ops.result_plan_expire_time_overflow ||
+       !query_result_plan_should_switch_plan(&ops, maximum)) {
+        fprintf(stderr,
+                "FAILED query plan exact-maximum result expiry: expected %" PRIdMAX "/%" PRIdMAX
+                "/non-overflow with switch, got %" PRIdMAX "/%" PRIdMAX "/%d with switch=%d\n",
+                (intmax_t)(maximum - ops.plan_switch_time_offset), (intmax_t)maximum,
+                (intmax_t)ops.current_plan_expire_time, (intmax_t)ops.result_plan_expire_time,
+                ops.result_plan_expire_time_overflow,
+                query_result_plan_should_switch_plan(&ops, maximum));
+        return 1;
+    }
+
+    fprintf(stderr, "OK query plan result expiry\n");
+    return 0;
 }
 
 int query_plan_unittest(void) {
@@ -1021,6 +1096,7 @@ int query_plan_unittest(void) {
     }
 
     errors += query_plan_unittest_expect_ops_cache_is_local();
+    errors += query_plan_unittest_expect_result_expiry();
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;

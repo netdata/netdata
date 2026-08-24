@@ -22,7 +22,7 @@ Module: cachestat
 
 ## Overview
 
-Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files.
+Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files. Setting `cachestat = yes` enables collection and the host-wide charts only; the per-application and per-cgroup charts additionally require `apps = yes` and/or `cgroups = yes` in the `[global]` section.
 
 Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel.
 
@@ -80,7 +80,8 @@ Now follow steps:
 
 #### Options
 
-All options are defined inside section `[global]`.
+The `cachestat` option in section `[ebpf programs]` controls whether the module is loaded.
+The options listed below are `[global]` overrides.
 
 
 <details open><summary>Config options</summary>
@@ -90,12 +91,12 @@ All options are defined inside section `[global]`.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. This configuration value takes precedence over the runtime interval passed by pluginsd. | 10 | no |
-| ebpf load mode | Legacy compatibility option. eBPFGo accepts `entry`; `return` is not supported and is ignored with a warning. | entry | no |
+| ebpf load mode | Legacy compatibility option. `entry` is accepted as a no-op; `return` is unsupported and ignored with a warning. Object flavor selects the eBPF runtime. | entry | no |
 | apps | Enable or disable integration with apps.plugin | no | no |
 | cgroups | Enable or disable integration with cgroup.plugin | no | no |
 | pid table size | Number of elements stored inside hash tables used to monitor calls per PID. | 32768 | no |
 | ebpf object flavor | Select the cachestat object flavor to load. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The default is `buffer`, and the collector falls back when the requested flavor is not available on the system. | buffer | no |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
+| ebpf type format | Legacy key from the C ebpf.plugin, kept so migrated configurations still parse. It maps onto `ebpf object flavor`: `legacy` forces the kprobe-based tracing objects, while `co-re` and `auto` are accepted no-ops that leave the flavor to auto-detection. Prefer `ebpf object flavor` in new configurations. | auto | no |
 | ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
 | maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
 | btf path | Override the default BTF source directory. The collector checks this path for a vmlinux BTF file used by CO-RE loading. | /sys/kernel/btf | no |

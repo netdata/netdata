@@ -1386,6 +1386,8 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
+        src/daemon/unit_test_bridge.c
+        src/daemon/unit_test_bridge.h
         src/daemon/dyncfg/dyncfg.c
         src/daemon/dyncfg/dyncfg.h
         src/daemon/dyncfg/dyncfg-files.c
@@ -2137,6 +2139,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.c
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -3254,8 +3257,6 @@ if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
             src/collectors/ebpf.plugin/ebpf.c
             src/collectors/ebpf.plugin/ebpf.h
-            src/collectors/ebpf.plugin/ebpf_dcstat.c
-            src/collectors/ebpf.plugin/ebpf_dcstat.h
             src/collectors/ebpf.plugin/ebpf_disk.c
             src/collectors/ebpf.plugin/ebpf_disk.h
             src/collectors/ebpf.plugin/ebpf_fd.c
@@ -3453,6 +3454,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                src/collectors/network-viewer.plugin/network-viewer-topology.c
+                src/collectors/network-viewer.plugin/network-viewer-topology.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 
@@ -3475,6 +3478,16 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_WINDOWS)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/collectors/network-viewer.plugin/network-viewer-windows.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-path.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology.h
+                        src/libnetdata/local-sockets/local-sockets-windows.h
                 )
         endif()
         if(OS_FREEBSD)
@@ -3585,6 +3598,16 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
         configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+   NOT CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set_property(
+                SOURCE src/daemon/unit_test_bridge.c
+                APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        message(WARNING
+                "Netdata test bridge cannot disable IPO for unsupported C compiler '${CMAKE_C_COMPILER_ID}'")
 endif()
 
 add_executable(netdata
@@ -4534,7 +4557,6 @@ if(ENABLE_PLUGIN_PYTHON)
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.conf
           src/collectors/python.d.plugin/go_expvar/go_expvar.conf
-          src/collectors/python.d.plugin/haproxy/haproxy.conf
           src/collectors/python.d.plugin/pandas/pandas.conf
           src/collectors/python.d.plugin/traefik/traefik.conf
           COMPONENT plugin-pythond
@@ -4543,7 +4565,6 @@ if(ENABLE_PLUGIN_PYTHON)
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.chart.py
           src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
-          src/collectors/python.d.plugin/haproxy/haproxy.chart.py
           src/collectors/python.d.plugin/pandas/pandas.chart.py
           src/collectors/python.d.plugin/traefik/traefik.chart.py
           COMPONENT plugin-pythond

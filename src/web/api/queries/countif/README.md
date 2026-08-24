@@ -18,14 +18,14 @@ The target number and the desired condition can be set using the `group_options`
 - `!0`, to match any number except zero.
 - `>=-3` to match any number bigger or equal to -3.
 
-. When an invalid condition is given, the web server can deliver a not accurate response.
+An invalid condition is rejected with an API error rather than returning an inaccurate response.
 
-## how to use
+## How to use
 
-This query cannot be used in alerts.
+CountIf can be used in APIs and badges, and in health lookup expressions.
 
-`countif` changes the units of charts. The result of the calculation is always from zero to 1, expressing the percentage of database points that matched the condition. 
+For a non-empty group, `countif` returns the percentage of database points that matched the condition, from zero to 100.
+For example, with one or more observed values, the health lookup `countif(!=1) -15m unaligned of value` returns zero only
+when every observed value in the 15-minute lookup is exactly `1`.
 
-In APIs and badges can be used like this: `&group=countif&group_options=>10` in the URL.
-
-
+In APIs and badges, use `&group=countif&group_options=>10` in the URL.

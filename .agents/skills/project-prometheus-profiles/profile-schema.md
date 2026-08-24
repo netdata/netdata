@@ -182,7 +182,7 @@ use a stricter minimal policy so intent is reviewable and defaults cannot drift:
 | Runtime field | Generic capability | Stock contribution policy |
 |---|---|---|
 | `id` | explicit stable base ID | omit when the context-derived ID is sufficient |
-| `priority` | numeric ordering hint | omit; every Prometheus chart uses the common default |
+| `priority` | numeric ordering hint, inheritable through `chart_defaults` | set at the nearest group for a deliberately ordered family subtree; use chart-local only for an exception |
 | `instances.by_labels: ['*']` | all current labels become identity | use explicit source-backed identity |
 | `lifecycle` | best-effort caps and expiry | omit; do not make coverage depend on silent caps |
 | `options.float` | force floating wire precision | omit when inherited runtime precision already does so |
@@ -202,6 +202,7 @@ family: Requests
 context_namespace: requests
 metrics: [exporter_requests_total]
 chart_defaults:
+  priority: 100
   label_promotion: [region]
   instances:
     by_labels: [service]
@@ -213,12 +214,19 @@ Each field affects a different part of the dashboard:
 
 - `family` composes with ancestor families using `/`. This is navigation, so use
   application functions and entity levels rather than metric types.
+- The profile template root MAY omit `family` when it is only a transparent
+  container and the application already provides that navigation level. Keep a
+  meaningful root for reusable instrumentation profiles. Nested groups MUST
+  provide `family`; a chart directly under a transparent root MUST provide its
+  own chart-level `family`.
 - `context_namespace` composes with `.` into chart contexts. It is identity, not
   merely display text.
 - `metrics` authorizes exact metric names for dimension selectors in the group
   and descendants. It does **not** route, chart, keep, or drop a series.
 - `chart_defaults` reduces repetition. The nearest group default wins; a
   chart-local value replaces it. Lists and objects are replaced, not merged.
+  Priority zero is unset/inherit; use explicit `70000` to reset a child subtree
+  or chart to engine-default ordering.
 - `groups` can nest to any depth. Put a metric at the highest scope that really
   needs it, not automatically at the root.
 
@@ -233,7 +241,7 @@ make a stale or excluded family look intentionally covered.
 ## Charts control presentation and identity
 
 Required chart fields are `title`, `context`, `units`, and at least one
-`dimension`. Stock Prometheus profiles MUST omit `priority`.
+`dimension`. `priority` MAY be inherited or set locally to order charts in the operator journey.
 
 Optional fields include:
 
@@ -260,13 +268,14 @@ or semantics into one chart merely because a chart-wide algorithm compiles.
 
 Priority behavior:
 
-- omitted or non-positive priority becomes `70000`;
-- every Prometheus chart intentionally uses that same runtime value;
-- YAML position does not become runtime or UI presentation order;
-- UI sorting is outside the profile contract.
+- an omitted or zero priority inherits the nearest nonzero group default;
+- an effective non-positive priority after inheritance becomes `70000`;
+- an explicit positive priority is preserved to the chart engine;
+- YAML position still does not become runtime or UI presentation order.
 
-Therefore omit `priority`. Keep source order coherent for review without
-claiming that it controls presentation.
+Omit `priority` for unrelated charts. Set `chart_defaults.priority` at the nearest
+group when a profile needs stable family ordering; reserve chart-local priority
+for deliberate exceptions.
 
 Presentation rules checked by the profile-validation tool:
 
