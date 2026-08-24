@@ -1296,6 +1296,41 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  macos-pkg: # Build the native macOS package and store it as an artifact.
+    name: Build macOS Package
+    runs-on: macos-14
+    if: github.event_name != 'workflow_dispatch'
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - uses: actions/checkout@v7
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          submodules: recursive
+      - name: Install netdata dependencies
+        id: install-deps
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+      - name: Build package
+        id: build-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          ./packaging/build-package.sh PKG "${PWD}/build-pkg"
+      - name: Store package
+        id: store
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: netdata-macos-pkg
+          path: build-pkg/packages/*.pkg
+          retention-days: 30
+
   macos-build: # Test building on macOS
     name: Test building on macOS
     runs-on: ${{ matrix.runner }}
