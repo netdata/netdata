@@ -331,7 +331,8 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(mem)
         *mem = 0;
 
-    if(!force && dictionary_referenced_items(dict))
+    // referenced_items keeps items alive; inflight keeps this object alive
+    if(!force && (dictionary_referenced_items(dict) || dictionary_inflight(dict)))
         return false;
 
     size_t dict_size = 0, counted_items = 0, item_size = 0, index_size = 0;
@@ -782,6 +783,12 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
 
+    // Publish the destroyed flag before reading the in-flight counter below.
+    // A thread entering the API increments that counter (a SEQ_CST RMW) before
+    // touching the dictionary, so this fence makes the two orderings meet:
+    // either we see its increment, or it sees our flag.
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+
     // Destroy the index while holding the items write lock.
     // This prevents a TOCTOU race: without this, a reader could pass the
     // is_dictionary_destroyed() check, then acquire an item via the index,
@@ -797,8 +804,11 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     // Re-check: a reader that held the index read lock during the destroy
     // above may have acquired an item before we got the index write lock.
-    // If so, fall back to the deferred destruction path.
-    if(dictionary_referenced_items(dict)) {
+    // Also refuse to free the object while any thread is inside the API - it
+    // holds no item reference, but it is about to touch this object and the
+    // locks that live in it. Both cases fall back to the deferred destruction
+    // path, and cleanup_destroyed_dictionaries() frees once they drain.
+    if(dictionary_referenced_items(dict) || dictionary_inflight(dict)) {
         dictionary_queue_for_destruction(dict);
 
         ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -816,7 +826,7 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // SET an item to the dictionary
 
-DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+static DICTIONARY_ITEM *dictionary_set_and_acquire_item_internal(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
 
@@ -844,7 +854,21 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIO
 
     DICTIONARY_ITEM *item =
         dict_item_add_or_reset_value_and_acquire(dict, name, name_len, value, value_len, constructor_data, NULL);
-    api_internal_check(dict, item, false, false);
+
+    // NULL is a valid result: a concurrent dictionary_destroy() refuses the
+    // insert under the index write lock. See dictionary.h.
+    api_internal_check(dict, item, false, true);
+    return item;
+}
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(!dict)) return NULL;
+
+    dictionary_inflight_enter(dict);
+    DICTIONARY_ITEM *item =
+        dictionary_set_and_acquire_item_internal(dict, name, name_len, value, value_len, constructor_data);
+    dictionary_inflight_exit(dict);
+
     return item;
 }
 
@@ -860,7 +884,7 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     return NULL;
 }
 
-DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
+static DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_internal(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
 
@@ -885,7 +909,18 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(D
     DICTIONARY_ITEM *item = dict_item_add_or_reset_value_and_acquire(dict, name, name_len, NULL, 0, NULL, master_item);
     dictionary_acquired_item_release(dict->master, master_item);
 
-    api_internal_check(dict, item, false, false);
+    // NULL is a valid result; see dictionary_set_and_acquire_item_internal().
+    api_internal_check(dict, item, false, true);
+    return item;
+}
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
+    if(unlikely(!dict)) return NULL;
+
+    dictionary_inflight_enter(dict);
+    DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_internal(dict, name, name_len, master_item);
+    dictionary_inflight_exit(dict);
+
     return item;
 }
 
@@ -904,13 +939,23 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
 // ----------------------------------------------------------------------------
 // GET an item from the dictionary
 
-DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+static DICTIONARY_ITEM *dictionary_get_and_acquire_item_internal(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
 
     api_internal_check(dict, NULL, false, true);
     DICTIONARY_ITEM *item = dict_item_find_and_acquire(dict, name, name_len);
     api_internal_check(dict, item, false, true);
+    return item;
+}
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict)) return NULL;
+
+    dictionary_inflight_enter(dict);
+    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_internal(dict, name, name_len);
+    dictionary_inflight_exit(dict);
+
     return item;
 }
 
@@ -992,7 +1037,7 @@ size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item
 // ----------------------------------------------------------------------------
 // DEL an item
 
-bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+static bool dictionary_del_internal(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return false;
 
@@ -1004,4 +1049,14 @@ bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_le
     }
 
     return dict_item_del(dict, name, name_len);
+}
+
+bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict)) return false;
+
+    dictionary_inflight_enter(dict);
+    bool ret = dictionary_del_internal(dict, name, name_len);
+    dictionary_inflight_exit(dict);
+
+    return ret;
 }

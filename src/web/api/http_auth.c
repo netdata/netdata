@@ -189,6 +189,10 @@ static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_
     const DICTIONARY_ITEM *item = bearer_token_set_and_acquire(
         token, user_role, access, cloud_account_id, client_name,
         created_s, expires_s, &inserted);
+    // NULL when netdata_authorized_bearers is being destroyed (shutdown)
+    if(unlikely(!item))
+        return 0;
+
     struct bearer_token *bt = dictionary_acquired_item_value(item);
 
     if(inserted && save)

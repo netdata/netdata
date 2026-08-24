@@ -20,6 +20,30 @@ typedef enum __attribute__ ((__packed__)) {
 // flags macros
 #define is_dictionary_destroyed(dict) dict_flag_check(dict, DICT_FLAG_DESTROYED)
 
+// ----------------------------------------------------------------------------
+// in-flight API callers
+//
+// referenced_items keeps ITEMS alive; this counter keeps the DICTIONARY OBJECT
+// alive. A thread inside the API - or blocked on one of the dictionary's own
+// locks - holds no item reference, so without this counter
+// dictionary_destroy() can free the DICTIONARY (and the locks inside it) from
+// under it. See dictionary_destroy() and dictionary_free_all_resources().
+//
+// Ordering: an entering caller increments this counter (a SEQ_CST read-modify-
+// write, i.e. a full barrier) and only then touches the dictionary;
+// dictionary_destroy() sets DICT_FLAG_DESTROYED, issues a SEQ_CST fence, and
+// only then reads this counter. Sequential consistency guarantees the two
+// cannot miss each other: either the caller is counted, or it sees the
+// destroyed flag and bails out.
+//
+// Limit: this protects a caller that has already entered the API. It cannot
+// protect a caller holding a stale DICTIONARY * that has not entered yet -
+// that window is unclosable from inside the dictionary and remains a
+// caller-ownership bug.
+#define dictionary_inflight_enter(dict) __atomic_add_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST)
+#define dictionary_inflight_exit(dict)  __atomic_sub_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST)
+#define dictionary_inflight(dict)       __atomic_load_n(&((dict)->inflight), __ATOMIC_SEQ_CST)
+
 // configuration options macros
 #define is_dictionary_single_threaded(dict) ((dict)->options & DICT_OPTION_SINGLE_THREADED)
 #define is_view_dictionary(dict) ((dict)->master)
@@ -174,6 +198,7 @@ struct dictionary {
     int32_t entries;                   // how many items are currently in the index (the linked list may have more)
     int32_t referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
     int32_t pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
+    int32_t inflight;                  // how many threads are currently inside the dictionary API (see dictionary_inflight_enter)
 
 #ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_t global_pointer_registry_mutex;

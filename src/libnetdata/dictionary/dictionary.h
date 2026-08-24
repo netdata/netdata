@@ -183,6 +183,19 @@ void dictionary_print_still_allocated_stacktraces(void);
 //
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
 // Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
+//
+// The set family MAY RETURN NULL: if another thread is destroying the
+// dictionary, the insert is refused and NULL (or false) is returned. Callers
+// that can race a dictionary_destroy() must check the result.
+//
+// Concurrency contract for dictionary_destroy():
+//   Safe   - other threads already inside the dictionary API (a set/get/del
+//            call, or a traversal between dfe_start and dfe_done). They are
+//            counted, and destruction is deferred until they leave;
+//            cleanup_destroyed_dictionaries() frees the dictionary afterwards.
+//   Unsafe - a thread holding a DICTIONARY * that has not entered the API yet.
+//            Nothing inside the dictionary can see such a thread, so the caller
+//            owns that lifetime.
 #define dictionary_set(dict, name, value, value_len) dictionary_set_advanced(dict, name, -1, value, value_len, NULL)
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 

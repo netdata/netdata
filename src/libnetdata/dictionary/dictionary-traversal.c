@@ -9,10 +9,16 @@
 void *dictionary_foreach_start_rw(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return NULL;
 
+    // Keep the DICTIONARY object alive for the whole traversal: we are about to
+    // take its lock, and dictionary_destroy() would otherwise free the object
+    // (locks included) from under us. Released in dictionary_foreach_done().
+    dictionary_inflight_enter(dfe->dict);
+
     DICTIONARY_STATS_TRAVERSALS_PLUS1(dfe->dict);
 
     if(unlikely(is_dictionary_destroyed(dfe->dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
+        dictionary_inflight_exit(dfe->dict);
         dfe->dict = NULL;
         dfe->item = NULL;
         dfe->name = NULL;
@@ -30,6 +36,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
     if(unlikely(is_dictionary_destroyed(dfe->dict))) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
         dfe->locked = false;
+        dictionary_inflight_exit(dfe->dict);
         dfe->dict = NULL;
         dfe->item = NULL;
         dfe->name = NULL;
@@ -146,6 +153,9 @@ void dictionary_foreach_done(DICTFE *dfe) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
         dfe->locked = false;
     }
+
+    // matches dictionary_inflight_enter() in dictionary_foreach_start_rw()
+    dictionary_inflight_exit(dfe->dict);
 
     dfe->dict = NULL;
     dfe->item = NULL;

@@ -652,6 +652,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         item = dictionary_set_and_acquire_item(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
 
+    // NULL when dict_mountpoints is being destroyed (shutdown)
+    if(unlikely(!item))
+        goto cleanup;
+
     struct mount_point_metadata *m = dictionary_acquired_item_value(item);
     if (m->slow) {
         add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
