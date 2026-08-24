@@ -308,3 +308,13 @@ include(NetdataPluginNetflow)
 #
 
 include(NetdataSystemFiles)
+
+# The macOS package bundles Bash 5.3 (macOS ships 3.2; alarm-notify.sh needs
+# 4+) and rewrites every staged bash shebang to it. The rewrite is registered
+# AFTER every other install rule on purpose - under CMP0082 install rules run
+# in declaration order, and it must see the complete staged payload.
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+  include(NetdataBash)
+  netdata_bundle_bash()
+  netdata_add_macos_shebang_rewrite()
+endif()

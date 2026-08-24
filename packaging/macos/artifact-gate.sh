@@ -19,10 +19,13 @@
 #
 # Usage: artifact-gate.sh [options] <tree>
 #
-#   <tree>                     root of the staged install (a DESTDIR)
+#   <tree>                     the staged payload AS IT WILL BE INSTALLED:
+#                              DESTDIR plus the install prefix, e.g.
+#                              <destdir>/opt/netdata
 #   --prefix <path>            install prefix the payload lands at, e.g.
-#                              /opt/netdata; absolute references under it are
-#                              resolved inside <tree> (default: none)
+#                              /opt/netdata; an absolute reference under it
+#                              (a shebang, symlink or load entry) is resolved
+#                              inside <tree> (default: none)
 #   --deployment-target <ver>  maximum allowed minos, default 14.0
 #
 # Exit status: 0 when the tree is clean, 1 on violations, 2 on usage errors.
