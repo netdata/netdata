@@ -1,5 +1,5 @@
-# This collector will not appear in documentation, as the go version is preferred,
-# /src/go/plugin/go.d/collector/haproxy/README.md
+# This collector will not appear in documentation; use the Prometheus HAProxy integration instead:
+# /src/go/plugin/go.d/collector/prometheus/integrations/haproxy_prometheus.md
 #
 #
 #  meta:

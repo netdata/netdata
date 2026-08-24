@@ -193,19 +193,12 @@ if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
   run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
 fi
 
-# The Go helper replaces the old Bash artifact. Remove leftovers from an
-# overlay upgrade so persisted defaults cannot keep executing stale code.
-if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
-  [ -L "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ]; then
-  run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
-fi
-
-# The otel-signal-viewer plugin was removed in favour of otel-plugin plus the
-# read-only legacy-otel-logs function. Native packages drop its files via
-# Obsoletes/Replaces, but an overlay upgrade only stops shipping them, so both
-# artifacts linger here. Only stock paths are touched, never user config.
-for x in usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin \
-  usr/lib/netdata/conf.d/otel-signal-viewer.yaml; do
+# Overlay upgrades do not remove artifacts that an archive stops shipping. Drop
+# retired plugin helpers and stock configuration without touching user config.
+for x in usr/libexec/netdata/plugins.d/cgroup-name.sh \
+  usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin \
+  usr/lib/netdata/conf.d/otel-signal-viewer.yaml \
+  usr/lib/netdata/conf.d/go.d/haproxy.conf; do
   if [ -e "${NETDATA_PREFIX}/${x}" ] || [ -L "${NETDATA_PREFIX}/${x}" ]; then
     run rm -f "${NETDATA_PREFIX}/${x}"
   fi
