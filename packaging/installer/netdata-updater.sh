@@ -883,10 +883,11 @@ self_update() {
 # build isn’t a git build).
 parse_version() {
   r="${1}"
+  vmax="999999999999999999"
   if [ "${r}" = "latest" ]; then
     # If we get ‘latest’ as a version, return the largest possible
     # version value.
-    printf "999999999999999999"
+    printf "%s" "${vmax}"
     return 0
   elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
@@ -927,6 +928,12 @@ parse_version() {
 
   echo "${v}" | tr '.' ' ' > "${tmpfile}"
   read -r maj min patch _ < "${tmpfile}"
+
+  if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
+    warning "Failed to parse version ${r}"
+    printf "%s" "${vmax}"
+    return 0
+  fi
 
   rm -f "${tmpfile}"
 
