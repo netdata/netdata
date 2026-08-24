@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     # TEMPORARY: disabled while the macOS pkg work iterates; skipping this also
     # skips prepare-upload and the artifact-verification jobs. Re-enable before merge.
-    if: false
+    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     outputs:
@@ -229,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     # TEMPORARY: disabled while the macOS pkg work iterates; skipping this also
     # skips build-static. Re-enable before merge.
-    if: false
+    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     outputs:
@@ -276,7 +276,7 @@ jobs:
     runs-on: ubuntu-latest
     # TEMPORARY: disabled while the macOS pkg work iterates (only build-static
     # consumes it). Re-enable before merge.
-    if: false
+    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     steps:
@@ -498,7 +498,7 @@ jobs:
     runs-on: windows-latest
     # TEMPORARY: disabled while the macOS pkg work iterates; skipping this also
     # skips windows-test. Re-enable before merge.
-    if: false
+    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     steps:
