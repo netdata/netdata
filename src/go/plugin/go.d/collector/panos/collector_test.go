@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"sort"
@@ -25,28 +26,32 @@ import (
 )
 
 var (
-	dataConfigJSON, _       = os.ReadFile("testdata/config.json")
-	dataConfigYAML, _       = os.ReadFile("testdata/config.yaml")
-	dataLegacyBGPPeers, _   = os.ReadFile("testdata/legacy_bgp_peers.xml")
-	dataAdvancedBGPPeers, _ = os.ReadFile("testdata/advanced_bgp_peers.xml")
-	dataSystemInfo, _       = os.ReadFile("testdata/system_info.xml")
-	dataHAState, _          = os.ReadFile("testdata/ha_state.xml")
-	dataEnvironment, _      = os.ReadFile("testdata/environment.xml")
-	dataLicenses, _         = os.ReadFile("testdata/licenses.xml")
-	dataIPSecSA, _          = os.ReadFile("testdata/ipsec_sa.xml")
+	dataConfigJSON, _          = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _          = os.ReadFile("testdata/config.yaml")
+	dataLegacyBGPPeers, _      = os.ReadFile("testdata/legacy_bgp_peers.xml")
+	dataAdvancedBGPPeers, _    = os.ReadFile("testdata/advanced_bgp_peers.xml")
+	dataAdvancedBGPPeersARE, _ = os.ReadFile("testdata/advanced_bgp_peers_are.xml")
+	dataAdvancedBGPSummary, _  = os.ReadFile("testdata/advanced_bgp_summary_are.xml")
+	dataSystemInfo, _          = os.ReadFile("testdata/system_info.xml")
+	dataHAState, _             = os.ReadFile("testdata/ha_state.xml")
+	dataEnvironment, _         = os.ReadFile("testdata/environment.xml")
+	dataLicenses, _            = os.ReadFile("testdata/licenses.xml")
+	dataIPSecSA, _             = os.ReadFile("testdata/ipsec_sa.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":       dataConfigJSON,
-		"dataConfigYAML":       dataConfigYAML,
-		"dataLegacyBGPPeers":   dataLegacyBGPPeers,
-		"dataAdvancedBGPPeers": dataAdvancedBGPPeers,
-		"dataSystemInfo":       dataSystemInfo,
-		"dataHAState":          dataHAState,
-		"dataEnvironment":      dataEnvironment,
-		"dataLicenses":         dataLicenses,
-		"dataIPSecSA":          dataIPSecSA,
+		"dataConfigJSON":          dataConfigJSON,
+		"dataConfigYAML":          dataConfigYAML,
+		"dataLegacyBGPPeers":      dataLegacyBGPPeers,
+		"dataAdvancedBGPPeers":    dataAdvancedBGPPeers,
+		"dataAdvancedBGPPeersARE": dataAdvancedBGPPeersARE,
+		"dataAdvancedBGPSummary":  dataAdvancedBGPSummary,
+		"dataSystemInfo":          dataSystemInfo,
+		"dataHAState":             dataHAState,
+		"dataEnvironment":         dataEnvironment,
+		"dataLicenses":            dataLicenses,
+		"dataIPSecSA":             dataIPSecSA,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -230,7 +235,9 @@ func TestCollector_Check(t *testing.T) {
 		},
 		"fails when system info payload is missing": {
 			client: &mockAPIClient{
-				responses: map[string][]byte{systemInfoCommand: []byte(`<response status="success"><result></result></response>`)},
+				responses: map[string][]byte{
+					systemInfoCommand: []byte(`<response status="success"><result></result></response>`),
+				},
 			},
 			wantErr:      "expected <system>",
 			wantCommands: []string{systemInfoCommand},
@@ -341,6 +348,40 @@ func TestCollector_CollectStopsOnCanceledContext(t *testing.T) {
 	}
 }
 
+func TestCollector_CollectStopsWhenBGPSummaryIsCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	api := &mockAPIClient{
+		responses: map[string][]byte{
+			legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+			advancedBGPPeerCommands[0]: dataAdvancedBGPPeersARE,
+			advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+		},
+	}
+	api.onOp = func(_ context.Context, cmd string) {
+		if cmd == advancedBGPSummaryCommand {
+			cancel()
+		}
+	}
+
+	collr := New()
+	collr.apiClient = api
+
+	err := collectOnceWithContext(t, collr, ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, []string{
+		systemInfoCommand,
+		haStateCommand,
+		environmentCommand,
+		licenseInfoCommand,
+		ipsecSACommand,
+		legacyBGPPeerCommand,
+		advancedBGPPeerCommands[0],
+		advancedBGPSummaryCommand,
+	}, api.commands)
+}
+
 func TestCollector_MetricStore(t *testing.T) {
 	assert.NotNil(t, New().MetricStore())
 }
@@ -418,14 +459,19 @@ func TestCollector_Collect(t *testing.T) {
 						metricKey("license_count_expired", nil):                                                                                 1,
 						metricKey("license_time_until_expiration", licenseLabels("Threat Prevention", "Threat prevention updates")):             30,
 						stateMetricKey("license_status", "expired", licenseLabels("Premium Support", "Support entitlement")):                    1,
-						metricKey("license_time_until_expiration", licenseLabels("GlobalProtect Portal", "Portal entitlement")):                 metrix.SampleValue(licenseNeverExpires),
-						metricKey("ipsec_tunnels_active", nil):                                                                                  2,
-						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "ESP", "G256")):     1727,
-						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-b", "gw-branch-b", "203.0.113.20", "67", "ESP", "AES128")):    99,
-						stateMetricKey("bgp_peer_state", "established", legacyPeerLabels()):                                                     1,
+						metricKey("license_time_until_expiration", licenseLabels("GlobalProtect Portal", "Portal entitlement")): metrix.SampleValue(
+							licenseNeverExpires,
+						),
+						metricKey("ipsec_tunnels_active", nil): 2,
+						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "ESP", "G256")):  1727,
+						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-b", "gw-branch-b", "203.0.113.20", "67", "ESP", "AES128")): 99,
+						stateMetricKey("bgp_peer_state", "established", legacyPeerLabels()):                                                  1,
 					},
 					wantMissing: []string{
-						metricKey("license_time_until_expiration", licenseLabels("Premium Support", "Support entitlement")),
+						metricKey(
+							"license_time_until_expiration",
+							licenseLabels("Premium Support", "Support entitlement"),
+						),
 						"env_sensors_collection_discovered",
 						"license_collection_discovered",
 						"ipsec_tunnels_collection_discovered",
@@ -437,7 +483,7 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"advanced BGP fallback": {
+		"advanced-routing XML BGP fallback": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
 					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
@@ -448,17 +494,450 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			steps: []collectStep{
 				{
-					name: "collects ARE peers after legacy empty success",
+					name: "collects advanced-routing XML peers after legacy empty success",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "openconfirm", advancedPeerLabels()):                  1,
 						metricKey("bgp_peer_uptime", advancedPeerLabels()):                                     93784,
 						metricKey("bgp_peer_prefixes_received_total", advancedPrefixLabels("ipv4", "unicast")): 100,
-						metricKey("bgp_vr_peers_total_configured", metrix.Labels{"vr": "lr-a"}):                1,
+						metricKey("bgp_vr_peers_total_configured", metrix.Labels{
+							"vr": "lr-a",
+						}): 1,
 					},
 					check: func(t *testing.T, c *Collector, _ *mockAPIClient, _ map[string]metrix.SampleValue) {
 						assert.Equal(t, routingEngineAdvanced, c.routingEngine)
 						assert.Equal(t, advancedBGPPeerCommands[0], c.bgpCommand)
 					},
+				},
+			},
+		},
+		"ARE JSON collection preserves identity and missing values": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: dataAdvancedBGPPeersARE,
+					advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "collects enriched peers and distinguishes explicit zero from missing",
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")):                       1,
+						metricKey("bgp_peer_uptime", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")):                                          1136150,
+						metricKey("bgp_peer_messages_in", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")):                                     189375,
+						metricKey("bgp_peer_prefixes_received_accepted", arePrefixLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core", "ipv4", "unicast")): 9,
+						metricKey("bgp_peer_prefixes_advertised", arePrefixLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core", "ipv4", "unicast")):        5,
+						stateMetricKey("bgp_peer_state", "connect", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                                 1,
+						metricKey("bgp_peer_messages_in", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                                           0,
+						metricKey("bgp_peer_messages_out", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                                          0,
+						metricKey("bgp_peer_updates_in", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                                            0,
+						metricKey("bgp_peer_updates_out", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                                           0,
+						metricKey("bgp_peer_flaps", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                                                 0,
+						metricKey("bgp_peer_established_transitions", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                               0,
+						metricKey("bgp_peer_prefixes_received_accepted", arePrefixLabels("lr-b", "203.0.113.10", "unknown", "65030", "core", "ipv4", "unicast")):       0,
+						metricKey("bgp_vr_peers_total_configured", metrix.Labels{
+							"vr": "lr-b",
+						}): 2,
+						metricKey("bgp_vr_peers_total_established", metrix.Labels{
+							"vr": "lr-b",
+						}): 1,
+					},
+					wantMissing: []string{
+						metricKey("bgp_peer_uptime", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")),
+						metricKey(
+							"bgp_peer_prefixes_advertised",
+							arePrefixLabels("lr-b", "203.0.113.10", "unknown", "65030", "core", "ipv4", "unicast"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"connect",
+							arePeerLabels("192.0.2.2", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					check: func(t *testing.T, c *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, routingEngineAdvanced, c.routingEngine)
+						assert.Equal(t, advancedBGPPeerCommands[0], c.bgpCommand)
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							legacyBGPPeerCommand,
+							advancedBGPPeerCommands[0],
+							advancedBGPSummaryCommand,
+						}, api.commands)
+					},
+				},
+				{
+					name: "omitted counters become gaps while explicit zero remains a value",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.commands = nil
+						payload := strings.Replace(string(dataAdvancedBGPPeersARE),
+							`        "connectionsEstablished": 0,
+        "connectionsDropped": 0,
+        "messageStats": {"updatesSent": 0, "updatesRecv": 0, "totalSent": 0, "totalRecv": 0},
+`, "", 1)
+						api.responses[advancedBGPPeerCommands[0]] = []byte(payload)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "connect", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):                           1,
+						metricKey("bgp_peer_prefixes_received_accepted", arePrefixLabels("lr-b", "203.0.113.10", "unknown", "65030", "core", "ipv4", "unicast")): 0,
+					},
+					wantMissing: []string{
+						metricKey(
+							"bgp_peer_messages_in",
+							arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core"),
+						),
+						metricKey(
+							"bgp_peer_messages_out",
+							arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core"),
+						),
+						metricKey(
+							"bgp_peer_updates_in",
+							arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core"),
+						),
+						metricKey(
+							"bgp_peer_updates_out",
+							arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core"),
+						),
+						metricKey("bgp_peer_flaps", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")),
+						metricKey(
+							"bgp_peer_established_transitions",
+							arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					check: func(t *testing.T, _ *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							advancedBGPPeerCommands[0],
+							advancedBGPSummaryCommand,
+						}, api.commands)
+					},
+				},
+				{
+					name: "summary failure retains the last successful logical-router identity",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.commands = nil
+						api.responses[advancedBGPPeerCommands[0]] = dataAdvancedBGPPeersARE
+						api.errors = map[string]error{
+							advancedBGPSummaryCommand: fmt.Errorf("summary unavailable: %w", context.DeadlineExceeded),
+						}
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.2", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+					wantLog: []string{"summary unavailable"},
+				},
+				{
+					name: "null summary retains known logical-router identities",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.errors = nil
+						api.responses[advancedBGPSummaryCommand] = []byte(
+							`<response status="success"><result><json>null</json></result></response>`,
+						)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+				},
+				{
+					name: "empty summary retains known logical-router identities",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPSummaryCommand] = []byte(
+							`<response status="success"><result><json>{}</json></result></response>`,
+						)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.2", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+					wantLog: []string{"summary is incomplete"},
+				},
+				{
+					name: "partial summary updates present names and retains missing identities",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPSummaryCommand] = []byte(`<response status="success"><result><json>{
+                            "lr-a-renamed": {"router-id": "192.0.2.1"}
+                        }</json></result></response>`)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a-renamed", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")):   1,
+					},
+				},
+				{
+					name: "ambiguous current router ID is withheld instead of reusing its cache",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPSummaryCommand] = []byte(`<response status="success"><result><json>{
+                            "lr-a-renamed": {"router-id": "192.0.2.1"},
+                            "lr-b": {"router-id": "192.0.2.2"},
+                            "lr-c": {"router-id": "192.0.2.2"}
+                        }</json></result></response>`)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a-renamed", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.2", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+				},
+			},
+		},
+		"ARE summary owns the last successful identity cache": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: dataAdvancedBGPPeersARE,
+					advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "complete peers and summary establish the cache",
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+				},
+				{
+					name: "successful summary retains names for temporarily absent peers",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPPeerCommands[0]] = []byte(`<response status="success"><result><json>{
+                            "peer-a": {
+                                "remote-as": 65010,
+                                "peer-group-name": "edge",
+                                "state": "Established",
+                                "local-ip": "192.0.2.9",
+                                "peer-ip": "192.0.2.10",
+                                "detail": {"localRouterId": "192.0.2.1", "bgpState": "Established"}
+                            }
+                        }</json></result></response>`)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+					},
+					check: func(t *testing.T, c *Collector, _ *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, map[string]string{
+							"192.0.2.1": "lr-a",
+							"192.0.2.2": "lr-b",
+						}, c.bgpRouterNames)
+					},
+				},
+				{
+					name: "missing peer router IDs do not clear the cache",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.commands = nil
+						api.responses[advancedBGPPeerCommands[0]] = advancedBGPPeersAREWithoutRouterIDs()
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("default", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+					check: func(t *testing.T, c *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, map[string]string{
+							"192.0.2.1": "lr-a",
+							"192.0.2.2": "lr-b",
+						}, c.bgpRouterNames)
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							advancedBGPPeerCommands[0],
+						}, api.commands)
+					},
+				},
+				{
+					name: "restored peers reuse the cache while summary remains unavailable",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPPeerCommands[0]] = dataAdvancedBGPPeersARE
+						api.errors = map[string]error{advancedBGPSummaryCommand: errors.New("summary unavailable")}
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantLog: []string{"summary unavailable"},
+				},
+			},
+		},
+		"ARE JSON peers without router IDs are withheld": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				payload := strings.Replace(
+					string(dataAdvancedBGPPeersARE),
+					`"remoteRouterId": "0.0.0.0",
+        "localRouterId": "192.0.2.2",`,
+					`"remoteRouterId": "0.0.0.0",
+        "localRouterId": null,`,
+					1,
+				)
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: []byte(payload),
+					advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "mixed response keeps resolved peers and withholds null router ID",
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"connect",
+							arePeerLabels("default", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					wantLog: []string{"withheld_peers=1"},
+				},
+			},
+		},
+		"ARE JSON response with all router IDs missing is withheld": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: advancedBGPPeersAREWithoutRouterIDs(),
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "does not publish fabricated default VR series",
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("default", "192.0.2.10", "192.0.2.9", "65010", "edge"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("default", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"connect",
+							arePeerLabels("default", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					wantLog: []string{"withheld_peers=3"},
+					check: func(t *testing.T, _ *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							legacyBGPPeerCommand,
+							advancedBGPPeerCommands[0],
+						}, api.commands)
+					},
+				},
+			},
+		},
+		"initial ARE summary failure withholds unresolved peers": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: dataAdvancedBGPPeersARE,
+				}
+				api.errors = map[string]error{advancedBGPSummaryCommand: errors.New("summary unavailable")}
+			},
+			steps: []collectStep{
+				{
+					name: "does not publish router IDs as vr labels",
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.1", "192.0.2.10", "192.0.2.9", "65010", "edge"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.2", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"connect",
+							arePeerLabels("192.0.2.2", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					wantLog: []string{"summary unavailable"},
+					check: func(t *testing.T, _ *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							legacyBGPPeerCommand,
+							advancedBGPPeerCommands[0],
+							advancedBGPSummaryCommand,
+						}, api.commands)
+					},
+				},
+			},
+		},
+		"malformed ARE peer preserves valid peers": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				payload := strings.Replace(
+					string(dataAdvancedBGPPeersARE),
+					`"bgpTimerUpMsec": 1136150000`,
+					`"bgpTimerUpMsec": "n/a"`,
+					1,
+				)
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: []byte(payload),
+					advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "valid peers still emit metrics",
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+						stateMetricKey("bgp_peer_state", "connect", arePeerLabels("lr-b", "203.0.113.10", "unknown", "65030", "core")):     1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+					wantLog: []string{"peer-b", "cannot unmarshal string"},
 				},
 			},
 		},
@@ -585,7 +1064,14 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name: "new remote AS replaces old label set",
 					setup: func(_ *Collector, api *mockAPIClient) {
-						api.responses[legacyBGPPeerCommand] = []byte(strings.Replace(string(dataLegacyBGPPeers), "<remote-as>65001</remote-as>", "<remote-as>65111</remote-as>", 1))
+						api.responses[legacyBGPPeerCommand] = []byte(
+							strings.Replace(
+								string(dataLegacyBGPPeers),
+								"<remote-as>65001</remote-as>",
+								"<remote-as>65111</remote-as>",
+								1,
+							),
+						)
 					},
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "established", legacyPeerLabelsWithRemoteAS("65111")): 1,
@@ -644,12 +1130,19 @@ func TestCollector_Collect(t *testing.T) {
 					name: "peer metrics survive malformed prefix counter",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "established", fallbackPeerLabels("192.0.2.1")): 1,
-						metricKey("bgp_vr_peers_total_configured", metrix.Labels{"vr": "default"}):       1,
+						metricKey("bgp_vr_peers_total_configured", metrix.Labels{
+							"vr": "default",
+						}): 1,
 					},
 					wantMissing: []string{
-						metricKey("bgp_peer_prefixes_received_total", fallbackPrefixLabels("192.0.2.1", "ipv4", "unicast")),
+						metricKey(
+							"bgp_peer_prefixes_received_total",
+							fallbackPrefixLabels("192.0.2.1", "ipv4", "unicast"),
+						),
 					},
-					wantLog: []string{`BGP peer entry 192.0.2.1: BGP peer 192.0.2.1 ipv4-unicast incoming-total: invalid integer`},
+					wantLog: []string{
+						`BGP peer entry 192.0.2.1: BGP peer 192.0.2.1 ipv4-unicast incoming-total: invalid integer`,
+					},
 				},
 			},
 		},
@@ -663,7 +1156,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			steps: []collectStep{
 				{
-					name: "collects ARE peers from second supported command",
+					name: "collects advanced-routing XML peers from second supported command",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "openconfirm", advancedPeerLabels()): 1,
 					},
@@ -685,7 +1178,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			steps: []collectStep{
 				{
-					name: "collects ARE peers from third supported command",
+					name: "collects advanced-routing XML peers from third supported command",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "openconfirm", advancedPeerLabels()): 1,
 					},
@@ -745,9 +1238,15 @@ func TestCollector_Collect(t *testing.T) {
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "unknown", fallbackPeerLabels("192.0.2.1")):     1,
 						stateMetricKey("bgp_peer_state", "established", fallbackPeerLabels("192.0.2.1")): 0,
-						metricKey("bgp_vr_peers_by_state_unknown", metrix.Labels{"vr": "default"}):       1,
-						metricKey("bgp_vr_peers_total_configured", metrix.Labels{"vr": "default"}):       1,
-						metricKey("bgp_vr_peers_total_established", metrix.Labels{"vr": "default"}):      0,
+						metricKey("bgp_vr_peers_by_state_unknown", metrix.Labels{
+							"vr": "default",
+						}): 1,
+						metricKey("bgp_vr_peers_total_configured", metrix.Labels{
+							"vr": "default",
+						}): 1,
+						metricKey("bgp_vr_peers_total_established", metrix.Labels{
+							"vr": "default",
+						}): 0,
 					},
 				},
 			},
@@ -758,8 +1257,10 @@ func TestCollector_Collect(t *testing.T) {
 				bgpPeers := strings.Replace(string(dataLegacyBGPPeers), "      <peer-group>edge</peer-group>\n", "", 1)
 				bgpPeers = strings.Replace(bgpPeers, "      <remote-as>65001</remote-as>\n", "", 1)
 				api.responses = map[string][]byte{
-					systemInfoCommand:    []byte(systemInfo),
-					licenseInfoCommand:   []byte(`<response status="success"><result><licenses><entry><feature>Threat Prevention</feature><expires>June 01, 2026</expires><expired>no</expired></entry></licenses></result></response>`),
+					systemInfoCommand: []byte(systemInfo),
+					licenseInfoCommand: []byte(
+						`<response status="success"><result><licenses><entry><feature>Threat Prevention</feature><expires>June 01, 2026</expires><expired>no</expired></entry></licenses></result></response>`,
+					),
 					legacyBGPPeerCommand: []byte(bgpPeers),
 				}
 			},
@@ -767,17 +1268,38 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name: "fallback label values are explicit",
 					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("system_uptime", metrix.Labels{"hostname": "edge-fw-a", "model": "PA-850", "serial": "0123456789", "sw_version": "unknown"}):                                                                 183845,
-						stateMetricKey("license_status", "valid", licenseLabels("Threat Prevention", "unknown")):                                                                                                               1,
-						stateMetricKey("bgp_peer_state", "established", metrix.Labels{"vr": "default", "peer_address": "192.0.2.1", "local_address": "192.0.2.254", "remote_as": "unknown_as", "peer_group": "unknown_group"}): 1,
+						metricKey("system_uptime", metrix.Labels{
+							"hostname":   "edge-fw-a",
+							"model":      "PA-850",
+							"serial":     "0123456789",
+							"sw_version": "unknown",
+						}): 183845,
+						stateMetricKey("license_status", "valid", licenseLabels("Threat Prevention", "unknown")): 1,
+						stateMetricKey("bgp_peer_state", "established", metrix.Labels{
+							"vr":            "default",
+							"peer_address":  "192.0.2.1",
+							"local_address": "192.0.2.254",
+							"remote_as":     "unknown_as",
+							"peer_group":    "unknown_group",
+						}): 1,
 					},
 				},
 			},
 		},
 		"system abnormal status states": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
-				systemInfo := strings.Replace(string(dataSystemInfo), "<device-certificate-status>Valid</device-certificate-status>", "<device-certificate-status>invalid</device-certificate-status>", 1)
-				systemInfo = strings.Replace(systemInfo, "<operational-mode>normal</operational-mode>", "<operational-mode>maintenance</operational-mode>", 1)
+				systemInfo := strings.Replace(
+					string(dataSystemInfo),
+					"<device-certificate-status>Valid</device-certificate-status>",
+					"<device-certificate-status>invalid</device-certificate-status>",
+					1,
+				)
+				systemInfo = strings.Replace(
+					systemInfo,
+					"<operational-mode>normal</operational-mode>",
+					"<operational-mode>maintenance</operational-mode>",
+					1,
+				)
 				api.responses = map[string][]byte{systemInfoCommand: []byte(systemInfo)}
 			},
 			steps: []collectStep{
@@ -795,7 +1317,14 @@ func TestCollector_Collect(t *testing.T) {
 		"malformed system uptime is partial failure": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					systemInfoCommand: []byte(strings.Replace(string(dataSystemInfo), "<uptime>2 days, 03:04:05</uptime>", "<uptime>soon</uptime>", 1)),
+					systemInfoCommand: []byte(
+						strings.Replace(
+							string(dataSystemInfo),
+							"<uptime>2 days, 03:04:05</uptime>",
+							"<uptime>soon</uptime>",
+							1,
+						),
+					),
 				}
 			},
 			steps: []collectStep{
@@ -812,7 +1341,9 @@ func TestCollector_Collect(t *testing.T) {
 		"malformed environment value preserves other metrics": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					environmentCommand: []byte(`<response status="success"><result><thermal><entry><slot>1</slot><description>Temperature Inlet</description><DegreesC>not-a-number</DegreesC><alarm>True</alarm></entry></thermal></result></response>`),
+					environmentCommand: []byte(
+						`<response status="success"><result><thermal><entry><slot>1</slot><description>Temperature Inlet</description><DegreesC>not-a-number</DegreesC><alarm>True</alarm></entry></thermal></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
@@ -876,8 +1407,16 @@ func TestCollector_Collect(t *testing.T) {
 						stateMetricKey("environment_power_supply_presence_status", "absent", envLabels("power_supply", "1", "Power Supply 1")):  1,
 					},
 					wantMissing: []string{
-						stateMetricKey("environment_power_supply_alarm_status", "clear", envLabels("power_supply", "1", "Power Supply 1")),
-						stateMetricKey("environment_power_supply_alarm_status", "alarm", envLabels("power_supply", "1", "Power Supply 1")),
+						stateMetricKey(
+							"environment_power_supply_alarm_status",
+							"clear",
+							envLabels("power_supply", "1", "Power Supply 1"),
+						),
+						stateMetricKey(
+							"environment_power_supply_alarm_status",
+							"alarm",
+							envLabels("power_supply", "1", "Power Supply 1"),
+						),
 					},
 					wantLog: []string{`environment power supply Power Supply 1 alarm: invalid status`},
 				},
@@ -908,7 +1447,14 @@ func TestCollector_Collect(t *testing.T) {
 		"HA priority fields are ignored": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					haStateCommand: []byte(strings.Replace(string(dataHAState), "<priority>100</priority>", "<priority>high</priority>", 1)),
+					haStateCommand: []byte(
+						strings.Replace(
+							string(dataHAState),
+							"<priority>100</priority>",
+							"<priority>high</priority>",
+							1,
+						),
+					),
 				}
 			},
 			steps: []collectStep{
@@ -929,7 +1475,9 @@ func TestCollector_Collect(t *testing.T) {
 		"HA disabled emits disabled status": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					haStateCommand: []byte(`<response status="success"><result><enabled>no</enabled></result></response>`),
+					haStateCommand: []byte(
+						`<response status="success"><result><enabled>no</enabled></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
@@ -1046,7 +1594,9 @@ func TestCollector_Collect(t *testing.T) {
 		"malformed license expiration does not emit fake never value": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					licenseInfoCommand: []byte(`<response status="success"><result><licenses><entry><feature>Threat Prevention</feature><description>Threat prevention updates</description><expires>tomorrow-ish</expires><expired>no</expired></entry></licenses></result></response>`),
+					licenseInfoCommand: []byte(
+						`<response status="success"><result><licenses><entry><feature>Threat Prevention</feature><description>Threat prevention updates</description><expires>tomorrow-ish</expires><expired>no</expired></entry></licenses></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
@@ -1056,8 +1606,13 @@ func TestCollector_Collect(t *testing.T) {
 						metricKey("license_count_total", nil): 1,
 						stateMetricKey("license_status", "valid", licenseLabels("Threat Prevention", "Threat prevention updates")): 1,
 					},
-					wantMissing: []string{metricKey("license_time_until_expiration", licenseLabels("Threat Prevention", "Threat prevention updates"))},
-					wantLog:     []string{`license Threat Prevention expiration: invalid expiration date`},
+					wantMissing: []string{
+						metricKey(
+							"license_time_until_expiration",
+							licenseLabels("Threat Prevention", "Threat prevention updates"),
+						),
+					},
+					wantLog: []string{`license Threat Prevention expiration: invalid expiration date`},
 				},
 			},
 		},
@@ -1078,17 +1633,22 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name: "expired licenses trigger status only",
 					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("license_count_total", nil):                                                                5,
-						metricKey("license_count_expired", nil):                                                              2,
-						stateMetricKey("license_status", "valid", licenseLabels("Expires Today", "today")):                   1,
-						metricKey("license_time_until_expiration", licenseLabels("Expires Today", "today")):                  0,
-						metricKey("license_time_until_expiration", licenseLabels("Future", "future")):                        30,
-						metricKey("license_time_until_expiration", licenseLabels("Never", "never")):                          metrix.SampleValue(licenseNeverExpires),
+						metricKey("license_count_total", nil):                                               5,
+						metricKey("license_count_expired", nil):                                             2,
+						stateMetricKey("license_status", "valid", licenseLabels("Expires Today", "today")):  1,
+						metricKey("license_time_until_expiration", licenseLabels("Expires Today", "today")): 0,
+						metricKey("license_time_until_expiration", licenseLabels("Future", "future")):       30,
+						metricKey("license_time_until_expiration", licenseLabels("Never", "never")): metrix.SampleValue(
+							licenseNeverExpires,
+						),
 						stateMetricKey("license_status", "expired", licenseLabels("Explicitly Expired", "explicit expired")): 1,
 						stateMetricKey("license_status", "expired", licenseLabels("Date Expired", "date expired")):           1,
 					},
 					wantMissing: []string{
-						metricKey("license_time_until_expiration", licenseLabels("Explicitly Expired", "explicit expired")),
+						metricKey(
+							"license_time_until_expiration",
+							licenseLabels("Explicitly Expired", "explicit expired"),
+						),
 						metricKey("license_time_until_expiration", licenseLabels("Date Expired", "date expired")),
 					},
 				},
@@ -1118,7 +1678,9 @@ func TestCollector_Collect(t *testing.T) {
 			prepare: func(c *Collector, api *mockAPIClient) {
 				c.now = func() time.Time { return time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC) }
 				api.responses = map[string][]byte{
-					licenseInfoCommand: []byte(`<response status="success"><result><licenses><entry><feature>Threat Prevention</feature><description>Threat prevention updates</description><expires>June 01, 2026</expires><expired>maybe</expired></entry></licenses></result></response>`),
+					licenseInfoCommand: []byte(
+						`<response status="success"><result><licenses><entry><feature>Threat Prevention</feature><description>Threat prevention updates</description><expires>June 01, 2026</expires><expired>maybe</expired></entry></licenses></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
@@ -1129,8 +1691,16 @@ func TestCollector_Collect(t *testing.T) {
 						metricKey("license_time_until_expiration", licenseLabels("Threat Prevention", "Threat prevention updates")): 30,
 					},
 					wantMissing: []string{
-						stateMetricKey("license_status", "valid", licenseLabels("Threat Prevention", "Threat prevention updates")),
-						stateMetricKey("license_status", "expired", licenseLabels("Threat Prevention", "Threat prevention updates")),
+						stateMetricKey(
+							"license_status",
+							"valid",
+							licenseLabels("Threat Prevention", "Threat prevention updates"),
+						),
+						stateMetricKey(
+							"license_status",
+							"expired",
+							licenseLabels("Threat Prevention", "Threat prevention updates"),
+						),
 					},
 					wantLog: []string{`license Threat Prevention expired status: invalid status`},
 				},
@@ -1139,15 +1709,22 @@ func TestCollector_Collect(t *testing.T) {
 		"malformed IPsec lifetime preserves active tunnel count": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(`<response status="success"><result><ntun>1</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>soon</remain><tid>66</tid></entry></entries></result></response>`),
+					ipsecSACommand: []byte(
+						`<response status="success"><result><ntun>1</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>soon</remain><tid>66</tid></entry></entries></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
 				{
 					name:        "bad tunnel lifetime is omitted",
 					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 1},
-					wantMissing: []string{metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown"))},
-					wantLog:     []string{`IPsec tunnel branch-a remain: invalid integer`},
+					wantMissing: []string{
+						metricKey(
+							"ipsec_tunnel_sa_lifetime",
+							ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown"),
+						),
+					},
+					wantLog: []string{`IPsec tunnel branch-a remain: invalid integer`},
 				},
 			},
 		},
@@ -1161,14 +1738,21 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name:        "active count commits without tunnel instances",
 					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 2},
-					wantMissing: []string{metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("unknown", "unknown", "unknown", "unknown", "unknown", "unknown"))},
+					wantMissing: []string{
+						metricKey(
+							"ipsec_tunnel_sa_lifetime",
+							ipsecLabels("unknown", "unknown", "unknown", "unknown", "unknown", "unknown"),
+						),
+					},
 				},
 			},
 		},
 		"IPsec count mismatch is partial success": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(`<response status="success"><result><ntun>2</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`),
+					ipsecSACommand: []byte(
+						`<response status="success"><result><ntun>2</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
@@ -1185,7 +1769,9 @@ func TestCollector_Collect(t *testing.T) {
 		"IPsec entries-only response infers active count": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(`<response status="success"><result><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`),
+					ipsecSACommand: []byte(
+						`<response status="success"><result><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`,
+					),
 				}
 			},
 			steps: []collectStep{
@@ -1398,7 +1984,9 @@ func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
 			collr := New()
 			collr.Logger = logger.NewWithWriter(&logBuf)
 			collr.apiClient = &mockAPIClient{
-				responses: map[string][]byte{tc.command: []byte(`<response status="success"><result><broken></result></response>`)},
+				responses: map[string][]byte{
+					tc.command: []byte(`<response status="success"><result><broken></result></response>`),
+				},
 			}
 
 			mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
@@ -1685,23 +2273,77 @@ func TestParseBGPPeers(t *testing.T) {
 				assert.Equal(t, "lr-a", peers[0].VR)
 				assert.Equal(t, "203.0.113.1", peers[0].PeerAddress)
 				assert.Equal(t, "openconfirm", peers[0].State)
-				assert.Equal(t, int64(93784), peers[0].Uptime)
+				assert.Equal(t, new(int64(93784)), peers[0].Uptime)
 			},
 		},
+		"advanced routing engine json": {
+			data:    dataAdvancedBGPPeersARE,
+			wantLen: 3,
+			validate: func(t *testing.T, peers []bgpPeer) {
+				byName := make(map[string]bgpPeer, len(peers))
+				for _, p := range peers {
+					byName[p.PeerAddress] = p
+				}
+
+				est := byName["198.51.100.10"]
+				assert.Empty(t, est.VR, "unresolved router IDs must not become public vr labels")
+				assert.True(t, est.needsVRResolve)
+				assert.Equal(t, "192.0.2.2", est.routerID)
+				assert.Equal(t, "established", est.State)
+				assert.Equal(t, "65020", est.RemoteAS)
+				assert.Equal(t, "core", est.PeerGroup)
+				assert.Equal(t, new(int64(1136150)), est.Uptime)
+				assert.Equal(t, new(int64(189375)), est.MessagesIn)
+				assert.NotNil(t, est.MessagesOut)
+				assert.NotNil(t, est.UpdatesIn)
+				assert.NotNil(t, est.UpdatesOut)
+				assert.NotNil(t, est.Flaps)
+				assert.NotNil(t, est.Established)
+				require.Len(t, est.PrefixCounters, 1)
+				assert.Equal(t, "ipv4", est.PrefixCounters[0].AFI)
+				assert.Equal(t, "unicast", est.PrefixCounters[0].SAFI)
+				assert.Equal(t, new(int64(9)), est.PrefixCounters[0].IncomingAccepted)
+				assert.Equal(t, new(int64(5)), est.PrefixCounters[0].OutgoingAdvertised)
+				assert.Nil(t, est.PrefixCounters[0].IncomingTotal)
+				assert.Nil(t, est.PrefixCounters[0].IncomingRejected)
+
+				con := byName["203.0.113.10"]
+				assert.Equal(t, "connect", con.State)
+				assert.Nil(t, con.Uptime)
+				assert.NotNil(t, con.MessagesIn)
+				assert.NotNil(t, con.Flaps)
+				assert.NotNil(t, con.Established)
+				require.Len(t, con.PrefixCounters, 1)
+				assert.Equal(t, new(int64(0)), con.PrefixCounters[0].IncomingAccepted)
+				assert.Nil(t, con.PrefixCounters[0].OutgoingAdvertised)
+			},
+		},
+		"advanced routing engine null peer entry": {
+			data:    []byte(`<response status="success"><result><json>{"peer-a": null}</json></result></response>`),
+			wantErr: `BGP peer "peer-a": must be a JSON object`,
+		},
 		"error response with nested lines": {
-			data:    []byte(`<response status="error" code="16"><msg><line>Unauthorized</line><line>Invalid API key</line></msg></response>`),
+			data: []byte(
+				`<response status="error" code="16"><msg><line>Unauthorized</line><line>Invalid API key</line></msg></response>`,
+			),
 			wantErr: "Unauthorized; Invalid API key",
 		},
 		"error response with result message": {
-			data:    []byte(`<response status="error" code="400"><result><msg>Parameter &quot;format&quot; is required while exporting certificate</msg></result></response>`),
+			data: []byte(
+				`<response status="error" code="400"><result><msg>Parameter &quot;format&quot; is required while exporting certificate</msg></result></response>`,
+			),
 			wantErr: `Parameter "format" is required while exporting certificate`,
 		},
 		"malformed numeric field fails peer": {
-			data:    []byte(`<response status="success"><result><entry><peer-address>192.0.2.1</peer-address><status>Established</status><status-duration>60</status-duration><msg-total-in>abc</msg-total-in><msg-total-out>1</msg-total-out><msg-update-in>1</msg-update-in><msg-update-out>1</msg-update-out><status-flap-counts>0</status-flap-counts><established-counts>1</established-counts></entry></result></response>`),
+			data: []byte(
+				`<response status="success"><result><entry><peer-address>192.0.2.1</peer-address><status>Established</status><status-duration>60</status-duration><msg-total-in>abc</msg-total-in><msg-total-out>1</msg-total-out><msg-update-in>1</msg-update-in><msg-update-out>1</msg-update-out><status-flap-counts>0</status-flap-counts><established-counts>1</established-counts></entry></result></response>`,
+			),
 			wantErr: `BGP peer 192.0.2.1 msg-total-in: invalid integer "abc"`,
 		},
 		"missing numeric field fails peer": {
-			data:    []byte(`<response status="success"><result><entry><peer-address>192.0.2.1</peer-address><status>Established</status><status-duration>60</status-duration><msg-total-in>1</msg-total-in><msg-total-out>1</msg-total-out><msg-update-in>1</msg-update-in><msg-update-out>1</msg-update-out><status-flap-counts>0</status-flap-counts></entry></result></response>`),
+			data: []byte(
+				`<response status="success"><result><entry><peer-address>192.0.2.1</peer-address><status>Established</status><status-duration>60</status-duration><msg-total-in>1</msg-total-in><msg-total-out>1</msg-total-out><msg-update-in>1</msg-update-in><msg-update-out>1</msg-update-out><status-flap-counts>0</status-flap-counts></entry></result></response>`,
+			),
 			wantErr: "BGP peer 192.0.2.1 established-counts: missing integer",
 		},
 		"malformed peer is skipped when another peer is valid": {
@@ -1713,7 +2355,7 @@ func TestParseBGPPeers(t *testing.T) {
 			wantErr: `BGP peer entry 192.0.2.1: BGP peer 192.0.2.1 msg-total-in: invalid integer "abc"`,
 			validate: func(t *testing.T, peers []bgpPeer) {
 				assert.Equal(t, "192.0.2.2", peers[0].PeerAddress)
-				assert.Equal(t, int64(120), peers[0].Uptime)
+				assert.Equal(t, new(int64(120)), peers[0].Uptime)
 			},
 		},
 		"malformed prefix counter preserves peer": {
@@ -1741,7 +2383,7 @@ func TestParseBGPPeers(t *testing.T) {
 				require.Len(t, peers[0].PrefixCounters, 1)
 				assert.Equal(t, "ipv6", peers[0].PrefixCounters[0].AFI)
 				assert.Equal(t, "unicast", peers[0].PrefixCounters[0].SAFI)
-				assert.Equal(t, int64(7), peers[0].PrefixCounters[0].IncomingTotal)
+				assert.Equal(t, new(int64(7)), peers[0].PrefixCounters[0].IncomingTotal)
 			},
 		},
 		"deduplicates same vr and peer": {
@@ -1753,7 +2395,7 @@ func TestParseBGPPeers(t *testing.T) {
 			validate: func(t *testing.T, peers []bgpPeer) {
 				assert.Equal(t, "192.0.2.1", peers[0].PeerAddress)
 				assert.Equal(t, "established", peers[0].State)
-				assert.Equal(t, int64(10), peers[0].MessagesIn)
+				assert.Equal(t, new(int64(10)), peers[0].MessagesIn)
 			},
 		},
 		"uses peer name when peer address is missing": {
@@ -1800,7 +2442,7 @@ func TestParseBGPPeers(t *testing.T) {
 				require.Len(t, peers[0].PrefixCounters, 1)
 				assert.Equal(t, "unknown", peers[0].PrefixCounters[0].AFI)
 				assert.Equal(t, "unknown", peers[0].PrefixCounters[0].SAFI)
-				assert.Equal(t, int64(7), peers[0].PrefixCounters[0].IncomingTotal)
+				assert.Equal(t, new(int64(7)), peers[0].PrefixCounters[0].IncomingTotal)
 			},
 		},
 		"container entries without peer data are skipped": {
@@ -1833,7 +2475,7 @@ func TestParseBGPPeers(t *testing.T) {
 				</result></response>`),
 			wantLen: 1,
 			validate: func(t *testing.T, peers []bgpPeer) {
-				assert.Equal(t, int64(0), peers[0].Uptime)
+				assert.Equal(t, new(int64(0)), peers[0].Uptime)
 			},
 		},
 	}
@@ -1854,6 +2496,172 @@ func TestParseBGPPeers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseBGPSummary(t *testing.T) {
+	tests := map[string]struct {
+		data          []byte
+		wantNames     map[string]string
+		wantAmbiguous map[string]bool
+		wantErr       string
+	}{
+		"advanced routing engine summary": {
+			data: dataAdvancedBGPSummary,
+			wantNames: map[string]string{
+				"192.0.2.1": "lr-a",
+				"192.0.2.2": "lr-b",
+			},
+			wantAmbiguous: map[string]bool{},
+		},
+		"non-json result yields no mapping": {
+			data:    []byte(`<response status="success"><result><entry/></result></response>`),
+			wantErr: "no JSON payload",
+		},
+		"duplicate router-id is ambiguous": {
+			data: []byte(`<response status="success"><result><json>{
+                "lr-a": {"router-id": "192.0.2.1"},
+                "lr-b": {"router-id": "192.0.2.1"}
+            }</json></result></response>`),
+			wantNames:     map[string]string{},
+			wantAmbiguous: map[string]bool{"192.0.2.1": true},
+		},
+		"null summary is not an object": {
+			data:    []byte(`<response status="success"><result><json>null</json></result></response>`),
+			wantErr: "must be a JSON object",
+		},
+		"error response": {
+			data:    []byte(`<response status="error" code="16"><msg><line>Unauthorized</line></msg></response>`),
+			wantErr: "Unauthorized",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseBGPSummary(tc.data)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantNames, got.names)
+			assert.Equal(t, tc.wantAmbiguous, got.ambiguous)
+		})
+	}
+}
+
+func TestCollector_enrichBGPPeerVRs(t *testing.T) {
+	t.Run("resolves logical-router names from summary", func(t *testing.T) {
+		collr := New()
+		collr.Logger = logger.NewWithWriter(&bytes.Buffer{})
+		api := &mockAPIClient{
+			responses: map[string][]byte{advancedBGPSummaryCommand: dataAdvancedBGPSummary},
+		}
+		collr.apiClient = api
+
+		peers := []bgpPeer{
+			{needsVRResolve: true, routerID: "192.0.2.1", PeerAddress: "192.0.2.10"},
+			{needsVRResolve: true, routerID: "192.0.2.2", PeerAddress: "198.51.100.10"},
+			{needsVRResolve: true, routerID: "192.0.2.9", PeerAddress: "203.0.113.10"},
+		}
+		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
+		require.NoError(t, err)
+		require.Len(t, resolved, 2)
+
+		assert.Equal(t, "lr-a", resolved[0].VR)
+		assert.Equal(t, "lr-b", resolved[1].VR)
+		assert.Equal(t, map[string]string{"192.0.2.1": "lr-a", "192.0.2.2": "lr-b"}, collr.bgpRouterNames)
+	})
+
+	t.Run("skips summary lookup for XML peers", func(t *testing.T) {
+		collr := New()
+		api := &mockAPIClient{
+			responses: map[string][]byte{advancedBGPSummaryCommand: dataAdvancedBGPSummary},
+		}
+		collr.apiClient = api
+
+		// Legacy/advanced-XML peers carry their vr name and no router-id; no
+		// summary query should be issued for them.
+		peers := []bgpPeer{{VR: "lr-a", PeerAddress: "192.0.2.1"}}
+		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
+		require.NoError(t, err)
+		require.Len(t, resolved, 1)
+
+		assert.Equal(t, "lr-a", resolved[0].VR)
+		assert.Empty(t, api.commands)
+	})
+
+	t.Run("first summary query failure withholds unresolved peers", func(t *testing.T) {
+		collr := New()
+		collr.Logger = logger.NewWithWriter(&bytes.Buffer{})
+		api := &mockAPIClient{
+			errors: map[string]error{advancedBGPSummaryCommand: errors.New("boom")},
+		}
+		collr.apiClient = api
+
+		peers := []bgpPeer{{needsVRResolve: true, routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
+		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
+		require.NoError(t, err)
+		assert.Empty(t, resolved)
+	})
+
+	t.Run("summary query failure reuses last successful mapping", func(t *testing.T) {
+		collr := New()
+		collr.Logger = logger.NewWithWriter(&bytes.Buffer{})
+		collr.bgpRouterNames = map[string]string{"192.0.2.1": "lr-a"}
+		api := &mockAPIClient{
+			errors: map[string]error{
+				advancedBGPSummaryCommand: fmt.Errorf("boom: %w", context.DeadlineExceeded),
+			},
+		}
+		collr.apiClient = api
+
+		peers := []bgpPeer{{needsVRResolve: true, routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
+		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
+		require.NoError(t, err)
+		require.Len(t, resolved, 1)
+		assert.Equal(t, "lr-a", resolved[0].VR)
+	})
+}
+
+func TestMergeBGPRouterNames(t *testing.T) {
+	peers := []bgpPeer{
+		{needsVRResolve: true, routerID: "192.0.2.1"},
+		{needsVRResolve: true, routerID: "192.0.2.2"},
+		{needsVRResolve: true},
+		{VR: "legacy"},
+	}
+	previous := map[string]string{
+		"192.0.2.1": "lr-a-old",
+		"192.0.2.2": "lr-b",
+		"192.0.2.9": "stale",
+	}
+
+	t.Run("updates present IDs, retains missing IDs, and drops stale IDs", func(t *testing.T) {
+		summary := bgpRouterSummary{
+			names:     map[string]string{"192.0.2.1": "lr-a-new"},
+			ambiguous: map[string]bool{},
+		}
+		got, missing, ambiguous := mergeBGPRouterNames(peers, previous, summary)
+
+		assert.Equal(t, map[string]string{
+			"192.0.2.1": "lr-a-new",
+			"192.0.2.2": "lr-b",
+		}, got)
+		assert.Equal(t, 1, missing)
+		assert.Zero(t, ambiguous)
+	})
+
+	t.Run("evicts explicitly ambiguous current IDs", func(t *testing.T) {
+		summary := bgpRouterSummary{
+			names:     map[string]string{"192.0.2.1": "lr-a-new"},
+			ambiguous: map[string]bool{"192.0.2.2": true},
+		}
+		got, missing, ambiguous := mergeBGPRouterNames(peers, previous, summary)
+
+		assert.Equal(t, map[string]string{"192.0.2.1": "lr-a-new"}, got)
+		assert.Zero(t, missing)
+		assert.Equal(t, 1, ambiguous)
+	})
 }
 
 func TestParseReadOnlyTelemetry(t *testing.T) {
@@ -2293,19 +3101,33 @@ func stateLabels(name, state string, labels metrix.Labels) metrix.Labels {
 }
 
 func systemLabels() metrix.Labels {
-	return metrix.Labels{"hostname": "edge-fw-a", "model": "PA-850", "serial": "0123456789", "sw_version": "11.1.2"}
+	return metrix.Labels{
+		"hostname":   "edge-fw-a",
+		"model":      "PA-850",
+		"serial":     "0123456789",
+		"sw_version": "11.1.2",
+	}
 }
 
 func envLabels(sensorType, slot, sensor string) metrix.Labels {
-	return metrix.Labels{"sensor_type": sensorType, "slot": slot, "sensor": sensor}
+	return metrix.Labels{
+		"sensor_type": sensorType,
+		"slot":        slot,
+		"sensor":      sensor,
+	}
 }
 
 func haLinkLabels(link string) metrix.Labels {
-	return metrix.Labels{"link": link}
+	return metrix.Labels{
+		"link": link,
+	}
 }
 
 func licenseLabels(feature, description string) metrix.Labels {
-	return metrix.Labels{"feature": feature, "description": description}
+	return metrix.Labels{
+		"feature":     feature,
+		"description": description,
+	}
 }
 
 func ipsecLabels(tunnel, gateway, remote, tunnelID, protocol, encryption string) metrix.Labels {
@@ -2350,6 +3172,31 @@ func advancedPrefixLabels(afi, safi string) metrix.Labels {
 	return labels
 }
 
+func arePeerLabels(vr, peerAddress, localAddress, remoteAS, peerGroup string) metrix.Labels {
+	return metrix.Labels{
+		"vr":            vr,
+		"peer_address":  peerAddress,
+		"local_address": localAddress,
+		"remote_as":     remoteAS,
+		"peer_group":    peerGroup,
+	}
+}
+
+func arePrefixLabels(vr, peerAddress, localAddress, remoteAS, peerGroup, afi, safi string) metrix.Labels {
+	labels := arePeerLabels(vr, peerAddress, localAddress, remoteAS, peerGroup)
+	labels["afi"] = afi
+	labels["safi"] = safi
+	return labels
+}
+
+func advancedBGPPeersAREWithoutRouterIDs() []byte {
+	payload := strings.ReplaceAll(string(dataAdvancedBGPPeersARE), `        "localRouterId": "192.0.2.1",
+`, "")
+	payload = strings.ReplaceAll(payload, `        "localRouterId": "192.0.2.2",
+`, "")
+	return []byte(payload)
+}
+
 func fallbackPeerLabels(peerAddress string) metrix.Labels {
 	return metrix.Labels{
 		"vr":            "default",
@@ -2375,7 +3222,9 @@ func deepNestedBGPPeerXML(depth int) []byte {
 		b.WriteString(strconv.Itoa(i))
 		b.WriteString(`">`)
 	}
-	b.WriteString(`<entry><peer-address>192.0.2.1</peer-address><status>Established</status><status-duration>60</status-duration><msg-total-in>10</msg-total-in><msg-total-out>20</msg-total-out><msg-update-in>3</msg-update-in><msg-update-out>4</msg-update-out><status-flap-counts>0</status-flap-counts><established-counts>1</established-counts></entry>`)
+	b.WriteString(
+		`<entry><peer-address>192.0.2.1</peer-address><status>Established</status><status-duration>60</status-duration><msg-total-in>10</msg-total-in><msg-total-out>20</msg-total-out><msg-update-in>3</msg-update-in><msg-update-out>4</msg-update-out><status-flap-counts>0</status-flap-counts><established-counts>1</established-counts></entry>`,
+	)
 	for range depth {
 		b.WriteString(`</entry>`)
 	}
@@ -2417,7 +3266,7 @@ func (m *mockAPIClient) op(ctx context.Context, cmd string) ([]byte, error) {
 	case legacyBGPPeerCommand, advancedBGPPeerCommands[0], advancedBGPPeerCommands[1], advancedBGPPeerCommands[2]:
 		return []byte(`<response status="success"><result></result></response>`), nil
 	default:
-		return []byte(`<response status="success"><result></result></response>`), nil
+		return nil, fmt.Errorf("unexpected PAN-OS command: %s", cmd)
 	}
 }
 

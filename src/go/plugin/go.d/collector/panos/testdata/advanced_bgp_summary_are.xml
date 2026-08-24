@@ -1,0 +1,6 @@
+<response status="success"><result>
+  <json>{
+    "lr-a": {"enabled": "yes", "router-id": "192.0.2.1", "local-as": 65000},
+    "lr-b": {"enabled": "yes", "router-id": "192.0.2.2", "local-as": 65000}
+  }</json>
+</result></response>

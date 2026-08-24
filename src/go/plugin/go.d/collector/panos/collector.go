@@ -57,12 +57,12 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key"`
-	Vsys               string `yaml:"vsys,omitempty" json:"vsys"`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
+	APIKey             string `yaml:"api_key,omitempty"             json:"api_key"`
+	Vsys               string `yaml:"vsys,omitempty"                json:"vsys"`
 }
 
 type Collector struct {
@@ -74,9 +74,10 @@ type Collector struct {
 
 	apiClient panosAPIClient
 
-	routingEngine routingEngine
-	bgpCommand    string
-	noBGPProbedAt time.Time
+	routingEngine  routingEngine
+	bgpCommand     string
+	noBGPProbedAt  time.Time
+	bgpRouterNames map[string]string
 
 	newAPIClient        func(Config) (panosAPIClient, error)
 	advancedBGPCommands []string
@@ -167,7 +168,9 @@ func (c *Collector) validateConfig() error {
 		return errors.New("config: not_follow_redirects is not supported by the panos collector")
 	}
 	if c.ProxyUsername != "" || c.ProxyPassword != "" {
-		return errors.New("config: proxy_username/proxy_password are not supported; include proxy credentials in proxy_url")
+		return errors.New(
+			"config: proxy_username/proxy_password are not supported; include proxy credentials in proxy_url",
+		)
 	}
 	if (c.TLSCert != "" && c.TLSKey == "") || (c.TLSKey != "" && c.TLSCert == "") {
 		return errors.New("config: tls_cert and tls_key must both be set")
