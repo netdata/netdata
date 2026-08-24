@@ -726,14 +726,6 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return unittest_stream_compressions();
                         }
-                        else if(strcmp(optarg, "stream_conf_compression_test") == 0) {
-                            unittest_running = true;
-                            return stream_conf_compression_levels_unittest();
-                        }
-                        else if(strcmp(optarg, "stream_receiver_timeout_test") == 0) {
-                            unittest_running = true;
-                            return stream_receiver_timeout_unittest();
-                        }
                         else if(strcmp(optarg, "progresstest") == 0) {
                             unittest_running = true;
                             return progress_unittest();
@@ -805,6 +797,14 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
 #endif
+                        else if(strcmp(optarg, "stream_conf_compression_test") == 0) {
+                            unittest_running = true;
+                            return stream_conf_compression_levels_unittest();
+                        }
+                        else if(strcmp(optarg, "stream_receiver_timeout_test") == 0) {
+                            unittest_running = true;
+                            return stream_receiver_timeout_unittest();
+                        }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"

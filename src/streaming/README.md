@@ -226,7 +226,7 @@ With these settings, you can configure how your Child nodes send metrics to Pare
 |-------------------------------------------------|---------------------------|--------------------------------------------------------------------------------|
 | `enabled`                                       | `no`                      | Enables streaming. Set to `yes` to allow this node to send metrics.            |
 | [`destination`](#destination)                   | (empty)                   | Defines one or more Parent nodes to send data to.                              |
-| `ssl skip certificate verification`             | `yes`                     | Accepts self-signed or expired SSL certificates.                               |
+| `ssl skip certificate verification`             | `no`                      | Disables certificate verification for this sender. Use only for testing.       |
 | `CApath`                                        | `/etc/ssl/certs/`         | Directory for trusted SSL certificates.                                        |
 | `CAfile`                                        | `/etc/ssl/certs/cert.pem` | File containing trusted certificates.                                          |
 | `api key`                                       | (empty)                   | API key used by the Child to authenticate with the Parent.                     |
