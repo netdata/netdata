@@ -512,10 +512,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r, QUERY_ENGINE_OPS_CACHE 
 }
 
 // the LATEST grouping asks for the most recent collected value; when the
-// query wants a single point and its window covers the metric's last stored
-// sample, the answer is the collector's cached last_stored_value - serve it
-// without building a query plan, so the storage engine is never touched.
-// options that change the value semantics (anomaly-bit, natural points,
+// query wants a single point and the metric's latest collection interval
+// reaches its window, the answer is the collector's cached last_stored_value -
+// serve it without building a query plan, so storage is never touched.
+// options that change the value semantics (anomaly-bit, resampling,
 // a pinned tier) fall back to the normal execution path.
 static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
@@ -529,9 +529,13 @@ static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
         (qt->window.options & (RRDR_OPTION_SELECTED_TIER|RRDR_OPTION_ANOMALY_BIT)))
         return false;
 
-    // the single output bucket spans (after, before]
+    // The single output bucket spans (after, before]. LATEST may use the live
+    // last observation until its next expected collection interval reaches
+    // the window, even when the stored endpoint itself precedes `after`.
     time_t db_last = ops->qm->tiers[0].db_last_time_s;
-    if(db_last <= qt->window.after || db_last > qt->window.before)
+    time_t db_update_every = ops->qm->tiers[0].db_update_every_s;
+    if(db_last > qt->window.before ||
+       nd_time_t_add_compare(db_last, db_update_every, qt->window.after) < 0)
         return false;
 
     // NAN when there is no live dimension (archived metric), or when the
