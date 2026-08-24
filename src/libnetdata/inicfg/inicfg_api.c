@@ -470,9 +470,18 @@ long long inicfg_get_number_range(struct config *root, const char *section, cons
     return rc;
 }
 
+// Formats a NETDATA_DOUBLE for the configuration file.
+// The fixed-point format is preferred for readability, but it needs thousands of digits for
+// huge magnitudes (e.g. 1e100), which would be silently truncated to a completely different
+// number. When it does not fit, fall back to the exponential format, which always fits.
+static void inicfg_double_to_str(char *dst, size_t dst_size, NETDATA_DOUBLE value) {
+    if((size_t)snprintfz(dst, dst_size, "%0.5" NETDATA_DOUBLE_MODIFIER, value) >= dst_size - 1)
+        snprintfz(dst, dst_size, NETDATA_DOUBLE_FORMAT_G, value);
+}
+
 NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
-    snprintfz(buffer, sizeof(buffer), "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    inicfg_double_to_str(buffer, sizeof(buffer), value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE, NULL);
     if(!opt) return value;
@@ -491,7 +500,7 @@ long long inicfg_set_number(struct config *root, const char *section, const char
 
 NETDATA_DOUBLE inicfg_set_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
-    snprintfz(buffer, sizeof(buffer), "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    inicfg_double_to_str(buffer, sizeof(buffer), value);
 
     inicfg_set_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE);
     return value;
