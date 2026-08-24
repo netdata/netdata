@@ -324,2255 +324,269 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-The built-in Prometheus profiles on this page define 109 curated charts across
-the primary and applicable supporting profiles.
-The catalogue is generated from the same profile design and runtime chart contracts used by the Agent.
+The built-in Prometheus profiles on this page map Prometheus metrics into
+109 curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 
 Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
 the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
 every metric that the collector can render.
 
-<details open data-prometheus-profile-catalog>
-<summary>Curated profile coverage (109 charts)</summary>
-
-
-<details open data-prometheus-profile>
-<summary>LiteLLM — 101 charts</summary>
-
+### LiteLLM
 
 Curated gateway, routing, provider, usage, cost, governance, dependency, and runtime metrics from LiteLLM.
 
 
-<details data-prometheus-profile-family>
-<summary>Gateway (16 charts)</summary>
-
-
-
-<details data-prometheus-profile-family>
-<summary>Client Traffic (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Client Request Outcomes</summary>
-
-
-- **Entity scope:** route, status_class
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_proxy_total_requests_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Client Failure Causes</summary>
-
-
-- **Entity scope:** status_class, exception_class
-- **Units:** `failures/s`
-- **Dimensions:** `failures`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_proxy_failed_requests_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Client Rate-Limit Attribution</summary>
-
-
-- **Entity scope:** rate_limit_category, rate_limit_type
-- **Units:** `failures/s`
-- **Dimensions:** `failures`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_proxy_failed_requests_metric_total{rate_limit_category=~".+",rate_limit_type=~".+"}`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>In-Flight Requests</summary>
-
-
-- **Entity scope:** collector job service
-- **Units:** `requests`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_in_flight_requests`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Admission Queue (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Queue-Time Distribution</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_request_queue_time_seconds_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Queued Request Measurements</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_request_queue_time_seconds_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Request Queue Time</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_request_queue_time_seconds_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Request Latency (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>End-to-End Request-Latency Distribution</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_request_total_latency_metric_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>End-to-End Request Measurements</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_request_total_latency_metric_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated End-to-End Request Time</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_request_total_latency_metric_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Processing Overhead (6 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>LiteLLM Overhead-Latency Distribution</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_overhead_latency_metric_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LiteLLM Overhead Measurements</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_overhead_latency_metric_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated LiteLLM Overhead</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_overhead_latency_metric_sum`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Guardrail-Inclusive Overhead Distribution</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_overhead_with_guardrails_latency_metric_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Guardrail-Inclusive Overhead Measurements</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_overhead_with_guardrails_latency_metric_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Guardrail-Inclusive Overhead</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_overhead_with_guardrails_latency_metric_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Routing and Deployments (13 charts)</summary>
-
-
-
-<details data-prometheus-profile-family>
-<summary>Deployment Requests (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Request Workload</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_total_requests_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Classified Deployment Outcomes</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/s`
-- **Dimensions:** `successful`, `failed`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_deployment_success_responses_total`
-- `litellm_deployment_failure_responses_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Failure Causes</summary>
-
-
-- **Entity scope:** model_id, status_class, exception_class
-- **Units:** `failures/s`
-- **Dimensions:** `failures`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_failure_responses_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Deployment Health (2 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Cooldowns</summary>
-
-
-- **Entity scope:** model_id, status_class
-- **Units:** `events/s`
-- **Dimensions:** `cooldowns`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_cooled_down_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Deployment State</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `{status}`
-- **Dimensions:** `state`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_state`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Deployment Capacity (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Request Limit</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/min`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_rpm_limit`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Token Limit</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/min`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_tpm_limit`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Provider Remaining Requests</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_requests_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Provider Remaining Tokens</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_tokens_metric`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Output-Token Latency (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Output-Token Latency Distribution</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_latency_per_output_token_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Deployment Output-Token Latency Measurements</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_latency_per_output_token_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Deployment Output-Token Latency</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_deployment_latency_per_output_token_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Fallbacks (1 chart)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Fallback Outcomes</summary>
-
-
-- **Entity scope:** requested_model, fallback_model
-- **Units:** `fallbacks/s`
-- **Dimensions:** `successful`, `failed`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_deployment_successful_fallbacks_total`
-- `litellm_deployment_failed_fallbacks_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Provider API (6 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Provider API Latency Distribution</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_llm_api_latency_metric_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Provider API Latency Measurements</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_llm_api_latency_metric_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Provider API Latency</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_llm_api_latency_metric_sum`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Provider Time-to-First-Token Distribution</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_llm_api_time_to_first_token_metric_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Provider Time-to-First-Token Measurements</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `requests/s`
-- **Dimensions:** `requests`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_llm_api_time_to_first_token_metric_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Provider Time-to-First-Token</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_llm_api_time_to_first_token_metric_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Usage and Cost (24 charts)</summary>
-
-
-
-<details data-prometheus-profile-family>
-<summary>By Deployment (6 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend</summary>
-
-
-- **Entity scope:** model_id, service_tier
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Audio and Reasoning Token Throughput</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/s`
-- **Dimensions:** `input_audio`, `output_audio`, `output_reasoning`
-<details><summary>Source metric selectors (3)</summary>
-
-
-- `litellm_input_audio_tokens_metric_total`
-- `litellm_output_audio_tokens_metric_total`
-- `litellm_output_reasoning_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Generated Images</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `images/s`
-- **Dimensions:** `images`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_images_generated_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Generated Video Duration</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `seconds/s`
-- **Dimensions:** `duration`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_video_duration_seconds_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>By API Key (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput by API Key</summary>
-
-
-- **Entity scope:** hashed_api_key
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput by API Key</summary>
-
-
-- **Entity scope:** hashed_api_key
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend by API Key</summary>
-
-
-- **Entity scope:** hashed_api_key
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>By Team (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput by Team</summary>
-
-
-- **Entity scope:** team
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput by Team</summary>
-
-
-- **Entity scope:** team
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend by Team</summary>
-
-
-- **Entity scope:** team
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>By User (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput by User</summary>
-
-
-- **Entity scope:** user
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput by User</summary>
-
-
-- **Entity scope:** user
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend by User</summary>
-
-
-- **Entity scope:** user
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>By Organization (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput by Organization</summary>
-
-
-- **Entity scope:** org_id
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput by Organization</summary>
-
-
-- **Entity scope:** org_id
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend by Organization</summary>
-
-
-- **Entity scope:** org_id
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>By End User (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput by End User</summary>
-
-
-- **Entity scope:** end_user
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput by End User</summary>
-
-
-- **Entity scope:** end_user
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend by End User</summary>
-
-
-- **Entity scope:** end_user
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>By Requested Model (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Request Token Throughput by Requested Model</summary>
-
-
-- **Entity scope:** requested_model
-- **Units:** `tokens/s`
-- **Dimensions:** `input`, `output`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_tokens_metric_total`
-- `litellm_output_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Reported Total Token Throughput by Requested Model</summary>
-
-
-- **Entity scope:** requested_model
-- **Units:** `tokens/s`
-- **Dimensions:** `total`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LLM Spend by Requested Model</summary>
-
-
-- **Entity scope:** requested_model
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Caching (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Cache Outcomes</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `events/s`
-- **Dimensions:** `hits`, `misses`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_cache_hits_metric_total`
-- `litellm_cache_misses_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>LiteLLM Cached Token Throughput</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/s`
-- **Dimensions:** `cached`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_cached_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Request Input-Cache Token Throughput</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/s`
-- **Dimensions:** `read`, `creation`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_input_cached_tokens_metric_total`
-- `litellm_input_cache_creation_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Provider Cache Token Throughput</summary>
-
-
-- **Entity scope:** model_id
-- **Units:** `tokens/s`
-- **Dimensions:** `read`, `creation`
-<details><summary>Source metric selectors (2)</summary>
-
-
-- `litellm_provider_cache_read_input_tokens_metric_total`
-- `litellm_provider_cache_creation_input_tokens_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Governance (16 charts)</summary>
-
-
-
-<details data-prometheus-profile-family>
-<summary>API Keys (5 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>API-Key Remaining Budget</summary>
-
-
-- **Entity scope:** hashed_api_key
-- **Units:** `USD`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_api_key_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>API-Key Budget Limit</summary>
-
-
-- **Entity scope:** hashed_api_key
-- **Units:** `USD`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_api_key_max_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>API-Key Budget Reset Window</summary>
-
-
-- **Entity scope:** hashed_api_key
-- **Units:** `hours`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_api_key_budget_remaining_hours_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>API-Key Model Request Headroom</summary>
-
-
-- **Entity scope:** hashed_api_key, model
-- **Units:** `requests`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_api_key_requests_for_model`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>API-Key Model Token Headroom</summary>
-
-
-- **Entity scope:** hashed_api_key, model
-- **Units:** `tokens`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_api_key_tokens_for_model`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Organizations (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Organization Remaining Budget</summary>
-
-
-- **Entity scope:** org_id
-- **Units:** `USD`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_org_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Organization Budget Limit</summary>
-
-
-- **Entity scope:** org_id
-- **Units:** `USD`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_org_max_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Organization Budget Reset Window</summary>
-
-
-- **Entity scope:** org_id
-- **Units:** `hours`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_org_budget_remaining_hours_metric`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Teams (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Team Remaining Budget</summary>
-
-
-- **Entity scope:** team
-- **Units:** `USD`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_team_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Team Budget Limit</summary>
-
-
-- **Entity scope:** team
-- **Units:** `USD`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_team_max_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Team Budget Reset Window</summary>
-
-
-- **Entity scope:** team
-- **Units:** `hours`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_team_budget_remaining_hours_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Team Membership</summary>
-
-
-- **Entity scope:** team
-- **Units:** `members`
-- **Dimensions:** `members`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_team_members_metric`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Users (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>User Remaining Budget</summary>
-
-
-- **Entity scope:** user
-- **Units:** `USD`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_remaining_user_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>User Budget Limit</summary>
-
-
-- **Entity scope:** user
-- **Units:** `USD`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_user_max_budget_metric`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>User Budget Reset Window</summary>
-
-
-- **Entity scope:** user
-- **Units:** `hours`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_user_budget_remaining_hours_metric`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Providers (1 chart)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Provider Remaining Budget</summary>
-
-
-- **Entity scope:** api_provider
-- **Units:** `USD`
-- **Dimensions:** `remaining`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_provider_remaining_budget_metric`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Guardrails (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Guardrail Invocations</summary>
-
-
-- **Entity scope:** guardrail_name, hook_type, status
-- **Units:** `invocations/s`
-- **Dimensions:** `invocations`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_guardrail_latency_seconds_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Guardrail Errors</summary>
-
-
-- **Entity scope:** guardrail_name, hook_type, error_type
-- **Units:** `errors/s`
-- **Dimensions:** `errors`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_guardrail_errors_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Guardrail Latency Distribution</summary>
-
-
-- **Entity scope:** guardrail_name, hook_type
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_guardrail_latency_seconds_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Guardrail Latency</summary>
-
-
-- **Entity scope:** guardrail_name, hook_type
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_guardrail_latency_seconds_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>MCP Gateway (2 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>MCP Tool Calls</summary>
-
-
-- **Entity scope:** mcp_server_name, mcp_tool_name
-- **Units:** `calls/s`
-- **Dimensions:** `calls`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_mcp_tool_calls_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>MCP Tool-Call Spend</summary>
-
-
-- **Entity scope:** mcp_server_name, mcp_tool_name
-- **Units:** `USD/s`
-- **Dimensions:** `spend`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_mcp_tool_call_spend_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Managed Batches and Files (8 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Managed Batches Created</summary>
-
-
-- **Entity scope:** api_provider, model
-- **Units:** `batches/s`
-- **Dimensions:** `created`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_managed_batch_created_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Successfully Cost-Tracked Batches</summary>
-
-
-- **Entity scope:** api_provider, model
-- **Units:** `batches/s`
-- **Dimensions:** `cost_tracked`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_check_batch_cost_jobs_processed_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Batch-Cost Processing Errors</summary>
-
-
-- **Entity scope:** collector job service
-- **Units:** `errors/s`
-- **Dimensions:** `errors`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_check_batch_cost_errors_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Managed Files Created</summary>
-
-
-- **Entity scope:** api_provider, model
-- **Units:** `files/s`
-- **Dimensions:** `created`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_managed_file_created_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Managed File Deletions</summary>
-
-
-- **Entity scope:** result
-- **Units:** `files/s`
-- **Dimensions:** `deletions`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_managed_file_deleted_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Managed Batch Duration Distribution</summary>
-
-
-- **Entity scope:** api_provider, model
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_managed_batch_duration_seconds_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Completed Managed Batches</summary>
-
-
-- **Entity scope:** api_provider, model
-- **Units:** `batches/s`
-- **Dimensions:** `completed`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_managed_batch_duration_seconds_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Managed Batch Duration</summary>
-
-
-- **Entity scope:** api_provider, model
-- **Units:** `seconds/s`
-- **Dimensions:** `time`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_managed_batch_duration_seconds_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Inventory and Callbacks (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Total Users</summary>
-
-
-- **Entity scope:** collector job
-- **Units:** `users`
-- **Dimensions:** `users`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_total_users`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Billable Users</summary>
-
-
-- **Entity scope:** collector job
-- **Units:** `users`
-- **Dimensions:** `users`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_active_users`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Teams</summary>
-
-
-- **Entity scope:** collector job
-- **Units:** `teams`
-- **Dimensions:** `teams`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_teams_count`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Callback Logging Failures</summary>
-
-
-- **Entity scope:** callback_name
-- **Units:** `failures/s`
-- **Dimensions:** `failures`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `litellm_callback_logging_failures_metric_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-<details data-prometheus-profile-family>
-<summary>Internal Services (4 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Internal Service Request Outcomes</summary>
-
-
-- **Entity scope:** service
-- **Units:** `requests/s`
-- **Dimensions:** `values of label outcome`
-<details><summary>Source metric selectors (22)</summary>
-
-
-- `litellm_auth_latency_count`
-- `litellm_batch_write_to_db_latency_count`
-- `litellm_postgres_latency_count`
-- `litellm_proxy_pre_call_latency_count`
-- `litellm_redis_latency_count`
-- `litellm_redis_daily_org_spend_update_queue_latency_count`
-- `litellm_redis_daily_tag_spend_update_queue_latency_count`
-- `litellm_redis_daily_team_spend_update_queue_latency_count`
-- `litellm_reset_budget_job_latency_count`
-- `litellm_router_latency_count`
-- `litellm_self_latency_count`
-- `litellm_auth_failed_requests_total`
-- `litellm_batch_write_to_db_failed_requests_total`
-- `litellm_postgres_failed_requests_total`
-- `litellm_proxy_pre_call_failed_requests_total`
-- `litellm_redis_failed_requests_total`
-- `litellm_redis_daily_org_spend_update_queue_failed_requests_total`
-- `litellm_redis_daily_tag_spend_update_queue_failed_requests_total`
-- `litellm_redis_daily_team_spend_update_queue_failed_requests_total`
-- `litellm_reset_budget_job_failed_requests_total`
-- `litellm_router_failed_requests_total`
-- `litellm_self_failed_requests_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Internal Service Failure Causes</summary>
-
-
-- **Entity scope:** function_name, error_class
-- **Units:** `failures/s`
-- **Dimensions:** `values of label service`
-<details><summary>Source metric selectors (11)</summary>
-
-
-- `litellm_auth_failed_requests_total`
-- `litellm_batch_write_to_db_failed_requests_total`
-- `litellm_postgres_failed_requests_total`
-- `litellm_proxy_pre_call_failed_requests_total`
-- `litellm_redis_failed_requests_total`
-- `litellm_redis_daily_org_spend_update_queue_failed_requests_total`
-- `litellm_redis_daily_tag_spend_update_queue_failed_requests_total`
-- `litellm_redis_daily_team_spend_update_queue_failed_requests_total`
-- `litellm_reset_budget_job_failed_requests_total`
-- `litellm_router_failed_requests_total`
-- `litellm_self_failed_requests_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Internal Service Latency Distribution</summary>
-
-
-- **Entity scope:** service
-- **Units:** `observations/s`
-- **Dimensions:** `matching series`
-<details><summary>Source metric selectors (11)</summary>
-
-
-- `litellm_auth_latency_bucket`
-- `litellm_batch_write_to_db_latency_bucket`
-- `litellm_postgres_latency_bucket`
-- `litellm_proxy_pre_call_latency_bucket`
-- `litellm_redis_latency_bucket`
-- `litellm_redis_daily_org_spend_update_queue_latency_bucket`
-- `litellm_redis_daily_tag_spend_update_queue_latency_bucket`
-- `litellm_redis_daily_team_spend_update_queue_latency_bucket`
-- `litellm_reset_budget_job_latency_bucket`
-- `litellm_router_latency_bucket`
-- `litellm_self_latency_bucket`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Accumulated Internal Service Latency</summary>
-
-
-- **Entity scope:** service
-- **Units:** `seconds/s`
-- **Dimensions:** `values of label measurement`
-<details><summary>Source metric selectors (11)</summary>
-
-
-- `litellm_auth_latency_sum`
-- `litellm_batch_write_to_db_latency_sum`
-- `litellm_postgres_latency_sum`
-- `litellm_proxy_pre_call_latency_sum`
-- `litellm_redis_latency_sum`
-- `litellm_redis_daily_org_spend_update_queue_latency_sum`
-- `litellm_redis_daily_tag_spend_update_queue_latency_sum`
-- `litellm_redis_daily_team_spend_update_queue_latency_sum`
-- `litellm_reset_budget_job_latency_sum`
-- `litellm_router_latency_sum`
-- `litellm_self_latency_sum`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile>
-<summary>Process runtime — 5 charts</summary>
-
+#### Gateway
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_proxy_total_requests_metric_total</code> | Gateway / Client Traffic — Client Request Outcomes | <code>requests</code> | <code>requests/s</code> | route, status_class |
+| <code>litellm_proxy_failed_requests_metric_total</code> | Gateway / Client Traffic — Client Failure Causes | <code>failures</code> | <code>failures/s</code> | status_class, exception_class |
+| <code>litellm_proxy_failed_requests_metric_total&#123;rate_limit_category=~".+",rate_limit_type=~".+"&#125;</code> | Gateway / Client Traffic — Client Rate-Limit Attribution | <code>failures</code> | <code>failures/s</code> | rate_limit_category, rate_limit_type |
+| <code>litellm_in_flight_requests</code> | Gateway / Client Traffic — In-Flight Requests | <code>requests</code> | <code>requests</code> | collector job service |
+| <code>litellm_request_queue_time_seconds_bucket</code> | Gateway / Admission Queue — Request Queue-Time Distribution | <code>matching series</code> | <code>observations/s</code> | model_id |
+| <code>litellm_request_queue_time_seconds_count</code> | Gateway / Admission Queue — Queued Request Measurements | <code>requests</code> | <code>requests/s</code> | model_id |
+| <code>litellm_request_queue_time_seconds_sum</code> | Gateway / Admission Queue — Accumulated Request Queue Time | <code>time</code> | <code>seconds/s</code> | model_id |
+| <code>litellm_request_total_latency_metric_bucket</code> | Gateway / Request Latency — End-to-End Request-Latency Distribution | <code>matching series</code> | <code>observations/s</code> | model_id, service_tier |
+| <code>litellm_request_total_latency_metric_count</code> | Gateway / Request Latency — End-to-End Request Measurements | <code>requests</code> | <code>requests/s</code> | model_id, service_tier |
+| <code>litellm_request_total_latency_metric_sum</code> | Gateway / Request Latency — Accumulated End-to-End Request Time | <code>time</code> | <code>seconds/s</code> | model_id, service_tier |
+| <code>litellm_overhead_latency_metric_bucket</code> | Gateway / Processing Overhead — LiteLLM Overhead-Latency Distribution | <code>matching series</code> | <code>observations/s</code> | model_id |
+| <code>litellm_overhead_latency_metric_count</code> | Gateway / Processing Overhead — LiteLLM Overhead Measurements | <code>requests</code> | <code>requests/s</code> | model_id |
+| <code>litellm_overhead_latency_metric_sum</code> | Gateway / Processing Overhead — Accumulated LiteLLM Overhead | <code>time</code> | <code>seconds/s</code> | model_id |
+| <code>litellm_overhead_with_guardrails_latency_metric_bucket</code> | Gateway / Processing Overhead — Guardrail-Inclusive Overhead Distribution | <code>matching series</code> | <code>observations/s</code> | model_id |
+| <code>litellm_overhead_with_guardrails_latency_metric_count</code> | Gateway / Processing Overhead — Guardrail-Inclusive Overhead Measurements | <code>requests</code> | <code>requests/s</code> | model_id |
+| <code>litellm_overhead_with_guardrails_latency_metric_sum</code> | Gateway / Processing Overhead — Accumulated Guardrail-Inclusive Overhead | <code>time</code> | <code>seconds/s</code> | model_id |
+
+#### Routing and Deployments
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_deployment_total_requests_total</code> | Routing and Deployments / Deployment Requests — Deployment Request Workload | <code>requests</code> | <code>requests/s</code> | model_id |
+| <code>litellm_deployment_success_responses_total</code> | Routing and Deployments / Deployment Requests — Classified Deployment Outcomes | <code>successful</code> | <code>requests/s</code> | model_id |
+| <code>litellm_deployment_failure_responses_total</code> | Routing and Deployments / Deployment Requests — Classified Deployment Outcomes | <code>failed</code> | <code>requests/s</code> | model_id |
+| <code>litellm_deployment_failure_responses_total</code> | Routing and Deployments / Deployment Requests — Deployment Failure Causes | <code>failures</code> | <code>failures/s</code> | model_id, status_class, exception_class |
+| <code>litellm_deployment_cooled_down_total</code> | Routing and Deployments / Deployment Health — Deployment Cooldowns | <code>cooldowns</code> | <code>events/s</code> | model_id, status_class |
+| <code>litellm_deployment_state</code> | Routing and Deployments / Deployment Health — Deployment State | <code>state</code> | <code>&#123;status&#125;</code> | model_id |
+| <code>litellm_deployment_rpm_limit</code> | Routing and Deployments / Deployment Capacity — Deployment Request Limit | <code>limit</code> | <code>requests/min</code> | model_id |
+| <code>litellm_deployment_tpm_limit</code> | Routing and Deployments / Deployment Capacity — Deployment Token Limit | <code>limit</code> | <code>tokens/min</code> | model_id |
+| <code>litellm_remaining_requests_metric</code> | Routing and Deployments / Deployment Capacity — Provider Remaining Requests | <code>remaining</code> | <code>requests</code> | model_id |
+| <code>litellm_remaining_tokens_metric</code> | Routing and Deployments / Deployment Capacity — Provider Remaining Tokens | <code>remaining</code> | <code>tokens</code> | model_id |
+| <code>litellm_deployment_latency_per_output_token_bucket</code> | Routing and Deployments / Output-Token Latency — Deployment Output-Token Latency Distribution | <code>matching series</code> | <code>observations/s</code> | model_id |
+| <code>litellm_deployment_latency_per_output_token_count</code> | Routing and Deployments / Output-Token Latency — Deployment Output-Token Latency Measurements | <code>requests</code> | <code>requests/s</code> | model_id |
+| <code>litellm_deployment_latency_per_output_token_sum</code> | Routing and Deployments / Output-Token Latency — Accumulated Deployment Output-Token Latency | <code>time</code> | <code>seconds/s</code> | model_id |
+| <code>litellm_deployment_successful_fallbacks_total</code> | Routing and Deployments / Fallbacks — Fallback Outcomes | <code>successful</code> | <code>fallbacks/s</code> | requested_model, fallback_model |
+| <code>litellm_deployment_failed_fallbacks_total</code> | Routing and Deployments / Fallbacks — Fallback Outcomes | <code>failed</code> | <code>fallbacks/s</code> | requested_model, fallback_model |
+
+#### Provider API
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_llm_api_latency_metric_bucket</code> | Provider API — Provider API Latency Distribution | <code>matching series</code> | <code>observations/s</code> | model_id, service_tier |
+| <code>litellm_llm_api_latency_metric_count</code> | Provider API — Provider API Latency Measurements | <code>requests</code> | <code>requests/s</code> | model_id, service_tier |
+| <code>litellm_llm_api_latency_metric_sum</code> | Provider API — Accumulated Provider API Latency | <code>time</code> | <code>seconds/s</code> | model_id, service_tier |
+| <code>litellm_llm_api_time_to_first_token_metric_bucket</code> | Provider API — Provider Time-to-First-Token Distribution | <code>matching series</code> | <code>observations/s</code> | model_id, service_tier |
+| <code>litellm_llm_api_time_to_first_token_metric_count</code> | Provider API — Provider Time-to-First-Token Measurements | <code>requests</code> | <code>requests/s</code> | model_id, service_tier |
+| <code>litellm_llm_api_time_to_first_token_metric_sum</code> | Provider API — Accumulated Provider Time-to-First-Token | <code>time</code> | <code>seconds/s</code> | model_id, service_tier |
+
+#### Usage and Cost
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By Deployment — Request Token Throughput | <code>input</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By Deployment — Request Token Throughput | <code>output</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By Deployment — Reported Total Token Throughput | <code>total</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By Deployment — LLM Spend | <code>spend</code> | <code>USD/s</code> | model_id, service_tier |
+| <code>litellm_input_audio_tokens_metric_total</code> | Usage and Cost / By Deployment — Audio and Reasoning Token Throughput | <code>input_audio</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_output_audio_tokens_metric_total</code> | Usage and Cost / By Deployment — Audio and Reasoning Token Throughput | <code>output_audio</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_output_reasoning_tokens_metric_total</code> | Usage and Cost / By Deployment — Audio and Reasoning Token Throughput | <code>output_reasoning</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_images_generated_metric_total</code> | Usage and Cost / By Deployment — Generated Images | <code>images</code> | <code>images/s</code> | model_id |
+| <code>litellm_video_duration_seconds_metric_total</code> | Usage and Cost / By Deployment — Generated Video Duration | <code>duration</code> | <code>seconds/s</code> | model_id |
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By API Key — Request Token Throughput by API Key | <code>input</code> | <code>tokens/s</code> | hashed_api_key |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By API Key — Request Token Throughput by API Key | <code>output</code> | <code>tokens/s</code> | hashed_api_key |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By API Key — Reported Total Token Throughput by API Key | <code>total</code> | <code>tokens/s</code> | hashed_api_key |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By API Key — LLM Spend by API Key | <code>spend</code> | <code>USD/s</code> | hashed_api_key |
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By Team — Request Token Throughput by Team | <code>input</code> | <code>tokens/s</code> | team |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By Team — Request Token Throughput by Team | <code>output</code> | <code>tokens/s</code> | team |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By Team — Reported Total Token Throughput by Team | <code>total</code> | <code>tokens/s</code> | team |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By Team — LLM Spend by Team | <code>spend</code> | <code>USD/s</code> | team |
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By User — Request Token Throughput by User | <code>input</code> | <code>tokens/s</code> | user |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By User — Request Token Throughput by User | <code>output</code> | <code>tokens/s</code> | user |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By User — Reported Total Token Throughput by User | <code>total</code> | <code>tokens/s</code> | user |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By User — LLM Spend by User | <code>spend</code> | <code>USD/s</code> | user |
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By Organization — Request Token Throughput by Organization | <code>input</code> | <code>tokens/s</code> | org_id |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By Organization — Request Token Throughput by Organization | <code>output</code> | <code>tokens/s</code> | org_id |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By Organization — Reported Total Token Throughput by Organization | <code>total</code> | <code>tokens/s</code> | org_id |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By Organization — LLM Spend by Organization | <code>spend</code> | <code>USD/s</code> | org_id |
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By End User — Request Token Throughput by End User | <code>input</code> | <code>tokens/s</code> | end_user |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By End User — Request Token Throughput by End User | <code>output</code> | <code>tokens/s</code> | end_user |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By End User — Reported Total Token Throughput by End User | <code>total</code> | <code>tokens/s</code> | end_user |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By End User — LLM Spend by End User | <code>spend</code> | <code>USD/s</code> | end_user |
+| <code>litellm_input_tokens_metric_total</code> | Usage and Cost / By Requested Model — Request Token Throughput by Requested Model | <code>input</code> | <code>tokens/s</code> | requested_model |
+| <code>litellm_output_tokens_metric_total</code> | Usage and Cost / By Requested Model — Request Token Throughput by Requested Model | <code>output</code> | <code>tokens/s</code> | requested_model |
+| <code>litellm_total_tokens_metric_total</code> | Usage and Cost / By Requested Model — Reported Total Token Throughput by Requested Model | <code>total</code> | <code>tokens/s</code> | requested_model |
+| <code>litellm_spend_metric_total</code> | Usage and Cost / By Requested Model — LLM Spend by Requested Model | <code>spend</code> | <code>USD/s</code> | requested_model |
+
+#### Caching
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_cache_hits_metric_total</code> | Caching — Cache Outcomes | <code>hits</code> | <code>events/s</code> | model_id |
+| <code>litellm_cache_misses_metric_total</code> | Caching — Cache Outcomes | <code>misses</code> | <code>events/s</code> | model_id |
+| <code>litellm_cached_tokens_metric_total</code> | Caching — LiteLLM Cached Token Throughput | <code>cached</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_input_cached_tokens_metric_total</code> | Caching — Request Input-Cache Token Throughput | <code>read</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_input_cache_creation_tokens_metric_total</code> | Caching — Request Input-Cache Token Throughput | <code>creation</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_provider_cache_read_input_tokens_metric_total</code> | Caching — Provider Cache Token Throughput | <code>read</code> | <code>tokens/s</code> | model_id |
+| <code>litellm_provider_cache_creation_input_tokens_metric_total</code> | Caching — Provider Cache Token Throughput | <code>creation</code> | <code>tokens/s</code> | model_id |
+
+#### Governance
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_remaining_api_key_budget_metric</code> | Governance / API Keys — API-Key Remaining Budget | <code>remaining</code> | <code>USD</code> | hashed_api_key |
+| <code>litellm_api_key_max_budget_metric</code> | Governance / API Keys — API-Key Budget Limit | <code>limit</code> | <code>USD</code> | hashed_api_key |
+| <code>litellm_api_key_budget_remaining_hours_metric</code> | Governance / API Keys — API-Key Budget Reset Window | <code>remaining</code> | <code>hours</code> | hashed_api_key |
+| <code>litellm_remaining_api_key_requests_for_model</code> | Governance / API Keys — API-Key Model Request Headroom | <code>remaining</code> | <code>requests</code> | hashed_api_key, model |
+| <code>litellm_remaining_api_key_tokens_for_model</code> | Governance / API Keys — API-Key Model Token Headroom | <code>remaining</code> | <code>tokens</code> | hashed_api_key, model |
+| <code>litellm_remaining_org_budget_metric</code> | Governance / Organizations — Organization Remaining Budget | <code>remaining</code> | <code>USD</code> | org_id |
+| <code>litellm_org_max_budget_metric</code> | Governance / Organizations — Organization Budget Limit | <code>limit</code> | <code>USD</code> | org_id |
+| <code>litellm_org_budget_remaining_hours_metric</code> | Governance / Organizations — Organization Budget Reset Window | <code>remaining</code> | <code>hours</code> | org_id |
+| <code>litellm_remaining_team_budget_metric</code> | Governance / Teams — Team Remaining Budget | <code>remaining</code> | <code>USD</code> | team |
+| <code>litellm_team_max_budget_metric</code> | Governance / Teams — Team Budget Limit | <code>limit</code> | <code>USD</code> | team |
+| <code>litellm_team_budget_remaining_hours_metric</code> | Governance / Teams — Team Budget Reset Window | <code>remaining</code> | <code>hours</code> | team |
+| <code>litellm_team_members_metric</code> | Governance / Teams — Team Membership | <code>members</code> | <code>members</code> | team |
+| <code>litellm_remaining_user_budget_metric</code> | Governance / Users — User Remaining Budget | <code>remaining</code> | <code>USD</code> | user |
+| <code>litellm_user_max_budget_metric</code> | Governance / Users — User Budget Limit | <code>limit</code> | <code>USD</code> | user |
+| <code>litellm_user_budget_remaining_hours_metric</code> | Governance / Users — User Budget Reset Window | <code>remaining</code> | <code>hours</code> | user |
+| <code>litellm_provider_remaining_budget_metric</code> | Governance / Providers — Provider Remaining Budget | <code>remaining</code> | <code>USD</code> | api_provider |
+
+#### Guardrails
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_guardrail_latency_seconds_count</code> | Guardrails — Guardrail Invocations | <code>invocations</code> | <code>invocations/s</code> | guardrail_name, hook_type, status |
+| <code>litellm_guardrail_errors_total</code> | Guardrails — Guardrail Errors | <code>errors</code> | <code>errors/s</code> | guardrail_name, hook_type, error_type |
+| <code>litellm_guardrail_latency_seconds_bucket</code> | Guardrails — Guardrail Latency Distribution | <code>matching series</code> | <code>observations/s</code> | guardrail_name, hook_type |
+| <code>litellm_guardrail_latency_seconds_sum</code> | Guardrails — Accumulated Guardrail Latency | <code>time</code> | <code>seconds/s</code> | guardrail_name, hook_type |
+
+#### MCP Gateway
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_mcp_tool_calls_total</code> | MCP Gateway — MCP Tool Calls | <code>calls</code> | <code>calls/s</code> | mcp_server_name, mcp_tool_name |
+| <code>litellm_mcp_tool_call_spend_metric_total</code> | MCP Gateway — MCP Tool-Call Spend | <code>spend</code> | <code>USD/s</code> | mcp_server_name, mcp_tool_name |
+
+#### Managed Batches and Files
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_managed_batch_created_total</code> | Managed Batches and Files — Managed Batches Created | <code>created</code> | <code>batches/s</code> | api_provider, model |
+| <code>litellm_check_batch_cost_jobs_processed_total</code> | Managed Batches and Files — Successfully Cost-Tracked Batches | <code>cost_tracked</code> | <code>batches/s</code> | api_provider, model |
+| <code>litellm_check_batch_cost_errors_total</code> | Managed Batches and Files — Batch-Cost Processing Errors | <code>errors</code> | <code>errors/s</code> | collector job service |
+| <code>litellm_managed_file_created_total</code> | Managed Batches and Files — Managed Files Created | <code>created</code> | <code>files/s</code> | api_provider, model |
+| <code>litellm_managed_file_deleted_total</code> | Managed Batches and Files — Managed File Deletions | <code>deletions</code> | <code>files/s</code> | result |
+| <code>litellm_managed_batch_duration_seconds_bucket</code> | Managed Batches and Files — Managed Batch Duration Distribution | <code>matching series</code> | <code>observations/s</code> | api_provider, model |
+| <code>litellm_managed_batch_duration_seconds_count</code> | Managed Batches and Files — Completed Managed Batches | <code>completed</code> | <code>batches/s</code> | api_provider, model |
+| <code>litellm_managed_batch_duration_seconds_sum</code> | Managed Batches and Files — Accumulated Managed Batch Duration | <code>time</code> | <code>seconds/s</code> | api_provider, model |
+
+#### Inventory and Callbacks
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_total_users</code> | Inventory and Callbacks — Total Users | <code>users</code> | <code>users</code> | collector job |
+| <code>litellm_active_users</code> | Inventory and Callbacks — Billable Users | <code>users</code> | <code>users</code> | collector job |
+| <code>litellm_teams_count</code> | Inventory and Callbacks — Teams | <code>teams</code> | <code>teams</code> | collector job |
+| <code>litellm_callback_logging_failures_metric_total</code> | Inventory and Callbacks — Callback Logging Failures | <code>failures</code> | <code>failures/s</code> | callback_name |
+
+#### Internal Services
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>litellm_auth_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_batch_write_to_db_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_postgres_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_proxy_pre_call_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_daily_org_spend_update_queue_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_daily_tag_spend_update_queue_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_daily_team_spend_update_queue_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_reset_budget_job_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_router_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_self_latency_count</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_auth_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_batch_write_to_db_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_postgres_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_proxy_pre_call_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_daily_org_spend_update_queue_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_daily_tag_spend_update_queue_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_redis_daily_team_spend_update_queue_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_reset_budget_job_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_router_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_self_failed_requests_total</code> | Internal Services — Internal Service Request Outcomes | <code>values of label outcome</code> | <code>requests/s</code> | service |
+| <code>litellm_auth_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_batch_write_to_db_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_postgres_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_proxy_pre_call_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_redis_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_redis_daily_org_spend_update_queue_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_redis_daily_tag_spend_update_queue_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_redis_daily_team_spend_update_queue_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_reset_budget_job_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_router_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_self_failed_requests_total</code> | Internal Services — Internal Service Failure Causes | <code>values of label service</code> | <code>failures/s</code> | function_name, error_class |
+| <code>litellm_auth_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_batch_write_to_db_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_postgres_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_proxy_pre_call_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_redis_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_redis_daily_org_spend_update_queue_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_redis_daily_tag_spend_update_queue_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_redis_daily_team_spend_update_queue_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_reset_budget_job_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_router_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_self_latency_bucket</code> | Internal Services — Internal Service Latency Distribution | <code>matching series</code> | <code>observations/s</code> | service |
+| <code>litellm_auth_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_batch_write_to_db_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_postgres_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_proxy_pre_call_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_redis_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_redis_daily_org_spend_update_queue_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_redis_daily_tag_spend_update_queue_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_redis_daily_team_spend_update_queue_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_reset_budget_job_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_router_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+| <code>litellm_self_latency_sum</code> | Internal Services — Accumulated Internal Service Latency | <code>values of label measurement</code> | <code>seconds/s</code> | service |
+
+### Process runtime
 
 Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
 
 **Supporting profile for LiteLLM.** Included whenever the LiteLLM profile is active and the endpoint exports process runtime metrics.
 
-<details data-prometheus-profile-family>
-<summary>Process Runtime (5 charts)</summary>
+#### Process Runtime
 
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>process_cpu_seconds_total</code> | Process Runtime — Process CPU Usage | <code>used</code> | <code>cores</code> | collector job process |
+| <code>process_resident_memory_bytes</code> | Process Runtime — Process Resident Memory | <code>resident</code> | <code>bytes</code> | collector job process |
+| <code>process_virtual_memory_bytes</code> | Process Runtime — Process Virtual Memory | <code>virtual</code> | <code>bytes</code> | collector job process |
+| <code>process_open_fds</code> | Process Runtime — Open File Descriptors | <code>open</code> | <code>fds</code> | collector job process |
+| <code>process_max_fds</code> | Process Runtime — File Descriptor Limit | <code>limit</code> | <code>fds</code> | collector job process |
 
-<details data-prometheus-profile-chart>
-<summary>Process CPU Usage</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `cores`
-- **Dimensions:** `used`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_cpu_seconds_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Process Resident Memory</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `bytes`
-- **Dimensions:** `resident`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_resident_memory_bytes`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Process Virtual Memory</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `bytes`
-- **Dimensions:** `virtual`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_virtual_memory_bytes`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Open File Descriptors</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `fds`
-- **Dimensions:** `open`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_open_fds`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>File Descriptor Limit</summary>
-
-
-- **Entity scope:** collector job process
-- **Units:** `fds`
-- **Dimensions:** `limit`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `process_max_fds`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile>
-<summary>Python garbage collection — 3 charts</summary>
-
+### Python garbage collection
 
 Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
 
 **Supporting profile for LiteLLM.** Included whenever the LiteLLM profile is active and the endpoint exports Python garbage-collection metrics.
 
-<details data-prometheus-profile-family>
-<summary>Process Runtime (3 charts)</summary>
+#### Process Runtime
 
-
-
-<details data-prometheus-profile-family>
-<summary>Python GC (3 charts)</summary>
-
-
-<details data-prometheus-profile-chart>
-<summary>Collected Objects</summary>
-
-
-- **Entity scope:** Python garbage-collector generation
-- **Units:** `objects/s`
-- **Dimensions:** `collected`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `python_gc_objects_collected_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Uncollectable Objects</summary>
-
-
-- **Entity scope:** Python garbage-collector generation
-- **Units:** `objects/s`
-- **Dimensions:** `uncollectable`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `python_gc_objects_uncollectable_total`
-
-</details>
-
-
-</details>
-
-<details data-prometheus-profile-chart>
-<summary>Collections</summary>
-
-
-- **Entity scope:** Python garbage-collector generation
-- **Units:** `collections/s`
-- **Dimensions:** `collections`
-<details><summary>Source metric selectors (1)</summary>
-
-
-- `python_gc_collections_total`
-
-</details>
-
-
-</details>
-
-
-
-</details>
-
-
-
-</details>
-
-
-</details>
-
-
-</details>
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>python_gc_objects_collected_total</code> | Process Runtime / Python GC — Collected Objects | <code>collected</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_objects_uncollectable_total</code> | Process Runtime / Python GC — Uncollectable Objects | <code>uncollectable</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_collections_total</code> | Process Runtime / Python GC — Collections | <code>collections</code> | <code>collections/s</code> | Python garbage-collector generation |
 
 
 

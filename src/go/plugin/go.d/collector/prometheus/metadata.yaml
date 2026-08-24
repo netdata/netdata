@@ -466,11 +466,6 @@ modules:
         - web
         - proxy
         - prometheus
-      related_resources:
-        integrations:
-          list:
-            - plugin_name: go.d.plugin
-              module_name: haproxy
       info_provided_to_referring_integrations:
         description: Collects HAProxy's Prometheus endpoint through the generic Prometheus collector and its stock HAProxy profile.
     overview:

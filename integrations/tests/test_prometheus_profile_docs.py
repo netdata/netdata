@@ -157,7 +157,7 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
 
         wrong_collector = {
             '_prometheus_profile_ids': ['ceph'],
-            'meta': {'id': 'wrong', 'plugin_name': 'go.d.plugin', 'module_name': 'haproxy'},
+            'meta': {'id': 'wrong', 'plugin_name': 'go.d.plugin', 'module_name': 'not_prometheus'},
             'metrics': {},
         }
         with self.assertRaisesRegex(ProfileCoverageError, 'allowed only on go.d.plugin/prometheus modules'):
