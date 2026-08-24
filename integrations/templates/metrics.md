@@ -2,31 +2,16 @@
 
 ## Metrics
 
-The built-in Prometheus profiles on this page define [[ entry.metrics.profile_coverage.chart_count ]] curated charts across
-the primary and applicable supporting profiles.
-The catalogue is generated from the same profile design and runtime chart contracts used by the Agent.
+The built-in Prometheus profiles on this page map Prometheus metrics into
+[[ entry.metrics.profile_coverage.chart_count ]] curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 
 Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
 the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
 every metric that the collector can render.
 
-[% if clean %]
-<details open data-prometheus-profile-catalog>
-<summary>Curated profile coverage ([[ entry.metrics.profile_coverage.chart_count ]] charts)</summary>
-[% else %]
-<!-- prometheus-profile-catalog -->
-{% details open=true summary="Curated profile coverage ([[ entry.metrics.profile_coverage.chart_count ]] charts)" %}
-[% endif %]
-
 [% for profile in entry.metrics.profile_coverage.profiles %]
-[% set profile_chart_label = profile.chart_count ~ ' chart' ~ ('s' if profile.chart_count != 1 else '') %]
-[% if clean %]
-<details[% if profile.open %] open[% endif %] data-prometheus-profile>
-<summary>[[ profile.title|e ]] — [[ profile_chart_label ]]</summary>
-[% else %]
-<!-- prometheus-profile-profile -->
-{% details[% if profile.open %] open=true[% endif %] summary="[[ profile.title|e ]] — [[ profile_chart_label ]]" %}
-[% endif %]
+### [[ profile.title|e ]]
 
 [[ profile.summary ]]
 
@@ -34,77 +19,17 @@ every metric that the collector can render.
 **Supporting profile for [[ profile.supported_by|e ]].** [[ profile.activation ]]
 [% endif %]
 
-[% for family in profile.families recursive %]
-[% set family_loop = loop %]
-[% set family_chart_label = family.chart_count ~ ' chart' ~ ('s' if family.chart_count != 1 else '') %]
-[% if clean %]
-<details data-prometheus-profile-family>
-<summary>[[ family.name|e ]] ([[ family_chart_label ]])</summary>
-[% else %]
-<!-- prometheus-profile-family -->
-{% details summary="[[ family.name|e ]] ([[ family_chart_label ]])" %}
-[% endif %]
+[% for group in profile.metric_groups %]
+#### [[ group.name|e ]]
 
-[% for chart in family.charts %]
-[% if clean %]
-<details data-prometheus-profile-chart>
-<summary>[[ chart.title|e ]]</summary>
-[% else %]
-<!-- prometheus-profile-chart -->
-{% details summary="[[ chart.title|e ]]" %}
-[% endif %]
-
-- **Entity scope:** [[ chart.entity_scope ]]
-- **Units:** `[[ chart.units ]]`
-- **Dimensions:** [% for dimension in chart.dimensions|unique(case_sensitive=true, attribute='name') %]`[[ dimension.name ]]`[% if not loop.last %], [% endif %][% endfor %]
-
-[% if clean %]
-<details>
-<summary>Source metric selectors ([[ chart.selectors|length ]])</summary>
-[% else %]
-{% details summary="Source metric selectors ([[ chart.selectors|length ]])" %}
-[% endif %]
-
-[% for selector in chart.selectors %]
-- `[[ selector ]]`
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+[% for row in group.rows %]
+| <code>[[ row.prometheus_metric|markdown_table_cell ]]</code> | [[ row.netdata_chart|markdown_table_cell ]] | <code>[[ row.dimension|markdown_table_cell ]]</code> | <code>[[ row.unit|markdown_table_cell ]]</code> | [[ row.scope|markdown_table_cell ]] |
 [% endfor %]
 
-[% if clean %]
-</details>
-[% else %]
-{% /details %}
-[% endif %]
-
-[% if clean %]
-</details>
-[% else %]
-{% /details %}
-[% endif %]
 [% endfor %]
-
-[% if family.children %]
-[[ family_loop(family.children) ]]
-[% endif %]
-
-[% if clean %]
-</details>
-[% else %]
-{% /details %}
-[% endif %]
 [% endfor %]
-
-[% if clean %]
-</details>
-[% else %]
-{% /details %}
-[% endif %]
-[% endfor %]
-
-[% if clean %]
-</details>
-[% else %]
-{% /details %}
-[% endif %]
 [% elif entry.metrics.scopes %]
 
 ## Metrics
