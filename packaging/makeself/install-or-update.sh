@@ -96,7 +96,7 @@ progress "Attempt to create user/group netdata/netadata"
 
 # These variables are consumed by helper functions from functions.sh.
 # shellcheck disable=SC2034
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+NETDATA_WANTED_GROUPS="docker nginx varnish adm nsd proxy squid ceph nobody I2C"
 # shellcheck disable=SC2034
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
