@@ -314,16 +314,25 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // so a percentage aggregation on a NONE pass resolves to NORMAL mode
     // everywhere - the same behavior such a query had before this scan
     ssize_t percentage_of_group_pass = -1;
+    size_t final_group_by_pass = 0;
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
             break;
 
-        if((qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) ||
-            qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE) {
+        final_group_by_pass = g;
+
+        if(percentage_of_group_pass < 0 &&
+           ((qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) ||
+            qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)) {
             percentage_of_group_pass = (ssize_t)g;
-            break;
         }
     }
+
+    bool final_pass_needs_raw_anomaly_contributors =
+        !query_target_aggregatable(qt) && final_group_by_pass > 0 &&
+        (qt->request.group_by[final_group_by_pass].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE ||
+         qt->request.group_by[final_group_by_pass].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE ||
+         (qt->request.group_by[final_group_by_pass].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE));
 
     size_t added = 0;
     RRDR *first_r = NULL, *last_r = NULL;
@@ -509,6 +518,10 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             if(r->n) {
                 r->gbc = onewayalloc_callocz(
                     owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR group-by counts"), sizeof(*r->gbc));
+
+                if(final_grouping && final_pass_needs_raw_anomaly_contributors)
+                    r->arc = onewayalloc_callocz(
+                        owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR anomaly-rate contributors"), sizeof(*r->arc));
 
                 if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE))) {
                     // this is where we are going to group the hidden dimensions
