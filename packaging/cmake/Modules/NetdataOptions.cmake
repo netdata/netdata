@@ -204,6 +204,16 @@ if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
         set(ENABLE_BUNDLED_JSONC True)
         set(ENABLE_BUNDLED_YAML True)
         set(ENABLE_BUNDLED_PROTOBUF True)
+
+        # Plugins that cannot work on a clean macOS machine stay out of the
+        # payload entirely rather than shipping broken. python.d: /usr/bin/python3
+        # is a Command Line Tools stub that pops a GUI install dialog, so a root
+        # LaunchDaemon shipping it would periodically prompt users to install a
+        # compiler. charts.d: its only modules are example, libreswan (Linux
+        # IPsec) and opensips - no macOS value - and dropping it also removes
+        # the dependency on a `timeout` command stock macOS does not have.
+        set(ENABLE_PLUGIN_PYTHON False)
+        set(ENABLE_PLUGIN_CHARTS False)
 endif()
 
 # A few payloads live in different packages per format: RPM keeps the

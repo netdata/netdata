@@ -153,10 +153,14 @@ install(FILES
 #
 # ioping.plugin
 #
+# The wrapper expects an ioping binary no macOS rule has ever built, so the
+# macOS package ships neither the wrapper nor its config.
+if(NOT NETDATA_PACKAGE_KIND STREQUAL "pkg")
 install(FILES
         src/collectors/ioping.plugin/ioping.conf
         COMPONENT netdata
         DESTINATION ${LIBCONFIG_DEST})
+endif()
 
 #
 # streaming
@@ -614,11 +618,13 @@ endif()
 #
 # ioping.plugin
 #
-
+# Excluded from the macOS package for the same reason as its config above.
+if(NOT NETDATA_PACKAGE_KIND STREQUAL "pkg")
 configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/ioping.plugin/ioping.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
         COMPONENT netdata
         DESTINATION ${PLUGINS_DEST})
+endif()
 
 #
 # go.d.plugin
