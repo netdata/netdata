@@ -65,7 +65,6 @@ pkg_check_modules(TLS IMPORTED_TARGET openssl)
 pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
 
 
-pkg_check_modules(LIBUV libuv)
 pkg_check_modules(UUID uuid)
 # libmnl wraps Linux netlink; a Homebrew libmnl.pc on macOS is a false positive
 # that would hand network-viewer and local-listeners a dylib they never call.
@@ -153,10 +152,6 @@ endif()
 
 if(NOT ZLIB_FOUND)
   message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
-endif()
-
-if(NOT LIBUV_FOUND)
-  message(FATAL_ERROR "libuv is required for building Netdata, but could not be found.")
 endif()
 
 # macOS and Windows provide the UUID functions in their system libraries, so the OS
