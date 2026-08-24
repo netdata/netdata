@@ -234,8 +234,7 @@ func (c *Collector) enrichBGPPeerVRs(ctx context.Context, peers []bgpPeer) ([]bg
 		}
 	}
 	if !needsSummary {
-		c.bgpRouterNames = nil
-		resolved := resolveBGPPeerVRs(peers, nil)
+		resolved := resolveBGPPeerVRs(peers, c.bgpRouterNames)
 		c.logUnresolvedBGPPeers(
 			"PAN-OS Advanced Routing Engine BGP peer identities are incomplete",
 			len(peers)-len(resolved),
@@ -253,7 +252,6 @@ func (c *Collector) enrichBGPPeerVRs(ctx context.Context, peers []bgpPeer) ([]bg
 		return nil, ctxErr
 	}
 	if err != nil {
-		c.bgpRouterNames, _, _ = mergeBGPRouterNames(peers, c.bgpRouterNames, bgpRouterSummary{})
 		resolved := resolveBGPPeerVRs(peers, c.bgpRouterNames)
 		c.Limit(logKeyBGPSummary, 1, recurringLogEvery).
 			Warningf("PAN-OS advanced-routing BGP summary query failed; retaining last successful logical-router mapping where available (withheld_peers=%d): %v", len(peers)-len(resolved), sanitizePANOSAPIError(err))
@@ -261,7 +259,6 @@ func (c *Collector) enrichBGPPeerVRs(ctx context.Context, peers []bgpPeer) ([]bg
 	}
 	summary, err := parseBGPSummary(body)
 	if err != nil {
-		c.bgpRouterNames, _, _ = mergeBGPRouterNames(peers, c.bgpRouterNames, bgpRouterSummary{})
 		resolved := resolveBGPPeerVRs(peers, c.bgpRouterNames)
 		c.Limit(logKeyBGPSummary, 1, recurringLogEvery).
 			Warningf("PAN-OS advanced-routing BGP summary parse failed; retaining last successful logical-router mapping where available (withheld_peers=%d): %v", len(peers)-len(resolved), err)
@@ -284,6 +281,11 @@ func mergeBGPRouterNames(
 	previous map[string]string,
 	summary bgpRouterSummary,
 ) (next map[string]string, missingIDs, ambiguousIDs int) {
+	next = make(map[string]string, len(summary.names)+len(peers))
+	for id, name := range summary.names {
+		next[id] = name
+	}
+
 	current := make(map[string]bool)
 	for _, peer := range peers {
 		if peer.needsVRResolve && peer.routerID != "" {
@@ -291,9 +293,9 @@ func mergeBGPRouterNames(
 		}
 	}
 
-	next = make(map[string]string, len(current))
 	for id := range current {
 		if summary.ambiguous[id] {
+			delete(next, id)
 			ambiguousIDs++
 			continue
 		}

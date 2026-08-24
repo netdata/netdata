@@ -710,6 +710,86 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+		"ARE summary owns the last successful identity cache": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: dataAdvancedBGPPeersARE,
+					advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "complete peers and summary establish the cache",
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+				},
+				{
+					name: "successful summary retains names for temporarily absent peers",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPPeerCommands[0]] = []byte(`<response status="success"><result><json>{
+                            "peer-a": {
+                                "remote-as": 65010,
+                                "peer-group-name": "edge",
+                                "state": "Established",
+                                "local-ip": "192.0.2.9",
+                                "peer-ip": "192.0.2.10",
+                                "detail": {"localRouterId": "192.0.2.1", "bgpState": "Established"}
+                            }
+                        }</json></result></response>`)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+					},
+					check: func(t *testing.T, c *Collector, _ *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, map[string]string{
+							"192.0.2.1": "lr-a",
+							"192.0.2.2": "lr-b",
+						}, c.bgpRouterNames)
+					},
+				},
+				{
+					name: "missing peer router IDs do not clear the cache",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.commands = nil
+						api.responses[advancedBGPPeerCommands[0]] = advancedBGPPeersAREWithoutRouterIDs()
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("default", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+					check: func(t *testing.T, c *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, map[string]string{
+							"192.0.2.1": "lr-a",
+							"192.0.2.2": "lr-b",
+						}, c.bgpRouterNames)
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							advancedBGPPeerCommands[0],
+						}, api.commands)
+					},
+				},
+				{
+					name: "restored peers reuse the cache while summary remains unavailable",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPPeerCommands[0]] = dataAdvancedBGPPeersARE
+						api.errors = map[string]error{advancedBGPSummaryCommand: errors.New("summary unavailable")}
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantLog: []string{"summary unavailable"},
+				},
+			},
+		},
 		"ARE JSON peers without router IDs are withheld": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				payload := strings.Replace(
@@ -745,13 +825,9 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		"ARE JSON response with all router IDs missing is withheld": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
-				payload := strings.ReplaceAll(string(dataAdvancedBGPPeersARE), `        "localRouterId": "192.0.2.1",
-`, "")
-				payload = strings.ReplaceAll(payload, `        "localRouterId": "192.0.2.2",
-`, "")
 				api.responses = map[string][]byte{
 					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
-					advancedBGPPeerCommands[0]: []byte(payload),
+					advancedBGPPeerCommands[0]: advancedBGPPeersAREWithoutRouterIDs(),
 				}
 			},
 			steps: []collectStep{
@@ -3117,6 +3193,14 @@ func arePrefixLabels(vr, peerAddress, localAddress, remoteAS, peerGroup, afi, sa
 	labels["afi"] = afi
 	labels["safi"] = safi
 	return labels
+}
+
+func advancedBGPPeersAREWithoutRouterIDs() []byte {
+	payload := strings.ReplaceAll(string(dataAdvancedBGPPeersARE), `        "localRouterId": "192.0.2.1",
+`, "")
+	payload = strings.ReplaceAll(payload, `        "localRouterId": "192.0.2.2",
+`, "")
+	return []byte(payload)
 }
 
 func fallbackPeerLabels(peerAddress string) metrix.Labels {
