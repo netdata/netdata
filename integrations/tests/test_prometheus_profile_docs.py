@@ -24,6 +24,19 @@ PROMETHEUS_METADATA = (
 )
 
 
+def _count_unescaped_pipes(value):
+    count = 0
+    backslashes = 0
+    for character in value:
+        if character == '\\':
+            backslashes += 1
+            continue
+        if character == '|' and backslashes % 2 == 0:
+            count += 1
+        backslashes = 0
+    return count
+
+
 class PrometheusProfileCatalogTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -160,7 +173,7 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         rich = template.render(entry=ceph, clean=False)
         self.assertEqual(clean, rich)
         self.assertEqual(clean.count('| Prometheus metric | Netdata chart | Dimension | Unit | Scope |'), 22)
-        self.assertEqual(sum(line.startswith('| `') for line in clean.splitlines()), 1786)
+        self.assertEqual(sum(line.startswith('| <code>') for line in clean.splitlines()), 1786)
         self.assertIn('Eligible metrics that are not covered by a curated chart', clean)
         self.assertNotIn('Operator question:', clean)
         self.assertNotIn('Operator question:', rich)
@@ -169,8 +182,8 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         self.assertNotIn('data-prometheus-profile', clean)
         self.assertIn('#### Managers', clean)
         self.assertIn(
-            '| `ceph_num_objects_degraded` | Capacity / Object Health — Objects | '
-            '`degraded` | `objects` | Ceph cluster endpoint |',
+            '| <code>ceph_num_objects_degraded</code> | Capacity / Object Health — Objects | '
+            '<code>degraded</code> | <code>objects</code> | Ceph cluster endpoint |',
             clean,
         )
 
@@ -196,7 +209,10 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
                 self.assertEqual(len(chart_rows), mapping_count)
                 self.assertEqual({row['dimension'] for row in chart_rows}, {dimension_name})
                 self.assertEqual(
-                    sum(f'— {title} | `{dimension_name}`' in line for line in clean.splitlines()),
+                    sum(
+                        f'— {title} | <code>{dimension_name}</code>' in line
+                        for line in clean.splitlines()
+                    ),
                     mapping_count,
                 )
 
@@ -205,12 +221,20 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         project_prometheus_profile_coverage(collectors, deepcopy(self.catalog))
         ceph = next(item for item in collectors if item['meta']['id'].endswith('-ceph'))
         row = ceph['metrics']['profile_coverage']['profiles'][0]['metric_groups'][0]['rows'][0]
-        row['prometheus_metric'] = 'ceph_metric{status=~"ok|error"}'
-        row['netdata_chart'] = '<unsafe | chart>'
+        row['prometheus_metric'] = 'ceph_metric{status=~"ok\\|error"}'
+        row['netdata_chart'] = '<unsafe \\| chart>'
+        row['dimension'] = 'dimension\\|value'
+        row['unit'] = 'unit\\|value'
+        row['scope'] = 'scope\\|value'
         rendered = get_jinja_env().get_template('metrics.md').render(entry=ceph, clean=True)
 
-        self.assertIn('`ceph_metric{status=~"ok\\|error"}`', rendered)
-        self.assertIn('&lt;unsafe \\| chart&gt;', rendered)
+        expected_row = (
+            '| <code>ceph_metric&#123;status=~"ok&#92;\\|error"&#125;</code> | '
+            '&lt;unsafe &#92;\\| chart&gt; | <code>dimension&#92;\\|value</code> | '
+            '<code>unit&#92;\\|value</code> | scope&#92;\\|value |'
+        )
+        self.assertIn(expected_row, rendered)
+        self.assertEqual(_count_unescaped_pipes(expected_row), 6)
         self.assertNotIn('&#124;', rendered)
 
     def test_view_chart_mismatch_fails_closed(self):

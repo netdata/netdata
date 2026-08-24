@@ -25,7 +25,7 @@ every metric that the collector can render.
 | Prometheus metric | Netdata chart | Dimension | Unit | Scope |
 |:------------------|:--------------|:----------|:-----|:------|
 [% for row in group.rows %]
-| `[[ row.prometheus_metric|replace('|', '\\|') ]]` | [[ row.netdata_chart|e|replace('|', '\\|') ]] | `[[ row.dimension|replace('|', '\\|') ]]` | `[[ row.unit|replace('|', '\\|') ]]` | [[ row.scope|e|replace('|', '\\|') ]] |
+| <code>[[ row.prometheus_metric|markdown_table_cell ]]</code> | [[ row.netdata_chart|markdown_table_cell ]] | <code>[[ row.dimension|markdown_table_cell ]]</code> | <code>[[ row.unit|markdown_table_cell ]]</code> | [[ row.scope|markdown_table_cell ]] |
 [% endfor %]
 
 [% endfor %]
