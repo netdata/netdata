@@ -40,8 +40,14 @@ echo -e "${PR_GRAY}[fetch-all] PR ${SLUG}#${PR} -> ${DIR}${PR_NC}" >&2
 
 # --- pr.json (state, head sha, draft, requested reviewers, ...) ------------
 gh pr view "${PR}" --repo "${SLUG}" --json \
-    number,title,state,isDraft,headRefName,headRefOid,baseRefName,baseRefOid,reviewDecision,reviewRequests,mergeable,mergeStateStatus,statusCheckRollup,labels,createdAt,updatedAt,author \
+    number,title,state,isDraft,headRefName,headRefOid,baseRefName,reviewDecision,reviewRequests,mergeable,mergeStateStatus,statusCheckRollup,labels,createdAt,updatedAt,author \
     > "${DIR}/pr.json"
+
+# `gh pr view --json` exposes no baseRefOid; the REST endpoint does (base.sha).
+# Merge it into pr.json so the summary can pin the exact base commit.
+base_sha="$(gh api "repos/${SLUG}/pulls/${PR}" --jq '.base.sha')"
+jq --arg sha "${base_sha}" '. + {baseRefOid: $sha}' "${DIR}/pr.json" > "${DIR}/pr.json.tmp"
+mv "${DIR}/pr.json.tmp" "${DIR}/pr.json"
 
 # --- Helper: fetch a paginated REST endpoint with paranoia -----------------
 # Args: <api-path> <output-file> <kind-label>
