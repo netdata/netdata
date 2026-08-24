@@ -1235,6 +1235,26 @@ struct jv2_two_pointers {
     METRIC *decoy;
 };
 
+// Releases everything jv2_make_two_pointers_one_uuid() took and zeroes the struct,
+// so the same struct can never be released twice - neither by a failure path inside
+// the maker, nor by the caller's cleanup afterwards.
+static void jv2_two_pointers_undo(MRG *mrg, struct jv2_two_pointers *tp) {
+    if(tp->live) {
+        mrg_metric_release_and_delete(mrg, tp->live);
+        tp->live = NULL;
+    }
+    if(tp->decoy) {
+        mrg_metric_release_and_delete(mrg, tp->decoy);
+        tp->decoy = NULL;
+    }
+    if(tp->pinned) {
+        uuidmap_free(tp->pinned);
+        tp->pinned = 0;
+    }
+    tp->shared_id = 0;
+    tp->stale_ptr = NULL;
+}
+
 static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_two_pointers *out) {
     memset(out, 0, sizeof(*out));
 
@@ -1255,7 +1275,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
     METRIC *first = mrg_metric_add_and_acquire(mrg, entry, &added);
     if(!first) {
         fprintf(stderr, "ERROR: cannot add the first metric\n");
-        uuidmap_free(out->pinned);
+        jv2_two_pointers_undo(mrg, out);
         return 1;
     }
     out->stale_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, first);
@@ -1264,7 +1284,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
     if(!mrg_metric_release_and_delete(mrg, first)) {
         // the reference is dropped either way; false only means it was retained
         fprintf(stderr, "ERROR: the first metric was not deleted\n");
-        uuidmap_free(out->pinned);
+        jv2_two_pointers_undo(mrg, out);
         return 1;
     }
 
@@ -1282,7 +1302,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
     out->decoy = mrg_metric_add_and_acquire(mrg, decoy_entry, &decoy_added);
     if(!out->decoy) {
         fprintf(stderr, "ERROR: cannot add the decoy metric\n");
-        uuidmap_free(out->pinned);
+        jv2_two_pointers_undo(mrg, out);
         return 1;
     }
 
@@ -1291,10 +1311,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
     out->live = mrg_metric_add_and_acquire(mrg, entry, &added);
     if(!out->live || !added) {
         fprintf(stderr, "ERROR: cannot re-create the metric for the same uuid\n");
-        if(out->live)
-            mrg_metric_release_and_delete(mrg, out->live);
-        mrg_metric_release_and_delete(mrg, out->decoy);
-        uuidmap_free(out->pinned);
+        jv2_two_pointers_undo(mrg, out);
         return 1;
     }
     out->shared_id = mrg_metric_uuidmap_id(mrg, out->live);
@@ -1306,9 +1323,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
         // than silently passing.
         fprintf(stderr, "ERROR: re-created metric reused the same address; "
                         "the case under test cannot be formed\n");
-        mrg_metric_release_and_delete(mrg, out->live);
-        mrg_metric_release_and_delete(mrg, out->decoy);
-        uuidmap_free(out->pinned);
+        jv2_two_pointers_undo(mrg, out);
         return 1;
     }
 
@@ -1316,9 +1331,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
         fprintf(stderr, "ERROR: re-created metric got uuid id %" PRIu32 ", expected the "
                         "pinned %" PRIu32 " - the premise does not hold\n",
                 out->shared_id, out->pinned);
-        mrg_metric_release_and_delete(mrg, out->live);
-        mrg_metric_release_and_delete(mrg, out->decoy);
-        uuidmap_free(out->pinned);
+        jv2_two_pointers_undo(mrg, out);
         return 1;
     }
 
@@ -1810,10 +1823,12 @@ cleanup:
     if(p_new) pgc_page_release(cache, p_new);
 
     if(tp.live) mrg_metric_release_and_delete(mrg, tp.live);
+    tp.live = NULL;
     if(tp.decoy) mrg_metric_release_and_delete(mrg, tp.decoy);
+    tp.decoy = NULL;
 
     pgc_destroy(cache, false);
-    if(tp.pinned) uuidmap_free(tp.pinned);
+    jv2_two_pointers_undo(mrg, &tp);
     main_mrg = saved_main_mrg;
 
     size_t referenced = mrg_destroy(mrg);
