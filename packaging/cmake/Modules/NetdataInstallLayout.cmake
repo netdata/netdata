@@ -112,6 +112,18 @@ else()
   set(NETDATA_STAGE_HOST_FILES FALSE)
 endif()
 
+# Guards the service-manager toolbox under SYSTEM_DEST (systemd, openrc,
+# rc.d, init.d, cron and friends - the copies install-service.sh picks from
+# at install time). The macOS package stages only its launchd job: its
+# installer bootstraps launchd directly, so shipping the other managers'
+# files would be dead payload. macOS SOURCE builds keep the full toolbox -
+# the trim keys on the package kind, not the OS.
+if(OS_WINDOWS OR NETDATA_PACKAGE_KIND STREQUAL "pkg")
+  set(NETDATA_STAGE_SERVICE_TOOLBOX FALSE)
+else()
+  set(NETDATA_STAGE_SERVICE_TOOLBOX TRUE)
+endif()
+
 # DEB policy requires a copyright file in every binary package, under that
 # package's own documentation directory.
 set(PKG_DOC_DEST "usr/share/doc")

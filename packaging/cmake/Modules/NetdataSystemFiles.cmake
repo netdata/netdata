@@ -60,7 +60,12 @@ install(DIRECTORY COMPONENT netdata DESTINATION ${CACHE_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${LOG_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${VARLIB_DEST}/registry)
 install(DIRECTORY COMPONENT netdata DESTINATION ${VARLIB_DEST}/cloud.d)
+# The daemon self-provisions its run directory at startup (run_dir.c; on
+# macOS /private/var/run/netdata, recreated on every boot), so the macOS
+# package does not stage one - the same posture RPM already takes.
+if(NOT NETDATA_PACKAGE_KIND STREQUAL "pkg")
 install(DIRECTORY COMPONENT netdata DESTINATION ${RUN_DEST})
+endif()
 install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/custom-plugins.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/health.d)
@@ -199,7 +204,15 @@ if(NOT OS_WINDOWS)
           ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
           COMPONENT netdata
           DESTINATION ${SYSTEM_DEST}/launchd)
+endif()
 
+# The logrotate configured copy is also consumed by the OS_LINUX host rule
+# below, so it stays outside the toolbox guard.
+if(NOT OS_WINDOWS)
+  configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
+endif()
+
+if(NETDATA_STAGE_SERVICE_TOOLBOX)
   configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
   install(FILES
           ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
@@ -212,7 +225,6 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION ${SYSTEM_DEST}/initd/init.d)
 
-  configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
   install(FILES
           ${CMAKE_BINARY_DIR}/system/logrotate/netdata
           COMPONENT netdata
@@ -230,7 +242,7 @@ if(OS_LINUX)
           DESTINATION ${HOST_LOGROTATE_DEST})
 endif()
 
-if(NOT OS_WINDOWS)
+if(NETDATA_STAGE_SERVICE_TOOLBOX)
   configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
   install(FILES
           ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
@@ -331,7 +343,7 @@ if(NETDATA_STAGE_HOST_FILES)
         endif()
 endif()
 
-if(NOT OS_WINDOWS)
+if(NETDATA_STAGE_SERVICE_TOOLBOX)
   install(FILES
           system/systemd/50-netdata.preset
           COMPONENT netdata
@@ -429,36 +441,38 @@ if(NOT OS_WINDOWS)
             DESTINATION ${LIBCONFIG_DEST})
   endif()
 
-  configure_file(system/cron/netdata-updater-daily.in
-                 system/cron/netdata-updater-daily
-                 @ONLY)
-  install(FILES
-          ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
-          COMPONENT netdata
-          DESTINATION ${SYSTEM_DEST}/cron)
+  if(NETDATA_STAGE_SERVICE_TOOLBOX)
+    configure_file(system/cron/netdata-updater-daily.in
+                   system/cron/netdata-updater-daily
+                   @ONLY)
+    install(FILES
+            ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
+            COMPONENT netdata
+            DESTINATION ${SYSTEM_DEST}/cron)
 
-  configure_file(system/systemd/netdata-updater.service.in
-                 system/systemd/netdata-updater.service
-                 @ONLY)
-  install(FILES
-          ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
-          COMPONENT netdata
-          DESTINATION ${SYSTEM_DEST}/systemd)
-
-  install(FILES
-          system/systemd/netdata-updater.timer
-          COMPONENT netdata
-          DESTINATION ${SYSTEM_DEST}/systemd)
-
-  if(NETDATA_STAGE_HOST_FILES)
+    configure_file(system/systemd/netdata-updater.service.in
+                   system/systemd/netdata-updater.service
+                   @ONLY)
     install(FILES
             ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
             COMPONENT netdata
-            DESTINATION ${HOST_SYSTEMD_UNIT_DEST})
+            DESTINATION ${SYSTEM_DEST}/systemd)
+
     install(FILES
             system/systemd/netdata-updater.timer
             COMPONENT netdata
-            DESTINATION ${HOST_SYSTEMD_UNIT_DEST})
+            DESTINATION ${SYSTEM_DEST}/systemd)
+
+    if(NETDATA_STAGE_HOST_FILES)
+      install(FILES
+              ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+              COMPONENT netdata
+              DESTINATION ${HOST_SYSTEMD_UNIT_DEST})
+      install(FILES
+              system/systemd/netdata-updater.timer
+              COMPONENT netdata
+              DESTINATION ${HOST_SYSTEMD_UNIT_DEST})
+    endif()
   endif()
 endif()
 

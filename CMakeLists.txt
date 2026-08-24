@@ -79,6 +79,16 @@ netdata_fixup_system_processor()
 # is the whole reason both sit here rather than further down: every declaration precedes
 # every read, so no consumer can depend on whether a value happened to reach the cache
 # via -D.
+# The macOS package owns /opt/netdata (a self-contained tree, no Homebrew
+# collision, the layout static Linux installs already use). Runtime paths are
+# baked into the binaries from the prefix, so it must be settled here - before
+# NETDATA_RUNTIME_PREFIX snapshots it - and only when the user did not choose
+# a prefix explicitly. NETDATA_PACKAGE_KIND is read as the raw cache value;
+# NetdataOptions declares and validates it a few lines down.
+if("${NETDATA_PACKAGE_KIND}" STREQUAL "pkg" AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "/opt/netdata" CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
+endif()
+
 set(BINDIR usr/sbin)
 set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include(NetdataPlatform)
