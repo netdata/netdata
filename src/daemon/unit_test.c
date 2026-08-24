@@ -1991,11 +1991,13 @@ static int test_inicfg_double_values(void) {
 
     // a value whose fixed-point form fills the buffer exactly must be kept in fixed-point
     // (the internal buffer is 100 bytes, so 99 characters is an exact fit, not a truncation)
+    const size_t exact_fit_len = 99;
     inicfg_set_double(&cfg, "unittest doubles", "exact fit", (NETDATA_DOUBLE)1e92);
     const char *stored = inicfg_get(&cfg, "unittest doubles", "exact fit", "");
-    if(strlen(stored) != 99 || strchr(stored, 'e') || strchr(stored, 'E')) {
-        fprintf(stderr, "%s: exact fit stored as '%s' (%zu chars), expected 99 fixed-point characters\n",
-                __FUNCTION__, stored, strlen(stored));
+    size_t stored_len = strnlen(stored, exact_fit_len + 1);
+    if(stored_len != exact_fit_len || strchr(stored, 'e') || strchr(stored, 'E')) {
+        fprintf(stderr, "%s: exact fit stored as '%s' (%zu chars), expected %zu fixed-point characters\n",
+                __FUNCTION__, stored, stored_len, exact_fit_len);
         rc = 1;
     }
 
