@@ -91,7 +91,17 @@ endif()
 # Helper binaries.
 #
 
-pkg_check_modules(PCRE2 libpcre2-8)
+# pcre2 gates only log2journal, which the macOS package deliberately does not
+# ship; skipping the lookup under the pkg kind keeps a build-host copy out of
+# the payload instead of adding pcre2 to the bundling set. The explicit FALSE
+# matters: pkg_check_modules caches its result, so a build directory that
+# already probed pcre2 would otherwise keep building log2journal after a
+# reconfigure to the pkg kind.
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+  set(PCRE2_FOUND FALSE)
+else()
+  pkg_check_modules(PCRE2 libpcre2-8)
+endif()
 pkg_check_modules(CAP IMPORTED_TARGET libcap)
 
 #
