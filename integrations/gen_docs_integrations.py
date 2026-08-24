@@ -86,21 +86,6 @@ def clean_and_write(md: str, path: Path):
     relatedResource tags are left as-is here; they are resolved in a post-pass
     once id_to_path is fully populated.
     """
-    marker_attributes = {
-        'catalog': 'data-prometheus-profile-catalog',
-        'profile': 'data-prometheus-profile',
-        'family': 'data-prometheus-profile-family',
-        'chart': 'data-prometheus-profile-chart',
-    }
-    for marker, attribute in marker_attributes.items():
-        pattern = rf'<!-- prometheus-profile-{marker} -->\s*\{{% details( open=true)? summary="(.*?)" %\}}'
-
-        def _profile_details(match, attribute=attribute):
-            opened = ' open' if match.group(1) else ''
-            return f'<details{opened} {attribute}>\n<summary>{match.group(2)}</summary>\n'
-
-        md = re.sub(pattern, _profile_details, md)
-
     md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
     md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
     md = md.replace("{% /details %}", "</details>\n")

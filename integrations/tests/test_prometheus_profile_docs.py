@@ -3,13 +3,13 @@
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 INTEGRATIONS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INTEGRATIONS_DIR))
 
 from _common import load_collectors  # noqa: E402
-from gen_docs_integrations import clean_and_write  # noqa: E402
 from gen_integrations import get_jinja_env  # noqa: E402
 from prometheus_profile_docs import (  # noqa: E402
     ProfileCoverageError,
@@ -44,26 +44,45 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         )
         self.assertEqual(sum(document['chart_count'] for document in self.catalog.values()), 994)
 
-        public_chart_fields = {
-            'context',
-            'title',
-            'family',
-            'units',
-            'dimensions',
-            'selectors',
-            'entity_scope',
+        expected_counts = {
+            'ceph': (1780, 1786, 22),
+            'fastapi': (10, 10, 1),
+            'haproxy': (226, 226, 7),
+            'litellm': (130, 166, 11),
+            'process_runtime': (5, 5, 1),
+            'python_gc': (3, 3, 1),
+            'vllm': (129, 129, 15),
         }
         for profile, document in self.catalog.items():
-            for chart in _profile_charts(document).values():
-                with self.subTest(profile=profile, context=chart['context']):
-                    self.assertEqual(set(chart), public_chart_fields)
+            with self.subTest(profile=profile):
+                metric_count, mapping_count, group_count = expected_counts[profile]
+                self.assertEqual(document['metric_count'], metric_count)
+                self.assertEqual(document['mapping_count'], mapping_count)
+                self.assertEqual(len(document['metric_groups']), group_count)
+                self.assertEqual(
+                    sum(len(group['rows']) for group in document['metric_groups']),
+                    mapping_count,
+                )
+                self.assertTrue(all(group['rows'] for group in document['metric_groups']))
+                for row in _profile_rows(document):
+                    self.assertEqual(
+                        set(row),
+                        {'prometheus_metric', 'netdata_chart', 'dimension', 'unit', 'scope'},
+                    )
 
-        ceph_contexts = {
-            chart['context']
-            for family in self.catalog['ceph']['families']
-            for chart in _all_family_charts(family)
-        }
-        self.assertIn('health.health_checks.state', ceph_contexts)
+        ceph_groups = self.catalog['ceph']['metric_groups']
+        self.assertEqual(ceph_groups[0]['name'], 'Capacity')
+        self.assertEqual(ceph_groups[-1]['name'], 'NVMe-oF')
+        self.assertIn(
+            {
+                'prometheus_metric': 'ceph_num_objects_degraded',
+                'netdata_chart': 'Capacity / Object Health — Objects',
+                'dimension': 'degraded',
+                'unit': 'objects',
+                'scope': 'Ceph cluster endpoint',
+            },
+            ceph_groups[0]['rows'],
+        )
 
     def test_projection_detaches_inherited_yaml_mappings(self):
         collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
@@ -89,6 +108,8 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         )
         self.assertNotIn('profile_coverage', aws['metrics'])
         self.assertEqual(covered['collector-go.d.plugin-prometheus-ceph']['chart_count'], 569)
+        self.assertEqual(covered['collector-go.d.plugin-prometheus-ceph']['metric_count'], 1780)
+        self.assertEqual(covered['collector-go.d.plugin-prometheus-ceph']['mapping_count'], 1786)
         self.assertEqual(covered['collector-go.d.plugin-prometheus-litellm']['chart_count'], 109)
         self.assertEqual(covered['collector-go.d.plugin-prometheus-vllm']['chart_count'], 120)
 
@@ -131,7 +152,7 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         with self.assertRaisesRegex(ProfileCoverageError, 'allowed only on go.d.plugin/prometheus modules'):
             project_prometheus_profile_coverage([wrong_collector], self.catalog)
 
-    def test_rendered_catalogue_is_hierarchical_and_complete(self):
+    def test_rendered_catalogue_is_grouped_tables_and_complete(self):
         collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
         project_prometheus_profile_coverage(collectors, self.catalog)
         ceph = next(item for item in collectors if item['meta']['id'].endswith('-ceph'))
@@ -139,74 +160,60 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
 
         clean = template.render(entry=ceph, clean=True)
         rich = template.render(entry=ceph, clean=False)
-        self.assertEqual(clean.count('data-prometheus-profile-chart'), 569)
-        self.assertEqual(rich.count('<!-- prometheus-profile-chart -->'), 569)
+        self.assertEqual(clean, rich)
+        self.assertEqual(clean.count('| Prometheus metric | Netdata chart | Dimension | Unit | Scope |'), 22)
+        self.assertEqual(sum(line.startswith('| `') for line in clean.splitlines()), 1786)
         self.assertIn('Eligible metrics that are not covered by a curated chart', clean)
         self.assertNotIn('Operator question:', clean)
         self.assertNotIn('Operator question:', rich)
-        self.assertIn('Entity scope:', clean)
-        self.assertIn('Source metric selectors', clean)
-        self.assertIn('Managers (1 chart)', clean)
-        self.assertIn('Managers (1 chart)', rich)
-        self.assertNotIn('(1 charts)', clean)
-        self.assertNotIn('(1 charts)', rich)
-        self.assertNotIn('| Metric |', clean)
+        self.assertNotIn('Source metric selectors', clean)
+        self.assertNotIn('<details', clean)
+        self.assertNotIn('data-prometheus-profile', clean)
+        self.assertIn('#### Managers', clean)
+        self.assertIn(
+            '| `ceph_num_objects_degraded` | Capacity / Object Health — Objects | '
+            '`degraded` | `objects` | Ceph cluster endpoint |',
+            clean,
+        )
 
-    def test_rendered_catalogue_deduplicates_dimension_names_not_selectors(self):
+    def test_rendered_catalogue_keeps_every_metric_to_dimension_mapping(self):
         collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
         project_prometheus_profile_coverage(collectors, self.catalog)
         litellm = next(item for item in collectors if item['meta']['id'].endswith('-litellm'))
         clean = get_jinja_env().get_template('metrics.md').render(entry=litellm, clean=True)
-        charts = _profile_charts(self.catalog['litellm'])
+        rows = list(_profile_rows(self.catalog['litellm']))
 
         cases = {
-            'internal_services.request_outcomes': ('Internal Service Request Outcomes', 'values of label outcome', 22),
-            'internal_services.failure_causes': ('Internal Service Failure Causes', 'values of label service', 11),
-            'internal_services.latency_distribution': ('Internal Service Latency Distribution', 'matching series', 11),
-            'internal_services.accumulated_latency': (
-                'Accumulated Internal Service Latency',
+            'Internal Service Request Outcomes': ('values of label outcome', 22),
+            'Internal Service Failure Causes': ('values of label service', 11),
+            'Internal Service Latency Distribution': ('matching series', 11),
+            'Accumulated Internal Service Latency': (
                 'values of label measurement',
                 11,
             ),
         }
-        for context, (title, dimension_name, selector_count) in cases.items():
-            with self.subTest(context=context):
-                chart = charts[context]
-                self.assertEqual(len(chart['selectors']), selector_count)
-                self.assertEqual({dimension['name'] for dimension in chart['dimensions']}, {dimension_name})
+        for title, (dimension_name, mapping_count) in cases.items():
+            with self.subTest(title=title):
+                chart_rows = [row for row in rows if row['netdata_chart'].endswith(f'— {title}')]
+                self.assertEqual(len(chart_rows), mapping_count)
+                self.assertEqual({row['dimension'] for row in chart_rows}, {dimension_name})
+                self.assertEqual(
+                    sum(f'— {title} | `{dimension_name}`' in line for line in clean.splitlines()),
+                    mapping_count,
+                )
 
-                start = clean.index(f'<summary>{title}</summary>')
-                end = clean.find('<details data-prometheus-profile-chart>', start + 1)
-                block = clean[start:end if end != -1 else None]
-                self.assertEqual(block.count(f'`{dimension_name}`'), 1)
-                self.assertIn(f'<summary>Source metric selectors ({selector_count})</summary>', block)
+    def test_rendered_table_preserves_pipes_and_escapes_text(self):
+        collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
+        project_prometheus_profile_coverage(collectors, deepcopy(self.catalog))
+        ceph = next(item for item in collectors if item['meta']['id'].endswith('-ceph'))
+        row = ceph['metrics']['profile_coverage']['profiles'][0]['metric_groups'][0]['rows'][0]
+        row['prometheus_metric'] = 'ceph_metric{status=~"ok|error"}'
+        row['netdata_chart'] = '<unsafe | chart>'
+        rendered = get_jinja_env().get_template('metrics.md').render(entry=ceph, clean=True)
 
-    def test_generated_markdown_preserves_catalogue_hooks(self):
-        markdown = (
-            '<!-- prometheus-profile-catalog -->\n'
-            '{% details open=true summary="Coverage" %}\n'
-            '<!-- prometheus-profile-chart -->\n'
-            '{% details summary="Requests" %}\n'
-            '{% /details %}\n{% /details %}\n'
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'integration.md'
-            clean_and_write(markdown, path)
-            rendered = path.read_text(encoding='utf-8')
-        self.assertIn(
-            '<details open data-prometheus-profile-catalog>\n<summary>Coverage</summary>\n',
-            rendered,
-        )
-        self.assertIn(
-            '<details data-prometheus-profile-chart>\n<summary>Requests</summary>\n',
-            rendered,
-        )
-        self.assertNotIn(
-            '<details open data-prometheus-profile-catalog><summary>',
-            rendered,
-        )
-        self.assertNotIn('<details data-prometheus-profile-chart><summary>', rendered)
-        self.assertNotIn('prometheus-profile-catalog -->', rendered)
+        self.assertIn('`ceph_metric{status=~"ok\\|error"}`', rendered)
+        self.assertIn('&lt;unsafe \\| chart&gt;', rendered)
+        self.assertNotIn('&#124;', rendered)
 
     def test_view_chart_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -235,18 +242,9 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
                 load_profile_catalog(design, runtime)
 
 
-def _all_family_charts(family):
-    yield from family['charts']
-    for child in family['children']:
-        yield from _all_family_charts(child)
-
-
-def _profile_charts(profile):
-    return {
-        chart['context']: chart
-        for family in profile['families']
-        for chart in _all_family_charts(family)
-    }
+def _profile_rows(profile):
+    for group in profile['metric_groups']:
+        yield from group['rows']
 
 
 def _write_minimal_catalog(root, contexts=('requests',), family='Service'):

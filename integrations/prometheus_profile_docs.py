@@ -115,30 +115,26 @@ def _runtime_charts(profile, runtime):
     return charts
 
 
-def _family_tree(charts):
-    roots = []
-    nodes = {}
+def _metric_groups(charts):
+    groups = []
+    groups_by_name = {}
     for chart in charts:
-        parent_key = ()
-        for part in chart['family'].split('/'):
-            key = (*parent_key, part)
-            if key not in nodes:
-                node = {
-                    'name': part,
-                    'path': '/'.join(key),
-                    'chart_count': 0,
-                    'charts': [],
-                    'children': [],
-                }
-                nodes[key] = node
-                if parent_key:
-                    nodes[parent_key]['children'].append(node)
-                else:
-                    roots.append(node)
-            nodes[key]['chart_count'] += 1
-            parent_key = key
-        nodes[parent_key]['charts'].append(chart)
-    return roots
+        group_name = chart['family'].split('/', 1)[0]
+        if group_name not in groups_by_name:
+            group = {'name': group_name, 'rows': []}
+            groups_by_name[group_name] = group
+            groups.append(group)
+
+        chart_name = f'{chart["family"].replace("/", " / ")} — {chart["title"]}'
+        for dimension in chart['dimensions']:
+            groups_by_name[group_name]['rows'].append({
+                'prometheus_metric': dimension['selector'],
+                'netdata_chart': chart_name,
+                'dimension': dimension['name'],
+                'unit': chart['units'],
+                'scope': chart['entity_scope'],
+            })
+    return groups
 
 
 def _validate_profile_file_sets(designs, runtimes):
@@ -254,7 +250,13 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
             'title': _require_text(documentation.get('title'), 'documentation.title', profile),
             'summary': _require_text(documentation.get('summary'), 'documentation.summary', profile),
             'chart_count': len(charts),
-            'families': _family_tree(charts),
+            'metric_count': len({
+                dimension['selector']
+                for chart in charts
+                for dimension in chart['dimensions']
+            }),
+            'mapping_count': sum(len(chart['dimensions']) for chart in charts),
+            'metric_groups': _metric_groups(charts),
             'supports': _profile_supports(profile, design),
         }
 
@@ -317,6 +319,13 @@ def project_prometheus_profile_coverage(collectors, catalog=None):
         item['metrics'] = deepcopy(item['metrics'])
         item['metrics']['profile_coverage'] = {
             'chart_count': sum(profile['chart_count'] for profile in profiles),
+            'metric_count': len({
+                row['prometheus_metric']
+                for profile in profiles
+                for group in profile['metric_groups']
+                for row in group['rows']
+            }),
+            'mapping_count': sum(profile['mapping_count'] for profile in profiles),
             'profiles': profiles,
         }
 
