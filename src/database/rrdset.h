@@ -12,7 +12,7 @@ typedef struct ml_chart rrd_ml_chart_t;
 #include "rrdset-type.h"
 #include "rrdlabels.h"
 #include "rrd-database-mode.h"
-#include "streaming/stream-receiver-timeout.h"
+#include "streaming/stream-receiver-cadence.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -175,7 +175,7 @@ struct rrdset {
         } snd;
 
         struct {
-            STREAM_RECEIVER_TIMEOUT_CHART timeout;  // contribution to the host receiver timeout tracker
+            STREAM_RECEIVER_CADENCE_CHART cadence;  // contribution to the host receiver cadence tracker
 #ifdef REPLICATION_TRACKING
             REPLAY_WHO who;
 #endif

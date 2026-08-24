@@ -227,7 +227,8 @@ void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
 int stream_conf_compression_levels_unittest(void);
-int stream_receiver_timeout_unittest(void);
+int stream_receiver_cadence_unittest(void);
+int stream_receiver_socket_unittest(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
@@ -476,7 +477,8 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (stream_conf_compression_levels_unittest()) return 1;
-                            if (stream_receiver_timeout_unittest()) return 1;
+                            if (stream_receiver_cadence_unittest()) return 1;
+                            if (stream_receiver_socket_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
@@ -801,9 +803,13 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return stream_conf_compression_levels_unittest();
                         }
-                        else if(strcmp(optarg, "stream_receiver_timeout_test") == 0) {
+                        else if(strcmp(optarg, "stream_receiver_cadence_test") == 0) {
                             unittest_running = true;
-                            return stream_receiver_timeout_unittest();
+                            return stream_receiver_cadence_unittest();
+                        }
+                        else if(strcmp(optarg, "stream_receiver_socket_test") == 0) {
+                            unittest_running = true;
+                            return stream_receiver_socket_unittest();
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {

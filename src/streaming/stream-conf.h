@@ -84,6 +84,11 @@ struct stream_receiver_config {
         bool enabled;
         STREAM_CAPABILITIES priorities[COMPRESSION_ALGORITHM_MAX];
     } compression;
+
+    struct {
+        bool automatic;
+        uint32_t idle_s;
+    } tcp_keepalive;
 };
 
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid);

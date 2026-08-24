@@ -262,6 +262,7 @@ Here you can define settings for authentication and access control between Paren
 | `health enabled`             | `auto`     | Controls alerts and notifications (`auto`, `yes`, or `no`). |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after the Child connects.         |
 | `health log retention`       | `5d`       | Duration (in seconds) to keep health log events.            |
+| `tcp keepalive idle`         | `auto`     | Parent TCP keepalive idle: `auto` or a duration from 30 seconds through 1 hour. |
 | `proxy enabled`              | (empty)    | Enables routing metrics through a proxy.                    |
 | `proxy destination`          | (empty)    | IP and port of the proxy server.                            |
 | `proxy api key`              | (empty)    | API key for the proxy server.                               |
@@ -286,6 +287,7 @@ This area lets you customize settings for specific Child nodes by their unique I
 | `health enabled`             | `auto`     | Controls alerts (`auto`, `yes`, `no`).                   |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after connection.              |
 | `health log retention`       | `5d`       | Duration to keep health log events.                      |
+| `tcp keepalive idle`         | API-key value | Overrides the API-key Parent TCP keepalive idle for this Child. |
 | `proxy enabled`              | (empty)    | Routes metrics through a proxy if enabled.               |
 | `proxy destination`          | (empty)    | Proxy server IP and port.                                |
 | `proxy api key`              | (empty)    | API key for the proxy.                                   |
@@ -295,6 +297,23 @@ This area lets you customize settings for specific Child nodes by their unique I
 | `replication period`         | `1d`       | Maximum replication window.                              |
 | `replication step`           | `10m`      | Time interval for each replication step.                 |
 | `is ephemeral node`          | `no`       | Marks the node as ephemeral (removes after inactivity).  |
+
+#### Receiver TCP keepalive
+
+`tcp keepalive idle` is a Parent receiver setting. Configure it under `[API_KEY]`, or under `[MACHINE_GUID]` to override the API-key
+value for one Child. It is not a `[stream]` sender setting and does not require a Child update.
+
+`[MACHINE_GUID]` has precedence over `[API_KEY]`, including when the machine-specific value is `auto` or invalid. With the default
+`auto` value, the Parent uses half of the fastest active chart cadence received from that Child, rounded up and bounded to 30 seconds
+through 1 hour. Before chart metadata is available, the Parent uses the valid handshake cadence together with
+the last learned host cadence; if neither is available, it uses 30 seconds. The Parent updates the accepted socket while it remains
+connected. An explicit duration replaces the automatic value and is bounded to the same 30-second through one-hour range. The duration
+aliases `0`, `off`, and `never` resolve to zero and are therefore raised to 30 seconds. Negative, too-large-to-parse, and otherwise
+invalid durations fall back to automatic cadence.
+
+The first keepalive probe starts after this idle period. Subsequent probes remain 10 seconds apart, and the connection is considered
+dead after three unanswered probes. Netdata's separate receiver application-idle threshold remains at least 10 minutes and is twice
+the selected chart cadence.
 
 ### Additional Settings
 

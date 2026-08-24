@@ -8,14 +8,14 @@
 #include "pluginsd_dyncfg.h"
 #include "pluginsd_replication.h"
 #include "database/rrdset-pluginsd-array.h"
-#include "streaming/stream-receiver-timeout.h"
+#include "streaming/stream-receiver-cadence.h"
 
 #define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
 #define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
 
-static inline void pluginsd_stream_receiver_timeout_chart_refresh(PARSER *parser, RRDSET *st) {
+static inline void pluginsd_stream_receiver_cadence_chart_refresh(PARSER *parser, RRDSET *st) {
     if(SERVING_STREAMING(parser) && parser->user.opaque)
-        stream_receiver_timeout_chart_refresh(parser->user.opaque, st);
+        stream_receiver_cadence_chart_refresh(parser->user.opaque, st);
 }
 
 PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);

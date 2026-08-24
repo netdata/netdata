@@ -85,6 +85,81 @@ static const struct {
     { COMPRESSION_ALGORITHM_GZIP,   "gzip compression level" },
 };
 
+typedef enum {
+    STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT,
+    STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY,
+    STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID,
+} STREAM_RECEIVER_KEEPALIVE_SOURCE;
+
+typedef struct {
+    bool automatic;
+    bool valid;
+    bool bounded;
+    int configured_s;
+    uint32_t idle_s;
+    STREAM_RECEIVER_KEEPALIVE_SOURCE source;
+    const char *raw_value;
+} STREAM_RECEIVER_KEEPALIVE_CONFIG;
+
+static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(
+    STREAM_RECEIVER_KEEPALIVE_SOURCE source,
+    const char *value) {
+
+    STREAM_RECEIVER_KEEPALIVE_CONFIG parsed = {
+        .automatic = true,
+        .valid = true,
+        .idle_s = STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS,
+        .source = source,
+        .raw_value = value ? value : "auto",
+    };
+
+    if(!value || !strcasecmp(value, "auto"))
+        return parsed;
+
+    int configured_s;
+    if(!duration_parse_seconds(value, &configured_s) || configured_s < 0) {
+        parsed.valid = false;
+        return parsed;
+    }
+
+    parsed.automatic = false;
+    parsed.configured_s = configured_s;
+    parsed.idle_s = (uint32_t)MIN(
+        MAX(configured_s, (int)STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
+        (int)STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
+    parsed.bounded = parsed.idle_s != (uint32_t)configured_s;
+    return parsed;
+}
+
+static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_resolve_receiver_keepalive(
+    struct config *config,
+    const char *api_key,
+    const char *machine_guid) {
+
+    const char *section = NULL;
+    STREAM_RECEIVER_KEEPALIVE_SOURCE source = STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT;
+    if(inicfg_exists(config, machine_guid, "tcp keepalive idle")) {
+        section = machine_guid;
+        source = STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID;
+    }
+    else if(inicfg_exists(config, api_key, "tcp keepalive idle")) {
+        section = api_key;
+        source = STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY;
+    }
+
+    const char *value = section ? inicfg_get(config, section, "tcp keepalive idle", "auto") : "auto";
+    return stream_conf_parse_receiver_keepalive(source, value);
+}
+
+static const char *stream_conf_receiver_keepalive_source_name(STREAM_RECEIVER_KEEPALIVE_SOURCE source) {
+    switch(source) {
+        case STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY: return "API key section";
+        case STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID: return "machine GUID section";
+        case STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT: return "default";
+    }
+    return "default";
+}
+
 static void stream_conf_resolve_sender_compression_levels(
     struct config *config,
     ND_COMPRESSION_PROFILE profile,
@@ -217,8 +292,68 @@ int stream_conf_compression_levels_unittest(void) {
         inicfg_free(&config);
     }
 
+    static const struct {
+        const char *name;
+        const char *api_value;
+        const char *machine_value;
+        bool automatic;
+        bool valid;
+        bool bounded;
+        int configured_s;
+        uint32_t idle_s;
+        STREAM_RECEIVER_KEEPALIVE_SOURCE source;
+        const char *raw_value;
+    } keepalive_tests[] = {
+        { "default auto", NULL, NULL, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT, "auto" },
+        { "API auto", "auto", NULL, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "auto" },
+        { "uppercase auto", "AUTO", NULL, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "AUTO" },
+        { "API duration", "2m", NULL, false, true, false, 120, 120, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "2m" },
+        { "machine duration overrides API", "2m", "3m", false, true, false, 180, 180, STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "3m" },
+        { "machine auto overrides API", "2m", "auto", true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "auto" },
+        { "machine invalid overrides API", "2m", "invalid", true, false, false, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "invalid" },
+        { "zero clamps to lower bound", "0", NULL, false, true, true, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0" },
+        { "off clamps to lower bound", "off", NULL, false, true, true, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "off" },
+        { "never clamps to lower bound", "never", NULL, false, true, true, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "never" },
+        { "negative falls back to auto", "-1s", NULL, true, false, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "-1s" },
+        { "exact lower bound", "30s", NULL, false, true, false, 30, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "30s" },
+        { "below lower bound", "29s", NULL, false, true, true, 29, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "29s" },
+        { "exact upper bound", "1h", NULL, false, true, false, 3600, 3600, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "1h" },
+        { "above upper bound", "3601s", NULL, false, true, true, 3601, 3600, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "3601s" },
+        { "huge duration falls back to auto", "999999999999999d", NULL, true, false, false, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "999999999999999d" },
+        { "unparseable falls back to auto", "not-a-duration", NULL, true, false, false, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "not-a-duration" },
+    };
+
+    for(size_t i = 0; i < _countof(keepalive_tests); i++) {
+        struct config config = APPCONFIG_INITIALIZER;
+        if(keepalive_tests[i].api_value)
+            inicfg_set(&config, "api", "tcp keepalive idle", keepalive_tests[i].api_value);
+        if(keepalive_tests[i].machine_value)
+            inicfg_set(&config, "machine", "tcp keepalive idle", keepalive_tests[i].machine_value);
+
+        STREAM_RECEIVER_KEEPALIVE_CONFIG actual =
+            stream_conf_resolve_receiver_keepalive(&config, "api", "machine");
+        if(actual.automatic != keepalive_tests[i].automatic ||
+           actual.valid != keepalive_tests[i].valid ||
+           actual.bounded != keepalive_tests[i].bounded ||
+           actual.configured_s != keepalive_tests[i].configured_s ||
+           actual.idle_s != keepalive_tests[i].idle_s ||
+           strcmp(actual.raw_value, keepalive_tests[i].raw_value) ||
+           actual.source != keepalive_tests[i].source) {
+            fprintf(stderr,
+                    "STREAM CONF KEEPALIVE TEST '%s': got automatic=%d valid=%d bounded=%d configured=%d idle=%u section=%s raw=%s\n",
+                    keepalive_tests[i].name, actual.automatic, actual.valid, actual.bounded,
+                    actual.configured_s, actual.idle_s,
+                    stream_conf_receiver_keepalive_source_name(actual.source), actual.raw_value);
+            errors++;
+        }
+        inicfg_free(&config);
+    }
+
     if(!errors)
-        fprintf(stderr, "STREAM CONF COMPRESSION TESTS PASSED\n");
+        fprintf(stderr, "STREAM CONF COMPRESSION AND RECEIVER KEEPALIVE TESTS PASSED\n");
 
     return errors;
 }
@@ -462,6 +597,24 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
                 &stream_config, machine_guid, "compression algorithms order",
                 inicfg_get(&stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
     }
+
+    STREAM_RECEIVER_KEEPALIVE_CONFIG keepalive =
+        stream_conf_resolve_receiver_keepalive(&stream_config, api_key, machine_guid);
+    config->tcp_keepalive.automatic = keepalive.automatic;
+    config->tcp_keepalive.idle_s = keepalive.idle_s;
+
+    if(!keepalive.valid)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: tcp keepalive idle = %s in the %s is invalid; using automatic receiver cadence",
+               rpt->hostname, rpt->remote_ip, rpt->remote_port,
+               keepalive.raw_value, stream_conf_receiver_keepalive_source_name(keepalive.source));
+    else if(!keepalive.automatic && keepalive.bounded)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: tcp keepalive idle = %s in the %s resolves to %d seconds "
+               "outside the supported range; using %u seconds",
+               rpt->hostname, rpt->remote_ip, rpt->remote_port,
+               keepalive.raw_value, stream_conf_receiver_keepalive_source_name(keepalive.source),
+               keepalive.configured_s, keepalive.idle_s);
 }
 
 bool stream_conf_is_key_type(const char *api_key, const char *type) {

@@ -1946,8 +1946,10 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-compression/zstd.c
         src/streaming/stream-compression/zstd.h
         src/streaming/stream-receiver.c
-        src/streaming/stream-receiver-timeout.c
-        src/streaming/stream-receiver-timeout.h
+        src/streaming/stream-receiver-cadence.c
+        src/streaming/stream-receiver-cadence.h
+        src/streaming/stream-receiver-socket.c
+        src/streaming/stream-receiver-socket.h
         src/streaming/stream-sender.c
         src/streaming/stream-replication-sender.c
         src/streaming/stream-replication-sender.h
@@ -3168,10 +3170,11 @@ add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-replay-endpoints-test.c)
 target_link_libraries(stream-replay-endpoints-test libnetdata)
 
-add_executable(stream-receiver-timeout-test EXCLUDE_FROM_ALL
-        src/streaming/tests/stream-receiver-timeout-test.c
-        src/streaming/stream-receiver-timeout.c)
-target_link_libraries(stream-receiver-timeout-test libnetdata)
+add_executable(stream-receiver-cadence-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-receiver-cadence-test.c
+        src/streaming/stream-receiver-cadence.c
+        src/streaming/stream-receiver-socket.c)
+target_link_libraries(stream-receiver-cadence-test libnetdata)
 
 if(OS_LINUX)
         add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL

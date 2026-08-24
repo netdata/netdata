@@ -16,7 +16,8 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 #include "stream.h"
 #include "stream-thread.h"
 #include "stream-conf.h"
-#include "stream-receiver-timeout.h"
+#include "stream-receiver-cadence.h"
+#include "stream-receiver-socket.h"
 #include "database/rrd.h"
 #include "plugins.d/plugins_d.h"
 
@@ -91,6 +92,7 @@ struct receiver_state {
         nd_poll_event_t wanted;
         usec_t last_traffic_ut;
         size_t bytes_received;          // raw socket bytes received on this connection (diagnostics)
+        STREAM_RECEIVER_KEEPALIVE_STATE keepalive;
         struct pollfd_meta meta;
     } thread;
 

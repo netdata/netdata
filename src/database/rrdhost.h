@@ -23,7 +23,7 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 //#include "streaming/stream-replication-tracking.h"
 #include "streaming/stream-parents.h"
 #include "streaming/stream-path.h"
-#include "streaming/stream-receiver-timeout.h"
+#include "streaming/stream-receiver-cadence.h"
 #include "storage-engine.h"
 //#include "streaming/stream-traffic-types.h"
 #include "rrdlabels.h"
@@ -245,7 +245,7 @@ struct rrdhost {
         // --- receiver ---
 
         struct {
-            STREAM_RECEIVER_TIMEOUT timeout;
+            STREAM_RECEIVER_CADENCE cadence;
 
             struct {
                 SPINLOCK spinlock;                  // lock for the management of the allocation

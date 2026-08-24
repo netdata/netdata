@@ -460,7 +460,7 @@ RRDHOST *rrdhost_create(
     host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? false : health;
 
     spinlock_init(&host->receiver_lock);
-    stream_receiver_timeout_init(&host->stream.rcv.timeout);
+    stream_receiver_cadence_init(&host->stream.rcv.cadence);
     spinlock_init(&host->rrdhost_update_lock);
     rw_spinlock_init(&host->metadata_lifetime_lock);
     rw_spinlock_init(&host->ml_host_rwlock);
@@ -966,7 +966,7 @@ static void rrdhost_free_unlinked(RRDHOST *host) {
     rrdhost_destroy_rrdcontexts(host);
     rrdlabels_destroy(host->rrdlabels);
     destroy_aclk_config(host);
-    stream_receiver_timeout_destroy(&host->stream.rcv.timeout);
+    stream_receiver_cadence_destroy(&host->stream.rcv.cadence);
 
     string_freez(host->hostname);
     string_freez(host->os);
