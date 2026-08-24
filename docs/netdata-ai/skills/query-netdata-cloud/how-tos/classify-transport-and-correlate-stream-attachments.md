@@ -14,6 +14,7 @@ which transport was active during a historical time bucket.
 - A narrow context pattern for discovering the transport metric, such as `vendor.*wan*`.
 - The selected transport context and its cellular/Ethernet dimension names.
 - Absolute Unix timestamps `AFTER` and `BEFORE` for the historical window.
+- A storage tier whose retained resolution is fine enough for the requested buckets. The example starts with tier 1.
 - A cohort rule. The examples require at least 12 valid paired hours and at least 90% cellular time.
 
 Raw Cloud responses contain node identifiers. Store them only under `.local/`, which is ignored by the repository.
@@ -31,6 +32,7 @@ SPACE='YOUR_SPACE_ID'
 ROOM='YOUR_ROOM_ID'
 AFTER=YOUR_AFTER_UNIX_TIMESTAMP
 BEFORE=YOUR_BEFORE_UNIX_TIMESTAMP
+QUERY_TIER=1
 CONTEXT_PATTERN='vendor.*wan*'
 AUDIT_DIR=".local/audits/query-netdata-cloud/transport-state/$SPACE/$ROOM/$AFTER-$BEFORE"
 mkdir -p "$AUDIT_DIR"
@@ -75,12 +77,13 @@ while (( start < BEFORE )); do
     --arg ethernet "$ETHERNET_DIMENSION" \
     --argjson after "$start" \
     --argjson before "$end" \
-    --argjson points "$points" '{
+    --argjson points "$points" \
+    --argjson tier "$QUERY_TIER" '{
       scope: {contexts: [$context], dimensions: [$cellular, $ethernet]},
       selectors: {
         nodes: ["*"], contexts: ["*"], instances: ["*"], dimensions: ["*"], labels: ["*"], alerts: ["*"]
       },
-      window: {after: $after, before: $before, points: $points},
+      window: {after: $after, before: $before, points: $points, tier: $tier},
       aggregations: {
         metrics: [{group_by: ["dimension", "node"], aggregation: "avg"}],
         time: {time_group: "average"}
@@ -91,6 +94,8 @@ while (( start < BEFORE )); do
     }')
 
   agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/data" "$TRANSPORT_PAYLOAD" > "$response"
+  jq -e --argjson tier "$QUERY_TIER" \
+    'all(.db.per_tier[]; .tier == $tier or .points == 0)' "$response" > /dev/null
   printf '%s\n' "$response" >> "$TRANSPORT_MANIFEST"
   start=$end
 done
@@ -99,7 +104,9 @@ test -s "$TRANSPORT_MANIFEST"
 ```
 
 The loop preserves the single-request behavior for windows no longer than 500 hours and splits longer windows before
-Cloud can clamp an explicit multi-route point target.
+Cloud can clamp an explicit multi-route point target. The `jq -e` guard rejects a response when Cloud falls back to or
+mixes in another tier. Select a tier whose `db.per_tier[].update_every` is no greater than the analysis bucket; do not
+use a coarse rollup to infer shorter transport changes.
 
 ### 3. Prove one-hot behavior and build the cellular cohort
 
@@ -226,12 +233,13 @@ while (( start < BEFORE )); do
     --arg dimension "$ATTACHMENT_DIMENSION" \
     --argjson after "$start" \
     --argjson before "$end" \
-    --argjson points "$points" '{
+    --argjson points "$points" \
+    --argjson tier "$QUERY_TIER" '{
       scope: {contexts: [$context], dimensions: [$dimension]},
       selectors: {
         nodes: ["*"], contexts: ["*"], instances: ["*"], dimensions: ["*"], labels: ["*"], alerts: ["*"]
       },
-      window: {after: $after, before: $before, points: $points},
+      window: {after: $after, before: $before, points: $points, tier: $tier},
       aggregations: {
         metrics: [{group_by: ["label"], group_by_label: ["machine_guid"], aggregation: "sum"}],
         time: {time_group: "average"}
@@ -243,6 +251,8 @@ while (( start < BEFORE )); do
 
   response="$AUDIT_DIR/attachments-$start-$end.json"
   agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/data" "$ATTACHMENT_PAYLOAD" > "$response"
+  jq -e --argjson tier "$QUERY_TIER" \
+    'all(.db.per_tier[]; .tier == $tier or .points == 0)' "$response" > /dev/null
   printf '%s\n' "$response" >> "$ATTACHMENT_MANIFEST"
   start=$end
 done
@@ -289,7 +299,7 @@ annotations when they are not; missing coverage or a coarser tier can make the r
 - A metric-validity summary: paired node-hours, range ratio, complementarity ratio, and exact-binary ratio.
 - A machine-GUID cohort that meets explicit minimum-coverage and cellular-share thresholds.
 - Accepted Parent attachment counts for cohort members over the same time window.
-- Coverage evidence retained in ignored raw response files.
+- Storage-tier and coverage evidence retained in ignored raw response files.
 
 ## Notes / gotchas
 
@@ -308,6 +318,9 @@ annotations when they are not; missing coverage or a coarser tier can make the r
 6. **Agent/version availability varies.** If `netdata.streaming.in.reconnects` or its `machine_guid` label is absent,
    record that no direct attachment telemetry is available for the requested window; do not substitute a host label or
    infer events from gaps without saying so.
+7. **Do not mix storage tiers.** Automatic selection can combine fine recent data with coarse older rollups across nodes.
+   If the selected tier lacks the required retention, report insufficient resolution; a coarse rollup can smear an event
+   or transport transition across many requested buckets.
 
 ## Source guides
 
