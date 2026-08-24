@@ -12,13 +12,13 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
     // Keep the DICTIONARY object alive for the whole traversal: we are about to
     // take its lock, and dictionary_destroy() would otherwise free the object
     // (locks included) from under us. Released in dictionary_foreach_done().
-    dictionary_inflight_enter(dfe->dict);
+    dictionary_api_enter(dfe->dict);
 
     DICTIONARY_STATS_TRAVERSALS_PLUS1(dfe->dict);
 
     if(unlikely(is_dictionary_destroyed(dfe->dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
-        dictionary_inflight_exit(dfe->dict);
+        dictionary_api_exit(dfe->dict);
         dfe->dict = NULL;
         dfe->item = NULL;
         dfe->name = NULL;
@@ -36,7 +36,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
     if(unlikely(is_dictionary_destroyed(dfe->dict))) {
         ll_recursive_unlock(dfe->dict, dfe->rw);
         dfe->locked = false;
-        dictionary_inflight_exit(dfe->dict);
+        dictionary_api_exit(dfe->dict);
         dfe->dict = NULL;
         dfe->item = NULL;
         dfe->name = NULL;
@@ -154,8 +154,8 @@ void dictionary_foreach_done(DICTFE *dfe) {
         dfe->locked = false;
     }
 
-    // matches dictionary_inflight_enter() in dictionary_foreach_start_rw()
-    dictionary_inflight_exit(dfe->dict);
+    // matches dictionary_api_enter() in dictionary_foreach_start_rw()
+    dictionary_api_exit(dfe->dict);
 
     dfe->dict = NULL;
     dfe->item = NULL;
@@ -169,7 +169,7 @@ void dictionary_foreach_done(DICTFE *dfe) {
 // The dictionary is locked for reading while this happens
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
-int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data) {
+static int dictionary_walkthrough_rw_internal(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data) {
     if(unlikely(!dict || !walkthrough_callback)) return 0;
 
     if(unlikely(is_dictionary_destroyed(dict))) {
@@ -234,7 +234,7 @@ static int dictionary_sort_compar(const void *item1, const void *item2) {
     return strcmp(item_get_name((*(DICTIONARY_ITEM **)item1)), item_get_name((*(DICTIONARY_ITEM **)item2)));
 }
 
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data, dict_item_comparator_t item_comparator) {
+static int dictionary_sorted_walkthrough_rw_internal(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data, dict_item_comparator_t item_comparator) {
     if(unlikely(!dict || !walkthrough_callback)) return 0;
 
     if(unlikely(is_dictionary_destroyed(dict))) {
@@ -298,3 +298,23 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
     return ret;
 }
 
+
+int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data) {
+    if(unlikely(!dict)) return 0;
+
+    dictionary_api_enter(dict);
+    int ret = dictionary_walkthrough_rw_internal(dict, rw, walkthrough_callback, data);
+    dictionary_api_exit(dict);
+
+    return ret;
+}
+
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data, dict_item_comparator_t item_comparator) {
+    if(unlikely(!dict)) return 0;
+
+    dictionary_api_enter(dict);
+    int ret = dictionary_sorted_walkthrough_rw_internal(dict, rw, walkthrough_callback, data, item_comparator);
+    dictionary_api_exit(dict);
+
+    return ret;
+}

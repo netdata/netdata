@@ -40,9 +40,28 @@ typedef enum __attribute__ ((__packed__)) {
 // protect a caller holding a stale DICTIONARY * that has not entered yet -
 // that window is unclosable from inside the dictionary and remains a
 // caller-ownership bug.
-#define dictionary_inflight_enter(dict) __atomic_add_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST)
-#define dictionary_inflight_exit(dict)  __atomic_sub_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST)
-#define dictionary_inflight(dict)       __atomic_load_n(&((dict)->inflight), __ATOMIC_SEQ_CST)
+//
+// EVERY public function that touches the dictionary object must be bracketed
+// by dictionary_api_enter() / dictionary_api_exit(). Taking one of the
+// dictionary's own locks without it is the exact race this closes: pass the
+// destroyed check, then block on a lock inside a struct that
+// dictionary_destroy() already freed because it saw inflight == 0.
+//
+// Single-threaded dictionaries are exempt: ll_recursive_lock() short-circuits
+// for them (dictionary-locks.h), so they pay nothing today, and by definition
+// they are not racing a destroy from another thread. Keeping them exempt
+// preserves their zero-overhead property.
+#define dictionary_api_enter(dict) do {                                             \
+        if(likely(!is_dictionary_single_threaded(dict)))                            \
+            __atomic_add_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);            \
+    } while(0)
+
+#define dictionary_api_exit(dict) do {                                              \
+        if(likely(!is_dictionary_single_threaded(dict)))                            \
+            __atomic_sub_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);            \
+    } while(0)
+
+#define dictionary_inflight(dict) __atomic_load_n(&((dict)->inflight), __ATOMIC_SEQ_CST)
 
 // configuration options macros
 #define is_dictionary_single_threaded(dict) ((dict)->options & DICT_OPTION_SINGLE_THREADED)

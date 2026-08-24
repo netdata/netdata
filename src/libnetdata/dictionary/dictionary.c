@@ -13,11 +13,15 @@ struct dictionary_stats dictionary_stats_category_other = {
 // public locks API
 
 inline void dictionary_write_lock(DICTIONARY *dict) {
+    // paired with dictionary_write_unlock(): the caller holds this
+    // dictionary's lock in between, so the object must stay alive
+    dictionary_api_enter(dict);
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 }
 
 inline void dictionary_write_unlock(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+    dictionary_api_exit(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -224,7 +228,10 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
 void dictionary_garbage_collect(DICTIONARY *dict) {
     if(!dict) return;
+
+    dictionary_api_enter(dict);
     garbage_collect_pending_deletes(dict);
+    dictionary_api_exit(dict);
 }
 
 // Like dictionary_garbage_collect(), but the victims' delete callbacks run
@@ -729,10 +736,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
     return dict;
 }
 
-void dictionary_flush(DICTIONARY *dict) {
-    if(unlikely(!dict))
-        return;
-
+static void dictionary_flush_internal(DICTIONARY *dict) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
     DICTIONARY_ITEM *item = dict->items.list;
@@ -755,6 +759,15 @@ void dictionary_flush(DICTIONARY *dict) {
     DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict);
 
     dictionary_garbage_collect(dict);
+}
+
+void dictionary_flush(DICTIONARY *dict) {
+    if(unlikely(!dict))
+        return;
+
+    dictionary_api_enter(dict);
+    dictionary_flush_internal(dict);
+    dictionary_api_exit(dict);
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
@@ -864,10 +877,10 @@ static DICTIONARY_ITEM *dictionary_set_and_acquire_item_internal(DICTIONARY *dic
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     if(unlikely(!dict)) return NULL;
 
-    dictionary_inflight_enter(dict);
+    dictionary_api_enter(dict);
     DICTIONARY_ITEM *item =
         dictionary_set_and_acquire_item_internal(dict, name, name_len, value, value_len, constructor_data);
-    dictionary_inflight_exit(dict);
+    dictionary_api_exit(dict);
 
     return item;
 }
@@ -917,9 +930,9 @@ static DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_internal(DICTIONARY
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
     if(unlikely(!dict)) return NULL;
 
-    dictionary_inflight_enter(dict);
+    dictionary_api_enter(dict);
     DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_internal(dict, name, name_len, master_item);
-    dictionary_inflight_exit(dict);
+    dictionary_api_exit(dict);
 
     return item;
 }
@@ -952,9 +965,9 @@ static DICTIONARY_ITEM *dictionary_get_and_acquire_item_internal(DICTIONARY *dic
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!dict)) return NULL;
 
-    dictionary_inflight_enter(dict);
+    dictionary_api_enter(dict);
     DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_internal(dict, name, name_len);
-    dictionary_inflight_exit(dict);
+    dictionary_api_exit(dict);
 
     return item;
 }
@@ -978,7 +991,11 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_item_acquire_if_not_deleted(DICTIONA
     if(unlikely(!dict || !item))
         return NULL;
 
-    if(unlikely(!item_check_and_acquire(dict, item)))
+    dictionary_api_enter(dict);
+    bool acquired = item_check_and_acquire(dict, item);
+    dictionary_api_exit(dict);
+
+    if(unlikely(!acquired))
         return NULL;
 
     api_internal_check(dict, item, false, false);
@@ -991,7 +1008,10 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, 
     api_internal_check(dict, item, false, true);
 
     if(likely(item)) {
+        dictionary_api_enter(dict);
         item_acquire(dict, item);
+        dictionary_api_exit(dict);
+
         api_internal_check(dict, item, false, false);
     }
 
@@ -1007,8 +1027,13 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
     // we pass the last parameter to reference_counter_release() as true
     // so that the release may get a write-lock if required to clean up
 
-    if(likely(item))
+    if(likely(item)) {
+        // the reference we are dropping is what kept this dictionary alive, so
+        // hold it across the release itself
+        dictionary_api_enter(dict);
         item_release(dict, item);
+        dictionary_api_exit(dict);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1054,9 +1079,9 @@ static bool dictionary_del_internal(DICTIONARY *dict, const char *name, ssize_t 
 bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!dict)) return false;
 
-    dictionary_inflight_enter(dict);
+    dictionary_api_enter(dict);
     bool ret = dictionary_del_internal(dict, name, name_len);
-    dictionary_inflight_exit(dict);
+    dictionary_api_exit(dict);
 
     return ret;
 }
