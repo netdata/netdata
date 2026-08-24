@@ -929,13 +929,13 @@ parse_version() {
   echo "${v}" | tr '.' ' ' > "${tmpfile}"
   read -r maj min patch _ < "${tmpfile}"
 
+  rm -f "${tmpfile}"
+
   if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
     warning "Failed to parse version ${r}"
     printf "%s" "${vmax}"
     return 0
   fi
-
-  rm -f "${tmpfile}"
 
   printf "%03d%03d%03d%01d%03d%05d" "${maj}" "${min}" "${patch}" "${t}" "${rc}" "${b}"
 }
