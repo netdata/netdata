@@ -250,12 +250,6 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
             'title': _require_text(documentation.get('title'), 'documentation.title', profile),
             'summary': _require_text(documentation.get('summary'), 'documentation.summary', profile),
             'chart_count': len(charts),
-            'metric_count': len({
-                dimension['selector']
-                for chart in charts
-                for dimension in chart['dimensions']
-            }),
-            'mapping_count': sum(len(chart['dimensions']) for chart in charts),
             'metric_groups': _metric_groups(charts),
             'supports': _profile_supports(profile, design),
         }
@@ -272,7 +266,7 @@ def _module_profiles(primary_ids, catalog):
         if profile_id in seen:
             continue
         profile = deepcopy(catalog[profile_id])
-        profile.update({'role': 'primary', 'activation': '', 'supported_by': '', 'open': True})
+        profile.update({'role': 'primary', 'activation': '', 'supported_by': ''})
         profiles.append(profile)
         seen.add(profile_id)
 
@@ -286,7 +280,6 @@ def _module_profiles(primary_ids, catalog):
                 'role': 'supporting',
                 'activation': support['activation'],
                 'supported_by': catalog[parent_id]['title'],
-                'open': False,
             })
             profiles.append(profile)
             seen.add(support_id)
@@ -319,13 +312,6 @@ def project_prometheus_profile_coverage(collectors, catalog=None):
         item['metrics'] = deepcopy(item['metrics'])
         item['metrics']['profile_coverage'] = {
             'chart_count': sum(profile['chart_count'] for profile in profiles),
-            'metric_count': len({
-                row['prometheus_metric']
-                for profile in profiles
-                for group in profile['metric_groups']
-                for row in group['rows']
-            }),
-            'mapping_count': sum(profile['mapping_count'] for profile in profiles),
             'profiles': profiles,
         }
 

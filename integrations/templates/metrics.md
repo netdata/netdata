@@ -2,7 +2,7 @@
 
 ## Metrics
 
-The built-in Prometheus profiles on this page map [[ entry.metrics.profile_coverage.metric_count ]] Prometheus metrics into
+The built-in Prometheus profiles on this page map Prometheus metrics into
 [[ entry.metrics.profile_coverage.chart_count ]] curated Netdata charts across the primary and applicable supporting profiles.
 The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 

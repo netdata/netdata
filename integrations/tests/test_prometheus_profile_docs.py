@@ -56,13 +56,10 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         for profile, document in self.catalog.items():
             with self.subTest(profile=profile):
                 metric_count, mapping_count, group_count = expected_counts[profile]
-                self.assertEqual(document['metric_count'], metric_count)
-                self.assertEqual(document['mapping_count'], mapping_count)
+                rows = list(_profile_rows(document))
+                self.assertEqual(len({row['prometheus_metric'] for row in rows}), metric_count)
                 self.assertEqual(len(document['metric_groups']), group_count)
-                self.assertEqual(
-                    sum(len(group['rows']) for group in document['metric_groups']),
-                    mapping_count,
-                )
+                self.assertEqual(len(rows), mapping_count)
                 self.assertTrue(all(group['rows'] for group in document['metric_groups']))
                 for row in _profile_rows(document):
                     self.assertEqual(
@@ -108,8 +105,8 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         )
         self.assertNotIn('profile_coverage', aws['metrics'])
         self.assertEqual(covered['collector-go.d.plugin-prometheus-ceph']['chart_count'], 569)
-        self.assertEqual(covered['collector-go.d.plugin-prometheus-ceph']['metric_count'], 1780)
-        self.assertEqual(covered['collector-go.d.plugin-prometheus-ceph']['mapping_count'], 1786)
+        self.assertNotIn('metric_count', covered['collector-go.d.plugin-prometheus-ceph'])
+        self.assertNotIn('mapping_count', covered['collector-go.d.plugin-prometheus-ceph'])
         self.assertEqual(covered['collector-go.d.plugin-prometheus-litellm']['chart_count'], 109)
         self.assertEqual(covered['collector-go.d.plugin-prometheus-vllm']['chart_count'], 120)
 
@@ -130,6 +127,7 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         for profile in profiles[1:]:
             self.assertTrue(profile['activation'])
             self.assertEqual(profile['supported_by'], 'vLLM')
+        self.assertTrue(all('open' not in profile for profile in profiles))
 
     def test_unknown_and_unmapped_profiles_fail_closed(self):
         collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
