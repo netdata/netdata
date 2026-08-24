@@ -439,7 +439,7 @@ time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *sect
 
 long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value) {
     char buffer[100];
-    sprintf(buffer, "%lld", value);
+    snprintfz(buffer, sizeof(buffer), "%lld", value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
     if(!opt) return value;
@@ -450,7 +450,7 @@ long long inicfg_get_number(struct config *root, const char *section, const char
 
 long long inicfg_get_number_range(struct config *root, const char *section, const char *name, long long value, long long min, long long max) {
     char buffer[100];
-    sprintf(buffer, "%lld", value);
+    snprintfz(buffer, sizeof(buffer), "%lld", value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
     if(!opt) return value;
@@ -472,7 +472,7 @@ long long inicfg_get_number_range(struct config *root, const char *section, cons
 
 NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
-    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    snprintfz(buffer, sizeof(buffer), "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE, NULL);
     if(!opt) return value;
@@ -483,7 +483,7 @@ NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const
 
 long long inicfg_set_number(struct config *root, const char *section, const char *name, long long value) {
     char buffer[100];
-    sprintf(buffer, "%lld", value);
+    snprintfz(buffer, sizeof(buffer), "%lld", value);
 
     inicfg_set_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER);
     return value;
@@ -491,7 +491,7 @@ long long inicfg_set_number(struct config *root, const char *section, const char
 
 NETDATA_DOUBLE inicfg_set_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
-    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    snprintfz(buffer, sizeof(buffer), "%0.5" NETDATA_DOUBLE_MODIFIER, value);
 
     inicfg_set_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE);
     return value;
