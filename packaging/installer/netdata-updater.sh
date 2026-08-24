@@ -807,7 +807,7 @@ newer_commit_date() {
   fi
 
   if command -v jq > /dev/null 2>&1 ; then
-    commit_date="$(jq -r -b '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}")"
+    commit_date="$(jq -r '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}")"
   elif command -v python > /dev/null 2>&1 || command -v python3 > /dev/null 2>&1 ; then
     python="$(command -v python3 2>/dev/null)"
     [ -z "${python}" ] && python="$(command -v python 2>/dev/null)"
