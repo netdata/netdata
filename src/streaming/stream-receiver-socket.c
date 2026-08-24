@@ -39,7 +39,7 @@ STREAM_RECEIVER_KEEPALIVE_RESULT stream_receiver_socket_keepalive_reconcile(
     uint32_t idle_s,
     STREAM_RECEIVER_KEEPALIVE_STATE *state) {
 
-    if(unlikely(!state))
+    if(!state)
         return STREAM_RECEIVER_KEEPALIVE_FAILED;
 
     if(state->non_tcp || state->option_unsupported)
@@ -48,7 +48,7 @@ STREAM_RECEIVER_KEEPALIVE_RESULT stream_receiver_socket_keepalive_reconcile(
     if(state->base_attempted && state->attempted_idle_s == idle_s)
         return STREAM_RECEIVER_KEEPALIVE_UNCHANGED;
 
-    if(unlikely(fd < 0)) {
+    if(fd < 0) {
         state->base_attempted = true;
         state->attempted_idle_s = idle_s;
         return STREAM_RECEIVER_KEEPALIVE_FAILED;
