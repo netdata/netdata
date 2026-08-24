@@ -1939,7 +1939,7 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
-    const time_t valid_update_every = 7;
+    const time_t valid_update_every = INT32_MAX;
     previous = rrdset_set_update_every_s(st, valid_update_every);
     if(previous != original_update_every || st->update_every != valid_update_every) {
         fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",

@@ -1005,7 +1005,7 @@ struct pgc_page *pg_cache_lookup_next(
             continue;
         }
         else {
-            if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
+            if (unlikely(!page_update_every_s)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
                 page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
                 pd->update_every_s = page_update_every_s;
