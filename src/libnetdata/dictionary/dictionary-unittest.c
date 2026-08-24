@@ -1236,6 +1236,34 @@ static void dict_destroy_race_traverser_thread(void *arg) {
     }
 }
 
+// Anchor thread: enters the dictionary API and stays admitted - holding no
+// item reference and none of the dictionary's locks - until told to leave.
+//
+// This is what makes the rest of the test legal. The documented contract only
+// protects a caller that is ALREADY inside the API; a thread holding a
+// DICTIONARY * it has not entered with is explicitly unsupported
+// (dictionary-internals.h). Without this anchor, a worker below could be
+// descheduled between its stop check and its next dictionary call while
+// dictionary_destroy() observes inflight == 0 and force-frees the object. The
+// worker would then resume into freed memory - a stale-pointer use-after-free
+// of the test's own making, which would make this test both flaky and useless
+// as proof of the admitted-caller guarantee.
+//
+// With the anchor admitted, dictionary_destroy() must take one of its deferred
+// paths, so the object stays alive until cleanup_destroyed_dictionaries() runs
+// after every worker has been joined and the anchor has left.
+static void dict_destroy_race_anchor_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    dictionary_api_enter(d->dict);
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED))
+        tinysleep();
+
+    dictionary_api_exit(d->dict);
+}
+
 // Run the racy workload in a child process: concurrent get/set/traverse
 // while the main thread destroys the dictionary. Without the fix this may
 // crash or trip internal consistency checks, depending on timing.
@@ -1247,6 +1275,11 @@ static void dict_destroy_race_child(int iterations) {
         struct dict_destroy_race_data getter_data = { .dict = dict, .ready = 0, .stop = 0 };
         struct dict_destroy_race_data setter_data = { .dict = dict, .ready = 0, .stop = 0 };
         struct dict_destroy_race_data traverser_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data anchor_data = { .dict = dict, .ready = 0, .stop = 0 };
+
+        ND_THREAD *anchor = nd_thread_create(
+            "race-anchor", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_anchor_thread, &anchor_data);
 
         ND_THREAD *getter = nd_thread_create(
             "race-getter", NETDATA_THREAD_OPTION_DONT_LOG,
@@ -1260,7 +1293,7 @@ static void dict_destroy_race_child(int iterations) {
             "race-trav", NETDATA_THREAD_OPTION_DONT_LOG,
             dict_destroy_race_traverser_thread, &traverser_data);
 
-        if(!getter || !setter || !traverser) {
+        if(!anchor || !getter || !setter || !traverser) {
             // Thread creation failed — stop any that did start and clean up.
             __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
             __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
@@ -1268,13 +1301,21 @@ static void dict_destroy_race_child(int iterations) {
             if(getter) nd_thread_join(getter);
             if(setter) nd_thread_join(setter);
             if(traverser) nd_thread_join(traverser);
+
+            // the anchor leaves last: it is what keeps the object alive
+            __atomic_store_n(&anchor_data.stop, 1, __ATOMIC_RELEASE);
+            if(anchor) nd_thread_join(anchor);
+
             dictionary_destroy(dict);
             cleanup_destroyed_dictionaries(false);
             _exit(2);
         }
 
         // wait for all workers to be running
-        while(!__atomic_load_n(&getter_data.ready, __ATOMIC_ACQUIRE) ||
+        // the anchor's ready flag also means "this thread is admitted", which
+        // is the precondition that makes the destroy below legal
+        while(!__atomic_load_n(&anchor_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&getter_data.ready, __ATOMIC_ACQUIRE) ||
               !__atomic_load_n(&setter_data.ready, __ATOMIC_ACQUIRE) ||
               !__atomic_load_n(&traverser_data.ready, __ATOMIC_ACQUIRE))
             tinysleep();
@@ -1286,7 +1327,15 @@ static void dict_destroy_race_child(int iterations) {
         // the new destroyed-flag + index-teardown synchronization. Instead,
         // rely on the active workers to create transient in-flight accesses
         // while destroy() races with get/set/traversal.
-        dictionary_destroy(dict);
+        size_t freed = dictionary_destroy(dict);
+
+        // This is the admitted-caller guarantee, asserted: the anchor is inside
+        // the API, so dictionary_destroy() MUST refuse to free the object and
+        // return 0 (having queued it for deferred destruction). A non-zero
+        // return means it freed the dictionary out from under an admitted
+        // caller, which is the exact bug this test exists to catch.
+        if(freed != 0)
+            _exit(3);
 
         __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
         __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
@@ -1294,6 +1343,11 @@ static void dict_destroy_race_child(int iterations) {
         nd_thread_join(getter);
         nd_thread_join(setter);
         nd_thread_join(traverser);
+
+        // Only now can the object become freeable: every worker has left the
+        // API for good, so the anchor can drop the last in-flight count.
+        __atomic_store_n(&anchor_data.stop, 1, __ATOMIC_RELEASE);
+        nd_thread_join(anchor);
 
         cleanup_destroyed_dictionaries(false);
     }
@@ -1364,10 +1418,22 @@ static int dictionary_destroy_race_unittest(void) {
     }
 
     if(WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-        fprintf(stderr,
-                "dictionary_destroy() TOCTOU race test: FAILED — "
-                "child exited with status %d\n",
-                WEXITSTATUS(status));
+        int code = WEXITSTATUS(status);
+
+        if(code == 3)
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "dictionary_destroy() freed the dictionary while a thread was "
+                    "admitted inside the API (in-flight counter ignored)\n");
+        else if(code == 2)
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "child could not create its worker threads\n");
+        else
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "child exited with status %d\n", code);
+
         return 1;
     }
 

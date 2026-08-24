@@ -38,27 +38,54 @@ typedef enum __attribute__ ((__packed__)) {
 //
 // Limit: this protects a caller that has already entered the API. It cannot
 // protect a caller holding a stale DICTIONARY * that has not entered yet -
-// that window is unclosable from inside the dictionary and remains a
+// destroy may read inflight == 0 and free the object a moment before that
+// caller increments it. That window is unclosable from inside the dictionary
+// (it needs a reference held by whoever owns the DICTIONARY *) and remains a
 // caller-ownership bug.
 //
-// EVERY public function that touches the dictionary object must be bracketed
-// by dictionary_api_enter() / dictionary_api_exit(). Taking one of the
-// dictionary's own locks without it is the exact race this closes: pass the
-// destroyed check, then block on a lock inside a struct that
-// dictionary_destroy() already freed because it saw inflight == 0.
+// Contract: every public function that takes one of the dictionary's own locks,
+// or that holds the dictionary object across a blocking point, must be
+// bracketed by dictionary_api_enter() / dictionary_api_exit(). That is the
+// exact race this closes: pass the destroyed check, then block on a lock inside
+// a struct that dictionary_destroy() already freed because it saw
+// inflight == 0.
 //
-// Single-threaded dictionaries are exempt: ll_recursive_lock() short-circuits
-// for them (dictionary-locks.h), so they pay nothing today, and by definition
-// they are not racing a destroy from another thread. Keeping them exempt
-// preserves their zero-overhead property.
+// dictionary_destroy() is the one deliberate exception to that rule, and it
+// cannot be otherwise: bracketing it would count the destroying thread in
+// inflight, so its own recheck below would always observe a non-zero counter
+// and it could never take the immediate free path. It is instead SINGLE-OWNER
+// (dictionary.h) - exactly one thread ends a dictionary's life, externally
+// serialized against any other destroy of the same object. Two concurrent
+// destroys can both pass the destroyed-flag check, and one can free the object
+// while the other is blocked on ll_recursive_lock(); that is a
+// double-free-class caller error, in the same class as the stale-pointer case
+// above, and is likewise not detectable from inside the dictionary.
+//
+// Functions that only perform a single atomic load or add on the object
+// (dictionary_version(), dictionary_entries(), dictionary_referenced_items(),
+// dictionary_version_increment()) are deliberately not bracketed: they hold
+// nothing across a blocking point, so the bracket would close no window that
+// caller ownership does not already have to cover, and dictionary_api_enter()
+// itself is a plain atomic add of the same weight.
+//
+// The callback registration functions (dictionary_register_*_callback()) are
+// construction-time API; the rule is stated for callers in dictionary.h. They
+// write dict->hooks - and dict->options, with a non-atomic read-modify-write -
+// so they must be called before the dictionary is published to other threads.
+// enter/exit would not make them safe.
+//
+// The counter is incremented unconditionally, including for single-threaded
+// dictionaries. Testing DICT_OPTION_SINGLE_THREADED first would dereference the
+// dictionary before the caller is counted, widening the window above by the
+// length of that load, and would itself race the non-atomic dict->options
+// update in dictionary_register_conflict_callback(). One uncontended atomic RMW
+// is not worth either.
 #define dictionary_api_enter(dict) do {                                             \
-        if(likely(!is_dictionary_single_threaded(dict)))                            \
-            __atomic_add_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);            \
+        __atomic_add_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);               \
     } while(0)
 
 #define dictionary_api_exit(dict) do {                                              \
-        if(likely(!is_dictionary_single_threaded(dict)))                            \
-            __atomic_sub_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);            \
+        __atomic_sub_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);               \
     } while(0)
 
 #define dictionary_inflight(dict) __atomic_load_n(&((dict)->inflight), __ATOMIC_SEQ_CST)

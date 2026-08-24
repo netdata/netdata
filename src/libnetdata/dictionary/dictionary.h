@@ -119,6 +119,19 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 // Create a view on a dictionary
 DICTIONARY *dictionary_create_view(DICTIONARY *master);
 
+// ----------------------------------------------------------------------------
+// Callback registration - CONSTRUCTION TIME ONLY
+//
+// All four dictionary_register_*_callback() functions below must be called on
+// the creating thread, before the DICTIONARY * is published to any other
+// thread. They are NOT thread-safe and are NOT protected against a concurrent
+// dictionary_destroy():
+//   - they write dict->hooks without holding any of the dictionary's locks;
+//   - dictionary_register_conflict_callback() additionally performs a
+//     non-atomic read-modify-write on dict->options.
+// Registering a callback on a dictionary that other threads can already reach
+// is a data race, regardless of what those threads are doing with it.
+
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
 typedef void (*dict_cb_insert_t)(const DICTIONARY_ITEM *item, void *value, void *data);
@@ -196,6 +209,13 @@ void dictionary_print_still_allocated_stacktraces(void);
 //   Unsafe - a thread holding a DICTIONARY * that has not entered the API yet.
 //            Nothing inside the dictionary can see such a thread, so the caller
 //            owns that lifetime.
+//   Unsafe - two threads calling dictionary_destroy() on the same dictionary.
+//            dictionary_destroy() is SINGLE-OWNER: exactly one thread may end a
+//            dictionary's life, and it must be externally serialized against any
+//            other destroy of the same object. Concurrent destroys are a
+//            double-free-class caller error, not something the dictionary
+//            detects: both can pass the destroyed-flag check and one can free
+//            the object while the other is blocked on its write lock.
 #define dictionary_set(dict, name, value, value_len) dictionary_set_advanced(dict, name, -1, value, value_len, NULL)
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
