@@ -1311,7 +1311,13 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
+          fetch-depth: 0
           submodules: recursive
+      - name: Fix tags
+        id: fix-tags
+        if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
+        run: |
+          git fetch --tags --force
       - name: Install latest bash
         id: install-bash
         if: needs.file-check.outputs.run == 'true'
