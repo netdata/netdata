@@ -17,17 +17,12 @@ static void stream_receiver_timeout_publish(STREAM_RECEIVER_TIMEOUT *timeout) {
 }
 
 static void stream_receiver_timeout_interval_add(STREAM_RECEIVER_TIMEOUT *timeout, uint32_t update_every_s) {
-    Pvoid_t *value = JudyLIns(&timeout->intervals, (Word_t)update_every_s, PJE0);
-    if(unlikely(!value)) {
-        fatal("STREAM RCV: cannot maintain the receiver update interval index");
-        return;
-    }
-    if(unlikely(value == PJERR)) {
+    Word_t *count = (Word_t *)JudyLIns(&timeout->intervals, (Word_t)update_every_s, PJE0);
+    if(unlikely(!count || count == (Word_t *)PJERR)) {
         fatal("STREAM RCV: cannot maintain the receiver update interval index");
         return;
     }
 
-    Word_t *count = (Word_t *)value;
     if(unlikely(*count == ~(Word_t)0))
         fatal("STREAM RCV: receiver update interval chart count overflow");
 
@@ -43,17 +38,12 @@ static void stream_receiver_timeout_interval_remove(
     STREAM_RECEIVER_TIMEOUT *timeout,
     uint32_t update_every_s,
     bool update_learned_minimum) {
-    Pvoid_t *value = JudyLGet(timeout->intervals, (Word_t)update_every_s, PJE0);
-    if(unlikely(!value)) {
-        internal_error(true, "STREAM RCV: receiver update interval index is inconsistent");
-        return;
-    }
-    if(unlikely(value == PJERR)) {
+    Word_t *count = (Word_t *)JudyLGet(timeout->intervals, (Word_t)update_every_s, PJE0);
+    if(unlikely(!count || count == (Word_t *)PJERR)) {
         internal_error(true, "STREAM RCV: receiver update interval index is inconsistent");
         return;
     }
 
-    Word_t *count = (Word_t *)value;
     if(unlikely(!*count)) {
         internal_error(true, "STREAM RCV: receiver update interval index is inconsistent");
         return;
