@@ -1089,7 +1089,7 @@ static int test_dyncfg_rejection_keeps_detail_in_response(int *passed) {
 }
 
 static int test_file_invalid_same_name_rule_is_skipped(int *passed) {
-    char filename[] = "/tmp/netdata-health-config-unittest-XXXXXX";
+    char filename[] = "./netdata-health-config-unittest-XXXXXX";
     int fd = mkstemp(filename);
     if(fd == -1) {
         fprintf(stderr, "FAILED [file invalid same-name rule]: cannot create fixture\n");
