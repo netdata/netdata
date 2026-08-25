@@ -1646,9 +1646,16 @@ static int test_rrddim_add_does_not_bump_metadata_version(void) {
         rc = 1;
     }
 
-    // A genuinely obsolete dimension must still be revived, and that revival must bump the version
-    // exactly once so the parent learns the chart is collected again.
+    // Marking a live dimension obsolete is a real state transition, so it MUST bump - exactly once.
+    // Asserting the exact delta (not just "it changed") is what pins the contract: a path that
+    // bumped twice would still re-send the chart definition twice.
+    before = rrdset_metadata_version(st);
     rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+    if(rrdset_metadata_version(st) != before + 1) {
+        fprintf(stderr, "%s: marking a dimension obsolete bumped the version by %u, expected exactly 1\n",
+                __FUNCTION__, rrdset_metadata_version(st) - before);
+        rc = 1;
+    }
 
     // ...and repeating the obsolete declaration must not bump it again either.
     before = rrdset_metadata_version(st);
@@ -1668,9 +1675,9 @@ static int test_rrddim_add_does_not_bump_metadata_version(void) {
         rc = 1;
     }
 
-    if(rrdset_metadata_version(st) == before) {
-        fprintf(stderr, "%s: reviving an obsolete dimension did not bump the chart metadata version\n",
-                __FUNCTION__);
+    if(rrdset_metadata_version(st) != before + 1) {
+        fprintf(stderr, "%s: reviving an obsolete dimension bumped the version by %u, expected exactly 1\n",
+                __FUNCTION__, rrdset_metadata_version(st) - before);
         rc = 1;
     }
 
