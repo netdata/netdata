@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
 const (
@@ -29,7 +29,15 @@ type Config struct {
 	User   string `yaml:"user" json:"user"`
 	APIKey string `yaml:"api_key" json:"api_key"`
 
-	web.HTTPConfig `yaml:",inline" json:""`
+	HTTPConfig `yaml:",inline" json:""`
+}
+
+type HTTPConfig struct {
+	URL      string           `yaml:"url" json:"url"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	ProxyURL string           `yaml:"proxy_url,omitempty" json:"proxy_url"`
+
+	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 func (c *Config) applyDefaults() {

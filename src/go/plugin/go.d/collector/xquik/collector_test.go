@@ -44,7 +44,6 @@ func TestCollector_Init(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, c.client)
-			require.True(t, c.ClientConfig.NotFollowRedirect)
 		})
 	}
 }

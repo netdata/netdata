@@ -26,12 +26,8 @@ type httpProfileClient struct {
 }
 
 func newProfileClient(cfg Config, httpClient *http.Client) profileClient {
-	request := cfg.RequestConfig.Copy()
-	request.Method = http.MethodGet
-	request.Body = ""
-
 	return &httpProfileClient{
-		request:    request,
+		request:    web.RequestConfig{URL: cfg.URL, Method: http.MethodGet},
 		apiKey:     cfg.APIKey,
 		httpClient: httpClient,
 	}

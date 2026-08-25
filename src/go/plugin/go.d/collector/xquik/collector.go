@@ -37,12 +37,9 @@ func New() *Collector {
 	return &Collector{
 		Config: Config{
 			UpdateEvery: defaultUpdateEvery,
-			HTTPConfig: web.HTTPConfig{
-				RequestConfig: web.RequestConfig{URL: defaultEndpoint},
-				ClientConfig: web.ClientConfig{
-					Timeout:           defaultTimeout,
-					NotFollowRedirect: true,
-				},
+			HTTPConfig: HTTPConfig{
+				URL:     defaultEndpoint,
+				Timeout: defaultTimeout,
 			},
 		},
 		store:     store,
@@ -71,8 +68,12 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("config validation: %w", err)
 	}
 
-	clientConfig := c.ClientConfig
-	clientConfig.NotFollowRedirect = true
+	clientConfig := web.ClientConfig{
+		Timeout:           c.Timeout,
+		NotFollowRedirect: true,
+		ProxyURL:          c.ProxyURL,
+		TLSConfig:         c.TLSConfig,
+	}
 	httpClient, err := web.NewHTTPClient(clientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %w", err)

@@ -27,7 +27,7 @@ modules:
 
           Xquik is an independent third-party service. Not affiliated with X Corp. "Twitter" and "X" are trademarks of X Corp.
         method_description: |
-          The collector sends one authenticated `GET /api/v1/x/users/{id}` request per check or collection.
+          The collector sends one authenticated `GET /api/v1/x/users/{user}` request per check or collection.
       supported_platforms:
         include: []
         exclude: []
