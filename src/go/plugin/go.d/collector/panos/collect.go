@@ -42,10 +42,26 @@ func (c *Collector) collect(ctx context.Context) (bool, error) {
 
 	peers, err := c.collectBGPPeers(ctx)
 	result.add(false, err)
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
 	if len(peers) > 0 {
-		monitoredPeers := orderedBGPPeers(peers)
-		result.add(c.collectPeerMetrics(monitoredPeers), nil)
-		result.add(c.collectVRMetrics(peers), nil)
+		peers, err = c.enrichBGPPeerVRs(ctx, peers)
+		result.add(false, err)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return result.hasMetrics, errors.Join(result.errs...)
+		}
+		if result.addContextError(ctx) {
+			return result.hasMetrics, errors.Join(result.errs...)
+		}
+		if len(peers) > 0 {
+			monitoredPeers := orderedBGPPeers(peers)
+			result.add(c.collectPeerMetrics(monitoredPeers), nil)
+			result.add(c.collectVRMetrics(peers), nil)
+		}
 	}
 
 	return result.hasMetrics, errors.Join(result.errs...)
@@ -113,20 +129,46 @@ func (c *Collector) collectPeerMetrics(peers []bgpPeer) bool {
 	for _, peer := range peers {
 		labels := peerLabelValues(peer)
 		observeStateSetVec(c.metrics.bgp.peerState, peer.State, labels...)
-		c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(peer.Uptime))
-		c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesIn))
-		c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesOut))
-		c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesIn))
-		c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesOut))
-		c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(peer.Flaps))
-		c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(peer.Established))
+		if peer.Uptime != nil {
+			c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(*peer.Uptime))
+		}
+		if peer.MessagesIn != nil {
+			c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(*peer.MessagesIn))
+		}
+		if peer.MessagesOut != nil {
+			c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(*peer.MessagesOut))
+		}
+		if peer.UpdatesIn != nil {
+			c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(*peer.UpdatesIn))
+		}
+		if peer.UpdatesOut != nil {
+			c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(*peer.UpdatesOut))
+		}
+		if peer.Flaps != nil {
+			c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(*peer.Flaps))
+		}
+		if peer.Established != nil {
+			c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(*peer.Established))
+		}
 
 		for _, counter := range peer.PrefixCounters {
 			prefixLabels := prefixLabelValues(peer, counter)
-			c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingTotal))
-			c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingAccepted))
-			c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingRejected))
-			c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).Observe(float64(counter.OutgoingAdvertised))
+			if counter.IncomingTotal != nil {
+				c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).
+					Observe(float64(*counter.IncomingTotal))
+			}
+			if counter.IncomingAccepted != nil {
+				c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).
+					Observe(float64(*counter.IncomingAccepted))
+			}
+			if counter.IncomingRejected != nil {
+				c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).
+					Observe(float64(*counter.IncomingRejected))
+			}
+			if counter.OutgoingAdvertised != nil {
+				c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).
+					Observe(float64(*counter.OutgoingAdvertised))
+			}
 		}
 	}
 
@@ -144,7 +186,9 @@ func (c *Collector) collectVRMetrics(peers []bgpPeer) bool {
 	for _, peer := range peers {
 		st := stats[peer.VR]
 		if st == nil {
-			st = &vrStats{stateCounts: make(map[string]int64)}
+			st = &vrStats{
+				stateCounts: make(map[string]int64),
+			}
 			stats[peer.VR] = st
 		}
 

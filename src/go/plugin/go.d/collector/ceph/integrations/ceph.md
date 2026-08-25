@@ -289,8 +289,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ceph_component_collection_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.component_collection_status | Ceph ${label:component} metric collection for cluster ${label:fsid} is failing |
-| [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization |
+| [ ceph_component_collection_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.component_collection_status | Metric collection for the Ceph ${label:component} component is failing while other Ceph metrics continue to be collected |
+| [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization. This stock capacity policy is silent by default; explicitly route it when notifications are required. |
 
 
 
@@ -692,8 +692,12 @@ automatically compatible. On-demand Function tables are not Prometheus time seri
 
 ### More preconfigured Ceph alerts are expected
 
-This integration ships alerts for collection failures and native capacity utilization.
-Health Function rows are on-demand tables and do not create alerts. Keep Ceph mixin/Alertmanager rules for
-PG states, OSD down/out, MON quorum, slow operations, scrub errors, and RGW conditions unless equivalent
-Netdata alerts are explicitly implemented and tested. Slack, webhook, and PagerDuty are notification
+This integration ships a notifying collection-failure alert and a silent-by-default native capacity-utilization
+policy. Existing installations that relied on automatic capacity notifications must explicitly route the
+capacity alert after upgrade.
+Health Function rows are on-demand tables and do not create alerts. When the Ceph Prometheus profile is
+configured, its MGR-owned alert layer supplies tested cluster health, crash, slow-operation, and cephadm
+conditions; this native collector remains the owner of Dashboard API component-collection failures. Keep Ceph
+mixin/Alertmanager rules for conditions without an explicitly implemented and tested Netdata equivalent,
+including any required PG, OSD, MON, scrub, or RGW policy. Slack, webhook, and PagerDuty are notification
 transports, not Ceph threshold definitions.

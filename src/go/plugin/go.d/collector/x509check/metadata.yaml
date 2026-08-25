@@ -113,6 +113,13 @@ modules:
             title: Config
             enabled: true
           list:
+            - name: Ceph RGW certificate
+              description: Check the certificate presented by a Ceph RGW HTTPS endpoint.
+              config: |
+                jobs:
+                  - name: ceph_rgw_cert
+                    source: https://rgw.example.org:443
+                    check_revocation_status: yes
             - name: Website certificate
               description: Website certificate.
               config: |

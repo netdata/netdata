@@ -412,25 +412,61 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+The built-in Prometheus profiles on this page map Prometheus metrics into
+17 curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
 
-Untyped metrics (have no '# TYPE') processing:
+### FastAPI HTTP instrumentation
 
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
+Curated request outcomes, latency, in-progress work, measurements, and body traffic from instrumented FastAPI services.
 
-**The rest are ignored**.
+
+#### FastAPI
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>http_requests_total</code> | FastAPI / HTTP Endpoints — HTTP Request Outcomes | <code>values of label status</code> | <code>requests/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_bucket</code> | FastAPI / HTTP Endpoints — HTTP Request Duration | <code>matching series</code> | <code>observations/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_count</code> | FastAPI / HTTP Endpoints — HTTP Request Measurements | <code>requests</code> | <code>requests/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_sum</code> | FastAPI / HTTP Endpoints — HTTP Completed Request Time | <code>time</code> | <code>seconds/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_highr_seconds_bucket</code> | FastAPI / HTTP Service — High-Resolution HTTP Request Duration | <code>matching series</code> | <code>observations/s</code> | instrumented FastAPI service |
+| <code>http_request_duration_highr_seconds_count</code> | FastAPI / HTTP Service — HTTP Request Measurements | <code>requests</code> | <code>requests/s</code> | instrumented FastAPI service |
+| <code>http_request_duration_highr_seconds_sum</code> | FastAPI / HTTP Service — HTTP Completed Request Time | <code>time</code> | <code>seconds/s</code> | instrumented FastAPI service |
+| <code>http_requests_inprogress</code> | FastAPI / HTTP In Progress — HTTP Requests In Progress | <code>requests</code> | <code>requests</code> | FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled |
+| <code>http_request_size_bytes_sum</code> | FastAPI / HTTP Body Traffic — HTTP Body Throughput | <code>request</code> | <code>bytes/s</code> | FastAPI HTTP route handler |
+| <code>http_response_size_bytes_sum</code> | FastAPI / HTTP Body Traffic — HTTP Body Throughput | <code>response</code> | <code>bytes/s</code> | FastAPI HTTP route handler |
+
+### Process runtime
+
+Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
+
+
+#### Process Runtime
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>process_cpu_seconds_total</code> | Process Runtime — Process CPU Usage | <code>used</code> | <code>cores</code> | collector job process |
+| <code>process_resident_memory_bytes</code> | Process Runtime — Process Resident Memory | <code>resident</code> | <code>bytes</code> | collector job process |
+| <code>process_virtual_memory_bytes</code> | Process Runtime — Process Virtual Memory | <code>virtual</code> | <code>bytes</code> | collector job process |
+| <code>process_open_fds</code> | Process Runtime — Open File Descriptors | <code>open</code> | <code>fds</code> | collector job process |
+| <code>process_max_fds</code> | Process Runtime — File Descriptor Limit | <code>limit</code> | <code>fds</code> | collector job process |
+
+### Python garbage collection
+
+Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
+
+
+#### Process Runtime
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>python_gc_objects_collected_total</code> | Process Runtime / Python GC — Collected Objects | <code>collected</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_objects_uncollectable_total</code> | Process Runtime / Python GC — Uncollectable Objects | <code>uncollectable</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_collections_total</code> | Process Runtime / Python GC — Collections | <code>collections</code> | <code>collections/s</code> | Python garbage-collector generation |
 
 
 
@@ -503,4 +539,9 @@ docker logs netdata 2>&1 | grep prometheus
 
 ### Disappearing or sparse metrics not clearing alerts
 
-When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+alert to detect that separate condition.

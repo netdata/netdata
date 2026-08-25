@@ -99,6 +99,13 @@ var displayRegistry = map[string]registeredDisplay{
 		unit:          "requests/min",
 		scale:         newRationalScale(60, 1),
 	},
+	"fan_revolutions_per_minute": {
+		quantity:      "count",
+		object:        "fan_revolutions",
+		effectiveRate: "per_second",
+		unit:          "fan revolutions per minute",
+		scale:         newRationalScale(60, 1),
+	},
 	"tokens_per_minute": {
 		quantity:      "count",
 		object:        "tokens",

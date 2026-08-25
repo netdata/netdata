@@ -173,12 +173,15 @@ jobs:
             libprotobuf-dev protobuf-compiler
 
       - name: Configure
-        env:
-          CFLAGS: -fsanitize=address -fno-omit-frame-pointer
-          CXXFLAGS: -fsanitize=address -fno-omit-frame-pointer
-          LDFLAGS: -fsanitize=address
         run: |
+          # ENABLE_ADDRESS_SANITIZER adds the sanitizer flags AND defines
+          # FSANITIZE_ADDRESS, which is what makes libnetdata's pooled
+          # allocators fall back to plain malloc/free. Setting the flags by hand
+          # (as this step used to) instruments the build but leaves the pools
+          # intact, so ASan cannot see a use-after-free inside ARAL, the
+          # dictionary allocators, STRING or onewayalloc.
           cmake -S . -B build -G Ninja \
+            -DENABLE_ADDRESS_SANITIZER=On \
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_PLUGIN_GO=OFF \
             -DENABLE_PLUGIN_XENSTAT=OFF \

@@ -23,6 +23,12 @@ func (d ProfileDesignDocument) validate() error {
 			return err
 		}
 	}
+	if err := requireText("documentation.title", d.Documentation.Title); err != nil {
+		return err
+	}
+	if err := requireText("documentation.summary", d.Documentation.Summary); err != nil {
+		return err
+	}
 	if d.Composition.Supports == nil {
 		return fmt.Errorf("composition.supports must be present")
 	}
@@ -50,6 +56,9 @@ func (d ProfileDesignDocument) validate() error {
 		}
 		if support.When.IsZero() {
 			return fmt.Errorf("composition.supports.%s.when must be present", id)
+		}
+		if err := requireText("composition.supports."+id+".activation", support.Activation); err != nil {
+			return err
 		}
 	}
 	for _, id := range sortedMapKeys(d.Entities) {
