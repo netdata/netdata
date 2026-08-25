@@ -97,7 +97,6 @@ typedef struct rrd_alert_prototype {
 // returns NULL when the single rule is valid, otherwise the reason it is not
 const char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t);
 bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, const char **msg);
-void health_reject_invalid_file_prototypes(DICTIONARY *invalid_prototype_names);
 bool health_prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
 RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(
     const char *payload, size_t payload_len, BUFFER *error, const char *name, unsigned flags);

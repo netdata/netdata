@@ -962,27 +962,36 @@ static int test_prototype_rejects_missing_on(int *passed) {
 }
 
 static int test_prototype_without_on_matches_nothing(int *passed) {
-    // health_prototype_matches_rrdset() only reads these fields of the chart
-    RRDSET st = { 0 };
-    st.id = string_strdupz("service.not-services_cpu_utilization");
-    st.name = string_dup(st.id);
-    st.context = string_strdupz("service.cpu_utilization");
-
     struct {
         bool is_template;
         const char *on;
+        const char *chart;
+        const char *context;
         bool expected_match;
         const char *description;
     } tests[] = {
-        { true,  NULL,                     false, "template without a context matches nothing" },
-        { false, NULL,                     false, "instance without a chart matches nothing" },
-        { true,  "system.cpu",             false, "template of another context does not match" },
-        { true,  "service.cpu_utilization", true, "template of this context matches" },
-        { false, "service.not-services_cpu_utilization", true, "instance of this chart matches" },
+        { true,  NULL, "service.not-services_cpu_utilization", "service.cpu_utilization", false,
+          "template without a context matches nothing" },
+        { false, NULL, "service.not-services_cpu_utilization", "service.cpu_utilization", false,
+          "instance without a chart matches nothing" },
+        { true, "system.cpu", "service.not-services_cpu_utilization", "service.cpu_utilization", false,
+          "system CPU template does not match the reported service chart" },
+        { true, "system.cpu", "system.cpu", "system.cpu", true,
+          "system CPU template still matches the intended chart" },
+        { true, "service.cpu_utilization", "service.not-services_cpu_utilization", "service.cpu_utilization", true,
+          "template of this context matches" },
+        { false, "service.not-services_cpu_utilization", "service.not-services_cpu_utilization", "service.cpu_utilization", true,
+          "instance of this chart matches" },
     };
 
     int failed = 0;
     for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        // health_prototype_matches_rrdset() only reads these chart fields.
+        RRDSET st = { 0 };
+        st.id = string_strdupz(tests[i].chart);
+        st.name = string_dup(st.id);
+        st.context = string_strdupz(tests[i].context);
+
         RRD_ALERT_PROTOTYPE ap = { 0 };
         ap.match.enabled = true;
         ap.match.is_template = tests[i].is_template;
@@ -1000,11 +1009,10 @@ static int test_prototype_without_on_matches_nothing(int *passed) {
             (*passed)++;
 
         rrd_alert_match_cleanup(&ap.match);
+        string_freez(st.context);
+        string_freez(st.name);
+        string_freez(st.id);
     }
-
-    string_freez(st.context);
-    string_freez(st.name);
-    string_freez(st.id);
 
     return failed;
 }
@@ -1080,28 +1088,35 @@ static int test_dyncfg_rejection_keeps_detail_in_response(int *passed) {
     return 0;
 }
 
-static int test_file_same_name_rule_set_rejected(int *passed) {
+static int test_file_invalid_same_name_rule_is_skipped(int *passed) {
     char filename[] = "/tmp/netdata-health-config-unittest-XXXXXX";
     int fd = mkstemp(filename);
     if(fd == -1) {
-        fprintf(stderr, "FAILED [file same-name rule set]: cannot create fixture\n");
+        fprintf(stderr, "FAILED [file invalid same-name rule]: cannot create fixture\n");
         return 1;
     }
 
     FILE *fp = fdopen(fd, "w");
     if(!fp) {
-        fprintf(stderr, "FAILED [file same-name rule set]: cannot open fixture\n");
+        fprintf(stderr, "FAILED [file invalid same-name rule]: cannot open fixture\n");
         close(fd);
         unlink(filename);
         return 1;
     }
 
     fputs(
-        "template: unittest_same_name\n"
+        "template: 10min_cpu_usage\n"
         "on: system.cpu\n"
+        "host labels: _os=linux\n"
         "every: 1s\n"
         "calc: 1\n\n"
-        "template: unittest_same_name\n"
+        "template: 10min_cpu_usage\n"
+        "on: system.cpu\n"
+        "host labels: _os=windows\n"
+        "every: 1s\n"
+        "calc: 1\n\n"
+        "template: 10min_cpu_usage\n"
+        "host labels: _os=freebsd\n"
         "every: 1s\n"
         "calc: 1\n\n"
         "template: unittest_unrelated\n"
@@ -1113,33 +1128,45 @@ static int test_file_same_name_rule_set_rejected(int *passed) {
 
     health_init_prototypes();
     dictionary_flush(health_globals.prototypes.dict);
-    DICTIONARY *invalid_prototype_names = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, NULL, 0);
 
     int failed = 0;
-    bool loaded = health_readfile(filename, invalid_prototype_names, false) == 1;
-    const DICTIONARY_ITEM *invalid_name =
-        dictionary_get_and_acquire_item(invalid_prototype_names, "unittest_same_name");
-    if(!loaded ||
-       !dictionary_get(health_globals.prototypes.dict, "unittest_same_name") ||
-       !dictionary_get(health_globals.prototypes.dict, "unittest_unrelated") ||
-       !invalid_name) {
-        fprintf(stderr, "FAILED [file same-name rule set]: loader did not retain the invalid set for rejection\n");
-        failed++;
+    bool loaded = health_readfile(filename, NULL, false) == 1;
+    RRD_ALERT_PROTOTYPE *cpu = dictionary_get(health_globals.prototypes.dict, "10min_cpu_usage");
+    RRD_ALERT_PROTOTYPE *windows = NULL;
+    size_t cpu_rules = 0;
+    for(RRD_ALERT_PROTOTYPE *t = cpu; t; t = t->_internal.next) {
+        cpu_rules++;
+        if(t->match.host_labels && strcmp(string2str(t->match.host_labels), "_os=windows") == 0)
+            windows = t;
     }
-    if(invalid_name)
-        dictionary_acquired_item_release(invalid_prototype_names, invalid_name);
 
-    health_reject_invalid_file_prototypes(invalid_prototype_names);
-    if(dictionary_get(health_globals.prototypes.dict, "unittest_same_name") ||
+    RRDSET system_cpu = { 0 };
+    system_cpu.id = string_strdupz("system.cpu");
+    system_cpu.name = string_dup(system_cpu.id);
+    system_cpu.context = string_dup(system_cpu.id);
+
+    RRDSET service_cpu = { 0 };
+    service_cpu.id = string_strdupz("service.not-services_cpu_utilization");
+    service_cpu.name = string_dup(service_cpu.id);
+    service_cpu.context = string_strdupz("service.cpu_utilization");
+
+    if(!loaded || !cpu || cpu_rules != 2 || !windows ||
+       !health_prototype_matches_rrdset(&system_cpu, windows) ||
+       health_prototype_matches_rrdset(&service_cpu, windows) ||
        !dictionary_get(health_globals.prototypes.dict, "unittest_unrelated")) {
-        fprintf(stderr, "FAILED [file same-name rule set]: invalid set was not rejected atomically\n");
+        fprintf(stderr, "FAILED [file invalid same-name rule]: valid Windows rule was not retained and correctly scoped\n");
         failed++;
     }
     else
         (*passed)++;
 
+    string_freez(service_cpu.context);
+    string_freez(service_cpu.name);
+    string_freez(service_cpu.id);
+    string_freez(system_cpu.context);
+    string_freez(system_cpu.name);
+    string_freez(system_cpu.id);
     dictionary_flush(health_globals.prototypes.dict);
-    dictionary_destroy(invalid_prototype_names);
     unlink(filename);
     return failed;
 }
@@ -1176,7 +1203,7 @@ int health_config_unittest(void) {
     failed += test_prototype_without_on_matches_nothing(&passed);
     failed += test_dyncfg_rejects_empty_on(&passed);
     failed += test_dyncfg_rejection_keeps_detail_in_response(&passed);
-    failed += test_file_same_name_rule_set_rejected(&passed);
+    failed += test_file_invalid_same_name_rule_is_skipped(&passed);
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);
