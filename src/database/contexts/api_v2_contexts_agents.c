@@ -100,7 +100,11 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_double(wb, "disk_percent", rounded_percent);
             }
 
-            if(tier_info->first_time_s < tier_info->last_time_s) {
+            // rrdstats_retention_collect() sets retention only when the tier has a
+            // known retention start; do not re-derive the condition from
+            // first_time_s here, or a zero (unknown) first_time_s publishes
+            // "from" as the unix epoch.
+            if(tier_info->retention) {
                 buffer_json_member_add_time_t_formatted(wb, "from", tier_info->first_time_s, options & CONTEXTS_OPTION_RFC3339);
                 buffer_json_member_add_time_t_formatted(wb, "to", tier_info->last_time_s, options & CONTEXTS_OPTION_RFC3339);
                 buffer_json_member_add_time_t(wb, "retention", tier_info->retention);

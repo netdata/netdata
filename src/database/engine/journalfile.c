@@ -1336,11 +1336,18 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         , ((double)(ended_ut - started_ut) / USEC_PER_MS)
         );
 
-    time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
-    do {
-        if(old <= global_first_time_s)
-            break;
-    } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, global_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    // A zero header start time is the "this journal has no metrics" marker
+    // written by journalfile_migrate_to_v2_callback(); it is not a retention
+    // start. Letting it win the MIN below pins the whole tier's global first
+    // time to the epoch permanently, for every consumer of
+    // storage_engine_global_first_time_s().
+    if(global_first_time_s > 0) {
+        time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+        do {
+            if(old <= global_first_time_s)
+                break;
+        } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, global_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    }
 }
 
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
