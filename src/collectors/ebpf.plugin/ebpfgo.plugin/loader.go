@@ -467,9 +467,13 @@ func BuildLoadPlan(req LoadPlanRequest) LoadPlan {
 		IsRHF:         req.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,
-		ObjectPath:    BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, req.IsReturn, req.IsRHF, flavor),
-		LoadMode:      resolvedLoad,
-		ProgramMode:   ConvertCoreType(req.CoreAttach, req.Mode),
+		// Carry the requested family on the plan, not just into the path:
+		// buildFallbackPlans reads primary.IsReturn to keep the whole fallback
+		// chain in the same 'p'/'r' family as the primary.
+		IsReturn:    req.IsReturn,
+		ObjectPath:  BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, req.IsReturn, req.IsRHF, flavor),
+		LoadMode:    resolvedLoad,
+		ProgramMode: ConvertCoreType(req.CoreAttach, req.Mode),
 	}
 }
 

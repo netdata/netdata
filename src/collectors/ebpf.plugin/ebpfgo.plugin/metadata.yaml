@@ -517,7 +517,7 @@ modules:
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: "Selects whether the error charts are published. `entry` collects and charts only the call counts; `return` additionally publishes `filesystem.file_error` and the per-application and per-cgroup error charts. Attachment is unaffected: the probes always read the syscall return value, so switching modes costs nothing at collection time."
+              description: "Selects whether the error charts are published. `entry` collects and charts only the call counts; `return` and its legacy alias `dev` additionally publish `filesystem.file_error` and the per-application and per-cgroup error charts. Attachment is unaffected: the probes always read the syscall return value, so switching modes costs nothing at collection time."
               default_value: entry
               required: false
             - name: apps
@@ -588,7 +588,7 @@ modules:
                 - name: open
                 - name: close
             - name: filesystem.file_error
-              description: "Open and close calls that returned an error. Only published with `ebpf load mode = return`."
+              description: "Open and close calls that returned an error. Published only in the non-entry load modes, `ebpf load mode = return` and its legacy alias `dev`."
               unit: "calls/s"
               chart_type: line
               dimensions:

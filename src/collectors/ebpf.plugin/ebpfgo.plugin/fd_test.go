@@ -112,20 +112,29 @@ func TestFDCustomBTFPath(t *testing.T) {
 // the 'r'-prefixed object family in BOTH modes, because those are the objects
 // whose programs read PT_REGS_RC.  `ebpf load mode` gates the error charts only.
 func TestBuildFDLegacyPlanAlwaysSelectsReturnObjects(t *testing.T) {
-	for _, reportErrors := range []bool{false, true} {
-		cfg := baseFDConfig()
-		cfg.KernelVersion = 395264 // 6.8
-		cfg.HasBTF = true
-		cfg.ObjectFlavor = "buffer"
-		cfg.ReportErrors = reportErrors
+	tests := map[string]struct {
+		reportErrors bool
+	}{
+		"entry mode still loads the return-probe objects": {reportErrors: false},
+		"return mode loads the return-probe objects":      {reportErrors: true},
+	}
 
-		plan := BuildFDLegacyPlan(cfg)
-		if !plan.IsReturn {
-			t.Fatalf("ReportErrors=%t: plan.IsReturn = false, want true", reportErrors)
-		}
-		if got := filepath.Base(plan.ObjectPath); !strings.HasPrefix(got, "r") {
-			t.Fatalf("ReportErrors=%t: object %q does not use the return-probe prefix", reportErrors, got)
-		}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := baseFDConfig()
+			cfg.KernelVersion = 395264 // 6.8
+			cfg.HasBTF = true
+			cfg.ObjectFlavor = "buffer"
+			cfg.ReportErrors = tc.reportErrors
+
+			plan := BuildFDLegacyPlan(cfg)
+			if !plan.IsReturn {
+				t.Fatalf("plan.IsReturn = false, want true")
+			}
+			if got := filepath.Base(plan.ObjectPath); !strings.HasPrefix(got, "r") {
+				t.Fatalf("object %q does not use the return-probe prefix", got)
+			}
+		})
 	}
 }
 

@@ -644,13 +644,25 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         dcstat_charts_announced = true;
     }
 
+    /* fd needs two latches, not one.  The error charts are announced only while
+     * the producer reports EBPFGO_SHM_FLAG_FD_ERRORS, and that bit can arrive
+     * after the base charts were already announced — an operator switching
+     * `ebpf load mode` from entry to return restarts ebpf-go.plugin while
+     * apps.plugin keeps running.  Without the second latch the announcement stays
+     * done, send_fd_data_to_netdata() starts SETting the error dimensions, and
+     * pluginsd logs an error for every SET to a chart that was never declared. */
     static bool fd_charts_announced = false;
-    if (!fd_charts_announced && apps_ebpf_fd_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
-        for (w = root; w; w = w->next) {
-            if (!w->exposed) continue;
-            send_fd_charts_to_netdata(w, type, lbl_name);
+    static bool fd_error_charts_announced = false;
+    if (apps_ebpf_fd_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+        bool fd_errors = apps_ebpf_fd_errors_are_available();
+        if (!fd_charts_announced || (fd_errors && !fd_error_charts_announced)) {
+            for (w = root; w; w = w->next) {
+                if (!w->exposed) continue;
+                send_fd_charts_to_netdata(w, type, lbl_name);
+            }
+            fd_charts_announced = true;
+            fd_error_charts_announced = fd_errors;
         }
-        fd_charts_announced = true;
     }
 #endif
 }

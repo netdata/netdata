@@ -93,7 +93,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			content:    "[global]\nebpf object flavor = ring-buffer\n",
 			wantFlavor: new("buffer"),
 		},
-		"type format legacy takes precedence over object flavor": {
+		"type format legacy sets the load method and leaves the object flavor alone": {
 			content:    "[global]\nebpf type format = legacy\nebpf object flavor = buffer\n",
 			wantFlavor: new("buffer"),
 			wantLoad:   new(LoadLegacy),
