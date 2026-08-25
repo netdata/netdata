@@ -81,14 +81,16 @@ VIOLATIONS_FILE="$(mktemp "${TMPDIR:-/tmp}/artifact-gate.XXXXXX")" || exit 2
 trap 'rm -f "${VIOLATIONS_FILE}"' EXIT
 
 violation() { # class, path, detail
-  printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "${VIOLATIONS_FILE}"
+  local class="$1" path="$2" detail="$3"
+  printf '%s\t%s\t%s\n' "${class}" "${path}" "${detail}" >> "${VIOLATIONS_FILE}"
 }
 
 # Interpreters that exist and work on a clean macOS install. /usr/bin/python3
 # is deliberately absent: it is a Command Line Tools stub that pops a GUI
 # install dialog, not an interpreter.
 system_interpreter_ok() { # command basename
-  case "$1" in
+  local cmd="$1"
+  case "${cmd}" in
     sh|bash|zsh|csh|tcsh|ksh|perl|osascript) return 0 ;;
     *) return 1 ;;
   esac
@@ -97,9 +99,11 @@ system_interpreter_ok() { # command basename
 # Map an absolute path under the install prefix to its location in the tree.
 # Prints the mapped path; returns 1 when the path is not under the prefix.
 map_into_tree() { # absolute path
+  local path="$1"
   if [ -n "${PREFIX}" ]; then
-    case "$1" in
-      "${PREFIX}"/*) printf '%s/%s\n' "${TREE}" "${1#"${PREFIX}"/}"; return 0 ;;
+    case "${path}" in
+      "${PREFIX}"/*) printf '%s/%s\n' "${TREE}" "${path#"${PREFIX}"/}"; return 0 ;;
+      *) ;; # not under the prefix; fall through to failure
     esac
   fi
   return 1
@@ -107,9 +111,9 @@ map_into_tree() { # absolute path
 
 # Numeric major.minor comparison; succeeds when $1 <= $2.
 version_le() {
-  local a_major a_minor b_major b_minor
-  a_major="${1%%.*}"; a_minor="$(echo "$1." | cut -d. -f2)"
-  b_major="${2%%.*}"; b_minor="$(echo "$2." | cut -d. -f2)"
+  local a="$1" b="$2" a_major a_minor b_major b_minor
+  a_major="${a%%.*}"; a_minor="$(echo "${a}." | cut -d. -f2)"
+  b_major="${b%%.*}"; b_minor="$(echo "${b}." | cut -d. -f2)"
   [ "${a_major:-0}" -lt "${b_major:-0}" ] && return 0
   [ "${a_major:-0}" -gt "${b_major:-0}" ] && return 1
   [ "${a_minor:-0}" -le "${b_minor:-0}" ]

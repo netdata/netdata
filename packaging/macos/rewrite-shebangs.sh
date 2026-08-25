@@ -41,6 +41,7 @@ find "${TREE}" -type f | LC_ALL=C sort | {
                 mv "${tmp}" "${f}"
                 rewritten=$((rewritten + 1))
                 ;;
+            *) ;; # not a bash shebang; leave the file untouched
         esac
     done
     echo "rewrite-shebangs: rewrote ${rewritten} script(s) under ${TREE} to ${INTERP}"
