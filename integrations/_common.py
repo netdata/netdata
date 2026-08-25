@@ -47,6 +47,7 @@ TAXONOMY_SOURCES = [
     (AGENT_REPO, EBPFGO_PATH / 'taxonomy.yaml', False),
     (AGENT_REPO, EBPFGO_PATH / 'dcstat' / 'taxonomy.yaml', False),
     (AGENT_REPO, EBPFGO_PATH / 'dns' / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'fd' / 'taxonomy.yaml', False),
     (AGENT_REPO, EBPFGO_PATH / 'socket' / 'taxonomy.yaml', False),
 ]
 
