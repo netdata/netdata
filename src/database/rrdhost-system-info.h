@@ -19,6 +19,13 @@ struct rrdhost_system_info {
     char *host_os_version;
     char *host_os_version_id;
     char *host_os_detection;
+    // Host-label metadata intentionally stays out of the public system-info serializers.
+    char *host_os_label_name;
+    char *host_os_label_version;
+    char *host_os_label_release;
+    char *host_os_label_codename;
+    char *host_os_label_edition;
+    char *host_os_label_build;
     char *host_cores;
     char *host_cpu_freq;
     char *host_cpu_model;
