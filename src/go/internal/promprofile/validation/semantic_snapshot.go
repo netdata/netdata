@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/internal/promprofile/replay"
+	promreplay "github.com/netdata/netdata/go/plugins/internal/promprofile/replay"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
@@ -91,7 +91,7 @@ func buildSemanticSnapshot(
 	}
 	snapshot.PlanActions = planActions
 	for _, profile := range profiles {
-		fact, err := semanticProfileFact(profile, owners)
+		fact, err := semanticProfileFact(profile, refs, owners)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -114,7 +114,8 @@ func buildSemanticSnapshot(
 		writerSeries := make(map[metrix.SeriesID]struct{})
 		if _, rejected := pipeline.selectorRejected[rawIdentity]; rejected {
 			source.Terminal = &promreplay.SemanticTerminal{
-				Disposition: "job_excluded", WriterReason: string(promcollector.PipelineReasonSelectorDenied),
+				Disposition:  "job_excluded",
+				WriterReason: string(promcollector.PipelineReasonSelectorDenied),
 			}
 			snapshot.Sources = append(snapshot.Sources, source)
 			continue
@@ -170,7 +171,12 @@ func buildSemanticSnapshot(
 					if series.unmatched {
 						if series.unmatchedReason == chartengine.PlanRouteReasonAutogenRuleRejected &&
 							series.autogenRuleIndex >= 0 && series.autogenRuleIndex < len(autogenRuleOwners) {
-							family := prompkg.SampleFamilyName(prompkg.Sample{Name: source.FinalMetricName, Kind: sample.Kind})
+							family := prompkg.SampleFamilyName(
+								prompkg.Sample{
+									Name: source.FinalMetricName,
+									Kind: sample.Kind,
+								},
+							)
 							source.AutogenSuppressions = append(
 								source.AutogenSuppressions,
 								promreplay.SemanticAutogenSuppression{
@@ -298,10 +304,14 @@ func hasJobPolicyKey(policy jobPolicy, key string) bool {
 
 func semanticProfileFact(
 	profile promprofiles.Profile,
+	refs []chartRef,
 	owners map[string]semanticChartOwner,
 ) (promreplay.SemanticProfile, error) {
 	fact := promreplay.SemanticProfile{
-		Name: profile.Name, Match: profile.Match, App: profile.App, HasApp: profile.HasApp(),
+		Name:   profile.Name,
+		Match:  profile.Match,
+		App:    profile.App,
+		HasApp: profile.HasApp(),
 	}
 	if selector := profile.AutogenSelector(); selector != nil {
 		fact.AutogenSelectorAllow = slices.Clone(selector.Allow)
@@ -313,12 +323,16 @@ func semanticProfileFact(
 	}
 	for i, pattern := range fallback.Gauge {
 		fact.FallbackRules = append(fact.FallbackRules, promreplay.SemanticFallbackRule{
-			RuntimePath: fmt.Sprintf("fallback_type.gauge[%d]", i), AssertedType: "gauge", Pattern: pattern,
+			RuntimePath:  fmt.Sprintf("fallback_type.gauge[%d]", i),
+			AssertedType: "gauge",
+			Pattern:      pattern,
 		})
 	}
 	for i, pattern := range fallback.Counter {
 		fact.FallbackRules = append(fact.FallbackRules, promreplay.SemanticFallbackRule{
-			RuntimePath: fmt.Sprintf("fallback_type.counter[%d]", i), AssertedType: "counter", Pattern: pattern,
+			RuntimePath:  fmt.Sprintf("fallback_type.counter[%d]", i),
+			AssertedType: "counter",
+			Pattern:      pattern,
 		})
 	}
 	template, err := profile.Template()
@@ -326,7 +340,10 @@ func semanticProfileFact(
 		return fact, err
 	}
 	fact.ContextNamespace = template.ContextNamespace
-	fact.Charts = semanticChartPolicies(profile.Name, template, owners)
+	fact.Charts, err = semanticChartPolicies(profile.Name, template, refs, owners)
+	if err != nil {
+		return fact, err
+	}
 	return fact, nil
 }
 
@@ -354,38 +371,42 @@ func semanticChartOwners(refs []chartRef) (map[string]semanticChartOwner, error)
 func semanticChartPolicies(
 	profileName string,
 	root charttpl.Group,
+	refs []chartRef,
 	owners map[string]semanticChartOwner,
-) []promreplay.SemanticChartPolicy {
+) ([]promreplay.SemanticChartPolicy, error) {
 	idsByPath := make(map[string]string)
 	for id, owner := range owners {
 		if owner.profile == profileName {
 			idsByPath[owner.path] = id
 		}
 	}
-	var out []promreplay.SemanticChartPolicy
-	var walk func(charttpl.Group, []int, *charttpl.Instances)
-	walk = func(group charttpl.Group, groupPath []int, inherited *charttpl.Instances) {
-		effective := inherited
-		if group.ChartDefaults != nil && group.ChartDefaults.Instances != nil {
-			effective = group.ChartDefaults.Instances
+	resolvedByPath := make(map[string]charttpl.Chart)
+	for _, ref := range refs {
+		if ref.profile == profileName {
+			resolvedByPath[ref.sourcePath] = ref.chart
 		}
+	}
+	var out []promreplay.SemanticChartPolicy
+	var walk func(charttpl.Group, []int) error
+	walk = func(group charttpl.Group, groupPath []int) error {
 		for index, chart := range group.Charts {
-			instances := effective
-			if chart.Instances != nil {
-				instances = chart.Instances
-			}
 			path := profileChartPath(groupPath, index)
+			// Merged refs come from the authoritative decoder, so group defaults are already materialized.
+			resolved, ok := resolvedByPath[path]
+			if !ok {
+				return fmt.Errorf("profile %q chart %q has no resolved merged template", profileName, path)
+			}
 			policy := promreplay.SemanticChartPolicy{
 				RuntimePath:         path,
 				TemplateID:          idsByPath[path],
 				ExplicitID:          chart.ID,
-				Priority:            chart.Priority,
+				Priority:            resolved.Priority,
 				DeclaredAlgorithm:   chart.Algorithm,
 				DeclaredAggregation: string(chart.Aggregation),
 				DeclaredType:        chart.Type,
 			}
-			if instances != nil {
-				policy.WildcardIdentity = slices.Contains(instances.ByLabels, "*")
+			if resolved.Instances != nil {
+				policy.WildcardIdentity = slices.Contains(resolved.Instances.ByLabels, "*")
 			}
 			if chart.Lifecycle != nil {
 				policy.MaxInstances = chart.Lifecycle.MaxInstances
@@ -396,7 +417,9 @@ func semanticChartPolicies(
 				}
 			}
 			for dimensionIndex, dimension := range chart.Dimensions {
-				dim := promreplay.SemanticDimensionPolicy{Index: dimensionIndex}
+				dim := promreplay.SemanticDimensionPolicy{
+					Index: dimensionIndex,
+				}
 				if dimension.Options != nil {
 					dim.ExplicitMultiplier = dimension.Options.Multiplier
 					dim.ExplicitDivisor = dimension.Options.Divisor
@@ -407,11 +430,16 @@ func semanticChartPolicies(
 			out = append(out, policy)
 		}
 		for index, child := range group.Groups {
-			walk(child, append(slices.Clone(groupPath), index), effective)
+			if err := walk(child, append(slices.Clone(groupPath), index)); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
-	walk(root, nil, nil)
-	return out
+	if err := walk(root, nil); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func semanticRelabelRulePath(stage promcollector.PipelineRelabelStage, block, rule int) string {
@@ -460,7 +488,10 @@ func semanticLabelNames(labels []promreplay.SemanticLabel) []string {
 func semanticStringMapLabels(labels map[string]string) []promreplay.SemanticLabel {
 	out := make([]promreplay.SemanticLabel, 0, len(labels))
 	for name, value := range labels {
-		out = append(out, promreplay.SemanticLabel{Name: name, Value: value})
+		out = append(out, promreplay.SemanticLabel{
+			Name:  name,
+			Value: value,
+		})
 	}
 	slices.SortFunc(out, compareSemanticLabels)
 	return out
@@ -487,31 +518,38 @@ func newSemanticFlatSeriesIndex(reader metrix.Reader) semanticFlatSeriesIndex {
 		physical:   make(map[prompkg.RawSampleIdentity][]semanticFlatSeries),
 		structural: make(map[semanticStructuralSeriesKey][]semanticFlatSeries),
 	}
-	reader.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, view metrix.LabelView, _ metrix.SampleValue) {
-		lbs := make(labels.Labels, 0, view.Len())
-		view.Range(func(key, value string) bool {
-			lbs = append(lbs, labels.Label{Name: key, Value: value})
-			return true
-		})
-		slices.SortFunc(lbs, func(a, b labels.Label) int {
-			if order := strings.Compare(a.Name, b.Name); order != 0 {
-				return order
+	reader.ForEachSeriesIdentity(
+		func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, view metrix.LabelView, _ metrix.SampleValue) {
+			lbs := make(labels.Labels, 0, view.Len())
+			view.Range(func(key, value string) bool {
+				lbs = append(lbs, labels.Label{
+					Name:  key,
+					Value: value,
+				})
+				return true
+			})
+			slices.SortFunc(lbs, func(a, b labels.Label) int {
+				if order := strings.Compare(a.Name, b.Name); order != 0 {
+					return order
+				}
+				return strings.Compare(a.Value, b.Value)
+			})
+			physical := prompkg.IdentifyRawSample(name, lbs)
+			flat := semanticFlatSeries{
+				id: identity.ID,
 			}
-			return strings.Compare(a.Value, b.Value)
-		})
-		physical := prompkg.IdentifyRawSample(name, lbs)
-		flat := semanticFlatSeries{id: identity.ID}
-		component := semanticFlattenComponent(meta.FlattenRole)
-		if structuralLabel := semanticComponentStructuralLabel(component); structuralLabel != "" {
-			flat.structuralValue = lbs.Get(structuralLabel)
-			key := semanticStructuralSeriesKey{
-				identity:  semanticRawIdentityWithoutLabel(name, lbs, structuralLabel),
-				component: component,
+			component := semanticFlattenComponent(meta.FlattenRole)
+			if structuralLabel := semanticComponentStructuralLabel(component); structuralLabel != "" {
+				flat.structuralValue = lbs.Get(structuralLabel)
+				key := semanticStructuralSeriesKey{
+					identity:  semanticRawIdentityWithoutLabel(name, lbs, structuralLabel),
+					component: component,
+				}
+				out.structural[key] = append(out.structural[key], flat)
 			}
-			out.structural[key] = append(out.structural[key], flat)
-		}
-		out.physical[physical] = append(out.physical[physical], flat)
-	})
+			out.physical[physical] = append(out.physical[physical], flat)
+		},
+	)
 	return out
 }
 
@@ -575,7 +613,10 @@ func semanticRawIdentityWithoutLabel(name string, lbs labels.Labels, excluded st
 func semanticReplayLabels(in []promreplay.SemanticLabel) labels.Labels {
 	out := make(labels.Labels, 0, len(in))
 	for _, label := range in {
-		out = append(out, labels.Label{Name: label.Name, Value: label.Value})
+		out = append(out, labels.Label{
+			Name:  label.Name,
+			Value: label.Value,
+		})
 	}
 	return out
 }
@@ -593,7 +634,10 @@ func semanticPromLabels(in labels.Labels) []promreplay.SemanticLabel {
 	out := make([]promreplay.SemanticLabel, 0, len(in))
 	for _, label := range in {
 		if label.Name != labels.MetricName {
-			out = append(out, promreplay.SemanticLabel{Name: label.Name, Value: label.Value})
+			out = append(out, promreplay.SemanticLabel{
+				Name:  label.Name,
+				Value: label.Value,
+			})
 		}
 	}
 	slices.SortFunc(out, compareSemanticLabels)
@@ -603,7 +647,10 @@ func semanticPromLabels(in labels.Labels) []promreplay.SemanticLabel {
 func semanticPipelineLabels(in []promcollector.PipelineLabel) []promreplay.SemanticLabel {
 	out := make([]promreplay.SemanticLabel, 0, len(in))
 	for _, label := range in {
-		out = append(out, promreplay.SemanticLabel{Name: label.Name, Value: label.Value})
+		out = append(out, promreplay.SemanticLabel{
+			Name:  label.Name,
+			Value: label.Value,
+		})
 	}
 	slices.SortFunc(out, compareSemanticLabels)
 	return out

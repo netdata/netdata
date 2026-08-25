@@ -30,8 +30,9 @@ Repository architecture and runtime documents are the final authority when the s
 - `src/go/plugin/go.d/collector/prometheus/relabel/README.md`
 - `src/go/plugin/framework/charttpl/README.md`
 
-Do not require the generic NIDL guide as an authoring prerequisite. Prometheus chart templates have a narrower identity,
-label, aggregation, and hierarchy contract described in the chart-template reference.
+Read `docs/NIDL-Framework.md` when choosing or reviewing a monitored component, instance grain, dimension set, or label
+role. Then use the chart-template reference for the Prometheus-specific identity, label-promotion, aggregation, and
+hierarchy contract that realizes that NIDL model.
 
 ## Authoring workflow
 
@@ -65,6 +66,17 @@ For each view, state:
 - the labels retained only for filtering/grouping;
 - the labels intentionally omitted and the reducer that makes the omission truthful;
 - the exact source signals, units, lifecycle, and relationship between dimensions.
+
+For every stock profile, also state the operator-facing profile `title` and
+`summary` in `PROFILE-DESIGN.yaml` `documentation`. Every
+`composition.supports` entry must include an `activation` sentence that explains
+when an operator will see that supporting profile. Machine condition IDs are not
+public explanations.
+
+The view `question` is internal authoring rationale used to design and review one coherent chart. It MUST NOT be projected
+into generated integration documentation. Public coverage is rendered as ordinary tables grouped by each profile's
+top-level family. Every metric-to-chart row contains the Prometheus metric, full Netdata family and chart title, dimension,
+unit, and entity scope.
 
 Do not create duplicate aggregate and detailed views when Netdata can derive the aggregate by grouping the detailed
 charts. Choose the finest operator-useful grain whose cardinality and churn remain acceptable.
@@ -133,6 +145,10 @@ an explicit future input when the validator cannot derive it.
 
 - Use nested groups to express hierarchy. Child `context_namespace` segments join with `.` and child `family` segments
   join with `/`.
+- Omit the template root `family` when it would only repeat the resolved application; its named child groups then become
+  top-level families. Retain a meaningful root for reusable instrumentation profiles that compose into other
+  applications. Nested groups still require `family`, and a chart directly under a transparent root needs its own
+  chart-level `family`.
 - Use base units. Convert bytes to bits only when the operator convention is bandwidth in bits/s; otherwise multiplier and
   divisor are usually unnecessary.
 - Omit `algorithm` normally. Runtime counter kind resolves to `incremental`; gauges and other kinds resolve to `absolute`.
@@ -146,12 +162,20 @@ an explicit future input when the validator cannot derive it.
 
 Contributed stock profiles MUST keep authored YAML minimal and predictable:
 
-- omit chart `priority`; Netdata presents equal-priority charts predictably rather than preserving an author-only order;
+- set `chart_defaults.priority` at the nearest group when operator navigation requires one order for the family subtree;
+  use chart-local `priority` only for a deliberate exception, and otherwise omit priority so the chart uses the runtime
+  default;
 - omit explicit chart `id` when the context-derived ID is sufficient;
 - avoid `instances.by_labels: ['*']`; use a source-backed explicit identity;
 - omit lifecycle caps; stock coverage must not depend on silently dropping observed or future entities;
 - omit redundant `options.float` when the runtime metric is already floating point;
 - omit redundant `algorithm`, `type`, multiplier, and divisor defaults.
+
+Stock profile work is incomplete until the profile is reachable from a
+Prometheus integration module through the owning metadata document's top-level
+`profile_coverage.modules` mapping. Do not repeat supporting profiles there;
+integration generation resolves the support closure from the design contract
+and fails on missing, duplicate, extra, or family-mismatched chart mappings.
 
 The runtime format permits those fields for user profiles. The restrictions above are stock contribution policy, not
 claims that the parser lacks the feature.
@@ -175,6 +199,26 @@ declared by its proof cases.
 `PASS` proves schema and the exercised production collector/planner/emitter path. It does not prove operator usefulness,
 source semantics, cardinality outside the evidence, or that a relationship is additive. Resolve warnings with evidence;
 do not mechanically silence them.
+
+Before semantic review, render the actual family table of contents:
+
+```bash
+.agents/skills/project-prometheus-profiles/scripts/profile-toc.py \
+  /path/to/profile.yaml \
+  --app application-name
+```
+
+The helper prints the operator-visible family tree with contexts and effective priorities, then emits advisory UX
+warnings. It is not a gate and does not make design decisions. Investigate each warning and either repair the hierarchy
+or record why the warning is intentional:
+
+- all top-level families sharing a prefix usually repeat the application/root;
+- a leaf with more than 15 contexts usually needs intermediate owner structure;
+- a one-context leaf may be unnecessary structure or a merge candidate;
+- a one-character family segment is often a slash-containing label such as `I/O` split accidentally into `I` and `O`.
+
+Do not remove structure solely to silence the warning when the parent is an operator entity, a module boundary, or a
+release contract; do not add structure solely to divide by metric type.
 
 ### 8. Perform semantic review
 
@@ -223,4 +267,5 @@ repository workflow. Integration files under `integrations/` are generated and s
 - `how-tos/build-synthetic-fixture.md` — public source-complete fixture construction.
 - `sqlite-metadata-reset.md` — destructive metadata-reset boundary.
 - `scripts/validate-profile.py` — compatibility launcher for the authoritative Go validator.
+- `scripts/profile-toc.py` — render the operator family ToC and report advisory hierarchy UX warnings.
 - `scripts/proof-bundle.py` — stock proof catalog and replay wrapper.

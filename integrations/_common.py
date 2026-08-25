@@ -174,12 +174,19 @@ def load_collectors(sources=None):
                 path)
             continue
 
+        profile_coverage = data.get('profile_coverage', {}).get('modules', {})
+        module_ids = {item['meta'].get('id') for item in data['modules']}
+        for module_id in sorted(set(profile_coverage) - module_ids):
+            warn(f'Profile coverage references unknown module id {module_id!r}.', path)
+
         for idx, item in enumerate(data['modules']):
             item['meta']['plugin_name'] = data['plugin_name']
             item['integration_type'] = 'collector'
             item['_src_path'] = path
             item['_repo'] = repo
             item['_index'] = idx
+            if item['meta'].get('id') in profile_coverage:
+                item['_prometheus_profile_ids'] = list(profile_coverage[item['meta']['id']])
             ret.append(item)
 
     return ret

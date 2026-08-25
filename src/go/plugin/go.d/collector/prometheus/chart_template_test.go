@@ -102,6 +102,41 @@ func TestBuildMergedChartTemplateAutogenRulesPreserveProfileScopes(t *testing.T)
 	}, spec.Engine.Autogen.Rules)
 }
 
+func TestBuildMergedChartTemplateAllowsTransparentProfileRoot(t *testing.T) {
+	catalog := loadTestCatalog(t, map[string]string{
+		"app": `
+match: "app_*"
+template:
+  context_namespace: app
+  metrics:
+    - app_requests_total
+  groups:
+    - family: Requests
+      charts:
+        - title: Requests
+          context: requests
+          units: requests/s
+          dimensions:
+            - selector: app_requests_total
+              name: requests
+`,
+	})
+	profiles, err := catalog.Resolve([]string{"app"})
+	require.NoError(t, err)
+
+	out, err := buildMergedChartTemplate("app", profiles)
+	require.NoError(t, err)
+	assert.NotContains(t, out, "family: \"\"")
+
+	spec, err := charttpl.DecodeYAML([]byte(out))
+	require.NoError(t, err)
+	compiled, err := chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+	charts := compiled.Charts()
+	require.Len(t, charts, 1)
+	assert.Equal(t, "Requests", charts[0].Meta.Family)
+}
+
 func TestBuildMergedChartTemplateHistogramProfileSuppressesFallbackComponents(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"latency": `

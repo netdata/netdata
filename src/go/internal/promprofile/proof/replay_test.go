@@ -280,6 +280,9 @@ const replayProfileDesign = `version: v1
 profile: app
 match: app_*
 namespace: app
+documentation:
+  title: Example application
+  summary: Curated request metrics for the example application.
 composition: {supports: {}}
 entities:
   service:

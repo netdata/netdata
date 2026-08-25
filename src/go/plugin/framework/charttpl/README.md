@@ -385,7 +385,9 @@ Explicitly defined charts (like `execution_state`) use the template. Any _other_
 
 ### 4. groups
 
-Groups organize charts into a hierarchy that can be nested to **any depth**. Each group defines a **family** segment, can declare **metrics** in scope, and contains **charts** and/or nested **groups**.
+Groups organize charts into a hierarchy that can be nested to **any depth**. A root group may be a transparent container
+without its own `family`; every nested group defines a **family** segment. Groups can also declare **metrics** in scope
+and contain **charts** and/or nested **groups**.
 
 Nesting serves three purposes:
 
@@ -400,6 +402,7 @@ groups:
     metrics:
       - <metric_name>
     chart_defaults:
+      priority: <int>
       label_promotion: [<label>, ...]
       instances:
         by_labels: [<label>, ...]
@@ -412,7 +415,7 @@ groups:
 
 | Field               | Type          | Required | Description                                                                         |
 |---------------------|---------------|----------|-------------------------------------------------------------------------------------|
-| `family`            | string        | **yes**  | Family segment. Groups compose the chart family hierarchy.                          |
+| `family`            | string        | root: no; nested: **yes** | Family segment. An omitted root is transparent; nested groups compose the hierarchy. |
 | `context_namespace` | string        | no       | Context segment appended to inherited context namespace.                            |
 | `metrics`           | array[string] | no       | Metrics visible to dimension selectors in this group and descendants.               |
 | `chart_defaults`    | object        | no       | Inheritable defaults for descendant charts (see [chart_defaults](#chart_defaults)). |
@@ -427,6 +430,10 @@ groups:
 | Nested group         | `InnoDB`                                |
 | Nested group         | `Buffer Pool`                           |
 | **Resulting family** | **`Storage Engine/InnoDB/Buffer Pool`** |
+
+A root group may omit `family` when it exists only to share metric scope, context namespace, or chart defaults. Its
+children then become the top-level family sections. Nested groups must always provide a nonblank family. A chart directly
+under a transparent root must provide `chart.family`, so every emitted chart still has a nonblank effective family.
 
 Here is a real-world nesting example showing how family and context compose at each level:
 
@@ -477,15 +484,20 @@ groups:
 
 #### chart_defaults
 
-Inheritable chart configuration applied to all descendant charts in the group subtree. Useful when many charts share the same instance identity or label promotion policy.
+Inheritable chart configuration applied to all descendant charts in the group subtree. Useful when a chart family shares
+one ordering priority, instance identity, or label promotion policy.
 
 | Field             | Type          | Description                              |
 |-------------------|---------------|------------------------------------------|
+| `priority`        | int           | Default chart ordering priority.         |
 | `label_promotion` | array[string] | Default non-identity chart-label policy. |
 | `instances`       | object        | Default instance identity policy.        |
 
 > [!NOTE]
 > **Inheritance rules**: nearest group default wins (child overrides parent), chart-local field overrides inherited default, and list/object fields replace the inherited field wholesale — there is no deep merge or append.
+
+Priority uses zero as its unset sentinel. An omitted or zero group/chart value inherits the nearest nonzero group default;
+use an explicit `70000` when a child subtree or chart must reset to engine-default ordering.
 
 `label_promotion` has three distinct states at either level:
 
@@ -502,11 +514,12 @@ groups:
   - family: Azure Key Vault
     context_namespace: key_vault
     chart_defaults:
+      priority: 100
       label_promotion: [resource_name, resource_group, region]
       instances:
         by_labels: [resource_uid]
     charts:
-      # Every chart below inherits instances and label_promotion
+      # Every chart below inherits priority, instances, and label_promotion
       # without repeating them.
       - id: availability
         title: Azure Key Vault Availability
@@ -524,7 +537,7 @@ groups:
             name: average
 ```
 
-Without `chart_defaults`, you would need to repeat `instances` and `label_promotion` on every chart.
+Without `chart_defaults`, you would need to repeat `priority`, `instances`, and `label_promotion` on every chart.
 
 ### 5. charts
 
@@ -565,7 +578,7 @@ charts:
 | `algorithm`       | string        | no       | runtime metric kind    | `absolute` or `incremental`. If omitted, resolved per dimension from the matched series kind. |
 | `aggregation`     | string        | no       | `sum`                  | Reducer applied to every dimension in the chart.                             |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
-| `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
+| `priority`        | int           | no       | from `chart_defaults`, otherwise `70000` | Chart ordering priority. Zero is unset/inherit; use `70000` to reset an inherited priority. |
 | `label_promotion` | array[string] | no       | from `chart_defaults`  | Non-identity chart-label policy: omitted uses automatic intersection, a non-empty list is an explicit allowlist, and `[]` promotes none. Entries must be non-empty label keys. |
 | `instances`       | object        | no       | from `chart_defaults`  | Instance identity policy (see [instances](#instances)).                      |
 | `lifecycle`       | object        | no       |                        | Instance/dimension cap and expiry (see [lifecycle](#lifecycle)).             |
@@ -1066,13 +1079,14 @@ The resulting chart families are `Storage Engine/InnoDB/Buffer Pool` and `Storag
 
 ### chart_defaults: reducing repetition
 
-When monitoring a cloud resource that has many charts, all sharing the same instance identity.
+When monitoring a cloud resource that has many charts, all sharing the same ordering priority and instance identity.
 
 ```yaml
 groups:
   - family: Azure PostgreSQL
     context_namespace: postgres_flexible
     chart_defaults:
+      priority: 100
       label_promotion: [resource_name, resource_group, region]
       instances:
         by_labels: [resource_uid]
@@ -1097,7 +1111,7 @@ groups:
             name: average
 ```
 
-All three charts inherit `instances` and `label_promotion` from `chart_defaults` — no repetition needed.
+All three charts inherit `priority`, `instances`, and `label_promotion` from `chart_defaults` — no repetition needed.
 
 ### Autogeneration: handling unpredictable metrics
 
@@ -1154,7 +1168,8 @@ All rules below produce semantic validation errors unless noted:
 |-----------------------------------------------------------------------------------------|---------------------------------|
 | `version` must be `v1`                                                                  | semantic                        |
 | `groups[]` must be non-empty                                                            | semantic                        |
-| `group.family` must not be empty or whitespace-only                                     | semantic                        |
+| Root `group.family` may be omitted; nested `group.family` must be nonblank               | semantic                        |
+| A chart directly under a transparent root must provide a nonblank `chart.family`         | semantic                        |
 | `group.metrics[]` entries must not be empty; no duplicates within same group            | semantic                        |
 | `chart.title`, `chart.context`, `chart.units` must be non-empty                         | semantic                        |
 | `chart.algorithm` must be `absolute` or `incremental` (when specified)                  | semantic                        |
@@ -1188,8 +1203,8 @@ All rules below produce semantic validation errors unless noted:
 |-----------------------------------------|------------------------------------------------------------------------------------------|
 | Missing `chart.id`                      | `id` derived from `context` (`.` replaced with `_`).                                     |
 | Missing `chart.algorithm`               | Resolved per rendered dimension from runtime series kind: counter = `incremental`; every other kind = `absolute`. |
-| `chart.priority = 0`                    | Treated as `70000` (engine default).                                                     |
-| Group family hierarchy + `chart.family` | Composed into `/`-separated chart family.                                                |
+| Effective `chart.priority <= 0` after group inheritance | Treated as `70000` (engine default).                                        |
+| Root/nested family hierarchy + `chart.family` | Nonblank segments compose into a `/`-separated chart family.                         |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |
 | `options.divisor = 0`                   | Treated as `1`.                                                                          |
 

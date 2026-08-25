@@ -5,14 +5,20 @@ profile: vllm
 match: vllm:* ray_vllm_*
 app: vllm
 namespace: vllm
+documentation:
+  title: vLLM
+  summary: Curated inference, scheduling, latency, token, cache, connector, engine, HTTP, and runtime metrics from vLLM and Ray.
 composition:
   supports:
     fastapi:
       when: native_transport
+      activation: Included when the endpoint exposes vLLM's native HTTP transport metrics; Ray-only metrics do not activate it.
     process_runtime:
       when: native_transport
+      activation: Included when the endpoint exposes vLLM's native process metrics; Ray-only metrics do not activate it.
     python_gc:
       when: native_transport
+      activation: Included when the endpoint exposes vLLM's native Python garbage-collection metrics; Ray-only metrics do not activate it.
 entities:
   model_engine_ray:
     grain: model_name and engine
@@ -785,8 +791,8 @@ exclusions:
 limitations: {}
 views:
   request_lifecycle.corrupted_requests:
-    family: vLLM/Request Lifecycle
-    question: At what rate does corrupted requests change?
+    family: Request Lifecycle
+    question: What is the rate of change for corrupted requests?
     entity: model_engine_ray
     inputs:
       corrupted:
@@ -801,8 +807,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.time_to_first_token:
-    family: vLLM/Request Lifecycle
-    question: How is time to first token distributed?
+    family: Request Lifecycle
+    question: What is the distribution of time to first token?
     entity: model_engine_ray
     inputs:
       time_to_first_token:
@@ -817,8 +823,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.end_to_end_latency:
-    family: vLLM/Request Lifecycle
-    question: How is end-to-end request latency distributed?
+    family: Request Lifecycle
+    question: What is the distribution of end-to-end request latency?
     entity: model_engine_ray
     inputs:
       end_to_end_latency:
@@ -833,8 +839,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.first_token_requests:
-    family: vLLM/Request Lifecycle
-    question: At what rate does requests reaching first token change?
+    family: Request Lifecycle
+    question: What is the rate of change for requests reaching first token?
     entity: model_engine_ray
     inputs:
       requests:
@@ -849,7 +855,7 @@ views:
       - Version
       omit: {}
   request_lifecycle.completed_pre_response_time:
-    family: vLLM/Request Lifecycle
+    family: Request Lifecycle
     question: At what rate is pre-response time attributed when requests reach their first token?
     entity: model_engine_ray
     inputs:
@@ -865,7 +871,7 @@ views:
       - Version
       omit: {}
   request_lifecycle.completed_end_to_end_time:
-    family: vLLM/Request Lifecycle
+    family: Request Lifecycle
     question: At what rate is end-to-end time attributed when requests complete?
     entity: model_engine_ray
     inputs:
@@ -881,8 +887,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.requested_sequences:
-    family: vLLM/Request Lifecycle
-    question: How is requested sequences distributed?
+    family: Request Lifecycle
+    question: What is the distribution of requested sequences?
     entity: model_engine_ray
     inputs:
       requested_sequences:
@@ -897,8 +903,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.requested_sequence_volume:
-    family: vLLM/Request Lifecycle
-    question: At what rate does requested sequence volume change?
+    family: Request Lifecycle
+    question: What is the rate of change for requested sequence volume?
     entity: model_engine_ray
     inputs:
       sequences:
@@ -913,8 +919,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.requested_token_limit:
-    family: vLLM/Request Lifecycle
-    question: How is requested token limit distributed?
+    family: Request Lifecycle
+    question: What is the distribution of requested token limit?
     entity: model_engine_ray
     inputs:
       requested_token_limit:
@@ -929,8 +935,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.requested_token_limits_sum:
-    family: vLLM/Request Lifecycle
-    question: At what rate does requested token limits sum change?
+    family: Request Lifecycle
+    question: What is the rate of change for requested token limits sum?
     entity: model_engine_ray
     inputs:
       token_limits:
@@ -945,8 +951,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.requests_with_explicit_token_limit:
-    family: vLLM/Request Lifecycle
-    question: At what rate does requests with explicit token limit change?
+    family: Request Lifecycle
+    question: What is the rate of change for requests with explicit token limit?
     entity: model_engine_ray
     inputs:
       requests:
@@ -961,8 +967,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.maximum_generated_tokens:
-    family: vLLM/Request Lifecycle
-    question: How is maximum generated tokens distributed?
+    family: Request Lifecycle
+    question: What is the distribution of maximum generated tokens?
     entity: model_engine_ray
     inputs:
       maximum_generated_tokens:
@@ -977,8 +983,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.maximum_generated_tokens_sum:
-    family: vLLM/Request Lifecycle
-    question: At what rate does maximum generated tokens sum change?
+    family: Request Lifecycle
+    question: What is the rate of change for maximum generated tokens sum?
     entity: model_engine_ray
     inputs:
       maximums:
@@ -993,8 +999,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.parent_requests:
-    family: vLLM/Request Lifecycle
-    question: At what rate does parent requests change?
+    family: Request Lifecycle
+    question: What is the rate of change for parent requests?
     entity: model_engine_ray
     inputs:
       requests:
@@ -1009,8 +1015,8 @@ views:
       - Version
       omit: {}
   request_lifecycle.outcomes:
-    family: vLLM/Request Lifecycle/Outcomes
-    question: At what rate does request outcomes change?
+    family: Request Lifecycle/Outcomes
+    question: What is the rate of change for request outcomes?
     entity: finished_request_ray
     inputs:
       requests:
@@ -1025,7 +1031,7 @@ views:
       - Version
       omit: {}
   scheduler.request_state:
-    family: vLLM/Scheduler
+    family: Scheduler
     question: What is the current request state?
     entity: model_engine_ray
     inputs:
@@ -1063,8 +1069,8 @@ views:
       - Version
       omit: {}
   scheduler.preemptions:
-    family: vLLM/Scheduler
-    question: At what rate does request preemptions change?
+    family: Scheduler
+    question: What is the rate of change for request preemptions?
     entity: model_engine_ray
     inputs:
       preemptions:
@@ -1079,7 +1085,7 @@ views:
       - Version
       omit: {}
   scheduler.sleep_state:
-    family: vLLM/Scheduler
+    family: Scheduler
     question: What is the current engine sleep state?
     entity: model_engine_ray
     inputs:
@@ -1097,8 +1103,8 @@ views:
       - Version
       omit: {}
   scheduler.queue_time:
-    family: vLLM/Scheduler
-    question: How is request queue time distributed?
+    family: Scheduler
+    question: What is the distribution of request queue time?
     entity: model_engine_ray
     inputs:
       queue_time:
@@ -1113,7 +1119,7 @@ views:
       - Version
       omit: {}
   scheduler.completed_queue_time:
-    family: vLLM/Scheduler
+    family: Scheduler
     question: At what rate is queue time attributed when whole requests complete?
     entity: model_engine_ray
     inputs:
@@ -1129,8 +1135,8 @@ views:
       - Version
       omit: {}
   prefill.prompt_tokens_by_source:
-    family: vLLM/Prefill
-    question: At what rate does prompt tokens by source change?
+    family: Prefill
+    question: What is the rate of change for prompt tokens by source?
     entity: model_engine_ray
     inputs:
       source:
@@ -1147,8 +1153,8 @@ views:
       - Version
       omit: {}
   prefill.prompt_size:
-    family: vLLM/Prefill
-    question: How is prompt size distributed?
+    family: Prefill
+    question: What is the distribution of prompt size?
     entity: model_engine_ray
     inputs:
       prompt_size:
@@ -1163,8 +1169,8 @@ views:
       - Version
       omit: {}
   prefill.prefill_time:
-    family: vLLM/Prefill
-    question: How is prefill time distributed?
+    family: Prefill
+    question: What is the distribution of prefill time?
     entity: model_engine_ray
     inputs:
       prefill_time:
@@ -1179,8 +1185,8 @@ views:
       - Version
       omit: {}
   prefill.computed_kv_tokens:
-    family: vLLM/Prefill
-    question: How is computed kv tokens distributed?
+    family: Prefill
+    question: What is the distribution of computed kv tokens?
     entity: model_engine_ray
     inputs:
       computed_kv_tokens:
@@ -1195,8 +1201,8 @@ views:
       - Version
       omit: {}
   prefill.completed_request_prompt_volume:
-    family: vLLM/Prefill
-    question: At what rate does completed request prompt volume change?
+    family: Prefill
+    question: What is the rate of change for completed request prompt volume?
     entity: model_engine_ray
     inputs:
       prompt_tokens:
@@ -1211,8 +1217,8 @@ views:
       - Version
       omit: {}
   prefill.computed_kv_token_volume:
-    family: vLLM/Prefill
-    question: At what rate does computed kv token volume change?
+    family: Prefill
+    question: What is the rate of change for computed kv token volume?
     entity: model_engine_ray
     inputs:
       computed_tokens:
@@ -1227,7 +1233,7 @@ views:
       - Version
       omit: {}
   prefill.completed_time:
-    family: vLLM/Prefill
+    family: Prefill
     question: At what rate is prefill time attributed when whole requests complete?
     entity: model_engine_ray
     inputs:
@@ -1243,8 +1249,8 @@ views:
       - Version
       omit: {}
   decode.generation_throughput:
-    family: vLLM/Decode
-    question: At what rate does generated tokens change?
+    family: Decode
+    question: What is the rate of change for generated tokens?
     entity: model_engine_ray
     inputs:
       generated:
@@ -1259,8 +1265,8 @@ views:
       - Version
       omit: {}
   decode.output_size:
-    family: vLLM/Decode
-    question: How is output size distributed?
+    family: Decode
+    question: What is the distribution of output size?
     entity: model_engine_ray
     inputs:
       output_size:
@@ -1275,8 +1281,8 @@ views:
       - Version
       omit: {}
   decode.decode_time:
-    family: vLLM/Decode
-    question: How is decode time distributed?
+    family: Decode
+    question: What is the distribution of decode time?
     entity: model_engine_ray
     inputs:
       decode_time:
@@ -1291,8 +1297,8 @@ views:
       - Version
       omit: {}
   decode.inter_token_latency:
-    family: vLLM/Decode
-    question: How is inter-token latency distributed?
+    family: Decode
+    question: What is the distribution of inter-token latency?
     entity: model_engine_ray
     inputs:
       inter_token_latency:
@@ -1307,8 +1313,8 @@ views:
       - Version
       omit: {}
   decode.mean_output_token_time:
-    family: vLLM/Decode
-    question: How is mean output-token time distributed?
+    family: Decode
+    question: What is the distribution of mean output-token time?
     entity: model_engine_ray
     inputs:
       mean_output_token_time:
@@ -1323,8 +1329,8 @@ views:
       - Version
       omit: {}
   decode.output_token_volume:
-    family: vLLM/Decode
-    question: At what rate does output token volume change?
+    family: Decode
+    question: What is the rate of change for output token volume?
     entity: model_engine_ray
     inputs:
       output_tokens:
@@ -1339,7 +1345,7 @@ views:
       - Version
       omit: {}
   decode.completed_time:
-    family: vLLM/Decode
+    family: Decode
     question: At what rate is decode time attributed when whole requests complete?
     entity: model_engine_ray
     inputs:
@@ -1355,8 +1361,8 @@ views:
       - Version
       omit: {}
   decode.inter_token_intervals:
-    family: vLLM/Decode
-    question: At what rate does inter-token intervals change?
+    family: Decode
+    question: What is the rate of change for inter-token intervals?
     entity: model_engine_ray
     inputs:
       intervals:
@@ -1371,8 +1377,8 @@ views:
       - Version
       omit: {}
   decode.inter_token_interval_time:
-    family: vLLM/Decode
-    question: At what rate does inter-token interval time change?
+    family: Decode
+    question: What is the rate of change for inter-token interval time?
     entity: model_engine_ray
     inputs:
       intervals:
@@ -1387,8 +1393,8 @@ views:
       - Version
       omit: {}
   decode.accumulated_mean_output_token_time:
-    family: vLLM/Decode
-    question: At what rate does accumulated mean output-token time change?
+    family: Decode
+    question: What is the rate of change for accumulated mean output-token time?
     entity: model_engine_ray
     inputs:
       request_means:
@@ -1403,8 +1409,8 @@ views:
       - Version
       omit: {}
   engine_execution.inference_time:
-    family: vLLM/Engine Execution
-    question: How is inference time distributed?
+    family: Engine Execution
+    question: What is the distribution of inference time?
     entity: model_engine_ray
     inputs:
       inference_time:
@@ -1419,7 +1425,7 @@ views:
       - Version
       omit: {}
   engine_execution.completed_time:
-    family: vLLM/Engine Execution
+    family: Engine Execution
     question: At what rate is inference time attributed when whole requests complete?
     entity: model_engine_ray
     inputs:
@@ -1435,8 +1441,8 @@ views:
       - Version
       omit: {}
   engine_execution.tokens_per_step:
-    family: vLLM/Engine Execution
-    question: How is tokens per engine step distributed?
+    family: Engine Execution
+    question: What is the distribution of tokens per engine step?
     entity: model_engine_ray
     inputs:
       tokens_per_step:
@@ -1451,8 +1457,8 @@ views:
       - Version
       omit: {}
   engine_execution.engine_steps:
-    family: vLLM/Engine Execution
-    question: At what rate does engine steps change?
+    family: Engine Execution
+    question: What is the rate of change for engine steps?
     entity: model_engine_ray
     inputs:
       steps:
@@ -1467,8 +1473,8 @@ views:
       - Version
       omit: {}
   engine_execution.step_token_volume:
-    family: vLLM/Engine Execution
-    question: At what rate does engine step token volume change?
+    family: Engine Execution
+    question: What is the rate of change for engine step token volume?
     entity: model_engine_ray
     inputs:
       tokens:
@@ -1483,8 +1489,8 @@ views:
       - Version
       omit: {}
   engine_execution.estimated_compute:
-    family: vLLM/Engine Execution
-    question: At what rate does estimated compute per gpu change?
+    family: Engine Execution
+    question: What is the rate of change for estimated compute per gpu?
     entity: model_engine_ray
     inputs:
       compute:
@@ -1504,8 +1510,8 @@ views:
       evidence:
       - display_conventions
   engine_execution.estimated_memory_bandwidth:
-    family: vLLM/Engine Execution
-    question: At what rate does estimated memory bandwidth per gpu change?
+    family: Engine Execution
+    question: What is the rate of change for estimated memory bandwidth per gpu?
     entity: model_engine_ray
     inputs:
       read:
@@ -1529,7 +1535,7 @@ views:
       evidence:
       - display_conventions
   kv_cache.usage:
-    family: vLLM/KV Cache
+    family: KV Cache
     question: What is the current kv cache usage?
     entity: model_engine_ray
     inputs:
@@ -1550,8 +1556,8 @@ views:
       evidence:
       - display_conventions
   kv_cache.local_prefix:
-    family: vLLM/KV Cache
-    question: At what rate does local prefix cache change?
+    family: KV Cache
+    question: What is the rate of change for local prefix cache?
     entity: model_engine_ray
     inputs:
       queries:
@@ -1570,8 +1576,8 @@ views:
       - Version
       omit: {}
   kv_cache.external_prefix:
-    family: vLLM/KV Cache
-    question: At what rate does external prefix cache change?
+    family: KV Cache
+    question: What is the rate of change for external prefix cache?
     entity: model_engine_ray
     inputs:
       queries:
@@ -1590,8 +1596,8 @@ views:
       - Version
       omit: {}
   kv_cache.multimodal:
-    family: vLLM/KV Cache
-    question: At what rate does multimodal cache change?
+    family: KV Cache
+    question: What is the rate of change for multimodal cache?
     entity: model_engine_ray
     inputs:
       queries:
@@ -1610,8 +1616,8 @@ views:
       - Version
       omit: {}
   kv_cache_residency.block_lifetime:
-    family: vLLM/KV Cache Residency
-    question: How is kv block lifetime distributed?
+    family: KV Cache Residency
+    question: What is the distribution of kv block lifetime?
     entity: model_engine_ray
     inputs:
       block_lifetime:
@@ -1626,8 +1632,8 @@ views:
       - Version
       omit: {}
   kv_cache_residency.idle_before_eviction:
-    family: vLLM/KV Cache Residency
-    question: How is kv block idle time before eviction distributed?
+    family: KV Cache Residency
+    question: What is the distribution of kv block idle time before eviction?
     entity: model_engine_ray
     inputs:
       idle_before_eviction:
@@ -1642,8 +1648,8 @@ views:
       - Version
       omit: {}
   kv_cache_residency.reuse_gap:
-    family: vLLM/KV Cache Residency
-    question: How is kv block reuse gap distributed?
+    family: KV Cache Residency
+    question: What is the distribution of kv block reuse gap?
     entity: model_engine_ray
     inputs:
       reuse_gap:
@@ -1658,8 +1664,8 @@ views:
       - Version
       omit: {}
   kv_cache_residency.events:
-    family: vLLM/KV Cache Residency
-    question: At what rate does kv cache events change?
+    family: KV Cache Residency
+    question: What is the rate of change for kv cache events?
     entity: model_engine_ray
     inputs:
       evictions:
@@ -1678,8 +1684,8 @@ views:
       - Version
       omit: {}
   kv_cache_residency.accumulated_time:
-    family: vLLM/KV Cache Residency
-    question: At what rate does accumulated kv residency time change?
+    family: KV Cache Residency
+    question: What is the rate of change for accumulated kv residency time?
     entity: model_engine_ray
     inputs:
       lifetime:
@@ -1702,8 +1708,8 @@ views:
       - Version
       omit: {}
   kv_offloading.load_size:
-    family: vLLM/KV Offloading
-    question: How is kv offload load size distributed?
+    family: KV Offloading
+    question: What is the distribution of kv offload load size?
     entity: model_engine_ray
     inputs:
       load_size:
@@ -1718,8 +1724,8 @@ views:
       - Version
       omit: {}
   kv_offloading.store_size:
-    family: vLLM/KV Offloading
-    question: How is kv offload store size distributed?
+    family: KV Offloading
+    question: What is the distribution of kv offload store size?
     entity: model_engine_ray
     inputs:
       store_size:
@@ -1734,8 +1740,8 @@ views:
       - Version
       omit: {}
   kv_offloading.transfer_operations:
-    family: vLLM/KV Offloading
-    question: At what rate does kv offload transfer operations change?
+    family: KV Offloading
+    question: What is the rate of change for kv offload transfer operations?
     entity: model_engine_ray
     inputs:
       loads:
@@ -1754,8 +1760,8 @@ views:
       - Version
       omit: {}
   kv_offloading.transfer_bytes:
-    family: vLLM/KV Offloading
-    question: At what rate does kv offload transfer throughput change?
+    family: KV Offloading
+    question: What is the rate of change for kv offload transfer throughput?
     entity: model_engine_ray
     inputs:
       loaded:
@@ -1774,7 +1780,7 @@ views:
       - Version
       omit: {}
   kv_offloading.completed_transfer_time:
-    family: vLLM/KV Offloading
+    family: KV Offloading
     question: At what rate is completed kv offload transfer time attributed by direction?
     entity: model_engine_ray
     inputs:
@@ -1794,8 +1800,8 @@ views:
       - Version
       omit: {}
   kv_offloading.lookup_sync_delay:
-    family: vLLM/KV Offloading
-    question: How is kv offload synchronous lookup delay distributed?
+    family: KV Offloading
+    question: What is the distribution of kv offload synchronous lookup delay?
     entity: model_engine_ray
     inputs:
       lookup_sync_delay:
@@ -1810,8 +1816,8 @@ views:
       - Version
       omit: {}
   kv_offloading.lookup_async_delay:
-    family: vLLM/KV Offloading
-    question: How is kv offload asynchronous lookup delay distributed?
+    family: KV Offloading
+    question: What is the distribution of kv offload asynchronous lookup delay?
     entity: model_engine_ray
     inputs:
       lookup_async_delay:
@@ -1826,8 +1832,8 @@ views:
       - Version
       omit: {}
   kv_offloading.lookup_measurements:
-    family: vLLM/KV Offloading
-    question: At what rate does kv offload lookup measurements change?
+    family: KV Offloading
+    question: What is the rate of change for kv offload lookup measurements?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -1846,8 +1852,8 @@ views:
       - Version
       omit: {}
   kv_offloading.lookup_delay_accumulation:
-    family: vLLM/KV Offloading
-    question: At what rate does kv offload lookup delay accumulation change?
+    family: KV Offloading
+    question: What is the rate of change for kv offload lookup delay accumulation?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -1866,7 +1872,7 @@ views:
       - Version
       omit: {}
   kv_offloading.cpu_cache_usage:
-    family: vLLM/KV Offloading
+    family: KV Offloading
     question: What is the current cpu kv cache usage?
     entity: model_engine_ray
     inputs:
@@ -1895,8 +1901,8 @@ views:
       evidence:
       - display_conventions
   kv_offloading.cpu_allocation_size:
-    family: vLLM/KV Offloading
-    question: How is cpu kv allocation size distributed?
+    family: KV Offloading
+    question: What is the distribution of cpu kv allocation size?
     entity: model_engine_ray
     inputs:
       cpu_allocation_size:
@@ -1911,8 +1917,8 @@ views:
       - Version
       omit: {}
   kv_offloading.cpu_allocation_measurements:
-    family: vLLM/KV Offloading
-    question: At what rate does cpu kv allocation measurements change?
+    family: KV Offloading
+    question: What is the rate of change for cpu kv allocation measurements?
     entity: model_engine_ray
     inputs:
       allocations:
@@ -1927,8 +1933,8 @@ views:
       - Version
       omit: {}
   kv_offloading.cpu_allocation_volume:
-    family: vLLM/KV Offloading
-    question: At what rate does cpu kv allocation volume change?
+    family: KV Offloading
+    question: What is the rate of change for cpu kv allocation volume?
     entity: model_engine_ray
     inputs:
       blocks:
@@ -1943,8 +1949,8 @@ views:
       - Version
       omit: {}
   kv_offloading.admission_outcomes:
-    family: vLLM/KV Offloading
-    question: At what rate does kv offload admission outcomes change?
+    family: KV Offloading
+    question: What is the rate of change for kv offload admission outcomes?
     entity: model_engine_ray
     inputs:
       allocation_failures:
@@ -1963,8 +1969,8 @@ views:
       - Version
       omit: {}
   kv_offloading.tiering_lookup_sync_delay:
-    family: vLLM/KV Offloading
-    question: How is tiered kv offload synchronous lookup delay distributed?
+    family: KV Offloading
+    question: What is the distribution of tiered kv offload synchronous lookup delay?
     entity: model_engine_ray
     inputs:
       tiering_lookup_sync_delay:
@@ -1979,8 +1985,8 @@ views:
       - Version
       omit: {}
   kv_offloading.tiering_lookup_async_delay:
-    family: vLLM/KV Offloading
-    question: How is tiered kv offload asynchronous lookup delay distributed?
+    family: KV Offloading
+    question: What is the distribution of tiered kv offload asynchronous lookup delay?
     entity: model_engine_ray
     inputs:
       tiering_lookup_async_delay:
@@ -1995,8 +2001,8 @@ views:
       - Version
       omit: {}
   kv_offloading.tiering_lookup_measurements:
-    family: vLLM/KV Offloading
-    question: At what rate does tiered kv offload lookup measurements change?
+    family: KV Offloading
+    question: What is the rate of change for tiered kv offload lookup measurements?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -2015,8 +2021,8 @@ views:
       - Version
       omit: {}
   kv_offloading.tiering_lookup_delay_accumulation:
-    family: vLLM/KV Offloading
-    question: At what rate does tiered kv offload lookup delay accumulation change?
+    family: KV Offloading
+    question: What is the rate of change for tiered kv offload lookup delay accumulation?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -2035,8 +2041,8 @@ views:
       - Version
       omit: {}
   nixl_connector.transfer_duration:
-    family: vLLM/NIXL Connector
-    question: How is nixl transfer duration distributed?
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer duration?
     entity: model_engine_ray
     inputs:
       transfer_duration:
@@ -2051,8 +2057,8 @@ views:
       - Version
       omit: {}
   nixl_connector.post_time:
-    family: vLLM/NIXL Connector
-    question: How is nixl transfer post time distributed?
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer post time?
     entity: model_engine_ray
     inputs:
       post_time:
@@ -2067,8 +2073,8 @@ views:
       - Version
       omit: {}
   nixl_connector.transfer_size:
-    family: vLLM/NIXL Connector
-    question: How is nixl transfer size distributed?
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer size?
     entity: model_engine_ray
     inputs:
       transfer_size:
@@ -2083,8 +2089,8 @@ views:
       - Version
       omit: {}
   nixl_connector.transfer_descriptors:
-    family: vLLM/NIXL Connector
-    question: How is nixl transfer descriptors distributed?
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer descriptors?
     entity: model_engine_ray
     inputs:
       transfer_descriptors:
@@ -2099,8 +2105,8 @@ views:
       - Version
       omit: {}
   nixl_connector.successful_transfers:
-    family: vLLM/NIXL Connector
-    question: At what rate does successful nixl transfers change?
+    family: NIXL Connector
+    question: What is the rate of change for successful nixl transfers?
     entity: model_engine_ray
     inputs:
       transfers:
@@ -2115,7 +2121,7 @@ views:
       - Version
       omit: {}
   nixl_connector.completed_transfer_time:
-    family: vLLM/NIXL Connector
+    family: NIXL Connector
     question: At what rate is completed nixl transfer and post-processing time attributed?
     entity: model_engine_ray
     inputs:
@@ -2135,8 +2141,8 @@ views:
       - Version
       omit: {}
   nixl_connector.transfer_throughput:
-    family: vLLM/NIXL Connector
-    question: At what rate does nixl transfer throughput change?
+    family: NIXL Connector
+    question: What is the rate of change for nixl transfer throughput?
     entity: model_engine_ray
     inputs:
       transferred:
@@ -2151,8 +2157,8 @@ views:
       - Version
       omit: {}
   nixl_connector.descriptor_throughput:
-    family: vLLM/NIXL Connector
-    question: At what rate does nixl descriptor throughput change?
+    family: NIXL Connector
+    question: What is the rate of change for nixl descriptor throughput?
     entity: model_engine_ray
     inputs:
       descriptors:
@@ -2167,8 +2173,8 @@ views:
       - Version
       omit: {}
   nixl_connector.failures:
-    family: vLLM/NIXL Connector
-    question: At what rate does nixl failures change?
+    family: NIXL Connector
+    question: What is the rate of change for nixl failures?
     entity: model_engine_ray
     inputs:
       transfers:
@@ -2187,8 +2193,8 @@ views:
       - Version
       omit: {}
   nixl_connector.expired_requests:
-    family: vLLM/NIXL Connector
-    question: At what rate does nixl requests with expired kv change?
+    family: NIXL Connector
+    question: What is the rate of change for nixl requests with expired kv?
     entity: model_engine_ray
     inputs:
       expired:
@@ -2203,8 +2209,8 @@ views:
       - Version
       omit: {}
   hf3fs_connector.save_duration:
-    family: vLLM/HF3FS Connector
-    question: How is hf3fs save duration distributed?
+    family: HF3FS Connector
+    question: What is the distribution of hf3fs save duration?
     entity: model_engine_ray
     inputs:
       save_duration:
@@ -2219,8 +2225,8 @@ views:
       - Version
       omit: {}
   hf3fs_connector.load_duration:
-    family: vLLM/HF3FS Connector
-    question: How is hf3fs load duration distributed?
+    family: HF3FS Connector
+    question: What is the distribution of hf3fs load duration?
     entity: model_engine_ray
     inputs:
       load_duration:
@@ -2235,8 +2241,8 @@ views:
       - Version
       omit: {}
   hf3fs_connector.transfer_measurements:
-    family: vLLM/HF3FS Connector
-    question: At what rate does hf3fs transfer measurements change?
+    family: HF3FS Connector
+    question: What is the rate of change for hf3fs transfer measurements?
     entity: model_engine_ray
     inputs:
       saves:
@@ -2255,7 +2261,7 @@ views:
       - Version
       omit: {}
   hf3fs_connector.completed_transfer_time:
-    family: vLLM/HF3FS Connector
+    family: HF3FS Connector
     question: At what rate is completed hf3fs transfer time attributed by direction?
     entity: model_engine_ray
     inputs:
@@ -2275,8 +2281,8 @@ views:
       - Version
       omit: {}
   hf3fs_connector.failures:
-    family: vLLM/HF3FS Connector
-    question: At what rate does hf3fs transfer failures change?
+    family: HF3FS Connector
+    question: What is the rate of change for hf3fs transfer failures?
     entity: model_engine_ray
     inputs:
       saves:
@@ -2295,8 +2301,8 @@ views:
       - Version
       omit: {}
   mooncake_connector.timing.duration:
-    family: vLLM/Mooncake Connector/Operation Timing
-    question: How is mooncake store operation time distributed?
+    family: Mooncake Connector/Operation Timing
+    question: What is the distribution of mooncake store operation time?
     entity: connector_operation_status_ray
     inputs:
       duration:
@@ -2311,8 +2317,8 @@ views:
       - Version
       omit: {}
   mooncake_connector.timing.operations:
-    family: vLLM/Mooncake Connector/Operation Timing
-    question: At what rate does mooncake store operations change?
+    family: Mooncake Connector/Operation Timing
+    question: What is the rate of change for mooncake store operations?
     entity: connector_operation_status_ray
     inputs:
       operations:
@@ -2327,7 +2333,7 @@ views:
       - Version
       omit: {}
   mooncake_connector.timing.completed_time:
-    family: vLLM/Mooncake Connector/Operation Timing
+    family: Mooncake Connector/Operation Timing
     question: At what rate is completed mooncake store operation time attributed?
     entity: connector_operation_status_ray
     inputs:
@@ -2343,8 +2349,8 @@ views:
       - Version
       omit: {}
   mooncake_connector.volume.keys:
-    family: vLLM/Mooncake Connector/Operation Volume
-    question: At what rate does mooncake store key throughput change?
+    family: Mooncake Connector/Operation Volume
+    question: What is the rate of change for mooncake store key throughput?
     entity: connector_operation_status_ray
     inputs:
       keys:
@@ -2359,8 +2365,8 @@ views:
       - Version
       omit: {}
   mooncake_connector.volume.bytes:
-    family: vLLM/Mooncake Connector/Operation Volume
-    question: At what rate does mooncake store byte throughput change?
+    family: Mooncake Connector/Operation Volume
+    question: What is the rate of change for mooncake store byte throughput?
     entity: connector_operation_status_ray
     inputs:
       bytes:
@@ -2375,8 +2381,8 @@ views:
       - Version
       omit: {}
   mooncake_connector.volume.failed_keys:
-    family: vLLM/Mooncake Connector/Operation Volume
-    question: At what rate does mooncake store failed keys change?
+    family: Mooncake Connector/Operation Volume
+    question: What is the rate of change for mooncake store failed keys?
     entity: connector_operation_status_ray
     inputs:
       failed:
@@ -2391,8 +2397,8 @@ views:
       - Version
       omit: {}
   speculative_decoding.drafts:
-    family: vLLM/Speculative Decoding
-    question: At what rate does drafts change?
+    family: Speculative Decoding
+    question: What is the rate of change for drafts?
     entity: model_engine_ray
     inputs:
       drafts:
@@ -2407,8 +2413,8 @@ views:
       - Version
       omit: {}
   speculative_decoding.token_outcomes:
-    family: vLLM/Speculative Decoding
-    question: At what rate does draft token outcomes change?
+    family: Speculative Decoding
+    question: What is the rate of change for draft token outcomes?
     entity: model_engine_ray
     inputs:
       proposed:
@@ -2427,8 +2433,8 @@ views:
       - Version
       omit: {}
   speculative_decoding.accepted_by_position:
-    family: vLLM/Speculative Decoding
-    question: At what rate does accepted tokens by position change?
+    family: Speculative Decoding
+    question: What is the rate of change for accepted tokens by position?
     entity: model_engine_ray
     inputs:
       position:
@@ -2445,8 +2451,8 @@ views:
       - Version
       omit: {}
   diffusion_decoding.denoising_steps:
-    family: vLLM/Diffusion Decoding
-    question: At what rate does diffusion denoising steps change?
+    family: Diffusion Decoding
+    question: What is the rate of change for diffusion denoising steps?
     entity: model_engine_ray
     inputs:
       steps:
@@ -2461,8 +2467,8 @@ views:
       - Version
       omit: {}
   diffusion_decoding.canvas_positions:
-    family: vLLM/Diffusion Decoding
-    question: At what rate does diffusion canvas positions change?
+    family: Diffusion Decoding
+    question: What is the rate of change for diffusion canvas positions?
     entity: model_engine_ray
     inputs:
       positions:
@@ -2477,8 +2483,8 @@ views:
       - Version
       omit: {}
   diffusion_decoding.committed_tokens:
-    family: vLLM/Diffusion Decoding
-    question: At what rate does diffusion committed tokens change?
+    family: Diffusion Decoding
+    question: What is the rate of change for diffusion committed tokens?
     entity: model_engine_ray
     inputs:
       committed:
@@ -2493,7 +2499,7 @@ views:
       - Version
       omit: {}
   websocket_service.active_connections:
-    family: vLLM/WebSocket Service
+    family: WebSocket Service
     question: What is the current active websocket connections?
     entity: service
     inputs:
@@ -2506,8 +2512,8 @@ views:
       promote: []
       omit: {}
   websocket_service.connection_lifecycle:
-    family: vLLM/WebSocket Service
-    question: At what rate does websocket connection lifecycle change?
+    family: WebSocket Service
+    question: What is the rate of change for websocket connection lifecycle?
     entity: service
     inputs:
       opened:
@@ -2523,8 +2529,8 @@ views:
       promote: []
       omit: {}
   websocket_service.connection_duration:
-    family: vLLM/WebSocket Service
-    question: How is websocket connection duration distributed?
+    family: WebSocket Service
+    question: What is the distribution of websocket connection duration?
     entity: service
     inputs:
       connection_duration:
@@ -2536,7 +2542,7 @@ views:
       promote: []
       omit: {}
   websocket_service.completed_connection_time:
-    family: vLLM/WebSocket Service
+    family: WebSocket Service
     question: At what rate is connection time attributed when websocket connections close?
     entity: service
     inputs:
@@ -2549,8 +2555,8 @@ views:
       promote: []
       omit: {}
   tool_parsing.invocations:
-    family: vLLM/Tool Parsing
-    question: At what rate does tool parser invocations change?
+    family: Tool Parsing
+    question: What is the rate of change for tool parser invocations?
     entity: parser_request
     inputs:
       invocations:

@@ -25,7 +25,7 @@ Module: nats
 This collector monitors the activity and performance of NATS servers.
 
 
-It sends HTTP requests to the NATS HTTP server's dedicated [monitoring port](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#monitoring-nats).
+It sends HTTP requests to the NATS HTTP server's dedicated [monitoring port](https://docs.nats.io/learn/monitoring/monitoring-endpoints).
 
 
 This collector is supported on all platforms.
@@ -72,7 +72,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable NATS monitoring
 
-See [Enable monitoring](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#enabling-monitoring).
+See [Enable monitoring](https://docs.nats.io/learn/monitoring/monitoring-endpoints).
 
 
 
@@ -93,7 +93,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. | http://127.0.0.1:8222 | yes |
 |  | timeout | HTTP request timeout (seconds). | 1 | no |
-| **Validation** | healthz_check | Selects the `/healthz` [endpoint mode](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health-healthz). Options: `default` (standard check), `js-enabled-only` (error if JetStream is disabled), `js-server-only` (skip account/stream/consumer checks). | default | no |
+| **Validation** | healthz_check | Selects the `/healthz` [endpoint mode](https://docs.nats.io/reference/system/monitor/healthz). Options: `default` (standard check), `js-enabled-only` (error if JetStream is disabled), `js-server-only` (skip account/stream/consumer checks). | default | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -287,7 +287,7 @@ Metrics:
 
 ### Per account
 
-These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
+These metrics refer to [Accounts](https://docs.nats.io/reference/system/monitor/accstatz).
 
 Labels:
 
@@ -313,7 +313,7 @@ Metrics:
 
 ### Per route
 
-These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
+These metrics refer to [Routes](https://docs.nats.io/reference/system/monitor/routez).
 
 Labels:
 
@@ -336,7 +336,7 @@ Metrics:
 
 ### Per inbound gateway connection
 
-These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/reference/system/monitor/gatewayz).
 
 Labels:
 
@@ -361,7 +361,7 @@ Metrics:
 
 ### Per outbound gateway connection
 
-These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/reference/system/monitor/gatewayz).
 
 Labels:
 
@@ -386,7 +386,7 @@ Metrics:
 
 ### Per leaf node connection
 
-These metrics refer to [Leaf Node Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information).
+These metrics refer to [Leaf Node Connections](https://docs.nats.io/reference/system/monitor/leafz).
 
 Labels:
 

@@ -95,8 +95,8 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | webadmin | Webadmin root path. | admin | yes |
 | **Limits** | max_queues | Maximum number of queues to collect concurrently. | 50 | no |
 |  | max_topics | Maximum number of topics to collect concurrently. | 50 | no |
-| **Filters** | queues_filter | Queue selector. Uses [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-|  | topics_filter | Topic selector. Uses [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+| **Filters** | queues_filter | Queue selector. Uses [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). |  | no |
+|  | topics_filter | Topic selector. Uses [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |

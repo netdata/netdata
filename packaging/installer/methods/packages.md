@@ -21,7 +21,7 @@ Our previous PackageCloud repositories are no longer updated. All packages are n
 Our repository system follows a structured organization:
 
 ```
-repository.netdata.cloud/repos/
+repository.netdata.cloud/repos/index.html
 ├── stable/                   # Stable Netdata Agent releases
 │   ├── debian/               # For Debian-based distributions
 │   │   ├── bullseye/         # Distribution codename directories
@@ -75,8 +75,8 @@ Each distribution has:
 1. Directories for each supported release version
 2. Subdirectories for each supported CPU architecture containing the actual packages
 
-**Example:** For RHEL 9 on 64-bit x86, you'll find the stable repository at:  
-[https://repository.netdata.cloud/repos/stable/el/9/x86_64/](https://repository.netdata.cloud/repos/stable/el/9/x86_64/)
+**Example:** For RHEL 9 on 64-bit x86, you can verify the stable repository through its metadata:
+[https://repository.netdata.cloud/repos/stable/el/9/x86_64/repodata/repomd.xml](https://repository.netdata.cloud/repos/stable/el/9/x86_64/repodata/repomd.xml)
 
 ### Package Signing
 
@@ -266,11 +266,11 @@ You can create local mirrors of our repositories using two main approaches:
 | Method           | Use case                              | Example |
 |------------------|---------------------------------------|---------|
 | Standard tools   | For formal repository mirroring | `aptly mirror create netdata-stable http://repository.netdata.cloud/repos/stable/debian/ bullseye/` |
-| Simple mirroring | For basic HTTP mirroring | `wget --mirror https://repository.netdata.cloud/repos/` |
+| Simple mirroring | For basic HTTP mirroring | `wget --mirror https://repository.netdata.cloud/repos/index.html` |
 
 ### Mirror Root URL
 
-[https://repository.netdata.cloud/repos/](https://repository.netdata.cloud/repos/)
+[https://repository.netdata.cloud/repos/index.html](https://repository.netdata.cloud/repos/index.html)
 
 ### Important Mirroring Tips
 
@@ -295,4 +295,3 @@ There are currently no official public mirrors of our repositories. If you wish 
 Please clearly inform your users that your mirror is not officially supported by Netdata. We recommend following industry best practices for repository mirroring and security.
 
 :::
-

@@ -6,6 +6,29 @@
     "plugin_name": {
       "type": "string"
     },
+    "profile_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Mappings from modules in this metadata document to stock Prometheus profiles whose curated coverage is projected into their integration pages.",
+      "properties": {
+        "modules": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "required": [
+        "modules"
+      ]
+    },
     "modules": {
       "description": "A list of module templates",
       "items": {

@@ -17,7 +17,7 @@ This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata rea
 ## Configure a new integration
 
 1. Go to **Settings → AI → MCP Connections**.
-2. Select an integration, such as **GitHub**, or choose **Custom MCP Server** to point at your own HTTPS MCP endpoint.
+2. Select an integration, such as **GitHub**, or choose **Custom MCP Server** to point at your own HTTPS MCP endpoint (see [Custom MCP Server requirements](#custom-mcp-server-requirements)).
 3. Choose an authentication method (see [Authentication methods](#authentication-methods) below). The available options depend on the integration.
 
    ![Choose an authentication method](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-auth.png)
@@ -104,3 +104,55 @@ See [Investigations](/docs/netdata-ai/investigations/index.md) and [Scheduled Re
 - **Read-only by design.** Only read-only tools can be enabled; mutating actions are never available through Netdata.
 - **OAuth respects your permissions.** With OAuth, each user authenticates individually and is limited to what they can already access in the connected system.
 - **Bearer tokens are Space-wide.** A bearer token is shared by everyone in the Space, so use it for providers where a shared, scoped access token is appropriate.
+
+## Custom MCP Server requirements
+
+The **Custom MCP Server** option accepts any MCP endpoint that meets the following:
+
+- **Transport:** Streamable HTTP over HTTPS. Any path works — Netdata uses the exact URL you configure. The optional standalone `GET` SSE stream isn't used, so the server must work without it.
+- **Authentication:** the token you provide is sent as `Authorization: Bearer <token>` on every request, including discovery. It is stored encrypted.
+- **TLS:** a publicly trusted certificate is required. Netdata validates against the system trust store — private CAs and self-signed certificates are rejected.
+- **Reachability:** the hostname must resolve to a public IP address. Loopback, private (RFC1918/ULA), link-local, CGNAT and multicast addresses are refused, both when you save the configuration and again before each connection.
+- **Redirects:** followed up to 10 hops, but every hop must stay HTTPS, resolve to a public IP, and remain on the same hostname — so your token is never forwarded to another host.
+- **Tool annotations:** only tools that advertise `annotations.readOnlyHint: true` in `tools/list` can be enabled. Read-only tools that omit the annotation are discovered but cannot be selected.
+
+Each MCP request has a 45-second timeout, and each tool result is truncated to 64 KiB before it reaches the model, so keep responses focused.
+
+## FAQ
+
+### Do MCP tool calls consume extra AI credits?
+
+No. There is no per-call or per-response charge.
+
+An investigation or scheduled report costs **1 AI credit when it completes**, no matter how many tools it calls. In conversations, tool results become part of the exchange, so a very verbose MCP server makes a conversation cost slightly more. See [Conversations](/docs/netdata-ai/conversations.md#ai-credits-consumption) and [Investigations](/docs/netdata-ai/investigations/index.md#availability-and-credits).
+
+### Does connecting a server consume credits?
+
+No. Connecting, authorizing and discovering tools never involve an AI model, so they cost nothing.
+
+### Is there a limit on how many tools an investigation may call?
+
+There is no fixed call count. Netdata AI decides which of the enabled tools to call, and how often, based on what it is investigating. Every investigation is bounded by its own time and context budget, so a run cannot loop indefinitely.
+
+### Can I choose which tools are available?
+
+Yes, at two levels:
+
+- **Per Space:** enable or disable each discovered tool, as in step 5 of [Configure a new integration](#configure-a-new-integration). Only enabled tools are ever offered to the model, and re-running discovery preserves your selections.
+- **Per conversation or report:** you pick which servers to include, up to 5 at a time — see [Using MCP servers](#using-mcp-servers). A connection is never used unless you select it.
+
+Selection is per *server*, not per *tool*: a single investigation cannot require or exclude an individual tool beyond what is enabled for the Space.
+
+### Can scheduled reports use MCP connections?
+
+Yes. The servers you select when you create the schedule are stored with it and reused on every run, exactly like an on-demand report.
+
+### Can I see which tools were used?
+
+In a conversation, yes: each tool call appears inline as it happens, with the tool and its result.
+
+Reports do not yet include a tool-call trace.
+
+### Which IP addresses does Netdata connect from?
+
+If your MCP endpoint is behind an IP allowlist, contact support for Netdata Cloud's current outbound addresses.
