@@ -460,7 +460,6 @@ RRDHOST *rrdhost_create(
     host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? false : health;
 
     spinlock_init(&host->receiver_lock);
-    stream_receiver_cadence_init(&host->stream.rcv.cadence);
     spinlock_init(&host->rrdhost_update_lock);
     rw_spinlock_init(&host->metadata_lifetime_lock);
     rw_spinlock_init(&host->ml_host_rwlock);

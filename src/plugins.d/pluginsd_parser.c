@@ -3,6 +3,7 @@
 #include "pluginsd_internals.h"
 #include "streaming/stream-replication-receiver.h"
 #include "database/rrddim-collection.h"
+#include "database/rrdset-collection.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -121,7 +122,6 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
         now_realtime_timeval(&tv);
 
     rrdset_timed_done(st, tv, pending_rrdset_next && *pending_rrdset_next ? true : false);
-    pluginsd_stream_receiver_cadence_observe_chart(parser, st);
 
     return PARSER_RC_OK;
 }
@@ -550,7 +550,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
-        pluginsd_stream_receiver_cadence_observe_chart(parser, st);
+        if(SERVING_STREAMING(parser))
+            rrdset_set_update_every_s(st, st->update_every);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART, NULL);
@@ -941,8 +942,6 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
         rrdset_set_update_every_s(st, update_every);
         update_every = st->update_every;
     }
-
-    pluginsd_stream_receiver_cadence_observe_chart(parser, st);
 
     timing_step(TIMING_STEP_BEGIN2_PARSE);
 

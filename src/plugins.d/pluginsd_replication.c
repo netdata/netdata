@@ -190,8 +190,6 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
             parser->user.replay.wall_clock_time = wall_clock_time;
             parser->user.replay.rset_enabled = true;
 
-            pluginsd_stream_receiver_cadence_observe_chart(parser, st);
-
             return PARSER_RC_OK;
         }
 
@@ -213,7 +211,6 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     parser->user.replay.end_time_ut = 0;
     parser->user.replay.wall_clock_time = 0;
     parser->user.replay.rset_enabled = false;
-    pluginsd_stream_receiver_cadence_observe_chart(parser, st);
     return PARSER_RC_OK;
 }
 
@@ -462,8 +459,6 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
         if (st->update_every != update_every_child)
             rrdset_set_update_every_s(st, update_every_child);
 
-        pluginsd_stream_receiver_cadence_observe_chart(parser, st);
-
         RRDSET_FLAGS old = rrdset_flag_set_and_clear(
             st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
             RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SYNC_CLOCK);
@@ -487,8 +482,6 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
 
         return PARSER_RC_OK;
     }
-
-    pluginsd_stream_receiver_cadence_observe_chart(parser, st);
 
     // ========================================================================
     // SAFETY NET: Detect stuck replication loops

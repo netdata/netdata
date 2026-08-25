@@ -102,9 +102,7 @@ The following are the parameters affected by the profile:
 |        machine learning training         |   off   |    auto    |   auto   |    auto    |
 | dbengine journal files unmapping timeout |   2m    |    off     |    2m    |     2m     |
 
-A few of these settings can be individually configured in `netdata.conf`, like the libc allocation arenas and machine learning.
-The profile also supplies the defaults for outbound streaming compression. Explicit compression-level settings in the sender-side
-`[stream]` section of `stream.conf` override the corresponding profile defaults.
+A few of these settings can be individually configured in `netdata.conf`, like the libc allocation arenas and machine learning. The rest are automatically set based on the profile.
 
 </details>
 

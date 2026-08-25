@@ -75,107 +75,35 @@ struct _stream_receive stream_receive = {
     }
 };
 
-static const struct {
-    compression_algorithm_t algorithm;
-    const char *setting;
-} sender_compression_level_settings[] = {
-    { COMPRESSION_ALGORITHM_BROTLI, "brotli compression level" },
-    { COMPRESSION_ALGORITHM_ZSTD,   "zstd compression level" },
-    { COMPRESSION_ALGORITHM_LZ4,    "lz4 compression acceleration" },
-    { COMPRESSION_ALGORITHM_GZIP,   "gzip compression level" },
-};
-
-typedef enum {
-    STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT,
-    STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY,
-    STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID,
-} STREAM_RECEIVER_KEEPALIVE_SOURCE;
-
 typedef struct {
     bool enabled;
     bool automatic;
-    bool valid;
-    bool bounded;
-    int configured_s;
     uint32_t idle_s;
-    STREAM_RECEIVER_KEEPALIVE_SOURCE source;
-    const char *raw_value;
 } STREAM_RECEIVER_KEEPALIVE_CONFIG;
 
-static bool stream_conf_duration_is_explicit_zero(const char *value) {
-    const char *s = value;
-    while(isspace((uint8_t)*s))
-        s++;
-
-    if(!strcasecmp(s, "off") || !strcasecmp(s, "never"))
-        return true;
-
-    bool parsed_number = false;
-    while(*s) {
-        while(isspace((uint8_t)*s))
-            s++;
-        if(!*s || !strcasecmp(s, "ago"))
-            break;
-
-        char *end;
-        NETDATA_DOUBLE number = str2ndd(s, &end);
-        if(end == s)
-            return false;
-
-        parsed_number = true;
-        if(number != 0)
-            return false;
-
-        s = end;
-        while(isspace((uint8_t)*s))
-            s++;
-        while(isalpha((uint8_t)*s))
-            s++;
-    }
-
-    return parsed_number;
-}
-
-static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(
-    STREAM_RECEIVER_KEEPALIVE_SOURCE source,
-    const char *value) {
-
+static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(const char *value) {
     STREAM_RECEIVER_KEEPALIVE_CONFIG parsed = {
         .enabled = true,
         .automatic = true,
-        .valid = true,
-        .idle_s = STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS,
-        .source = source,
-        .raw_value = value ? value : "auto",
     };
 
     if(!value || !strcasecmp(value, "auto"))
         return parsed;
 
-    int64_t configured_ns;
-    int configured_s;
-    const char *trimmed = value;
-    while(isspace((uint8_t)*trimmed))
-        trimmed++;
-
-    if(*trimmed == '-' || !duration_parse(value, &configured_ns, "s", "ns") || configured_ns < 0 ||
-       !duration_parse_seconds(value, &configured_s)) {
-        parsed.valid = false;
+    int64_t ns;
+    if(!duration_parse(value, &ns, "s", "ns") || ns < 0)
         return parsed;
-    }
 
     parsed.automatic = false;
-    parsed.configured_s = configured_s;
-    if(configured_ns == 0 && stream_conf_duration_is_explicit_zero(value)) {
+    if(ns == 0) {
         parsed.enabled = false;
-        parsed.idle_s = 0;
         return parsed;
     }
 
+    uint64_t seconds = 1 + ((uint64_t)ns - 1) / NSEC_PER_SEC;
     parsed.idle_s = (uint32_t)MIN(
-        MAX(configured_s, (int)STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
-        (int)STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
-    parsed.bounded = parsed.idle_s != (uint32_t)configured_s;
+        MAX(seconds, STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
+        STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
     return parsed;
 }
 
@@ -184,28 +112,10 @@ static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_resolve_receiver_keepalive(
     const char *api_key,
     const char *machine_guid) {
 
-    const char *section = NULL;
-    STREAM_RECEIVER_KEEPALIVE_SOURCE source = STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT;
-    if(inicfg_exists(config, machine_guid, "tcp keepalive idle")) {
-        section = machine_guid;
-        source = STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID;
-    }
-    else if(inicfg_exists(config, api_key, "tcp keepalive idle")) {
-        section = api_key;
-        source = STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY;
-    }
-
+    const char *section = inicfg_exists(config, machine_guid, "tcp keepalive idle") ? machine_guid :
+        inicfg_exists(config, api_key, "tcp keepalive idle") ? api_key : NULL;
     const char *value = section ? inicfg_get(config, section, "tcp keepalive idle", "auto") : "auto";
-    return stream_conf_parse_receiver_keepalive(source, value);
-}
-
-static const char *stream_conf_receiver_keepalive_source_name(STREAM_RECEIVER_KEEPALIVE_SOURCE source) {
-    switch(source) {
-        case STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY: return "API key section";
-        case STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID: return "machine GUID section";
-        case STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT: return "default";
-    }
-    return "default";
+    return stream_conf_parse_receiver_keepalive(value);
 }
 
 static void stream_conf_resolve_sender_compression_levels(
@@ -230,193 +140,72 @@ static void stream_conf_resolve_sender_compression_levels(
             break;
     }
 
-    for(size_t i = 0; i < _countof(sender_compression_level_settings); i++) {
-        compression_algorithm_t algorithm = sender_compression_level_settings[i].algorithm;
-        levels[algorithm] = (int)inicfg_get_number(
-            config, CONFIG_SECTION_STREAM, sender_compression_level_settings[i].setting, levels[algorithm]);
-    }
+    levels[COMPRESSION_ALGORITHM_BROTLI] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "brotli compression level", levels[COMPRESSION_ALGORITHM_BROTLI]);
+    levels[COMPRESSION_ALGORITHM_ZSTD] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "zstd compression level", levels[COMPRESSION_ALGORITHM_ZSTD]);
+    levels[COMPRESSION_ALGORITHM_LZ4] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "lz4 compression acceleration", levels[COMPRESSION_ALGORITHM_LZ4]);
+    levels[COMPRESSION_ALGORITHM_GZIP] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "gzip compression level", levels[COMPRESSION_ALGORITHM_GZIP]);
 }
 
-void stream_conf_configure_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
+void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
     stream_conf_resolve_sender_compression_levels(&stream_config, profile, stream_send.compression.levels);
 }
 
-int stream_conf_compression_levels_unittest(void) {
-    static const struct {
-        const char *name;
-        ND_COMPRESSION_PROFILE profile;
-        const char *configured[COMPRESSION_ALGORITHM_MAX];
-        int expected[COMPRESSION_ALGORITHM_MAX];
-    } tests[] = {
-        {
-            .name = "balanced defaults",
-            .profile = ND_COMPRESSION_DEFAULT,
-            .expected = {
-                [COMPRESSION_ALGORITHM_ZSTD] = 3,
-                [COMPRESSION_ALGORITHM_LZ4] = 1,
-                [COMPRESSION_ALGORITHM_GZIP] = 3,
-                [COMPRESSION_ALGORITHM_BROTLI] = 3,
-            },
-        },
-        {
-            .name = "fastest defaults",
-            .profile = ND_COMPRESSION_FASTEST,
-            .expected = {
-                [COMPRESSION_ALGORITHM_ZSTD] = 1,
-                [COMPRESSION_ALGORITHM_LZ4] = 9,
-                [COMPRESSION_ALGORITHM_GZIP] = 1,
-                [COMPRESSION_ALGORITHM_BROTLI] = 1,
-            },
-        },
-        {
-            .name = "partial zstd override",
-            .profile = ND_COMPRESSION_FASTEST,
-            .configured = {
-                [COMPRESSION_ALGORITHM_ZSTD] = "19",
-            },
-            .expected = {
-                [COMPRESSION_ALGORITHM_ZSTD] = 19,
-                [COMPRESSION_ALGORITHM_LZ4] = 9,
-                [COMPRESSION_ALGORITHM_GZIP] = 1,
-                [COMPRESSION_ALGORITHM_BROTLI] = 1,
-            },
-        },
-        {
-            .name = "all explicit overrides",
-            .profile = ND_COMPRESSION_DEFAULT,
-            .configured = {
-                [COMPRESSION_ALGORITHM_ZSTD] = "19",
-                [COMPRESSION_ALGORITHM_LZ4] = "7",
-                [COMPRESSION_ALGORITHM_GZIP] = "8",
-                [COMPRESSION_ALGORITHM_BROTLI] = "10",
-            },
-            .expected = {
-                [COMPRESSION_ALGORITHM_ZSTD] = 19,
-                [COMPRESSION_ALGORITHM_LZ4] = 7,
-                [COMPRESSION_ALGORITHM_GZIP] = 8,
-                [COMPRESSION_ALGORITHM_BROTLI] = 10,
-            },
-        },
-        {
-            .name = "unknown profile fallback",
-            .profile = (ND_COMPRESSION_PROFILE)255,
-            .expected = {
-                [COMPRESSION_ALGORITHM_ZSTD] = 3,
-                [COMPRESSION_ALGORITHM_LZ4] = 1,
-                [COMPRESSION_ALGORITHM_GZIP] = 3,
-                [COMPRESSION_ALGORITHM_BROTLI] = 3,
-            },
-        },
-    };
-
+int stream_conf_unittest(void) {
     int errors = 0;
 
-    for(size_t i = 0; i < _countof(tests); i++) {
-        struct config config = APPCONFIG_INITIALIZER;
-        int levels[COMPRESSION_ALGORITHM_MAX] = { 0 };
+    struct config config = APPCONFIG_INITIALIZER;
+    int levels[COMPRESSION_ALGORITHM_MAX] = { 0 };
+    stream_conf_resolve_sender_compression_levels(&config, ND_COMPRESSION_FASTEST, levels);
+    if(levels[COMPRESSION_ALGORITHM_ZSTD] != 1 || levels[COMPRESSION_ALGORITHM_LZ4] != 9 ||
+       levels[COMPRESSION_ALGORITHM_BROTLI] != 1 || levels[COMPRESSION_ALGORITHM_GZIP] != 1)
+        errors++;
 
-        for(size_t j = 0; j < _countof(sender_compression_level_settings); j++) {
-            compression_algorithm_t algorithm = sender_compression_level_settings[j].algorithm;
-            if(tests[i].configured[algorithm])
-                inicfg_set(&config, CONFIG_SECTION_STREAM, sender_compression_level_settings[j].setting,
-                           tests[i].configured[algorithm]);
-        }
-
-        stream_conf_resolve_sender_compression_levels(&config, tests[i].profile, levels);
-
-        for(size_t j = 0; j < _countof(sender_compression_level_settings); j++) {
-            compression_algorithm_t algorithm = sender_compression_level_settings[j].algorithm;
-            if(levels[algorithm] != tests[i].expected[algorithm]) {
-                fprintf(stderr,
-                        "STREAM CONF COMPRESSION TEST '%s': %s expected %d, got %d\n",
-                        tests[i].name,
-                        sender_compression_level_settings[j].setting,
-                        tests[i].expected[algorithm],
-                        levels[algorithm]);
-                errors++;
-            }
-        }
-
-        inicfg_free(&config);
-    }
+    inicfg_set(&config, CONFIG_SECTION_STREAM, "zstd compression level", "19");
+    stream_conf_resolve_sender_compression_levels(&config, ND_COMPRESSION_FASTEST, levels);
+    if(levels[COMPRESSION_ALGORITHM_ZSTD] != 19 || levels[COMPRESSION_ALGORITHM_LZ4] != 9)
+        errors++;
 
     static const struct {
-        const char *name;
-        const char *api_value;
-        const char *machine_value;
+        const char *value;
         bool enabled;
         bool automatic;
-        bool valid;
-        bool bounded;
-        int configured_s;
         uint32_t idle_s;
-        STREAM_RECEIVER_KEEPALIVE_SOURCE source;
-        const char *raw_value;
     } keepalive_tests[] = {
-        { "default auto", NULL, NULL, true, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_DEFAULT, "auto" },
-        { "API auto", "auto", NULL, true, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "auto" },
-        { "uppercase auto", "AUTO", NULL, true, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "AUTO" },
-        { "API duration", "2m", NULL, true, false, true, false, 120, 120, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "2m" },
-        { "machine duration overrides API", "2m", "3m", true, false, true, false, 180, 180, STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "3m" },
-        { "machine auto overrides API", "2m", "auto", true, true, true, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "auto" },
-        { "machine invalid overrides API", "2m", "invalid", true, true, false, false, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "invalid" },
-        { "zero disables", "0", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0" },
-        { "zero milliseconds disables", "0ms", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0ms" },
-        { "off disables", "off", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "off" },
-        { "never disables", "never", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "never" },
-        { "positive millisecond clamps to lower bound", "1ms", NULL, true, false, true, true, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "1ms" },
-        { "positive fractional second clamps to lower bound", "0.1s", NULL, true, false, true, true, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0.1s" },
-        { "positive sub-nanosecond clamps to lower bound", "0.1ns", NULL, true, false, true, true, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0.1ns" },
-        { "machine disabled overrides API", "2m", "off", false, false, true, false, 0, 0,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "off" },
-        { "machine duration overrides API disabled", "off", "3m", true, false, true, false, 180, 180,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "3m" },
-        { "negative falls back to auto", "-1s", NULL, true, true, false, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "-1s" },
-        { "negative fractional second falls back to auto", "-0.1s", NULL, true, true, false, false, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "-0.1s" },
-        { "exact lower bound", "30s", NULL, true, false, true, false, 30, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "30s" },
-        { "below lower bound", "29s", NULL, true, false, true, true, 29, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "29s" },
-        { "exact upper bound", "1h", NULL, true, false, true, false, 3600, 3600, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "1h" },
-        { "above upper bound", "3601s", NULL, true, false, true, true, 3601, 3600, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "3601s" },
-        { "huge duration falls back to auto", "999999999999999d", NULL, true, true, false, false, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "999999999999999d" },
-        { "unparseable falls back to auto", "not-a-duration", NULL, true, true, false, false, 0, 30,
-          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "not-a-duration" },
+        { "auto", true, true, 0 },
+        { "0", false, false, 0 },
+        { "off", false, false, 0 },
+        { "never", false, false, 0 },
+        { "1ms", true, false, 30 },
+        { "2m", true, false, 120 },
+        { "2h", true, false, 3600 },
+        { "invalid", true, true, 0 },
     };
 
     for(size_t i = 0; i < _countof(keepalive_tests); i++) {
-        struct config config = APPCONFIG_INITIALIZER;
-        if(keepalive_tests[i].api_value)
-            inicfg_set(&config, "api", "tcp keepalive idle", keepalive_tests[i].api_value);
-        if(keepalive_tests[i].machine_value)
-            inicfg_set(&config, "machine", "tcp keepalive idle", keepalive_tests[i].machine_value);
-
-        STREAM_RECEIVER_KEEPALIVE_CONFIG actual =
-            stream_conf_resolve_receiver_keepalive(&config, "api", "machine");
-        if(actual.enabled != keepalive_tests[i].enabled ||
-           actual.automatic != keepalive_tests[i].automatic ||
-           actual.valid != keepalive_tests[i].valid ||
-           actual.bounded != keepalive_tests[i].bounded ||
-           actual.configured_s != keepalive_tests[i].configured_s ||
-           actual.idle_s != keepalive_tests[i].idle_s ||
-           strcmp(actual.raw_value, keepalive_tests[i].raw_value) ||
-           actual.source != keepalive_tests[i].source) {
-            fprintf(stderr,
-                    "STREAM CONF KEEPALIVE TEST '%s': got enabled=%d automatic=%d valid=%d bounded=%d configured=%d idle=%u section=%s raw=%s\n",
-                    keepalive_tests[i].name, actual.enabled, actual.automatic, actual.valid, actual.bounded,
-                    actual.configured_s, actual.idle_s,
-                    stream_conf_receiver_keepalive_source_name(actual.source), actual.raw_value);
+        STREAM_RECEIVER_KEEPALIVE_CONFIG keepalive = stream_conf_parse_receiver_keepalive(keepalive_tests[i].value);
+        if(keepalive.enabled != keepalive_tests[i].enabled ||
+           keepalive.automatic != keepalive_tests[i].automatic ||
+           keepalive.idle_s != keepalive_tests[i].idle_s)
             errors++;
-        }
-        inicfg_free(&config);
     }
 
-    if(!errors)
-        fprintf(stderr, "STREAM CONF COMPRESSION AND RECEIVER KEEPALIVE TESTS PASSED\n");
+    inicfg_set(&config, "api", "tcp keepalive idle", "2m");
+    inicfg_set(&config, "machine", "tcp keepalive idle", "3m");
+    STREAM_RECEIVER_KEEPALIVE_CONFIG keepalive =
+        stream_conf_resolve_receiver_keepalive(&config, "api", "machine");
+    if(keepalive.automatic || !keepalive.enabled || keepalive.idle_s != 180)
+        errors++;
+
+    inicfg_free(&config);
+
+    if(errors)
+        fprintf(stderr, "STREAM CONF TESTS FAILED: %d error(s)\n", errors);
+    else
+        fprintf(stderr, "STREAM CONF TESTS PASSED\n");
 
     return errors;
 }
@@ -666,19 +455,6 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
     config->tcp_keepalive.enabled = keepalive.enabled;
     config->tcp_keepalive.automatic = keepalive.automatic;
     config->tcp_keepalive.idle_s = keepalive.idle_s;
-
-    if(!keepalive.valid)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM RCV '%s' [from [%s]:%s]: tcp keepalive idle = %s in the %s is invalid; using automatic receiver cadence",
-               rpt->hostname, rpt->remote_ip, rpt->remote_port,
-               keepalive.raw_value, stream_conf_receiver_keepalive_source_name(keepalive.source));
-    else if(!keepalive.automatic && keepalive.bounded)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM RCV '%s' [from [%s]:%s]: tcp keepalive idle = %s in the %s resolves to %d seconds "
-               "outside the supported range; using %u seconds",
-               rpt->hostname, rpt->remote_ip, rpt->remote_port,
-               keepalive.raw_value, stream_conf_receiver_keepalive_source_name(keepalive.source),
-               keepalive.configured_s, keepalive.idle_s);
 }
 
 bool stream_conf_is_key_type(const char *api_key, const char *type) {

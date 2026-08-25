@@ -4,6 +4,14 @@
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
 
+#if defined(__APPLE__) && !defined(TCP_KEEPIDLE)
+#define TCP_KEEPIDLE TCP_KEEPALIVE
+#endif
+
+#define CONNECTION_PROBE_INTERVAL_SECONDS 10
+#define CONNECTION_PROBE_COUNT 3
+#define STREAM_RECEIVER_IDLE_TIMEOUT_MIN_SECONDS 600ULL
+
 #ifdef NETDATA_LOG_STREAM_RECEIVER
 #include "stream-trace.h"
 
@@ -415,36 +423,75 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static uint32_t stream_receiver_update_every(struct receiver_state *rpt) {
+    uint32_t update_every = __atomic_load_n(&rpt->host->stream.rcv.min_update_every, __ATOMIC_ACQUIRE);
+    if(update_every != UINT32_MAX)
+        return update_every;
+
+    return rpt->handshake_update_every > 0 ? (uint32_t)rpt->handshake_update_every : 0;
+}
+
+static uint64_t stream_receiver_application_timeout(struct receiver_state *rpt) {
+    return MAX(
+        STREAM_RECEIVER_IDLE_TIMEOUT_MIN_SECONDS,
+        (uint64_t)stream_receiver_update_every(rpt) * 2);
+}
+
+static uint32_t stream_receiver_automatic_keepalive_idle(struct receiver_state *rpt) {
+    uint64_t update_every = stream_receiver_update_every(rpt);
+    uint64_t idle = update_every ? (update_every + 1) / 2 : STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS;
+    return (uint32_t)MIN(
+        MAX(idle, STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
+        STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
+}
+
 static void stream_receiver_reconcile_keepalive(struct receiver_state *rpt) {
-    bool desired_enabled = rpt->config.tcp_keepalive.enabled;
-    uint32_t desired_idle_s = desired_enabled && rpt->config.tcp_keepalive.automatic ?
-        stream_receiver_cadence_automatic_keepalive_idle_seconds(&rpt->host->stream.rcv.cadence) :
+    bool enabled = rpt->config.tcp_keepalive.enabled;
+    uint32_t observed = __atomic_load_n(&rpt->host->stream.rcv.min_update_every, __ATOMIC_ACQUIRE);
+
+    if(rpt->thread.keepalive_initialized &&
+       (!rpt->config.tcp_keepalive.automatic ||
+        observed == __atomic_load_n(&rpt->host->stream.rcv.min_update_every_applied, __ATOMIC_RELAXED)))
+        return;
+
+    rpt->thread.keepalive_initialized = true;
+    __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, observed, __ATOMIC_RELAXED);
+
+    uint32_t idle_s = enabled && rpt->config.tcp_keepalive.automatic ?
+        stream_receiver_automatic_keepalive_idle(rpt) :
         rpt->config.tcp_keepalive.idle_s;
 
-    bool base_was_attempted = rpt->thread.keepalive.base_attempted;
-    STREAM_RECEIVER_KEEPALIVE_RESULT result = stream_receiver_socket_keepalive_reconcile(
-        rpt->sock.fd, desired_enabled, desired_idle_s, &rpt->thread.keepalive);
-
-    if(desired_enabled && !base_was_attempted && !rpt->thread.keepalive.base_applied &&
-       result != STREAM_RECEIVER_KEEPALIVE_NON_TCP)
+    int value = enabled;
+    if(setsockopt(rpt->sock.fd, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof(value)) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM RCV '%s' [from [%s]:%s]: cannot apply TCP keepalive probe settings on socket %d",
+               "STREAM RCV '%s' [from [%s]:%s]: cannot %s SO_KEEPALIVE on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+               enabled ? "enable" : "disable", rpt->sock.fd);
+        return;
+    }
+
+    if(!enabled)
+        return;
+
+#ifdef TCP_KEEPIDLE
+    value = (int)idle_s;
+    if(setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPIDLE, &value, sizeof(value)) != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPIDLE on socket %d",
                rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
-    if(result == STREAM_RECEIVER_KEEPALIVE_FAILED) {
-        if(desired_enabled)
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP keepalive idle to %u seconds on socket %d",
-                   rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, desired_idle_s, rpt->sock.fd);
-        else
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM RCV '%s' [from [%s]:%s]: cannot disable TCP keepalive on socket %d",
-                   rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-    }
-    else if(result == STREAM_RECEIVER_KEEPALIVE_OPTION_UNSUPPORTED)
+    value = CONNECTION_PROBE_INTERVAL_SECONDS;
+    if(setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPINTVL, &value, sizeof(value)) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM RCV '%s' [from [%s]:%s]: this platform cannot configure TCP keepalive idle per socket",
-               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPINTVL on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+
+    value = CONNECTION_PROBE_COUNT;
+    if(setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPCNT, &value, sizeof(value)) != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPCNT on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+#endif
 }
 
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt) {
@@ -472,7 +519,6 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
                "STREAM RCV '%s' [from [%s]:%s]: failed to set non-blocking mode on socket %d",
                rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
-    // The dispatcher owns this live descriptor and is the only thread allowed to change its keepalive policy.
     stream_receiver_reconcile_keepalive(rpt);
 
     __atomic_store_n(&rpt->host->stream.rcv.status.tid, gettid_cached(), __ATOMIC_RELAXED);
@@ -912,7 +958,6 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
         else if (likely(rc > 0)) {
             rpt->thread.last_traffic_ut = now_ut;
 
-            // Apply cadence changes produced by this parser batch without waiting for the periodic safety scan.
             stream_receiver_reconcile_keepalive(rpt);
 
             if(!stream_receiver_dequeue_senders(sth, rpt, now_ut))
@@ -1025,8 +1070,6 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         if (m->type != POLLFD_TYPE_RECEIVER) continue;
         struct receiver_state *rpt = m->rpt;
 
-        stream_receiver_reconcile_keepalive(rpt);
-
         // Probe socket to detect dead connections (e.g., from TCP keepalive)
         // Uses nd_sock_peek_nowait() which handles both SSL and plain TCP:
         // - For SSL: uses SSL_peek() to avoid corrupting SSL state
@@ -1086,12 +1129,12 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
 
-        uint64_t timeout_s = stream_receiver_cadence_application_timeout_seconds(&rpt->host->stream.rcv.cadence);
+        uint64_t timeout_s = stream_receiver_application_timeout(rpt);
         if(unlikely(!rpt->thread.last_traffic_ut) && now_ut)
             rpt->thread.last_traffic_ut = now_ut;
         usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->thread.last_traffic_ut);
 
-        if(unlikely(stream_receiver_cadence_application_timeout_expired(&rpt->host->stream.rcv.cadence, idle_ut) &&
+        if(unlikely(idle_ut > (usec_t)timeout_s * USEC_PER_SEC &&
                      !rrdhost_receiver_replicating_charts(rpt->host))) {
 
             ND_LOG_STACK lgs[] = {

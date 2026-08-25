@@ -765,8 +765,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
 
-        // Start a new observation epoch before accepting chart data from this connection.
-        stream_receiver_cadence_connection_start(&rpt->host->stream.rcv.cadence, rpt->handshake_update_every);
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELEASE);
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
 
         // mark all charts as obsolete
         svc_rrdhost_obsolete_all_charts(rpt->host);
