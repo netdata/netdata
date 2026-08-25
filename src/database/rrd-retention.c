@@ -8,8 +8,10 @@
 // The expected retention is an extrapolation of the current disk usage
 // (elapsed * 100 / disk_percent). On a mostly empty quota it grows without
 // bound: a 20 GiB tier with a few KiB used extrapolates to centuries. Cap it,
-// so the published value stays a plausible duration.
-#define MAX_EXPECTED_RETENTION_S (10 * 365 * 86400)
+// so the published value stays a plausible duration. The ceiling is set high
+// enough not to truncate realistic long estimates - a 20 GiB tier ingesting
+// ~1 GiB/year legitimately extrapolates to ~21 years.
+#define MAX_EXPECTED_RETENTION_S (25 * 365 * 86400)
 
 // Round retention time to more human-readable values (days/hours/minutes)
 static time_t round_retention(time_t retention_seconds) {
