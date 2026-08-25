@@ -81,6 +81,50 @@ typedef struct {
     uint32_t idle_s;
 } STREAM_RECEIVER_KEEPALIVE_CONFIG;
 
+static bool stream_conf_duration_is_explicit_zero(const char *value) {
+    const char *s = value;
+    while(isspace((uint8_t)*s))
+        s++;
+
+    if(!strcasecmp(s, "off") || !strcasecmp(s, "never"))
+        return true;
+
+    bool parsed_number = false;
+    while(*s) {
+        while(isspace((uint8_t)*s))
+            s++;
+        if(!*s || !strcasecmp(s, "ago"))
+            break;
+
+        char *end;
+        (void)str2ndd(s, &end);
+        if(end == s)
+            return false;
+
+        parsed_number = true;
+        for(const char *p = s; p < end && *p != 'e' && *p != 'E'; p++) {
+            if(*p >= '1' && *p <= '9')
+                return false;
+        }
+
+        s = end;
+        while(isspace((uint8_t)*s))
+            s++;
+        while(isalpha((uint8_t)*s))
+            s++;
+    }
+
+    return parsed_number;
+}
+
+static bool stream_conf_duration_has_ago_suffix(const char *value) {
+    const char *end = value + strlen(value);
+    while(end > value && isspace((uint8_t)end[-1]))
+        end--;
+
+    return end - value >= 3 && !strncasecmp(end - 3, "ago", 3);
+}
+
 static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(const char *value) {
     STREAM_RECEIVER_KEEPALIVE_CONFIG parsed = {
         .enabled = true,
@@ -90,17 +134,25 @@ static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(con
     if(!value || !strcasecmp(value, "auto"))
         return parsed;
 
+    const char *trimmed = value;
+    while(isspace((uint8_t)*trimmed))
+        trimmed++;
+
     int64_t ns;
-    if(!duration_parse(value, &ns, "s", "ns") || ns < 0)
+    if(*trimmed == '-' || !duration_parse(value, &ns, "s", "ns") || ns < 0)
+        return parsed;
+
+    bool explicit_zero = ns == 0 && stream_conf_duration_is_explicit_zero(value);
+    if(ns == 0 && !explicit_zero && stream_conf_duration_has_ago_suffix(value))
         return parsed;
 
     parsed.automatic = false;
-    if(ns == 0) {
+    if(explicit_zero) {
         parsed.enabled = false;
         return parsed;
     }
 
-    uint64_t seconds = 1 + ((uint64_t)ns - 1) / NSEC_PER_SEC;
+    uint64_t seconds = ns > 0 ? 1 + ((uint64_t)ns - 1) / NSEC_PER_SEC : 1;
     parsed.idle_s = (uint32_t)MIN(
         MAX(seconds, STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
         STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
@@ -177,8 +229,16 @@ int stream_conf_unittest(void) {
     } keepalive_tests[] = {
         { "auto", true, true, 0 },
         { "0", false, false, 0 },
+        { "0ms", false, false, 0 },
         { "off", false, false, 0 },
         { "never", false, false, 0 },
+        { "0.1ns", true, false, 30 },
+        { "-0.1ns", true, true, 0 },
+        { "0.1ns ago", true, true, 0 },
+        { "0.1nsago", true, true, 0 },
+        { "1e-400ns", true, false, 30 },
+        { "1e-400ns ago", true, true, 0 },
+        { "0e-400ns", false, false, 0 },
         { "1ms", true, false, 30 },
         { "2m", true, false, 120 },
         { "2h", true, false, 3600 },
