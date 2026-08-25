@@ -90,6 +90,18 @@ static inline bool proc_interrupts_word_has_trigger_suffix(const char *word) {
     return separator && proc_interrupts_word_is_trigger(separator + 1);
 }
 
+static size_t proc_interrupts_strnlen(const char *s, size_t max) {
+    size_t len = 0;
+
+    if(!s)
+        return 0;
+
+    while(len < max && s[len])
+        len++;
+
+    return len;
+}
+
 // The first word of a /proc/interrupts line, split into the interrupt id and - when the kernel
 // printed no space between the label and the first counter - that counter.
 //
@@ -107,7 +119,10 @@ struct interrupt_id {
 static struct interrupt_id proc_interrupts_parse_first_word(char *word) {
     struct interrupt_id rc = { .id = word, .idlen = 0, .glued_value = NULL, .skip = true };
 
-    if(unlikely(!word || !word[0]))
+    if(unlikely(!word))
+        return rc;
+
+    if(unlikely(!word[0]))
         return rc;
 
     char *colon = strchr(word, ':');
@@ -127,7 +142,7 @@ static struct interrupt_id proc_interrupts_parse_first_word(char *word) {
         *colon = '\0';
     }
 
-    rc.idlen = strlen(word);
+    rc.idlen = proc_interrupts_strnlen(word, MAX_INTERRUPT_NAME);
     rc.skip = (rc.idlen == 0);
 
     return rc;
@@ -176,18 +191,6 @@ static size_t proc_interrupts_name_first_word(
 
 static inline char proc_interrupts_name_char(char c) {
     return (c == ':' || isspace((uint8_t)c)) ? '_' : c;
-}
-
-static size_t proc_interrupts_strnlen(const char *s, size_t max) {
-    size_t len = 0;
-
-    if(!s)
-        return 0;
-
-    while(len < max && s[len])
-        len++;
-
-    return len;
 }
 
 static inline void proc_interrupts_append_char(char *dst, size_t *len, char c) {
