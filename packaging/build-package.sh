@@ -276,8 +276,23 @@ else
     add_cmake_option ENABLE_SENTRY Off
 fi
 
+# A compiler cache is an optimisation and must not be able to fail a build.
+# Without sccache these would make every compile fail, so drop them and build
+# normally. The remaining SCCACHE_* variables are inert without a launcher.
+if [ -n "${CMAKE_C_COMPILER_LAUNCHER:-}${CMAKE_CXX_COMPILER_LAUNCHER:-}${RUSTC_WRAPPER:-}" ] &&
+   ! command -v sccache > /dev/null 2>&1; then
+    echo "sccache is not available; building without a compiler cache."
+    unset CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER RUSTC_WRAPPER
+fi
+
 run_cmake
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)" -- -k 1
+
+# The sccache server dies with the build container, so its statistics cannot be
+# collected from a later step.
+if [ -n "${SCCACHE_BUCKET:-}" ]; then
+    sccache --show-stats || true
+fi
 
 if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
     sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources build/netdata
