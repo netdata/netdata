@@ -702,17 +702,20 @@ func (c *Collector) collectJobStatus(mx map[string]int64) {
 		return
 	}
 
-	assignJobChartIDs(jobs, c.seenJobs)
-	c.updateJobCharts(jobs, complete)
-
+	assignJobChartIDs(jobs, c.jobChartIDs)
 	for _, job := range jobs {
 		px := fmt.Sprintf("job_%s_", job.chartID)
 		mx[px+"enabled"] = boolToInt64(job.enabled)
 		mx[px+"disabled"] = boolToInt64(!job.enabled)
 	}
 
+	selectedJobs := c.updateJobCharts(jobs, complete)
+	if len(selectedJobs) == 0 {
+		return
+	}
+
 	if lastExecutions, ok := c.querySQLAgentJobLastExecutions(); ok {
-		for _, job := range jobs {
+		for _, job := range selectedJobs {
 			if lastExec, ok := lastExecutions[job.id]; ok {
 				collectJobLastExecution(mx, job, &lastExec)
 			} else {
@@ -722,7 +725,7 @@ func (c *Collector) collectJobStatus(mx map[string]int64) {
 	}
 
 	if currentExecutions, ok := c.querySQLAgentJobCurrentExecutions(); ok {
-		for _, job := range jobs {
+		for _, job := range selectedJobs {
 			mx[fmt.Sprintf("job_%s_current_execution_time", job.chartID)] = currentExecutions[job.id]
 		}
 	}
@@ -776,7 +779,17 @@ func assignJobChartIDs(jobs []sqlAgentJob, previous map[string]string) {
 		return jobs[i].id < jobs[j].id
 	})
 
-	used := make(map[string]bool, len(jobs))
+	current := make(map[string]bool, len(jobs))
+	for _, job := range jobs {
+		current[job.id] = true
+	}
+
+	used := make(map[string]bool, len(previous)+len(jobs))
+	for jobID, chartID := range previous {
+		if !current[jobID] {
+			used[chartID] = true
+		}
+	}
 	for i := range jobs {
 		if chartID := previous[jobs[i].id]; chartID != "" && !used[chartID] {
 			jobs[i].chartID = chartID
@@ -802,48 +815,63 @@ func assignJobChartIDs(jobs []sqlAgentJob, previous map[string]string) {
 	}
 }
 
-func (c *Collector) updateJobCharts(jobs []sqlAgentJob, removeMissing bool) {
+func (c *Collector) updateJobCharts(jobs []sqlAgentJob, inventoryComplete bool) []sqlAgentJob {
 	seen := make(map[string]bool, len(jobs))
 	currentChartIDs := make(map[string]bool, len(jobs))
 	for _, job := range jobs {
+		seen[job.id] = true
+		c.jobChartIDs[job.id] = job.chartID
 		currentChartIDs[job.chartID] = true
 	}
 
+	selected := jobs[:0]
 	for _, job := range jobs {
-		seen[job.id] = true
-
-		if chartID, ok := c.seenJobs[job.id]; ok {
+		if chartID, ok := c.activeJobs[job.id]; ok {
 			if chartID != job.chartID {
 				if !currentChartIDs[chartID] {
 					c.removeJobCharts(chartID)
 				}
-				c.addJobCharts(job)
-			} else {
-				c.updateJobChartsLabels(job)
 			}
-		} else {
-			c.addJobCharts(job)
 		}
-		c.seenJobs[job.id] = job.chartID
+
+		c.ensureJobStatusChart(job)
+		if job.enabled || c.CollectDisabledJobs {
+			c.ensureJobExecutionCharts(job)
+			selected = append(selected, job)
+		} else {
+			c.removeJobExecutionCharts(job.chartID)
+		}
+		c.updateJobChartsLabels(job)
+		c.activeJobs[job.id] = job.chartID
 	}
 
-	if !removeMissing {
-		return
+	if !inventoryComplete {
+		return selected
 	}
-	for jobID, chartID := range c.seenJobs {
+	for jobID, chartID := range c.activeJobs {
 		if seen[jobID] {
 			continue
 		}
 		c.removeJobCharts(chartID)
-		delete(c.seenJobs, jobID)
+		delete(c.activeJobs, jobID)
 	}
+	for jobID := range c.jobChartIDs {
+		if !seen[jobID] {
+			delete(c.jobChartIDs, jobID)
+		}
+	}
+	return selected
 }
 
 func (c *Collector) querySQLAgentJobLastExecutions() (map[string]sqlAgentJobLastExecution, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(ctx, queryJobLastExecutions)
+	query := queryJobLastExecutions
+	if c.CollectDisabledJobs {
+		query = queryJobLastExecutionsAll
+	}
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		c.Debugf("job last executions query failed: %v", err)
 		return nil, false
@@ -916,7 +944,11 @@ func (c *Collector) querySQLAgentJobCurrentExecutions() (map[string]int64, bool)
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(ctx, queryJobCurrentExecutions)
+	query := queryJobCurrentExecutions
+	if c.CollectDisabledJobs {
+		query = queryJobCurrentExecutionsAll
+	}
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		c.Debugf("job current executions query failed: %v", err)
 		return nil, false

@@ -161,6 +161,12 @@
         "minimum": 0.5,
         "default": 5
       },
+      "collect_disabled_jobs": {
+        "title": "Collect disabled SQL Agent job executions",
+        "description": "Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option adds four charts and eight dimensions per disabled job; stock execution alerts remain gated by the job's enabled state.",
+        "type": "boolean",
+        "default": false
+      },
       "functions": {
         "title": "Functions",
         "description": "Configuration for Netdata functions exposed by this collector.",
@@ -341,6 +347,12 @@
             "dsn",
             "timeout",
             "vnode"
+          ]
+        },
+        {
+          "title": "SQL Agent",
+          "fields": [
+            "collect_disabled_jobs"
           ]
         },
         {

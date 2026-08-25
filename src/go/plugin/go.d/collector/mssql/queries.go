@@ -219,22 +219,27 @@ ORDER BY name, job_id;
 `
 
 // queryJobLastExecutions gets the latest completed SQL Agent job execution.
-const queryJobLastExecutions = `
+const queryJobLastExecutionsHead = `
 WITH final_summary_rows AS (
   SELECT
-    job_id,
-    instance_id,
-    run_status,
-    run_date,
-    run_time,
-    run_duration,
+    sh.job_id,
+    sh.instance_id,
+    sh.run_status,
+    sh.run_date,
+    sh.run_time,
+    sh.run_duration,
     ROW_NUMBER() OVER (
-      PARTITION BY job_id
-      ORDER BY instance_id DESC
+      PARTITION BY sh.job_id
+      ORDER BY sh.instance_id DESC
     ) AS row_num
-  FROM msdb.dbo.sysjobhistory
-  WHERE step_id = 0
-    AND run_status IN (0, 1, 3)
+  FROM msdb.dbo.sysjobhistory AS sh
+  JOIN msdb.dbo.sysjobs AS j
+    ON j.job_id = sh.job_id
+  WHERE sh.step_id = 0
+    AND sh.run_status IN (0, 1, 3)
+`
+
+const queryJobLastExecutionsTail = `
 ),
 latest_final_summary AS (
   SELECT
@@ -307,24 +312,39 @@ LEFT JOIN failed_steps AS fs
   ON fs.job_id = ls.job_id;
 `
 
+const queryJobLastExecutions = queryJobLastExecutionsHead + `  AND j.enabled = 1
+` + queryJobLastExecutionsTail
+
+const queryJobLastExecutionsAll = queryJobLastExecutionsHead + queryJobLastExecutionsTail
+
 // queryJobCurrentExecutions gets current SQL Agent job execution runtime.
-const queryJobCurrentExecutions = `
+const queryJobCurrentExecutionsHead = `
 WITH latest_session AS (
   SELECT MAX(session_id) AS session_id
   FROM msdb.dbo.sysjobactivity
 )
 SELECT
-  CONVERT(varchar(36), job_id) AS job_id,
+  CONVERT(varchar(36), ja.job_id) AS job_id,
   CASE
-    WHEN start_execution_date IS NOT NULL
-     AND stop_execution_date IS NULL
-     AND DATEDIFF(second, start_execution_date, GETDATE()) > 0
-      THEN DATEDIFF(second, start_execution_date, GETDATE())
+    WHEN ja.start_execution_date IS NOT NULL
+     AND ja.stop_execution_date IS NULL
+     AND DATEDIFF(second, ja.start_execution_date, GETDATE()) > 0
+      THEN DATEDIFF(second, ja.start_execution_date, GETDATE())
     ELSE 0
   END AS current_execution_time_seconds
-FROM msdb.dbo.sysjobactivity
-WHERE session_id = (SELECT session_id FROM latest_session);
+FROM msdb.dbo.sysjobactivity AS ja
+JOIN msdb.dbo.sysjobs AS j
+  ON j.job_id = ja.job_id
+WHERE ja.session_id = (SELECT session_id FROM latest_session)
 `
+
+const queryJobCurrentExecutionsTail = `;
+`
+
+const queryJobCurrentExecutions = queryJobCurrentExecutionsHead + `  AND j.enabled = 1
+` + queryJobCurrentExecutionsTail
+
+const queryJobCurrentExecutionsAll = queryJobCurrentExecutionsHead + queryJobCurrentExecutionsTail
 
 // querySQLErrors gets SQL error counts from performance counters
 const querySQLErrors = `
