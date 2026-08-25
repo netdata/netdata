@@ -47,6 +47,14 @@ function(netdata_add_macos_package_target)
                 COMPONENT netdata
                 DESTINATION /Library/LaunchDaemons)
 
+        # Third-party licence notices: static distribution carries the bundled
+        # libraries' obligations into the package. The script runs at install
+        # time, after every bundled component's source exists in the build
+        # tree, and fails closed on a missing licence file.
+        configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/install-licenses.cmake.in"
+                       "${pkg_dir}/install-licenses.cmake" @ONLY)
+        install(SCRIPT "${pkg_dir}/install-licenses.cmake" COMPONENT netdata)
+
         # The uninstaller ships inside the payload so every installed Agent
         # carries the exact removal logic matching its own layout. It is
         # operator-run (sudo), unlike the maintainer scripts below.
