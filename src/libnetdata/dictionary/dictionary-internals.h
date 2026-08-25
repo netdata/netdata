@@ -13,9 +13,13 @@ typedef enum __attribute__ ((__packed__)) {
     DICT_FLAG_QUEUED_FOR_DESTRUCTION = (1 << 1), // this dictionary is queued for delayed destruction
 } DICT_FLAGS;
 
-#define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_RELAXED) & (flag))
-#define dict_flag_set(dict, flag)   __atomic_or_fetch(&((dict)->flags), flag, __ATOMIC_RELAXED)
-#define dict_flag_clear(dict, flag) __atomic_and_fetch(&((dict)->flags), ~(flag), __ATOMIC_RELAXED)
+// These are __ATOMIC_SEQ_CST, not relaxed: DICT_FLAG_DESTROYED is one half of
+// the admission handshake with the in-flight counter below, and that handshake
+// is only provable if all four operations involved are sequentially consistent.
+// See the comment on dictionary_api_enter().
+#define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define dict_flag_set(dict, flag)   __atomic_or_fetch(&((dict)->flags), flag, __ATOMIC_SEQ_CST)
+#define dict_flag_clear(dict, flag) __atomic_and_fetch(&((dict)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 // flags macros
 #define is_dictionary_destroyed(dict) dict_flag_check(dict, DICT_FLAG_DESTROYED)
@@ -29,12 +33,28 @@ typedef enum __attribute__ ((__packed__)) {
 // dictionary_destroy() can free the DICTIONARY (and the locks inside it) from
 // under it. See dictionary_destroy() and dictionary_free_all_resources().
 //
-// Ordering: an entering caller increments this counter (a SEQ_CST read-modify-
-// write, i.e. a full barrier) and only then touches the dictionary;
-// dictionary_destroy() sets DICT_FLAG_DESTROYED, issues a SEQ_CST fence, and
-// only then reads this counter. Sequential consistency guarantees the two
-// cannot miss each other: either the caller is counted, or it sees the
-// destroyed flag and bails out.
+// Ordering: this is the store-buffer (Dekker) pattern over two objects, and it
+// is made safe by keeping ALL FOUR operations __ATOMIC_SEQ_CST, so that they
+// all appear in the single total order S the C memory model defines:
+//
+//   entering caller     destroy
+//   ---------------     -------
+//   1. RMW  inflight++  3. RMW  flags |= DESTROYED
+//   2. load flags       4. load inflight
+//
+// Proof that the two cannot miss each other: suppose the caller's load (2)
+// does not observe the flag, i.e. (2) precedes (3) in S. Sequentially
+// consistent operations respect program order in S, so
+// (1) < (2) < (3) < (4) in S. A SEQ_CST load reads the last preceding write in
+// S, so (4) observes the increment of (1) and destroy defers. Either the caller
+// is counted, or it sees the destroyed flag and bails out.
+//
+// This is why dict_flag_check() / dict_flag_set() are SEQ_CST and not relaxed:
+// with a relaxed flag access the argument above collapses. A SEQ_CST RMW is not
+// a fence in the C model - it does not order a later relaxed load of a
+// different object - so both sides could legally miss each other and destroy
+// would free the dictionary under an entering caller. No explicit
+// __atomic_thread_fence() is needed once every operation is SEQ_CST.
 //
 // Limit: this protects a caller that has already entered the API. It cannot
 // protect a caller holding a stale DICTIONARY * that has not entered yet -

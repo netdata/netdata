@@ -197,9 +197,19 @@ void dictionary_print_still_allocated_stacktraces(void);
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
 // Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
 //
-// The set family MAY RETURN NULL: if another thread is destroying the
-// dictionary, the insert is refused and NULL (or false) is returned. Callers
-// that can race a dictionary_destroy() must check the result.
+// The set family MAY REFUSE THE INSERT: if another thread is destroying the
+// dictionary, nothing is inserted. How that is reported depends on the form:
+//
+//   dictionary_set_and_acquire_item*() - returns NULL. This is the ONLY
+//       unambiguous failure signal in the family: a successful insert always
+//       returns an acquired item. Callers that can race a dictionary_destroy()
+//       must check it.
+//   dictionary_set() / dictionary_set_advanced() / dictionary_view_set*() -
+//       return the item's value, so NULL is AMBIGUOUS. They also return NULL
+//       after a SUCCESSFUL insert with value_len == 0 (the value is NULL by
+//       design, see above), and on invalid input (bad or over-long name,
+//       over-long value). A caller that must distinguish refusal from either
+//       of those has to use the *_and_acquire_item*() form.
 //
 // Concurrency contract for dictionary_destroy():
 //   Safe   - other threads already inside the dictionary API (a set/get/del

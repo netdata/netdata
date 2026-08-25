@@ -710,6 +710,13 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 }
 
 DICTIONARY *dictionary_create_view(DICTIONARY *master) {
+    // Keep the MASTER alive for the whole view construction: we dereference it
+    // and mutate its hooks across dictionary_create_internal(), which allocates
+    // and takes locks. Without this, a concurrent dictionary_destroy(master)
+    // could observe inflight == 0 and free the master (and its hooks) while we
+    // are still building the view on top of it.
+    dictionary_api_enter(master);
+
     DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
                                                   master->value_aral ? aral_requested_element_size(master->value_aral) : 0);
 
@@ -733,6 +740,11 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
     dictionary_debug_track_dict(dict);
+
+    // matches dictionary_api_enter(master) above; the view now holds a hooks
+    // link, and the master's lifetime past this point is the caller's
+    dictionary_api_exit(master);
+
     return dict;
 }
 
@@ -794,13 +806,12 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         return 0;
     }
 
-    dict_flag_set(dict, DICT_FLAG_DESTROYED);
-
     // Publish the destroyed flag before reading the in-flight counter below.
-    // A thread entering the API increments that counter (a SEQ_CST RMW) before
-    // touching the dictionary, so this fence makes the two orderings meet:
-    // either we see its increment, or it sees our flag.
-    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    // Both are SEQ_CST, as is a caller's inflight++ / destroyed-flag check, so
+    // the four operations are totally ordered and the two sides cannot miss
+    // each other: either we observe the caller's increment and defer, or the
+    // caller observes this flag and bails out. See dictionary-internals.h.
+    dict_flag_set(dict, DICT_FLAG_DESTROYED);
 
     // Destroy the index while holding the items write lock.
     // This prevents a TOCTOU race: without this, a reader could pass the
