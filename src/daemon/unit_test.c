@@ -2563,6 +2563,110 @@ int test_sqlite(void) {
 }
 
 #ifdef OS_WINDOWS
+int unit_test_windows_os_version(void) {
+    static const struct {
+        const char *product_name;
+        const char *display_version;
+        const char *edition_id;
+        DWORD build;
+        DWORD ubr;
+        bool has_ubr;
+        bool is_server;
+        const char *name;
+        const char *version;
+        const char *release;
+        const char *edition;
+        const char *exact_build;
+    } cases[] = {
+        {"Windows Server 2022 Datacenter", "21H2", "ServerDatacenter", 20348, 2582, true, true,
+         "Windows Server", "2022", "21H2", "Datacenter", "20348.2582"},
+        {"Windows 10 Home", "24H2", "Core", 26100, 2605, true, false,
+         "Windows", "11", "24H2", "Home", "26100.2605"},
+        {"Windows 10 Home", "22H2", "Core", 19045, 0, true, false,
+         "Windows", "10", "22H2", "Home", "19045.0"},
+        {"Microsoft Windows Server 2022 Datacenter: Azure Edition", "23H2", "ServerDatacenter", 20348, 0, true, true,
+         "Windows Server", "2022", "23H2", "Datacenter: Azure Edition", "20348.0"},
+        {NULL, NULL, "Professional", 26100, 0, false, false,
+         "Windows", "11", "", "Professional", ""},
+        {NULL, NULL, "ServerDatacenter", 25000, 0, false, true,
+         "Windows Server", "2022", "", "ServerDatacenter", ""},
+        {NULL, NULL, "ServerDatacenter", 26100, 0, false, true,
+         "Windows Server", "2025", "", "ServerDatacenter", ""},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        NETDATA_WINDOWS_OS_LABELS labels;
+        netdata_windows_parse_os_labels(&labels, cases[i].product_name, cases[i].display_version, cases[i].edition_id,
+                                        cases[i].build, cases[i].ubr, cases[i].has_ubr, cases[i].is_server);
+        if(strcmp(labels.name, cases[i].name) || strcmp(labels.version, cases[i].version) ||
+           strcmp(labels.release, cases[i].release) || strcmp(labels.edition, cases[i].edition) ||
+           strcmp(labels.build, cases[i].exact_build)) {
+            fprintf(stderr,
+                    "unit_test_windows_os_version: case '%s' produced name='%s' version='%s' release='%s' edition='%s' build='%s'\n",
+                    cases[i].product_name ? cases[i].product_name : "(NULL)",
+                    labels.name, labels.version, labels.release, labels.edition, labels.build);
+            failures++;
+        }
+    }
+
+    static const struct {
+        const char *product_name;
+        DWORD build;
+        bool is_server;
+        const char *expected;
+    } version_cases[] = {
+        {"Windows 10 Home", 19045, false, "Microsoft Windows 10 Home"},
+        {"Windows 10 Home", 26100, false, "Microsoft Windows 11 Home"},
+        {"Windows Server 2022 Datacenter", 20348, true, "Microsoft Windows Server 2022 Datacenter"},
+    };
+
+    for (size_t i = 0; i < sizeof(version_cases) / sizeof(version_cases[0]); i++) {
+        char version[256];
+        netdata_windows_format_os_version(version, sizeof(version), version_cases[i].product_name,
+                                          version_cases[i].build, version_cases[i].is_server);
+        if (strcmp(version, version_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: formatter case '%s' produced '%s'\n",
+                    version_cases[i].product_name, version);
+            failures++;
+        }
+    }
+
+    static const struct {
+        DWORD build;
+        bool is_server;
+        const char *edition_id;
+        const char *expected;
+    } id_like_cases[] = {
+        {25000, true, "ServerDatacenter", "Windows-Server-2022-ServerDatacenter"},
+        {26100, true, "ServerDatacenter", "Windows-Server-2025-ServerDatacenter"},
+        {9600, true, "ServerDatacenter", "Windows-Server-2012R2-ServerDatacenter"},
+        {26100, false, "Core", "Windows-11-Core"},
+        {19045, false, NULL, "Windows-10"},
+    };
+
+    for (size_t i = 0; i < sizeof(id_like_cases) / sizeof(id_like_cases[0]); i++) {
+        char id_like[256];
+        netdata_windows_format_os_id_like(id_like, sizeof(id_like), id_like_cases[i].build,
+                                          id_like_cases[i].edition_id, id_like_cases[i].is_server);
+        if (strcmp(id_like, id_like_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: id-like build %u produced '%s'\n",
+                    id_like_cases[i].build, id_like);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu label, %zu formatter, %zu id-like cases)\n",
+            sizeof(cases) / sizeof(cases[0]), sizeof(version_cases) / sizeof(version_cases[0]),
+            sizeof(id_like_cases) / sizeof(id_like_cases[0]));
+    return 0;
+}
+
 int unit_test_windows_virt_normalize(void) {
     static const struct {
         const char *raw;
