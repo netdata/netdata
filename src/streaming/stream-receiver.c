@@ -445,7 +445,7 @@ static uint32_t stream_receiver_automatic_keepalive_idle(struct receiver_state *
         STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
 }
 
-static void stream_receiver_reconcile_keepalive(struct receiver_state *rpt) {
+void stream_receiver_reconcile_keepalive(struct receiver_state *rpt) {
     bool enabled = rpt->config.tcp_keepalive.enabled;
     uint32_t observed = __atomic_load_n(&rpt->host->stream.rcv.min_update_every, __ATOMIC_ACQUIRE);
 

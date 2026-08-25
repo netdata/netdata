@@ -250,6 +250,9 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
             return false;
         }
+
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELEASE);
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -307,6 +310,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set timeout for socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
+            stream_receiver_reconcile_keepalive(rpt);
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->remote_ip, initial_response);
@@ -764,9 +768,6 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
-
-        __atomic_store_n(&rpt->host->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELEASE);
-        __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
 
         // mark all charts as obsolete
         svc_rrdhost_obsolete_all_charts(rpt->host);
