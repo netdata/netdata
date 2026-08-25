@@ -97,7 +97,17 @@ cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROU
 cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
 cmake_dependent_option(ENABLE_CGROUP_NAME "Build the cgroup-name helper" True "OS_LINUX;ENABLE_PLUGIN_GO" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+# eBPF support is 64-bit only: the legacy BPF objects we ship are fetched with no
+# architecture dimension (see NetdataEBPFLegacy.cmake - only libc varies), 32-bit
+# kernels provide no BTF to build CO-RE programs from, and the loaders share struct
+# layouts with the BPF side. On a 32-bit userland the plugin builds and installs but
+# cannot load a single program - it exits 1 and netdata disables it.
+cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX;CMAKE_SIZEOF_VOID_P EQUAL 8" False)
+
+if(OS_LINUX AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(STATUS "eBPF plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+endif()
+
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)

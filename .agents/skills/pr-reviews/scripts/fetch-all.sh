@@ -38,10 +38,24 @@ DIR="$(pr_state_dir "${PR}")"
 
 echo -e "${PR_GRAY}[fetch-all] PR ${SLUG}#${PR} -> ${DIR}${PR_NC}" >&2
 
+# Temporary files are per-invocation (mktemp) so concurrent runs never share a
+# name; a single trap removes whatever is still around on exit or failure.
+PR_TMP_FILES=()
+pr_cleanup_tmp() { (( ${#PR_TMP_FILES[@]} )) && rm -f "${PR_TMP_FILES[@]}"; return 0; }
+trap pr_cleanup_tmp EXIT
+
 # --- pr.json (state, head sha, draft, requested reviewers, ...) ------------
 gh pr view "${PR}" --repo "${SLUG}" --json \
-    number,title,state,isDraft,headRefName,headRefOid,baseRefName,baseRefOid,reviewDecision,reviewRequests,mergeable,mergeStateStatus,statusCheckRollup,labels,createdAt,updatedAt,author \
+    number,title,state,isDraft,headRefName,headRefOid,baseRefName,reviewDecision,reviewRequests,mergeable,mergeStateStatus,statusCheckRollup,labels,createdAt,updatedAt,author \
     > "${DIR}/pr.json"
+
+# `gh pr view --json` exposes no baseRefOid; the REST endpoint does (base.sha).
+# Merge it into pr.json so the summary can pin the exact base commit.
+base_sha="$(gh api "repos/${SLUG}/pulls/${PR}" --jq '.base.sha')"
+pr_json_tmp="$(mktemp "${DIR}/pr.json.XXXXXX")"
+PR_TMP_FILES+=("${pr_json_tmp}")
+jq --arg sha "${base_sha}" '. + {baseRefOid: $sha}' "${DIR}/pr.json" > "${pr_json_tmp}"
+mv "${pr_json_tmp}" "${DIR}/pr.json"
 
 # --- Helper: fetch a paginated REST endpoint with paranoia -----------------
 # Args: <api-path> <output-file> <kind-label>
@@ -115,7 +129,7 @@ owner="${SLUG%%/*}"
 name="${SLUG##*/}"
 
 threads_tmp="$(mktemp "${TMPDIR:-/tmp}/pr-threads-XXXXXX.json")"
-trap 'rm -f "${threads_tmp}"' EXIT
+PR_TMP_FILES+=("${threads_tmp}")
 
 cursor=""
 echo '[]' > "${DIR}/review-threads.json"

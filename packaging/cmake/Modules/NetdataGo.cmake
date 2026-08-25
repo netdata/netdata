@@ -21,6 +21,12 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
     endif()
 
     if(GO_FOUND)
-        set(ENABLE_PLUGIN_EBPF_GO ON)
+        # The BPF side is always LP64, and the loader shares struct layouts with it,
+        # so this plugin is only built for 64-bit userlands.
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(ENABLE_PLUGIN_EBPF_GO ON)
+        else()
+            message(STATUS "eBPF Go plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+        endif()
     endif()
 endif()

@@ -124,22 +124,87 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 		device            ddsnmp.DeviceConnectionInfo
 		pdus              []gosnmp.SnmpPDU
 		wantProfileVendor bool
+		wantProfileModel  string
 		wantVendor        string
 		wantModel         string
 	}{
-		"access point uses dynamic Ubiquiti identity": {
+		"access point prefers dedicated model OID": {
 			device: ddsnmp.DeviceConnectionInfo{
 				Hostname:    "192.0.2.20",
 				SysObjectID: "1.3.6.1.4.1.41112",
 				SysName:     "unifi-ap",
-				SysDescr:    "Ubiquiti UniFi U6 Mesh",
+				SysDescr:    "device model UAP-AC-LR 6.8.2.15592",
 				Vendor:      "Unknown",
 				Model:       "UniFi UAP-FlexHD",
 			},
-			pdus:              topologyUniFiAPPDUs(),
+			pdus:              append(topologyUniFiAPPDUs(), topologySysDescrPDU("device model UAP-AC-LR 6.8.2.15592")),
 			wantProfileVendor: true,
+			wantProfileModel:  "UniFi U6-Mesh",
 			wantVendor:        "Ubiquiti",
 			wantModel:         "UniFi U6-Mesh",
+		},
+		"U6 Mesh access point falls back to sysDescr": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.21",
+				SysObjectID: "1.3.6.1.4.1.41112",
+				SysName:     "unifi-u6-mesh",
+				SysDescr:    "Ubiquiti UniFi U6-Mesh 6.8.2.15592",
+				Vendor:      "Unknown",
+				Model:       "Unknown",
+			},
+			pdus: []gosnmp.SnmpPDU{
+				topologyOctetStringPDU("1.3.6.1.4.1.41112.1.6.3.3.0", ""),
+				topologySysDescrPDU("Ubiquiti UniFi U6-Mesh 6.8.2.15592"),
+			},
+			wantProfileVendor: true,
+			wantProfileModel:  "UniFi U6-Mesh",
+			wantVendor:        "Ubiquiti",
+			wantModel:         "UniFi U6-Mesh",
+		},
+		"UAP AC LR access point falls back to sysDescr": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.22",
+				SysObjectID: "1.3.6.1.4.1.41112",
+				SysName:     "unifi-uap-ac-lr",
+				SysDescr:    "device model UAP-AC-LR 6.8.2.15592",
+				Vendor:      "Unknown",
+				Model:       "Unknown",
+			},
+			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("device model UAP-AC-LR 6.8.2.15592")},
+			wantProfileVendor: true,
+			wantProfileModel:  "UniFi UAP-AC-LR",
+			wantVendor:        "Ubiquiti",
+			wantModel:         "UniFi UAP-AC-LR",
+		},
+		"UDR7 resolves explicit generic Net-SNMP identity": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.2",
+				SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+				SysName:     "unifi-udr7",
+				SysDescr:    "Linux appliance UniFi UDR7 5.1.19 ipq5322",
+				Vendor:      "net-snmp",
+				Model:       "Linux",
+			},
+			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("Linux appliance UniFi UDR7 5.1.19 ipq5322")},
+			wantProfileVendor: true,
+			wantProfileModel:  "UniFi UDR7",
+			wantVendor:        "Ubiquiti",
+			wantModel:         "UniFi UDR7",
+		},
+		"U6 Mesh Pro access point falls back to the longest matching model": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.23",
+				SysObjectID: "1.3.6.1.4.1.41112",
+				SysName:     "unifi-u6-mesh-pro",
+				SysDescr:    "Ubiquiti UniFi U6-Mesh-Pro 6.8.2",
+				Vendor:      "Unknown",
+				Model:       "Unknown",
+			},
+			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("Ubiquiti UniFi U6-Mesh-Pro 6.8.2")},
+			wantProfileVendor: true,
+			wantProfileModel:  "UniFi U6-Mesh-Pro",
+			wantVendor:        "Ubiquiti",
+			wantModel:         "UniFi U6-Mesh-Pro",
 		},
 		"switch overrides generic Net-SNMP vendor": {
 			device: ddsnmp.DeviceConnectionInfo{
@@ -150,7 +215,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "net-snmp",
 				Model:       "Linux",
 			},
-			pdus:              topologyUniFiSwitchPDUs(),
+			pdus:              append(topologyUniFiSwitchPDUs(), topologySysDescrPDU("Linux UBNT 4.4.153 mips")),
 			wantProfileVendor: true,
 			wantVendor:        "Ubiquiti",
 			wantModel:         "Linux",
@@ -164,7 +229,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "net-snmp",
 				Model:       "Linux",
 			},
-			pdus:              topologyUniFiGatewayPDUs(),
+			pdus:              append(topologyUniFiGatewayPDUs(), topologySysDescrPDU("Linux Router 6.6.43-ui-ipq9574 aarch64")),
 			wantProfileVendor: true,
 			wantVendor:        "Ubiquiti",
 			wantModel:         "Linux",
@@ -178,6 +243,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "net-snmp",
 				Model:       "Linux",
 			},
+			pdus:       []gosnmp.SnmpPDU{topologySysDescrPDU("Linux generic Net-SNMP agent")},
 			wantVendor: "net-snmp",
 			wantModel:  "Linux",
 		},
@@ -195,6 +261,11 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				assert.Equal(t, ddsnmp.MetaTag{Value: "Ubiquiti", IsExactMatch: true}, metadata["vendor"])
 			} else {
 				assert.NotContains(t, metadata, "vendor")
+			}
+			if tc.wantProfileModel != "" {
+				assert.Equal(t, ddsnmp.MetaTag{Value: tc.wantProfileModel, IsExactMatch: true}, metadata["model"])
+			} else {
+				assert.NotContains(t, metadata, "model")
 			}
 			device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, metadata, nil)
 
@@ -317,4 +388,8 @@ func topologyOctetPDU(name string, value ...byte) gosnmp.SnmpPDU {
 
 func topologyOctetStringPDU(name, value string) gosnmp.SnmpPDU {
 	return topologyOctetPDU(name, []byte(value)...)
+}
+
+func topologySysDescrPDU(value string) gosnmp.SnmpPDU {
+	return topologyOctetStringPDU("1.3.6.1.2.1.1.1.0", value)
 }
