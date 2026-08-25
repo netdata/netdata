@@ -111,9 +111,9 @@ Platforms in the community support tier are those which are primarily supported 
 | Fedora      | Rawhide   | No                       |                                                                                                           |
 | FreeBSD     | 13-STABLE | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo      | Latest    | No                       |                                                                                                           |
-| macOS       | 26        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
-| macOS       | 15        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
-| macOS       | 14        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
+| macOS       | 26        | Yes                      | Self-contained native package for Apple Silicon. Source builds require Homebrew for dependencies         |
+| macOS       | 15        | Yes                      | Self-contained native package for Apple Silicon. Source builds require Homebrew for dependencies         |
+| macOS       | 14        | Yes                      | Self-contained native package for Apple Silicon. Source builds require Homebrew for dependencies         |
 
 ## Binary Distribution Packages
 
@@ -124,6 +124,7 @@ For quick format guidance:
 - Docker under Linux is distributed as a `docker image`.
 - Static builds are distributed as `.gz.run` installers.
 - Linux native packages are distributed as `DEB` and `RPM` for platforms in the Core tier where native packages are available.
+- The macOS native package is distributed as a `.pkg` installer for Apple Silicon Macs running macOS 14 or newer. It is self-contained: it does not require Homebrew or any other dependencies.
 
 :::important
 
