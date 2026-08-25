@@ -4,6 +4,14 @@
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
 
+#if defined(__APPLE__) && !defined(TCP_KEEPIDLE)
+#define TCP_KEEPIDLE TCP_KEEPALIVE
+#endif
+
+#define CONNECTION_PROBE_INTERVAL_SECONDS 10
+#define CONNECTION_PROBE_COUNT 3
+#define STREAM_RECEIVER_IDLE_TIMEOUT_MIN_SECONDS 600ULL
+
 #ifdef NETDATA_LOG_STREAM_RECEIVER
 #include "stream-trace.h"
 
@@ -415,6 +423,128 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static uint32_t stream_receiver_update_every(struct receiver_state *rpt) {
+    uint32_t update_every = __atomic_load_n(&rpt->host->stream.rcv.min_update_every, __ATOMIC_ACQUIRE);
+    if(update_every != UINT32_MAX)
+        return update_every;
+
+    return rpt->handshake_update_every > 0 ? (uint32_t)rpt->handshake_update_every : 0;
+}
+
+static uint64_t stream_receiver_application_timeout(struct receiver_state *rpt) {
+    return MAX(
+        STREAM_RECEIVER_IDLE_TIMEOUT_MIN_SECONDS,
+        (uint64_t)stream_receiver_update_every(rpt) * 2);
+}
+
+static uint32_t stream_receiver_automatic_keepalive_idle(struct receiver_state *rpt) {
+    uint64_t update_every = stream_receiver_update_every(rpt);
+    uint64_t idle = update_every ? (update_every + 1) / 2 : STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS;
+    return (uint32_t)MIN(
+        MAX(idle, STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
+        STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
+}
+
+static void stream_receiver_log_poll_error(
+    struct stream_thread *sth, struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
+    char keepalive[128];
+    if(!rpt->config.tcp_keepalive.enabled)
+        snprintfz(keepalive, sizeof(keepalive), "disabled");
+    else {
+#ifdef TCP_KEEPIDLE
+        uint32_t idle_s = rpt->config.tcp_keepalive.automatic ?
+            stream_receiver_automatic_keepalive_idle(rpt) :
+            rpt->config.tcp_keepalive.idle_s;
+        snprintfz(keepalive, sizeof(keepalive),
+                  "enabled policy=%s idle=%us interval=%us probes=%u",
+                  rpt->config.tcp_keepalive.automatic ? "automatic" : "configured",
+                  idle_s, CONNECTION_PROBE_INTERVAL_SECONDS, CONNECTION_PROBE_COUNT);
+#else
+        snprintfz(keepalive, sizeof(keepalive),
+                  "enabled policy=%s socket_tuning=os-default",
+                  rpt->config.tcp_keepalive.automatic ? "automatic" : "configured");
+#endif
+    }
+
+    int socket_error = 0;
+    socklen_t socket_error_size = sizeof(socket_error);
+    if(getsockopt(rpt->sock.fd, SOL_SOCKET, SO_ERROR, &socket_error, &socket_error_size) != 0) {
+        int query_error = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection; "
+               "SO_ERROR is unavailable: %s (errno=%d); TCP keepalive: %s",
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+               stream_handshake_error_to_string(reason), strerror(query_error), query_error, keepalive);
+        return;
+    }
+
+    if(socket_error) {
+        errno = socket_error;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection; "
+               "SO_ERROR=%d (%s); TCP keepalive: %s",
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+               stream_handshake_error_to_string(reason), socket_error, strerror(socket_error), keepalive);
+    }
+    else {
+        errno_clear();
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection; "
+               "SO_ERROR=0 (no pending socket error); TCP keepalive: %s",
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+               stream_handshake_error_to_string(reason), keepalive);
+    }
+}
+
+void stream_receiver_reconcile_keepalive(struct receiver_state *rpt) {
+    bool enabled = rpt->config.tcp_keepalive.enabled;
+    uint32_t observed = __atomic_load_n(&rpt->host->stream.rcv.min_update_every, __ATOMIC_ACQUIRE);
+
+    if(rpt->thread.keepalive_initialized &&
+       (!rpt->config.tcp_keepalive.automatic ||
+        observed == __atomic_load_n(&rpt->host->stream.rcv.min_update_every_applied, __ATOMIC_RELAXED)))
+        return;
+
+    rpt->thread.keepalive_initialized = true;
+    __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, observed, __ATOMIC_RELAXED);
+
+    uint32_t idle_s = enabled && rpt->config.tcp_keepalive.automatic ?
+        stream_receiver_automatic_keepalive_idle(rpt) :
+        rpt->config.tcp_keepalive.idle_s;
+
+    int value = enabled;
+    if(setsockopt(rpt->sock.fd, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof(value)) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot %s SO_KEEPALIVE on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+               enabled ? "enable" : "disable", rpt->sock.fd);
+        return;
+    }
+
+    if(!enabled)
+        return;
+
+#ifdef TCP_KEEPIDLE
+    value = (int)idle_s;
+    if(setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPIDLE, &value, sizeof(value)) != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPIDLE on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+
+    value = CONNECTION_PROBE_INTERVAL_SECONDS;
+    if(setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPINTVL, &value, sizeof(value)) != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPINTVL on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+
+    value = CONNECTION_PROBE_COUNT;
+    if(setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPCNT, &value, sizeof(value)) != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPCNT on socket %d",
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+#endif
+}
+
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -439,6 +569,8 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV '%s' [from [%s]:%s]: failed to set non-blocking mode on socket %d",
                rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+
+    stream_receiver_reconcile_keepalive(rpt);
 
     __atomic_store_n(&rpt->host->stream.rcv.status.tid, gettid_cached(), __ATOMIC_RELAXED);
     rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
@@ -877,6 +1009,8 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
         else if (likely(rc > 0)) {
             rpt->thread.last_traffic_ut = now_ut;
 
+            stream_receiver_reconcile_keepalive(rpt);
+
             if(!stream_receiver_dequeue_senders(sth, rpt, now_ut))
                 status = EVLOOP_STATUS_SOCKET_ERROR;
         }
@@ -951,10 +1085,13 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
         STREAM_HANDSHAKE reason = events & ND_POLL_HUP ? STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE : STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR;
 
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection",
-               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
-               stream_handshake_error_to_string(reason));
+        if(events & ND_POLL_ERROR)
+            stream_receiver_log_poll_error(sth, rpt, reason);
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+                   stream_handshake_error_to_string(reason));
 
         stream_receiver_remove(sth, rpt, reason);
         return false;
@@ -1046,7 +1183,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
 
-        time_t timeout_s = 600;
+        uint64_t timeout_s = stream_receiver_application_timeout(rpt);
         if(unlikely(!rpt->thread.last_traffic_ut) && now_ut)
             rpt->thread.last_traffic_ut = now_ut;
         usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->thread.last_traffic_ut);
@@ -1074,10 +1211,10 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %" PRId64 " seconds - closing connection - "
+                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %" PRIu64 " seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, (int64_t)timeout_s,
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
                    stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
 
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_TIMEOUT);

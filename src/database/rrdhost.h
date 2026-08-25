@@ -245,6 +245,9 @@ struct rrdhost {
         // --- receiver ---
 
         struct {
+            uint32_t min_update_every;
+            uint32_t min_update_every_applied;
+
             struct {
                 SPINLOCK spinlock;                  // lock for the management of the allocation
                 uint32_t size;

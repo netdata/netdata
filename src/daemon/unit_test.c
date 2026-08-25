@@ -1913,6 +1913,11 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         "Unit Testing", "x", "unittest", NULL, 1,
         original_update_every, RRDSET_TYPE_LINE);
 
+    uint32_t old_min_update_every =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    uint32_t old_min_update_every_applied =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every_applied, __ATOMIC_RELAXED);
+
     int rc = 0;
     time_t previous = rrdset_set_update_every_s(st, 0);
     if(previous != original_update_every || st->update_every != original_update_every) {
@@ -1939,16 +1944,50 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
-    const time_t valid_update_every = INT32_MAX;
-    previous = rrdset_set_update_every_s(st, valid_update_every);
-    if(previous != original_update_every || st->update_every != valid_update_every) {
+    const time_t maximum_update_every = INT32_MAX;
+    previous = rrdset_set_update_every_s(st, maximum_update_every);
+    if(previous != original_update_every || st->update_every != maximum_update_every) {
         fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
-                __FUNCTION__, (long)previous, (long)valid_update_every, st->update_every);
+                __FUNCTION__, (long)previous, (long)maximum_update_every, st->update_every);
         rc = 1;
     }
 
     if(st->update_every != original_update_every)
         rrdset_set_update_every_s(st, original_update_every);
+
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
+
+    const time_t valid_update_every = 300;
+    previous = rrdset_set_update_every_s(st, valid_update_every);
+    if(previous != original_update_every || st->update_every != valid_update_every) {
+        fprintf(stderr, "%s: cadence update every did not change chart from %ld to %ld; current %d\n",
+                __FUNCTION__, (long)previous, (long)valid_update_every, st->update_every);
+        rc = 1;
+    }
+
+    uint32_t min_update_every =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    if(min_update_every != valid_update_every) {
+        fprintf(stderr, "%s: valid update every selected minimum %u instead of %ld seconds\n",
+                __FUNCTION__, min_update_every, valid_update_every);
+        rc = 1;
+    }
+
+    rrdset_set_update_every_s(st, 600);
+    min_update_every = __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    if(min_update_every != valid_update_every) {
+        fprintf(stderr, "%s: receiver minimum increased from %ld to %u seconds\n",
+                __FUNCTION__, valid_update_every, min_update_every);
+        rc = 1;
+    }
+
+    if(st->update_every != original_update_every)
+        rrdset_set_update_every_s(st, original_update_every);
+
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, old_min_update_every, __ATOMIC_RELAXED);
+    __atomic_store_n(
+        &st->rrdhost->stream.rcv.min_update_every_applied, old_min_update_every_applied, __ATOMIC_RELAXED);
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     nd_profile.update_every = old_update_every;
