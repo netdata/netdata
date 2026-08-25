@@ -1763,6 +1763,7 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_dyncfg.c
         src/plugins.d/pluginsd_dyncfg.h
         src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions-unittest.c
         src/plugins.d/pluginsd_functions.h
         src/plugins.d/pluginsd_internals.c
         src/plugins.d/pluginsd_internals.h
@@ -1770,6 +1771,20 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_parser.h
         src/plugins.d/pluginsd_replication.c
         src/plugins.d/pluginsd_replication.h
+)
+
+set(NRPC_FILES
+        src/nrpc/nrpc.h
+        src/nrpc/nrpc-internals.h
+        src/nrpc/nrpc-lifetime.h
+        src/nrpc/nrpc-builtin.c
+        src/nrpc/nrpc-calls.c
+        src/nrpc/nrpc-catalog.c
+        src/nrpc/nrpc-registry.c
+        src/nrpc/nrpc-serving.c
+        src/nrpc/nrpc-serving-internals.h
+        src/nrpc/nrpc-transport.h
+        src/nrpc/nrpc-unittest.c
 )
 
 set(RRD_PLUGIN_FILES
@@ -1790,13 +1805,7 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
         src/database/contexts/rrdcontext-worker.c
-        src/database/rrdcollector.c
-        src/database/rrdcollector.h
         src/database/rrddim.c
-        src/database/rrdfunctions.c
-        src/database/rrdfunctions.h
-        src/database/rrdfunctions-inline.c
-        src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
@@ -1830,13 +1839,6 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_alert.h
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
-        src/database/rrdfunctions-inflight.c
-        src/database/rrdfunctions-inflight.h
-        src/database/rrdfunctions-exporters.c
-        src/database/rrdfunctions-exporters.h
-        src/database/rrdfunctions-unittest.c
-        src/database/rrdfunctions-internals.h
-        src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
@@ -1982,7 +1984,6 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
-        src/streaming/protocol/command-function-del.c
         src/streaming/protocol/command-host-labels.c
         src/streaming/protocol/command-chart-definition.c
         src/streaming/protocol/command-begin-set-end-v2.c
@@ -2321,6 +2322,7 @@ set(NETDATA_FILES
         ${IDLEJITTER_PLUGIN_FILES}
         ${ML_FILES}
         ${PLUGINSD_PLUGIN_FILES}
+        ${NRPC_FILES}
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}

@@ -25,8 +25,13 @@ struct function_v2_entry {
     size_t size;
     size_t used;
     size_t *node_ids;
-    STRING *help;
-    STRING *tags;
+
+    // OWNED byte copies (see nrpc_catalog_host_to_dict): a borrowed STRING
+    // reference could be swapped and freed by a concurrent function
+    // re-registration before the rendering phase reads it
+    const char *help;
+    const char *tags;
+
     HTTP_ACCESS access;
     int priority;
     uint32_t version;
@@ -557,7 +562,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
 
                 rrdhost_health_to_json_v2(wb, "health", &s);
 
-                host_functions2json(host, wb); // functions
+                nrpc_catalog_host2json(rrdhost_nrpc_owner(host), wb); // functions
                 agent_capabilities_to_json(wb, host, "capabilities");
 
                 host_dyncfg_to_json_v2(wb, "dyncfg", &s);
@@ -688,10 +693,10 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             .help = NULL,
             .tags = NULL,
             .access = HTTP_ACCESS_ALL,
-            .priority = RRDFUNCTIONS_PRIORITY_DEFAULT,
-            .version = RRDFUNCTIONS_VERSION_DEFAULT,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
         };
-        host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
+        nrpc_catalog_host_to_dict(rrdhost_nrpc_owner(host), ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
     }
 
     if(ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS)) {
@@ -793,12 +798,18 @@ static bool functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     t->node_ids[t->used++] = *v;
 
+    // the loser's owned copies (the kept entry keeps its own)
+    freez((void *)n->help);
+    freez((void *)n->tags);
+
     return true;
 }
 
 static void functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct function_v2_entry *t = value;
     freez(t->node_ids);
+    freez((void *)t->help);
+    freez((void *)t->tags);
 }
 
 static void contexts_cleanup(struct context_v2_entry *n) {
@@ -1474,14 +1485,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 dfe_start_read(ctl.functions.dict, t) {
                     buffer_json_add_array_item_object(wb);
                     {
-                        const char *name = t_dfe.name ? strstr(t_dfe.name, RRDFUNCTIONS_VERSION_SEPARATOR) : NULL;
+                        const char *name = t_dfe.name ? strstr(t_dfe.name, NRPC_VERSION_SEPARATOR) : NULL;
                         if(name)
-                            name += sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) - 1;
+                            name += sizeof(NRPC_VERSION_SEPARATOR) - 1;
                         else
                             name = t_dfe.name;
 
                         buffer_json_member_add_string(wb, "name", name);
-                        buffer_json_member_add_string(wb, "help", string2str(t->help));
+                        buffer_json_member_add_string(wb, "help", t->help ? t->help : "");
 
                         if (!(ctl.options & CONTEXTS_OPTION_MCP)) {
                             buffer_json_member_add_array(wb, "ni");
@@ -1494,7 +1505,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                             buffer_json_member_add_uint64(wb, "priority", t->priority);
                             buffer_json_member_add_uint64(wb, "version", t->version);
                         }
-                        buffer_json_member_add_string(wb, "tags", string2str(t->tags));
+                        buffer_json_member_add_string(wb, "tags", t->tags ? t->tags : "");
                         http_access2buffer_json_array(wb, "access", t->access);
                     }
                     buffer_json_object_close(wb);

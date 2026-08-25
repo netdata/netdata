@@ -486,12 +486,10 @@ The plugin can register functions to Netdata, like this:
 - Priority defines the position of the function relative to the other functions (default is 100).
 - Version defines the version of the function (default is 0).
 
-Users can use a function to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
-
-- per node
-- per chart
-
-Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
+Users can use a function to ask for more information from the collector. Netdata maintains a per-node registry of
+functions; every function is registered host-wide. The `GLOBAL` word is accepted and optional: a `FUNCTION` line
+without it registers the function host-wide all the same (chart-scoped functions no longer exist - a line sent while a
+chart definition is open is coerced to host-wide, with a notice in the logs).
 
 Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
 
@@ -501,7 +499,7 @@ The plugin can unregister a previously registered function while continuing to r
 
 > FUNCTION_DEL [GLOBAL] "name of the function"
 
-- Use `GLOBAL` for host-level functions (the same scope as `FUNCTION GLOBAL`).
+- The delete is keyed on the function name alone; the optional `GLOBAL` word is accepted and ignored.
 - Unregistered functions disappear from `/api/v1/functions` and return 503 on calls.
 - Functions can be re-registered later with a new `FUNCTION` line.
 

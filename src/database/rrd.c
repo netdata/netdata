@@ -88,7 +88,7 @@ void api_v1_management_init(void);
 void rrdset_thread_rda_free(void);
 
 int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
-    nd_thread_register_cleanup(rrd_collector_finished);
+    nd_thread_register_cleanup(nrpc_serving_finished);
     nd_thread_register_cleanup(sender_thread_buffer_free);
     nd_thread_register_cleanup(rrdset_thread_rda_free);
     nd_thread_register_cleanup(query_target_free);

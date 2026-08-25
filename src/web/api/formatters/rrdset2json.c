@@ -102,7 +102,8 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     chart_labels2json(st, wb);
     buffer_json_object_close(wb);
 
+    // chart-scoped functions no longer exist; the key stays, always empty,
+    // so the payload shape is unchanged
     buffer_json_member_add_object(wb, "functions");
-    chart_functions2json(st, wb);
     buffer_json_object_close(wb);
 }

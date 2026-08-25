@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-tools-execute-function-registry.h"
-#include "database/rrdfunctions.h"
+#include "nrpc/nrpc.h"
 
 // Parameter type string mappings
 ENUM_STR_MAP_DEFINE(MCP_REQUIRED_PARAMS_TYPE) = {
@@ -328,23 +328,16 @@ static MCP_FUNCTION_REGISTRY_ENTRY *mcp_function_get_info(RRDHOST *host, const c
 
     // Call the function with info parameter
     BUFFER *response = buffer_create(0, NULL);
-    int code = rrd_function_run(
-        host,
-        response,
-        10,
-        auth.access,
-        info_function,
-        true,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        buffer_tostring(source),
-        false);
+    int code = nrpc_call(&(struct nrpc_call_spec) {
+        .owner = host ? rrdhost_nrpc_owner(host) : NRPC_OWNER_NONE,
+        .result_wb = response,
+        .cmd = info_function,
+        .source = buffer_tostring(source),
+        .user_access = auth.access,
+        .timeout_s = 10,
+        .wait = true,
+        .allow_restricted = false,
+    });
     
     if (code != HTTP_RESP_OK) {
         buffer_sprintf(error, "Failed to get function info: HTTP %d", code);

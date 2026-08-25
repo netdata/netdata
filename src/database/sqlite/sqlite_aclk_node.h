@@ -13,7 +13,7 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable);
 
 // Folds the ACLK session into the manifest content hash, so one value describes everything that must
 // force a re-publish. A collision would suppress a manifest the cloud never received, at the same
-// ~2^-64 manifest_dict_hash() already accepts for the content itself. Here (rather than beside its
+// ~2^-64 nrpc_catalog_manifest_hash() already accepts for the content itself. Here (rather than beside its
 // caller) so it can be unit tested.
 //
 // Every value including 0 is a valid key: what marks a config as having nothing outstanding is
@@ -119,7 +119,5 @@ static inline void manifest_pacer_end(MANIFEST_PACER *pacer)
 {
     pacer->cutoff = pacer->deferred ? pacer->deadlines[pacer->deferred - 1] : 0;
 }
-
-int rrdfunctions_manifest_pacer_unittest(void);
 
 #endif //NETDATA_SQLITE_ACLK_NODE_H

@@ -229,9 +229,13 @@ int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
-int rrdfunctions_verify_access_unittest(void);
-int rrdfunctions_manifest_unittest(void);
-int rrdfunctions_manifest_pacer_unittest(void);
+int nrpc_access_unittest(void);
+int nrpc_manifest_unittest(void);
+int nrpc_manifest_pacer_unittest(void);
+int nrpc_del_unittest(void);
+int nrpc_registry_unittest(void);
+int pluginsd_functions_unittest(void);
+int nrpc_catalog_unittest(void);
 int mcp_execute_function_access_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
@@ -516,9 +520,13 @@ int netdata_main(int argc, char **argv) {
                             if (uuid_unittest()) return 1;
                             if (os_socket_egress_interface_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
-                            if (rrdfunctions_verify_access_unittest()) return 1;
-                            if (rrdfunctions_manifest_unittest()) return 1;
-                            if (rrdfunctions_manifest_pacer_unittest()) return 1;
+                            if (nrpc_access_unittest()) return 1;
+                            if (nrpc_manifest_unittest()) return 1;
+                            if (nrpc_manifest_pacer_unittest()) return 1;
+                            if (nrpc_del_unittest()) return 1;
+                            if (nrpc_registry_unittest()) return 1;
+                            if (pluginsd_functions_unittest()) return 1;
+                            if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
@@ -742,11 +750,19 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "dyncfgtest") == 0)
                             return unittest_run_with_rrd(dyncfg_unittest);
                         else if(strcmp(optarg, "functionsaccesstest") == 0)
-                            return unittest_run_with_rrd(rrdfunctions_verify_access_unittest);
+                            return unittest_run_with_rrd(nrpc_access_unittest);
                         else if(strcmp(optarg, "functionsmanifesttest") == 0)
-                            return unittest_run_with_rrd(rrdfunctions_manifest_unittest);
+                            return unittest_run_with_rrd(nrpc_manifest_unittest);
                         else if(strcmp(optarg, "functionsmanifestpacertest") == 0)
-                            return unittest_run_with_rrd(rrdfunctions_manifest_pacer_unittest);
+                            return unittest_run_with_rrd(nrpc_manifest_pacer_unittest);
+                        else if(strcmp(optarg, "functionsdeltest") == 0)
+                            return unittest_run_with_rrd(nrpc_del_unittest);
+                        else if(strcmp(optarg, "functionsregistrytest") == 0)
+                            return unittest_run_with_rrd(nrpc_registry_unittest);
+                        else if(strcmp(optarg, "functionstransporttest") == 0)
+                            return unittest_run_with_rrd(pluginsd_functions_unittest);
+                        else if(strcmp(optarg, "functionsemitterstest") == 0)
+                            return unittest_run_with_rrd(nrpc_catalog_unittest);
                         else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
                             return unittest_run_with_rrd(mcp_execute_function_access_unittest);
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
@@ -1125,7 +1141,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("inflight functions");
 
-    rrd_functions_inflight_init();
+    nrpc_inflight_calls_create();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("silencers");

@@ -869,15 +869,21 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
 //    if(string_strcmp(ap->config.name, "ram_available") == 0)
 //        trace = true;
 
-    dyncfg_add(localhost, key, "/health/alerts/prototypes",
-               ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
-               ap->config.source_type, string2str(ap->config.source),
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
-                   DYNCFG_CMD_UPDATE | DYNCFG_CMD_USERCONFIG |
-                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG /* && !ap->_internal.is_on_disk */ ? DYNCFG_CMD_REMOVE : 0),
-               HTTP_ACCESS_NONE,
-               HTTP_ACCESS_NONE,
-               dyncfg_health_cb, NULL);
+    dyncfg_add(&(struct dyncfg_add_inline_spec) {
+        .host = localhost,
+        .id = key,
+        .path = "/health/alerts/prototypes",
+        .status = ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED,
+        .type = DYNCFG_TYPE_JOB,
+        .source_type = ap->config.source_type,
+        .source = string2str(ap->config.source),
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
+                DYNCFG_CMD_UPDATE | DYNCFG_CMD_USERCONFIG |
+                (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG /* && !ap->_internal.is_on_disk */ ? DYNCFG_CMD_REMOVE : 0),
+        .view_access = HTTP_ACCESS_NONE,
+        .edit_access = HTTP_ACCESS_NONE,
+        .cb = dyncfg_health_cb,
+    });
 
 #ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
     {
@@ -902,14 +908,19 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
 void health_dyncfg_register_all_prototypes(void) {
     RRD_ALERT_PROTOTYPE *ap;
 
-    dyncfg_add(localhost,
-               DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
-               DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
-               DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
-               HTTP_ACCESS_NONE,
-               HTTP_ACCESS_NONE,
-               dyncfg_health_cb, NULL);
+    dyncfg_add(&(struct dyncfg_add_inline_spec) {
+        .host = localhost,
+        .id = DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX,
+        .path = "/health/alerts/prototypes",
+        .status = DYNCFG_STATUS_ACCEPTED,
+        .type = DYNCFG_TYPE_TEMPLATE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+        .source = "internal",
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
+        .view_access = HTTP_ACCESS_NONE,
+        .edit_access = HTTP_ACCESS_NONE,
+        .cb = dyncfg_health_cb,
+    });
 
     dfe_start_read(health_globals.prototypes.dict, ap) {
         if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
