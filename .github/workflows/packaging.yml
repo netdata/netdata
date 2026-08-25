@@ -2,8 +2,12 @@
 # Handles building of binary packages for the agent.
 name: Packages
 on:
-  # TEMPORARY: pull_request trigger disabled while the macOS pkg work iterates;
-  # restore it (types: opened, reopened, labeled, synchronize) before merge.
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - labeled
+      - synchronize
   push:
     branches:
       - master

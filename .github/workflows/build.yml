@@ -150,9 +150,6 @@ jobs:
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
     runs-on: ubuntu-latest
-    # TEMPORARY: disabled while the macOS pkg work iterates; skipping this also
-    # skips prepare-upload and the artifact-verification jobs. Re-enable before merge.
-    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     outputs:
@@ -227,9 +224,6 @@ jobs:
   static-matrix: # Generate the static build matrix.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
-    # TEMPORARY: disabled while the macOS pkg work iterates; skipping this also
-    # skips build-static. Re-enable before merge.
-    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     outputs:
@@ -274,9 +268,6 @@ jobs:
   prepare-static-topology-ip-intel-stock:
     name: Prepare static topology-ip-intel stock payload
     runs-on: ubuntu-latest
-    # TEMPORARY: disabled while the macOS pkg work iterates (only build-static
-    # consumes it). Re-enable before merge.
-    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     steps:
@@ -496,9 +487,6 @@ jobs:
   windows-build: # Build on Windows
     name: Build Windows
     runs-on: windows-latest
-    # TEMPORARY: disabled while the macOS pkg work iterates; skipping this also
-    # skips windows-test. Re-enable before merge.
-    if: github.event_name == 'temporarily-disabled'
     needs:
       - file-check
     steps:
