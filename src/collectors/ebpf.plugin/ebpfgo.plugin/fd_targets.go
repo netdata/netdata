@@ -18,14 +18,59 @@ type FDTargets struct {
 	Close string
 }
 
-// fdOpenCandidates and fdCloseCandidates are ordered by preference, newest
-// kernel symbol first, mirroring open_targets[] / close_targets[] in the C
-// module.  Order matters: a kernel that exports both names must pick the newer
-// one, because that is the symbol the shipped BPF objects were built against.
-var (
-	fdOpenCandidates  = []string{"do_sys_openat2", "do_sys_open"}
-	fdCloseCandidates = []string{"close_fd", "__close_fd"}
-)
+// fdOpenCandidates is ordered by preference, newest kernel symbol first,
+// mirroring open_targets[] in the C module.  Both names are ABI-agnostic inner
+// functions: open(2), openat(2) and openat2(2) all funnel through
+// do_sys_openat2() (linux fs/open.c), so one probe covers every entry point.
+var fdOpenCandidates = []string{"do_sys_openat2", "do_sys_open"}
+
+// fdCloseCandidates prefers the architecture's close(2) syscall wrapper over the
+// inner helpers, and is the one place this collector deliberately diverges from
+// the C module it replaces.
+//
+// The C module used {"close_fd", "__close_fd"} only, and that list went stale:
+// since the close(2) refactor that introduced file_close_fd(), the syscall no
+// longer calls close_fd().  On linux 6.18 fs/open.c reads
+//
+//	SYSCALL_DEFINE1(close, unsigned int, fd) {
+//	        file = file_close_fd(fd);            // not close_fd()
+//	        retval = filp_flush(file, current->files);
+//
+// while fs/file.c still defines close_fd(), so the symbol resolves, the probe
+// attaches, the module loads — and the counter never moves.  Its only surviving
+// callers under fs/ are autofs' dev-ioctl and one path in fs/file.c, neither of
+// which runs in normal operation.  That is why the close charts read a flat zero
+// on any kernel with the refactor, in the C module as much as here.
+//
+// file_close_fd() is NOT a usable replacement: it returns struct file * (NULL for
+// a bad fd), and the shipped BPF program classifies errors with
+// `(int)PT_REGS_RC(ctx) < 0`.  On a pointer that test is effectively random, and
+// NULL is not negative, so real failures would be missed.  The syscall wrapper
+// returns the long the caller sees — 0 or -errno — so both the call count and the
+// error count are exact, on every kernel version, which is why it goes first
+// rather than being gated behind a version check.
+//
+// Only one wrapper name can exist on a given host, so their relative order is
+// irrelevant; what matters is that all of them precede the fallbacks.  Archs
+// without CONFIG_ARCH_HAS_SYSCALL_WRAPPER (32-bit arm, powerpc, and everything
+// before the wrappers existed) expose the plain sys_close.  The two historical
+// helpers stay last so a kernel predating the wrappers still resolves.
+//
+// KNOWN GAP: on x86_64 this selects __x64_sys_close, so closes issued by 32-bit
+// processes through the ia32 compat entry (__ia32_sys_close) are not counted.
+// Open does not have this asymmetry because it probes an inner function.
+// Counting both would need a second close link; see the SOW follow-up.
+var fdCloseCandidates = []string{
+	"__x64_sys_close",   // x86_64
+	"__ia32_sys_close",  // x86 32-bit (also the compat entry on x86_64)
+	"__arm64_sys_close", // aarch64
+	"__s390x_sys_close", // s390x
+	"__s390_sys_close",  // s390 compat
+	"__riscv_sys_close", // riscv
+	"sys_close",         // powerpc, 32-bit arm, and any kernel without syscall wrappers
+	"close_fd",          // inner helper: the close(2) path before file_close_fd() landed
+	"__close_fd",        // inner helper: the same, before it was renamed to close_fd()
+}
 
 // resolveFDTargets resolves both attach targets from the live symbol table.
 //

@@ -683,20 +683,28 @@ filesystem, the collector needs to attach `kprobes` and `kretprobes` for each of
 
 #### File descriptor
 
-To give metrics related to `open` and `close` events, instead of instrumenting each syscall used to do these events, the
-eBPFGo `fd` collector instruments the common kernel function behind them. The name of that function changed across kernel
-versions, so the collector resolves it from `/proc/kallsyms` at start-up, preferring the newer name:
+To give metrics related to `open` and `close` events, the eBPFGo `fd` collector resolves its attach symbols from
+`/proc/kallsyms` at start-up, because they differ across kernel versions and architectures.
+
+For open it instruments the inner function that every entry point funnels through, so one probe covers `open`, `openat`
+and `openat2`:
 
 - [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
     Function called from `do_sys_open` since version `5.6.0`.
 - [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
      open files on older kernels.
-- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
-    descriptor since kernel `5.11.0`.
-- `__close_fd`: Function used to close files before version `5.11.0`.
 
-Both are instrumented as return probes, because the return value is what distinguishes a successful call from a failed
-one. The selected eBPF object flavor supplies the appropriate attachment method for the running kernel.
+Close is resolved differently, because no inner function stayed on the close(2) path across kernel versions. Newer
+kernels call `file_close_fd()` from the syscall and leave `close_fd()` for in-kernel callers only, so a probe on the
+inner helper attaches successfully and then never fires. The collector therefore instruments the syscall itself:
+
+- `__x64_sys_close`, `__arm64_sys_close`, and the equivalents on other architectures with syscall wrappers.
+- `sys_close` on architectures without them, such as 32-bit ARM and PowerPC.
+- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html) and `__close_fd`, the inner
+    helpers, only as a fallback on kernels that predate the syscall wrappers.
+
+Both open and close are instrumented as return probes, because the return value is what distinguishes a successful call
+from a failed one. The selected eBPF object flavor supplies the appropriate attachment method for the running kernel.
 
 #### File error
 

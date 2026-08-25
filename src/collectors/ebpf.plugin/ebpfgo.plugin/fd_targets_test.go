@@ -26,8 +26,42 @@ func TestResolveFDTargetsFromReader(t *testing.T) {
 		wantClose string
 		wantErr   bool
 	}{
-		// Modern kernel: both newest symbols present.
-		"5-11-and-newer": {
+		// The case that motivated the fix: on a post-refactor kernel close_fd
+		// still exists (so it resolves and attaches) but the syscall no longer
+		// calls it.  The wrapper must win, or the close counters read zero.
+		"syscall wrapper wins over the stale inner helper": {
+			kallsyms: `
+ffffffff81000000 T do_sys_openat2
+ffffffff81000010 T close_fd
+ffffffff81000020 T file_close_fd
+ffffffff81000030 T __x64_sys_close
+`,
+			wantOpen:  "do_sys_openat2",
+			wantClose: "__x64_sys_close",
+		},
+		"arm64 wrapper": {
+			kallsyms: `
+ffffffff81000000 T do_sys_openat2
+ffffffff81000010 T close_fd
+ffffffff81000020 T __arm64_sys_close
+`,
+			wantOpen:  "do_sys_openat2",
+			wantClose: "__arm64_sys_close",
+		},
+		// powerpc and 32-bit arm have no CONFIG_ARCH_HAS_SYSCALL_WRAPPER, so the
+		// syscall symbol is the unprefixed one.
+		"unwrapped arch uses sys_close": {
+			kallsyms: `
+ffffffff81000000 T do_sys_openat2
+ffffffff81000010 T close_fd
+ffffffff81000020 T sys_close
+`,
+			wantOpen:  "do_sys_openat2",
+			wantClose: "sys_close",
+		},
+		// Pre-wrapper kernel: the historical helpers are all that exist, and the
+		// collector must still resolve rather than refuse to load.
+		"pre-wrapper kernel falls back to close_fd": {
 			kallsyms: `
 ffffffff81000000 T do_sys_openat2
 ffffffff81000010 T close_fd
@@ -44,6 +78,18 @@ ffffffff81000010 T __close_fd
 			wantOpen:  "do_sys_open",
 			wantClose: "__close_fd",
 		},
+		// file_close_fd is deliberately NOT a candidate: it returns struct file *,
+		// and the shipped BPF program classifies errors with `(int)ret < 0`, which
+		// is meaningless on a pointer and never true for the NULL error case.
+		"file_close_fd is never selected": {
+			kallsyms: `
+ffffffff81000000 T do_sys_openat2
+ffffffff81000010 T file_close_fd
+ffffffff81000020 T close_fd
+`,
+			wantOpen:  "do_sys_openat2",
+			wantClose: "close_fd",
+		},
 		// Transitional kernel exporting both open symbols: candidate order must
 		// pick do_sys_openat2, because that is what the shipped objects trace.
 		"both-open-symbols-present": {
@@ -55,7 +101,7 @@ ffffffff81000020 T __close_fd
 			wantOpen:  "do_sys_openat2",
 			wantClose: "__close_fd",
 		},
-		"both-close-symbols-present": {
+		"both-close-helpers-present": {
 			kallsyms: `
 ffffffff81000000 T __close_fd
 ffffffff81000010 T close_fd
@@ -153,14 +199,32 @@ func TestResolveFDTargetsFromReadFailure(t *testing.T) {
 	}
 }
 
-// TestFDCandidateOrder pins the preference order itself: the shipped BPF objects
-// trace the newest symbol, so degrading to the older one when both exist would
-// attach the wrong probe.
+// TestFDCandidateOrder pins the preference order itself.  Open traces the inner
+// function that every entry point funnels through; close traces the syscall
+// wrapper, and the two stale inner helpers must remain strictly last so a
+// post-refactor kernel can never select one of them.
 func TestFDCandidateOrder(t *testing.T) {
 	if fdOpenCandidates[0] != "do_sys_openat2" {
 		t.Errorf("fdOpenCandidates = %v, want do_sys_openat2 first", fdOpenCandidates)
 	}
-	if fdCloseCandidates[0] != "close_fd" {
-		t.Errorf("fdCloseCandidates = %v, want close_fd first", fdCloseCandidates)
+
+	tail := fdCloseCandidates[len(fdCloseCandidates)-2:]
+	if tail[0] != "close_fd" || tail[1] != "__close_fd" {
+		t.Fatalf("fdCloseCandidates = %v, want it to end with close_fd, __close_fd", fdCloseCandidates)
+	}
+
+	for i, candidate := range fdCloseCandidates[:len(fdCloseCandidates)-2] {
+		if candidate != "sys_close" && !strings.HasSuffix(candidate, "_sys_close") {
+			t.Errorf("fdCloseCandidates[%d] = %q, want a syscall symbol before the inner helpers",
+				i, candidate)
+		}
+	}
+
+	// file_close_fd() is in the close(2) path but returns struct file *, which the
+	// shipped program's `(int)ret < 0` error test cannot interpret.
+	for _, candidate := range fdCloseCandidates {
+		if candidate == "file_close_fd" {
+			t.Error("file_close_fd must not be a candidate: its struct file * return breaks error counting")
+		}
 	}
 }
