@@ -10,35 +10,14 @@
 #define STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS 30U
 #define STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS 3600U
 
-typedef struct stream_receiver_cadence_chart {
-    uint32_t update_every_s;
-    uint32_t generation;
-} STREAM_RECEIVER_CADENCE_CHART;
-
 typedef struct stream_receiver_cadence {
-    // The host owns this state. Mutation is locked; receiver threads consume the published values atomically.
-    SPINLOCK spinlock;
-    Pvoid_t intervals; // chart count by update interval for the current connection
-    uint32_t generation;
-    uint32_t provisional_update_every_s;
-    uint32_t minimum_update_every_s;
-    uint32_t learned_update_every_s;
-    uint32_t automatic_keepalive_idle_s;
-    uint64_t application_timeout_s __attribute__((aligned(8)));
+    uint32_t provisional_update_every_s; // used until a chart is observed on the connection
+    uint32_t minimum_update_every_s;     // UINT32_MAX until the first chart, then monotonically decreases
 } STREAM_RECEIVER_CADENCE;
 
 void stream_receiver_cadence_init(STREAM_RECEIVER_CADENCE *cadence);
 void stream_receiver_cadence_connection_start(STREAM_RECEIVER_CADENCE *cadence, int64_t handshake_update_every_s);
-void stream_receiver_cadence_destroy(STREAM_RECEIVER_CADENCE *cadence);
-
-void stream_receiver_cadence_chart_track(
-    STREAM_RECEIVER_CADENCE *cadence,
-    STREAM_RECEIVER_CADENCE_CHART *chart,
-    int64_t update_every_s,
-    bool active);
-void stream_receiver_cadence_chart_forget(
-    STREAM_RECEIVER_CADENCE *cadence,
-    STREAM_RECEIVER_CADENCE_CHART *chart);
+void stream_receiver_cadence_observe(STREAM_RECEIVER_CADENCE *cadence, int64_t update_every_s);
 
 uint64_t stream_receiver_cadence_application_timeout_seconds(const STREAM_RECEIVER_CADENCE *cadence);
 usec_t stream_receiver_cadence_application_timeout_usec(const STREAM_RECEIVER_CADENCE *cadence);
@@ -48,6 +27,6 @@ int stream_receiver_cadence_unittest(void);
 
 struct receiver_state;
 struct rrdset;
-void stream_receiver_cadence_chart_refresh(struct receiver_state *rpt, struct rrdset *st);
+void stream_receiver_cadence_observe_chart(struct receiver_state *rpt, struct rrdset *st);
 
 #endif // NETDATA_STREAM_RECEIVER_CADENCE_H

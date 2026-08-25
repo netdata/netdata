@@ -113,20 +113,21 @@ Children with retained data appear as **Stale** (or **Live** if actively streami
 | Child crashes or network drops    | **Cadence/configuration-dependent**    | TCP keepalive idle plus unanswered probes     |
 | Child silently stops sending data | **At least 10 minutes; cadence-aware** | Per-host idle activity timeout                |
 
-On platforms that support a per-socket keepalive idle value, the Parent defaults it to half of the fastest active chart
-cadence, rounded up and bounded to 30 seconds through 1 hour. A `tcp keepalive idle` value under the receiving
-`[API_KEY]` or `[MACHINE_GUID]` section can override the automatic value. After the idle period, the Parent sends up
-to three probes 10 seconds apart. Detection is therefore about 1 minute at the 30-second floor and slightly over 1 hour
-at the 1-hour cap, rather than a fixed 60 seconds. Platforms without a per-socket keepalive idle option retain their
-operating system's TCP keepalive timing.
+On platforms that support a per-socket keepalive idle value, the Parent defaults it to half of the fastest chart cadence
+observed during the current connection, rounded up and bounded to 30 seconds through 1 hour. A `tcp keepalive idle` value
+under the receiving `[API_KEY]` or `[MACHINE_GUID]` section can override the automatic value. After the idle period, the
+Parent sends up to three probes 10 seconds apart. Detection is therefore about 1 minute at the 30-second floor and slightly
+over 1 hour at the 1-hour cap, rather than a fixed 60 seconds. Platforms without a per-socket keepalive idle option retain
+their operating system's TCP keepalive timing.
 
 Setting `tcp keepalive idle = off` (or `0` or `never`) under the receiving `[API_KEY]` or `[MACHINE_GUID]` section disables
 `SO_KEEPALIVE` for matching connections. Dead-path detection then depends on socket errors, a remote close, incoming traffic,
 or the application-idle threshold.
 
-The silent-child timeout is `max(10 minutes, 2 × the minimum update interval)` across charts received from that host.
-The Parent retains the last learned minimum across reconnects and chart cleanup. Until a reconnect supplies its first
-chart definition, the Parent uses the larger of that retained minimum and the Child's handshake update interval.
+The silent-child timeout is `max(10 minutes, 2 × the minimum update interval)` across charts observed during the current connection.
+Before the first chart is observed, the Parent uses the Child's valid handshake update interval. The first chart replaces that
+provisional interval even when the chart is slower; later observations can only lower it. A reconnect resets the observation. A chart
+that slows down or disappears does not raise the selected interval on the existing connection.
 
 This timeout is automatic and not user-configurable. A Parent cannot infer a plugin-specific interval for a brand-new
 host before the unchanged Child sends its first chart definition; the 10-minute minimum applies until then.

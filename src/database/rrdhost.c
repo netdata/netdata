@@ -966,7 +966,6 @@ static void rrdhost_free_unlinked(RRDHOST *host) {
     rrdhost_destroy_rrdcontexts(host);
     rrdlabels_destroy(host->rrdlabels);
     destroy_aclk_config(host);
-    stream_receiver_cadence_destroy(&host->stream.rcv.cadence);
 
     string_freez(host->hostname);
     string_freez(host->os);

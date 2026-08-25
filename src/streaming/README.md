@@ -304,17 +304,19 @@ This area lets you customize settings for specific Child nodes by their unique I
 value for one Child. It is not a `[stream]` sender setting and does not require a Child update.
 
 `[MACHINE_GUID]` has precedence over `[API_KEY]`, including when the machine-specific value is `auto` or invalid. With the default
-`auto` value, the Parent uses half of the fastest active chart cadence received from that Child, rounded up and bounded to 30 seconds
-through 1 hour. Before chart metadata is available, the Parent uses the valid handshake cadence together with
-the last learned host cadence; if neither is available, it uses 30 seconds. The Parent updates the accepted socket while it remains
-connected. An explicit positive duration replaces the automatic value and is bounded to the same 30-second through one-hour range.
+`auto` value, the Parent uses half of the fastest chart cadence observed during the current connection, rounded up and bounded to 30
+seconds through 1 hour. Before the first chart is observed, the Parent uses the valid handshake cadence; if that is unavailable, it
+uses 30 seconds. The first chart replaces the provisional handshake cadence even when the chart is slower; later observations can only
+lower the automatic value while the socket remains connected. A reconnect resets the observation. An explicit positive duration
+replaces the automatic value and is bounded to the same 30-second through one-hour range.
 The values `0`, `off`, and `never` disable `SO_KEEPALIVE` for matching connections. Negative, too-large-to-parse, and otherwise invalid
 durations fall back to automatic cadence.
 
 The first keepalive probe starts after this idle period. Subsequent probes remain 10 seconds apart, and the connection is considered
 dead after three unanswered probes. Netdata's separate receiver application-idle threshold remains at least 10 minutes and is twice
-the selected chart cadence. When TCP keepalive is disabled, dead-path detection depends on socket errors, a remote close, incoming
-traffic, or the application-idle threshold.
+the selected connection cadence. A chart that slows down or disappears does not raise either automatic value until the Child
+reconnects. When TCP keepalive is disabled, dead-path detection depends on socket errors, a remote close, incoming traffic, or the
+application-idle threshold.
 
 ### Additional Settings
 
