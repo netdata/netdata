@@ -142,39 +142,40 @@ For internal plugins, the Netdata daemon already handles initialization and shut
 Register your configurations when your plugin initializes:
 
 ```c
-bool dyncfg_add(
-    RRDHOST *host,               // The host this configuration belongs to (localhost for global configs)
-    const char *id,              // Unique ID for this configuration
-    const char *path,            // Path for UI organization
-    DYNCFG_STATUS status,        // Initial status (ACCEPTED, DISABLED, etc.)
-    DYNCFG_TYPE type,            // SINGLE, TEMPLATE, or JOB
-    DYNCFG_SOURCE_TYPE source_type, // INTERNAL, DYNCFG, USER
-    const char *source,          // Source identifier (e.g., "internal")
-    DYNCFG_CMDS cmds,            // Supported commands (bitwise OR of DYNCFG_CMD_* values)
-    HTTP_ACCESS view_access,     // Access permissions for viewing
-    HTTP_ACCESS edit_access,     // Access permissions for editing
-    dyncfg_cb_t cb,              // Callback function for handling commands
-    void *data                   // User data passed to the callback
-);
+bool dyncfg_add(const struct dyncfg_add_inline_spec *spec);
+
+struct dyncfg_add_inline_spec {
+    RRDHOST *host;                    // The host this configuration belongs to (localhost for global configs)
+    const char *id;                   // Unique ID for this configuration
+    const char *path;                 // Path for UI organization
+    DYNCFG_STATUS status;             // Initial status (ACCEPTED, DISABLED, etc.)
+    DYNCFG_TYPE type;                 // SINGLE, TEMPLATE, or JOB
+    DYNCFG_SOURCE_TYPE source_type;   // INTERNAL, DYNCFG, USER
+    const char *source;               // Source identifier (e.g., "internal")
+    DYNCFG_CMDS cmds;                 // Supported commands (bitwise OR of DYNCFG_CMD_* values)
+    HTTP_ACCESS view_access;          // Access permissions for viewing
+    HTTP_ACCESS edit_access;          // Access permissions for editing
+    dyncfg_cb_t cb;                   // Callback function for handling commands
+    void *data;                       // User data passed to the callback
+};
 ```
 
 Example (from health_dyncfg.c):
 
 ```c
-dyncfg_add(
-    localhost,
-    DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, 
-    "/health/alerts/prototypes",
-    DYNCFG_STATUS_ACCEPTED, 
-    DYNCFG_TYPE_TEMPLATE,
-    DYNCFG_SOURCE_TYPE_INTERNAL, 
-    "internal",
-    DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
-    HTTP_ACCESS_NONE,
-    HTTP_ACCESS_NONE,
-    dyncfg_health_cb, 
-    NULL
-);
+dyncfg_add(&(struct dyncfg_add_inline_spec) {
+    .host = localhost,
+    .id = DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX,
+    .path = "/health/alerts/prototypes",
+    .status = DYNCFG_STATUS_ACCEPTED,
+    .type = DYNCFG_TYPE_TEMPLATE,
+    .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+    .source = "internal",
+    .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
+    .view_access = HTTP_ACCESS_NONE,
+    .edit_access = HTTP_ACCESS_NONE,
+    .cb = dyncfg_health_cb,
+});
 ```
 
 ### 3. Implement a Callback Function

@@ -36,6 +36,9 @@ All SQL Server editions are supported, including Express, Developer, Standard, E
 On editions that lack certain features, the collector omits the unavailable metrics and continues
 collecting the rest:
 - SQL Server Express and other editions without SQL Server Agent: job metrics are not collected.
+- Disabled SQL Server Agent jobs retain their administrative enabled/disabled status by default, while their
+  execution charts are excluded. Set `collect_disabled_jobs: true` to retain their execution charts; stock
+  execution alerts still apply only while a job is enabled.
 - Editions without Always On Availability Groups (e.g., Express): AG metrics are not collected.
 - Editions without replication configured: replication metrics are not collected.
 
@@ -108,6 +111,8 @@ The default configuration for this integration does not impose any limits on dat
 
 The collector executes lightweight queries against system views.
 Most queries complete in milliseconds and have minimal impact on server performance.
+Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds four charts with eight
+dimensions for every disabled job. The administrative job-status chart is always collected.
 
 
 ## Setup
@@ -250,6 +255,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
 |  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
 | **Target** | timeout | Query timeout (seconds). | 5 | no |
+| **SQL Agent** | collect_disabled_jobs | Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option adds four charts and eight dimensions per disabled job. Stock last-execution alerts remain gated by the job's enabled state. | no | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
@@ -468,8 +474,8 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ mssql_database_log_percent_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.database_log_percent_used | SQL Server transaction log percent used has been above 90% for the last 15 minutes |
-| [ mssql_sql_agent_job_last_execution_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.job_last_execution_status | SQL Server Agent job succeeded but at least one step failed in the last completed execution |
-| [ mssql_sql_agent_job_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.job_last_execution_status | SQL Server Agent job failed in the last completed execution |
+| [ mssql_sql_agent_job_last_execution_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.job_last_execution_status | Enabled SQL Server Agent job succeeded but at least one step failed in the last completed execution |
+| [ mssql_sql_agent_job_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf) | mssql.job_last_execution_status | Enabled SQL Server Agent job failed in the last completed execution |
 
 
 

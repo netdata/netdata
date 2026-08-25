@@ -19,7 +19,6 @@ extern struct config cloud_config;
 
 // Functions to free various configurations
 void claim_config_free(void);
-void rrd_functions_inflight_destroy(void);
 void cgroup_netdev_link_destroy(void);
 void bearer_tokens_destroy(void);
 void alerts_by_x_cleanup(void);
@@ -357,7 +356,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     mcp_functions_registry_cleanup();
     rrdhost_free_all();
     dyncfg_shutdown();
-    rrd_functions_inflight_destroy();
+    nrpc_inflight_calls_destroy();
+    nrpc_registries_destroy();
     health_plugin_destroy();
     cgroup_netdev_link_destroy();
     bearer_tokens_destroy();

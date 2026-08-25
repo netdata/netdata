@@ -9,7 +9,7 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
-#define RRDFUNCTIONS_DISKSPACE_HELP "Displays filesystem mount points with space utilization, available capacity, and inode usage statistics."
+#define FUNCTION_DISKSPACE_HELP "Displays filesystem mount points with space utilization, available capacity, and inode usage statistics."
 
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
@@ -868,7 +868,7 @@ static void diskspace_main_cleanup(void *ptr) {
     simple_pattern_free(excluded_zfs_datasets_pattern);
     excluded_zfs_datasets_pattern = NULL;
 
-    rrd_collector_finished();
+    nrpc_serving_finished();
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -894,7 +894,7 @@ static int diskspace_function_mount_points(BUFFER *wb, const char *function __ma
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_DISKSPACE_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_DISKSPACE_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_space_util = 0.0;
@@ -1105,11 +1105,17 @@ void diskspace_main(void *ptr) {
     netdata_mutex_init(&slow_mountinfo_mutex);
     diskspace_mountpoints_init();
 
-    rrd_function_add_inline(localhost, NULL, "mount-points", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_DISKSPACE_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            diskspace_function_mount_points);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "mount-points",
+        .help = FUNCTION_DISKSPACE_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = diskspace_function_mount_points,
+    });
 
     cleanup_mount_points = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 

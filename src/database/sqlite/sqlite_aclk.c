@@ -1407,13 +1407,20 @@ void aclk_arm_node_manifest(RRDHOST *host)
     // caller - rrdhost_free_unlinked() - and everything this function's callers depend on is torn
     // down earlier in it:
     //   1. rrdhost_index_del_by_guid()          - the host stops being findable
-    //   2. stream_receiver_signal_to_stop_and_wait() - blocks until host->receiver is NULL
-    //   3. rrd_functions_host_destroy()         - host->functions becomes NULL
+    //   2. stream_receiver_signal_to_stop_and_wait() - waits for host->receiver to become NULL,
+    //      but the wait is BOUNDED (~2s) and gives up on a stalled receiver thread, so step 2 is
+    //      best-effort, not a guarantee (pre-existing residual, tracked separately)
+    //   3. nrpc_registry_destroy()         - the host's registry entry is synchronously DISARMED
+    //      (owner callbacks cleared under the entry's lock, so the component can no longer call
+    //      this function for that host) and leaves the component index
     //   4. destroy_aclk_config()                - only now is the config freed
-    // So the function-registry callers (which must first mutate host->functions) and
-    // rrdhost_clear_receiver() (which runs before host->receiver is cleared) cannot still be
-    // running here, and a caller that reached this host through rrdhost_find_by_guid() did so
-    // before step 1. Do NOT "fix" this by routing the arm back through the ACLK event loop: that
+    // So the function-registry paths (which reach this only through the owner callback the disarm
+    // cleared in step 3) and rrdhost_clear_receiver() (which runs before host->receiver is
+    // cleared) cannot still be running here, and a caller that reached this host through
+    // rrdhost_find_by_guid() did so before step 1. An owner-callback invocation that snapshotted
+    // the callback JUST before the disarm is bounded by the owner's thread lifecycle: the sender
+    // is joined and the receiver stopped (best-effort, step 2) before step 3 runs.
+    // Do NOT "fix" this by routing the arm back through the ACLK event loop: that
     // publishes a borrowed RRDHOST pointer to another thread (a wider window on a longer-lived
     // object) and blocks the caller in push_cmd() when the command pool is full, sometimes while
     // holding the host functions lock.

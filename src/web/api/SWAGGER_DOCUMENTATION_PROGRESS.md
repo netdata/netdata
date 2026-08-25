@@ -2651,7 +2651,7 @@ Per dimension:
 **Source Code Locations:**
 - Registration: `src/web/api/web_api_v3.c:112-118`
 - Implementation: `src/web/api/v1/api_v1_function.c:29-226`
-- Function Execution: `src/database/rrdfunctions-inflight.c`
+- Function Execution: `src/nrpc/nrpc-calls.c`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_FUNCTIONS` - Requires function execution permission
@@ -3281,7 +3281,7 @@ Per dimension:
 ### REMOTE HOST HANDLING
 
 - If `host != localhost`, delegates to `call_function_bearer_get_token()`
-- Converts to function call via `rrd_function_run()` with function name `RRDFUNCTIONS_BEARER_GET_TOKEN`
+- Converts to function call via `nrpc_call()` with function name `FUNCTION_BEARER_GET_TOKEN`
 - Passes all auth context via JSON payload including user_role, access array, cloud_account_id, client_name
 
 ### VERIFICATION SUMMARY
@@ -4158,7 +4158,7 @@ Response structure is determined dynamically by the weights engine based on the 
 **Source Code Locations:**
 - Registration: `src/web/api/web_api_v1.c:118-125`
 - Implementation: `src/web/api/v1/api_v1_functions.c:5-19`
-- Response Generator: `src/database/rrdfunctions-exporters.c:95-127`
+- Response Generator: `src/nrpc/nrpc-catalog.c:95-127`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_FUNCTIONS`
