@@ -45,8 +45,9 @@ modules:
           On editions that lack certain features, the collector omits the unavailable metrics and continues
           collecting the rest:
           - SQL Server Express and other editions without SQL Server Agent: job metrics are not collected.
-          - Disabled SQL Server Agent jobs are excluded by default. Set `collect_disabled_jobs: true` to retain their
-            state and execution-history charts; stock execution alerts still apply only while a job is enabled.
+          - Disabled SQL Server Agent jobs retain their administrative enabled/disabled status by default, while their
+            execution charts are excluded. Set `collect_disabled_jobs: true` to retain their execution charts; stock
+            execution alerts still apply only while a job is enabled.
           - Editions without Always On Availability Groups (e.g., Express): AG metrics are not collected.
           - Editions without replication configured: replication metrics are not collected.
 
@@ -85,8 +86,8 @@ modules:
           description: |
             The collector executes lightweight queries against system views.
             Most queries complete in milliseconds and have minimal impact on server performance.
-            Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds five charts with ten
-            dimensions for every disabled job.
+            Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds four charts with eight
+            dimensions for every disabled job. The administrative job-status chart is always collected.
       additional_permissions:
         description: |
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
@@ -267,9 +268,10 @@ modules:
 
             - name: collect_disabled_jobs
               description: |
-                Collect status, last-execution, and current-execution charts for disabled SQL Server Agent jobs.
-                Disabled jobs are excluded by default. Enabling this option adds five charts and ten dimensions per
-                disabled job. Stock last-execution alerts remain gated by the job's enabled state.
+                Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL
+                Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option
+                adds four charts and eight dimensions per disabled job. Stock last-execution alerts remain gated by the
+                job's enabled state.
               default_value: false
               required: false
               group: SQL Agent

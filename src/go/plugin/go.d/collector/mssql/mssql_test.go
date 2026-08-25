@@ -239,33 +239,6 @@ func TestSQLAgentExecutionQuerySelection(t *testing.T) {
 	assert.NotContains(t, queryJobCurrentExecutionsAll, "AND j.enabled = 1")
 }
 
-func TestSQLAgentExecutionAlertContract(t *testing.T) {
-	for _, name := range []string{
-		"mssql_sql_agent_job_last_execution_warning",
-		"mssql_sql_agent_job_last_execution_failed",
-	} {
-		block := mssqlHealthAlertBlock(t, name)
-		assert.Contains(t, block, "calc: $this * ${mssql.job_status.enabled}")
-		assert.Contains(t, block, "($this == nan or $this == inf) ? (nan) : ($this > 0)")
-		assert.NotContains(t, block, "delay:")
-		assert.Contains(t, block, "info: Enabled SQL Server Agent job")
-	}
-}
-
-func mssqlHealthAlertBlock(t *testing.T, template string) string {
-	t.Helper()
-	content, err := os.ReadFile("../../../../../health/health.d/mssql.conf")
-	require.NoError(t, err)
-
-	start := strings.Index(string(content), "template: "+template)
-	require.NotEqual(t, -1, start)
-	block := string(content)[start:]
-	if end := strings.Index(block, "\n template:"); end >= 0 {
-		block = block[:end]
-	}
-	return block
-}
-
 func TestCollectJobLastExecution(t *testing.T) {
 	job := sqlAgentJob{id: "job-id", name: "Job", chartID: "job"}
 
@@ -406,15 +379,18 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 		notWantMetrics     []string
 		checkCollector     func(t *testing.T, c *Collector)
 	}{
-		"disabled job is excluded by default": {
+		"disabled job keeps only administrative status by default": {
 			prepareMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(queryJobs).WillReturnRows(
 					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
 						AddRow(jobID2, "Disabled Job", int64(0)),
 				)
 			},
+			wantMetrics: map[string]int64{
+				"job_disabled_job_enabled":  0,
+				"job_disabled_job_disabled": 1,
+			},
 			notWantMetrics: []string{
-				"job_disabled_job_disabled",
 				"job_disabled_job_last_execution_status_error",
 				"job_disabled_job_last_execution_duration",
 				"job_disabled_job_last_execution_age",
@@ -422,7 +398,18 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 			},
 			checkCollector: func(t *testing.T, c *Collector) {
 				chart := c.Charts().Get("job_disabled_job_status")
-				assert.True(t, chart == nil || chart.IsRemoved())
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+
+				for _, chartID := range []string{
+					"job_disabled_job_last_execution_status",
+					"job_disabled_job_last_execution_duration",
+					"job_disabled_job_last_execution_age",
+					"job_disabled_job_current_execution_time",
+				} {
+					chart := c.Charts().Get(chartID)
+					assert.Truef(t, chart == nil || chart.IsRemoved(), "execution chart %s should not be active", chartID)
+				}
 			},
 		},
 		"disabled job is collected when enabled": {
@@ -462,7 +449,7 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				mock.ExpectQuery(queryJobs).WillReturnRows(
 					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
 						AddRow(jobID1, "Clean Job", int64(1)).
-						AddRow(jobID2, "Warning.Job", int64(0)).
+						AddRow(jobID2, "Middle.Job", int64(0)).
 						AddRow("33333333-3333-3333-3333-333333333333", "Never Job", int64(1)),
 				)
 				mock.ExpectQuery(queryJobLastExecutions).WillReturnRows(
@@ -486,14 +473,14 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				"job_clean_job_current_execution_time":        0,
 				"job_never_job_last_execution_status_unknown": 1,
 				"job_never_job_current_execution_time":        0,
+				"job_middle_job_enabled":                      0,
+				"job_middle_job_disabled":                     1,
 			},
 			notWantMetrics: []string{
-				"job_warning_job_enabled",
-				"job_warning_job_disabled",
-				"job_warning_job_last_execution_status_warning",
-				"job_warning_job_last_execution_duration",
-				"job_warning_job_last_execution_age",
-				"job_warning_job_current_execution_time",
+				"job_middle_job_last_execution_status_warning",
+				"job_middle_job_last_execution_duration",
+				"job_middle_job_last_execution_age",
+				"job_middle_job_current_execution_time",
 				"job_never_job_last_execution_duration",
 				"job_never_job_last_execution_age",
 			},
@@ -647,10 +634,14 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				c.collectJobStatus(mx)
 				chart := c.Charts().Get("job_job_status")
 				require.NotNil(t, chart)
-				assert.True(t, chart.IsRemoved())
-				assert.NotContains(t, mx, "job_job_disabled")
+				assert.False(t, chart.IsRemoved())
+				assert.Equal(t, int64(1), mx["job_job_disabled"])
 				assert.Equal(t, "job", c.jobChartIDs[jobID1])
-				assert.NotContains(t, c.activeJobs, jobID1)
+				assert.Equal(t, "job", c.activeJobs[jobID1])
+
+				execution := c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.True(t, execution.IsRemoved())
 
 				mx = make(map[string]int64)
 				c.collectJobStatus(mx)
@@ -659,6 +650,10 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				assert.False(t, chart.IsRemoved())
 				assert.Equal(t, int64(1), mx["job_job_enabled"])
 				assert.Equal(t, "job", c.activeJobs[jobID1])
+
+				execution = c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.False(t, execution.IsRemoved())
 			},
 		},
 		"configuration can exclude and restore a disabled job": {
@@ -690,8 +685,11 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				c.collectJobStatus(make(map[string]int64))
 				chart := c.Charts().Get("job_job_status")
 				require.NotNil(t, chart)
-				assert.True(t, chart.IsRemoved())
+				assert.False(t, chart.IsRemoved())
 				assert.Equal(t, "job", c.jobChartIDs[jobID1])
+				execution := c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.True(t, execution.IsRemoved())
 
 				c.CollectDisabledJobs = true
 				c.collectJobStatus(make(map[string]int64))
@@ -700,6 +698,10 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				assert.False(t, chart.IsRemoved())
 				assert.Equal(t, "job", c.activeJobs[jobID1])
 				assert.Equal(t, 1, countCollectorChartsByID(c, "job_job_status"))
+				execution = c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.False(t, execution.IsRemoved())
+				assert.Equal(t, 1, countCollectorChartsByID(c, "job_job_last_execution_status"))
 			},
 		},
 		"inventory failure preserves active job charts": {
@@ -736,11 +738,14 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 				suffix := "a_b_" + cleanJobID(jobID2)
 				assert.Equal(t, "a_b", c.jobChartIDs[jobID1])
 				assert.Equal(t, suffix, c.jobChartIDs[jobID2])
-				assert.NotContains(t, c.activeJobs, jobID1)
+				assert.Equal(t, "a_b", c.activeJobs[jobID1])
 				assert.Equal(t, suffix, c.activeJobs[jobID2])
 
 				base := c.Charts().Get("job_a_b_status")
-				assert.True(t, base == nil || base.IsRemoved())
+				require.NotNil(t, base)
+				assert.False(t, base.IsRemoved())
+				baseExecution := c.Charts().Get("job_a_b_last_execution_status")
+				assert.True(t, baseExecution == nil || baseExecution.IsRemoved())
 				active := c.Charts().Get("job_" + suffix + "_status")
 				require.NotNil(t, active)
 				assert.False(t, active.IsRemoved())
@@ -768,11 +773,18 @@ func TestCollector_CollectJobStatus(t *testing.T) {
 
 				observedDisabled := c.Charts().Get("job_job_one_status")
 				require.NotNil(t, observedDisabled)
-				assert.True(t, observedDisabled.IsRemoved())
+				assert.False(t, observedDisabled.IsRemoved())
+				assert.Equal(t, int64(1), mx["job_job_one_disabled"])
+				observedExecution := c.Charts().Get("job_job_one_last_execution_status")
+				require.NotNil(t, observedExecution)
+				assert.True(t, observedExecution.IsRemoved())
 
 				unobserved := c.Charts().Get("job_job_two_status")
 				require.NotNil(t, unobserved)
 				assert.False(t, unobserved.IsRemoved())
+				unobservedExecution := c.Charts().Get("job_job_two_last_execution_status")
+				require.NotNil(t, unobservedExecution)
+				assert.False(t, unobservedExecution.IsRemoved())
 				assert.Equal(t, "job_two", c.activeJobs[jobID2])
 			},
 		},

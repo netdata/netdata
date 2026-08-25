@@ -703,19 +703,19 @@ func (c *Collector) collectJobStatus(mx map[string]int64) {
 	}
 
 	assignJobChartIDs(jobs, c.jobChartIDs)
-	jobs = c.updateJobCharts(jobs, complete)
-
 	for _, job := range jobs {
 		px := fmt.Sprintf("job_%s_", job.chartID)
 		mx[px+"enabled"] = boolToInt64(job.enabled)
 		mx[px+"disabled"] = boolToInt64(!job.enabled)
 	}
-	if len(jobs) == 0 {
+
+	selectedJobs := c.updateJobCharts(jobs, complete)
+	if len(selectedJobs) == 0 {
 		return
 	}
 
 	if lastExecutions, ok := c.querySQLAgentJobLastExecutions(); ok {
-		for _, job := range jobs {
+		for _, job := range selectedJobs {
 			if lastExec, ok := lastExecutions[job.id]; ok {
 				collectJobLastExecution(mx, job, &lastExec)
 			} else {
@@ -725,7 +725,7 @@ func (c *Collector) collectJobStatus(mx map[string]int64) {
 	}
 
 	if currentExecutions, ok := c.querySQLAgentJobCurrentExecutions(); ok {
-		for _, job := range jobs {
+		for _, job := range selectedJobs {
 			mx[fmt.Sprintf("job_%s_current_execution_time", job.chartID)] = currentExecutions[job.id]
 		}
 	}
@@ -821,36 +821,27 @@ func (c *Collector) updateJobCharts(jobs []sqlAgentJob, inventoryComplete bool) 
 	for _, job := range jobs {
 		seen[job.id] = true
 		c.jobChartIDs[job.id] = job.chartID
-		if job.enabled || c.CollectDisabledJobs {
-			currentChartIDs[job.chartID] = true
-		}
+		currentChartIDs[job.chartID] = true
 	}
 
 	selected := jobs[:0]
 	for _, job := range jobs {
-		if !job.enabled && !c.CollectDisabledJobs {
-			if chartID, ok := c.activeJobs[job.id]; ok {
-				if !currentChartIDs[chartID] {
-					c.removeJobCharts(chartID)
-				}
-				delete(c.activeJobs, job.id)
-			}
-			continue
-		}
-		selected = append(selected, job)
-
 		if chartID, ok := c.activeJobs[job.id]; ok {
 			if chartID != job.chartID {
 				if !currentChartIDs[chartID] {
 					c.removeJobCharts(chartID)
 				}
-				c.addJobCharts(job)
-			} else {
-				c.updateJobChartsLabels(job)
 			}
-		} else {
-			c.addJobCharts(job)
 		}
+
+		c.ensureJobStatusChart(job)
+		if job.enabled || c.CollectDisabledJobs {
+			c.ensureJobExecutionCharts(job)
+			selected = append(selected, job)
+		} else {
+			c.removeJobExecutionCharts(job.chartID)
+		}
+		c.updateJobChartsLabels(job)
 		c.activeJobs[job.id] = job.chartID
 	}
 

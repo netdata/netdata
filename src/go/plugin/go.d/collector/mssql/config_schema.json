@@ -162,8 +162,8 @@
         "default": 5
       },
       "collect_disabled_jobs": {
-        "title": "Collect disabled SQL Agent jobs",
-        "description": "Collect charts and execution metrics for disabled SQL Server Agent jobs. Disabled jobs are excluded by default. Enabling this option adds five charts and ten dimensions per disabled job; stock execution alerts remain gated by the job's enabled state.",
+        "title": "Collect disabled SQL Agent job executions",
+        "description": "Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option adds four charts and eight dimensions per disabled job; stock execution alerts remain gated by the job's enabled state.",
         "type": "boolean",
         "default": false
       },
