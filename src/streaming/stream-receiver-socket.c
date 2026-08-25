@@ -8,14 +8,15 @@
 #define STREAM_RECEIVER_TCP_KEEPIDLE TCP_KEEPIDLE
 #endif
 
+static bool stream_receiver_socket_keepalive_enable(int fd, bool enabled) {
+    int value = enabled ? 1 : 0;
+    return setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&value, sizeof(value)) == 0;
+}
+
 static bool stream_receiver_socket_keepalive_base(int fd) {
-    int enable = 1;
     int interval = STREAM_RECEIVER_KEEPALIVE_INTERVAL_SECONDS;
     int count = STREAM_RECEIVER_KEEPALIVE_PROBE_COUNT;
-    bool success = true;
-
-    if(setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&enable, sizeof(enable)) != 0)
-        success = false;
+    bool success = stream_receiver_socket_keepalive_enable(fd, true);
 
 #ifdef TCP_KEEPINTVL
     if(setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&interval, sizeof(interval)) != 0)
@@ -36,20 +37,29 @@ static bool stream_receiver_socket_keepalive_base(int fd) {
 
 STREAM_RECEIVER_KEEPALIVE_RESULT stream_receiver_socket_keepalive_reconcile(
     int fd,
+    bool enabled,
     uint32_t idle_s,
     STREAM_RECEIVER_KEEPALIVE_STATE *state) {
 
     if(!state)
         return STREAM_RECEIVER_KEEPALIVE_FAILED;
 
-    if(state->non_tcp || state->option_unsupported)
+    if(state->non_tcp)
         return STREAM_RECEIVER_KEEPALIVE_UNCHANGED;
 
-    if(state->base_attempted && state->attempted_idle_s == idle_s)
+    if(state->base_attempted && state->attempted_enabled == enabled &&
+       (!enabled || state->attempted_idle_s == idle_s))
         return STREAM_RECEIVER_KEEPALIVE_UNCHANGED;
+
+    if(state->option_unsupported && enabled && state->base_applied) {
+        state->attempted_enabled = true;
+        state->attempted_idle_s = idle_s;
+        return STREAM_RECEIVER_KEEPALIVE_UNCHANGED;
+    }
 
     if(fd < 0) {
         state->base_attempted = true;
+        state->attempted_enabled = enabled;
         state->attempted_idle_s = idle_s;
         return STREAM_RECEIVER_KEEPALIVE_FAILED;
     }
@@ -60,21 +70,41 @@ STREAM_RECEIVER_KEEPALIVE_RESULT stream_receiver_socket_keepalive_reconcile(
         struct sockaddr_storage address = { 0 };
         socklen_t address_length = sizeof(address);
         if(getsockname(fd, (struct sockaddr *)&address, &address_length) != 0) {
+            state->attempted_enabled = enabled;
             state->attempted_idle_s = idle_s;
             return STREAM_RECEIVER_KEEPALIVE_FAILED;
         }
 
         if(address.ss_family != AF_INET && address.ss_family != AF_INET6) {
             state->non_tcp = true;
+            state->attempted_enabled = enabled;
             state->attempted_idle_s = idle_s;
             return STREAM_RECEIVER_KEEPALIVE_NON_TCP;
         }
-
-        state->base_applied = stream_receiver_socket_keepalive_base(fd);
     }
 
     // Remember failed attempts separately from successful application so periodic reconciliation does not create syscall/log storms.
+    state->attempted_enabled = enabled;
     state->attempted_idle_s = idle_s;
+
+    if(!enabled) {
+        if(!stream_receiver_socket_keepalive_enable(fd, false))
+            return STREAM_RECEIVER_KEEPALIVE_FAILED;
+
+        state->base_applied = false;
+        state->applied_enabled = false;
+        state->applied_idle_s = 0;
+        return STREAM_RECEIVER_KEEPALIVE_APPLIED;
+    }
+
+    if(!state->base_applied)
+        state->base_applied = stream_receiver_socket_keepalive_base(fd);
+
+    if(state->option_unsupported) {
+        state->applied_enabled = state->base_applied;
+        return state->base_applied ? STREAM_RECEIVER_KEEPALIVE_OPTION_UNSUPPORTED :
+                                     STREAM_RECEIVER_KEEPALIVE_BASE_FAILED;
+    }
 
 #ifdef STREAM_RECEIVER_TCP_KEEPIDLE
     int value = (int)idle_s;
@@ -84,10 +114,12 @@ STREAM_RECEIVER_KEEPALIVE_RESULT stream_receiver_socket_keepalive_reconcile(
     if(!state->base_applied)
         return STREAM_RECEIVER_KEEPALIVE_BASE_FAILED;
 
+    state->applied_enabled = true;
     state->applied_idle_s = idle_s;
     return STREAM_RECEIVER_KEEPALIVE_APPLIED;
 #else
     state->option_unsupported = true;
+    state->applied_enabled = state->base_applied;
     return STREAM_RECEIVER_KEEPALIVE_OPTION_UNSUPPORTED;
 #endif
 }
@@ -132,11 +164,17 @@ int stream_receiver_socket_unittest(void) {
 
     STREAM_RECEIVER_KEEPALIVE_STATE state = { 0 };
     int errors = 0;
-    if(stream_receiver_socket_keepalive_reconcile(accepted, 30, &state) !=
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 30, &state) !=
            STREAM_RECEIVER_KEEPALIVE_OPTION_UNSUPPORTED ||
-       !state.base_attempted || !state.option_unsupported || state.applied_idle_s != 0)
+       !state.base_attempted || !state.base_applied || !state.option_unsupported || state.applied_idle_s != 0)
         errors++;
-    if(stream_receiver_socket_keepalive_reconcile(accepted, 60, &state) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 60, &state) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+        errors++;
+    if(stream_receiver_socket_keepalive_reconcile(accepted, false, 0, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
+       state.base_applied || state.applied_enabled)
+        errors++;
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 60, &state) !=
+           STREAM_RECEIVER_KEEPALIVE_OPTION_UNSUPPORTED || !state.base_applied)
         errors++;
 
     close(accepted);
@@ -155,12 +193,24 @@ int stream_receiver_socket_unittest(void) {
 
     STREAM_RECEIVER_KEEPALIVE_STATE state = { 0 };
     int errors = 0;
-    if(stream_receiver_socket_keepalive_reconcile(accepted, 30, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
-       !state.base_attempted || !state.base_applied || state.applied_idle_s != 30)
+    if(stream_receiver_socket_keepalive_reconcile(accepted, false, 0, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
+       !state.base_attempted || state.base_applied || state.applied_enabled || state.applied_idle_s != 0)
         errors++;
 
     int actual = 0;
     socklen_t actual_length = sizeof(actual);
+    if(getsockopt(accepted, SOL_SOCKET, SO_KEEPALIVE, (char *)&actual, &actual_length) != 0 || actual != 0)
+        errors++;
+
+    if(stream_receiver_socket_keepalive_reconcile(accepted, false, 0, &state) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+        errors++;
+
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 30, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
+       !state.base_attempted || !state.base_applied || !state.applied_enabled || state.applied_idle_s != 30)
+        errors++;
+
+    actual = 0;
+    actual_length = sizeof(actual);
     if(getsockopt(accepted, IPPROTO_TCP, STREAM_RECEIVER_TCP_KEEPIDLE, (char *)&actual, &actual_length) != 0 || actual != 30)
         errors++;
 
@@ -185,7 +235,7 @@ int stream_receiver_socket_unittest(void) {
         errors++;
 #endif
 
-    if(stream_receiver_socket_keepalive_reconcile(accepted, 120, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 120, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
        state.applied_idle_s != 120)
         errors++;
 
@@ -194,16 +244,38 @@ int stream_receiver_socket_unittest(void) {
     if(getsockopt(accepted, IPPROTO_TCP, STREAM_RECEIVER_TCP_KEEPIDLE, (char *)&actual, &actual_length) != 0 || actual != 120)
         errors++;
 
-    if(stream_receiver_socket_keepalive_reconcile(accepted, 120, &state) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 120, &state) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+        errors++;
+
+    if(stream_receiver_socket_keepalive_reconcile(accepted, false, 0, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
+       state.base_applied || state.applied_enabled || state.applied_idle_s != 0)
+        errors++;
+
+    actual = 1;
+    actual_length = sizeof(actual);
+    if(getsockopt(accepted, SOL_SOCKET, SO_KEEPALIVE, (char *)&actual, &actual_length) != 0 || actual != 0)
+        errors++;
+
+    if(stream_receiver_socket_keepalive_reconcile(accepted, true, 120, &state) != STREAM_RECEIVER_KEEPALIVE_APPLIED ||
+       !state.base_applied || !state.applied_enabled || state.applied_idle_s != 120)
         errors++;
 
     STREAM_RECEIVER_KEEPALIVE_STATE failed = { 0 };
     close(accepted);
     accepted = -1;
-    if(stream_receiver_socket_keepalive_reconcile(-1, 60, &failed) != STREAM_RECEIVER_KEEPALIVE_FAILED ||
-       !failed.base_attempted || failed.base_applied || failed.attempted_idle_s != 60 || failed.applied_idle_s != 0)
+    if(stream_receiver_socket_keepalive_reconcile(-1, true, 60, &failed) != STREAM_RECEIVER_KEEPALIVE_FAILED ||
+       !failed.base_attempted || failed.base_applied || !failed.attempted_enabled ||
+       failed.attempted_idle_s != 60 || failed.applied_idle_s != 0)
         errors++;
-    if(stream_receiver_socket_keepalive_reconcile(-1, 60, &failed) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+    if(stream_receiver_socket_keepalive_reconcile(-1, true, 60, &failed) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
+        errors++;
+
+    STREAM_RECEIVER_KEEPALIVE_STATE failed_disable = { 0 };
+    if(stream_receiver_socket_keepalive_reconcile(-1, false, 0, &failed_disable) != STREAM_RECEIVER_KEEPALIVE_FAILED ||
+       !failed_disable.base_attempted || failed_disable.base_applied || failed_disable.attempted_enabled ||
+       failed_disable.applied_enabled)
+        errors++;
+    if(stream_receiver_socket_keepalive_reconcile(-1, false, 0, &failed_disable) != STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
         errors++;
 
 #if defined(AF_UNIX) && !defined(OS_WINDOWS)
@@ -212,12 +284,12 @@ int stream_receiver_socket_unittest(void) {
         errors++;
     else {
         STREAM_RECEIVER_KEEPALIVE_STATE unix_state = { 0 };
-        if(stream_receiver_socket_keepalive_reconcile(unix_pair[0], 30, &unix_state) !=
+        if(stream_receiver_socket_keepalive_reconcile(unix_pair[0], true, 30, &unix_state) !=
                STREAM_RECEIVER_KEEPALIVE_NON_TCP ||
            !unix_state.base_attempted || unix_state.base_applied || !unix_state.non_tcp ||
            unix_state.applied_idle_s != 0)
             errors++;
-        if(stream_receiver_socket_keepalive_reconcile(unix_pair[0], 60, &unix_state) !=
+        if(stream_receiver_socket_keepalive_reconcile(unix_pair[0], false, 0, &unix_state) !=
                STREAM_RECEIVER_KEEPALIVE_UNCHANGED)
             errors++;
         close(unix_pair[0]);

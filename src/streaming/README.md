@@ -262,7 +262,7 @@ Here you can define settings for authentication and access control between Paren
 | `health enabled`             | `auto`     | Controls alerts and notifications (`auto`, `yes`, or `no`). |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after the Child connects.         |
 | `health log retention`       | `5d`       | Duration (in seconds) to keep health log events.            |
-| `tcp keepalive idle`         | `auto`     | Parent TCP keepalive idle: `auto` or a duration from 30 seconds through 1 hour. |
+| `tcp keepalive idle`         | `auto`     | Parent TCP keepalive idle: `auto`, `off`, or a duration from 30 seconds through 1 hour. |
 | `proxy enabled`              | (empty)    | Enables routing metrics through a proxy.                    |
 | `proxy destination`          | (empty)    | IP and port of the proxy server.                            |
 | `proxy api key`              | (empty)    | API key for the proxy server.                               |
@@ -307,13 +307,14 @@ value for one Child. It is not a `[stream]` sender setting and does not require 
 `auto` value, the Parent uses half of the fastest active chart cadence received from that Child, rounded up and bounded to 30 seconds
 through 1 hour. Before chart metadata is available, the Parent uses the valid handshake cadence together with
 the last learned host cadence; if neither is available, it uses 30 seconds. The Parent updates the accepted socket while it remains
-connected. An explicit duration replaces the automatic value and is bounded to the same 30-second through one-hour range. The duration
-aliases `0`, `off`, and `never` resolve to zero and are therefore raised to 30 seconds. Negative, too-large-to-parse, and otherwise
-invalid durations fall back to automatic cadence.
+connected. An explicit positive duration replaces the automatic value and is bounded to the same 30-second through one-hour range.
+The values `0`, `off`, and `never` disable `SO_KEEPALIVE` for matching connections. Negative, too-large-to-parse, and otherwise invalid
+durations fall back to automatic cadence.
 
 The first keepalive probe starts after this idle period. Subsequent probes remain 10 seconds apart, and the connection is considered
 dead after three unanswered probes. Netdata's separate receiver application-idle threshold remains at least 10 minutes and is twice
-the selected chart cadence.
+the selected chart cadence. When TCP keepalive is disabled, dead-path detection depends on socket errors, a remote close, incoming
+traffic, or the application-idle threshold.
 
 ### Additional Settings
 

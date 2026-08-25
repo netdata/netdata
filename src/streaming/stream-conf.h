@@ -86,6 +86,7 @@ struct stream_receiver_config {
     } compression;
 
     struct {
+        bool enabled;
         bool automatic;
         uint32_t idle_s;
     } tcp_keepalive;

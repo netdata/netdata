@@ -416,24 +416,31 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
 // --------------------------------------------------------------------------------------------------------------------
 
 static void stream_receiver_reconcile_keepalive(struct receiver_state *rpt) {
-    uint32_t desired_idle_s = rpt->config.tcp_keepalive.automatic ?
+    bool desired_enabled = rpt->config.tcp_keepalive.enabled;
+    uint32_t desired_idle_s = desired_enabled && rpt->config.tcp_keepalive.automatic ?
         stream_receiver_cadence_automatic_keepalive_idle_seconds(&rpt->host->stream.rcv.cadence) :
         rpt->config.tcp_keepalive.idle_s;
 
     bool base_was_attempted = rpt->thread.keepalive.base_attempted;
     STREAM_RECEIVER_KEEPALIVE_RESULT result = stream_receiver_socket_keepalive_reconcile(
-        rpt->sock.fd, desired_idle_s, &rpt->thread.keepalive);
+        rpt->sock.fd, desired_enabled, desired_idle_s, &rpt->thread.keepalive);
 
-    if(!base_was_attempted && !rpt->thread.keepalive.base_applied &&
+    if(desired_enabled && !base_was_attempted && !rpt->thread.keepalive.base_applied &&
        result != STREAM_RECEIVER_KEEPALIVE_NON_TCP)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM RCV '%s' [from [%s]:%s]: cannot apply TCP keepalive probe settings on socket %d",
                rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
-    if(result == STREAM_RECEIVER_KEEPALIVE_FAILED)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP keepalive idle to %u seconds on socket %d",
-               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, desired_idle_s, rpt->sock.fd);
+    if(result == STREAM_RECEIVER_KEEPALIVE_FAILED) {
+        if(desired_enabled)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP keepalive idle to %u seconds on socket %d",
+                   rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, desired_idle_s, rpt->sock.fd);
+        else
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM RCV '%s' [from [%s]:%s]: cannot disable TCP keepalive on socket %d",
+                   rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+    }
     else if(result == STREAM_RECEIVER_KEEPALIVE_OPTION_UNSUPPORTED)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM RCV '%s' [from [%s]:%s]: this platform cannot configure TCP keepalive idle per socket",

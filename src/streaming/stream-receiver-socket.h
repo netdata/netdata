@@ -20,6 +20,8 @@ typedef enum {
 typedef struct stream_receiver_keepalive_state {
     bool base_attempted;
     bool base_applied;
+    bool attempted_enabled;
+    bool applied_enabled;
     bool non_tcp;
     bool option_unsupported;
     uint32_t attempted_idle_s;
@@ -28,6 +30,7 @@ typedef struct stream_receiver_keepalive_state {
 
 STREAM_RECEIVER_KEEPALIVE_RESULT stream_receiver_socket_keepalive_reconcile(
     int fd,
+    bool enabled,
     uint32_t idle_s,
     STREAM_RECEIVER_KEEPALIVE_STATE *state);
 

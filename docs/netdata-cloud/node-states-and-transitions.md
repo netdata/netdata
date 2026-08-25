@@ -120,6 +120,10 @@ to three probes 10 seconds apart. Detection is therefore about 1 minute at the 3
 at the 1-hour cap, rather than a fixed 60 seconds. Platforms without a per-socket keepalive idle option retain their
 operating system's TCP keepalive timing.
 
+Setting `tcp keepalive idle = off` (or `0` or `never`) under the receiving `[API_KEY]` or `[MACHINE_GUID]` section disables
+`SO_KEEPALIVE` for matching connections. Dead-path detection then depends on socket errors, a remote close, incoming traffic,
+or the application-idle threshold.
+
 The silent-child timeout is `max(10 minutes, 2 × the minimum update interval)` across charts received from that host.
 The Parent retains the last learned minimum across reconnects and chart cleanup. Until a reconnect supplies its first
 chart definition, the Parent uses the larger of that retained minimum and the Child's handshake update interval.
