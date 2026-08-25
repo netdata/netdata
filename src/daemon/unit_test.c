@@ -1913,6 +1913,11 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         "Unit Testing", "x", "unittest", NULL, 1,
         original_update_every, RRDSET_TYPE_LINE);
 
+    uint32_t old_min_update_every =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    uint32_t old_min_update_every_applied =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every_applied, __ATOMIC_RELAXED);
+
     int rc = 0;
     time_t previous = rrdset_set_update_every_s(st, 0);
     if(previous != original_update_every || st->update_every != original_update_every) {
@@ -1979,6 +1984,10 @@ static int test_rrdset_rejects_invalid_update_every(void) {
 
     if(st->update_every != original_update_every)
         rrdset_set_update_every_s(st, original_update_every);
+
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, old_min_update_every, __ATOMIC_RELAXED);
+    __atomic_store_n(
+        &st->rrdhost->stream.rcv.min_update_every_applied, old_min_update_every_applied, __ATOMIC_RELAXED);
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     nd_profile.update_every = old_update_every;
