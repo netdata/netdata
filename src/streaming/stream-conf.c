@@ -102,6 +102,40 @@ typedef struct {
     const char *raw_value;
 } STREAM_RECEIVER_KEEPALIVE_CONFIG;
 
+static bool stream_conf_duration_is_explicit_zero(const char *value) {
+    const char *s = value;
+    while(isspace((uint8_t)*s))
+        s++;
+
+    if(!strcasecmp(s, "off") || !strcasecmp(s, "never"))
+        return true;
+
+    bool parsed_number = false;
+    while(*s) {
+        while(isspace((uint8_t)*s))
+            s++;
+        if(!*s || !strcasecmp(s, "ago"))
+            break;
+
+        char *end;
+        NETDATA_DOUBLE number = str2ndd(s, &end);
+        if(end == s)
+            return false;
+
+        parsed_number = true;
+        if(number != 0)
+            return false;
+
+        s = end;
+        while(isspace((uint8_t)*s))
+            s++;
+        while(isalpha((uint8_t)*s))
+            s++;
+    }
+
+    return parsed_number;
+}
+
 static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(
     STREAM_RECEIVER_KEEPALIVE_SOURCE source,
     const char *value) {
@@ -118,15 +152,21 @@ static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(
     if(!value || !strcasecmp(value, "auto"))
         return parsed;
 
+    int64_t configured_ns;
     int configured_s;
-    if(!duration_parse_seconds(value, &configured_s) || configured_s < 0) {
+    const char *trimmed = value;
+    while(isspace((uint8_t)*trimmed))
+        trimmed++;
+
+    if(*trimmed == '-' || !duration_parse(value, &configured_ns, "s", "ns") || configured_ns < 0 ||
+       !duration_parse_seconds(value, &configured_s)) {
         parsed.valid = false;
         return parsed;
     }
 
     parsed.automatic = false;
     parsed.configured_s = configured_s;
-    if(configured_s == 0) {
+    if(configured_ns == 0 && stream_conf_duration_is_explicit_zero(value)) {
         parsed.enabled = false;
         parsed.idle_s = 0;
         return parsed;
@@ -322,13 +362,22 @@ int stream_conf_compression_levels_unittest(void) {
         { "machine invalid overrides API", "2m", "invalid", true, true, false, false, 0, 30,
           STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "invalid" },
         { "zero disables", "0", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0" },
+        { "zero milliseconds disables", "0ms", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0ms" },
         { "off disables", "off", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "off" },
         { "never disables", "never", NULL, false, false, true, false, 0, 0, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "never" },
+        { "positive millisecond clamps to lower bound", "1ms", NULL, true, false, true, true, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "1ms" },
+        { "positive fractional second clamps to lower bound", "0.1s", NULL, true, false, true, true, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0.1s" },
+        { "positive sub-nanosecond clamps to lower bound", "0.1ns", NULL, true, false, true, true, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "0.1ns" },
         { "machine disabled overrides API", "2m", "off", false, false, true, false, 0, 0,
           STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "off" },
         { "machine duration overrides API disabled", "off", "3m", true, false, true, false, 180, 180,
           STREAM_RECEIVER_KEEPALIVE_SOURCE_MACHINE_GUID, "3m" },
         { "negative falls back to auto", "-1s", NULL, true, true, false, false, 0, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "-1s" },
+        { "negative fractional second falls back to auto", "-0.1s", NULL, true, true, false, false, 0, 30,
+          STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "-0.1s" },
         { "exact lower bound", "30s", NULL, true, false, true, false, 30, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "30s" },
         { "below lower bound", "29s", NULL, true, false, true, true, 29, 30, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "29s" },
         { "exact upper bound", "1h", NULL, true, false, true, false, 3600, 3600, STREAM_RECEIVER_KEEPALIVE_SOURCE_API_KEY, "1h" },
