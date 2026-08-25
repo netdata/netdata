@@ -115,30 +115,26 @@ def _runtime_charts(profile, runtime):
     return charts
 
 
-def _family_tree(charts):
-    roots = []
-    nodes = {}
+def _metric_groups(charts):
+    groups = []
+    groups_by_name = {}
     for chart in charts:
-        parent_key = ()
-        for part in chart['family'].split('/'):
-            key = (*parent_key, part)
-            if key not in nodes:
-                node = {
-                    'name': part,
-                    'path': '/'.join(key),
-                    'chart_count': 0,
-                    'charts': [],
-                    'children': [],
-                }
-                nodes[key] = node
-                if parent_key:
-                    nodes[parent_key]['children'].append(node)
-                else:
-                    roots.append(node)
-            nodes[key]['chart_count'] += 1
-            parent_key = key
-        nodes[parent_key]['charts'].append(chart)
-    return roots
+        group_name = chart['family'].split('/', 1)[0]
+        if group_name not in groups_by_name:
+            group = {'name': group_name, 'rows': []}
+            groups_by_name[group_name] = group
+            groups.append(group)
+
+        chart_name = f'{chart["family"].replace("/", " / ")} — {chart["title"]}'
+        for dimension in chart['dimensions']:
+            groups_by_name[group_name]['rows'].append({
+                'prometheus_metric': dimension['selector'],
+                'netdata_chart': chart_name,
+                'dimension': dimension['name'],
+                'unit': chart['units'],
+                'scope': chart['entity_scope'],
+            })
+    return groups
 
 
 def _validate_profile_file_sets(designs, runtimes):
@@ -254,7 +250,7 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
             'title': _require_text(documentation.get('title'), 'documentation.title', profile),
             'summary': _require_text(documentation.get('summary'), 'documentation.summary', profile),
             'chart_count': len(charts),
-            'families': _family_tree(charts),
+            'metric_groups': _metric_groups(charts),
             'supports': _profile_supports(profile, design),
         }
 
@@ -270,7 +266,7 @@ def _module_profiles(primary_ids, catalog):
         if profile_id in seen:
             continue
         profile = deepcopy(catalog[profile_id])
-        profile.update({'role': 'primary', 'activation': '', 'supported_by': '', 'open': True})
+        profile.update({'role': 'primary', 'activation': '', 'supported_by': ''})
         profiles.append(profile)
         seen.add(profile_id)
 
@@ -284,7 +280,6 @@ def _module_profiles(primary_ids, catalog):
                 'role': 'supporting',
                 'activation': support['activation'],
                 'supported_by': catalog[parent_id]['title'],
-                'open': False,
             })
             profiles.append(profile)
             seen.add(support_id)

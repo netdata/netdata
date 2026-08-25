@@ -107,6 +107,7 @@ typedef struct parser_user_object {
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
 struct parser;
+struct nrpc_transport;
 typedef ssize_t (*send_to_plugin_callback_t)(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
 
 struct parser {
@@ -130,11 +131,21 @@ struct parser {
         BUFFER *response;
         parser_deferred_action_t action;
         void *action_data;
+
+        // function-family defers only: the acquired inflight-dictionary item
+        // held across the RESULT_BEGIN..END span, so a concurrent GC delete
+        // cannot free the record (and its result buffer) mid-stream
+        const DICTIONARY_ITEM *item;
     } defer;
 
     struct {
-        DICTIONARY *functions;
+        DICTIONARY *calls;
         usec_t smaller_monotonic_timeout_ut;
+
+        // the refcounted lifetime shell handed to everyone who may need to
+        // reach this parser later (registry entries, cancel/progress hooks,
+        // dyncfg nodes); see parser_destroy() for the teardown protocol
+        struct nrpc_transport *transport;
     } inflight;
 
     struct {

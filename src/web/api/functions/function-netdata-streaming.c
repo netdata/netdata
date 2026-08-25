@@ -35,7 +35,7 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_STREAMING_HELP);
     buffer_json_member_add_array(wb, "data");
 
     size_t max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX] = { 0 };

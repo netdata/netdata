@@ -192,7 +192,7 @@ static inline int settings_put(struct web_client *w, char *file) {
 
     if(!settings_ensure_path_exists()) {
         rw_spinlock_write_unlock(&settings_spinlock);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Settings path cannot be created or accessed.",
             HTTP_RESP_BAD_REQUEST);
@@ -204,7 +204,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(buffer_tostring(w->payload));
     if (jobj == NULL) {
         rw_spinlock_write_unlock(&settings_spinlock);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Payload cannot be parsed as a JSON object",
             HTTP_RESP_BAD_REQUEST);
@@ -214,7 +214,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     struct json_object *version_obj;
     if (!json_object_object_get_ex(jobj, "version", &version_obj)) {
         rw_spinlock_write_unlock(&settings_spinlock);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Field version is not found in payload",
             HTTP_RESP_BAD_REQUEST);
@@ -224,7 +224,7 @@ static inline int settings_put(struct web_client *w, char *file) {
 
     if (old_version != new_version) {
         rw_spinlock_write_unlock(&settings_spinlock);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Payload version does not match the version of the stored object",
             HTTP_RESP_CONFLICT);
@@ -245,7 +245,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     if (fp == NULL) {
         rw_spinlock_write_unlock(&settings_spinlock);
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot open/create settings file '%s'", tmp_filename);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Cannot create payload file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
@@ -256,7 +256,7 @@ static inline int settings_put(struct web_client *w, char *file) {
         rw_spinlock_write_unlock(&settings_spinlock);
         errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot save settings to file '%s'", tmp_filename);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Cannot save payload to file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
@@ -273,13 +273,13 @@ static inline int settings_put(struct web_client *w, char *file) {
 
     if(!renamed) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot rename file '%s' to '%s'", tmp_filename, filename);
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Failed to move the payload file to its final location",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
-    return rrd_call_function_error(
+    return nrpc_call_error(
         w->response.data,
         "OK",
         HTTP_RESP_OK);
@@ -319,19 +319,19 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     if(!is_settings_file_valid(file))
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Invalid settings file given.",
             HTTP_RESP_BAD_REQUEST);
 
     if(host != localhost)
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Settings API is only allowed for the agent node.",
             HTTP_RESP_BAD_REQUEST);
 
     if(w->user_auth.method != USER_AUTH_METHOD_BEARER && strcmp(file, "default") != 0)
-        return rrd_call_function_error(
+        return nrpc_call_error(
             w->response.data,
             "Only the 'default' settings file is allowed for anonymous users",
             HTTP_RESP_BAD_REQUEST);
@@ -343,13 +343,13 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
 
         case HTTP_REQUEST_MODE_PUT:
             if(!w->payload || !buffer_strlen(w->payload))
-                return rrd_call_function_error(
+                return nrpc_call_error(
                     w->response.data,
                     "Settings API PUT action requires a payload.",
                     HTTP_RESP_BAD_REQUEST);
 
             if(buffer_strlen(w->payload) > MAX_SETTINGS_SIZE_BYTES)
-                return rrd_call_function_error(
+                return nrpc_call_error(
                     w->response.data,
                     "Settings API PUT payload exceeds the maximum allowed size.",
                     HTTP_RESP_CONTENT_TOO_LONG);
@@ -357,7 +357,7 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
             return settings_put(w, file);
 
         default:
-            return rrd_call_function_error(w->response.data,
+            return nrpc_call_error(w->response.data,
                                            "Invalid HTTP mode. HTTP modes GET and PUT are supported.",
                                            HTTP_RESP_BAD_REQUEST);
     }

@@ -157,8 +157,6 @@ struct rrdset {
 
     size_t rrdlabels_last_saved_version;
 
-    DICTIONARY *functions_view;                     // collector functions this rrdset supports, can be NULL
-
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
 

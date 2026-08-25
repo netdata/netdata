@@ -29,14 +29,24 @@ STRING *rrd_string_strdupz(const char *s) {
 
     size_t len = strlen(s);
     size_t dst_size = (len * 2) + 1;
-    char *buf = mallocz(dst_size);
+
+    // The sanitized copy is scratch: it is interned and thrown away immediately.
+    // Keep it on the stack for the sizes chart metadata actually uses, so the hot path
+    // (re-registration of an already known chart, which on a parent is continuous)
+    // does not touch the allocator at all. Ids may be up to RRD_ID_LENGTH_MAX, so the
+    // heap fallback stays for the long ones.
+    char stack_buf[512];
+    char *buf = (dst_size <= sizeof(stack_buf)) ? stack_buf : mallocz(dst_size);
 
     // Sanitize the string, preserving valid UTF-8
     text_sanitize((unsigned char *)buf, (const unsigned char *)s, dst_size,
                   rrd_string_allowed_chars, true, "", NULL);
 
     STRING *result = string_strdupz(buf);
-    freez(buf);
+
+    if(buf != stack_buf)
+        freez(buf);
+
     return result;
 }
 
@@ -78,7 +88,7 @@ void api_v1_management_init(void);
 void rrdset_thread_rda_free(void);
 
 int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
-    nd_thread_register_cleanup(rrd_collector_finished);
+    nd_thread_register_cleanup(nrpc_serving_finished);
     nd_thread_register_cleanup(sender_thread_buffer_free);
     nd_thread_register_cleanup(rrdset_thread_rda_free);
     nd_thread_register_cleanup(query_target_free);

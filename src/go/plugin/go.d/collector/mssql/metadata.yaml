@@ -45,6 +45,9 @@ modules:
           On editions that lack certain features, the collector omits the unavailable metrics and continues
           collecting the rest:
           - SQL Server Express and other editions without SQL Server Agent: job metrics are not collected.
+          - Disabled SQL Server Agent jobs retain their administrative enabled/disabled status by default, while their
+            execution charts are excluded. Set `collect_disabled_jobs: true` to retain their execution charts; stock
+            execution alerts still apply only while a job is enabled.
           - Editions without Always On Availability Groups (e.g., Express): AG metrics are not collected.
           - Editions without replication configured: replication metrics are not collected.
 
@@ -83,6 +86,8 @@ modules:
           description: |
             The collector executes lightweight queries against system views.
             Most queries complete in milliseconds and have minimal impact on server performance.
+            Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds four charts with eight
+            dimensions for every disabled job. The administrative job-status chart is always collected.
       additional_permissions:
         description: |
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
@@ -260,6 +265,16 @@ modules:
               default_value: 5
               required: false
               group: Target
+
+            - name: collect_disabled_jobs
+              description: |
+                Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL
+                Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option
+                adds four charts and eight dimensions per disabled job. Stock last-execution alerts remain gated by the
+                job's enabled state.
+              default_value: false
+              required: false
+              group: SQL Agent
 
             - name: functions.top_queries.disabled
               description: Disable the [top-queries](#top-queries) function.
@@ -443,11 +458,11 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
       - name: mssql_sql_agent_job_last_execution_warning
         metric: mssql.job_last_execution_status
-        info: SQL Server Agent job succeeded but at least one step failed in the last completed execution
+        info: Enabled SQL Server Agent job succeeded but at least one step failed in the last completed execution
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
       - name: mssql_sql_agent_job_last_execution_failed
         metric: mssql.job_last_execution_status
-        info: SQL Server Agent job failed in the last completed execution
+        info: Enabled SQL Server Agent job failed in the last completed execution
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
     functions:
       description: |

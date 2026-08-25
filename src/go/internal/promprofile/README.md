@@ -105,8 +105,9 @@ Important boundaries:
   signal or chart ownership.
 - `PROFILE-DESIGN.yaml` is research-backed design input, not a serialization of the resulting profile. Its `documentation`
   block owns the operator-facing profile title and summary used by generated integration documentation.
-- A view's `question` is internal authoring rationale. Generated integration documentation MUST NOT publish it. The public
-  chart projection is limited to context, title, family hierarchy, units, dimensions, selectors, and entity scope.
+- A view's `question` is internal authoring rationale. Generated integration documentation MUST NOT publish it. Public
+  coverage is rendered as ordinary tables grouped by each profile's top-level family. Every metric-to-chart row contains
+  the Prometheus metric, full Netdata family and chart title, dimension, unit, and entity scope.
 - `proof.yaml` contains independent expectations, not generated snapshots, counts, or content digests.
 - Production code is authoritative for behavior. Semantic contracts state what that behavior must mean for the profile.
 

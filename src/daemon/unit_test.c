@@ -1913,9 +1913,6 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         "Unit Testing", "x", "unittest", NULL, 1,
         original_update_every, RRDSET_TYPE_LINE);
 
-    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);
-    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
-
     int rc = 0;
     time_t previous = rrdset_set_update_every_s(st, 0);
     if(previous != original_update_every || st->update_every != original_update_every) {
@@ -1942,10 +1939,24 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
+    const time_t maximum_update_every = INT32_MAX;
+    previous = rrdset_set_update_every_s(st, maximum_update_every);
+    if(previous != original_update_every || st->update_every != maximum_update_every) {
+        fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
+                __FUNCTION__, (long)previous, (long)maximum_update_every, st->update_every);
+        rc = 1;
+    }
+
+    if(st->update_every != original_update_every)
+        rrdset_set_update_every_s(st, original_update_every);
+
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
+
     const time_t valid_update_every = 300;
     previous = rrdset_set_update_every_s(st, valid_update_every);
     if(previous != original_update_every || st->update_every != valid_update_every) {
-        fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
+        fprintf(stderr, "%s: cadence update every did not change chart from %ld to %ld; current %d\n",
                 __FUNCTION__, (long)previous, (long)valid_update_every, st->update_every);
         rc = 1;
     }
@@ -1971,6 +1982,65 @@ static int test_rrdset_rejects_invalid_update_every(void) {
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     nd_profile.update_every = old_update_every;
+    return rc;
+}
+
+static int test_inicfg_double_values(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    // NETDATA_DOUBLE values are formatted into fixed size buffers before being stored.
+    // Huge magnitudes must not be silently truncated into a completely different number.
+    // 1e92 is the largest magnitude whose fixed-point form still fits; 1e93 is the first that does not.
+    static const NETDATA_DOUBLE values[] = { 1.5, -0.25, 123456.789, 1e30, 1e92, 1e93, 1e100, -1e100 };
+    struct config cfg = APPCONFIG_INITIALIZER;
+    int rc = 0;
+
+    for(size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        NETDATA_DOUBLE value = values[i];
+        char name[64];
+
+        // the default value must survive the round-trip through the config
+        snprintfz(name, sizeof(name), "default %zu", i);
+        NETDATA_DOUBLE got = inicfg_get_double(&cfg, "unittest doubles", name, value);
+        if(fabsndd(got - value) > fabsndd(value) * (NETDATA_DOUBLE)0.000001) {
+            fprintf(stderr, "%s: default " NETDATA_DOUBLE_FORMAT_G " returned " NETDATA_DOUBLE_FORMAT_G "\n",
+                    __FUNCTION__, value, got);
+            rc = 1;
+        }
+
+        // and so must a value that was set
+        snprintfz(name, sizeof(name), "set %zu", i);
+        inicfg_set_double(&cfg, "unittest doubles", name, value);
+        got = inicfg_get_double(&cfg, "unittest doubles", name, (NETDATA_DOUBLE)0.0);
+        if(fabsndd(got - value) > fabsndd(value) * (NETDATA_DOUBLE)0.000001) {
+            fprintf(stderr, "%s: set " NETDATA_DOUBLE_FORMAT_G " returned " NETDATA_DOUBLE_FORMAT_G "\n",
+                    __FUNCTION__, value, got);
+            rc = 1;
+        }
+    }
+
+    // a value whose fixed-point form fills the buffer exactly must be kept in fixed-point
+    // (the internal buffer is 100 bytes, so 99 characters is an exact fit, not a truncation)
+    const size_t exact_fit_len = 99;
+    inicfg_set_double(&cfg, "unittest doubles", "exact fit", (NETDATA_DOUBLE)1e92);
+    const char *stored = inicfg_get(&cfg, "unittest doubles", "exact fit", "");
+    size_t stored_len = strnlen(stored, exact_fit_len + 1);
+    if(stored_len != exact_fit_len || strchr(stored, 'e') || strchr(stored, 'E')) {
+        fprintf(stderr, "%s: exact fit stored as '%s' (%zu chars), expected %zu fixed-point characters\n",
+                __FUNCTION__, stored, stored_len, exact_fit_len);
+        rc = 1;
+    }
+
+    // one character more does not fit, so it must switch to the exponential format
+    inicfg_set_double(&cfg, "unittest doubles", "truncated", (NETDATA_DOUBLE)1e93);
+    stored = inicfg_get(&cfg, "unittest doubles", "truncated", "");
+    if(!strchr(stored, 'e') && !strchr(stored, 'E')) {
+        fprintf(stderr, "%s: too long value stored as '%s', expected the exponential format\n",
+                __FUNCTION__, stored);
+        rc = 1;
+    }
+
+    inicfg_free(&cfg);
     return rc;
 }
 
@@ -2302,6 +2372,9 @@ int run_all_mockup_tests(void)
     if(test_rrdr_relative_window_extreme_values())
         return 1;
 
+    if(test_inicfg_double_values())
+        return 1;
+
     if(test_query_window_resampling_boundaries())
         return 1;
 
@@ -2520,6 +2593,110 @@ int test_sqlite(void) {
 }
 
 #ifdef OS_WINDOWS
+int unit_test_windows_os_version(void) {
+    static const struct {
+        const char *product_name;
+        const char *display_version;
+        const char *edition_id;
+        DWORD build;
+        DWORD ubr;
+        bool has_ubr;
+        bool is_server;
+        const char *name;
+        const char *version;
+        const char *release;
+        const char *edition;
+        const char *exact_build;
+    } cases[] = {
+        {"Windows Server 2022 Datacenter", "21H2", "ServerDatacenter", 20348, 2582, true, true,
+         "Windows Server", "2022", "21H2", "Datacenter", "20348.2582"},
+        {"Windows 10 Home", "24H2", "Core", 26100, 2605, true, false,
+         "Windows", "11", "24H2", "Home", "26100.2605"},
+        {"Windows 10 Home", "22H2", "Core", 19045, 0, true, false,
+         "Windows", "10", "22H2", "Home", "19045.0"},
+        {"Microsoft Windows Server 2022 Datacenter: Azure Edition", "23H2", "ServerDatacenter", 20348, 0, true, true,
+         "Windows Server", "2022", "23H2", "Datacenter: Azure Edition", "20348.0"},
+        {NULL, NULL, "Professional", 26100, 0, false, false,
+         "Windows", "11", "", "Professional", ""},
+        {NULL, NULL, "ServerDatacenter", 25000, 0, false, true,
+         "Windows Server", "2022", "", "ServerDatacenter", ""},
+        {NULL, NULL, "ServerDatacenter", 26100, 0, false, true,
+         "Windows Server", "2025", "", "ServerDatacenter", ""},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        NETDATA_WINDOWS_OS_LABELS labels;
+        netdata_windows_parse_os_labels(&labels, cases[i].product_name, cases[i].display_version, cases[i].edition_id,
+                                        cases[i].build, cases[i].ubr, cases[i].has_ubr, cases[i].is_server);
+        if(strcmp(labels.name, cases[i].name) || strcmp(labels.version, cases[i].version) ||
+           strcmp(labels.release, cases[i].release) || strcmp(labels.edition, cases[i].edition) ||
+           strcmp(labels.build, cases[i].exact_build)) {
+            fprintf(stderr,
+                    "unit_test_windows_os_version: case '%s' produced name='%s' version='%s' release='%s' edition='%s' build='%s'\n",
+                    cases[i].product_name ? cases[i].product_name : "(NULL)",
+                    labels.name, labels.version, labels.release, labels.edition, labels.build);
+            failures++;
+        }
+    }
+
+    static const struct {
+        const char *product_name;
+        DWORD build;
+        bool is_server;
+        const char *expected;
+    } version_cases[] = {
+        {"Windows 10 Home", 19045, false, "Microsoft Windows 10 Home"},
+        {"Windows 10 Home", 26100, false, "Microsoft Windows 11 Home"},
+        {"Windows Server 2022 Datacenter", 20348, true, "Microsoft Windows Server 2022 Datacenter"},
+    };
+
+    for (size_t i = 0; i < sizeof(version_cases) / sizeof(version_cases[0]); i++) {
+        char version[256];
+        netdata_windows_format_os_version(version, sizeof(version), version_cases[i].product_name,
+                                          version_cases[i].build, version_cases[i].is_server);
+        if (strcmp(version, version_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: formatter case '%s' produced '%s'\n",
+                    version_cases[i].product_name, version);
+            failures++;
+        }
+    }
+
+    static const struct {
+        DWORD build;
+        bool is_server;
+        const char *edition_id;
+        const char *expected;
+    } id_like_cases[] = {
+        {25000, true, "ServerDatacenter", "Windows-Server-2022-ServerDatacenter"},
+        {26100, true, "ServerDatacenter", "Windows-Server-2025-ServerDatacenter"},
+        {9600, true, "ServerDatacenter", "Windows-Server-2012R2-ServerDatacenter"},
+        {26100, false, "Core", "Windows-11-Core"},
+        {19045, false, NULL, "Windows-10"},
+    };
+
+    for (size_t i = 0; i < sizeof(id_like_cases) / sizeof(id_like_cases[0]); i++) {
+        char id_like[256];
+        netdata_windows_format_os_id_like(id_like, sizeof(id_like), id_like_cases[i].build,
+                                          id_like_cases[i].edition_id, id_like_cases[i].is_server);
+        if (strcmp(id_like, id_like_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: id-like build %u produced '%s'\n",
+                    id_like_cases[i].build, id_like);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu label, %zu formatter, %zu id-like cases)\n",
+            sizeof(cases) / sizeof(cases[0]), sizeof(version_cases) / sizeof(version_cases[0]),
+            sizeof(id_like_cases) / sizeof(id_like_cases[0]));
+    return 0;
+}
+
 int unit_test_windows_virt_normalize(void) {
     static const struct {
         const char *raw;

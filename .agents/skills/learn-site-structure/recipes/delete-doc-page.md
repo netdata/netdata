@@ -36,8 +36,10 @@ step can't resolve it).
 
 ## 3. Open the learn-repo manual-surgery PR
 
-Once the ingest PR is merged (or BEFORE if you want to bundle
-the surgery with the ingest PR -- see step 4 alternative):
+Before the source deletion merges when that repository's PR CI
+runs Learn ingest after regenerating pages; otherwise, once the
+ingest PR is merged (or before if you want to bundle the surgery
+with the ingest PR):
 
 1. Open `${NETDATA_REPOS_DIR}/learn/LegacyLearnCorrelateLinksWithGHURLs.json`.
 2. Search for the GitHub blob/edit URL of the deleted file:
@@ -46,11 +48,18 @@ the surgery with the ingest PR -- see step 4 alternative):
    ```
 3. Find the entry. Apply your decision from step 1:
    - **Redirect to replacement**: change the value to the
-     full Learn URL of the replacement page
-     (`https://learn.netdata.cloud/docs/<replacement>`).
+     GitHub blob URL of the replacement source
+     (`https://github.com/netdata/netdata/blob/master/<replacement-source>.md`).
+     Ingest resolves that source through the live map to the
+     replacement's current Learn route.
    - **Drop**: delete the entry from the JSON entirely.
 
 Save the file.
+
+Run Learn ingest with the intended source-repository state and commit the
+resulting `netlify.toml` change with the catalog change. The strict redirect
+gate rejects a catalog target that conflicts with the currently committed
+generated rule, so the pair must be consistent before the PR is mergeable.
 
 Alternative: if you want a one-off manual `[[redirects]]`
 rule (for example, to redirect to an entirely external
@@ -106,10 +115,15 @@ curl -sI https://learn.netdata.cloud<old-path>
 - **Forgetting the manual JSON surgery.** Without it, the
   deleted page's old URL serves a 404. External links break
   silently for users.
+- **Using a full Learn URL as the catalog value.** The strict
+  legacy gate treats an absolute HTTP(S) value as an external
+  source. Use the replacement's GitHub blob URL so ingest can
+  resolve it through the live map.
 - **Editing `netlify.toml` directly.** Regenerated each
-  ingest. Edit `static.toml` (for hand-curated static rules)
-  or `LegacyLearnCorrelateLinksWithGHURLs.json` (for the
-  dynamic catalog).
+  ingest. Edit `LegacyLearnCorrelateLinksWithGHURLs.json` as
+  the dynamic source of truth, run ingest, and commit its
+  generated `netlify.toml` result. Use `static.toml` only for
+  hand-curated static rules.
 - **Deleting a `part_of_learn: True` page.** That's a
   hand-authored learn-repo page (currently only
   `docs/ask-nedi.mdx`). Deleting it requires editing the

@@ -19,9 +19,10 @@ profile contribution must make a deliberate catalog disposition.
   `integrations/prometheus_profile_docs.py` joins each mapped profile's strict
   `PROFILE-DESIGN.yaml` with its runtime profile YAML. Generation fails if a
   stock profile is unmapped or if a semantic view and runtime chart differ. The
-  public chart payload is an allowlist of context, title, family hierarchy,
-  units, dimensions, selectors, and entity scope. A profile-design view's
-  `question` remains internal authoring rationale and is not projected.
+  public payload groups metric-to-chart mapping rows by the profile's top-level
+  family. Each row contains the Prometheus metric, full Netdata family and chart
+  title, dimension, unit, and entity scope. A profile-design view's `question`
+  remains internal authoring rationale and is not projected.
 - **Generic profile configuration:** the Prometheus collector metadata documents
   the `profiles` job option
   (`src/go/plugin/go.d/collector/prometheus/metadata.yaml:175-203`). That is
@@ -34,9 +35,9 @@ profile contribution must make a deliberate catalog disposition.
 
 `integrations/gen_integrations.py` imports collector entries through
 `load_collectors`, projects profile coverage, and then renders the metadata
-modules. Website consumes the clean native-`details` form; Agent Markdown is
-generated from the rich form and retains the same `data-prometheus-profile-*`
-hooks after `clean_and_write()` conversion.
+modules. Website and Agent Markdown receive the same ordinary tables. The
+profile and family headings are documentation structure, not interactive
+catalog controls.
 
 ## Required catalog disposition
 
@@ -88,7 +89,7 @@ For every stock profile:
 - Run `python3 -m unittest integrations.tests.test_prometheus_profile_docs` to
   enforce stock-profile reachability, exact view/chart/family parity, support
   projection, the public chart-field allowlist, absence of internal questions,
-  inherited-YAML isolation, and generated markup hooks.
+  inherited-YAML isolation, complete metric mappings, and grouped table output.
 - Regenerate the application integration page and, when the catalog gains or
   loses an entry, `src/collectors/COLLECTORS.md`.
 - Run `python3 integrations/gen_taxonomy.py --check-only`.

@@ -179,13 +179,13 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
 
     // rrd_rdlock() for the same reason build_node_info() takes it: an archived host keeps its
     // aclk config, so it is still reached by this loop, and rrdhost_cleanup_data_collection_and_health()
-    // destroys host->functions. This excludes the orphan-cleanup path, which does that under
+    // destroys the host's function-registry entry. This excludes the orphan-cleanup path, which does that under
     // rrd_wrlock() (service.c). It does NOT cover
     // rrdhost_free___consume_metadata_lifetime_writelock(), which drops rrd_wrlock() before
     // rrdhost_free_unlinked() - that exposure is pre-existing and identical for build_node_info()
     // and build_node_collectors(), which dereference the host in this same loop.
     rrd_rdlock();
-    manifest.functions = host_functions_to_manifest_dict(host);
+    manifest.functions = nrpc_catalog_manifest_dict(rrdhost_nrpc_owner(host));
     rrd_rdunlock();
 
     // Suppress publishing a manifest identical to the one already published in this ACLK session.
@@ -210,7 +210,7 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // empty manifests - an empty list is meaningful to the cloud ("this node has no functions"),
     // not an absence of information.
     uint64_t key = manifest_publication_key(
-        manifest_dict_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
+        nrpc_catalog_manifest_hash(manifest.functions, node_id, manifest.claim_id), aclk_session_load());
     bool suppressed = __atomic_load_n(&aclk_host_config->node_manifest_sent_token, __ATOMIC_ACQUIRE) != 0 &&
                       __atomic_load_n(&aclk_host_config->node_manifest_sent_key, __ATOMIC_ACQUIRE) == key;
 

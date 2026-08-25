@@ -72,6 +72,22 @@ typedef void (*stream_defer_cleanup_t)(struct sender_state *s, void *data);
 
 struct sender_state {
     SPINLOCK spinlock;
+
+    // Serializes {render + commit} of the global-functions payload across its
+    // two call sites (the flag poll in stream_send_metrics_init() on
+    // collection/receiver threads, and the reconnect push in
+    // stream_send_global_functions() on the sender thread). The pending-dels
+    // protocol makes the FUNCTION_DEL queue lossless, but each caller renders
+    // into a private buffer and sender_commit() serializes in LOCK-ARRIVAL
+    // order - without this lock a stale buffer holding "FUNCTION_DEL f" could
+    // commit AFTER a fresh re-list that re-added f, making the parent delete a
+    // live function. Lock order: this -> the component-global registries
+    // index locks (the nRPC outer dictionary the renderer resolves the
+    // host's registry entry through) -> {inner registry locks, pending_dels
+    // spinlock, the commit spinlock above}; never acquired while holding any
+    // of those.
+    SPINLOCK global_functions_spinlock;
+
     STREAM_CAPABILITIES capabilities;
     STREAM_CAPABILITIES disabled_capabilities;
     int16_t hops;
