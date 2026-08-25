@@ -10,11 +10,8 @@ include_guard()
 function(netdata_add_macos_package_target)
         set(pkg_dir "${CMAKE_BINARY_DIR}/macos-pkg")
 
-        # The identifier is the upgrade identity macOS Installer keys on, and
-        # it becomes an unchangeable public contract the moment a package
-        # ships. PROVISIONAL until release approval; nothing is published
-        # from CI while the work iterates.
-        set(NETDATA_PKG_IDENTIFIER "cloud.netdata.agent")
+        # NETDATA_PKG_IDENTIFIER comes from NetdataOptions.cmake - the staged
+        # .install-type consumes it too.
 
         # Installer orders upgrades by comparing versions, so the package
         # version must be monotonic; the generic package version carries the
@@ -38,6 +35,15 @@ function(netdata_add_macos_package_target)
         configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/netdata.plist.in"
                        "${pkg_dir}/com.github.netdata.plist" @ONLY)
         install(FILES "${pkg_dir}/com.github.netdata.plist"
+                COMPONENT netdata
+                DESTINATION /Library/LaunchDaemons)
+
+        # The auto-updater's calendar daemon. postinstall bootstraps it only
+        # when auto-updates are not opted out (D15b) and never while the
+        # updater itself is mid-transaction.
+        configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/netdata-updater.plist.in"
+                       "${pkg_dir}/com.github.netdata.updater.plist" @ONLY)
+        install(FILES "${pkg_dir}/com.github.netdata.updater.plist"
                 COMPONENT netdata
                 DESTINATION /Library/LaunchDaemons)
 

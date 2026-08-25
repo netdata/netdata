@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U0029
+# Next unused error code: U0032
 
 set -e
 
@@ -33,6 +33,14 @@ NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata
 NETDATA_STABLE_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/stable}"
 NETDATA_NIGHTLY_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/edge}"
 NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
+
+# Publisher pinning for macOS package updates: the Apple Developer Team ID
+# expected on a downloaded .pkg. Empty means this build has no pinned
+# publisher (Netdata's macOS packages are not signed yet); the updater then
+# fails closed unless NETDATA_UPDATER_ALLOW_UNSIGNED_PKG=1 is set in the
+# updater config - a development/CI escape. Release gating must assert this
+# is non-empty once package signing ships.
+NETDATA_MACOS_PKG_TEAM_ID=""
 
 # Following variables are intended to be overridden by the updater config file.
 NETDATA_UPDATER_JITTER=3600
@@ -232,7 +240,9 @@ _get_intervaldir() {
 }
 
 _get_scheduler_type() {
-  if _get_intervaldir > /dev/null ; then
+  if [ "${INSTALL_TYPE}" = "macos-pkg" ] ; then
+    echo 'launchd'
+  elif _get_intervaldir > /dev/null ; then
     echo 'interval'
   elif issystemd ; then
     echo 'systemd'
@@ -340,18 +350,30 @@ dev_null_fix() {
 enable_netdata_updater() {
   updater_type="$(echo "${1}" | tr '[:upper:]' '[:lower:]')"
   case "${updater_type}" in
-    systemd|interval|crontab)
+    systemd|interval|crontab|launchd)
       updater_type="${1}"
       ;;
     "")
       updater_type="$(_get_scheduler_type)"
       ;;
     *)
-      fatal "Unrecognized updater type ${updater_type} requested. Supported types are 'systemd', 'interval', and 'crontab'." U0001
+      fatal "Unrecognized updater type ${updater_type} requested. Supported types are 'systemd', 'interval', 'crontab', and 'launchd'." U0001
       ;;
   esac
 
   case "${updater_type}" in
+    "launchd")
+      if [ -f "/Library/LaunchDaemons/com.github.netdata.updater.plist" ]; then
+        launchctl enable system/com.github.netdata.updater 2>/dev/null || true
+        launchctl bootstrap system /Library/LaunchDaemons/com.github.netdata.updater.plist 2>/dev/null || true
+
+        info "Auto-updating has been ENABLED using a launchd calendar daemon.\n"
+        info "If the update process fails, the failure will be logged to the updater log in Netdata's log directory."
+      else
+        error "launchd-based auto-update scheduling requested, but the updater LaunchDaemon is not installed. Auto-updates have NOT been enabled."
+        return 1
+      fi
+      ;;
     "systemd")
       if issystemd; then
         if systemd_unit_exists netdata-updater.timer; then
@@ -404,6 +426,13 @@ enable_netdata_updater() {
 }
 
 disable_netdata_updater() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    # The disable override persists in launchd's database, so the job stays
+    # off across reboots even though the plist remains on disk.
+    launchctl bootout system/com.github.netdata.updater 2>/dev/null || true
+    launchctl disable system/com.github.netdata.updater 2>/dev/null || true
+  fi
+
   if issystemd && systemd_unit_exists "netdata-updater.timer" ; then
     systemctl disable netdata-updater.timer
     systemctl stop netdata-updater.timer
@@ -434,6 +463,15 @@ auto_update_status() {
     systemd) info "The default auto-update scheduling method for this system is: systemd timer units" ;;
     crontab) info "The default auto-update scheduling method for this system is: drop-in crontab" ;;
     interval) info "The default auto-update scheduling method for this system is: drop-in periodic script" ;;
+    launchd)
+      info "The default auto-update scheduling method for this system is: launchd calendar daemon"
+      if launchctl print system/com.github.netdata.updater > /dev/null 2>&1; then
+        info "Auto-updates using a launchd calendar daemon are ENABLED"
+      else
+        info "Auto-updates using a launchd calendar daemon are DISABLED"
+      fi
+      return
+      ;;
     *) info "No recognized auto-update scheduling method found" ; return ;;
   esac
 
@@ -1159,6 +1197,132 @@ update_static() {
   return 0
 }
 
+parse_macos_pkg_version() {
+  # The macOS package versions as MAJOR.MINOR.PATCH.TWEAK - the monotonic
+  # scheme macOS Installer orders upgrades by. Same output shape as
+  # parse_version so values are directly comparable to each other.
+  _oldifs="${IFS}"
+  IFS='.'
+  # shellcheck disable=SC2086
+  set -- ${1}
+  IFS="${_oldifs}"
+  printf "%04d%03d%03d%05d" "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}"
+}
+
+get_macos_pkg_receipt_version() {
+  pkgutil --pkg-info "${NETDATA_MACOS_PKG_IDENTIFIER}" 2>/dev/null | sed -n 's/^version: //p'
+}
+
+verify_macos_pkg() {
+  pkgfile="${1}"
+
+  # Publisher pinning: a valid Developer ID signature from anyone else is
+  # still a refusal - signature validity alone establishes nothing about
+  # who published the package.
+  if [ -n "${NETDATA_MACOS_PKG_TEAM_ID}" ]; then
+    if ! sig="$(pkgutil --check-signature "${pkgfile}" 2>/dev/null)"; then
+      fatal "Downloaded macOS package is not signed; refusing to install it." U0029
+    fi
+    if ! echo "${sig}" | grep -q "Developer ID Installer"; then
+      fatal "Downloaded macOS package is not signed with a Developer ID Installer certificate; refusing to install it." U002A
+    fi
+    if ! echo "${sig}" | grep -q "(${NETDATA_MACOS_PKG_TEAM_ID})"; then
+      fatal "Downloaded macOS package is signed by a publisher other than Netdata; refusing to install it." U002B
+    fi
+  elif [ "${NETDATA_UPDATER_ALLOW_UNSIGNED_PKG:-0}" != "1" ]; then
+    fatal "This updater has no pinned publisher for macOS packages and NETDATA_UPDATER_ALLOW_UNSIGNED_PKG is not set; refusing to install unverifiable packages." U002C
+  fi
+
+  # The product archive's Distribution carries the identity facts; xar
+  # ships with macOS and extracts it without unpacking the payload.
+  dist_dir="${ndtmpdir}/pkg-dist"
+  rm -rf "${dist_dir}"
+  mkdir -p "${dist_dir}"
+  if ! (cd "${dist_dir}" && xar -x -f "${pkgfile}" Distribution) || [ ! -f "${dist_dir}/Distribution" ]; then
+    fatal "Unable to read the downloaded macOS package's distribution definition." U002D
+  fi
+
+  if ! grep -q "pkg-ref id=\"${NETDATA_MACOS_PKG_IDENTIFIER}\"" "${dist_dir}/Distribution"; then
+    fatal "Downloaded macOS package does not carry the expected identifier ${NETDATA_MACOS_PKG_IDENTIFIER}; refusing to install it." U002E
+  fi
+
+  sysarch="${PREBUILT_ARCH:-$(uname -m)}"
+  if ! grep -q "hostArchitectures=\"[^\"]*${sysarch}" "${dist_dir}/Distribution"; then
+    fatal "Downloaded macOS package does not support this architecture (${sysarch}); refusing to install it." U002F
+  fi
+
+  new_pkg_version="$(sed -n 's/.*pkg-ref id="[^"]*" version="\([^"]*\)".*/\1/p' "${dist_dir}/Distribution" | head -n 1)"
+}
+
+update_macos_pkg() {
+  create_exec_tmp_directory
+  PREVDIR="$(pwd)"
+
+  info "Entering ${ndtmpdir}"
+  cd "${ndtmpdir}" || fatal "Failed to change current working directory to ${ndtmpdir}" U0019
+
+  if update_available; then
+    sysarch="${PREBUILT_ARCH:-$(uname -m)}"
+    filename="netdata-latest-macos-${sysarch}.pkg"
+
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
+      pkg_url="file://${path}/${filename}"
+      checksum_url="file://${path}/sha256sums.txt"
+    else
+      tag="$(get_latest_tag)"
+      if [ "${RELEASE_CHANNEL}" = "stable" ]; then
+        pkg_url="${NETDATA_STABLE_BASE_URL}/download/${tag}/${filename}"
+        checksum_url="${NETDATA_STABLE_BASE_URL}/download/${tag}/sha256sums.txt"
+      else
+        pkg_url="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
+        checksum_url="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
+      fi
+    fi
+
+    download "${checksum_url}" "${ndtmpdir}/sha256sum.txt"
+    download "${pkg_url}" "${ndtmpdir}/${filename}"
+    if ! grep "${filename}" "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
+      fatal "Package checksum validation failed. Stopping the update and leaving the package in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere upstream and can be resolved by simply retrying in an hour." U0030
+    fi
+
+    verify_macos_pkg "${ndtmpdir}/${filename}"
+
+    current_pkg_version="$(get_macos_pkg_receipt_version)"
+    if [ "${NETDATA_FORCE_UPDATE}" != "1" ] && [ -n "${current_pkg_version}" ] && [ -n "${new_pkg_version}" ]; then
+      if [ "$(parse_macos_pkg_version "${new_pkg_version}")" -le "$(parse_macos_pkg_version "${current_pkg_version}")" ]; then
+        info "Downloaded package version ${new_pkg_version} is not newer than the installed ${current_pkg_version}; not updating."
+        cd "${PREVDIR}"
+        [ -n "${logfile}" ] && rm "${logfile}" && logfile=
+        return 0
+      fi
+    fi
+
+    # installer(8) runs this package's own maintainer scripts; they leave
+    # the updater's launchd registration alone while this process runs.
+    info "Installing ${filename} (version ${new_pkg_version:-unknown})"
+    if ! installer -pkg "${ndtmpdir}/${filename}" -target / >&3 2>&3; then
+      fatal "Failed to install the downloaded package; see /var/log/install.log for the Installer's reasoning." U0031
+    fi
+
+    installed_pkg_version="$(get_macos_pkg_receipt_version)"
+    if [ -n "${new_pkg_version}" ] && [ "${installed_pkg_version}" != "${new_pkg_version}" ]; then
+      error "Installation reported success but the package receipt says version ${installed_pkg_version:-absent} instead of ${new_pkg_version}."
+    else
+      info "Updated to ${installed_pkg_version:-unknown}."
+      rm -r "${ndtmpdir}"
+    fi
+  fi
+
+  if [ -e "${PREVDIR}" ]; then
+    info "Switching back to ${PREVDIR}"
+    cd "${PREVDIR}"
+  fi
+  [ -n "${logfile}" ] && rm "${logfile}" && logfile=
+
+  return 0
+}
+
 get_new_binpkg_major() {
   case "${pm_cmd}" in
     apt-get) apt-get --just-print upgrade 2>&1 | grep Inst | grep ' netdata ' | cut -f 3 -d ' ' | tr -d '[]' | cut -f 1 -d '.' ;;
@@ -1558,6 +1722,7 @@ case "${INSTALL_TYPE}" in
       update_static && exit 0
       ;;
     *binpkg*) update_binpkg && exit 0 ;;
+    macos-pkg) update_macos_pkg && exit 0 ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.
       validate_environment_file
       update_legacy

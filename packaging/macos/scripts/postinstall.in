@@ -67,6 +67,18 @@ fi
 dseditgroup -o edit -a "${NETDATA_USER}" -t user "${NETDATA_USER}" 2>/dev/null || true
 
 #
+# Stock configuration: the payload carries it under usr/lib/netdata/conf.d
+# only, because Installer replaces payload files wholesale on upgrade.
+# Copy into etc/netdata when absent - the noreplace semantics of the other
+# packaging formats - so user edits survive upgrades.
+#
+for f in netdata.conf netdata-updater.conf; do
+    if [ ! -f "${PREFIX}/etc/netdata/${f}" ] && [ -f "${PREFIX}/usr/lib/netdata/conf.d/${f}" ]; then
+        cp "${PREFIX}/usr/lib/netdata/conf.d/${f}" "${PREFIX}/etc/netdata/${f}"
+    fi
+done
+
+#
 # Ownership. The Agent's writable state belongs to the service account;
 # configuration is root-owned and group-readable - a pre-staged claim.conf
 # keeps its content and ends up 0640 root:netdata like every other file
@@ -124,5 +136,53 @@ while :; do
     fi
     sleep 2
 done
+
+#
+# Auto-updater daemon. Opt-out (D15b): a pre-staged or user-edited
+# netdata-updater.conf with NETDATA_MACOS_AUTO_UPDATES='0' - stock config is
+# copy-if-absent, so a pre-staged file survives the install. The opt-out
+# uses launchctl disable, which persists in launchd's override database:
+# merely skipping the bootstrap would not survive a reboot, because launchd
+# loads every plist under /Library/LaunchDaemons at boot.
+#
+# Never touch the label while the updater is mid-transaction - this very
+# postinstall may be its grandchild, and booting it out would kill the
+# installer under itself. The freshly delivered plist then takes effect at
+# the next boot or the next idle (re)install; label and program path do not
+# change between versions.
+#
+UPDATER_LABEL="com.github.netdata.updater"
+UPDATER_PLIST="/Library/LaunchDaemons/${UPDATER_LABEL}.plist"
+
+auto_updates=1
+if [ -r "${PREFIX}/etc/netdata/netdata-updater.conf" ]; then
+    # shellcheck disable=SC1091
+    . "${PREFIX}/etc/netdata/netdata-updater.conf" 2>/dev/null || true
+    if [ "${NETDATA_MACOS_AUTO_UPDATES:-1}" = "0" ]; then
+        auto_updates=0
+    fi
+fi
+
+if /bin/launchctl print "system/${UPDATER_LABEL}" 2>/dev/null | grep -q "state = running"; then
+    log "updater is mid-transaction; leaving its registration untouched"
+else
+    if /bin/launchctl print "system/${UPDATER_LABEL}" >/dev/null 2>&1; then
+        /bin/launchctl bootout "system/${UPDATER_LABEL}" 2>/dev/null || true
+        i=0
+        while [ "${i}" -lt 60 ] && /bin/launchctl print "system/${UPDATER_LABEL}" >/dev/null 2>&1; do
+            sleep 1
+            i=$((i + 1))
+        done
+    fi
+    if [ "${auto_updates}" -eq 1 ]; then
+        log "bootstrapping ${UPDATER_LABEL}"
+        /bin/launchctl enable "system/${UPDATER_LABEL}" 2>/dev/null || true
+        /bin/launchctl bootstrap system "${UPDATER_PLIST}" \
+            || log "WARNING: updater bootstrap failed; it will register at the next boot"
+    else
+        log "auto-updates opted out; disabling ${UPDATER_LABEL}"
+        /bin/launchctl disable "system/${UPDATER_LABEL}" 2>/dev/null || true
+    fi
+fi
 
 exit 0

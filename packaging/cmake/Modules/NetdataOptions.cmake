@@ -164,6 +164,16 @@ if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi|pkg)$")
         message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, msi, or pkg)")
 endif()
 
+# The macOS package identifier is the upgrade identity macOS Installer keys
+# on, and it becomes an unchangeable public contract the moment a package
+# ships. PROVISIONAL until release approval; nothing is published from CI
+# while the work iterates. Defined here, not in NetdataMacOSPackage.cmake,
+# because the staged .install-type (NetdataSystemFiles) and the package
+# target both consume it.
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+        set(NETDATA_PKG_IDENTIFIER "cloud.netdata.agent")
+endif()
+
 # The two names the enum replaced die loudly, not silently: CMake answers an
 # unused -D with a non-fatal end-of-configure notice that nothing fails on, and
 # netdata-installer.sh forwards NETDATA_CMAKE_OPTIONS verbatim, so an old

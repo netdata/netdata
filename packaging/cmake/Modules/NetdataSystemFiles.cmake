@@ -355,10 +355,29 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${LIBCONFIG_DEST}/vnodes)
 
-install(FILES
-        system/.install-type
-        COMPONENT netdata
-        DESTINATION ${CONFIG_DEST})
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+  # netdata-updater.sh dispatches on INSTALL_TYPE and validates the package
+  # it downloads against the identifier and architecture recorded here. A pkg
+  # install has no .environment file, so this also carries the two facts the
+  # updater's shared plumbing reads from there: the installing uid (root -
+  # installer(8) runs as root) and the runtime prefix.
+  file(WRITE "${CMAKE_BINARY_DIR}/system/.install-type"
+       "INSTALL_TYPE='macos-pkg'
+INSTALL_UID='0'
+PREBUILT_ARCH='${CMAKE_SYSTEM_PROCESSOR}'
+NETDATA_PREFIX='${NETDATA_RUNTIME_PREFIX}'
+NETDATA_MACOS_PKG_IDENTIFIER='${NETDATA_PKG_IDENTIFIER}'
+")
+  install(FILES
+          "${CMAKE_BINARY_DIR}/system/.install-type"
+          COMPONENT netdata
+          DESTINATION ${CONFIG_DEST})
+else()
+  install(FILES
+          system/.install-type
+          COMPONENT netdata
+          DESTINATION ${CONFIG_DEST})
+endif()
 
 install(PROGRAMS
         system/edit-config
@@ -425,20 +444,32 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION "${BINDIR}")
 
-  install(FILES
-          system/netdata.conf
-          system/netdata-updater.conf
-          COMPONENT netdata
-          DESTINATION ${NETDATA_CONF_DEST})
-
-  if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
-    # RPMs ship the stock copies under /usr/lib/netdata/conf.d in addition to
-    # the %config(noreplace) ones in /etc/netdata.
+  if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+    # macOS Installer replaces payload files wholesale on upgrade, so a stock
+    # config in etc/netdata would clobber user edits. Ship the stock copies
+    # only under usr/lib/netdata/conf.d; postinstall copies them into
+    # etc/netdata when absent (the noreplace semantics of the other formats).
     install(FILES
             system/netdata.conf
             system/netdata-updater.conf
             COMPONENT netdata
             DESTINATION ${LIBCONFIG_DEST})
+  else()
+    install(FILES
+            system/netdata.conf
+            system/netdata-updater.conf
+            COMPONENT netdata
+            DESTINATION ${NETDATA_CONF_DEST})
+
+    if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
+      # RPMs ship the stock copies under /usr/lib/netdata/conf.d in addition to
+      # the %config(noreplace) ones in /etc/netdata.
+      install(FILES
+              system/netdata.conf
+              system/netdata-updater.conf
+              COMPONENT netdata
+              DESTINATION ${LIBCONFIG_DEST})
+    endif()
   endif()
 
   if(NETDATA_STAGE_SERVICE_TOOLBOX)
