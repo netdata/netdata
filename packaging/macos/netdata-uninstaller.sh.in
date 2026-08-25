@@ -54,7 +54,9 @@ log() {
 for arg in "$@"; do
     case "${arg}" in
         --purge) PURGE=1 ;;
-        --yes) ASSUME_YES=1 ;;
+        # --force is what kickstart.sh passes the uninstaller it finds; it
+        # means the same thing --yes does here.
+        --yes|--force) ASSUME_YES=1 ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; exit 1 ;;
     esac

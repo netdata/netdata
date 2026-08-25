@@ -1156,11 +1156,15 @@ detect_existing_install() {
   progress "Checking for existing installations of Netdata..."
   EXISTING_INSTALL_IS_NATIVE="0"
 
+  # /opt/netdata/bin is the static install's layout; /opt/netdata/usr/bin and
+  # /opt/netdata/usr/sbin are the native macOS package's. Both belong in each
+  # branch: on macOS the install prefix has a default, so the first branch is
+  # the one that runs there.
   if [ -n "${INSTALL_PREFIX}" ]; then
-    searchpath="/opt/netdata/bin:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+    searchpath="/opt/netdata/bin:/opt/netdata/usr/bin:/opt/netdata/usr/sbin:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
     searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
   else
-    searchpath="/opt/netdata/bin:${PATH}"
+    searchpath="/opt/netdata/bin:/opt/netdata/usr/bin:/opt/netdata/usr/sbin:${PATH}"
   fi
 
   while [ -n "${searchpath}" ]; do
@@ -1236,7 +1240,7 @@ handle_existing_install() {
   fi
 
   case "${INSTALL_TYPE}" in
-    kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
+    kickstart-*|legacy-*|binpkg-*|manual-static|macos-pkg|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
         if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
           warning "Found an existing netdata install managed by the system package manager, but could not determine the install type. Usually this means you installed an unsupported third-party netdata package. This script supports claiming most such installs, but attempting to update or reinstall them using this script may be dangerous."
@@ -1251,7 +1255,7 @@ handle_existing_install() {
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
-          binpkg-*) NETDATA_REQUESTED_INSTALL_TYPE='native' ;;
+          binpkg-*|macos-pkg) NETDATA_REQUESTED_INSTALL_TYPE='native' ;;
           *-build) NETDATA_REQUESTED_INSTALL_TYPE='build' ;;
           *-static) NETDATA_REQUESTED_INSTALL_TYPE='static' ;;
           *)
@@ -1358,10 +1362,13 @@ confirm_install_prefix() {
   fi
 
   if [ -n "${INSTALL_PREFIX}" ]; then
+    USER_SET_INSTALL_PREFIX=1
     NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install-prefix ${INSTALL_PREFIX}"
   else
     case "${SYSTYPE}" in
       Darwin)
+        # Default for the source-build path only; the native package owns
+        # /opt/netdata and install_on_macos overrides this on success.
         INSTALL_PREFIX="/usr/local/netdata"
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --install-no-prefix ${INSTALL_PREFIX}"
         ;;
@@ -2504,11 +2511,99 @@ install_on_linux() {
   fi
 }
 
+# ======================================================================
+# Native macOS package install code.
+
+set_macos_pkg_urls() {
+  pkg_filename="netdata-latest-macos-${SYSARCH}.pkg"
+
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
+    export NETDATA_MACOS_PKG_URL="file://${path}/${pkg_filename}"
+    export NETDATA_MACOS_PKG_CHECKSUM_URL="file://${path}/sha256sums.txt"
+  elif [ "${1}" = "stable" ]; then
+    latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+    export NETDATA_MACOS_PKG_URL="https://github.com/netdata/netdata/releases/download/${latest}/${pkg_filename}"
+    export NETDATA_MACOS_PKG_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
+  else
+    tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+    export NETDATA_MACOS_PKG_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/${pkg_filename}"
+    export NETDATA_MACOS_PKG_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
+  fi
+}
+
+macos_pkg_supported() {
+  # The native package is Apple Silicon only and sets a macOS 14 floor.
+  [ "${SYSARCH}" = "arm64" ] || return 1
+  osmajor="$(sw_vers -productVersion 2>/dev/null | cut -d. -f1)"
+  [ "${osmajor:-0}" -ge 14 ] || return 1
+  return 0
+}
+
+try_macos_pkg_install() {
+  set_macos_pkg_urls "${SELECTED_RELEASE_CHANNEL}"
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to install using the native macOS package..."
+  else
+    progress "Attempting to install using the native macOS package..."
+  fi
+
+  if ! check_for_remote_file "${NETDATA_MACOS_PKG_URL}"; then
+    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} native macOS package for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
+    return 2
+  fi
+
+  if ! download "${NETDATA_MACOS_PKG_URL}" "./${pkg_filename}"; then
+    fatal "Unable to download the native macOS package. ${BADNET_MSG}." F0208
+  fi
+
+  if ! download "${NETDATA_MACOS_PKG_CHECKSUM_URL}" "./sha256sum.txt"; then
+    fatal "Unable to fetch checksums to verify the native macOS package. ${BADNET_MSG}." F0206
+  fi
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would validate SHA256 checksum of the downloaded package and install it with installer(8)."
+    return 0
+  fi
+
+  if ! grep "${pkg_filename}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
+    bad_sums_report="$(report_bad_sha256sum "${pkg_filename}" "./sha256sum.txt")"
+    fatal "macOS package checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0207
+  fi
+
+  progress "Installing netdata"
+  # The package's own preinstall refuses to install over a foreign Netdata
+  # (source install, Homebrew service, port conflict) without touching the
+  # system; a failure here therefore needs no rollback of our own.
+  if ! run_as_root /usr/sbin/installer -pkg "./${pkg_filename}" -target /; then
+    warning "Failed to install the native macOS package. If the Installer refused because an existing Netdata install or a port conflict was found, /var/log/install.log names it and how to resolve it."
+    return 2
+  fi
+
+  INSTALL_PREFIX="/opt/netdata"
+  return 0
+}
+
 install_on_macos() {
   case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
-    native) fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--native-only\` option." F0305 ;;
     static) fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--static-only\` option." F0306 ;;
-    *)
+    native)
+      if ! macos_pkg_supported; then
+        fatal "User requested the native macOS package, but it requires an Apple Silicon Mac running macOS 14 or newer. Try installing without \`--native-only\` option." F0305
+      elif [ -n "${INSTALL_VERSION}" ]; then
+        fatal "User requested the native macOS package, but installing specific versions of it is not supported yet. Try installing without \`--native-only\` option." F0305
+      fi
+
+      SELECTED_INSTALL_METHOD="native"
+      INSTALL_TYPE="macos-pkg"
+      if try_macos_pkg_install; then
+        NETDATA_INSTALL_SUCCESSFUL=1
+      else
+        fatal "Unable to install on this system." F0307
+      fi
+      ;;
+    build)
       SELECTED_INSTALL_METHOD="build"
       INSTALL_TYPE="kickstart-build"
       try_build_install
@@ -2517,6 +2612,28 @@ install_on_macos() {
         0) NETDATA_INSTALL_SUCCESSFUL=1 ;;
         *) fatal "Unable to install on this system." F0307 ;;
       esac
+      ;;
+    *)
+      if macos_pkg_supported && [ -z "${INSTALL_VERSION}" ] && [ -z "${USER_SET_INSTALL_PREFIX}" ]; then
+        SELECTED_INSTALL_METHOD="native"
+        INSTALL_TYPE="macos-pkg"
+        if try_macos_pkg_install; then
+          NETDATA_INSTALL_SUCCESSFUL=1
+        else
+          warning "Failed to install the native macOS package, falling back to building from source."
+        fi
+      fi
+
+      if [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+        SELECTED_INSTALL_METHOD="build"
+        INSTALL_TYPE="kickstart-build"
+        try_build_install
+
+        case "$?" in
+          0) NETDATA_INSTALL_SUCCESSFUL=1 ;;
+          *) fatal "Unable to install on this system." F0307 ;;
+        esac
+      fi
       ;;
   esac
 }
