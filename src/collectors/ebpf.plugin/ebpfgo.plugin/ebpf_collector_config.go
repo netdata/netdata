@@ -13,6 +13,7 @@ type collectorCommonConfig struct {
 	BTFPath        *string
 	HasBTF         *bool
 	ObjectFlavor   *string
+	LoadMethod     *LoadMethod
 	AppsLevel      *int
 	// ReturnMode receives `ebpf load mode`.  Only fd passes it: it is the only
 	// module whose charts differ between `entry` and `return`.
@@ -51,7 +52,11 @@ func applyCommonCollectorConfig(fileCfg pluginConfigFile, dst collectorCommonCon
 	if fileCfg.CollectPidLevel != nil && dst.AppsLevel != nil {
 		*dst.AppsLevel = *fileCfg.CollectPidLevel
 	}
-	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
+	if fileCfg.LoadMethod != nil && *fileCfg.LoadMethod != LoadPlayDice && dst.LoadMethod != nil {
+		*dst.LoadMethod = *fileCfg.LoadMethod
+	}
+	if (fileCfg.LoadMethod == nil || *fileCfg.LoadMethod == LoadPlayDice) &&
+		fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
 		*dst.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 	if fileCfg.LoadModeReturn != nil && dst.ReturnMode != nil {

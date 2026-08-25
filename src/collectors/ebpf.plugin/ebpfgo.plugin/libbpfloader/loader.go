@@ -170,12 +170,13 @@ func FDSupportsCore() bool {
 	return false
 }
 
-func NewFDRuntime(path string, useCore bool) (*FDRuntime, error) {
+func NewFDRuntime(path string, useCore bool, customBTFPath string) (*FDRuntime, error) {
+	_ = customBTFPath
 	return newDisabledRuntime[FDRuntime](path, useCore)
 }
 
-func (r *FDRuntime) Prepare(pidTableSize uint32, mapsPerCore bool, closeTarget string) error {
-	_, _, _ = pidTableSize, mapsPerCore, closeTarget
+func (r *FDRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+	_, _ = pidTableSize, mapsPerCore
 	return ErrDisabled
 }
 

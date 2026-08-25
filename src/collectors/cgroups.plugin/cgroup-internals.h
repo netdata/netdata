@@ -71,6 +71,7 @@ typedef struct cgroup_ebpfgo_publish_fd {
     long long close_call;
     long long open_err;
     long long close_err;
+    uint32_t update_every_s;
 } cgroup_ebpfgo_publish_fd_t;
 
 typedef struct cgroup_ebpfgo_socket {
@@ -285,6 +286,7 @@ struct cgroup {
     RRDSET *st_fd_open_error;
     RRDSET *st_fd_close;
     RRDSET *st_fd_close_error;
+    long    last_fd_divisor; // tracks fd collector cadence across ebpfgo.plugin restarts
 
     // eBPF socket snapshot from ebpfgo.plugin SHM.
     cgroup_ebpfgo_socket_t net;

@@ -93,13 +93,16 @@ func TestUpdateFDAppsFirstCycleSuppressesBacklog(t *testing.T) {
 func TestUpdateFDAppsPublishesIntervalDeltas(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
 	store.UpdateFDApps([]libbpfloader.FDAppSnapshot{fdApp(42, 100, 90, 4, 1)}, false)
-	store.UpdateFDApps([]libbpfloader.FDAppSnapshot{fdApp(42, 130, 120, 6, 1)}, false)
+	store.UpdateFDApps([]libbpfloader.FDAppSnapshot{fdApp(42, 130, 120, 6, 1)}, false, 23)
 
 	row := fdRow(t, store, 42)
 	want := netdataPublishFDStat{OpenCall: 30, CloseCall: 30, OpenErr: 2, CloseErr: 0}
 	if row.OpenCall != want.OpenCall || row.CloseCall != want.CloseCall ||
 		row.OpenErr != want.OpenErr || row.CloseErr != want.CloseErr {
 		t.Fatalf("second cycle published %+v, want %+v", row, want)
+	}
+	if row.UpdateEverySec != 23 {
+		t.Fatalf("UpdateEverySec = %d, want 23", row.UpdateEverySec)
 	}
 }
 

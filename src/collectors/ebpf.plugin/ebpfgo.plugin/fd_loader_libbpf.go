@@ -15,15 +15,18 @@ import (
 // Matches tryLoadCachestatPlan / tryLoadDCStatPlan / tryLoadSocketPlan.
 func tryLoadFDPlan(cfg FDLegacyConfig, plan LoadPlan) (*FDLegacyHandle, error) {
 	coreSupported := libbpfloader.FDSupportsCore()
-	rt, err := libbpfloader.NewFDRuntime(plan.ObjectPath, plan.LoadMode == LoadCore && coreSupported)
+	rt, err := libbpfloader.NewFDRuntime(
+		plan.ObjectPath,
+		plan.LoadMode == LoadCore && coreSupported,
+		fdCustomBTFPath(cfg.BTFPath),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	// The close target is needed here, not just at attach time: the base object
-	// ships one close program per kernel symbol name, so prepare() has to
-	// autoload the one matching this host and disable the other.
-	if err := rt.Prepare(cfg.PidTableSize, cfg.MapsPerCore, cfg.Targets.Close); err != nil {
+	// Prepare selects the object-family program set and configures its maps.
+	// Attach consumes the resolved kernel targets below.
+	if err := rt.Prepare(cfg.PidTableSize, cfg.MapsPerCore); err != nil {
 		rt.Close()
 		return nil, err
 	}

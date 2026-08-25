@@ -17,14 +17,14 @@ func TestFDRuntimeDisabledBuild(t *testing.T) {
 		t.Fatal("FDSupportsCore must be false without libbpf")
 	}
 
-	rt, err := libbpfloader.NewFDRuntime("/nonexistent/fd.o", true)
+	rt, err := libbpfloader.NewFDRuntime("/nonexistent/fd.o", true, "/custom/btf/vmlinux")
 	if rt != nil || !errors.Is(err, libbpfloader.ErrDisabled) {
 		t.Fatalf("NewFDRuntime() = (%v, %v), want (nil, ErrDisabled)", rt, err)
 	}
 
 	var nilRT *libbpfloader.FDRuntime
 	for name, call := range map[string]func() error{
-		"Prepare":          func() error { return nilRT.Prepare(1024, true, "close_fd") },
+		"Prepare":          func() error { return nilRT.Prepare(1024, true) },
 		"Load":             func() error { return nilRT.Load() },
 		"Attach":           func() error { return nilRT.Attach("do_sys_openat2", "close_fd") },
 		"UpdateController": func() error { return nilRT.UpdateController(true, 0) },

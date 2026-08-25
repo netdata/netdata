@@ -1047,7 +1047,6 @@ static void ebpf_parse_args(int argc, char **argv)
         {"filesystem", no_argument, 0, 0},
         {"disk", no_argument, 0, 0},
         {"mount", no_argument, 0, 0},
-        {"filedescriptor", no_argument, 0, 0},
         {"hardirq", no_argument, 0, 0},
         {"softirq", no_argument, 0, 0},
         {"oomkill", no_argument, 0, 0},

@@ -70,6 +70,8 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
         close_call += fd->close_call;
         open_err += fd->open_err;
         close_err += fd->close_err;
+        if (fd->fd_update_every_s)
+            cg->fd.update_every_s = fd->fd_update_every_s;
     }
 
     /* The consumed marker is a watermark and must only move forward.  It is the
@@ -127,10 +129,26 @@ void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg)
     const char *close_err_context = is_service ? "systemd.service.fd_close_error" : "cgroup.fd_close_error";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5400;
 
-    /* The values are per-interval totals, so the publisher's interval is the
-     * dimension divisor that turns them into calls/s — the same conversion
-     * cgroup_ebpfgo_cachestat.c applies to its delta charts. */
-    const collected_number divisor = cgroup_update_every;
+    /* The values are per-fd-collector-interval totals.  The shared-memory
+     * header belongs to whichever module owns publishing, so use fd's per-row
+     * cadence rather than cgroup_update_every. */
+    const collected_number divisor = cg->fd.update_every_s ?
+        (collected_number)cg->fd.update_every_s : cgroup_update_every;
+
+    if (unlikely(divisor != cg->last_fd_divisor)) {
+        {
+            RRDDIM *rd;
+            if (cg->st_fd_open && (rd = rrddim_find_active(cg->st_fd_open, "calls")))
+                rrddim_set_divisor(cg->st_fd_open, rd, (int32_t)divisor);
+            if (cg->st_fd_close && (rd = rrddim_find_active(cg->st_fd_close, "calls")))
+                rrddim_set_divisor(cg->st_fd_close, rd, (int32_t)divisor);
+            if (cg->st_fd_open_error && (rd = rrddim_find_active(cg->st_fd_open_error, "calls")))
+                rrddim_set_divisor(cg->st_fd_open_error, rd, (int32_t)divisor);
+            if (cg->st_fd_close_error && (rd = rrddim_find_active(cg->st_fd_close_error, "calls")))
+                rrddim_set_divisor(cg->st_fd_close_error, rd, (int32_t)divisor);
+        }
+        cg->last_fd_divisor = divisor;
+    }
 
     cgroup_ebpfgo_update_single_chart(
         cg,

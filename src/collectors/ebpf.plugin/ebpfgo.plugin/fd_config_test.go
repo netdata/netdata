@@ -89,6 +89,10 @@ func TestResolveFDLegacyConfigLoadMode(t *testing.T) {
 			global: "[global]\n    ebpf load mode = return\n\n[ebpf programs]\n    fd = yes\n",
 			want:   true,
 		},
+		"dev mode enables the error charts": {
+			global: "[global]\n    ebpf load mode = dev\n\n[ebpf programs]\n    fd = yes\n",
+			want:   true,
+		},
 		"absent key keeps the default": {
 			global: "[ebpf programs]\n    fd = yes\n",
 			want:   false,
@@ -111,6 +115,28 @@ func TestResolveFDLegacyConfigLoadMode(t *testing.T) {
 				t.Fatalf("ReportErrors = %t, want %t", cfg.ReportErrors, tc.want)
 			}
 		})
+	}
+}
+
+func TestResolveFDLegacyConfigTypeFormatOverridesObjectFlavor(t *testing.T) {
+	writeCollectorConfigFixture(t, "fd.conf", `
+[global]
+    ebpf type format = legacy
+    ebpf object flavor = buffer
+
+[ebpf programs]
+    fd = yes
+`, "", "", "")
+
+	cfg, err := resolveFDLegacyConfig()
+	if err != nil {
+		t.Fatalf("resolveFDLegacyConfig: %v", err)
+	}
+	if cfg.LoadMethod != LoadLegacy {
+		t.Fatalf("LoadMethod = %v, want %v", cfg.LoadMethod, LoadLegacy)
+	}
+	if cfg.ObjectFlavor != "buffer" {
+		t.Fatalf("ObjectFlavor = %q, want the default unchanged when type format wins", cfg.ObjectFlavor)
 	}
 }
 

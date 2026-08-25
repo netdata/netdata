@@ -53,16 +53,20 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		content      string
 		wantFlavor   *string
 		wantPidLevel *int
+		wantLoad     *LoadMethod
 	}{
-		"ebpf type format legacy forces tracing flavor": {
+		"ebpf type format legacy forces legacy load": {
 			content:    "[global]\nebpf type format = legacy\n",
 			wantFlavor: new("tracing"),
+			wantLoad:   new(LoadLegacy),
 		},
 		"ebpf type format auto leaves flavor unchanged": {
-			content: "[global]\nebpf type format = auto\n",
+			content:  "[global]\nebpf type format = auto\n",
+			wantLoad: new(LoadPlayDice),
 		},
-		"ebpf type format co-re leaves flavor unchanged": {
-			content: "[global]\nebpf type format = co-re\n",
+		"ebpf type format co-re forces core load": {
+			content:  "[global]\nebpf type format = co-re\n",
+			wantLoad: new(LoadCore),
 		},
 		"ebpf co-re tracing probe forces tracing flavor": {
 			content:    "[global]\nebpf co-re tracing = probe\n",
@@ -89,6 +93,11 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			content:    "[global]\nebpf object flavor = ring-buffer\n",
 			wantFlavor: new("buffer"),
 		},
+		"type format legacy takes precedence over object flavor": {
+			content:    "[global]\nebpf type format = legacy\nebpf object flavor = buffer\n",
+			wantFlavor: new("buffer"),
+			wantLoad:   new(LoadLegacy),
+		},
 		"collect pid real parent sets level 0": {
 			content:      "[global]\ncollect pid = real parent\n",
 			wantPidLevel: new(0),
@@ -108,6 +117,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			cfg := parseTempConfig(t, "cachestat.conf", tc.content)
 			checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, tc.wantFlavor)
 			checkPtr(t, "CollectPidLevel", cfg.CollectPidLevel, tc.wantPidLevel)
+			checkPtr(t, "LoadMethod", cfg.LoadMethod, tc.wantLoad)
 		})
 	}
 }

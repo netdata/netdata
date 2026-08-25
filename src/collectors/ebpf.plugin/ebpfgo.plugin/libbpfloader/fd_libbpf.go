@@ -29,12 +29,11 @@ struct netdata_ebpf_fd_pid_snapshot_list {
     size_t count;
 };
 
-struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, int use_core);
+struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, int use_core, const char *custom_btf_path);
 int netdata_fd_runtime_prepare(
     struct netdata_ebpf_fd_runtime *rt,
     unsigned int pid_table_size,
-    int maps_per_core,
-    const char *close_target);
+    int maps_per_core);
 int netdata_fd_runtime_load(struct netdata_ebpf_fd_runtime *rt);
 int netdata_fd_runtime_attach(
     struct netdata_ebpf_fd_runtime *rt,
@@ -87,16 +86,18 @@ func FDSupportsCore() bool {
 	return C.netdata_fd_runtime_supports_core() != 0
 }
 
-func NewFDRuntime(path string, useCore bool) (*FDRuntime, error) {
+func NewFDRuntime(path string, useCore bool, customBTFPath string) (*FDRuntime, error) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
+	cbtfPath := C.CString(customBTFPath)
+	defer C.free(unsafe.Pointer(cbtfPath))
 
 	cUseCore := C.int(0)
 	if useCore {
 		cUseCore = 1
 	}
 
-	rt := C.netdata_fd_runtime_open_mode(cpath, cUseCore)
+	rt := C.netdata_fd_runtime_open_mode(cpath, cUseCore, cbtfPath)
 	if rt == nil {
 		return nil, fmt.Errorf("open fd object %q failed", path)
 	}
@@ -104,10 +105,8 @@ func NewFDRuntime(path string, useCore bool) (*FDRuntime, error) {
 	return &FDRuntime{ptr: rt}, nil
 }
 
-// Prepare needs the resolved close symbol: the base object ships one close
-// program per kernel symbol name and the one naming a symbol this host does not
-// export would fail to load, taking the whole object with it.
-func (r *FDRuntime) Prepare(pidTableSize uint32, mapsPerCore bool, closeTarget string) error {
+// Prepare configures map sizes and map types before loading the selected object.
+func (r *FDRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
 	if r == nil || r.ptr == nil {
 		return ErrDisabled
 	}
@@ -117,10 +116,7 @@ func (r *FDRuntime) Prepare(pidTableSize uint32, mapsPerCore bool, closeTarget s
 		cMapsPerCore = 1
 	}
 
-	cClose := C.CString(closeTarget)
-	defer C.free(unsafe.Pointer(cClose))
-
-	if ret := C.netdata_fd_runtime_prepare(r.ptr, C.uint(pidTableSize), cMapsPerCore, cClose); ret != 0 {
+	if ret := C.netdata_fd_runtime_prepare(r.ptr, C.uint(pidTableSize), cMapsPerCore); ret != 0 {
 		return fmt.Errorf("prepare fd runtime failed: %d", int(ret))
 	}
 

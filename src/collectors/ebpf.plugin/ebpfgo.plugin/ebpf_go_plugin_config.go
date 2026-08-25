@@ -31,6 +31,7 @@ type pluginConfigFile struct {
 	BTFPath                   *string
 	Lifetime                  *int
 	ObjectFlavor              *string
+	LoadMethod                *LoadMethod
 	CollectPidLevel           *int  // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
 	PerQueryTracking          *bool // "per query tracking" key → DNS per-query flow capture
 	FlowTTL                   *int  // "flow ttl" key → DNS flow record lifetime in seconds (dns.conf only)
@@ -288,28 +289,31 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			// here would fire several times for one setting and name the wrong
 			// module every time.
 			//
-			// The C plugin's ebpf_select_mode() treated anything that was not
-			// "return" as entry.  Kept narrower here so a typo is reported instead of
-			// silently meaning entry.
+			// The C plugin's ebpf_select_mode() accepted `return` and its legacy
+			// `dev` alias as the two non-entry modes. Preserve that contract: fd
+			// exposes error charts in both modes.
 			switch strings.ToLower(strings.TrimSpace(value)) {
 			case "entry":
 				cfg.LoadModeReturn = new(false)
-			case "return":
+			case "return", "dev":
 				cfg.LoadModeReturn = new(true)
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf load mode %q, using default\n", path, value)
 			}
 			found = true
 		case "ebpf type format":
-			// Legacy key from the old ebpf.plugin; maps to ebpf object flavor.
-			// "legacy" forces the kprobe-based tracing path; "co-re" and "auto"
-			// are explicit no-ops (leave flavor to auto-detection).  Any other
-			// value is unrecognized — warn so the operator can correct a typo.
+			// Legacy key from the old ebpf.plugin. An explicit type format selects
+			// the load method and takes precedence over ebpf object flavor.
 			switch strings.ToLower(value) {
 			case "legacy":
+				cfg.LoadMethod = new(LoadLegacy)
 				cfg.ObjectFlavor = new("tracing")
-			case "co-re", "auto":
-				// no-op: these are the documented default choices
+			case "co-re":
+				cfg.LoadMethod = new(LoadCore)
+			case "auto":
+				// Preserve an explicit reset from an earlier merged legacy/co-re
+				// setting; LoadPlayDice means auto-detection in this config layer.
+				cfg.LoadMethod = new(LoadPlayDice)
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf type format %q, using default\n", path, value)
 			}
@@ -409,6 +413,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.ObjectFlavor != nil {
 		c.ObjectFlavor = other.ObjectFlavor
+	}
+	if other.LoadMethod != nil {
+		c.LoadMethod = other.LoadMethod
 	}
 	if other.CollectPidLevel != nil {
 		c.CollectPidLevel = other.CollectPidLevel

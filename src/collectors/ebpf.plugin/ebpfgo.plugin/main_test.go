@@ -7,6 +7,8 @@ func TestParsePluginArgs(t *testing.T) {
 		args         []string
 		wantInterval int
 		wantOnly     moduleSelection
+		wantErrors   *bool
+		wantLoad     *LoadMethod
 	}{
 		"numeric pluginsd interval": {
 			args:         []string{"10"},
@@ -30,6 +32,28 @@ func TestParsePluginArgs(t *testing.T) {
 			wantInterval: 5,
 			wantOnly:     moduleSelectionFD,
 		},
+		"fd legacy filedescriptor alias": {
+			args:     []string{"--filedescriptor"},
+			wantOnly: moduleSelectionFD,
+		},
+		"fd short legacy filedescriptor alias": {
+			args:     []string{"-filedescriptor"},
+			wantOnly: moduleSelectionFD,
+		},
+		"return enables fd error charts": {
+			args:       []string{"--filedescriptor", "--return"},
+			wantOnly:   moduleSelectionFD,
+			wantErrors: new(true),
+		},
+		"legacy forces fd legacy object": {
+			args:     []string{"--fd", "--legacy"},
+			wantOnly: moduleSelectionFD,
+			wantLoad: new(LoadLegacy),
+		},
+		"core overrides legacy when last": {
+			args:     []string{"--legacy", "--core"},
+			wantLoad: new(LoadCore),
+		},
 		// Each flag means "run only this module", so they cannot combine; the C
 		// plugin's getopt loop let the last one win and so does this parser.
 		"last selection flag wins": {
@@ -43,10 +67,18 @@ func TestParsePluginArgs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			gotInterval, gotOnly := parsePluginArgs(tc.args)
+			gotInterval, gotOnly, gotFD := parsePluginArgs(tc.args)
 			if gotInterval != tc.wantInterval || gotOnly != tc.wantOnly {
 				t.Fatalf("parsePluginArgs(%q) = (%d, %d), want (%d, %d)",
 					tc.args, gotInterval, gotOnly, tc.wantInterval, tc.wantOnly)
+			}
+			if (gotFD.reportErrors == nil) != (tc.wantErrors == nil) ||
+				gotFD.reportErrors != nil && *gotFD.reportErrors != *tc.wantErrors {
+				t.Fatalf("parsePluginArgs(%q) reportErrors = %#v, want %#v", tc.args, gotFD.reportErrors, tc.wantErrors)
+			}
+			if (gotFD.loadMethod == nil) != (tc.wantLoad == nil) ||
+				gotFD.loadMethod != nil && *gotFD.loadMethod != *tc.wantLoad {
+				t.Fatalf("parsePluginArgs(%q) loadMethod = %#v, want %#v", tc.args, gotFD.loadMethod, tc.wantLoad)
 			}
 		})
 	}

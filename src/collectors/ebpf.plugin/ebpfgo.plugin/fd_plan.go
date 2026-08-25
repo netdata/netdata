@@ -1,6 +1,8 @@
 package main
 
 import (
+	"path/filepath"
+
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
@@ -40,6 +42,7 @@ type FDLegacyConfig struct {
 	PidTableSize   uint32
 	MapsPerCore    bool
 	ObjectFlavor   string
+	LoadMethod     LoadMethod
 	AppsLevel      int // BPF apps collection level: 0=real parent, 1=parent, 2=all
 	// ReportErrors mirrors `ebpf load mode`: false for `entry` (the stock
 	// default), true for `return`/`dev`.  It gates ONLY the error charts.  The
@@ -91,6 +94,7 @@ func defaultFDLegacyConfig() FDLegacyConfig {
 		PidTableSize:   fdDefaultPIDTableSize,
 		MapsPerCore:    true,
 		ObjectFlavor:   fdDefaultObjectFlavor,
+		LoadMethod:     LoadCore,
 		Enabled:        false,
 		AppsEnabled:    false,
 		CgroupsEnabled: false,
@@ -119,6 +123,7 @@ func resolveFDLegacyConfig() (FDLegacyConfig, error) {
 		BTFPath:        &cfg.BTFPath,
 		HasBTF:         &cfg.HasBTF,
 		ObjectFlavor:   &cfg.ObjectFlavor,
+		LoadMethod:     &cfg.LoadMethod,
 		AppsLevel:      &cfg.AppsLevel,
 		ReturnMode:     &cfg.ReportErrors,
 	})
@@ -146,7 +151,7 @@ func resolveFDLegacyConfig() (FDLegacyConfig, error) {
 }
 
 func BuildFDLegacyPlan(cfg FDLegacyConfig) LoadPlan {
-	return buildKprobeLegacyPlan(kprobePlanRequest{
+	plan := buildKprobeLegacyPlan(kprobePlanRequest{
 		PluginsDir:      cfg.PluginsDir,
 		Kernels:         cfg.Kernels,
 		IsRHF:           cfg.IsRHF,
@@ -161,4 +166,22 @@ func BuildFDLegacyPlan(cfg FDLegacyConfig) LoadPlan {
 		// FDLegacyConfig.ReportErrors.
 		IsReturn: true,
 	})
+	if cfg.LoadMethod == LoadLegacy {
+		plan.Flavor = ObjectFlavorBase
+		plan.Selector = SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+		if int(plan.Selector) > fdMaxBaseSelector {
+			plan.Selector = uint32(fdMaxBaseSelector)
+		}
+		plan.ObjectPath = BuildObjectPathWithFlavor(
+			cfg.PluginsDir, plan.Selector, "fd", plan.IsReturn, cfg.IsRHF, ObjectFlavorBase)
+		plan.LoadMode = LoadLegacy
+	}
+	return plan
+}
+
+// fdCustomBTFPath returns the vmlinux BTF file from the configured directory.
+// `btf path` has always been a directory option, while libbpf's skeleton open
+// options require the full file path.
+func fdCustomBTFPath(btfDir string) string {
+	return filepath.Join(btfDir, fdDefaultBTFFile)
 }

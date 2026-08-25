@@ -22,7 +22,7 @@ func main() {
 	// host that is ~130 threads and ~1 GB of stack RSS for no benefit.
 	runtime.GOMAXPROCS(7)
 
-	updateEvery, only := parsePluginArgs(os.Args[1:])
+	updateEvery, only, fdOverrides := parsePluginArgs(os.Args[1:])
 
 	cachestatCfg, err := resolveCachestatLegacyConfig()
 	if err != nil {
@@ -46,6 +46,12 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: fd config load failed: %v\n", err)
 		os.Exit(1)
+	}
+	if fdOverrides.reportErrors != nil {
+		fdCfg.ReportErrors = *fdOverrides.reportErrors
+	}
+	if fdOverrides.loadMethod != nil {
+		fdCfg.LoadMethod = *fdOverrides.loadMethod
 	}
 
 	dnsCfg, err := resolveDNSLegacyConfig()
@@ -308,20 +314,31 @@ const (
 // The flags are mutually exclusive because each means "run only this module"; the
 // last one on the command line wins, matching how the C plugin's getopt loop
 // behaved when several were passed.
-func parsePluginArgs(args []string) (updateEvery int, only moduleSelection) {
+type fdCLIOverrides struct {
+	reportErrors *bool
+	loadMethod   *LoadMethod
+}
+
+func parsePluginArgs(args []string) (updateEvery int, only moduleSelection, fd fdCLIOverrides) {
 	for _, arg := range args {
 		switch arg {
 		case "--dcstat", "-dcstat":
 			only = moduleSelectionDCStat
-		case "--fd", "-fd":
+		case "--fd", "-fd", "--filedescriptor", "-filedescriptor":
 			only = moduleSelectionFD
+		case "--return", "-return":
+			fd.reportErrors = new(true)
+		case "--legacy", "-legacy":
+			fd.loadMethod = new(LoadLegacy)
+		case "--core", "-core":
+			fd.loadMethod = new(LoadCore)
 		default:
 			if parsed, err := strconv.Atoi(arg); err == nil && parsed > 0 && updateEvery == 0 {
 				updateEvery = parsed
 			}
 		}
 	}
-	return updateEvery, only
+	return updateEvery, only, fd
 }
 
 // resolveUpdateEvery returns the first positive value from: config file, CLI arg, fallback.

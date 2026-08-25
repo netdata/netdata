@@ -102,6 +102,12 @@ func TestBuildFDLegacyPlan(t *testing.T) {
 	}
 }
 
+func TestFDCustomBTFPath(t *testing.T) {
+	if got, want := fdCustomBTFPath("/custom/btf"), "/custom/btf/vmlinux"; got != want {
+		t.Fatalf("fdCustomBTFPath() = %q, want %q", got, want)
+	}
+}
+
 // TestBuildFDLegacyPlanAlwaysSelectsReturnObjects pins the D1 decision: fd loads
 // the 'r'-prefixed object family in BOTH modes, because those are the objects
 // whose programs read PT_REGS_RC.  `ebpf load mode` gates the error charts only.
@@ -120,6 +126,25 @@ func TestBuildFDLegacyPlanAlwaysSelectsReturnObjects(t *testing.T) {
 		if got := filepath.Base(plan.ObjectPath); !strings.HasPrefix(got, "r") {
 			t.Fatalf("ReportErrors=%t: object %q does not use the return-probe prefix", reportErrors, got)
 		}
+	}
+}
+
+func TestBuildFDLegacyPlanForcedLegacyUsesBaseObject(t *testing.T) {
+	cfg := baseFDConfig()
+	cfg.KernelVersion = 395264 // 6.8
+	cfg.HasBTF = true
+	cfg.ObjectFlavor = "arena"
+	cfg.LoadMethod = LoadLegacy
+
+	plan := BuildFDLegacyPlan(cfg)
+	if plan.LoadMode != LoadLegacy {
+		t.Fatalf("forced legacy LoadMode = %v, want %v", plan.LoadMode, LoadLegacy)
+	}
+	if plan.Flavor != ObjectFlavorBase {
+		t.Fatalf("forced legacy Flavor = %q, want base", plan.Flavor)
+	}
+	if got, want := filepath.Base(plan.ObjectPath), "rnetdata_ebpf_fd.5.14.o"; got != want {
+		t.Fatalf("forced legacy object = %q, want %q", got, want)
 	}
 }
 

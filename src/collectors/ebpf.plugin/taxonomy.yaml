@@ -1,5 +1,0 @@
-taxonomy_version: 1
-plugin_name: ebpf.plugin
-module_name: filedescriptor
-taxonomy_optout:
-  reason: ebpf.plugin metrics are served through legacy eBPF charts and the network-protocols on-demand function; collector taxonomy is not yet authored for these contexts.

@@ -32,8 +32,8 @@ const (
 // Must match NETDATA_EBPFGO_INTEGRATION_NAME / NETDATA_EBPFGO_SHM_INTEGRATION_NAME
 // in apps_ebpf_shared_pid_row.h, which is what all consumer plugins open.
 const (
-	productionSHMName = "/netdata_shm_integration_ebpfgo_v5"
-	productionSEMName = "/netdata_sem_integration_ebpfgo_v5"
+	productionSHMName = "/netdata_shm_integration_ebpfgo_v6"
+	productionSEMName = "/netdata_sem_integration_ebpfgo_v6"
 )
 
 // ebpfFreshnessToken issues the synthetic `ct` stamp a module publishes for its

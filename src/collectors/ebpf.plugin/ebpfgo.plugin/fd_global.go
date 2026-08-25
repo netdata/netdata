@@ -199,7 +199,7 @@ func runFDGlobalCollector(
 			return
 		}
 
-		staleCandidates := store.UpdateFDApps(apps, handle.ReportErrors)
+		staleCandidates := store.UpdateFDApps(apps, handle.ReportErrors, uint32(updateEvery))
 		if len(staleCandidates) > 0 {
 			// Authoritative liveness check matching the C-version behavior: a
 			// process is alive iff kill(pid, 0) succeeds.  Idle-but-alive PIDs

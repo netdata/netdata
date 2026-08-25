@@ -145,32 +145,39 @@ enum netdata_fd_global_key {
 #define NETDATA_FD_DEFAULT_OPEN_TARGET "do_sys_openat2"
 #define NETDATA_FD_DEFAULT_CLOSE_TARGET "close_fd"
 
-static const char *fd_open_program_name(int flavor)
+static const char *fd_open_program_name(int kind, int flavor)
 {
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
-    if (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
+    if (kind == NETDATA_FD_RUNTIME_CORE &&
+        (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA))
         return "netdata_sys_open_buffer";
 #else
+    (void)kind;
     (void)flavor;
 #endif
+
+    if (kind == NETDATA_FD_RUNTIME_LEGACY)
+        return "netdata_sys_open";
+
     return "netdata_sys_open_kretprobe";
 }
 
-/* The base object ships one close program per kernel symbol name, because its
- * SEC() encodes the symbol.  Attachment overrides the target, but the program
- * still has to exist in the loaded object, so the name is chosen from the
- * resolved target rather than hardcoded. */
-static const char *fd_close_program_name(int flavor, const char *close_target)
+/* The legacy ELF and the CO-RE skeleton use different program names.  Their
+ * SEC() target is irrelevant here because bpf_program__attach_kprobe() receives
+ * the resolved target explicitly. */
+static const char *fd_close_program_name(int kind, int flavor)
 {
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
-    if (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
+    if (kind == NETDATA_FD_RUNTIME_CORE &&
+        (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA))
         return "netdata_close_buffer";
 #else
+    (void)kind;
     (void)flavor;
 #endif
 
-    if (close_target && !strcmp(close_target, "__close_fd"))
-        return "netdata___close_fd_kretprobe";
+    if (kind == NETDATA_FD_RUNTIME_LEGACY)
+        return "netdata_close";
 
     return "netdata_close_fd_kretprobe";
 }
@@ -182,11 +189,11 @@ static const char *fd_close_program_name(int flavor, const char *close_target)
  * programs whose SEC() names three different kernel symbols: loading the close
  * program for the symbol this host does not export fails the whole object.  The
  * unused trampoline programs are covered by the same sweep. */
-static void fd_prepare_autoload(struct bpf_object *obj, int flavor, const char *close_target)
+static void fd_prepare_autoload(struct bpf_object *obj, int kind, int flavor)
 {
     const char *keep[] = {
-        fd_open_program_name(flavor),
-        fd_close_program_name(flavor, close_target),
+        fd_open_program_name(kind, flavor),
+        fd_close_program_name(kind, flavor),
     };
 
     struct bpf_program *prog;
@@ -314,7 +321,7 @@ int netdata_fd_runtime_supports_core(void)
 #endif
 }
 
-struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, int use_core)
+struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, int use_core, const char *custom_btf_path)
 {
     struct netdata_ebpf_fd_runtime *rt = callocz(1, sizeof(*rt));
     if (!rt) {
@@ -329,17 +336,21 @@ struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, i
     if (use_core) {
         rt->kind = NETDATA_FD_RUNTIME_CORE;
         rt->flavor = fd_runtime_flavor_from_path(path);
+        struct bpf_object_open_opts opts = {
+            .sz = sizeof(opts),
+            .btf_custom_path = custom_btf_path && *custom_btf_path ? custom_btf_path : NULL,
+        };
         switch (rt->flavor) {
         case NETDATA_FD_RUNTIME_FLAVOR_BUFFER:
-            rt->core.buffer = fd_buffer_bpf__open();
+            rt->core.buffer = fd_buffer_bpf__open_opts(&opts);
             rt->obj = rt->core.buffer ? rt->core.buffer->obj : NULL;
             break;
         case NETDATA_FD_RUNTIME_FLAVOR_ARENA:
-            rt->core.arena = fd_arena_bpf__open();
+            rt->core.arena = fd_arena_bpf__open_opts(&opts);
             rt->obj = rt->core.arena ? rt->core.arena->obj : NULL;
             break;
         default:
-            rt->core.base = fd_bpf__open();
+            rt->core.base = fd_bpf__open_opts(&opts);
             rt->obj = rt->core.base ? rt->core.base->obj : NULL;
             break;
         }
@@ -352,6 +363,7 @@ struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, i
     } else
 #else
     (void)use_core;
+    (void)custom_btf_path;
 #endif
     {
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
@@ -368,23 +380,18 @@ struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, i
     return rt;
 }
 
-/* close_target selects which close program is autoloaded: the base object ships
- * one per kernel symbol name and the one naming a symbol this host lacks would
- * fail to load. */
+/* Prepare selects the object-family program set and configures its maps. The
+ * resolved kernel symbols are consumed only by netdata_fd_runtime_attach(). */
 int netdata_fd_runtime_prepare(
     struct netdata_ebpf_fd_runtime *rt,
     unsigned int pid_table_size,
-    int maps_per_core,
-    const char *close_target)
+    int maps_per_core)
 {
     struct bpf_object *obj = fd_runtime_object(rt);
     if (!rt || !obj)
         return -1;
 
-    if (!close_target || !*close_target)
-        close_target = NETDATA_FD_DEFAULT_CLOSE_TARGET;
-
-    fd_prepare_autoload(obj, rt->flavor, close_target);
+    fd_prepare_autoload(obj, rt->kind, rt->flavor);
     if (fd_update_map_types(obj, maps_per_core) != 0)
         return -1;
     fd_update_map_sizes(obj, pid_table_size);
@@ -574,9 +581,9 @@ int netdata_fd_runtime_attach(
     if (!rt->links)
         return -1;
 
-    rt->links[0] = fd_attach_program_by_name(obj, fd_open_program_name(rt->flavor), open_target);
+    rt->links[0] = fd_attach_program_by_name(obj, fd_open_program_name(rt->kind, rt->flavor), open_target);
     rt->links[1] =
-        fd_attach_program_by_name(obj, fd_close_program_name(rt->flavor, close_target), close_target);
+        fd_attach_program_by_name(obj, fd_close_program_name(rt->kind, rt->flavor), close_target);
 
     for (size_t i = 0; i < NETDATA_FD_LINK_COUNT; i++) {
         if (!rt->links[i] || libbpf_get_error(rt->links[i])) {

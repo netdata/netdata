@@ -65,17 +65,19 @@ func buildFDPublish(
 	previous fdCounters,
 	ct uint64,
 	hasPrevious bool,
+	updateEvery uint32,
 ) netdataPublishFDStat {
 	if !hasPrevious {
-		return netdataPublishFDStat{Ct: ct}
+		return netdataPublishFDStat{Ct: ct, UpdateEverySec: updateEvery}
 	}
 
 	return netdataPublishFDStat{
-		Ct:        ct,
-		OpenCall:  fdDeltaU32(current.OpenCall, previous.OpenCall),
-		CloseCall: fdDeltaU32(current.CloseCall, previous.CloseCall),
-		OpenErr:   fdDeltaU32(current.OpenErr, previous.OpenErr),
-		CloseErr:  fdDeltaU32(current.CloseErr, previous.CloseErr),
+		Ct:             ct,
+		OpenCall:       fdDeltaU32(current.OpenCall, previous.OpenCall),
+		CloseCall:      fdDeltaU32(current.CloseCall, previous.CloseCall),
+		OpenErr:        fdDeltaU32(current.OpenErr, previous.OpenErr),
+		CloseErr:       fdDeltaU32(current.CloseErr, previous.CloseErr),
+		UpdateEverySec: updateEvery,
 	}
 }
 
@@ -143,7 +145,11 @@ func (s *ebpfSharedMemoryStore) RemoveFDPIDs(pids []uint32) {
 // reportErrors is `ebpf load mode = return`.  It does not change what is
 // collected — the counters are always populated — only whether the consumers are
 // told they may show the error charts.  See ebpfgoSHMFlagFDErrors.
-func (s *ebpfSharedMemoryStore) UpdateFDApps(apps []libbpfloader.FDAppSnapshot, reportErrors bool) []uint32 {
+func (s *ebpfSharedMemoryStore) UpdateFDApps(
+	apps []libbpfloader.FDAppSnapshot,
+	reportErrors bool,
+	updateEveryS ...uint32,
+) []uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -159,6 +165,10 @@ func (s *ebpfSharedMemoryStore) UpdateFDApps(apps []libbpfloader.FDAppSnapshot, 
 	// One token per cycle, stamped on every PID that is active in it, so tokens
 	// issued later are always strictly greater than every token issued before.
 	publishToken := s.fdToken.next()
+	updateEvery := uint32(fdDefaultUpdateEvery)
+	if len(updateEveryS) > 0 && updateEveryS[0] > 0 {
+		updateEvery = updateEveryS[0]
+	}
 
 	for _, app := range apps {
 		current := fdCountersOf(app)
@@ -207,7 +217,7 @@ func (s *ebpfSharedMemoryStore) UpdateFDApps(apps []libbpfloader.FDAppSnapshot, 
 		copy(ident.comm[:], app.Comm[:])
 		ident.ppid = app.Ppid
 
-		s.fdData[app.Pid] = buildFDPublish(current, previous, publishCt, hasPrevious)
+		s.fdData[app.Pid] = buildFDPublish(current, previous, publishCt, hasPrevious, updateEvery)
 		s.fdIdent[app.Pid] = ident
 		pids, ordered = appendAscending(pids, app.Pid, ordered)
 	}
