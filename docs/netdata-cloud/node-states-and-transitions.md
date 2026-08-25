@@ -107,11 +107,18 @@ Children with retained data appear as **Stale** (or **Live** if actively streami
 
 **Parent detects child disconnection:**
 
-| Event                             | Detection Time                         | Mechanism                                      |
-|-----------------------------------|----------------------------------------|------------------------------------------------|
-| Child shuts down gracefully       | **Immediate**                          | Socket close detected                          |
-| Child crashes or network drops    | **~60 seconds**                        | TCP keepalive probes (30s idle + 3×10s probes) |
-| Child silently stops sending data | **At least 10 minutes; cadence-aware** | Per-host idle activity timeout                 |
+| Event                             | Detection Time                         | Mechanism                                     |
+|-----------------------------------|----------------------------------------|-----------------------------------------------|
+| Child shuts down gracefully       | **Immediate**                          | Socket close detected                         |
+| Child crashes or network drops    | **Cadence/configuration-dependent**    | TCP keepalive idle plus unanswered probes     |
+| Child silently stops sending data | **At least 10 minutes; cadence-aware** | Per-host idle activity timeout                |
+
+On platforms that support a per-socket keepalive idle value, the Parent defaults it to half of the fastest active chart
+cadence, rounded up and bounded to 30 seconds through 1 hour. A `tcp keepalive idle` value under the receiving
+`[API_KEY]` or `[MACHINE_GUID]` section can override the automatic value. After the idle period, the Parent sends up
+to three probes 10 seconds apart. Detection is therefore about 1 minute at the 30-second floor and slightly over 1 hour
+at the 1-hour cap, rather than a fixed 60 seconds. Platforms without a per-socket keepalive idle option retain their
+operating system's TCP keepalive timing.
 
 The silent-child timeout is `max(10 minutes, 2 × the minimum update interval)` across charts received from that host.
 The Parent retains the last learned minimum across reconnects and chart cleanup. Until a reconnect supplies its first
@@ -136,13 +143,13 @@ A standalone Agent connects directly to Cloud without a Parent.
 
 A child streams metrics to a Parent, which connects to Cloud.
 
-| Event                                | From           | To          | Timing                                         |
-|--------------------------------------|----------------|-------------|------------------------------------------------|
-| Child connects to Parent             | Unseen/Offline | **Live**    | Immediate                                      |
-| Child stops streaming                | Live           | **Stale**   | Immediate to ~60 seconds (see Detection Speed) |
-| Child restarts streaming             | Stale          | **Live**    | Immediate                                      |
-| All Parents go offline               | Live/Stale     | **Offline** | Immediate to ~60 seconds                       |
-| Parent reconnects (child still down) | Offline        | **Stale**   | Immediate (if data retained)                   |
+| Event                                | From           | To          | Timing                                      |
+|--------------------------------------|----------------|-------------|---------------------------------------------|
+| Child connects to Parent             | Unseen/Offline | **Live**    | Immediate                                   |
+| Child stops streaming                | Live           | **Stale**   | Failure-mode-dependent (see Detection Speed) |
+| Child restarts streaming             | Stale          | **Live**    | Immediate                                   |
+| All Parents go offline               | Live/Stale     | **Offline** | Immediate to ~60 seconds                    |
+| Parent reconnects (child still down) | Offline        | **Stale**   | Immediate (if data retained)                |
 
 ### First Connection
 
