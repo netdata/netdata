@@ -173,18 +173,15 @@ bool nrpc_call_deadline(const char *call_id, usec_t *out_stop_monotonic_ut) {
 }
 
 // This has exactly one call site: the leak-checking cleanup at the end of the
-// daemon shutdown, which sits behind FSANITIZE_ADDRESS - a macro the tree
-// consumes but no build defines. So as things stand the block is compiled out
-// everywhere, this function never runs, and the table lives for the whole
-// process lifetime.
+// daemon shutdown, which sits behind FSANITIZE_ADDRESS. Sanitizer builds define
+// that macro, so there the table is torn down at exit; every other build
+// compiles the block out and the table lives for the whole process lifetime.
 //
-// That is why no accessor tests the dictionary for NULL. The test would be
-// dead today, and it would not be protection even if the block were switched
-// on: the teardown is ordered after every thread that could reach the table
-// has been joined, and a thread that outlived that join to reach one accessor
-// reaches the other five just as easily. Ordering is the guarantee; a NULL
-// test in one of six places could only disguise which contract is meant to
-// hold.
+// Either way, no accessor tests the dictionary for NULL, and that is deliberate.
+// The teardown is ordered after every thread that could reach the table has been
+// joined, so a thread that outlived that join to reach one accessor reaches the
+// other five just as easily. Ordering is the guarantee; a NULL test in one of
+// six places could only disguise which contract is meant to hold.
 void nrpc_inflight_calls_destroy(void) {
     if(!nrpc_inflight_calls.dict)
         return;
