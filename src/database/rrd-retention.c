@@ -112,13 +112,17 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
                 // push the product past time_t's range, and an out-of-range
                 // floating-point to integer conversion is undefined - it can
                 // itself yield a negative value that a later clamp cannot fix.
+                // The clamp bound never goes below requested_retention, so a tier
+                // configured for a longer retention than MAX_EXPECTED_RETENTION_S never
+                // publishes an expected retention lower than the requested one.
+                time_t max_retention = MAX(MAX_EXPECTED_RETENTION_S, tier_info->requested_retention);
                 time_t space_retention = 0;
                 if(tier_info->disk_percent > 0) {
                     double extrapolated =
                         (double)(now_s - tier_info->first_time_s) * 100.0 / tier_info->disk_percent;
 
-                    space_retention = (extrapolated >= (double)MAX_EXPECTED_RETENTION_S)
-                                          ? MAX_EXPECTED_RETENTION_S
+                    space_retention = (extrapolated >= (double)max_retention)
+                                          ? max_retention
                                           : (time_t)extrapolated;
                 }
 
