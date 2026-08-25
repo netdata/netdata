@@ -1619,6 +1619,74 @@ static int test_rrdmetric_algorithm_follows_rrddim(void) {
     return rc;
 }
 
+static int test_rrddim_add_does_not_bump_metadata_version(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-metadata-version", "unittest-metadata-version", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDDIM *rd = rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    // An unchanged rrddim_add() must not bump the chart metadata version: the streaming sender
+    // treats a bump as "re-send the whole chart definition upstream" (rrdset_check_upstream_exposed()).
+    uint32_t before = rrdset_metadata_version(st);
+    for(int i = 0; i < 5 ;i++)
+        rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: repeated rrddim_add() bumped the chart metadata version (%u -> %u)\n",
+                __FUNCTION__, before, rrdset_metadata_version(st));
+        rc = 1;
+    }
+
+    // A genuinely obsolete dimension must still be revived, and that revival must bump the version
+    // exactly once so the parent learns the chart is collected again.
+    rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+
+    // ...and repeating the obsolete declaration must not bump it again either.
+    before = rrdset_metadata_version(st);
+    for(int i = 0; i < 5 ;i++)
+        rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: repeated rrddim_is_obsolete() bumped the chart metadata version\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    before = rrdset_metadata_version(st);
+
+    rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+        fprintf(stderr, "%s: obsolete dimension was not revived by rrddim_add()\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrdset_metadata_version(st) == before) {
+        fprintf(stderr, "%s: reviving an obsolete dimension did not bump the chart metadata version\n",
+                __FUNCTION__);
+        rc = 1;
+    }
+
+    // ...and once revived, further identical adds must go quiet again.
+    before = rrdset_metadata_version(st);
+    rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: rrddim_add() on a revived dimension bumped the version again\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrddim_scale_minimum_magnitude(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -2322,6 +2390,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdmetric_algorithm_follows_rrddim())
+        return 1;
+
+    if(test_rrddim_add_does_not_bump_metadata_version())
         return 1;
 
     if(test_rrddim_scale_minimum_magnitude())

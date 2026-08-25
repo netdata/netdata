@@ -626,6 +626,17 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 }
 
 inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd) {
+    // Already obsolete - there is no transition to make, and bumping RRDSET.version again would
+    // re-send the whole chart definition upstream. pluginsd_dimension() calls this on every
+    // DIMENSION line carrying the "obsolete" option, so a child that keeps declaring a dimension
+    // obsolete would otherwise re-announce its chart forever.
+    // Skipping the housekeeping flag re-raise is safe: svc_rrdset_archive_obsolete_dimensions()
+    // (daemon/service.c) re-sets RRDSET_FLAG_OBSOLETE_DIMENSIONS itself whenever a candidate could
+    // not be archived in a pass, so cleanup does not depend on the collector re-raising it.
+    // Mirrors rrdset_is_obsolete___safe_from_collector_thread(), which has always been guarded.
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        return;
+
     netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
@@ -636,6 +647,18 @@ inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *
 }
 
 inline void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st __maybe_unused, RRDDIM *rd) {
+    // Nothing to clear when the dimension is not obsolete - and doing the work anyway is not free:
+    // rrdset_metadata_updated() bumps RRDSET.version, which makes rrdset_check_upstream_exposed()
+    // false and re-sends the entire chart definition (incl. every chart label) to the parent. The
+    // hot callers (rrddim_add_custom(), pluginsd_dimension()) reach this on every collection step,
+    // so without this guard every collected dimension re-announces its chart, forever.
+    // This mirrors rrdset_isnot_obsolete___safe_from_collector_thread(), which has always been guarded.
+    // Skipping rrddim_reinitialize_collection() here is safe: it is idempotent (it only fills
+    // rd->tiers[].sch when NULL) and rrddim_conflict_callback() already runs it on every one of
+    // these paths, via the rrddim_add() that precedes them.
+    if(likely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        return;
+
     netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
