@@ -50,7 +50,6 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/freeradius"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/gearman"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/geth"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/haproxy"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/hddtemp"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/hdfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/hpssa"

@@ -327,25 +327,273 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+The built-in Prometheus profiles on this page map Prometheus metrics into
+120 curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
 
-Untyped metrics (have no '# TYPE') processing:
+### vLLM
 
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
+Curated inference, scheduling, latency, token, cache, connector, engine, HTTP, and runtime metrics from vLLM and Ray.
 
-**The rest are ignored**.
+
+#### Request Lifecycle
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:corrupted_requests_total</code> | Request Lifecycle — Corrupted Requests | <code>corrupted</code> | <code>requests/s</code> | model_name and engine |
+| <code>vllm:time_to_first_token_seconds_bucket</code> | Request Lifecycle — Time to First Token | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:e2e_request_latency_seconds_bucket</code> | Request Lifecycle — End-to-End Request Latency | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:time_to_first_token_seconds_count</code> | Request Lifecycle — Requests Reaching First Token | <code>requests</code> | <code>requests/s</code> | model_name and engine |
+| <code>vllm:time_to_first_token_seconds_sum</code> | Request Lifecycle — Completed Pre-Response Time | <code>time</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:e2e_request_latency_seconds_sum</code> | Request Lifecycle — Completed End-to-End Request Time | <code>time</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:request_params_n_bucket</code> | Request Lifecycle — Requested Sequences | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_params_n_sum</code> | Request Lifecycle — Requested Sequence Volume | <code>sequences</code> | <code>sequences/s</code> | model_name and engine |
+| <code>vllm:request_params_max_tokens_bucket</code> | Request Lifecycle — Requested Token Limit | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_params_max_tokens_sum</code> | Request Lifecycle — Requested Token Limits Sum | <code>token_limits</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_params_max_tokens_count</code> | Request Lifecycle — Requests with Explicit Token Limit | <code>requests</code> | <code>requests/s</code> | model_name and engine |
+| <code>vllm:request_max_num_generation_tokens_bucket</code> | Request Lifecycle — Maximum Generated Tokens | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_max_num_generation_tokens_sum</code> | Request Lifecycle — Maximum Generated Tokens Sum | <code>maximums</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_params_n_count</code> | Request Lifecycle — Parent Requests | <code>requests</code> | <code>requests/s</code> | model_name and engine |
+| <code>vllm:request_success_total</code> | Request Lifecycle / Outcomes — Request Outcomes | <code>requests</code> | <code>requests/s</code> | model_name and engine and finished_reason |
+
+#### Scheduler
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:num_requests_running</code> | Scheduler — Request State | <code>running</code> | <code>requests</code> | model_name and engine |
+| <code>vllm:num_requests_waiting_by_reason&#123;reason="capacity"&#125;</code> | Scheduler — Request State | <code>waiting_capacity</code> | <code>requests</code> | model_name and engine |
+| <code>vllm:num_requests_waiting_by_reason&#123;reason="deferred"&#125;</code> | Scheduler — Request State | <code>waiting_deferred</code> | <code>requests</code> | model_name and engine |
+| <code>vllm:num_preemptions_total</code> | Scheduler — Request Preemptions | <code>preemptions</code> | <code>preemptions/s</code> | model_name and engine |
+| <code>vllm:engine_sleep_state</code> | Scheduler — Engine Sleep State | <code>values of label sleep_state</code> | <code>&#123;status&#125;</code> | model_name and engine |
+| <code>vllm:request_queue_time_seconds_bucket</code> | Scheduler — Request Queue Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_queue_time_seconds_sum</code> | Scheduler — Completed Request Queue Time | <code>time</code> | <code>seconds/s</code> | model_name and engine |
+
+#### Prefill
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:prompt_tokens_by_source_total</code> | Prefill — Prompt Tokens by Source | <code>values of label source</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_prompt_tokens_bucket</code> | Prefill — Prompt Size | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_prefill_time_seconds_bucket</code> | Prefill — Prefill Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_prefill_kv_computed_tokens_bucket</code> | Prefill — Computed KV Tokens | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_prompt_tokens_sum</code> | Prefill — Completed Request Prompt Volume | <code>prompt_tokens</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_prefill_kv_computed_tokens_sum</code> | Prefill — Computed KV Token Volume | <code>computed_tokens</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_prefill_time_seconds_sum</code> | Prefill — Completed Request Prefill Time | <code>time</code> | <code>seconds/s</code> | model_name and engine |
+
+#### Decode
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:generation_tokens_total</code> | Decode — Generated Tokens | <code>generated</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_generation_tokens_bucket</code> | Decode — Output Size | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_decode_time_seconds_bucket</code> | Decode — Decode Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:inter_token_latency_seconds_bucket</code> | Decode — Inter-Token Latency | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_time_per_output_token_seconds_bucket</code> | Decode — Mean Output-Token Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_generation_tokens_sum</code> | Decode — Output Token Volume | <code>output_tokens</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:request_decode_time_seconds_sum</code> | Decode — Completed Request Decode Time | <code>time</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:inter_token_latency_seconds_count</code> | Decode — Inter-Token Intervals | <code>intervals</code> | <code>intervals/s</code> | model_name and engine |
+| <code>vllm:inter_token_latency_seconds_sum</code> | Decode — Inter-Token Interval Time | <code>intervals</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:request_time_per_output_token_seconds_sum</code> | Decode — Accumulated Mean Output-Token Time | <code>request_means</code> | <code>seconds/s</code> | model_name and engine |
+
+#### Engine Execution
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:request_inference_time_seconds_bucket</code> | Engine Execution — Inference Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:request_inference_time_seconds_sum</code> | Engine Execution — Completed Request Inference Time | <code>time</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:iteration_tokens_total_bucket</code> | Engine Execution — Tokens per Engine Step | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:iteration_tokens_total_count</code> | Engine Execution — Engine Steps | <code>steps</code> | <code>steps/s</code> | model_name and engine |
+| <code>vllm:iteration_tokens_total_sum</code> | Engine Execution — Engine Step Token Volume | <code>tokens</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:estimated_flops_per_gpu_total</code> | Engine Execution — Estimated Compute per GPU | <code>compute</code> | <code>GFLOP/s/GPU</code> | model_name and engine |
+| <code>vllm:estimated_read_bytes_per_gpu_total</code> | Engine Execution — Estimated Memory Bandwidth per GPU | <code>read</code> | <code>GB/s/GPU</code> | model_name and engine |
+| <code>vllm:estimated_write_bytes_per_gpu_total</code> | Engine Execution — Estimated Memory Bandwidth per GPU | <code>write</code> | <code>GB/s/GPU</code> | model_name and engine |
+
+#### KV Cache
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:kv_cache_usage_perc</code> | KV Cache — KV Cache Usage | <code>used</code> | <code>percentage</code> | model_name and engine |
+| <code>vllm:prefix_cache_queries_total</code> | KV Cache — Local Prefix Cache | <code>queries</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:prefix_cache_hits_total</code> | KV Cache — Local Prefix Cache | <code>hits</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:external_prefix_cache_queries_total</code> | KV Cache — External Prefix Cache | <code>queries</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:external_prefix_cache_hits_total</code> | KV Cache — External Prefix Cache | <code>hits</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:mm_cache_queries_total</code> | KV Cache — Multimodal Cache | <code>queries</code> | <code>items/s</code> | model_name and engine |
+| <code>vllm:mm_cache_hits_total</code> | KV Cache — Multimodal Cache | <code>hits</code> | <code>items/s</code> | model_name and engine |
+
+#### KV Cache Residency
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:kv_block_lifetime_seconds_bucket</code> | KV Cache Residency — KV Block Lifetime | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_block_idle_before_evict_seconds_bucket</code> | KV Cache Residency — KV Block Idle Time Before Eviction | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_block_reuse_gap_seconds_bucket</code> | KV Cache Residency — KV Block Reuse Gap | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_block_lifetime_seconds_count</code> | KV Cache Residency — KV Cache Events | <code>evictions</code> | <code>blocks/s</code> | model_name and engine |
+| <code>vllm:kv_block_reuse_gap_seconds_count</code> | KV Cache Residency — KV Cache Events | <code>reuse_gaps</code> | <code>blocks/s</code> | model_name and engine |
+| <code>vllm:kv_block_lifetime_seconds_sum</code> | KV Cache Residency — Accumulated KV Residency Time | <code>lifetime</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_block_idle_before_evict_seconds_sum</code> | KV Cache Residency — Accumulated KV Residency Time | <code>idle_before_eviction</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_block_reuse_gap_seconds_sum</code> | KV Cache Residency — Accumulated KV Residency Time | <code>reuse_gap</code> | <code>seconds/s</code> | model_name and engine |
+
+#### KV Offloading
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:kv_offload_load_size_bucket</code> | KV Offloading — KV Offload Load Size | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_store_size_bucket</code> | KV Offloading — KV Offload Store Size | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_load_size_count</code> | KV Offloading — KV Offload Transfer Operations | <code>loads</code> | <code>operations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_store_size_count</code> | KV Offloading — KV Offload Transfer Operations | <code>stores</code> | <code>operations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_load_bytes_total</code> | KV Offloading — KV Offload Transfer Throughput | <code>loaded</code> | <code>bytes/s</code> | model_name and engine |
+| <code>vllm:kv_offload_store_bytes_total</code> | KV Offloading — KV Offload Transfer Throughput | <code>stored</code> | <code>bytes/s</code> | model_name and engine |
+| <code>vllm:kv_offload_load_time_total</code> | KV Offloading — Completed KV Offload Transfer Time | <code>load</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_offload_store_time_total</code> | KV Offloading — Completed KV Offload Transfer Time | <code>store</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_offload_lookup_sync_delay_seconds_bucket</code> | KV Offloading — KV Offload Synchronous Lookup Delay | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_lookup_async_delay_seconds_bucket</code> | KV Offloading — KV Offload Asynchronous Lookup Delay | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_lookup_sync_delay_seconds_count</code> | KV Offloading — KV Offload Lookup Measurements | <code>synchronous</code> | <code>lookups/s</code> | model_name and engine |
+| <code>vllm:kv_offload_lookup_async_delay_seconds_count</code> | KV Offloading — KV Offload Lookup Measurements | <code>asynchronous</code> | <code>lookups/s</code> | model_name and engine |
+| <code>vllm:kv_offload_lookup_sync_delay_seconds_sum</code> | KV Offloading — KV Offload Lookup Delay Accumulation | <code>synchronous</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_offload_lookup_async_delay_seconds_sum</code> | KV Offloading — KV Offload Lookup Delay Accumulation | <code>asynchronous</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_offload_cpu_cache_usage_perc</code> | KV Offloading — CPU KV Cache Usage | <code>total</code> | <code>percentage</code> | model_name and engine |
+| <code>vllm:kv_offload_cpu_cache_write_usage_perc</code> | KV Offloading — CPU KV Cache Usage | <code>writes</code> | <code>percentage</code> | model_name and engine |
+| <code>vllm:kv_offload_cpu_cache_read_usage_perc</code> | KV Offloading — CPU KV Cache Usage | <code>reads</code> | <code>percentage</code> | model_name and engine |
+| <code>vllm:kv_offload_cpu_allocation_size_bucket</code> | KV Offloading — CPU KV Allocation Size | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_cpu_allocation_size_count</code> | KV Offloading — CPU KV Allocation Measurements | <code>allocations</code> | <code>allocations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_cpu_allocation_size_sum</code> | KV Offloading — CPU KV Allocation Volume | <code>blocks</code> | <code>blocks/s</code> | model_name and engine |
+| <code>vllm:kv_offload_allocation_failure_total</code> | KV Offloading — KV Offload Admission Outcomes | <code>allocation_failures</code> | <code>events/s</code> | model_name and engine |
+| <code>vllm:kv_offload_stores_skipped_total</code> | KV Offloading — KV Offload Admission Outcomes | <code>stores_skipped</code> | <code>events/s</code> | model_name and engine |
+| <code>vllm:kv_offload_tiering_lookup_sync_delay_seconds_bucket</code> | KV Offloading — Tiered KV Offload Synchronous Lookup Delay | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_tiering_lookup_async_delay_seconds_bucket</code> | KV Offloading — Tiered KV Offload Asynchronous Lookup Delay | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:kv_offload_tiering_lookup_sync_delay_seconds_count</code> | KV Offloading — Tiered KV Offload Lookup Measurements | <code>synchronous</code> | <code>lookups/s</code> | model_name and engine |
+| <code>vllm:kv_offload_tiering_lookup_async_delay_seconds_count</code> | KV Offloading — Tiered KV Offload Lookup Measurements | <code>asynchronous</code> | <code>lookups/s</code> | model_name and engine |
+| <code>vllm:kv_offload_tiering_lookup_sync_delay_seconds_sum</code> | KV Offloading — Tiered KV Offload Lookup Delay Accumulation | <code>synchronous</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:kv_offload_tiering_lookup_async_delay_seconds_sum</code> | KV Offloading — Tiered KV Offload Lookup Delay Accumulation | <code>asynchronous</code> | <code>seconds/s</code> | model_name and engine |
+
+#### NIXL Connector
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:nixl_xfer_time_seconds_bucket</code> | NIXL Connector — NIXL Transfer Duration | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:nixl_post_time_seconds_bucket</code> | NIXL Connector — NIXL Transfer Post Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:nixl_bytes_transferred_bucket</code> | NIXL Connector — NIXL Transfer Size | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:nixl_num_descriptors_bucket</code> | NIXL Connector — NIXL Transfer Descriptors | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:nixl_xfer_time_seconds_count</code> | NIXL Connector — Successful NIXL Transfers | <code>transfers</code> | <code>transfers/s</code> | model_name and engine |
+| <code>vllm:nixl_xfer_time_seconds_sum</code> | NIXL Connector — Completed NIXL Transfer Time | <code>transfer</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:nixl_post_time_seconds_sum</code> | NIXL Connector — Completed NIXL Transfer Time | <code>post</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:nixl_bytes_transferred_sum</code> | NIXL Connector — NIXL Transfer Throughput | <code>transferred</code> | <code>bytes/s</code> | model_name and engine |
+| <code>vllm:nixl_num_descriptors_sum</code> | NIXL Connector — NIXL Descriptor Throughput | <code>descriptors</code> | <code>descriptors/s</code> | model_name and engine |
+| <code>vllm:nixl_num_failed_transfers_total</code> | NIXL Connector — NIXL Failures | <code>transfers</code> | <code>failures/s</code> | model_name and engine |
+| <code>vllm:nixl_num_failed_notifications_total</code> | NIXL Connector — NIXL Failures | <code>notifications</code> | <code>failures/s</code> | model_name and engine |
+| <code>vllm:nixl_num_kv_expired_reqs_total</code> | NIXL Connector — NIXL Requests with Expired KV | <code>expired</code> | <code>requests/s</code> | model_name and engine |
+
+#### HF3FS Connector
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:hf3fs_save_duration_seconds_bucket</code> | HF3FS Connector — HF3FS Save Duration | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:hf3fs_load_duration_seconds_bucket</code> | HF3FS Connector — HF3FS Load Duration | <code>matching series</code> | <code>observations/s</code> | model_name and engine |
+| <code>vllm:hf3fs_save_duration_seconds_count</code> | HF3FS Connector — HF3FS Transfer Measurements | <code>saves</code> | <code>operations/s</code> | model_name and engine |
+| <code>vllm:hf3fs_load_duration_seconds_count</code> | HF3FS Connector — HF3FS Transfer Measurements | <code>loads</code> | <code>operations/s</code> | model_name and engine |
+| <code>vllm:hf3fs_save_duration_seconds_sum</code> | HF3FS Connector — Completed HF3FS Transfer Time | <code>saves</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:hf3fs_load_duration_seconds_sum</code> | HF3FS Connector — Completed HF3FS Transfer Time | <code>loads</code> | <code>seconds/s</code> | model_name and engine |
+| <code>vllm:hf3fs_num_failed_save_total</code> | HF3FS Connector — HF3FS Transfer Failures | <code>saves</code> | <code>failures/s</code> | model_name and engine |
+| <code>vllm:hf3fs_num_failed_load_total</code> | HF3FS Connector — HF3FS Transfer Failures | <code>loads</code> | <code>failures/s</code> | model_name and engine |
+
+#### Mooncake Connector
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:mooncake_store_operation_time_seconds_bucket</code> | Mooncake Connector / Operation Timing — Mooncake Store Operation Time | <code>matching series</code> | <code>observations/s</code> | model_name and engine and operation and status |
+| <code>vllm:mooncake_store_operation_total</code> | Mooncake Connector / Operation Timing — Mooncake Store Operations | <code>operations</code> | <code>operations/s</code> | model_name and engine and operation and status |
+| <code>vllm:mooncake_store_operation_time_seconds_sum</code> | Mooncake Connector / Operation Timing — Completed Mooncake Store Operation Time | <code>time</code> | <code>seconds/s</code> | model_name and engine and operation and status |
+| <code>vllm:mooncake_store_operation_keys_total</code> | Mooncake Connector / Operation Volume — Mooncake Store Key Throughput | <code>keys</code> | <code>keys/s</code> | model_name and engine and operation and status |
+| <code>vllm:mooncake_store_operation_bytes_total</code> | Mooncake Connector / Operation Volume — Mooncake Store Byte Throughput | <code>bytes</code> | <code>bytes/s</code> | model_name and engine and operation and status |
+| <code>vllm:mooncake_store_operation_failed_keys_total</code> | Mooncake Connector / Operation Volume — Mooncake Store Failed Keys | <code>failed</code> | <code>keys/s</code> | model_name and engine and operation and status |
+
+#### Speculative Decoding
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:spec_decode_num_drafts_total</code> | Speculative Decoding — Drafts | <code>drafts</code> | <code>drafts/s</code> | model_name and engine |
+| <code>vllm:spec_decode_num_draft_tokens_total</code> | Speculative Decoding — Draft Token Outcomes | <code>proposed</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:spec_decode_num_accepted_tokens_total</code> | Speculative Decoding — Draft Token Outcomes | <code>accepted</code> | <code>tokens/s</code> | model_name and engine |
+| <code>vllm:spec_decode_num_accepted_tokens_per_pos_total</code> | Speculative Decoding — Accepted Tokens by Position | <code>values of label position</code> | <code>tokens/s</code> | model_name and engine |
+
+#### Diffusion Decoding
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:diffusion_num_denoising_steps_total</code> | Diffusion Decoding — Diffusion Denoising Steps | <code>steps</code> | <code>steps/s</code> | model_name and engine |
+| <code>vllm:diffusion_num_canvas_positions_total</code> | Diffusion Decoding — Diffusion Canvas Positions | <code>positions</code> | <code>positions/s</code> | model_name and engine |
+| <code>vllm:diffusion_num_committed_tokens_total</code> | Diffusion Decoding — Diffusion Committed Tokens | <code>committed</code> | <code>tokens/s</code> | model_name and engine |
+
+#### WebSocket Service
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:websocket_connections_active</code> | WebSocket Service — Active WebSocket Connections | <code>active</code> | <code>connections</code> | collector job service |
+| <code>vllm:websocket_connections_total</code> | WebSocket Service — WebSocket Connection Lifecycle | <code>opened</code> | <code>connections/s</code> | collector job service |
+| <code>vllm:websocket_connection_duration_seconds_count</code> | WebSocket Service — WebSocket Connection Lifecycle | <code>closed</code> | <code>connections/s</code> | collector job service |
+| <code>vllm:websocket_connection_duration_seconds_bucket</code> | WebSocket Service — WebSocket Connection Duration | <code>matching series</code> | <code>observations/s</code> | collector job service |
+| <code>vllm:websocket_connection_duration_seconds_sum</code> | WebSocket Service — Completed WebSocket Connection Time | <code>time</code> | <code>seconds/s</code> | collector job service |
+
+#### Tool Parsing
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>vllm:tool_call_parser_invocations_total</code> | Tool Parsing — Tool Parser Invocations | <code>invocations</code> | <code>invocations/s</code> | model_name and request_type and mode and outcome |
+
+### FastAPI HTTP instrumentation
+
+Curated request outcomes, latency, in-progress work, measurements, and body traffic from instrumented FastAPI services.
+
+**Supporting profile for vLLM.** Included when the endpoint exposes vLLM's native HTTP transport metrics; Ray-only metrics do not activate it.
+
+#### FastAPI
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>http_requests_total</code> | FastAPI / HTTP Endpoints — HTTP Request Outcomes | <code>values of label status</code> | <code>requests/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_bucket</code> | FastAPI / HTTP Endpoints — HTTP Request Duration | <code>matching series</code> | <code>observations/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_count</code> | FastAPI / HTTP Endpoints — HTTP Request Measurements | <code>requests</code> | <code>requests/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_seconds_sum</code> | FastAPI / HTTP Endpoints — HTTP Completed Request Time | <code>time</code> | <code>seconds/s</code> | FastAPI HTTP endpoint and method |
+| <code>http_request_duration_highr_seconds_bucket</code> | FastAPI / HTTP Service — High-Resolution HTTP Request Duration | <code>matching series</code> | <code>observations/s</code> | instrumented FastAPI service |
+| <code>http_request_duration_highr_seconds_count</code> | FastAPI / HTTP Service — HTTP Request Measurements | <code>requests</code> | <code>requests/s</code> | instrumented FastAPI service |
+| <code>http_request_duration_highr_seconds_sum</code> | FastAPI / HTTP Service — HTTP Completed Request Time | <code>time</code> | <code>seconds/s</code> | instrumented FastAPI service |
+| <code>http_requests_inprogress</code> | FastAPI / HTTP In Progress — HTTP Requests In Progress | <code>requests</code> | <code>requests</code> | FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled |
+| <code>http_request_size_bytes_sum</code> | FastAPI / HTTP Body Traffic — HTTP Body Throughput | <code>request</code> | <code>bytes/s</code> | FastAPI HTTP route handler |
+| <code>http_response_size_bytes_sum</code> | FastAPI / HTTP Body Traffic — HTTP Body Throughput | <code>response</code> | <code>bytes/s</code> | FastAPI HTTP route handler |
+
+### Process runtime
+
+Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
+
+**Supporting profile for vLLM.** Included when the endpoint exposes vLLM's native process metrics; Ray-only metrics do not activate it.
+
+#### Process Runtime
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>process_cpu_seconds_total</code> | Process Runtime — Process CPU Usage | <code>used</code> | <code>cores</code> | collector job process |
+| <code>process_resident_memory_bytes</code> | Process Runtime — Process Resident Memory | <code>resident</code> | <code>bytes</code> | collector job process |
+| <code>process_virtual_memory_bytes</code> | Process Runtime — Process Virtual Memory | <code>virtual</code> | <code>bytes</code> | collector job process |
+| <code>process_open_fds</code> | Process Runtime — Open File Descriptors | <code>open</code> | <code>fds</code> | collector job process |
+| <code>process_max_fds</code> | Process Runtime — File Descriptor Limit | <code>limit</code> | <code>fds</code> | collector job process |
+
+### Python garbage collection
+
+Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
+
+**Supporting profile for vLLM.** Included when the endpoint exposes vLLM's native Python garbage-collection metrics; Ray-only metrics do not activate it.
+
+#### Process Runtime
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>python_gc_objects_collected_total</code> | Process Runtime / Python GC — Collected Objects | <code>collected</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_objects_uncollectable_total</code> | Process Runtime / Python GC — Uncollectable Objects | <code>uncollectable</code> | <code>objects/s</code> | Python garbage-collector generation |
+| <code>python_gc_collections_total</code> | Process Runtime / Python GC — Collections | <code>collections</code> | <code>collections/s</code> | Python garbage-collector generation |
 
 
 

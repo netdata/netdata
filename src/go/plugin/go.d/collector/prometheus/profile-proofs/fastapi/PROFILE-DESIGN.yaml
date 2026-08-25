@@ -4,6 +4,9 @@ version: v1
 profile: fastapi
 match: 'http_requests* http_request_duration* http_request_size* http_response_size*'
 namespace: fastapi
+documentation:
+  title: FastAPI HTTP instrumentation
+  summary: Curated request outcomes, latency, in-progress work, measurements, and body traffic from instrumented FastAPI services.
 composition:
   supports: {}
 entities:

@@ -32,6 +32,7 @@ func LoadProfileDesign(path string) (ProfileDesignDocument, error) {
 		"profile",
 		"match",
 		"namespace",
+		"documentation",
 		"composition",
 		"entities",
 		"views",

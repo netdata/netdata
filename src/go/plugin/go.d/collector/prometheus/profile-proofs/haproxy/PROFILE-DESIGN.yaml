@@ -5,6 +5,9 @@ profile: haproxy
 match: haproxy_*
 app: haproxy
 namespace: haproxy
+documentation:
+  title: HAProxy Prometheus
+  summary: Curated process, frontend, listener, backend, server, and stick-table metrics from the HAProxy Prometheus exporter.
 composition:
   supports: {}
 entities:
