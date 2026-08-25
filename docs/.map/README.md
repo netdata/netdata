@@ -72,11 +72,18 @@ Before merging, **always test the map file**.
 
 1. Clone [Learn](https://github.com/netdata/learn) locally.
 2. Prepare environment and dependencies (see [ingest instructions](https://github.com/netdata/learn#ingest-and-process-documentation-files)).
-3. Run the ingest command:
+3. Run ingest against the local checkout that contains your documentation and `map.yaml` changes. Replace
+   `/path/to/netdata` with the absolute path to that checkout:
 
    ```bash
-   python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANCH
+   python3 ingest/ingest.py \
+     --local-repo netdata:/path/to/netdata \
+     --ignore-on-prem-repo \
+     --fail-links-netdata
    ```
+
+   Local-source mode also derives the kickstart checksum from the selected checkout. A full ingest that selects a remote
+   `OWNER/REPO:BRANCH` instead must pass that branch's 32-character checksum with `--kickstart-checksum`.
 
 4. Inspect the ingested changes.
 5. (Optional, advanced) [Deploy Learn](https://github.com/netdata/learn#local-deploy-of-learn) locally to confirm it builds correctly.
