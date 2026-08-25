@@ -1,0 +1,80 @@
+version: v1
+context_namespace: s3check
+groups:
+  - family: Probe
+    chart_defaults:
+      priority: 1100
+    metrics:
+      - stage_status
+    charts:
+      - id: stage_status
+        title: S3 probe stage status
+        context: stage_status
+        units: status
+        type: line
+        instances:
+          by_labels: [stage]
+        label_promotion: [reason]
+        dimensions:
+          - selector: 'stage_status{stage_status="ok"}'
+            name: ok
+          - selector: 'stage_status{stage_status="failed"}'
+            name: failed
+          - selector: 'stage_status{stage_status="skipped"}'
+            name: skipped
+  - family: Latency
+    chart_defaults:
+      priority: 1110
+    metrics:
+      - stage_duration_ms
+      - stage_latency_exceeded
+    charts:
+      - id: stage_duration
+        title: S3 probe stage duration
+        context: stage_duration
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [stage]
+        label_promotion: [reason]
+        dimensions:
+          - selector: stage_duration_ms
+            name: duration
+            options:
+              float: true
+      - id: stage_latency_status
+        title: S3 probe stage latency objective status
+        context: stage_latency_status
+        units: status
+        type: line
+        instances:
+          by_labels: [stage]
+        label_promotion: [reason]
+        dimensions:
+          - selector: stage_latency_exceeded
+            name: exceeded
+  - family: Requests
+    chart_defaults:
+      priority: 1120
+    metrics:
+      - stage_operations_total
+      - stage_attempts_total
+      - stage_retries_total
+      - stage_failures_total
+    charts:
+      - id: stage_requests
+        title: S3 probe stage requests
+        context: stage_requests
+        units: requests
+        type: line
+        instances:
+          by_labels: [stage]
+        dimensions:
+          - selector: stage_operations_total
+            name: operations
+          - selector: stage_attempts_total
+            name: attempts
+          - selector: stage_retries_total
+            name: retries
+          - selector: stage_failures_total
+            name: failures

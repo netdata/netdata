@@ -209,6 +209,23 @@ adaptation_contracts:
         unrelated sensor names that merely contain the source substring
       - each alert is installed as silent SHOULD policy because fixed temperature limits are workload- and vendor-dependent
       - unknown sensor families are intentionally not alerted by these rules
+  s3check_active_probe_stage:
+    preserved:
+      - categorical failure of a configured authenticated S3 lifecycle stage
+      - distinct stage identity and bounded payload-mismatch, visibility, deletion, cleanup, and timeout reasons
+      - cleanup failure remains visible after a successful functional path
+    differences:
+      - this is an active Netdata S3 probe rather than an upstream PromQL passive metric
+      - current stage state is evaluated on each health beat; no synthetic pending state is added
+      - raw provider errors, credentials, request IDs, and endpoint details are never labels
+  s3check_latency_objective:
+    preserved:
+      - client-vantage latency visibility for every successful lifecycle stage
+      - stage identity and operator-selected objective
+    differences:
+      - the threshold is explicit deployment policy rather than a universal source threshold
+      - failed or skipped requests do not raise a second latency incident
+      - the alert is silent until the operator enables and tunes the objective
 
 alerts:
   ceph_health_error:
@@ -2523,6 +2540,36 @@ netdata_extensions:
     fidelity: CORRECTED-INTENT
     owner: httpcheck
     context: httpcheck.status
+
+  s3check_stage_failed:
+    sow_id: RGW-M-05
+    reason: authenticated active S3 probe owns categorical PUT, GET integrity, LIST, DELETE,
+      and cleanup stage failure
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.stage_status
+    labels_policy: one stage instance with a bounded reason label
+    lookup: ''
+    calc: $failed
+    units: status
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: sysadmin
+    adaptation: s3check_active_probe_stage
+
+  s3check_stage_latency:
+    sow_id: RGW-S-11
+    reason: successful authenticated S3 stage latency is compared with the configured client-vantage
+      objective
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.stage_latency_status
+    labels_policy: one stage instance with a bounded reason label
+    lookup: ''
+    calc: $exceeded
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: silent
+    adaptation: s3check_latency_objective
 
   rgw_tls_certificate_expiring:
     sow_id: RGW-S-01

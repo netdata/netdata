@@ -1,0 +1,221 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "S3 check collector configuration",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Probe interval in seconds. It must be long enough for the configured timeout and retry budget.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 90
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds for a configured job whose initial S3 check failed. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "endpoint": {
+        "title": "Endpoint",
+        "description": "Absolute HTTP(S) base endpoint of the S3-compatible service, without a path, query, or credentials.",
+        "type": "string",
+        "minLength": 1
+      },
+      "region": {
+        "title": "Region",
+        "description": "S3 signing region, for example us-east-1.",
+        "type": "string",
+        "minLength": 1
+      },
+      "bucket": {
+        "title": "Dedicated probe bucket",
+        "description": "Unversioned bucket reserved for this probe. Bucket versioning must be disabled and the bucket must not contain unrelated data.",
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 63
+      },
+      "prefix": {
+        "title": "Probe prefix",
+        "description": "Dedicated key prefix, ending with a slash and used only by this collector.",
+        "type": "string",
+        "default": "netdata-s3check/",
+        "minLength": 2,
+        "maxLength": 256
+      },
+      "access_key_id": {
+        "title": "Access key ID",
+        "description": "Static S3 access key ID. Use a Netdata secret reference in configuration files.",
+        "type": "string",
+        "sensitive": true
+      },
+      "secret_access_key": {
+        "title": "Secret access key",
+        "description": "Static S3 secret access key. Use a Netdata secret reference in configuration files.",
+        "type": "string",
+        "sensitive": true
+      },
+      "session_token": {
+        "title": "Session token",
+        "description": "Optional static S3 session token.",
+        "type": "string",
+        "sensitive": true
+      },
+      "path_style": {
+        "title": "Path-style addressing",
+        "description": "Place the bucket in the URL path. This is the normal choice for Ceph RGW and many S3-compatible endpoints.",
+        "type": "boolean",
+        "default": true
+      },
+      "max_retries": {
+        "title": "Maximum retries",
+        "description": "Additional attempts allowed per S3 operation. Zero sends one attempt; the maximum is two.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2,
+        "default": 1
+      },
+      "latency_threshold_ms": {
+        "title": "Latency objective",
+        "description": "Successful stage duration in milliseconds that raises the silent latency alert. Zero disables the policy.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 3600000,
+        "default": 0
+      },
+      "timeout": {
+        "title": "HTTP timeout",
+        "description": "Timeout in seconds for one HTTP attempt.",
+        "type": "number",
+        "minimum": 0.5,
+        "maximum": 10,
+        "default": 2
+      },
+      "not_follow_redirects": {
+        "title": "Reject redirects",
+        "description": "Reject endpoint redirects so signed requests cannot be resent to an unconfigured origin.",
+        "type": "boolean",
+        "default": true
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associate this data collection job with a configured Virtual Node.",
+        "type": "string"
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "HTTP proxy URL. An empty value uses the standard proxy environment variables.",
+        "type": "string"
+      },
+      "force_http2": {
+        "title": "Force HTTP/2",
+        "description": "Force HTTP/2, including h2c over plain TCP.",
+        "type": "boolean",
+        "default": false
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "Skip TLS certificate and hostname verification. This is insecure.",
+        "type": "boolean",
+        "default": false
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "Absolute path to a CA bundle.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "Absolute path to a client certificate.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "Absolute path to a client private key.",
+        "type": "string",
+        "pattern": "^$|^/"
+      }
+    },
+    "required": [
+      "endpoint",
+      "region",
+      "bucket",
+      "access_key_id",
+      "secret_access_key"
+    ],
+    "dependencies": {
+      "tls_cert": ["tls_key"],
+      "tls_key": ["tls_cert"]
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "endpoint",
+            "region",
+            "bucket",
+            "prefix",
+            "path_style",
+            "max_retries",
+            "latency_threshold_ms",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "access_key_id",
+            "secret_access_key",
+            "session_token"
+          ]
+        },
+        {
+          "title": "HTTP",
+          "fields": [
+            "timeout",
+            "not_follow_redirects",
+            "proxy_url",
+            "force_http2"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        }
+      ]
+    },
+    "access_key_id": {
+      "ui:widget": "password"
+    },
+    "secret_access_key": {
+      "ui:widget": "password"
+    },
+    "session_token": {
+      "ui:widget": "password"
+    },
+    "endpoint": {
+      "ui:placeholder": "https://s3.example.net"
+    },
+    "vnode": {
+      "ui:placeholder": "Create a Virtual Node first, then reference its name here."
+    }
+  }
+}

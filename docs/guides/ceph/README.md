@@ -1,6 +1,10 @@
 # Monitor Ceph
 
-Netdata gives you a complete operational view of Ceph by collecting four complementary telemetry surfaces: the MGR Prometheus module, official `ceph-exporter`, the NVMe-oF gateway exporter, and the Ceph Dashboard API. Deploy one Agent close to each Ceph node to monitor cluster state, daemon health, host resources, RGW traffic, and local hardware together.
+Netdata gives you a complete operational view of Ceph by collecting four complementary telemetry surfaces—the MGR
+Prometheus module, official `ceph-exporter`, the NVMe-oF gateway exporter, and the Ceph Dashboard API—and by running
+authenticated S3 lifecycle checks from the client vantages that depend on object storage.
+Deploy one Agent close to each Ceph node to monitor cluster state, daemon health, host resources, RGW traffic,
+client-visible S3 correctness, and local hardware.
 
 ## What you can monitor
 
@@ -9,6 +13,7 @@ Netdata gives you a complete operational view of Ceph by collecting four complem
 - CephFS/MDS, RBD, RBD Mirror, SMB, and client I/O telemetry exposed by your Ceph release.
 - Host-local daemon performance from official `ceph-exporter`.
 - RGW requests, Lua execution, notifications, queues, retries, and access logs.
+- Authenticated S3 write, read, list, delete, payload-integrity, cleanup, and latency results from selected vantages.
 - RGW endpoint availability and TLS certificate health.
 - NVMe-oF gateway, block-device, host, subsystem, and namespace telemetry from supported exporters.
 - Node hardware health, cooling, power, memory, processors, storage, and temperature reporting on Tentacle.
@@ -49,6 +54,7 @@ Use this map to identify the Netdata surface that owns the operational question 
 | RBD mirroring | Local/remote snapshot timestamp synchronization | MGR Prometheus | Identify mirrored images that have diverged |
 | RGW service health | Notifications, Lua execution, queue pressure, retries, aborted requests | MGR Prometheus | Inspect aggregate gateway behavior |
 | RGW request outcomes | Status classes, bytes, clients, and request duration | `web_log` | Analyze complete RGW access logs |
+| Authenticated S3 correctness | PUT, GET integrity, LIST, DELETE, cleanup, and latency | `s3check` | Verify client-visible object operations |
 | RGW endpoint reachability | Unauthenticated HTTP liveness | `httpcheck` | Verify the selected endpoint is reachable |
 | RGW certificates | Certificate expiration and revocation | `x509check` | Track certificate lifecycle independently of RGW traffic |
 | Node health | CPU, memory, disk I/O, filesystems, network interfaces, and processes | Standard Netdata collectors | Continue using normal Agent monitoring for each Ceph node |
@@ -86,6 +92,7 @@ Run one Agent on each Ceph node. Each Agent monitors the Ceph services and host 
 | `ceph-exporter` | One job on each node whose daemon telemetry you need | Host-local daemon performance and daemon inventory |
 | NVMe-oF gateway exporter | One job on each gateway endpoint | Gateway-local runtime, block-device, host, subsystem, and namespace telemetry |
 | Ceph Dashboard API | One logical job per Ceph cluster | Dashboard API component integrity and Ceph investigation Functions |
+| Authenticated S3 check | One job for each selected client vantage | Client-visible S3 object lifecycle and latency |
 | Host collectors | Every Agent | Node disks, filesystems, network interfaces, processes, and logs |
 
 Use one stable job identity for the MGR surface. If the active MGR moves, update DNS or the reverse proxy to the current active endpoint rather than creating one job for every possible MGR. Multiple active MGR jobs for the same cluster create duplicate cluster alert owners.
@@ -113,6 +120,13 @@ Enable the exporter in each Ceph NVMe-oF gateway deployment and collect every ga
 ### Ceph Dashboard API
 
 Enable the Ceph Dashboard module, secure it with TLS, and create a read-only Dashboard user. Configure one native Ceph collector job per cluster. The Dashboard collector complements the metric endpoints: it owns API component integrity and provides Ceph investigation Functions.
+
+### Authenticated S3 checks
+
+Configure an `s3check` job for every client vantage whose object-storage behavior matters. Each job uses a dedicated
+unversioned bucket and prefix, reconciles that prefix, performs one authenticated PUT, GET, LIST, DELETE, and
+cleanup cycle, verifies the downloaded payload, and removes probe objects after interrupted cycles. Place jobs at each
+site or RGW client path that requires a client-visible correctness signal.
 
 ## Supported releases
 
@@ -170,7 +184,8 @@ The built-in Ceph profile recognizes all three Prometheus interfaces. Alert owne
 - placement group, pool, capacity, and recovery conditions;
 - node-proxy hardware conditions exposed by MGR;
 - gateway-local NVMe-oF conditions exposed by each gateway-exporter job;
-- RGW notification, Lua, request-fallback, queue-pressure, and multisite retry conditions.
+- RGW notification, Lua, request-fallback, queue-pressure, and multisite retry conditions;
+- authenticated S3 stage failures and configured latency objectives from each `s3check` job.
 
 The native Dashboard collector owns API component collection failures. Generic Netdata collectors own host-local and endpoint checks:
 
@@ -201,7 +216,7 @@ The MGR profile provides aggregate RGW telemetry for requests, aborted requests,
 
 Collect the RGW JSON access log with `web_log` to analyze HTTP outcomes, bytes, clients, and latency. Configure RGW to emit its access log in JSON format and make that file available to the Agent. The Ceph JSON example maps request, status, size, and client fields, and declares `total_time` as a numeric custom field in milliseconds, preserving Ceph's exact duration field.
 
-Use `httpcheck` for unauthenticated endpoint liveness and `x509check` for certificate expiration or revocation.
+Use `s3check` for authenticated object lifecycle correctness and client-vantage latency. Keep `httpcheck` for unauthenticated endpoint liveness and `x509check` for certificate expiration or revocation.
 
 ## Investigation Functions
 
@@ -258,6 +273,7 @@ For collector configuration details, see:
 
 - [Ceph](/src/go/plugin/go.d/collector/ceph/integrations/ceph.md)
 - [Ceph Prometheus](/src/go/plugin/go.d/collector/prometheus/integrations/ceph_prometheus.md)
+- [S3 Compatible Object Storage](/src/go/plugin/go.d/collector/s3check/integrations/s3_compatible_object_storage.md)
 
 For Agent deployment, streaming, retention, exporting, and notifications, see:
 

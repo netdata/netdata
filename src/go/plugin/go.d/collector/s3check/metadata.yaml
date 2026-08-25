@@ -1,0 +1,301 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: s3check
+      monitored_instance:
+        name: S3 Compatible Object Storage
+        link: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+        categories:
+          - data-collection.synthetic-testing
+        icon_filename: synthetics.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: >-
+                Runs an authenticated write, read, list, and delete lifecycle probe against one S3-compatible
+                endpoint.
+      keywords:
+        - s3
+        - object storage
+        - ceph
+        - rgw
+        - synthetic
+    overview:
+      data_collection:
+        metrics_description: |
+          Verify authenticated S3 PUT, GET, LIST, and DELETE operations from one configured endpoint.
+
+          Each job measures stage state, duration, configured latency objective, attempts, retries, and failures. The
+          probe is intentionally active: it creates, reads, lists, and deletes one small object on every successful
+          collection cycle.
+        method_description: |
+          The collector uses the AWS SigV4 S3 client with explicit static credentials, endpoint, region, and addressing
+          configuration. It requires a dedicated unversioned bucket and prefix, checks bucket versioning before the job
+          starts, and never deletes versions or keys outside its prefix.
+
+          Every cycle generates a unique small payload and key, uploads it, reads and verifies its SHA-256 digest,
+          confirms LIST visibility, deletes it, and verifies that it disappeared. After an interrupted write path the
+          collector retries deletion; after a process restart it removes at most three stale probe keys per cycle before
+          creating a new object.
+
+          Raw S3 errors are classified into bounded stage reasons. Credentials, signed headers, request IDs,
+          and endpoint details are not exposed as chart labels.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          No host capabilities are required. The S3 account needs permission to perform GetBucketVersioning, PutObject,
+          GetObject, ListBucket, and DeleteObject operations in the dedicated probe bucket.
+      default_behavior:
+        auto_detection:
+          description: |
+            There is no auto-detection. A job starts only after an endpoint, region, bucket, and credentials are
+            configured.
+        limits:
+          description: |
+            A successful normal cycle makes six S3 API calls: prefix LIST, PUT, GET, LIST, DELETE, and HEAD. Each call
+            uses the configured timeout and bounded retry count, and the worst-case probe deadline must fit inside
+            update_every.
+            The probe payload is 4 KiB. Prefix reconciliation lists one prefix before every new write and deletes at
+            most three collector-owned keys per cycle.
+        performance_impact:
+          description: |
+            Each successful cycle performs one small object write, read, list request, delete, and metadata check. Use a
+            dedicated bucket and an interval appropriate for the endpoint and object-storage workload.
+    setup:
+      prerequisites:
+        list:
+          - title: Create a dedicated unversioned bucket and prefix
+            description: |
+              Create a bucket used only by Netdata. Bucket versioning and Object Lock must be disabled; both Enabled and
+              Suspended versioning states are rejected. Keep the configured prefix reserved for this collector.
+          - title: Create restricted S3 credentials
+            description: |
+              Create credentials for one dedicated probe identity. The identity needs S3 read and write access to the
+              selected bucket and permission to read its versioning status. Prefer Netdata secret references instead of
+              storing credentials directly in configuration files.
+          - title: Choose the client vantage
+            description: |
+              Run the job on the Netdata Agent whose network path represents the client view you need to test. For Ceph,
+              run jobs at each site or RGW vantage whose client-visible S3 correctness matters.
+      configuration:
+        file:
+          name: go.d/s3check.conf
+        options:
+          description: |
+            Every job requires an endpoint, region, bucket, access key ID, and secret access key. The default retry and
+            timeout budget is chosen to fit the default 90-second interval.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Probe interval in seconds.
+              default_value: 90
+              required: false
+              group: Base
+            - name: autodetection_retry
+              description: >-
+                Recheck interval in seconds after a failed initial configured-job check; zero disables retries.
+              default_value: 0
+              required: false
+              group: Base
+            - name: endpoint
+              description: Absolute HTTP(S) S3 base endpoint without a path, query, or credentials.
+              default_value: ""
+              required: true
+              group: Base
+            - name: region
+              description: S3 signing region, for example us-east-1.
+              default_value: ""
+              required: true
+              group: Base
+            - name: bucket
+              description: Dedicated unversioned S3 bucket used by the probe.
+              default_value: ""
+              required: true
+              group: Base
+            - name: prefix
+              description: Dedicated key prefix, ending with a slash.
+              default_value: netdata-s3check/
+              required: false
+              group: Base
+            - name: path_style
+              description: Use path-style bucket addressing. This is normally required by Ceph RGW.
+              default_value: true
+              required: false
+              group: Base
+            - name: max_retries
+              description: Additional attempts allowed per S3 operation, from zero through two.
+              default_value: 1
+              required: false
+              group: Base
+            - name: latency_threshold_ms
+              description: >-
+                Successful stage duration in milliseconds that raises the silent latency alert; zero disables it.
+              default_value: 0
+              required: false
+              group: Base
+            - name: vnode
+              description: Associates the job with a configured Virtual Node.
+              default_value: ""
+              required: false
+              group: Base
+            - name: access_key_id
+              description: S3 access key ID. Use a Netdata secret reference in configuration files.
+              default_value: ""
+              required: true
+              group: Auth
+            - name: secret_access_key
+              description: S3 secret access key. Use a Netdata secret reference in configuration files.
+              default_value: ""
+              required: true
+              group: Auth
+            - name: session_token
+              description: Optional static S3 session token.
+              default_value: ""
+              required: false
+              group: Auth
+            - name: timeout
+              description: Timeout in seconds for one HTTP attempt.
+              default_value: 2
+              required: false
+              group: HTTP
+            - name: not_follow_redirects
+              description: Reject redirects so signed requests cannot be resent to an unconfigured origin.
+              default_value: true
+              required: false
+              group: HTTP
+            - name: proxy_url
+              description: HTTP proxy URL; empty uses standard proxy environment variables.
+              default_value: ""
+              required: false
+              group: HTTP
+            - name: force_http2
+              description: Force HTTP/2, including h2c over plain TCP.
+              default_value: false
+              required: false
+              group: HTTP
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification. This is insecure.
+              default_value: false
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Absolute path to a CA bundle.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Absolute path to a client certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Absolute path to a client private key.
+              default_value: ""
+              required: false
+              group: TLS
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Ceph RGW authenticated S3 check
+              description: |
+                Run one job from each client vantage whose authenticated S3 behavior matters. Replace the bucket,
+                endpoint, and secret references with values for a dedicated unversioned probe bucket.
+              config: |
+                jobs:
+                  - name: ceph_rgw_site_a
+                    endpoint: https://rgw.example.net
+                    region: us-east-1
+                    bucket: netdata-s3check
+                    prefix: netdata-s3check/
+                    access_key_id: ${env:NETDATA_S3CHECK_ACCESS_KEY_ID}
+                    secret_access_key: ${env:NETDATA_S3CHECK_SECRET_ACCESS_KEY}
+                    path_style: yes
+                    update_every: 90
+                    timeout: 2
+                    max_retries: 1
+                    latency_threshold_ms: 0
+    troubleshooting:
+      problems:
+        list:
+          - name: S3 check does not start
+            description: |
+              Verify that the endpoint is absolute, the region and bucket are set, credentials resolve, and the account
+              can call GetBucketVersioning. Netdata rejects buckets whose versioning status is Enabled or Suspended.
+          - name: Cleanup remains pending
+            description: |
+              The collector found stale probe keys. It reconciles the prefix before every new write, deletes at most
+              three collector-owned keys per cycle, and creates no new object until that prefix is clean. Confirm that
+              no other writer uses the prefix.
+    alerts:
+      - name: s3check_stage_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
+        metric: s3check.stage_status
+        info: >-
+          The authenticated S3 lifecycle probe reported stage ${label:stage} with bounded failure
+          reason ${label:reason}. Raw provider errors are intentionally not exposed.
+      - name: s3check_stage_latency
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
+        metric: s3check.stage_latency_status
+        info: >-
+          Successful stage ${label:stage} took at least the configured latency_threshold_ms. Tune the objective to
+          the client vantage and workload.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Every stage is emitted on every cycle, including skipped stages.
+      availability: []
+      scopes:
+        - name: stage
+          description: One lifecycle stage of one configured S3 job.
+          labels:
+            - name: stage
+              description: "Lifecycle stage: setup, put, get, list, delete, or cleanup."
+            - name: reason
+              description: Bounded result classification; raw provider errors are never exposed.
+          metrics:
+            - name: s3check.stage_status
+              description: S3 Probe Stage Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: skipped
+            - name: s3check.stage_duration
+              description: S3 Probe Stage Duration
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: s3check.stage_latency_status
+              description: S3 Probe Stage Latency Objective Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: exceeded
+        - name: stage requests
+          description: Cumulative request accounting for one lifecycle stage of one configured S3 job.
+          labels:
+            - name: stage
+              description: "Lifecycle stage: setup, put, get, list, delete, or cleanup."
+          metrics:
+            - name: s3check.stage_requests
+              description: S3 Probe Stage Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: operations
+                - name: attempts
+                - name: retries
+                - name: failures
