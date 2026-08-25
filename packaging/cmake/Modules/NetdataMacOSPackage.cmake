@@ -41,6 +41,15 @@ function(netdata_add_macos_package_target)
                 COMPONENT netdata
                 DESTINATION /Library/LaunchDaemons)
 
+        # The uninstaller ships inside the payload so every installed Agent
+        # carries the exact removal logic matching its own layout. It is
+        # operator-run (sudo), unlike the maintainer scripts below.
+        configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/netdata-uninstaller.sh.in"
+                       "${pkg_dir}/netdata-uninstaller.sh" @ONLY)
+        install(PROGRAMS "${pkg_dir}/netdata-uninstaller.sh"
+                COMPONENT netdata
+                DESTINATION "${LIBEXEC_DEST}")
+
         # Maintainer scripts: strictly non-interactive, idempotent; pkgbuild
         # requires them executable.
         foreach(script preinstall postinstall)
