@@ -570,7 +570,18 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
     }                                                                                               \
 } while(0)
 
-int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
+static void health_add_file_prototype(RRD_ALERT_PROTOTYPE *ap, DICTIONARY *invalid_prototype_names) {
+    if(health_prototype_add(ap, NULL))
+        return;
+
+    // Same-name file rules are assembled only after each rule has been parsed. Keep the name until the
+    // load completes, so a later invalid rule can reject the already-added members of its whole set.
+    if(invalid_prototype_names)
+        dictionary_set(invalid_prototype_names, string2str(ap->config.name), NULL, 0);
+}
+
+int health_readfile(const char *filename, void *data, bool stock_config) {
+    DICTIONARY *invalid_prototype_names = data;
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
     static uint32_t
@@ -704,7 +715,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 lookup_data_source_from_rrdr_options(ap);
                 dims_grouping_from_rrdr_options(ap);
                 replace_green_red(ap, green, red);
-                health_prototype_add(ap, NULL);
+                health_add_file_prototype(ap, invalid_prototype_names);
                 freez(ap);
             }
 
@@ -886,7 +897,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         lookup_data_source_from_rrdr_options(ap);
         dims_grouping_from_rrdr_options(ap);
         replace_green_red(ap, green, red);
-        health_prototype_add(ap, NULL);
+        health_add_file_prototype(ap, invalid_prototype_names);
         freez(ap);
     }
 

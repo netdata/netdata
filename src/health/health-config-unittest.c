@@ -1056,6 +1056,94 @@ static int test_dyncfg_rejects_empty_on(int *passed) {
     return failed;
 }
 
+static int test_dyncfg_rejection_keeps_detail_in_response(int *passed) {
+    static const char sentinel[] = "unittest-rejection-detail";
+    static const char payload[] =
+        "{\"format_version\":1,\"name\":\"unittest\",\"rules\":[{\"enabled\":true,\"type\":\"template\","
+        "\"config\":{\"match\":{\"on\":\"system.cpu\",\"host_labels\":\"*\",\"instance_labels\":\"*\"},"
+        "\"value\":{\"database_lookup\":{\"after\":-600,\"before\":0,\"time_group\":\"average\","
+        "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"\"},"
+        "\"update_every\":60},\"conditions\":{\"warning_condition\":\"unittest-rejection-detail(\","
+        "\"critical_condition\":\"\"}}}]}";
+
+    CLEAN_BUFFER *request = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    buffer_strcat(request, payload);
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, "unittest", request, NULL, NULL,
+                                result, HTTP_ACCESS_NONE, NULL, NULL);
+    if(code != HTTP_RESP_BAD_REQUEST || !strstr(buffer_tostring(result), sentinel)) {
+        fprintf(stderr, "FAILED [dyncfg rejection detail]: code=%d response='%s'\n", code, buffer_tostring(result));
+        return 1;
+    }
+
+    (*passed)++;
+    return 0;
+}
+
+static int test_file_same_name_rule_set_rejected(int *passed) {
+    char filename[] = "/tmp/netdata-health-config-unittest-XXXXXX";
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "FAILED [file same-name rule set]: cannot create fixture\n");
+        return 1;
+    }
+
+    FILE *fp = fdopen(fd, "w");
+    if(!fp) {
+        fprintf(stderr, "FAILED [file same-name rule set]: cannot open fixture\n");
+        close(fd);
+        unlink(filename);
+        return 1;
+    }
+
+    fputs(
+        "template: unittest_same_name\n"
+        "on: system.cpu\n"
+        "every: 1s\n"
+        "calc: 1\n\n"
+        "template: unittest_same_name\n"
+        "every: 1s\n"
+        "calc: 1\n\n"
+        "template: unittest_unrelated\n"
+        "on: system.cpu\n"
+        "every: 1s\n"
+        "calc: 1\n",
+        fp);
+    fclose(fp);
+
+    health_init_prototypes();
+    dictionary_flush(health_globals.prototypes.dict);
+    DICTIONARY *invalid_prototype_names = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, NULL, 0);
+
+    int failed = 0;
+    bool loaded = health_readfile(filename, invalid_prototype_names, false) == 1;
+    const DICTIONARY_ITEM *invalid_name =
+        dictionary_get_and_acquire_item(invalid_prototype_names, "unittest_same_name");
+    if(!loaded ||
+       !dictionary_get(health_globals.prototypes.dict, "unittest_same_name") ||
+       !dictionary_get(health_globals.prototypes.dict, "unittest_unrelated") ||
+       !invalid_name) {
+        fprintf(stderr, "FAILED [file same-name rule set]: loader did not retain the invalid set for rejection\n");
+        failed++;
+    }
+    if(invalid_name)
+        dictionary_acquired_item_release(invalid_prototype_names, invalid_name);
+
+    health_reject_invalid_file_prototypes(invalid_prototype_names);
+    if(dictionary_get(health_globals.prototypes.dict, "unittest_same_name") ||
+       !dictionary_get(health_globals.prototypes.dict, "unittest_unrelated")) {
+        fprintf(stderr, "FAILED [file same-name rule set]: invalid set was not rejected atomically\n");
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    dictionary_flush(health_globals.prototypes.dict);
+    dictionary_destroy(invalid_prototype_names);
+    unlink(filename);
+    return failed;
+}
+
 int health_config_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -1087,6 +1175,8 @@ int health_config_unittest(void) {
     failed += test_prototype_rejects_missing_on(&passed);
     failed += test_prototype_without_on_matches_nothing(&passed);
     failed += test_dyncfg_rejects_empty_on(&passed);
+    failed += test_dyncfg_rejection_keeps_detail_in_response(&passed);
+    failed += test_file_same_name_rule_set_rejected(&passed);
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);

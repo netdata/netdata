@@ -293,6 +293,18 @@ void health_init_prototypes(void) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+void health_reject_invalid_file_prototypes(DICTIONARY *invalid_prototype_names) {
+    void *unused;
+    dfe_start_read(invalid_prototype_names, unused) {
+        const char *name = unused_dfe.name;
+        dictionary_del(health_globals.prototypes.dict, name);
+        netdata_log_error("HEALTH: alert '%s' was rejected because at least one same-name file rule is invalid", name);
+    }
+    dfe_done(unused);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
 static inline struct pattern_array *health_config_add_key_to_values(struct pattern_array *pa, const char *input_key, char *value)
 {
     size_t value_len = strlen(value);
@@ -507,12 +519,17 @@ void health_reload_prototypes(void) {
     dictionary_flush(health_globals.prototypes.dict);
 
     // load the prototypes from disk
+    DICTIONARY *invalid_prototype_names = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, NULL, 0);
+
     recursive_config_double_dir_load(
         health_user_config_dir(),
         health_globals.config.stock_enabled ? health_stock_config_dir() : NULL,
         NULL,
         health_readfile,
-        NULL, 0);
+        invalid_prototype_names, 0);
+
+    health_reject_invalid_file_prototypes(invalid_prototype_names);
+    dictionary_destroy(invalid_prototype_names);
 
     // register all loaded prototypes
     __atomic_store_n(&health_globals.prototypes.registering, true, __ATOMIC_RELAXED);

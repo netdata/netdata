@@ -633,16 +633,13 @@ static void dyncfg_health_prototype_reapply(RRD_ALERT_PROTOTYPE *ap) {
     health_prototype_apply_to_all_hosts(ap);
 }
 
-// A saved configuration replayed at startup is echoed with no caller to read the response, so the
-// reason we refused it would otherwise be lost and only the status code would reach the log
-// (dyncfg_echo_cb()). Log it here rather than in the generic dyncfg layer: that layer handles every
-// module, including ones whose jobs hold credentials (SNMP communities, passwords, tokens), and their
-// rejection text may quote the offending value. An alert prototype has no credential-bearing field -
-// see the schema written by health_prototype_to_json() - so its rejection text is safe to log.
+// A saved configuration replayed at startup is echoed with no caller to read the response, so record
+// the rejection here. Keep the detailed parser reason only in that response: alert payload fields,
+// including expressions and action strings, are user-provided and may contain sensitive content.
 static int health_dyncfg_reject(BUFFER *result, const char *cmd, const char *alert, const char *reason) {
     nd_log(NDLS_DAEMON, NDLP_ERR,
-           "HEALTH DYNCFG: rejected '%s' of alert prototype '%s': %s",
-           cmd, alert ? alert : "", reason ? reason : "");
+           "HEALTH DYNCFG: rejected '%s' of alert prototype '%s'",
+           cmd, alert ? alert : "");
 
     return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, reason);
 }
