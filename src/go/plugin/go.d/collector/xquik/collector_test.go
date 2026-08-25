@@ -154,6 +154,10 @@ func TestCollector_CollectForwardsContext(t *testing.T) {
 	type contextKey struct{}
 	ctx := context.WithValue(context.Background(), contextKey{}, "collect")
 	fake := &fakeProfileClient{result: completeProfile()}
+	fake.onProfile = func(got context.Context, user string) {
+		require.Equal(t, "collect", got.Value(contextKey{}))
+		require.Equal(t, "netdata", user)
+	}
 	c := New()
 	c.User = "netdata"
 	c.client = fake
@@ -161,9 +165,6 @@ func TestCollector_CollectForwardsContext(t *testing.T) {
 	cc.BeginCycle()
 	require.NoError(t, c.Collect(ctx))
 	require.NoError(t, cc.CommitCycleSuccess())
-
-	require.Equal(t, "collect", fake.ctx.Value(contextKey{}))
-	require.Equal(t, "netdata", fake.user)
 }
 
 func TestCollector_CollectBeforeInit(t *testing.T) {
@@ -238,15 +239,15 @@ func cloneLabels(labels metrix.Labels) metrix.Labels {
 }
 
 type fakeProfileClient struct {
-	result profile
-	err    error
-	ctx    context.Context
-	user   string
+	result    profile
+	err       error
+	onProfile func(context.Context, string)
 }
 
 func (c *fakeProfileClient) Profile(ctx context.Context, user string) (profile, error) {
-	c.ctx = ctx
-	c.user = user
+	if c.onProfile != nil {
+		c.onProfile(ctx, user)
+	}
 	return c.result, c.err
 }
 
