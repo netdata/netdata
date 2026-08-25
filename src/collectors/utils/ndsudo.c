@@ -666,7 +666,14 @@ int main(int argc, char *argv[]) {
 
     char new_path[] =
 #ifdef __APPLE__
-        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin";
+        // Apple-owned directories only. /usr/local and /opt/homebrew are
+        // writable by the console admin on typical Macs (Homebrew chowns its
+        // prefix to the installing user), so a setuid-root binary searching
+        // them would execute admin-planted binaries as root. Homebrew-provided
+        // tools (smartctl, chronyc, nvme) are therefore not reachable through
+        // ndsudo on macOS; the collectors that want them fail cleanly with
+        // "not available in PATH".
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin";
 #else
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
 #endif
