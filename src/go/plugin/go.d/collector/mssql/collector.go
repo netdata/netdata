@@ -38,8 +38,9 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			DSN:     "sqlserver://localhost:1433",
-			Timeout: confopt.Duration(time.Second * 5),
+			DSN:                 "sqlserver://localhost:1433",
+			Timeout:             confopt.Duration(time.Second * 5),
+			CollectDisabledJobs: false,
 			Functions: FunctionsConfig{
 				TopQueries: TopQueriesConfig{
 					Limit:          500,
@@ -55,7 +56,8 @@ func New() *Collector {
 		seenWaitTypes:        make(map[string]bool),
 		seenLockTypes:        make(map[string]bool),
 		seenLockStatsTypes:   make(map[string]bool),
-		seenJobs:             make(map[string]string),
+		jobChartIDs:          make(map[string]string),
+		activeJobs:           make(map[string]string),
 		seenReplications:     make(map[string]bool),
 
 		seenAGs:                make(map[string]bool),
@@ -67,12 +69,13 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode       string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	DSN         string           `yaml:"dsn" json:"dsn"`
-	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CloudAuth   cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
-	Functions   FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+	Vnode               string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery         int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN                 string           `yaml:"dsn" json:"dsn"`
+	Timeout             confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CollectDisabledJobs bool             `yaml:"collect_disabled_jobs" json:"collect_disabled_jobs"`
+	CloudAuth           cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
+	Functions           FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 }
 
 type FunctionsConfig struct {
@@ -165,7 +168,8 @@ type Collector struct {
 	seenWaitTypes        map[string]bool
 	seenLockTypes        map[string]bool
 	seenLockStatsTypes   map[string]bool
-	seenJobs             map[string]string
+	jobChartIDs          map[string]string
+	activeJobs           map[string]string
 	seenReplications     map[string]bool
 
 	hadrEnabled bool // true if Always On AG is enabled on this instance
