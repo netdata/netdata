@@ -1356,21 +1356,21 @@ jobs:
         id: smoke
         if: needs.file-check.outputs.run == 'true'
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf -o /dev/null http://localhost:19999/api/v1/info && break
             sleep 2
           done
           curl -sf -o /dev/null http://localhost:19999/api/v1/info
           sudo launchctl print system/com.github.netdata | grep -q 'state = running'
           pkgutil --pkg-info cloud.netdata.agent
-          grep -q "INSTALL_TYPE='macos-pkg'" /opt/netdata/etc/netdata/.install-type
+          sudo grep -q "INSTALL_TYPE='macos-pkg'" /opt/netdata/etc/netdata/.install-type
       - name: Reinstall over the existing install
         id: reinstall-pkg
         if: needs.file-check.outputs.run == 'true'
         run: |
           echo "ci-marker" | sudo tee /opt/netdata/etc/netdata/user-marker.conf > /dev/null
           sudo installer -pkg build-pkg/packages/netdata-*.pkg -target /
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf -o /dev/null http://localhost:19999/api/v1/info && break
             sleep 2
           done
