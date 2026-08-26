@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -197,19 +198,10 @@ func TestResolveFDLegacyConfigResolvesTargetsWhenEnabled(t *testing.T) {
 		t.Skip("/proc/kallsyms did not yield fd targets on this host")
 	}
 
-	if !contains(fdOpenCandidates, cfg.Targets.Open) {
+	if !slices.Contains(fdOpenCandidates, cfg.Targets.Open) {
 		t.Errorf("Targets.Open = %q, want one of %v", cfg.Targets.Open, fdOpenCandidates)
 	}
-	if !contains(fdCloseCandidates, cfg.Targets.Close) {
+	if !slices.Contains(fdCloseCandidates, cfg.Targets.Close) {
 		t.Errorf("Targets.Close = %q, want one of %v", cfg.Targets.Close, fdCloseCandidates)
 	}
-}
-
-func contains(haystack []string, needle string) bool {
-	for _, candidate := range haystack {
-		if candidate == needle {
-			return true
-		}
-	}
-	return false
 }
