@@ -4,9 +4,11 @@ package snmptopology
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -26,6 +28,56 @@ func newTestReverseDNSResolver() *reversedns.Resolver { return reversedns.New(re
 
 func newTopologyRegistry() *topologyRegistry {
 	return newTopologyRegistryWithResolver(newTestReverseDNSResolver())
+}
+
+// publishTestTopologyBuilder freezes a build-only cache and republishes the
+// complete immutable test generation. Production publishes through sweeps.
+func publishTestTopologyBuilder(r *topologyRegistry, cache *topologyBuilder) {
+	if r == nil || cache == nil {
+		return
+	}
+	current := r.acquireGeneration()
+	sequence := uint64(1)
+	states := make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState)
+	if current != nil {
+		sequence = current.sequence + 1
+		for _, device := range current.devices {
+			states[device.registrationID] = deviceRefreshState{generation: device}
+		}
+	}
+	registrationID := ddsnmp.DeviceRegistrationID(sequence)
+	publishedAt := time.Now()
+	states[registrationID] = deviceRefreshState{generation: freezeTestTopologyBuilderAt(registrationID, publishedAt, cache)}
+	r.publishGeneration(newTopologyGeneration(sequence, publishedAt, states))
+}
+
+func snapshotTestTopologyBuilder(c *topologyBuilder) (topologymodel.ObservationSnapshot, bool) {
+	generation := freezeTestTopologyBuilder(1, c)
+	if generation == nil || !generation.hasObservation {
+		return topologymodel.ObservationSnapshot{}, false
+	}
+	return generation.observation, true
+}
+
+func trapEnrichmentForTest(c *topologyBuilder, ip, trapIfIndex string) *TrapTopologyEnrichment {
+	addr, ok := topologyutil.ParseIPAddress(ip)
+	if !ok {
+		return nil
+	}
+	generation := freezeTestTopologyBuilder(1, c)
+	if generation == nil {
+		return nil
+	}
+	return generation.trap.enrichmentForCanonicalSource(addr.String(), trapIfIndex)
+}
+
+func freezeTestTopologyBuilder(registrationID ddsnmp.DeviceRegistrationID, builder *topologyBuilder) *topologyDeviceGeneration {
+	return freezeTestTopologyBuilderAt(registrationID, time.Now(), builder)
+}
+
+func freezeTestTopologyBuilderAt(registrationID ddsnmp.DeviceRegistrationID, publishedAt time.Time, builder *topologyBuilder) *topologyDeviceGeneration {
+	snapshot, _ := freezeTopologyBuilder(builder)
+	return activateTopologyDeviceSnapshot(registrationID, publishedAt, snapshot)
 }
 
 func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.DeviceConnectionInfo) {
@@ -53,13 +105,13 @@ func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, opti
 	return data, ok && err == nil
 }
 
-func snapshotTopologyCacheForTest(cache *topologyCache) (topologymodel.Data, bool) {
+func snapshotTopologyCacheForTest(cache *topologyBuilder) (topologymodel.Data, bool) {
 	return snapshotTopologyCacheForTestWithOptions(cache, defaultTopologyQueryOptionsForTest())
 }
 
-func snapshotTopologyCacheForTestWithOptions(cache *topologyCache, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
+func snapshotTopologyCacheForTestWithOptions(cache *topologyBuilder, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
 	registry := newTopologyRegistry()
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 	return snapshotTopologyRegistryForTestWithOptions(registry, options)
 }
 

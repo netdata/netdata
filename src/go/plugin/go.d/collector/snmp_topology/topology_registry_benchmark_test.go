@@ -432,36 +432,27 @@ func benchmarkTopologyRetainedSnapshotBytes(
 	return retainedBytes
 }
 
-func BenchmarkTopologyCacheFDBSnapshotReadLock(b *testing.B) {
+func BenchmarkTopologyGenerationFDBSnapshotRead(b *testing.B) {
 	registry := benchmarkManagedFabricFDBTopologyRegistry(1, 1600, false)
-	var cache *topologyCache
-	for candidate := range registry.caches {
-		cache = candidate
-		break
-	}
-	if cache == nil {
-		b.Fatal("benchmark cache is missing")
-	}
-	if _, ok := cache.snapshotEngineObservations(); !ok {
-		b.Fatal("benchmark cache is not renderable")
+	generation := registry.acquireGeneration()
+	if generation == nil || len(generation.devices) != 1 || !generation.devices[0].hasObservation {
+		b.Fatal("benchmark generation is not renderable")
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		snapshot, ok := cache.snapshotEngineObservations()
-		if !ok {
-			b.Fatal("benchmark cache became unavailable")
-		}
+		generation := registry.acquireGeneration()
+		snapshot := generation.devices[0].observation
 		runtime.KeepAlive(snapshot)
 	}
 }
 
-func BenchmarkTopologyCacheAliasSnapshotReadLock(b *testing.B) {
+func BenchmarkTopologyGenerationAliasSnapshotRead(b *testing.B) {
 	for _, aliases := range []int{256, 4096} {
 		b.Run(fmt.Sprintf("aliases=%d", aliases), func(b *testing.B) {
 			now := time.Now()
-			cache := newTopologyCache()
+			cache := newTopologyBuilder()
 			cache.updateTime = now
 			cache.staleAfter = time.Hour
 			cache.agentID = "benchmark-agent"
@@ -484,17 +475,49 @@ func BenchmarkTopologyCacheAliasSnapshotReadLock(b *testing.B) {
 					IfIndex: fmt.Sprintf("%d", i+1),
 				}
 			}
-			cache.finalizeTopologyCache()
-			if _, ok := cache.snapshotEngineObservations(); !ok {
+			generation := freezeTestTopologyBuilder(1, cache)
+			if generation == nil || !generation.hasObservation {
 				b.Fatal("benchmark cache is not renderable")
 			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
-				snapshot, ok := cache.snapshotEngineObservations()
-				if !ok {
-					b.Fatal("benchmark cache became unavailable")
+				snapshot := generation.observation
+				runtime.KeepAlive(snapshot)
+			}
+		})
+	}
+}
+
+func BenchmarkTopologyBuilderBuildAndFreeze(b *testing.B) {
+	for _, fdbEntries := range []int{0, 1600} {
+		b.Run(fmt.Sprintf("fdb_entries=%d", fdbEntries), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				now := time.Now()
+				builder := newTopologyBuilder()
+				builder.updateTime = now
+				builder.staleAfter = time.Hour
+				builder.agentID = "benchmark-agent"
+				builder.localDevice = topologymodel.Device{
+					ChassisID:     "02:00:00:00:00:01",
+					ChassisIDType: "macAddress",
+					SysName:       "benchmark-switch",
+					ManagementIP:  "192.0.2.1",
+				}
+				builder.bridgePortToIf["1"] = "1"
+				builder.ifNamesByIndex["1"] = "uplink"
+				for entryIndex := range fdbEntries {
+					mac := benchmarkManagedFabricEndpointMAC(0, entryIndex+1, false)
+					builder.fdbEntries[mac+"|1||"] = &fdbEntry{
+						mac: mac, bridgePort: "1", status: "learned",
+					}
+				}
+
+				snapshot, _ := freezeTopologyBuilder(builder)
+				if snapshot == nil || !snapshot.hasObservation {
+					b.Fatal("frozen snapshot is not renderable")
 				}
 				runtime.KeepAlive(snapshot)
 			}
@@ -535,16 +558,16 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricMixedReadPublish(b *testin
 	registry := benchmarkManagedFabricFDBTopologyRegistry(8, 128, true)
 	deps := funcDepsAdapter{registry: registry}
 	options := topologyoptions.DefaultQueryOptions()
-	var published *topologyCache
-	for cache := range registry.caches {
-		published = cache
-		break
-	}
+	published := registry.acquireGeneration()
 	if published == nil {
-		b.Fatal("benchmark cache is missing")
+		b.Fatal("benchmark generation is missing")
 	}
-	replacement := newTopologyCache()
-	replacement.replaceWith(published)
+	replacement := &topologyGeneration{
+		sequence:          published.sequence + 1,
+		publishedAt:       published.publishedAt.Add(time.Second),
+		devices:           append([]*topologyDeviceGeneration(nil), published.devices...),
+		renderableDevices: append([]*topologyDeviceGeneration(nil), published.renderableDevices...),
+	}
 
 	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {
 		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Links.Rows, ok, err)
@@ -559,9 +582,7 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricMixedReadPublish(b *testin
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			if operations.Add(1)%128 == 0 {
-				published.mu.Lock()
-				published.replaceWith(replacement)
-				published.mu.Unlock()
+				registry.publishGeneration(replacement)
 				publications.Add(1)
 			}
 			payload, ok, err := deps.Snapshot(options)
@@ -584,7 +605,7 @@ func benchmarkManagedFabricFDBTopologyRegistry(deviceCount, fdbEntriesPerDevice 
 	registry := newTopologyRegistry()
 	now := time.Now()
 	for deviceIndex := range deviceCount {
-		cache := newTopologyCache()
+		cache := newTopologyBuilder()
 		cache.lastUpdate = now
 		cache.updateTime = now
 		cache.agentID = fmt.Sprintf("benchmark-agent-%d", deviceIndex)
@@ -613,7 +634,7 @@ func benchmarkManagedFabricFDBTopologyRegistry(deviceCount, fdbEntriesPerDevice 
 				status:     "learned",
 			}
 		}
-		registry.register(cache)
+		publishTestTopologyBuilder(registry, cache)
 	}
 	return registry
 }
@@ -628,9 +649,9 @@ func benchmarkManagedFabricFDBSegmentDensityRegistry(deviceCount, fdbEntryCount,
 
 	registry := newTopologyRegistry()
 	now := time.Now()
-	caches := make([]*topologyCache, 0, deviceCount)
+	caches := make([]*topologyBuilder, 0, deviceCount)
 	for deviceIndex := range deviceCount {
-		cache := newTopologyCache()
+		cache := newTopologyBuilder()
 		cache.lastUpdate = now
 		cache.updateTime = now
 		cache.agentID = fmt.Sprintf("segment-benchmark-agent-%d", deviceIndex)
@@ -641,7 +662,6 @@ func benchmarkManagedFabricFDBSegmentDensityRegistry(deviceCount, fdbEntryCount,
 			ManagementIP:  fmt.Sprintf("198.18.%d.%d", deviceIndex/254, deviceIndex%254+1),
 		}
 		caches = append(caches, cache)
-		registry.register(cache)
 	}
 
 	hub := caches[0]
@@ -668,6 +688,9 @@ func benchmarkManagedFabricFDBSegmentDensityRegistry(deviceCount, fdbEntryCount,
 			status:     "learned",
 		}
 	}
+	for _, cache := range caches {
+		publishTestTopologyBuilder(registry, cache)
+	}
 	return registry
 }
 
@@ -690,7 +713,7 @@ func benchmarkManagedFabricEndpointMAC(deviceIndex, entryIndex int, shared bool)
 
 func benchmarkInferredLLDPTopologyRegistry(linkCount, aliasCount int) *topologyRegistry {
 	now := time.Now()
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.lastUpdate = now
 	cache.updateTime = now
 	cache.agentID = "benchmark-agent"
@@ -719,10 +742,10 @@ func benchmarkInferredLLDPTopologyRegistry(linkCount, aliasCount int) *topologyR
 		}
 	}
 
-	return &topologyRegistry{
-		caches:          map[*topologyCache]struct{}{cache: {}},
-		producerScopeID: "benchmark-producer",
-	}
+	registry := newTopologyRegistry()
+	registry.producerScopeID = "benchmark-producer"
+	publishTestTopologyBuilder(registry, cache)
+	return registry
 }
 
 func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
@@ -789,16 +812,14 @@ func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 }
 
 func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrimary, ipOnly bool, logicalPeerCount int) *topologyRegistry {
-	registry := &topologyRegistry{
-		caches:          make(map[*topologyCache]struct{}, deviceCount),
-		producerScopeID: "benchmark-producer",
-	}
+	registry := newTopologyRegistry()
+	registry.producerScopeID = "benchmark-producer"
 	now := time.Now()
 	selectedIPs := make([]string, deviceCount)
-	caches := make([]*topologyCache, 0, deviceCount)
+	caches := make([]*topologyBuilder, 0, deviceCount)
 
 	for deviceIndex := range deviceCount {
-		cache := newTopologyCache()
+		cache := newTopologyBuilder()
 		cache.lastUpdate = now
 		cache.updateTime = now
 		cache.agentID = fmt.Sprintf("benchmark-agent-%d", deviceIndex)
@@ -829,7 +850,6 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 			ManagementAddresses: addresses,
 			OSPFRouterID:        fmt.Sprintf("192.0.2.%d", deviceIndex+1),
 		}
-		registry.caches[cache] = struct{}{}
 		caches = append(caches, cache)
 	}
 
@@ -871,7 +891,8 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 		}
 	}
 	for _, cache := range caches {
-		cache.finalizeTopologyCache()
+		cache.finalize()
+		publishTestTopologyBuilder(registry, cache)
 	}
 
 	return registry

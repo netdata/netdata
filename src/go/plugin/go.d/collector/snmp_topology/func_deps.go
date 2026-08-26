@@ -54,10 +54,10 @@ func topologyMethods() []funcapi.FunctionConfig {
 }
 
 func (c *Collector) FunctionAvailable(functionID string) bool {
-	if functionID != snmptopologyfunc.MethodID {
+	if c == nil || functionID != snmptopologyfunc.MethodID || c.topologyRegistry == nil {
 		return false
 	}
-	return c.functionAvailability.Load()
+	return c.topologyRegistry.hasRenderableObservations()
 }
 
 func topologyFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

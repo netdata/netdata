@@ -5,7 +5,8 @@ package ddsnmp
 import (
 	"maps"
 	"net/netip"
-	"sort"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -45,54 +46,86 @@ type DeviceConnectionInfo struct {
 	VnodeLabels   map[string]string
 }
 
+// DeviceRegistrationID identifies one uninterrupted registration lifetime.
+// IDs are unique within one DeviceStore and never reused.
+type DeviceRegistrationID uint64
+
+func (id DeviceRegistrationID) String() string {
+	return strconv.FormatUint(uint64(id), 10)
+}
+
+// DeviceEntry is one registered SNMP job and its connection state.
+type DeviceEntry struct {
+	RegistrationID DeviceRegistrationID
+	Info           DeviceConnectionInfo
+}
+
 // NewDeviceStore returns an empty SNMP device connection-state store.
 func NewDeviceStore() *DeviceStore {
 	return &DeviceStore{
-		devices:    make(map[string]DeviceConnectionInfo),
-		byHostname: make(map[string]map[string]struct{}),
+		ownerRegistrations: make(map[string]DeviceRegistrationID),
+		devices:            make(map[DeviceRegistrationID]DeviceConnectionInfo),
+		byHostname:         make(map[string]map[string]struct{}),
 	}
 }
 
 // DeviceStore holds SNMP device connection state shared between SNMP-family modules.
 type DeviceStore struct {
-	mu         sync.RWMutex
-	devices    map[string]DeviceConnectionInfo
-	byHostname map[string]map[string]struct{}
+	mu                 sync.RWMutex
+	ownerRegistrations map[string]DeviceRegistrationID
+	devices            map[DeviceRegistrationID]DeviceConnectionInfo
+	byHostname         map[string]map[string]struct{}
+	lastRegistrationID DeviceRegistrationID
 }
 
-// Register adds or updates a device in the store.
+// Register adds or updates a device by its caller-owned lookup key. An update
+// retains the current registration ID; a new registration receives a new ID.
 // Reference types are deep-copied to prevent data races with the caller.
-func (s *DeviceStore) Register(key string, info DeviceConnectionInfo) {
+func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	s.mu.Lock()
 	s.ensureMapsLocked()
-	if old, ok := s.devices[key]; ok {
-		s.removeHostnameIndexLocked(key, old.Hostname)
+	registrationID, exists := s.ownerRegistrations[ownerKey]
+	if exists {
+		s.removeHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
+	} else {
+		registrationID = s.nextRegistrationIDLocked()
+		s.ownerRegistrations[ownerKey] = registrationID
 	}
-	s.devices[key] = cloneDeviceConnectionInfo(info)
-	s.addHostnameIndexLocked(key, info.Hostname)
+	s.devices[registrationID] = cloneDeviceConnectionInfo(info)
+	s.addHostnameIndexLocked(ownerKey, info.Hostname)
 	s.mu.Unlock()
 }
 
 // Unregister removes a device from the store.
-func (s *DeviceStore) Unregister(key string) {
+func (s *DeviceStore) Unregister(ownerKey string) {
 	s.mu.Lock()
-	if old, ok := s.devices[key]; ok {
-		s.removeHostnameIndexLocked(key, old.Hostname)
+	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
+		s.removeHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
+		delete(s.devices, registrationID)
+		delete(s.ownerRegistrations, ownerKey)
 	}
-	delete(s.devices, key)
 	s.mu.Unlock()
 }
 
-// Devices returns a deep-copied snapshot of all registered devices.
-func (s *DeviceStore) Devices() []DeviceConnectionInfo {
+// Entries returns a deterministic, deep-copied snapshot of all registered jobs.
+func (s *DeviceStore) Entries() []DeviceEntry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	devices := make([]DeviceConnectionInfo, 0, len(s.devices))
-	for _, info := range s.devices {
-		devices = append(devices, cloneDeviceConnectionInfo(info))
+	registrationIDs := make([]DeviceRegistrationID, 0, len(s.devices))
+	for registrationID := range s.devices {
+		registrationIDs = append(registrationIDs, registrationID)
 	}
-	return devices
+	slices.Sort(registrationIDs)
+
+	entries := make([]DeviceEntry, 0, len(registrationIDs))
+	for _, registrationID := range registrationIDs {
+		entries = append(entries, DeviceEntry{
+			RegistrationID: registrationID,
+			Info:           cloneDeviceConnectionInfo(s.devices[registrationID]),
+		})
+	}
+	return entries
 }
 
 // DevicesByHostname returns all deep-copied registered devices whose configured
@@ -116,13 +149,13 @@ func (s *DeviceStore) DevicesByHostname(hostname string) []DeviceConnectionInfo 
 		for key := range keySet {
 			keys = append(keys, key)
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 
 		devices := make([]DeviceConnectionInfo, 0, len(keys))
-		for _, key := range keys {
-			info, ok := s.devices[key]
+		for _, ownerKey := range keys {
+			registrationID, ok := s.ownerRegistrations[ownerKey]
 			if ok {
-				devices = append(devices, cloneDeviceConnectionInfo(info))
+				devices = append(devices, cloneDeviceConnectionInfo(s.devices[registrationID]))
 			}
 		}
 		return devices
@@ -151,15 +184,26 @@ func cloneDeviceConnectionInfo(info DeviceConnectionInfo) DeviceConnectionInfo {
 }
 
 func (s *DeviceStore) ensureMapsLocked() {
+	if s.ownerRegistrations == nil {
+		s.ownerRegistrations = make(map[string]DeviceRegistrationID)
+	}
 	if s.devices == nil {
-		s.devices = make(map[string]DeviceConnectionInfo)
+		s.devices = make(map[DeviceRegistrationID]DeviceConnectionInfo)
 	}
 	if s.byHostname == nil {
 		s.byHostname = make(map[string]map[string]struct{})
-		for key, info := range s.devices {
-			s.addHostnameIndexLocked(key, info.Hostname)
+		for ownerKey, registrationID := range s.ownerRegistrations {
+			s.addHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
 		}
 	}
+}
+
+func (s *DeviceStore) nextRegistrationIDLocked() DeviceRegistrationID {
+	if s.lastRegistrationID == ^DeviceRegistrationID(0) {
+		panic("SNMP DeviceStore registration ID space exhausted")
+	}
+	s.lastRegistrationID++
+	return s.lastRegistrationID
 }
 
 func (s *DeviceStore) addHostnameIndexLocked(key, hostname string) {

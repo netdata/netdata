@@ -4,7 +4,7 @@ package snmptopology
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
-type topologyMetricHandler func(*topologyCache, map[string]string)
+type topologyMetricHandler func(*topologyBuilder, map[string]string)
 
 var topologyMetricHandlers = make(map[ddsnmp.TopologyKind]topologyMetricHandler)
 
@@ -21,7 +21,7 @@ func registerTopologyMetricHandler(kind ddsnmp.TopologyKind, handler topologyMet
 	topologyMetricHandlers[kind] = handler
 }
 
-func (c *topologyCache) ingestMetric(kind ddsnmp.TopologyKind, tags map[string]string) {
+func (c *topologyBuilder) ingestMetric(kind ddsnmp.TopologyKind, tags map[string]string) {
 	if handler := topologyMetricHandlers[kind]; handler != nil {
 		handler(c, tags)
 	}

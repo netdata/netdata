@@ -206,22 +206,23 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
-	require.Empty(t, deviceStore.Devices())
+	require.Empty(t, deviceStore.Entries())
 
 	_ = collr.Collect(context.Background())
 
-	devices := deviceStore.Devices()
-	require.Len(t, devices, 1)
-	assert.Equal(t, "192.0.2.1", devices[0].Hostname)
-	assert.Equal(t, 161, devices[0].Port)
-	assert.Equal(t, gosnmp.Version2c.String(), devices[0].SNMPVersion)
-	assert.Equal(t, "mock sysName", devices[0].SysName)
-	assert.Equal(t, "mock sysDescr", devices[0].SysDescr)
-	assert.Equal(t, "mock sysContact", devices[0].SysContact)
-	assert.Equal(t, "mock sysLocation", devices[0].SysLocation)
+	entries := deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.NotZero(t, entries[0].RegistrationID)
+	assert.Equal(t, "192.0.2.1", entries[0].Info.Hostname)
+	assert.Equal(t, 161, entries[0].Info.Port)
+	assert.Equal(t, gosnmp.Version2c.String(), entries[0].Info.SNMPVersion)
+	assert.Equal(t, "mock sysName", entries[0].Info.SysName)
+	assert.Equal(t, "mock sysDescr", entries[0].Info.SysDescr)
+	assert.Equal(t, "mock sysContact", entries[0].Info.SysContact)
+	assert.Equal(t, "mock sysLocation", entries[0].Info.SysLocation)
 
 	collr.Cleanup(context.Background())
-	require.Empty(t, deviceStore.Devices())
+	require.Empty(t, deviceStore.Entries())
 }
 
 func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.T) {
@@ -254,20 +255,20 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 	require.NoError(t, collr.Check(context.Background()))
 	require.NotNil(t, collr.Collect(context.Background()))
 
-	devices := deviceStore.Devices()
-	require.Len(t, devices, 1)
-	assert.Equal(t, "profile-vendor", devices[0].Vendor)
-	assert.Equal(t, "profile-model", devices[0].Model)
+	entries := deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
+	assert.Equal(t, "profile-model", entries[0].Info.Model)
 	assert.Zero(t, mockCollector.metadataCalls, "normal collection metadata must be reused without a separate request")
 
 	profileMetrics.DeviceMetadata["vendor"] = ddsnmp.MetaTag{Value: "later-vendor", IsExactMatch: true}
 	profileMetrics.DeviceMetadata["model"] = ddsnmp.MetaTag{Value: "later-model", IsExactMatch: true}
 	require.NotNil(t, collr.Collect(context.Background()))
 
-	devices = deviceStore.Devices()
-	require.Len(t, devices, 1)
-	assert.Equal(t, "profile-vendor", devices[0].Vendor)
-	assert.Equal(t, "profile-model", devices[0].Model)
+	entries = deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
+	assert.Equal(t, "profile-model", entries[0].Info.Model)
 	assert.Equal(t, 2, mockCollector.collectCalls)
 	assert.Zero(t, mockCollector.metadataCalls)
 }
@@ -294,12 +295,12 @@ func TestCollector_SetupVnodeAndRegisterDeviceStateShareResolvedMetadata(t *test
 	collr.vnode = collr.setupVnode(si, profileMetadata)
 	collr.registerDeviceState(si, nil)
 
-	devices := deviceStore.Devices()
-	require.Len(t, devices, 1)
-	assert.Equal(t, "profile-vendor", devices[0].VnodeLabels["vendor"])
-	assert.Equal(t, "operator-model", devices[0].VnodeLabels["model"])
-	assert.Equal(t, "profile-vendor", devices[0].Vendor)
-	assert.Equal(t, "operator-model", devices[0].Model)
+	entries := deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "profile-vendor", entries[0].Info.VnodeLabels["vendor"])
+	assert.Equal(t, "operator-model", entries[0].Info.VnodeLabels["model"])
+	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
+	assert.Equal(t, "operator-model", entries[0].Info.Model)
 }
 
 func TestCollector_Check(t *testing.T) {

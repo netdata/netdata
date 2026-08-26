@@ -94,7 +94,7 @@ func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
 	}
 }
 
-func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecForwardingFixture) *topologyCache {
+func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecForwardingFixture) *topologyBuilder {
 	t.Helper()
 
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
@@ -136,7 +136,7 @@ func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecFo
 	for _, tags := range data.arpEntries {
 		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindArpEntry, Tags: tags})
 	}
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	return cache
 }

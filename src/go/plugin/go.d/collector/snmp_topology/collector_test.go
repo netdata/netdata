@@ -77,13 +77,35 @@ func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
 	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	coll.topologyRegistry.register(cache)
-
-	coll.updateFunctionAvailability()
+	publishTestTopologyBuilder(coll.topologyRegistry, cache)
 
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
+}
+
+func TestSNMPTopologyFunctionAvailabilityChangesOnlyWithPublishedGeneration(t *testing.T) {
+	coll := newTestSNMPTopologyCollector()
+	publishedAt := time.Now()
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	builder.updateTime = publishedAt
+	builder.lastUpdate = publishedAt
+	builder.staleAfter = 20 * time.Millisecond
+	const registrationID ddsnmp.DeviceRegistrationID = 1
+	device := freezeTestTopologyBuilderAt(registrationID, publishedAt, builder)
+	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, publishedAt, states))
+
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
+	require.True(t, device.freshAt(publishedAt.Add(10*time.Millisecond)))
+	require.False(t, device.freshAt(publishedAt.Add(21*time.Millisecond)))
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID),
+		"one published generation must not decay between completed sweeps")
+
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(2, publishedAt.Add(21*time.Millisecond), states))
+	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID),
+		"the next completed sweep must remove an expired retained generation from renderable membership")
 }
 
 func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
@@ -94,7 +116,9 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
-	coll.functionAvailability.Store(true)
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	publishTestTopologyBuilder(coll.topologyRegistry, builder)
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 
 	ctx, cancel := context.WithCancel(context.Background())

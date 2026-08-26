@@ -11,14 +11,14 @@ import (
 )
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindLldpLocPort, (*topologyCache).updateLldpLocPort)
-	registerTopologyMetricHandler(ddsnmp.KindLldpLocManAddr, (*topologyCache).updateLldpLocManAddr)
-	registerTopologyMetricHandler(ddsnmp.KindLldpRem, (*topologyCache).updateLldpRemote)
-	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddr, (*topologyCache).updateLldpRemManAddr)
-	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddrCompat, (*topologyCache).updateLldpRemManAddr)
+	registerTopologyMetricHandler(ddsnmp.KindLldpLocPort, (*topologyBuilder).updateLldpLocPort)
+	registerTopologyMetricHandler(ddsnmp.KindLldpLocManAddr, (*topologyBuilder).updateLldpLocManAddr)
+	registerTopologyMetricHandler(ddsnmp.KindLldpRem, (*topologyBuilder).updateLldpRemote)
+	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddr, (*topologyBuilder).updateLldpRemManAddr)
+	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddrCompat, (*topologyBuilder).updateLldpRemManAddr)
 }
 
-func (c *topologyCache) updateLldpLocPort(tags map[string]string) {
+func (c *topologyBuilder) updateLldpLocPort(tags map[string]string) {
 	portNum := tags[tagLldpLocPortNum]
 	if portNum == "" {
 		return
@@ -41,7 +41,7 @@ func (c *topologyCache) updateLldpLocPort(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateLldpLocManAddr(tags map[string]string) {
+func (c *topologyBuilder) updateLldpLocManAddr(tags map[string]string) {
 	addrHex := tags[tagLldpLocMgmtAddr]
 	if addrHex == "" {
 		return
@@ -64,7 +64,7 @@ func (c *topologyCache) updateLldpLocManAddr(tags map[string]string) {
 	c.appendLocalManagementAddress(mgmt)
 }
 
-func (c *topologyCache) updateLldpRemote(tags map[string]string) {
+func (c *topologyBuilder) updateLldpRemote(tags map[string]string) {
 	localPort := tags[tagLldpLocPortNum]
 	if localPort == "" {
 		return
@@ -124,7 +124,7 @@ func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateLldpRemManAddr(tags map[string]string) {
+func (c *topologyBuilder) updateLldpRemManAddr(tags map[string]string) {
 	localPort := tags[tagLldpLocPortNum]
 	if localPort == "" {
 		return

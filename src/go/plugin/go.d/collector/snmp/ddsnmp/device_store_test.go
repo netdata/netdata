@@ -93,8 +93,41 @@ func TestDeviceStoreRegisterClonesReferenceFields(t *testing.T) {
 	info.ManualProfiles[0] = "changed"
 	info.VnodeLabels["site"] = "changed"
 
-	devices := store.Devices()
-	require.Len(t, devices, 1)
-	require.Equal(t, []string{"profile-a"}, devices[0].ManualProfiles)
-	require.Equal(t, "lab", devices[0].VnodeLabels["site"])
+	entries := store.Entries()
+	require.Len(t, entries, 1)
+	require.NotZero(t, entries[0].RegistrationID)
+	require.Equal(t, []string{"profile-a"}, entries[0].Info.ManualProfiles)
+	require.Equal(t, "lab", entries[0].Info.VnodeLabels["site"])
+}
+
+func TestDeviceStoreEntriesAreSortedByRegistrationID(t *testing.T) {
+	store := NewDeviceStore()
+	store.Register("job-b", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-b"})
+	store.Register("job-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-a"})
+
+	entries := store.Entries()
+	require.Len(t, entries, 2)
+	require.Less(t, entries[0].RegistrationID, entries[1].RegistrationID)
+	require.Equal(t, "switch-b", entries[0].Info.SysName)
+	require.Equal(t, "switch-a", entries[1].Info.SysName)
+}
+
+func TestDeviceStoreRegistrationIdentityChangesOnlyAfterUnregister(t *testing.T) {
+	store := NewDeviceStore()
+	store.Register("owner-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "initial"})
+
+	entries := store.Entries()
+	require.Len(t, entries, 1)
+	initialIdentity := entries[0].RegistrationID
+
+	store.Register("owner-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "updated"})
+	entries = store.Entries()
+	require.Len(t, entries, 1)
+	require.Equal(t, initialIdentity, entries[0].RegistrationID, "live metadata updates must retain the registration identity")
+
+	store.Unregister("owner-a")
+	store.Register("owner-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "replacement"})
+	entries = store.Entries()
+	require.Len(t, entries, 1)
+	require.Greater(t, entries[0].RegistrationID, initialIdentity, "replacement registrations must receive a new identity")
 }

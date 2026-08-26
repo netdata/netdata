@@ -209,7 +209,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.funcRouter.Cleanup(ctx)
 	}
 	if c.deviceStore != nil {
-		c.deviceStore.Unregister(c.deviceStoreKey())
+		c.deviceStore.Unregister(c.deviceStoreOwnerKey())
 	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()

@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) collectTopologyVTPVLANContexts(ctx context.Context, cache *topologyCache, dev ddsnmp.DeviceConnectionInfo) {
+func (c *Collector) collectTopologyVTPVLANContexts(ctx context.Context, cache *topologyBuilder, dev ddsnmp.DeviceConnectionInfo) {
 	if cache == nil {
 		return
 	}

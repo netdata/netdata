@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func (c *topologyCache) applyLLDPLocalDeviceProfileTags(tags map[string]string) {
+func (c *topologyBuilder) applyLLDPLocalDeviceProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
 		return
 	}
@@ -46,7 +46,7 @@ func (c *topologyCache) applyLLDPLocalDeviceProfileTags(tags map[string]string) 
 	}
 }
 
-func (c *topologyCache) applyOSPFProfileTags(tags map[string]string) {
+func (c *topologyBuilder) applyOSPFProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
 		return
 	}
@@ -57,7 +57,7 @@ func (c *topologyCache) applyOSPFProfileTags(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) applyAuthoritativeBridgeIdentity(mac string) {
+func (c *topologyBuilder) applyAuthoritativeBridgeIdentity(mac string) {
 	mac = topologyutil.NormalizeMAC(mac)
 	if mac == "" || mac == "00:00:00:00:00:00" {
 		return
@@ -67,7 +67,7 @@ func (c *topologyCache) applyAuthoritativeBridgeIdentity(mac string) {
 	c.localDevice.ChassisIDType = "macAddress"
 }
 
-func (c *topologyCache) applyBridgeProfileTags(tags map[string]string) {
+func (c *topologyBuilder) applyBridgeProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
 		return
 	}

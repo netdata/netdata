@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologymodel.L3Interface {
+func (c *topologyBuilder) snapshotL3Interfaces(localDeviceID string) []topologymodel.L3Interface {
 	if c == nil || len(c.l3InterfacesByIP) == 0 {
 		return nil
 	}

@@ -234,7 +234,7 @@ func (s *topologyScenario) render(t testing.TB) topologyapi.Data {
 		registry.reverseDNS = dns.resolver
 	}
 	for _, dev := range s.devs {
-		registry.register(s.cacheForDevice(t, dev))
+		publishTestTopologyBuilder(registry, s.cacheForDevice(t, dev))
 	}
 
 	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(s.opts)
@@ -244,7 +244,7 @@ func (s *topologyScenario) render(t testing.TB) topologyapi.Data {
 	return payload
 }
 
-func (s *topologyScenario) cacheForDevice(t testing.TB, dev *topologyScenarioDevice) *topologyCache {
+func (s *topologyScenario) cacheForDevice(t testing.TB, dev *topologyScenarioDevice) *topologyBuilder {
 	t.Helper()
 
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
@@ -264,7 +264,7 @@ func (s *topologyScenario) cacheForDevice(t testing.TB, dev *topologyScenarioDev
 	cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{pm})
 	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{pm})
 	cache.ingestTopologyBGPPeers([]*ddsnmp.ProfileMetrics{pm})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 	return cache
 }
 

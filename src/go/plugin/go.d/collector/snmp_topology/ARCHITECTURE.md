@@ -6,8 +6,8 @@ per-protocol details; those live in the profile definitions and focused tests.
 
 ## Short Version
 
-`snmp_topology` is a single-instance go.d collector that periodically builds a
-cached topology view from SNMP devices registered by the SNMP collector.
+`snmp_topology` is a single-instance go.d collector that periodically builds an
+immutable topology generation from SNMP jobs registered by the SNMP collector.
 
 It has three independent entry points:
 
@@ -15,7 +15,7 @@ It has three independent entry points:
 - `Collect(ctx)` only publishes internal collector metrics.
 - `snmp:topology:snmp` serves the latest cached topology through a Function.
 
-Function calls do not walk SNMP. They snapshot already-collected cache state,
+Function calls do not walk SNMP. They acquire one already-published generation,
 build a graph, shape/enrich it, and render `netdata.topology.v1`.
 
 ## Runtime Order
@@ -67,20 +67,22 @@ collector instance for the whole agent.
 ```mermaid
 flowchart TD
     Run["Run(ctx)"]
-    Publish["publish trap enrichment"]
+    TrapPublish["publish trap enrichment"]
     Tick["initial refresh, then every update_every"]
-    Devices["read devices from DeviceStore"]
-    Fresh{"new or refresh_every elapsed?"}
+    Devices["read registered jobs from DeviceStore"]
+    Fresh{"next retry/refresh due?"}
     Resolve["resolve DNS targets<br/>up to 8 workers, shared 5s budget"]
     Walk["SNMP walk topology profiles"]
-    Next["build fresh topologyCache off-registry"]
-    Swap["swap fresh cache into registered cache"]
-    Prune["prune removed devices"]
+    Next["build mutable device state off-registry"]
+    Freeze["freeze immutable DeviceSnapshot"]
+    Activate["activate snapshots at publication"]
+    GenPublish["publish one TopologyGeneration"]
+    Prune["prune unregistered job state"]
     Collect["Collect(ctx)"]
     Metrics["write internal metrics only"]
 
-    Run --> Publish --> Tick --> Devices --> Fresh
-    Fresh -->|"yes"| Resolve --> Walk --> Next --> Swap --> Prune --> Tick
+    Run --> TrapPublish --> Tick --> Devices --> Fresh
+    Fresh -->|"yes"| Resolve --> Walk --> Next --> Freeze --> Prune --> Activate --> GenPublish --> Tick
     Fresh -->|"no"| Prune
     Collect --> Metrics
 ```
@@ -93,27 +95,45 @@ Run(ctx)
     refreshTopologyRecovering(ctx)
 
 refreshTopology(ctx)
-  read registered SNMP devices from ddsnmp.DeviceStore
-  build a plan of new or stale devices
+  read SNMP job entries and store-owned registration IDs from ddsnmp.DeviceStore
+  clone the current per-job refresh state for this sweep
+  build a plan of jobs whose next retry/refresh is due
   resolve planned DNS targets with up to eight workers under one shared 5s budget
-  for each planned device, in DeviceStore snapshot order:
-    refreshDeviceTopology(ctx, key, device, targetManagementIPs)
-  prune caches for devices no longer registered
+  for each planned job, in registration-ID order:
+    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
+    update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
+  prune state for jobs no longer registered
+  activate successful snapshots with one publication-based freshness deadline
+  atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, key, device, targetManagementIPs)
+refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
   query sysUpTime
-  build a fresh per-device topologyCache off-registry with private target candidates
-  ingest topology metrics into the fresh cache
+  build a fresh mutable per-device builder with private target candidates
+  ingest topology metrics into the builder
   collect VTP VLAN contexts when needed
   filter target and observed addresses with collected masks, select one management IP, and finalize diagnostics
-  swap the fresh cache into the registered cache
+  freeze one immutable DeviceSnapshot with its exact acquisition time
 ```
 
 The refresh loop checks devices every `update_every` seconds, but a device is
-fully refreshed only when it is new or older than `refresh_every`.
+fully refreshed only when its normal refresh or failure retry is due. A failed
+attempt retries after `update_every`, doubles the delay after each consecutive
+failure, and caps at `refresh_every`. Success resets the failure count and
+restores the normal interval. Retry timing is internal and has no public tuning
+option. Retryable client-construction, connection, and collection warnings use
+the logger's built-in hourly limiter keyed by registration ID and
+bounded failure class; warning suppression does not change retry timing.
+
+`DeviceStore` keeps each caller-owned key private and assigns a typed, monotonic
+registration ID to each uninterrupted registration lifetime. Updating a live
+registration retains its ID; unregistering and registering the same owner key
+again receives a new ID. Refresh ownership uses that ID, not the owner key or a
+rebuilt `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore
+keep independent refresh state and device generations, and a replacement job
+cannot inherit the removed job's retry or warning-limiter state.
 
 Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh
@@ -125,10 +145,15 @@ addresses, then uses one selector across the surviving targets, LLDP/CDP
 addresses, and IP-MIB addresses. Only the selected target enters public identity
 or trap matching; alternate DNS answers are never published as aliases.
 
-The important safety property is that a device refresh builds the next cache
-off-registry and only swaps it into the registered cache after ingestion
-finishes. Function readers keep seeing the previous complete snapshot while a
-new SNMP walk is in progress.
+The important safety property is two-level immutability. A device refresh builds
+and freezes its next collected snapshot off-registry. At the completed sweep
+boundary, successful snapshots are activated with one shared publication time,
+then the collector publishes the complete device vector with one atomic pointer
+update. Function, focus-option, availability, reverse-DNS warming, and trap
+readers each acquire one generation and cannot combine devices from different
+sweeps. A failed attempt retains the last successful device generation and its
+original freshness deadline; a canceled or panicking sweep does not publish a
+partial vector.
 
 ## Topology Profile Composition
 
@@ -167,11 +192,12 @@ anchor. An existing PDU emits the tagged observation with an internal value of
 zero, including when the PDU is an OctetString. Cache ingestion consumes the
 tags; scalar topology values retain normal value semantics.
 
-## Per-Device Cache
+## Per-Device Builder And Generation
 
-`topology_cache.go` defines one mutable cache per SNMP device.
+`topology_cache.go` defines the mutable, collection-only builder for one SNMP
+job. It is never published to runtime readers and needs no synchronization.
 
-The cache stores normalized intermediate facts collected from topology profile
+The builder stores normalized intermediate facts collected from topology profile
 metrics:
 
 - local device identity and metadata;
@@ -195,22 +221,37 @@ Ingestion is split by source area:
 - `topology_vlan_context_*.go`
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
-right cache ingester. Profile tags and device metadata are applied separately
+right builder ingester. Profile tags and device metadata are applied separately
 because they describe the device itself rather than one topology row.
+
+Finalization converts the builder into an immutable `topologyDeviceGeneration`:
+
+- a prepared `ObservationSnapshot` for Function, focus, availability, and
+  reverse-DNS readers;
+- immutable trap-match, interface-name, and neighbor indexes;
+- collection and expiry timestamps;
+- the typed DeviceStore registration ID.
+
+The collector separately owns `deviceRefreshState` per registration ID. It
+tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,
+consecutive failures, and the last successful device generation.
 
 ## Registry And Snapshot
 
-`topology_registry.go` owns the set of active per-device caches.
+`topology_registry.go` owns one atomic pointer to the latest immutable
+`topologyGeneration`. The generation contains the complete, registration-ID
+ordered vector produced by one refresh sweep.
 
 ```text
 topologyRegistry.snapshotWithOptions(options)
   normalize query options
-  take active cache snapshots
+  acquire one topology generation
+  read the generation's fixed renderable device membership
   aggregate per-device observations
   build a topology graph
 ```
 
-Each cache snapshot is converted into:
+Each device generation contributes:
 
 - an `l2topology.L2Observation`, used by the generic L2 engine;
 - typed SNMP-side observation rows for L3 interfaces, OSPF neighbors, and BGP
@@ -279,8 +320,16 @@ subnets observed by different Agents do not collide after Cloud aggregation.
 If the registry id is unavailable, L3 subnet segment actors are omitted; direct
 L3 subnet links, OSPF, and BGP enrichment still run.
 
-Only fresh caches contribute snapshots. Stale caches are ignored until refreshed
-or pruned.
+Renderable membership is fixed when a complete topology generation publishes;
+Function, focus, availability, and reverse-DNS readers therefore see one stable
+view until the next completed sweep. Newly successful device snapshots start
+their display-freshness window at that publication boundary while preserving
+their exact acquisition timestamp. A retained generation from a failed refresh
+keeps its original deadline and is removed from renderable membership when a
+later completed sweep observes it expired. Trap enrichment preserves the prior
+behavior of using the last successfully published device generation even after
+topology display freshness expires; unregistering the SNMP job removes it on the
+next completed sweep.
 
 ## Graph Build Order
 
@@ -293,7 +342,7 @@ aggregate observations
   -> l2topology.BuildL2ResultFromObservations
   -> l2topology.ToGraph
   -> convert generic graph to topologymodel.Data
-  -> augment local actors with SNMP device/cache detail
+  -> augment local actors with SNMP device-generation detail
   -> topologyshape.ApplyPolicies
   -> topologyenrich.ApplyLayer3 (L3 subnet, OSPF, BGP)
   -> topologyshape.ApplyDepthFocusFilter
@@ -327,7 +376,7 @@ resolver from copied managed-actor references and shares it across L3 subnet,
 OSPF, and BGP enrichment. BGP runs last because it extends the resolver with
 BGP-local identifiers and interface addresses. This keeps actor-alias work
 linear in the indexed identities instead of repeating the complete alias scan
-for every cache snapshot and logical L3 enricher.
+for every device snapshot and logical L3 enricher.
 
 L3 subnet enrichment has two grains:
 
@@ -350,7 +399,7 @@ context and segment identity includes it.
 
 ## Internal Packages
 
-The root package owns collector lifecycle, cache ingestion, registry snapshots,
+The root package owns collector lifecycle, builder ingestion, immutable generations, registry snapshots,
 and adapters to shared SNMP-family state.
 
 The internal packages are deliberately narrower:
@@ -413,7 +462,7 @@ flowchart TD
     Handler["snmptopologyfunc.Handle"]
     Options["resolve QueryOptions"]
     Registry["topologyRegistry.snapshotWithOptions"]
-    Snapshot["fresh cache snapshots"]
+    Snapshot["fresh device-generation snapshots"]
     Aggregate["aggregate observations"]
     L2["l2topology BuildL2Result -> ToGraph"]
     Shape["topologyshape policies and focus"]
@@ -460,7 +509,7 @@ payload; it is a cross-collector lookup path for trap log rows.
 ## Metrics And Charts
 
 The collector emits internal metrics only. These metrics describe refresh health
-and cache state; they are not the topology payload.
+and retained device-generation state; they are not the topology payload.
 
 - `Collect(ctx)` writes current internal metric values.
 - `Run(ctx)` performs SNMP topology refresh.
@@ -469,25 +518,33 @@ and cache state; they are not the topology payload.
 ## Concurrency Rules
 
 - `Collector.refreshMu` serializes topology refreshes and cleanup.
-- Each `topologyCache` has its own `mu`.
-- The registry has its own `mu` for the set of active cache pointers.
-- Function requests snapshot caches under read locks; they do not mutate caches.
-- Device refresh swaps a completed per-device cache into the already-registered
-  cache instead of mutating the published cache step by step.
+- Each due device is collected into a private `topologyBuilder`; builders have no
+  locks because runtime readers never receive them.
+- Finalization freezes the builder into one immutable
+  `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
+  `topologyDeviceGeneration` values at one shared publication time. A failed
+  collection retains the prior successful device generation and deadline.
+- A completed sweep fixes renderable membership and publishes one immutable
+  `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
+  the previous generation visible.
+- Function, focus, availability, reverse-DNS, and trap readers each load that
+  pointer once and never block on collection or builder locks.
+- The registry mutex only protects producer-scope discovery and the reverse-DNS
+  warmer context; it does not protect topology generations.
 
-When adding new cache state, add it to:
+When adding new collected state, add it to:
 
-- `topologyCache`;
-- `newTopologyCache`;
-- `replaceWith`;
-- the relevant snapshot builder;
-- tests that prove stale/partial data is not exposed.
+- `topologyBuilder` and `newTopologyBuilder`;
+- the relevant ingestion and finalization path;
+- the immutable observation or trap projection that owns the published value;
+- tests proving the value is complete before publication and that a failed or
+  canceled refresh cannot expose partial state.
 
 ## Where To Change Things
 
 - Add or adjust SNMP topology profile rows:
   - profile YAML and `ddsnmp.TopologyKind`;
-  - cache ingester in the root package;
+  - builder ingester in the root package;
   - snapshot conversion if the row contributes to graph facts.
 - Add graph shaping policy:
   - `internal/topologyshape`.
@@ -501,7 +558,7 @@ When adding new cache state, add it to:
   - `internal/topologyv1`;
   - normalized golden test;
   - topology schema validation tests.
-- Add collector refresh or cache lifecycle behavior:
+- Add collector refresh or generation lifecycle behavior:
   - root package only.
 
 ## Validation Checklist
@@ -522,4 +579,4 @@ If topology output may have changed, also inspect:
 git diff -- src/go/plugin/go.d/collector/snmp_topology/testdata/topology_v1_normalized_golden.json
 ```
 
-An unchanged golden is expected for internal refactors and cache-only cleanup.
+An unchanged golden is expected for internal ownership and generation refactors.
