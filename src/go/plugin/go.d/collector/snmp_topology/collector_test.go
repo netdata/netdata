@@ -77,9 +77,9 @@ func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
 	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	coll.topologyRegistry.register(cache)
+	publishTestTopologyBuilder(coll.topologyRegistry, cache)
 
 	coll.updateFunctionAvailability()
 

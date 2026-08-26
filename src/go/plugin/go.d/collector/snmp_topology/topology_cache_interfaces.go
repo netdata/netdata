@@ -13,14 +13,14 @@ import (
 )
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindIfName, (*topologyCache).updateIfNameByIndex)
-	registerTopologyMetricHandler(ddsnmp.KindIfStatus, (*topologyCache).updateIfNameByIndex)
-	registerTopologyMetricHandler(ddsnmp.KindIfDuplex, (*topologyCache).updateIfNameByIndex)
-	registerTopologyMetricHandler(ddsnmp.KindIpIfIndex, (*topologyCache).updateIfIndexByIP)
-	registerTopologyMetricHandler(ddsnmp.KindBridgePortIfIndex, (*topologyCache).updateBridgePortMap)
+	registerTopologyMetricHandler(ddsnmp.KindIfName, (*topologyBuilder).updateIfNameByIndex)
+	registerTopologyMetricHandler(ddsnmp.KindIfStatus, (*topologyBuilder).updateIfNameByIndex)
+	registerTopologyMetricHandler(ddsnmp.KindIfDuplex, (*topologyBuilder).updateIfNameByIndex)
+	registerTopologyMetricHandler(ddsnmp.KindIpIfIndex, (*topologyBuilder).updateIfIndexByIP)
+	registerTopologyMetricHandler(ddsnmp.KindBridgePortIfIndex, (*topologyBuilder).updateBridgePortMap)
 }
 
-func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
+func (c *topologyBuilder) updateIfNameByIndex(tags map[string]string) {
 	ifIndex := strings.TrimSpace(tags[tagTopoIfIndex])
 	if ifIndex == "" {
 		return
@@ -78,7 +78,7 @@ func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
+func (c *topologyBuilder) updateIfIndexByIP(tags map[string]string) {
 	ifIndex := strings.TrimSpace(tags[tagTopoIfIndex])
 	if ifIndex == "" {
 		return
@@ -108,7 +108,7 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
+func (c *topologyBuilder) updateBridgePortMap(tags map[string]string) {
 	basePort := strings.TrimSpace(tags[tagBridgeBasePort])
 	if basePort == "" {
 		return

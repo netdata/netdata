@@ -4,14 +4,14 @@ package snmptopology
 
 import (
 	"net/netip"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-type topologyCache struct {
-	mu         sync.RWMutex
+// topologyBuilder is a mutable, collection-only builder. Runtime readers only
+// receive immutable topologyDeviceGeneration values produced from it.
+type topologyBuilder struct {
 	lastUpdate time.Time
 	updateTime time.Time
 	staleAfter time.Duration

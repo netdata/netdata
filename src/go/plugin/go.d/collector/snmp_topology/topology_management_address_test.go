@@ -167,7 +167,7 @@ func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testi
 }
 
 func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{
 		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
@@ -214,7 +214,7 @@ func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *
 		{Address: "198.51.100.20", AddressType: "ipv4", Source: "ip_mib"},
 	}, cache.localDevice.ManagementAddresses)
 
-	cache.finalizeTopologyCache()
+	cache.finalize()
 	require.Nil(t, cache.localManagementAddressKeys)
 }
 
@@ -236,7 +236,7 @@ func BenchmarkTopologyCacheIPManagementAddressIngest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				cache := newTopologyCache()
+				cache := newTopologyBuilder()
 				cache.ingestTopologyProfileMetrics(pms)
 				runtime.KeepAlive(cache)
 			}

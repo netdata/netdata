@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"net/netip"
 	"sort"
 	"sync"
@@ -34,17 +33,17 @@ func TestCollectorGetRegisteredDevicesUsesInjectedDeviceStore(t *testing.T) {
 		VnodeLabels:    map[string]string{"site": "lab"},
 	})
 
-	devices := coll.getRegisteredDevices()
-	require.Len(t, devices, 1)
-	require.Equal(t, "192.0.2.10", devices[0].Hostname)
+	entries := coll.getRegisteredDevices()
+	require.Len(t, entries, 1)
+	require.Equal(t, "192.0.2.10", entries[0].Info.Hostname)
 
-	devices[0].ManualProfiles[0] = "changed"
-	devices[0].VnodeLabels["site"] = "changed"
+	entries[0].Info.ManualProfiles[0] = "changed"
+	entries[0].Info.VnodeLabels["site"] = "changed"
 
 	again := coll.getRegisteredDevices()
 	require.Len(t, again, 1)
-	require.Equal(t, []string{"profile-a"}, again[0].ManualProfiles)
-	require.Equal(t, "lab", again[0].VnodeLabels["site"])
+	require.Equal(t, []string{"profile-a"}, again[0].Info.ManualProfiles)
+	require.Equal(t, "lab", again[0].Info.VnodeLabels["site"])
 }
 
 func TestCollectorValidationLifecycleDoesNotStartPolling(t *testing.T) {
@@ -147,18 +146,183 @@ func TestCollectorRunDoesNotPollWhenContextAlreadyCanceled(t *testing.T) {
 	require.NoError(t, coll.Run(ctx))
 }
 
-func TestCollectorPruneStaleDeviceCachesRemovesLastDeviceCache(t *testing.T) {
+func TestCollectorRefreshPrunesUnregisteredDeviceStateFromPublishedGeneration(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
-	cache := newTopologyCache()
-	coll.deviceCaches["gone:161"] = cache
-	coll.deviceLastCollected["gone:161"] = time.Now()
-	coll.topologyRegistry.register(cache)
+	cache := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(cache)
+	generation := newTopologyDeviceGeneration("gone", cache)
+	coll.deviceStates["gone"] = deviceRefreshState{generation: generation}
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
 
 	coll.refreshTopology(context.Background())
 
-	require.Empty(t, coll.deviceCaches)
-	require.Empty(t, coll.deviceLastCollected)
-	require.False(t, topologyRegistryHasCache(coll.topologyRegistry, cache))
+	require.Empty(t, coll.deviceStates)
+	require.Zero(t, coll.topologyRegistry.acquireGeneration().deviceCount())
+}
+
+func TestCollectorRefreshKeepsDistinctRegistrationKeysForSharedEndpoint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: gosnmp.Version2c.String(),
+	}
+	first := snmpmock.NewMockHandler(ctrl)
+	second := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(first, dev)
+	expectTopologyRefreshSNMPClient(second, dev)
+
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", dev)
+	store.Register("job-b", dev)
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
+	}
+	clients := []gosnmp.Handler{first, second}
+	coll.newSnmpClient = func() gosnmp.Handler {
+		client := clients[0]
+		clients = clients[1:]
+		return client
+	}
+
+	stats := coll.refreshTopology(context.Background())
+
+	require.Zero(t, stats.errors)
+	require.Equal(t, 2, stats.registeredDevices)
+	require.Equal(t, 2, stats.cachedDevices)
+	require.Contains(t, coll.deviceStates, "job-a")
+	require.Contains(t, coll.deviceStates, "job-b")
+	require.NotSame(t, coll.deviceStates["job-a"].generation, coll.deviceStates["job-b"].generation)
+	require.Equal(t, 2, coll.topologyRegistry.acquireGeneration().deviceCount())
+}
+
+func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: gosnmp.Version2c.String(),
+	}
+	firstFailure := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClientConnectError(firstFailure, dev, errors.New("unreachable"))
+	success := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(success, dev)
+	secondFailure := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClientConnectError(secondFailure, dev, errors.New("unreachable again"))
+
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", dev)
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
+	}
+	clients := []gosnmp.Handler{firstFailure, success, secondFailure}
+	coll.newSnmpClient = func() gosnmp.Handler {
+		client := clients[0]
+		clients = clients[1:]
+		return client
+	}
+
+	base := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	now := base
+	coll.now = func() time.Time { return now }
+
+	firstStats := coll.refreshTopology(context.Background())
+	firstState := coll.deviceStates["job-a"]
+	require.Equal(t, 1, firstStats.errors)
+	require.Equal(t, deviceRefreshOutcomeFailed, firstState.outcome)
+	require.Equal(t, base, firstState.lastAttempt)
+	require.True(t, firstState.lastSuccess.IsZero())
+	require.Equal(t, base.Add(defaultDeviceCheckEvery), firstState.nextRetry)
+	require.EqualValues(t, 1, firstState.consecutiveFailures)
+	require.Nil(t, firstState.generation)
+
+	now = base.Add(30 * time.Second)
+	skippedStats := coll.refreshTopology(context.Background())
+	require.Zero(t, skippedStats.errors)
+	require.Len(t, clients, 2, "refresh before nextRetry must not create a client")
+
+	now = base.Add(defaultDeviceCheckEvery)
+	successStats := coll.refreshTopology(context.Background())
+	successState := coll.deviceStates["job-a"]
+	require.Zero(t, successStats.errors)
+	require.Equal(t, deviceRefreshOutcomeSuccess, successState.outcome)
+	require.Equal(t, now, successState.lastSuccess)
+	require.Equal(t, now.Add(defaultRefreshEvery), successState.nextRetry)
+	require.Zero(t, successState.consecutiveFailures)
+	require.NotNil(t, successState.generation)
+	lastSuccessGeneration := successState.generation
+
+	now = successState.nextRetry
+	failedStats := coll.refreshTopology(context.Background())
+	failedState := coll.deviceStates["job-a"]
+	require.Equal(t, 1, failedStats.errors)
+	require.Equal(t, deviceRefreshOutcomeFailed, failedState.outcome)
+	require.Equal(t, successState.lastSuccess, failedState.lastSuccess)
+	require.Same(t, lastSuccessGeneration, failedState.generation)
+	require.Equal(t, now.Add(defaultDeviceCheckEvery), failedState.nextRetry)
+	require.EqualValues(t, 1, failedState.consecutiveFailures)
+}
+
+func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: gosnmp.Version2c.String(),
+	}
+	mockHandler := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
+	mockHandler.EXPECT().Close().Return(nil)
+
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", dev)
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return nil }
+	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		t.Fatal("a device without topology profiles must not create a collector")
+		return nil
+	}
+
+	base := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	previousSuccess := base.Add(-time.Hour)
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	previous := newTopologyDeviceGeneration("job-a", builder)
+	coll.deviceStates["job-a"] = deviceRefreshState{
+		generation:          previous,
+		lastSuccess:         previousSuccess,
+		consecutiveFailures: 3,
+	}
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, base, coll.deviceStates))
+	coll.now = func() time.Time { return base }
+
+	stats := coll.refreshTopology(context.Background())
+	state := coll.deviceStates["job-a"]
+
+	require.Zero(t, stats.errors)
+	require.Equal(t, deviceRefreshOutcomeNoProfiles, state.outcome)
+	require.Equal(t, base, state.lastAttempt)
+	require.Equal(t, previousSuccess, state.lastSuccess)
+	require.Equal(t, base.Add(defaultRefreshEvery), state.nextRetry)
+	require.Zero(t, state.consecutiveFailures)
+	require.Same(t, previous, state.generation)
+	require.Same(t, previous, coll.topologyRegistry.acquireGeneration().devices[0])
+}
+
+func TestFailedRefreshRetryDelayCapsAtRefreshInterval(t *testing.T) {
+	require.Equal(t, time.Minute, failedRefreshRetryDelay(time.Minute, 30*time.Minute, 1))
+	require.Equal(t, 2*time.Minute, failedRefreshRetryDelay(time.Minute, 30*time.Minute, 2))
+	require.Equal(t, 16*time.Minute, failedRefreshRetryDelay(time.Minute, 30*time.Minute, 5))
+	require.Equal(t, 30*time.Minute, failedRefreshRetryDelay(time.Minute, 30*time.Minute, 6))
+	require.Equal(t, 30*time.Minute, failedRefreshRetryDelay(time.Minute, 30*time.Minute, 100))
 }
 
 func TestCollectorRefreshTopologyRecoveringHandlesPanic(t *testing.T) {
@@ -312,7 +476,7 @@ func TestCollectorCancelsInFlightVLANContextRefresh(t *testing.T) {
 func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
 
-	cache := coll.newDeviceCollectionCache(ddsnmp.DeviceConnectionInfo{Hostname: "switch-a"})
+	cache := coll.newDeviceTopologyBuilder(ddsnmp.DeviceConnectionInfo{Hostname: "switch-a"})
 
 	require.Equal(t, defaultRefreshEvery+2*defaultDeviceCheckEvery, cache.staleAfter)
 }
@@ -441,11 +605,23 @@ func TestCollectorRefreshResolvesOnlyDueDNSTargets(t *testing.T) {
 	for _, dev := range []ddsnmp.DeviceConnectionInfo{fresh, due, literal} {
 		registerTestDeviceState(store, dev)
 	}
-	freshKey := fresh.Hostname + ":161"
-	freshCache := newTopologyCache()
-	coll.deviceCaches[freshKey] = freshCache
-	coll.deviceLastCollected[freshKey] = time.Now()
-	coll.topologyRegistry.register(freshCache)
+	var freshKey, dueKey string
+	for _, entry := range store.Entries() {
+		switch entry.Info.Hostname {
+		case fresh.Hostname:
+			freshKey = entry.Key
+		case due.Hostname:
+			dueKey = entry.Key
+		}
+	}
+	require.NotEmpty(t, freshKey)
+	require.NotEmpty(t, dueKey)
+	coll.deviceStates[freshKey] = deviceRefreshState{
+		lastAttempt: time.Now(),
+		lastSuccess: time.Now(),
+		nextRetry:   time.Now().Add(time.Hour),
+		outcome:     deviceRefreshOutcomeSuccess,
+	}
 
 	mockHandler := snmpmock.NewMockHandler(ctrl)
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
@@ -475,8 +651,9 @@ func TestCollectorRefreshResolvesOnlyDueDNSTargets(t *testing.T) {
 	mu.Unlock()
 	require.Equal(t, []string{"switch-due.example"}, gotCalls)
 
-	dueSnapshot, ok := coll.deviceCaches[due.Hostname+":161"].snapshotEngineObservations()
-	require.True(t, ok)
+	dueGeneration := coll.deviceStates[dueKey].generation
+	require.NotNil(t, dueGeneration)
+	dueSnapshot := dueGeneration.observation
 	require.Len(t, dueSnapshot.L2Observations, 1)
 	require.Equal(t, "192.0.2.20", dueSnapshot.L2Observations[0].ManagementIP)
 
@@ -693,9 +870,10 @@ func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
 	}
 
 	key := dev.Hostname + ":161"
-	require.True(t, coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")}))
-	snapshot, ok := coll.deviceCaches[key].snapshotEngineObservations()
-	require.True(t, ok)
+	generation, outcome := coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")})
+	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
+	require.NotNil(t, generation)
+	snapshot := generation.observation
 	require.Len(t, snapshot.L2Observations, 1)
 	require.Equal(t, "192.0.2.50", snapshot.L2Observations[0].ManagementIP)
 }
@@ -747,15 +925,13 @@ func TestCollectorRefreshSelectsNextDNSTargetAfterMaskRejection(t *testing.T) {
 
 	require.Zero(t, stats.errors)
 	require.Equal(t, 1, resolverCalls)
-	cache := coll.deviceCaches[dev.Hostname+":161"]
-	require.NotNil(t, cache)
-	cache.mu.RLock()
-	local := cache.localDevice
-	trapMethods := maps.Clone(cache.trapMatchMethodByIP)
-	storedTargets := append([]netip.Addr(nil), cache.targetManagementIPs...)
-	cache.mu.RUnlock()
+	entries := store.Entries()
+	require.Len(t, entries, 1)
+	generation := coll.deviceStates[entries[0].Key].generation
+	require.NotNil(t, generation)
+	local := generation.observation.LocalDevice
+	trapMethods := generation.trap.matchMethodByIP
 	require.Equal(t, "198.51.100.10", local.ManagementIP)
-	require.Empty(t, storedTargets)
 	require.NotContains(t, local.ManagementAddresses, topologymodel.ManagementAddress{
 		Address:     "192.0.2.0",
 		AddressType: "ipv4",
@@ -789,7 +965,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	expectTopologyRefreshSNMPClient(mockHandler, dev)
 
 	key := "10.0.0.10:161"
-	published := newTopologyCache()
+	published := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(published)
 
 	started := make(chan struct{})
@@ -797,8 +973,9 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	done := make(chan struct{})
 
 	coll := newTestSNMPTopologyCollector()
-	coll.deviceCaches[key] = published
-	coll.topologyRegistry.register(published)
+	publishedGeneration := newTopologyDeviceGeneration(key, published)
+	coll.deviceStates[key] = deviceRefreshState{generation: publishedGeneration}
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return &blockingTopologyCollector{
@@ -815,8 +992,9 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 
 	<-started
 
-	snapshot, ok := published.snapshotEngineObservations()
-	require.True(t, ok)
+	visible := coll.topologyRegistry.acquireGeneration()
+	require.Same(t, publishedGeneration, visible.devices[0])
+	snapshot := visible.devices[0].observation
 	require.Len(t, snapshot.L2Observations, 1)
 	require.Len(t, snapshot.L2Observations[0].FDBEntries, 1)
 	require.Len(t, snapshot.L2Observations[0].ARPNDEntries, 1)
@@ -839,12 +1017,13 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 	mockHandler.EXPECT().Close().Return(nil)
 
 	key := "10.0.0.10:161"
-	published := newTopologyCache()
+	published := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(published)
 
 	coll := newTestSNMPTopologyCollector()
-	coll.deviceCaches[key] = published
-	coll.topologyRegistry.register(published)
+	publishedGeneration := newTopologyDeviceGeneration(key, published)
+	coll.deviceStates[key] = deviceRefreshState{generation: publishedGeneration}
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
@@ -852,10 +1031,13 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 		})
 	}
 
-	require.False(t, coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")}))
+	generation, outcome := coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
+	require.Nil(t, generation)
+	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 
-	snapshot, ok := published.snapshotEngineObservations()
-	require.True(t, ok)
+	visible := coll.topologyRegistry.acquireGeneration()
+	require.Same(t, publishedGeneration, visible.devices[0])
+	snapshot := visible.devices[0].observation
 	require.Len(t, snapshot.L2Observations, 1)
 	require.Len(t, snapshot.L2Observations[0].FDBEntries, 1)
 	require.Len(t, snapshot.L2Observations[0].ARPNDEntries, 1)
@@ -903,7 +1085,19 @@ func expectTopologyRefreshSNMPClientConnect(mockHandler *snmpmock.MockHandler, d
 	mockHandler.EXPECT().Connect().Return(nil)
 }
 
-func seedPublishedEndpointSnapshot(cache *topologyCache) {
+func expectTopologyRefreshSNMPClientConnectError(mockHandler *snmpmock.MockHandler, dev ddsnmp.DeviceConnectionInfo, err error) {
+	mockHandler.EXPECT().SetTarget(dev.Hostname)
+	mockHandler.EXPECT().SetPort(uint16(dev.Port))
+	mockHandler.EXPECT().SetRetries(dev.Retries)
+	mockHandler.EXPECT().SetTimeout(time.Duration(dev.Timeout) * time.Second)
+	mockHandler.EXPECT().SetMaxOids(dev.MaxOIDs)
+	mockHandler.EXPECT().SetMaxRepetitions(uint32(dev.MaxRepetitions))
+	mockHandler.EXPECT().SetCommunity(dev.Community)
+	mockHandler.EXPECT().SetVersion(gosnmp.Version2c)
+	mockHandler.EXPECT().Connect().Return(err)
+}
+
+func seedPublishedEndpointSnapshot(cache *topologyBuilder) {
 	now := time.Now()
 	cache.updateTime = now
 	cache.lastUpdate = now
@@ -958,11 +1152,4 @@ func replacementEndpointProfileMetrics() []*ddsnmp.ProfileMetrics {
 			},
 		},
 	}}
-}
-
-func topologyRegistryHasCache(registry *topologyRegistry, cache *topologyCache) bool {
-	registry.mu.RLock()
-	defer registry.mu.RUnlock()
-	_, ok := registry.caches[cache]
-	return ok
 }

@@ -45,6 +45,13 @@ type DeviceConnectionInfo struct {
 	VnodeLabels   map[string]string
 }
 
+// DeviceEntry is one registered SNMP job and its connection state.
+// Key is the opaque registration identity supplied by the owning job.
+type DeviceEntry struct {
+	Key  string
+	Info DeviceConnectionInfo
+}
+
 // NewDeviceStore returns an empty SNMP device connection-state store.
 func NewDeviceStore() *DeviceStore {
 	return &DeviceStore{
@@ -83,16 +90,25 @@ func (s *DeviceStore) Unregister(key string) {
 	s.mu.Unlock()
 }
 
-// Devices returns a deep-copied snapshot of all registered devices.
-func (s *DeviceStore) Devices() []DeviceConnectionInfo {
+// Entries returns a deterministic, deep-copied snapshot of all registered jobs.
+func (s *DeviceStore) Entries() []DeviceEntry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	devices := make([]DeviceConnectionInfo, 0, len(s.devices))
-	for _, info := range s.devices {
-		devices = append(devices, cloneDeviceConnectionInfo(info))
+	keys := make([]string, 0, len(s.devices))
+	for key := range s.devices {
+		keys = append(keys, key)
 	}
-	return devices
+	sort.Strings(keys)
+
+	entries := make([]DeviceEntry, 0, len(keys))
+	for _, key := range keys {
+		entries = append(entries, DeviceEntry{
+			Key:  key,
+			Info: cloneDeviceConnectionInfo(s.devices[key]),
+		})
+	}
+	return entries
 }
 
 // DevicesByHostname returns all deep-copied registered devices whose configured

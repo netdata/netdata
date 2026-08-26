@@ -13,7 +13,7 @@ import (
 
 func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 	// dev is a shallow copy of the caller's value, so dev.Labels still aliases
-	// the caller's map (e.g. a live topologyCache.localDevice read under RLock).
+	// the caller's map (e.g. a live topologyBuilder.localDevice read under RLock).
 	// Clone it before the mutations below so concurrent snapshot readers never
 	// write a shared map (fatal "concurrent map writes").
 	dev.Labels = maps.Clone(dev.Labels)

@@ -93,8 +93,20 @@ func TestDeviceStoreRegisterClonesReferenceFields(t *testing.T) {
 	info.ManualProfiles[0] = "changed"
 	info.VnodeLabels["site"] = "changed"
 
-	devices := store.Devices()
-	require.Len(t, devices, 1)
-	require.Equal(t, []string{"profile-a"}, devices[0].ManualProfiles)
-	require.Equal(t, "lab", devices[0].VnodeLabels["site"])
+	entries := store.Entries()
+	require.Len(t, entries, 1)
+	require.Equal(t, "switch-a", entries[0].Key)
+	require.Equal(t, []string{"profile-a"}, entries[0].Info.ManualProfiles)
+	require.Equal(t, "lab", entries[0].Info.VnodeLabels["site"])
+}
+
+func TestDeviceStoreEntriesAreSortedByRegistrationKey(t *testing.T) {
+	store := NewDeviceStore()
+	store.Register("job-b", DeviceConnectionInfo{Hostname: "192.0.2.10"})
+	store.Register("job-a", DeviceConnectionInfo{Hostname: "192.0.2.10"})
+
+	entries := store.Entries()
+	require.Len(t, entries, 2)
+	require.Equal(t, "job-a", entries[0].Key)
+	require.Equal(t, "job-b", entries[1].Key)
 }
