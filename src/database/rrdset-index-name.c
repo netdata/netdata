@@ -70,7 +70,7 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND|RRDSET_FLAG_EXPORTING_IGNORE|RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_metadata_updated(st);
 
-    // The name is a prototype matching input - prototype_matches_rrdset() compares
+    // The name is a prototype matching input - health_prototype_matches_rrdset() compares
     // ap->match.on.chart against both st->id and st->name - so a rename can both
     // invalidate the alerts currently attached and enable new matches.
     // This is the only place a rename is detected, and not all callers go through
