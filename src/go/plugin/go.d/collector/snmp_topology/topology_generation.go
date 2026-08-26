@@ -28,10 +28,11 @@ type topologyGeneration struct {
 	devices     []*topologyDeviceGeneration
 }
 
-func newTopologyDeviceGeneration(key string, builder *topologyBuilder) *topologyDeviceGeneration {
+func freezeTopologyBuilder(key string, builder *topologyBuilder) (*topologyDeviceGeneration, topologyBuilderFinalizeStats) {
 	if builder == nil {
-		return nil
+		return nil, topologyBuilderFinalizeStats{}
 	}
+	stats := builder.finalize()
 
 	collectedAt := builder.lastUpdate
 	if collectedAt.IsZero() {
@@ -42,19 +43,14 @@ func newTopologyDeviceGeneration(key string, builder *topologyBuilder) *topology
 		expiresAt = collectedAt.Add(builder.staleAfter)
 	}
 
-	observation, ok := builder.preparedSnapshot, builder.hasPreparedSnapshot
-	if !ok {
-		observation, ok = builder.buildObservationSnapshot()
-	}
-
 	return &topologyDeviceGeneration{
 		key:            key,
 		collectedAt:    collectedAt,
 		expiresAt:      expiresAt,
-		observation:    observation,
-		hasObservation: ok,
+		observation:    builder.preparedSnapshot,
+		hasObservation: builder.hasPreparedSnapshot,
 		trap:           newTopologyTrapDeviceGeneration(builder),
-	}
+	}, stats
 }
 
 func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[string]deviceRefreshState) *topologyGeneration {

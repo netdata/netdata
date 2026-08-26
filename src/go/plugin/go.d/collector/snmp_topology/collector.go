@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -97,12 +96,11 @@ type (
 		collectorapi.Base `yaml:",inline"`
 		Config            `yaml:",inline"`
 
-		deviceStates         map[string]deviceRefreshState
-		generationSequence   uint64
-		topologyRegistry     *topologyRegistry
-		functionAvailability atomic.Bool
-		deviceSource         deviceSource
-		trapEnrichment       *TrapEnrichmentHandle
+		deviceStates       map[string]deviceRefreshState
+		generationSequence uint64
+		topologyRegistry   *topologyRegistry
+		deviceSource       deviceSource
+		trapEnrichment     *TrapEnrichmentHandle
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -148,7 +146,6 @@ func (c *Collector) Run(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
-	c.functionAvailability.Store(false)
 	c.publishTrapTopologyEnrichment()
 	defer c.unpublishTrapTopologyEnrichment()
 	c.topologyRegistry.setReverseDNSWarmContext(ctx)
@@ -224,7 +221,6 @@ func (c *Collector) Cleanup(context.Context) {
 
 	c.deviceStates = make(map[string]deviceRefreshState)
 	c.topologyRegistry.publishGeneration(nil)
-	c.functionAvailability.Store(false)
 	c.recordCleanupStats()
 }
 
@@ -342,11 +338,6 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 	}()
 
 	c.recordRefreshStats(c.refreshTopology(ctx))
-	c.updateFunctionAvailability()
-}
-
-func (c *Collector) updateFunctionAvailability() {
-	c.functionAvailability.Store(c.topologyRegistry.hasRenderableObservations())
 }
 
 // refreshDeviceTopology builds one immutable generation without changing the

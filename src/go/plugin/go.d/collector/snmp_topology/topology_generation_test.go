@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"fmt"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,27 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
+
+func TestPublishTestTopologyBuilderUsesProductionFinalization(t *testing.T) {
+	registry := newTopologyRegistry()
+	builder := newTopologyBuilder()
+	builder.updateTime = time.Now()
+	builder.staleAfter = time.Hour
+	builder.agentID = "agent-test"
+	builder.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "switch-a",
+	}
+	builder.targetManagementIPs = []netip.Addr{netip.MustParseAddr("192.0.2.10")}
+
+	publishTestTopologyBuilder(registry, builder)
+	generation := registry.acquireGeneration()
+	require.NotNil(t, generation)
+	require.Len(t, generation.devices, 1)
+	require.Equal(t, "192.0.2.10", generation.devices[0].observation.LocalDevice.ManagementIP)
+	require.Equal(t, "management_ip", generation.devices[0].trap.matchMethodByIP["192.0.2.10"])
+}
 
 func TestTopologyRegistryPublishesWholeGenerationVectors(t *testing.T) {
 	registry := newTopologyRegistry()

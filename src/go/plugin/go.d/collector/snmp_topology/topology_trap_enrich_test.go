@@ -69,7 +69,7 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 			wantInterfaceStatus: "skipped",
 			wantNeighborStatus:  "skipped",
 		},
-		"management-address-outranks-interface-address": {
+		"selected-management-ip-outranks-interface-address": {
 			setup: func(cache *topologyBuilder) {
 				cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{{
 					Address: "192.0.2.10", AddressType: "ipv4", Source: "lldp_local",
@@ -78,7 +78,7 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 			},
 			source:              "192.0.2.10",
 			wantDeviceStatus:    "matched",
-			wantDeviceMethod:    "management_address",
+			wantDeviceMethod:    "management_ip",
 			wantInterfaceStatus: "skipped",
 			wantNeighborStatus:  "skipped",
 		},
@@ -98,7 +98,6 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cache := newTopologyBuilder()
 			tc.setup(cache)
-			cache.rebuildTrapSourceMatchMethods()
 
 			enrich := trapEnrichmentForTest(cache, tc.source, tc.ifIndex)
 			require.NotNil(t, enrich)
@@ -208,23 +207,28 @@ func TestTrapEnrichmentHandleForSourceAmbiguousRegistryMatchDoesNotEnrich(t *tes
 }
 
 func BenchmarkTopologyGenerationTrapEnrichmentForSource(b *testing.B) {
-	cache := newTopologyBuilder()
-	for i := 1; i <= 200; i++ {
-		cache.localDevice.ManagementAddresses = append(cache.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
-			Address:     fmt.Sprintf("192.0.2.%d", i),
-			AddressType: "ipv4",
-			Source:      "lldp_local",
-		})
-	}
-	cache.rebuildTrapSourceMatchMethods()
-	generation := newTopologyTrapDeviceGeneration(cache)
+	for _, deviceCount := range []int{1, 128, 1024} {
+		b.Run(fmt.Sprintf("devices=%d", deviceCount), func(b *testing.B) {
+			devices := make([]*topologyDeviceGeneration, deviceCount)
+			for i := range devices {
+				devices[i] = &topologyDeviceGeneration{trap: topologyTrapDeviceGeneration{
+					matchMethodByIP: map[string]string{
+						fmt.Sprintf("198.51.%d.%d", i/254, i%254+1): "management_ip",
+					},
+				}}
+			}
+			devices[len(devices)-1].trap.matchMethodByIP["192.0.2.200"] = "management_ip"
+			registry := newTopologyRegistry()
+			registry.publishGeneration(&topologyGeneration{devices: devices})
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if enrichment := generation.enrichmentForCanonicalSource("192.0.2.200", ""); enrichment == nil {
-			b.Fatal("expected trap enrichment")
-		}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if enrichment := registry.trapEnrichmentForSource("192.0.2.200", ""); enrichment == nil {
+					b.Fatal("expected trap enrichment")
+				}
+			}
+		})
 	}
 }
 

@@ -475,8 +475,7 @@ func BenchmarkTopologyGenerationAliasSnapshotRead(b *testing.B) {
 					IfIndex: fmt.Sprintf("%d", i+1),
 				}
 			}
-			cache.finalize()
-			generation := newTopologyDeviceGeneration("benchmark", cache)
+			generation := freezeTestTopologyBuilder("benchmark", cache)
 			if generation == nil || !generation.hasObservation {
 				b.Fatal("benchmark cache is not renderable")
 			}
@@ -486,6 +485,41 @@ func BenchmarkTopologyGenerationAliasSnapshotRead(b *testing.B) {
 			for b.Loop() {
 				snapshot := generation.observation
 				runtime.KeepAlive(snapshot)
+			}
+		})
+	}
+}
+
+func BenchmarkTopologyBuilderBuildAndFreeze(b *testing.B) {
+	for _, fdbEntries := range []int{0, 1600} {
+		b.Run(fmt.Sprintf("fdb_entries=%d", fdbEntries), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				now := time.Now()
+				builder := newTopologyBuilder()
+				builder.updateTime = now
+				builder.staleAfter = time.Hour
+				builder.agentID = "benchmark-agent"
+				builder.localDevice = topologymodel.Device{
+					ChassisID:     "02:00:00:00:00:01",
+					ChassisIDType: "macAddress",
+					SysName:       "benchmark-switch",
+					ManagementIP:  "192.0.2.1",
+				}
+				builder.bridgePortToIf["1"] = "1"
+				builder.ifNamesByIndex["1"] = "uplink"
+				for entryIndex := range fdbEntries {
+					mac := benchmarkManagedFabricEndpointMAC(0, entryIndex+1, false)
+					builder.fdbEntries[mac+"|1||"] = &fdbEntry{
+						mac: mac, bridgePort: "1", status: "learned",
+					}
+				}
+
+				generation, _ := freezeTopologyBuilder("benchmark", builder)
+				if generation == nil || !generation.hasObservation {
+					b.Fatal("frozen generation is not renderable")
+				}
+				runtime.KeepAlive(generation)
 			}
 		})
 	}

@@ -150,7 +150,7 @@ func TestCollectorRefreshPrunesUnregisteredDeviceStateFromPublishedGeneration(t 
 	coll := newTestSNMPTopologyCollector()
 	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	generation := newTopologyDeviceGeneration("gone", cache)
+	generation := freezeTestTopologyBuilder("gone", cache)
 	coll.deviceStates["gone"] = deviceRefreshState{generation: generation}
 	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
 
@@ -197,6 +197,72 @@ func TestCollectorRefreshKeepsDistinctRegistrationKeysForSharedEndpoint(t *testi
 	require.Contains(t, coll.deviceStates, "job-b")
 	require.NotSame(t, coll.deviceStates["job-a"].generation, coll.deviceStates["job-b"].generation)
 	require.Equal(t, 2, coll.topologyRegistry.acquireGeneration().deviceCount())
+}
+
+func TestCollectorRefreshPublishesOnlyAfterCompleteMultiDeviceSweep(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	devA := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
+	devB := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.20", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
+	clientA := snmpmock.NewMockHandler(ctrl)
+	clientB := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(clientA, devA)
+	expectTopologyRefreshSNMPClient(clientB, devB)
+
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", devA)
+	store.Register("job-b", devB)
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	clients := []gosnmp.Handler{clientA, clientB}
+	coll.newSnmpClient = func() gosnmp.Handler {
+		client := clients[0]
+		clients = clients[1:]
+		return client
+	}
+
+	secondStarted := make(chan struct{})
+	releaseSecond := make(chan struct{})
+	collectorCalls := 0
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		collectorCalls++
+		if collectorCalls == 1 {
+			return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
+		}
+		return &blockingTopologyCollector{started: secondStarted, release: releaseSecond}
+	}
+
+	previous := testTopologyGenerationVector(7, time.Now(), "previous")
+	previous.devices[0].key = "job-a"
+	previous.devices[1].key = "job-b"
+	coll.deviceStates = map[string]deviceRefreshState{
+		"job-a": {generation: previous.devices[0]},
+		"job-b": {generation: previous.devices[1]},
+	}
+	coll.generationSequence = previous.sequence
+	coll.topologyRegistry.publishGeneration(previous)
+
+	done := make(chan refreshStats, 1)
+	go func() { done <- coll.refreshTopology(context.Background()) }()
+
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second device refresh did not start")
+	}
+	require.Same(t, previous, coll.topologyRegistry.acquireGeneration())
+	require.Same(t, previous.devices[0], coll.deviceStates["job-a"].generation)
+	require.Same(t, previous.devices[1], coll.deviceStates["job-b"].generation)
+
+	close(releaseSecond)
+	stats := <-done
+	require.Zero(t, stats.errors)
+	published := coll.topologyRegistry.acquireGeneration()
+	require.NotSame(t, previous, published)
+	require.EqualValues(t, 8, published.sequence)
+	require.Len(t, published.devices, 2)
+	require.Same(t, coll.deviceStates["job-a"].generation, published.devices[0])
+	require.Same(t, coll.deviceStates["job-b"].generation, published.devices[1])
 }
 
 func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *testing.T) {
@@ -267,6 +333,8 @@ func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *t
 	require.Same(t, lastSuccessGeneration, failedState.generation)
 	require.Equal(t, now.Add(defaultDeviceCheckEvery), failedState.nextRetry)
 	require.EqualValues(t, 1, failedState.consecutiveFailures)
+	require.False(t, failedState.generation.freshAt(failedState.generation.expiresAt.Add(time.Nanosecond)),
+		"failure retention must not extend the last successful collection's display freshness")
 }
 
 func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(t *testing.T) {
@@ -295,7 +363,7 @@ func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(
 	previousSuccess := base.Add(-time.Hour)
 	builder := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(builder)
-	previous := newTopologyDeviceGeneration("job-a", builder)
+	previous := freezeTestTopologyBuilder("job-a", builder)
 	coll.deviceStates["job-a"] = deviceRefreshState{
 		generation:          previous,
 		lastSuccess:         previousSuccess,
@@ -334,9 +402,19 @@ func TestCollectorRefreshTopologyRecoveringHandlesPanic(t *testing.T) {
 	coll.newSnmpClient = func() gosnmp.Handler {
 		panic("boom")
 	}
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	previousDevice := freezeTestTopologyBuilder("test:192.0.2.10:161:0", builder)
+	coll.deviceStates[previousDevice.key] = deviceRefreshState{generation: previousDevice}
+	previous := newTopologyGeneration(1, time.Now(), coll.deviceStates)
+	coll.generationSequence = previous.sequence
+	coll.topologyRegistry.publishGeneration(previous)
 
 	require.NotPanics(t, func() { coll.refreshTopologyRecovering(context.Background()) })
 	require.NotPanics(t, func() { coll.refreshTopologyRecovering(context.Background()) })
+	require.Same(t, previous, coll.topologyRegistry.acquireGeneration())
+	require.Same(t, previousDevice, coll.deviceStates[previousDevice.key].generation)
+	require.EqualValues(t, 1, coll.generationSequence)
 }
 
 func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
@@ -973,7 +1051,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	done := make(chan struct{})
 
 	coll := newTestSNMPTopologyCollector()
-	publishedGeneration := newTopologyDeviceGeneration(key, published)
+	publishedGeneration := freezeTestTopologyBuilder(key, published)
 	coll.deviceStates[key] = deviceRefreshState{generation: publishedGeneration}
 	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
@@ -1021,7 +1099,7 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 	seedPublishedEndpointSnapshot(published)
 
 	coll := newTestSNMPTopologyCollector()
-	publishedGeneration := newTopologyDeviceGeneration(key, published)
+	publishedGeneration := freezeTestTopologyBuilder(key, published)
 	coll.deviceStates[key] = deviceRefreshState{generation: publishedGeneration}
 	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
@@ -1152,4 +1230,39 @@ func replacementEndpointProfileMetrics() []*ddsnmp.ProfileMetrics {
 			},
 		},
 	}}
+}
+
+func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
+	for _, deviceCount := range []int{10, 100, 1000} {
+		b.Run(fmt.Sprintf("devices=%d", deviceCount), func(b *testing.B) {
+			coll, store := newTestSNMPTopologyCollectorWithStore()
+			now := time.Now()
+			coll.now = func() time.Time { return now }
+			for i := range deviceCount {
+				key := fmt.Sprintf("job-%06d", i)
+				store.Register(key, ddsnmp.DeviceConnectionInfo{
+					Hostname:       fmt.Sprintf("192.0.%d.%d", i/254, i%254+1),
+					Port:           161,
+					ManualProfiles: []string{"generic-device"},
+					VnodeLabels:    map[string]string{"site": "benchmark"},
+				})
+				coll.deviceStates[key] = deviceRefreshState{
+					generation:  &topologyDeviceGeneration{key: key, collectedAt: now, expiresAt: now.Add(time.Hour)},
+					lastSuccess: now,
+					nextRetry:   now.Add(time.Hour),
+					outcome:     deviceRefreshOutcomeSuccess,
+				}
+			}
+			coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, now, coll.deviceStates))
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				stats := coll.refreshTopology(context.Background())
+				if stats.registeredDevices != deviceCount || stats.errors != 0 {
+					b.Fatalf("refresh stats: registered=%d errors=%d", stats.registeredDevices, stats.errors)
+				}
+			}
+		})
+	}
 }

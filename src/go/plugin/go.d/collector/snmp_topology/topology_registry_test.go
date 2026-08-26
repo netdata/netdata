@@ -338,6 +338,7 @@ func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
 				cache := newTopologyBuilder()
 				seedPublishedEndpointSnapshot(cache)
 				cache.lastUpdate = time.Now().Add(-2 * time.Hour)
+				cache.updateTime = cache.lastUpdate
 				cache.staleAfter = time.Hour
 				publishTestTopologyBuilder(registry, cache)
 			},

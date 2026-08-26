@@ -46,12 +46,12 @@ func publishTestTopologyBuilder(r *topologyRegistry, cache *topologyBuilder) {
 		}
 	}
 	key := fmt.Sprintf("test:%d", sequence)
-	states[key] = deviceRefreshState{generation: newTopologyDeviceGeneration(key, cache)}
+	states[key] = deviceRefreshState{generation: freezeTestTopologyBuilder(key, cache)}
 	r.publishGeneration(newTopologyGeneration(sequence, time.Now(), states))
 }
 
 func snapshotTestTopologyBuilder(c *topologyBuilder) (topologymodel.ObservationSnapshot, bool) {
-	generation := newTopologyDeviceGeneration("test", c)
+	generation := freezeTestTopologyBuilder("test", c)
 	if generation == nil || !generation.freshAt(time.Now()) || !generation.hasObservation {
 		return topologymodel.ObservationSnapshot{}, false
 	}
@@ -63,7 +63,16 @@ func trapEnrichmentForTest(c *topologyBuilder, ip, trapIfIndex string) *TrapTopo
 	if !ok {
 		return nil
 	}
-	return newTopologyTrapDeviceGeneration(c).enrichmentForCanonicalSource(addr.String(), trapIfIndex)
+	generation := freezeTestTopologyBuilder("test", c)
+	if generation == nil {
+		return nil
+	}
+	return generation.trap.enrichmentForCanonicalSource(addr.String(), trapIfIndex)
+}
+
+func freezeTestTopologyBuilder(key string, builder *topologyBuilder) *topologyDeviceGeneration {
+	generation, _ := freezeTopologyBuilder(key, builder)
+	return generation
 }
 
 func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.DeviceConnectionInfo) {

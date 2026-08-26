@@ -81,9 +81,23 @@ func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(
 	seedPublishedEndpointSnapshot(cache)
 	publishTestTopologyBuilder(coll.topologyRegistry, cache)
 
-	coll.updateFunctionAvailability()
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
+}
+
+func TestSNMPTopologyFunctionAvailabilityExpiresWithPublishedGeneration(t *testing.T) {
+	coll := newTestSNMPTopologyCollector()
+	now := time.Now()
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	builder.updateTime = now
+	builder.lastUpdate = now
+	builder.staleAfter = 20 * time.Millisecond
+	publishTestTopologyBuilder(coll.topologyRegistry, builder)
 
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
+	require.Eventually(t, func() bool {
+		return !coll.FunctionAvailable(snmptopologyfunc.MethodID)
+	}, time.Second, 5*time.Millisecond)
 }
 
 func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
@@ -94,7 +108,9 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
-	coll.functionAvailability.Store(true)
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	publishTestTopologyBuilder(coll.topologyRegistry, builder)
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 
 	ctx, cancel := context.WithCancel(context.Background())

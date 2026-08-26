@@ -314,7 +314,9 @@ Only fresh device generations contribute Function, focus, availability, and
 reverse-DNS snapshots. Trap enrichment preserves the prior behavior of using
 the last successfully published device generation even after topology display
 freshness expires; unregistering the SNMP job removes it on the next completed
-sweep.
+sweep. Failed refreshes retain the last successful generation but do not extend
+its original collection time or display-freshness deadline, so sustained
+failures do not present indefinitely stale topology as current.
 
 ## Graph Build Order
 
