@@ -567,7 +567,8 @@
 
       #### Source IP addresses
 
-      Netdata Cloud connects to your webhook URL from a fixed set of IP addresses. If your endpoint sits behind a firewall,
+      Netdata Cloud connects to your webhook URL from the currently published set of IP addresses. The set can change, so
+      refresh your allowlist periodically. If your endpoint sits behind a firewall,
       a WAF, or an IP allowlist, see
       [Netdata Cloud Outbound IP Addresses](/docs/netdata-cloud/netdata-cloud-outbound-ips.md) for the published list and
       how to consume it.
