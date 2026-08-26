@@ -4,19 +4,18 @@ package snmptopology
 
 import (
 	"sort"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func topologyObservationSnapshotsAt(generation *topologyGeneration, now time.Time) []topologymodel.ObservationSnapshot {
+func topologyObservationSnapshots(generation *topologyGeneration) []topologymodel.ObservationSnapshot {
 	if generation == nil {
 		return nil
 	}
 
-	snapshots := generation.observationSnapshotsAt(now)
+	snapshots := generation.observationSnapshots()
 	if len(snapshots) == 0 {
 		return nil
 	}

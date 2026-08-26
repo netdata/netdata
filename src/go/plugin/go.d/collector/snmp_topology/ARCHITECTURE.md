@@ -74,14 +74,15 @@ flowchart TD
     Resolve["resolve DNS targets<br/>up to 8 workers, shared 5s budget"]
     Walk["SNMP walk topology profiles"]
     Next["build mutable device state off-registry"]
-    Freeze["freeze immutable DeviceGeneration"]
+    Freeze["freeze immutable DeviceSnapshot"]
+    Activate["activate snapshots at publication"]
     GenPublish["publish one TopologyGeneration"]
     Prune["prune unregistered job state"]
     Collect["Collect(ctx)"]
     Metrics["write internal metrics only"]
 
     Run --> TrapPublish --> Tick --> Devices --> Fresh
-    Fresh -->|"yes"| Resolve --> Walk --> Next --> Freeze --> Prune --> GenPublish --> Tick
+    Fresh -->|"yes"| Resolve --> Walk --> Next --> Freeze --> Prune --> Activate --> GenPublish --> Tick
     Fresh -->|"no"| Prune
     Collect --> Metrics
 ```
@@ -102,6 +103,7 @@ refreshTopology(ctx)
     refreshDeviceTopology(ctx, key, device, targetManagementIPs)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
+  activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
 refreshDeviceTopology(ctx, key, device, targetManagementIPs)
@@ -113,7 +115,7 @@ refreshDeviceTopology(ctx, key, device, targetManagementIPs)
   ingest topology metrics into the builder
   collect VTP VLAN contexts when needed
   filter target and observed addresses with collected masks, select one management IP, and finalize diagnostics
-  freeze one immutable DeviceGeneration
+  freeze one immutable DeviceSnapshot with its exact acquisition time
 ```
 
 The refresh loop checks devices every `update_every` seconds, but a device is
@@ -121,7 +123,9 @@ fully refreshed only when its normal refresh or failure retry is due. A failed
 attempt retries after `update_every`, doubles the delay after each consecutive
 failure, and caps at `refresh_every`. Success resets the failure count and
 restores the normal interval. Retry timing is internal and has no public tuning
-option.
+option. Retryable client-construction, connection, and collection warnings use
+the logger's built-in hourly limiter keyed by opaque registration identity and
+bounded failure class; warning suppression does not change retry timing.
 
 Refresh ownership uses the opaque DeviceStore registration key, not a rebuilt
 `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore keep
@@ -138,12 +142,14 @@ addresses, and IP-MIB addresses. Only the selected target enters public identity
 or trap matching; alternate DNS answers are never published as aliases.
 
 The important safety property is two-level immutability. A device refresh builds
-and freezes its next generation off-registry. The collector then publishes the
-complete device vector with one atomic pointer update only after the sweep
-finishes. Function, focus-option, availability, reverse-DNS warming, and trap
+and freezes its next collected snapshot off-registry. At the completed sweep
+boundary, successful snapshots are activated with one shared publication time,
+then the collector publishes the complete device vector with one atomic pointer
+update. Function, focus-option, availability, reverse-DNS warming, and trap
 readers each acquire one generation and cannot combine devices from different
-sweeps. A failed attempt retains the last successful device generation; a
-canceled or panicking sweep does not publish a partial vector.
+sweeps. A failed attempt retains the last successful device generation and its
+original freshness deadline; a canceled or panicking sweep does not publish a
+partial vector.
 
 ## Topology Profile Composition
 
@@ -236,7 +242,7 @@ ordered vector produced by one refresh sweep.
 topologyRegistry.snapshotWithOptions(options)
   normalize query options
   acquire one topology generation
-  select fresh device observation snapshots
+  read the generation's fixed renderable device membership
   aggregate per-device observations
   build a topology graph
 ```
@@ -310,13 +316,16 @@ subnets observed by different Agents do not collide after Cloud aggregation.
 If the registry id is unavailable, L3 subnet segment actors are omitted; direct
 L3 subnet links, OSPF, and BGP enrichment still run.
 
-Only fresh device generations contribute Function, focus, availability, and
-reverse-DNS snapshots. Trap enrichment preserves the prior behavior of using
-the last successfully published device generation even after topology display
-freshness expires; unregistering the SNMP job removes it on the next completed
-sweep. Failed refreshes retain the last successful generation but do not extend
-its original collection time or display-freshness deadline, so sustained
-failures do not present indefinitely stale topology as current.
+Renderable membership is fixed when a complete topology generation publishes;
+Function, focus, availability, and reverse-DNS readers therefore see one stable
+view until the next completed sweep. Newly successful device snapshots start
+their display-freshness window at that publication boundary while preserving
+their exact acquisition timestamp. A retained generation from a failed refresh
+keeps its original deadline and is removed from renderable membership when a
+later completed sweep observes it expired. Trap enrichment preserves the prior
+behavior of using the last successfully published device generation even after
+topology display freshness expires; unregistering the SNMP job removes it on the
+next completed sweep.
 
 ## Graph Build Order
 
@@ -508,10 +517,12 @@ and retained device-generation state; they are not the topology payload.
 - Each due device is collected into a private `topologyBuilder`; builders have no
   locks because runtime readers never receive them.
 - Finalization freezes the builder into one immutable
-  `topologyDeviceGeneration`. A failed collection retains the prior successful
-  device generation.
-- A completed sweep publishes one immutable `topologyGeneration` through an
-  atomic pointer. Cancellation or panic leaves the previous generation visible.
+  `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
+  `topologyDeviceGeneration` values at one shared publication time. A failed
+  collection retains the prior successful device generation and deadline.
+- A completed sweep fixes renderable membership and publishes one immutable
+  `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
+  the previous generation visible.
 - Function, focus, availability, reverse-DNS, and trap readers each load that
   pointer once and never block on collection or builder locks.
 - The registry mutex only protects producer-scope discovery and the reverse-DNS

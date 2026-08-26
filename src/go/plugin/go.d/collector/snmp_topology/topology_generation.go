@@ -9,8 +9,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-// topologyDeviceGeneration is the immutable output of one successful device
-// collection. Builders are never published to runtime readers.
+// topologyDeviceSnapshot is the immutable output of one successful device
+// collection. It is not visible to readers until activated at global publish.
+type topologyDeviceSnapshot struct {
+	collectedAt    time.Time
+	freshFor       time.Duration
+	observation    topologymodel.ObservationSnapshot
+	hasObservation bool
+	trap           topologyTrapDeviceGeneration
+}
+
+// topologyDeviceGeneration is an immutable collected snapshot activated at a
+// global publication boundary. Builders and unactivated snapshots are never
+// published to runtime readers.
 type topologyDeviceGeneration struct {
 	key            string
 	collectedAt    time.Time
@@ -23,12 +34,13 @@ type topologyDeviceGeneration struct {
 // topologyGeneration is the immutable device vector published after one
 // complete refresh sweep.
 type topologyGeneration struct {
-	sequence    uint64
-	publishedAt time.Time
-	devices     []*topologyDeviceGeneration
+	sequence          uint64
+	publishedAt       time.Time
+	devices           []*topologyDeviceGeneration
+	renderableDevices []*topologyDeviceGeneration
 }
 
-func freezeTopologyBuilder(key string, builder *topologyBuilder) (*topologyDeviceGeneration, topologyBuilderFinalizeStats) {
+func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
 	if builder == nil {
 		return nil, topologyBuilderFinalizeStats{}
 	}
@@ -38,19 +50,35 @@ func freezeTopologyBuilder(key string, builder *topologyBuilder) (*topologyDevic
 	if collectedAt.IsZero() {
 		collectedAt = builder.updateTime
 	}
-	expiresAt := time.Time{}
-	if !collectedAt.IsZero() && builder.staleAfter > 0 {
-		expiresAt = collectedAt.Add(builder.staleAfter)
-	}
-
-	return &topologyDeviceGeneration{
-		key:            key,
+	return &topologyDeviceSnapshot{
 		collectedAt:    collectedAt,
-		expiresAt:      expiresAt,
+		freshFor:       builder.staleAfter,
 		observation:    builder.preparedSnapshot,
 		hasObservation: builder.hasPreparedSnapshot,
 		trap:           newTopologyTrapDeviceGeneration(builder),
 	}, stats
+}
+
+func activateTopologyDeviceSnapshot(
+	key string,
+	publishedAt time.Time,
+	snapshot *topologyDeviceSnapshot,
+) *topologyDeviceGeneration {
+	if snapshot == nil {
+		return nil
+	}
+	expiresAt := time.Time{}
+	if snapshot.freshFor > 0 {
+		expiresAt = publishedAt.Add(snapshot.freshFor)
+	}
+	return &topologyDeviceGeneration{
+		key:            key,
+		collectedAt:    snapshot.collectedAt,
+		expiresAt:      expiresAt,
+		observation:    snapshot.observation,
+		hasObservation: snapshot.hasObservation,
+		trap:           snapshot.trap,
+	}
 }
 
 func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[string]deviceRefreshState) *topologyGeneration {
@@ -63,13 +91,19 @@ func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[st
 	sort.Strings(keys)
 
 	devices := make([]*topologyDeviceGeneration, 0, len(keys))
+	renderableDevices := make([]*topologyDeviceGeneration, 0, len(keys))
 	for _, key := range keys {
-		devices = append(devices, states[key].generation)
+		device := states[key].generation
+		devices = append(devices, device)
+		if device.hasObservation && device.freshAt(publishedAt) {
+			renderableDevices = append(renderableDevices, device)
+		}
 	}
 	return &topologyGeneration{
-		sequence:    sequence,
-		publishedAt: publishedAt,
-		devices:     devices,
+		sequence:          sequence,
+		publishedAt:       publishedAt,
+		devices:           devices,
+		renderableDevices: renderableDevices,
 	}
 }
 
@@ -80,31 +114,20 @@ func (g *topologyDeviceGeneration) freshAt(now time.Time) bool {
 	return g.expiresAt.IsZero() || !now.After(g.expiresAt)
 }
 
-func (g *topologyGeneration) observationSnapshotsAt(now time.Time) []topologymodel.ObservationSnapshot {
-	if g == nil || len(g.devices) == 0 {
+func (g *topologyGeneration) observationSnapshots() []topologymodel.ObservationSnapshot {
+	if g == nil || len(g.renderableDevices) == 0 {
 		return nil
 	}
 
-	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(g.devices))
-	for _, device := range g.devices {
-		if device == nil || !device.hasObservation || !device.freshAt(now) {
-			continue
-		}
+	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(g.renderableDevices))
+	for _, device := range g.renderableDevices {
 		snapshots = append(snapshots, device.observation)
 	}
 	return snapshots
 }
 
-func (g *topologyGeneration) hasRenderableObservationsAt(now time.Time) bool {
-	if g == nil {
-		return false
-	}
-	for _, device := range g.devices {
-		if device != nil && device.hasObservation && device.freshAt(now) {
-			return true
-		}
-	}
-	return false
+func (g *topologyGeneration) hasRenderableObservations() bool {
+	return g != nil && len(g.renderableDevices) > 0
 }
 
 func (g *topologyGeneration) deviceCount() int {

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -58,7 +57,7 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOpti
 	options = topologyoptions.NormalizeQueryOptions(options)
 
 	generation := r.acquireGeneration()
-	aggregate, ok := aggregateTopologyObservationSnapshots(topologyObservationSnapshotsAt(generation, time.Now()))
+	aggregate, ok := aggregateTopologyObservationSnapshots(topologyObservationSnapshots(generation))
 	if !ok {
 		return topologymodel.Data{}, false, nil
 	}
@@ -72,7 +71,7 @@ func (r *topologyRegistry) hasRenderableObservations() bool {
 		return false
 	}
 	generation := r.acquireGeneration()
-	return generation != nil && generation.hasRenderableObservationsAt(time.Now())
+	return generation != nil && generation.hasRenderableObservations()
 }
 
 func (r *topologyRegistry) producerScope() string {
@@ -103,7 +102,7 @@ func (r *topologyRegistry) managedDeviceFocusTargets() []topologyoptions.Managed
 		return nil
 	}
 	generation := r.acquireGeneration()
-	return buildTopologyManagedFocusTargets(topologyObservationSnapshotsAt(generation, time.Now()))
+	return buildTopologyManagedFocusTargets(topologyObservationSnapshots(generation))
 }
 
 func (r *topologyRegistry) setReverseDNSWarmContext(ctx context.Context) {

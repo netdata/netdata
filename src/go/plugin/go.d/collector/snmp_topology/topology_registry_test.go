@@ -333,14 +333,17 @@ func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
 			},
 			want: false,
 		},
-		"cache-stale": {
+		"retained-generation-stale": {
 			setup: func(registry *topologyRegistry) {
 				cache := newTopologyBuilder()
 				seedPublishedEndpointSnapshot(cache)
-				cache.lastUpdate = time.Now().Add(-2 * time.Hour)
+				publishedAt := time.Now().Add(-2 * time.Hour)
+				cache.lastUpdate = publishedAt
 				cache.updateTime = cache.lastUpdate
 				cache.staleAfter = time.Hour
-				publishTestTopologyBuilder(registry, cache)
+				device := freezeTestTopologyBuilderAt("job-a", publishedAt, cache)
+				states := map[string]deviceRefreshState{"job-a": {generation: device}}
+				registry.publishGeneration(newTopologyGeneration(2, time.Now(), states))
 			},
 			want: false,
 		},

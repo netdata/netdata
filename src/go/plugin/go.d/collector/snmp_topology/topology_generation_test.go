@@ -65,7 +65,7 @@ func TestTopologyRegistryPublishesWholeGenerationVectors(t *testing.T) {
 			<-start
 			for range iterations {
 				generation := registry.acquireGeneration()
-				snapshots := topologyObservationSnapshotsAt(generation, now)
+				snapshots := topologyObservationSnapshots(generation)
 				if len(snapshots) != 2 {
 					errors <- fmt.Sprintf("sequence %d exposed %d devices", generation.sequence, len(snapshots))
 					return
@@ -99,8 +99,9 @@ func testTopologyGenerationVector(sequence uint64, now time.Time, identity strin
 		}
 	}
 	return &topologyGeneration{
-		sequence:    sequence,
-		publishedAt: now,
-		devices:     devices,
+		sequence:          sequence,
+		publishedAt:       now,
+		devices:           devices,
+		renderableDevices: append([]*topologyDeviceGeneration(nil), devices...),
 	}
 }

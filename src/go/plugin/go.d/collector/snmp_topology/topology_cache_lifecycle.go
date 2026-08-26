@@ -30,8 +30,8 @@ func newTopologyBuilder() *topologyBuilder {
 	}
 }
 
-func (c *Collector) freezeTopologyBuilder(key string, cache *topologyBuilder) *topologyDeviceGeneration {
-	generation, stats := freezeTopologyBuilder(key, cache)
+func (c *Collector) freezeTopologyBuilder(cache *topologyBuilder) *topologyDeviceSnapshot {
+	snapshot, stats := freezeTopologyBuilder(cache)
 
 	if stats.droppedNoMAC > 0 {
 		c.Warningf("device '%s': dropped %d topology FDB row(s) with empty MAC", stats.agentID, stats.droppedNoMAC)
@@ -39,7 +39,7 @@ func (c *Collector) freezeTopologyBuilder(key string, cache *topologyBuilder) *t
 	if stats.unmappedPort > 0 {
 		c.Warningf("device '%s': observed %d topology FDB row(s) with bridge ports missing ifIndex mapping", stats.agentID, stats.unmappedPort)
 	}
-	return generation
+	return snapshot
 }
 
 type topologyBuilderFinalizeStats struct {

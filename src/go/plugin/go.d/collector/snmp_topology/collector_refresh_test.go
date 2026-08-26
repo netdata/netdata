@@ -3,12 +3,15 @@
 package snmptopology
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net/netip"
 	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +22,7 @@ import (
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -263,6 +267,137 @@ func TestCollectorRefreshPublishesOnlyAfterCompleteMultiDeviceSweep(t *testing.T
 	require.Len(t, published.devices, 2)
 	require.Same(t, coll.deviceStates["job-a"].generation, published.devices[0])
 	require.Same(t, coll.deviceStates["job-b"].generation, published.devices[1])
+}
+
+func TestCollectorRefreshActivatesFreshnessAtAtomicPublication(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	devA := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
+	devB := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.20", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
+	clientA := snmpmock.NewMockHandler(ctrl)
+	clientB := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(clientA, devA)
+	expectTopologyRefreshSNMPClient(clientB, devB)
+
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", devA)
+	store.Register("job-b", devB)
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	clients := []gosnmp.Handler{clientA, clientB}
+	coll.newSnmpClient = func() gosnmp.Handler {
+		client := clients[0]
+		clients = clients[1:]
+		return client
+	}
+
+	secondStarted := make(chan struct{})
+	releaseSecond := make(chan struct{})
+	collectorCalls := 0
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		collectorCalls++
+		if collectorCalls == 1 {
+			return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
+		}
+		return &blockingTopologyCollector{started: secondStarted, release: releaseSecond}
+	}
+
+	base := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	var clock atomic.Int64
+	clock.Store(base.UnixNano())
+	coll.now = func() time.Time { return time.Unix(0, clock.Load()).UTC() }
+
+	previous := testTopologyGenerationVector(1, base, "previous")
+	previous.devices[0].key = "job-a"
+	previous.devices[1].key = "job-b"
+	coll.deviceStates = map[string]deviceRefreshState{
+		"job-a": {generation: previous.devices[0]},
+		"job-b": {generation: previous.devices[1]},
+	}
+	coll.generationSequence = previous.sequence
+	coll.topologyRegistry.publishGeneration(previous)
+
+	done := make(chan refreshStats, 1)
+	go func() { done <- coll.refreshTopology(context.Background()) }()
+
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second device refresh did not start")
+	}
+	clock.Store(base.Add(2 * time.Hour).UnixNano())
+	visibleDuringSweep := topologyObservationSnapshots(coll.topologyRegistry.acquireGeneration())
+
+	close(releaseSecond)
+	stats := <-done
+	require.Zero(t, stats.errors)
+	require.Len(t, visibleDuringSweep, 2,
+		"published membership must remain fixed while the next sweep is in flight")
+	published := coll.topologyRegistry.acquireGeneration()
+	require.Len(t, topologyObservationSnapshots(published), 2,
+		"every successful result must be fresh when its sweep is first published")
+	require.Equal(t, base, coll.deviceStates["job-a"].generation.collectedAt,
+		"activation must preserve the exact device acquisition time")
+	require.Equal(t,
+		published.publishedAt.Add(coll.refreshEvery()+2*coll.deviceCheckEvery()),
+		coll.deviceStates["job-a"].generation.expiresAt,
+		"the freshness window must begin at atomic publication",
+	)
+}
+
+func TestCollectorDeviceRefreshWarningsAreLimitedPerRegistrationAndFailureClass(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: gosnmp.Version2c.String(),
+	}
+	first := snmpmock.NewMockHandler(ctrl)
+	second := snmpmock.NewMockHandler(ctrl)
+	collectionFailure := snmpmock.NewMockHandler(ctrl)
+	otherRegistration := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClientConnectError(first, dev, errors.New("first failure"))
+	expectTopologyRefreshSNMPClientConnectError(second, dev, errors.New("second failure"))
+	expectTopologyRefreshSNMPClientConnect(collectionFailure, dev)
+	collectionFailure.EXPECT().Close().Return(nil)
+	expectTopologyRefreshSNMPClientConnectError(otherRegistration, dev, errors.New("other registration failure"))
+
+	coll := newTestSNMPTopologyCollector()
+	var logs bytes.Buffer
+	coll.Logger = logger.NewWithWriter(&logs)
+	clients := []gosnmp.Handler{first, second, collectionFailure, otherRegistration}
+	coll.newSnmpClient = func() gosnmp.Handler {
+		client := clients[0]
+		clients = clients[1:]
+		return client
+	}
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			return nil, errors.New("collection failure")
+		})
+	}
+
+	for range 2 {
+		snapshot, outcome := coll.refreshDeviceTopology(context.Background(), "job-a", dev, nil)
+		require.Nil(t, snapshot)
+		require.Equal(t, deviceRefreshOutcomeFailed, outcome)
+	}
+	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), "job-a", dev, nil)
+	require.Nil(t, snapshot)
+	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
+	snapshot, outcome = coll.refreshDeviceTopology(context.Background(), "job-b", dev, nil)
+	require.Nil(t, snapshot)
+	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
+
+	require.Equal(t, 2, strings.Count(logs.String(), "failed to connect"), logs.String())
+	require.Equal(t, 1, strings.Count(logs.String(), "topology collection failed"), logs.String())
+	require.Contains(t, logs.String(), "first failure")
+	require.NotContains(t, logs.String(), "second failure")
+	require.Contains(t, logs.String(), "collection failure")
+	require.Contains(t, logs.String(), "other registration failure")
 }
 
 func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *testing.T) {

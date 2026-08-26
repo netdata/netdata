@@ -515,11 +515,11 @@ func BenchmarkTopologyBuilderBuildAndFreeze(b *testing.B) {
 					}
 				}
 
-				generation, _ := freezeTopologyBuilder("benchmark", builder)
-				if generation == nil || !generation.hasObservation {
-					b.Fatal("frozen generation is not renderable")
+				snapshot, _ := freezeTopologyBuilder(builder)
+				if snapshot == nil || !snapshot.hasObservation {
+					b.Fatal("frozen snapshot is not renderable")
 				}
-				runtime.KeepAlive(generation)
+				runtime.KeepAlive(snapshot)
 			}
 		})
 	}
@@ -563,9 +563,10 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricMixedReadPublish(b *testin
 		b.Fatal("benchmark generation is missing")
 	}
 	replacement := &topologyGeneration{
-		sequence:    published.sequence + 1,
-		publishedAt: published.publishedAt.Add(time.Second),
-		devices:     append([]*topologyDeviceGeneration(nil), published.devices...),
+		sequence:          published.sequence + 1,
+		publishedAt:       published.publishedAt.Add(time.Second),
+		devices:           append([]*topologyDeviceGeneration(nil), published.devices...),
+		renderableDevices: append([]*topologyDeviceGeneration(nil), published.renderableDevices...),
 	}
 
 	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {

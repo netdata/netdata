@@ -173,6 +173,13 @@ const (
 	defaultRefreshEvery            = 30 * time.Minute
 	topologyTargetLookupMaxTimeout = 5 * time.Second
 	topologyTargetLookupMaxWorkers = 8
+	topologyRefreshWarningEvery    = time.Hour
+)
+
+const (
+	topologyRefreshFailureClient     = "client"
+	topologyRefreshFailureConnect    = "connect"
+	topologyRefreshFailureCollection = "collection"
 )
 
 type topologyRefreshDevicePlan struct {
@@ -238,6 +245,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		registeredDevices: len(entries),
 	}
 	nextStates := cloneDeviceRefreshStates(c.deviceStates)
+	successfulSnapshots := make(map[string]*topologyDeviceSnapshot)
 
 	plans := make([]topologyRefreshDevicePlan, 0, len(entries))
 	for _, entry := range entries {
@@ -265,7 +273,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		attemptedAt := c.currentTime()
 		state := nextStates[plan.key]
 		state.lastAttempt = attemptedAt
-		generation, outcome := c.refreshDeviceTopology(ctx, plan.key, plan.device, plan.targetManagementIPs)
+		snapshot, outcome := c.refreshDeviceTopology(ctx, plan.key, plan.device, plan.targetManagementIPs)
 		if ctx.Err() != nil {
 			break
 		}
@@ -274,7 +282,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		state.outcome = outcome
 		switch outcome {
 		case deviceRefreshOutcomeSuccess:
-			state.generation = generation
+			successfulSnapshots[plan.key] = snapshot
 			state.lastSuccess = completedAt
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
@@ -304,9 +312,15 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	}
 
 	pruneUnregisteredDeviceStates(nextStates, seen)
+	publishedAt := c.currentTime()
+	for key, snapshot := range successfulSnapshots {
+		state := nextStates[key]
+		state.generation = activateTopologyDeviceSnapshot(key, publishedAt, snapshot)
+		nextStates[key] = state
+	}
 	c.deviceStates = nextStates
 	c.generationSequence++
-	generation := newTopologyGeneration(c.generationSequence, c.currentTime(), nextStates)
+	generation := newTopologyGeneration(c.generationSequence, publishedAt, nextStates)
 	c.topologyRegistry.publishGeneration(generation)
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()
@@ -340,21 +354,22 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 	c.recordRefreshStats(c.refreshTopology(ctx))
 }
 
-// refreshDeviceTopology builds one immutable generation without changing the
-// generation currently visible to readers.
+// refreshDeviceTopology builds one immutable collected snapshot without
+// changing the generation currently visible to readers.
 func (c *Collector) refreshDeviceTopology(
 	ctx context.Context,
 	key string,
 	dev ddsnmp.DeviceConnectionInfo,
 	targetManagementIPs []netip.Addr,
-) (*topologyDeviceGeneration, deviceRefreshOutcome) {
+) (*topologyDeviceSnapshot, deviceRefreshOutcome) {
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
 	}
 
 	snmpClient, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
 	if err != nil {
-		c.Warningf("device '%s': failed to create SNMP client: %v", dev.Hostname, err)
+		c.warnTopologyRefreshFailure(key, topologyRefreshFailureClient,
+			"device '%s': failed to create SNMP client: %v", dev.Hostname, err)
 		return nil, deviceRefreshOutcomeFailed
 	}
 	if dev.MaxRepetitions != 0 {
@@ -364,7 +379,8 @@ func (c *Collector) refreshDeviceTopology(
 		if ctx.Err() != nil {
 			return nil, deviceRefreshOutcomeFailed
 		}
-		c.Warningf("device '%s': failed to connect: %v", dev.Hostname, err)
+		c.warnTopologyRefreshFailure(key, topologyRefreshFailureConnect,
+			"device '%s': failed to connect: %v", dev.Hostname, err)
 		return nil, deviceRefreshOutcomeFailed
 	}
 	stopContextClose := closeSNMPClientOnContextCancel(ctx, snmpClient)
@@ -397,7 +413,8 @@ func (c *Collector) refreshDeviceTopology(
 		if ctx.Err() != nil {
 			return nil, deviceRefreshOutcomeFailed
 		}
-		c.Warningf("device '%s': topology collection failed: %v", dev.Hostname, err)
+		c.warnTopologyRefreshFailure(key, topologyRefreshFailureCollection,
+			"device '%s': topology collection failed: %v", dev.Hostname, err)
 		return nil, deviceRefreshOutcomeFailed
 	}
 
@@ -427,7 +444,11 @@ func (c *Collector) refreshDeviceTopology(
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
 	}
-	return c.freezeTopologyBuilder(key, next), deviceRefreshOutcomeSuccess
+	return c.freezeTopologyBuilder(next), deviceRefreshOutcomeSuccess
+}
+
+func (c *Collector) warnTopologyRefreshFailure(key, class, format string, args ...any) {
+	c.Limit("snmp_topology:refresh:"+key+":"+class, 1, topologyRefreshWarningEvery).Warningf(format, args...)
 }
 
 func (c *Collector) resolveTopologyTargetManagementIPs(
