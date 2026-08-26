@@ -47,6 +47,12 @@ int health_parse_delay(
             if(isnan(*delay_multiplier) || isinf(*delay_multiplier) || islessequal(*delay_multiplier, 0)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, filename, value, key);
+
+                // strtof() has already written the rejected value, and unlike the duration keywords
+                // (duration_parse_seconds() writes nothing when it fails) there is no earlier value
+                // left to fall back to. Clearing the flag makes the default below apply, so a second
+                // 'multiplier' token cannot leave a non-finite or non-positive value behind.
+                given_multiplier = 0;
             }
             else given_multiplier = 1;
         }
@@ -564,6 +570,13 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
     }                                                                                               \
 } while(0)
 
+static void health_add_file_prototype(RRD_ALERT_PROTOTYPE *ap) {
+    // Static rules are independent members of a same-name chain. health_prototype_add() logs and rejects an
+    // invalid member before it can be appended, preserving valid OS- or label-specific members of the chain.
+    if(!health_prototype_add(ap, NULL))
+        health_prototype_cleanup(ap);
+}
+
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
@@ -698,7 +711,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 lookup_data_source_from_rrdr_options(ap);
                 dims_grouping_from_rrdr_options(ap);
                 replace_green_red(ap, green, red);
-                health_prototype_add(ap, NULL);
+                health_add_file_prototype(ap);
                 freez(ap);
             }
 
@@ -880,7 +893,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         lookup_data_source_from_rrdr_options(ap);
         dims_grouping_from_rrdr_options(ap);
         replace_green_red(ap, green, red);
-        health_prototype_add(ap, NULL);
+        health_add_file_prototype(ap);
         freez(ap);
     }
 
