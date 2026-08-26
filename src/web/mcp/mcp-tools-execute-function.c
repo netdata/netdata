@@ -4,7 +4,7 @@
 #include "mcp-tools-execute-function-internal.h"
 #include "mcp-tools-execute-function-registry.h"
 #include "mcp-params.h"
-#include "database/rrdfunctions.h"
+#include "nrpc/nrpc.h"
 
 // Analyze the JSON response and determine its type
 MCP_FUNCTION_TYPE mcp_functions_analyze_response(struct json_object *json_obj, int *out_status) {
@@ -2221,24 +2221,18 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload
     BUFFER *result_buffer = buffer_create(0, NULL);
     
     // Execute the function
-    int ret = rrd_function_run(
-        data->request.host,
-        result_buffer,
-        (int)data->request.timeout,
-        data->request.auth->access,
-        data->request.function,
-        true,
-        data->request.transaction,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        payload,
-        buffer_tostring(source),
-        false
-    );
+    int ret = nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(data->request.host),
+        .result_wb = result_buffer,
+        .cmd = data->request.function,
+        .source = buffer_tostring(source),
+        .user_access = data->request.auth->access,
+        .timeout_s = (int)data->request.timeout,
+        .wait = true,
+        .allow_restricted = false,
+        .call_id = data->request.transaction,
+        .payload = payload,
+    });
     
     if (ret != HTTP_RESP_OK) {
         buffer_sprintf(data->request.mcpc->error,
@@ -2632,8 +2626,9 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     // /api/v3/function path denies. Enforce the same access here (GHSA-6628-vxm3-4g8g).
     {
         CLEAN_BUFFER *access_error = buffer_create(0, NULL);
-        int access_code = rrd_function_verify_access(
-            data.request.host, access_error, data.request.function,
+        int access_code = nrpc_method_authorize(
+            data.request.host ? rrdhost_nrpc_owner(data.request.host) : NRPC_OWNER_NONE,
+            access_error, data.request.function,
             data.request.auth ? data.request.auth->access : HTTP_ACCESS_NONE,
             false, NULL);
 

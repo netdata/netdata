@@ -78,6 +78,10 @@ HTTP_ACCESS http_access_from_hex_str(const char *str);
 HTTP_ACCESS http_access_from_source(const char *str);
 bool log_cb_http_access_to_hex(struct web_buffer *wb, void *data);
 
+static inline bool http_access_user_has_enough_access_level_for_endpoint(HTTP_ACCESS user, HTTP_ACCESS endpoint) {
+    return ((user & endpoint) == endpoint);
+}
+
 #define HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(access) ((access & HTTP_ACCESS_SIGNED_ID) ? HTTP_RESP_FORBIDDEN : HTTP_RESP_PRECOND_FAIL)
 
 typedef enum __attribute__((packed)) {

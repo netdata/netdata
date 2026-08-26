@@ -2,7 +2,7 @@
 
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-execute-function-registry.h"
-#include "database/rrdfunctions-inline.h"
+#include "nrpc/nrpc.h"
 
 // ----------------------------------------------------------------------------
 // Regression test for GHSA-6628-vxm3-4g8g.
@@ -13,7 +13,7 @@
 // The metadata is produced by mcp_functions_registry_get() -> "<fn> info", run
 // with HTTP_ACCESS_ALL — so before the fix it ignored the caller's real access.
 //
-// The fix authorizes the caller (rrd_function_verify_access) in
+// The fix authorizes the caller (nrpc_method_authorize) in
 // mcp_tool_execute_function_execute() BEFORE that metadata path runs.
 //
 // This test drives the real MCP handler with an anonymous caller and a
@@ -102,16 +102,24 @@ int mcp_execute_function_access_unittest(void) {
 
     mcp_functions_registry_init();
 
-    // The info path executes the function, which registers an inflight request.
-    // Normal startup (and dyncfg_unittest) initialize this global; the standalone
-    // -W mcpfunctionaccesstest path does not, so ensure it here (init is idempotent).
-    rrd_functions_inflight_init();
+    // The info path executes the method, which registers an in-flight
+    // call. Normal startup (and dyncfg_unittest) create the in-flight calls table; the
+    // standalone -W mcpfunctionaccesstest path does not, so ensure it here
+    // (create is idempotent).
+    nrpc_inflight_calls_create();
 
     // A protected function mirroring systemd-journal's access requirements.
-    rrd_function_add_inline(host, NULL, MCP_UT_FN, 10, 0, 1,
-                            "unittest protected function", "logs",
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                            mcp_ut_protected_cb);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(host),
+        .name = MCP_UT_FN,
+        .help = "unittest protected function",
+        .tags = "logs",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        .handler = mcp_ut_protected_cb,
+    });
 
     const char *node = rrdhost_hostname(host);
     int errors = 0;
@@ -184,7 +192,7 @@ int mcp_execute_function_access_unittest(void) {
         mcp_free_client(mcpc);
     }
 
-    rrd_function_del(host, NULL, MCP_UT_FN, false, true);
+    nrpc_method_unregister(rrdhost_nrpc_owner(host), MCP_UT_FN, NRPC_SOURCE_DAEMON);
     mcp_functions_registry_cleanup();
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

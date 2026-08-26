@@ -127,6 +127,18 @@
 - Feat(fetch): include base commit SHA in PR JSON output ([#23637](https://github.com/netdata/netdata/issues/23637))
 - Fix(go.d/panos): collect BGP peers on the Advanced Routing Engine ([#23636](https://github.com/netdata/netdata/issues/23636))
 - Regenerate integrations docs ([#23640](https://github.com/netdata/netdata/issues/23640))
+- Fix(installer): install-required-packages.sh detection and tree-validation correctness fixes ([#23408](https://github.com/netdata/netdata/issues/23408))
+- Fix(inicfg): replace sprintf with snprintfz for safer string formatting ([#23638](https://github.com/netdata/netdata/issues/23638))
+- Fix(jsonwrap): correct logical operator in condition check ([#23639](https://github.com/netdata/netdata/issues/23639))
+- Fix pooled response buffers and fragmented WebSocket payload masking ([#23485](https://github.com/netdata/netdata/issues/23485))
+- Update labels ([#23453](https://github.com/netdata/netdata/issues/23453))
+- Fix Kavenegar notification documentation link ([#23644](https://github.com/netdata/netdata/issues/23644))
+- Regenerate integrations docs ([#23646](https://github.com/netdata/netdata/issues/23646))
+- Fix(go.d/mssql): exclude disabled SQL Agent jobs by default ([#23645](https://github.com/netdata/netdata/issues/23645))
+- Refactor the function-call mechanism into a first-class component ([#23532](https://github.com/netdata/netdata/issues/23532))
+- Regenerate integrations docs ([#23647](https://github.com/netdata/netdata/issues/23647))
+- Document Learn checksum ownership and recovery validation ([#23652](https://github.com/netdata/netdata/issues/23652))
+- Fix streaming compression precedence and cadence-aware receiver liveness ([#23615](https://github.com/netdata/netdata/issues/23615))
 
 ## [2.11.0] - 2026-08-12
 

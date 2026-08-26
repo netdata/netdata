@@ -6,7 +6,7 @@
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
 
-#define RRDFUNCTIONS_NETDEV_HELP "Shows real-time network interface performance including traffic rates, packet counts, drops, and link status."
+#define FUNCTION_NETDEV_HELP "Shows real-time network interface performance including traffic rates, packet counts, drops, and link status."
 
 #define STATE_LENGTH_MAX 32
 
@@ -499,7 +499,7 @@ static int netdev_function_net_interfaces(BUFFER *wb, const char *function __may
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_NETDEV_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_NETDEV_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_traffic_rx = 0.0;
@@ -1698,11 +1698,17 @@ void netdev_main(void *ptr_is_null __maybe_unused)
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
         virtual_device_collect_delay_secs = 300;
 
-    rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_NETDEV_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            netdev_function_net_interfaces);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "network-interfaces",
+        .help = FUNCTION_NETDEV_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = netdev_function_net_interfaces,
+    });
 
     heartbeat_t hb;
     heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);

@@ -541,7 +541,7 @@ int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
         for (size_t f = 0; f < files_used; f++)
             dictionary_acquired_item_release(nd_journal_files_registry, file_items[f]);
 
-        return rrd_call_function_error(wb, "No new data since the previous call.", HTTP_RESP_NOT_MODIFIED);
+        return nrpc_call_error(wb, "No new data since the previous call.", HTTP_RESP_NOT_MODIFIED);
     }
 
     // sort the files, so that they are optimal for facets
@@ -686,7 +686,7 @@ int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
     switch (status) {
         case ND_SD_JOURNAL_OK:
             if (lqs->rq.if_modified_since && !lqs->c.rows_useful)
-                return rrd_call_function_error(
+                return nrpc_call_error(
                     wb, "No additional useful data since the previous call.", HTTP_RESP_NOT_MODIFIED);
             break;
 
@@ -695,20 +695,20 @@ int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs) {
             break;
 
         case ND_SD_JOURNAL_CANCELLED:
-            return rrd_call_function_error(wb, "Request cancelled.", HTTP_RESP_CLIENT_CLOSED_REQUEST);
+            return nrpc_call_error(wb, "Request cancelled.", HTTP_RESP_CLIENT_CLOSED_REQUEST);
 
         case ND_SD_JOURNAL_NOT_MODIFIED:
-            return rrd_call_function_error(wb, "No new data since the previous call.", HTTP_RESP_NOT_MODIFIED);
+            return nrpc_call_error(wb, "No new data since the previous call.", HTTP_RESP_NOT_MODIFIED);
 
         case ND_SD_JOURNAL_FAILED_TO_OPEN:
-            return rrd_call_function_error(wb, "Failed to open systemd journal file.", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "Failed to open systemd journal file.", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         case ND_SD_JOURNAL_FAILED_TO_SEEK:
-            return rrd_call_function_error(
+            return nrpc_call_error(
                 wb, "Failed to seek in systemd journal file.", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         default:
-            return rrd_call_function_error(wb, "Unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "Unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
