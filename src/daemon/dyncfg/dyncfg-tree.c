@@ -62,9 +62,9 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb, bool anonymou
 }
 
 static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id, bool anonymous) {
-    size_t entries = dictionary_entries(dyncfg_globals.nodes);
+    size_t entries = 0;
     size_t used = 0;
-    const DICTIONARY_ITEM **items = entries ? callocz(entries, sizeof(*items)) : NULL;
+    const DICTIONARY_ITEM **items = NULL;
     size_t restart_required = 0, plugin_rejected = 0, status_incomplete = 0, status_failed = 0;
 
     STRING *template = NULL;
@@ -74,6 +74,16 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     size_t path_len = strlen(path);
     DYNCFG *df;
     dfe_start_read(dyncfg_globals.nodes, df) {
+        if(!items) {
+            // size items[] while we hold the dictionary read lock, so that no
+            // writer can add entries between counting them and filling them in
+            entries = dictionary_entries(dyncfg_globals.nodes);
+            if(!entries)
+                break;
+
+            items = callocz(entries, sizeof(*items));
+        }
+
         if(!UUIDeq(df->host_uuid, host->host_id))
             continue;
 
@@ -86,9 +96,14 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
         if((id && strcmp(id, df_dfe.name) != 0) && (template && df->template != template))
             continue;
 
+        if(used >= entries)
+            break;
+
         items[used++] = dictionary_acquired_item_dup(dyncfg_globals.nodes, df_dfe.item);
     }
     dfe_done(df);
+
+    string_freez(template);
 
     if(used > 1)
         qsort(items, used, sizeof(const DICTIONARY_ITEM *), dyncfg_tree_compar);
