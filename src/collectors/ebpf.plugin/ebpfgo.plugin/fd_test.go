@@ -233,7 +233,7 @@ func TestSelectMaxIndexNeverReturnsTheMissingFDBaseSelector(t *testing.T) {
 
 	for _, kver := range kernels {
 		for _, isRHF := range []int{-1, 8 * 256, 9 * 256} {
-			if got := SelectMaxIndex(isRHF, kver); got == 5 {
+			if SelectMaxIndex(isRHF, kver) == 5 {
 				t.Fatalf("SelectMaxIndex(isRHF=%d, kver=%d) = 5 (\"5.10\"); fd ships no base object for it",
 					isRHF, kver)
 			}
