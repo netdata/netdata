@@ -22,6 +22,7 @@ type Scheduler struct {
 	reconciler ModuleReconciler                          // per-module reconciliation callback
 	retries    *autoDetectionRetryIndex                  // auto-detection retry worker
 	pending    *pendingJobIndex                          // release-triggered latest desired jobs
+	accepted   *acceptedActivationIndex                  // detached accepted-job activation owner
 	jobs       map[lifecycle.ResourceIdentity]RuntimeJob // scheduled job by identity
 	modules    map[string]int                            // scheduled job count by module
 }
@@ -34,12 +35,13 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 		reconciler: reconciler,
 		retries:    newAutoDetectionRetryIndex(),
 		pending:    newPendingJobIndex(),
+		accepted:   newAcceptedActivationIndex(),
 		jobs:       make(map[lifecycle.ResourceIdentity]RuntimeJob),
 		modules:    make(map[string]int),
 	}, nil
 }
 
-func (s *Scheduler) bindAutoDetectionRetries(
+func (s *Scheduler) bindBackgroundWorkers(
 	commands jobmgr.PreparedCommandPort,
 	plan autoDetectionRetryPlanner,
 	pendingPlan pendingJobPlanner,
@@ -47,7 +49,7 @@ func (s *Scheduler) bindAutoDetectionRetries(
 	failure func(error),
 ) error {
 	if s == nil {
-		return errors.New("job output: nil autodetection retry scheduler")
+		return errors.New("job output: nil background scheduler")
 	}
 	if err := s.pending.bind(commands, pendingPlan, run, failure); err != nil {
 		return err
@@ -59,18 +61,20 @@ func (s *Scheduler) bindAutoDetectionRetries(
 	return nil
 }
 
-func (s *Scheduler) StopAutoDetectionRetries() {
+func (s *Scheduler) StopBackgroundWorkers() {
 	if s != nil {
+		s.accepted.stopWorker()
 		s.retries.stopWorker()
 		s.pending.stopWorker()
 	}
 }
 
-func (s *Scheduler) WaitAutoDetectionRetries(ctx context.Context) error {
+func (s *Scheduler) WaitBackgroundWorkers(ctx context.Context) error {
 	if s == nil {
-		return errors.New("job output: nil autodetection retry scheduler")
+		return errors.New("job output: nil background scheduler")
 	}
 	return errors.Join(
+		s.accepted.wait(ctx),
 		s.retries.wait(ctx),
 		s.pending.wait(ctx),
 	)

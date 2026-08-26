@@ -351,6 +351,26 @@ func (dcjc *DynCfgJobController) prepareEnable(
 			dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusRunning),
 		)
 	}
+	if record.Status == dyncfg.StatusAccepted.String() {
+		config, err := graphRecordConfig(record)
+		if err != nil {
+			return nil, err
+		}
+		spec, err := newAcceptedActivationSpec(config)
+		if err != nil {
+			return nil, err
+		}
+		return dcjc.noopWithAfterApply(
+			scope,
+			current,
+			permit,
+			mustDynCfgMessage(202, ""),
+			func() {
+				dcjc.scheduler.accepted.arm(spec)
+			},
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusAccepted),
+		)
+	}
 	return dcjc.prepareRunningTransition(
 		ctx,
 		target,
