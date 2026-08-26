@@ -371,7 +371,7 @@ static void pulse_child_chart_labels(RRDSET *st, RRDHOST *host) {
 // dictionary write (conflict callback, destroy_lock trylock, collection reinitialise) and is only
 // needed the first time each dimension appears, so look it up first and fall back to creating it.
 static inline RRDDIM *pulse_child_dim(RRDSET *st, const char *id, collected_number multiplier, RRD_ALGORITHM algorithm) {
-    // rrdddim_find_active() only hides an obsolete dimension when its chart is ALSO undiscoverable
+    // rrddim_find_active() only hides an obsolete dimension when its chart is ALSO undiscoverable
     // (rrdset_is_discoverable()), and these pulse charts are never obsolete - so it can hand back an
     // obsolete dimension. Returning it unrevived would defer revival to rrdset_done(), which logs
     // "has the OBSOLETE flag set, but it is collected" as an error. Fall through to rrddim_add(),

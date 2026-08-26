@@ -653,9 +653,12 @@ inline void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st __mayb
     // hot callers (rrddim_add_custom(), pluginsd_dimension()) reach this on every collection step,
     // so without this guard every collected dimension re-announces its chart, forever.
     // This mirrors rrdset_isnot_obsolete___safe_from_collector_thread(), which has always been guarded.
-    // Skipping rrddim_reinitialize_collection() here is safe: it is idempotent (it only fills
-    // rd->tiers[].sch when NULL) and rrddim_conflict_callback() already runs it on every one of
-    // these paths, via the rrddim_add() that precedes them.
+    // Skipping rrddim_reinitialize_collection() here is safe: the hot callers that pass a
+    // non-obsolete dimension (rrddim_add_custom(), pluginsd_dimension()) have just run it via
+    // rrddim_conflict_callback() in the rrddim_add() that precedes them, and it is idempotent
+    // anyway (it only fills rd->tiers[].sch when NULL). The callers that revive a genuinely
+    // obsolete dimension (pluginsd_set_v2(), rrdset_done()) already test RRDDIM_FLAG_OBSOLETE
+    // themselves, so this guard never fires for them and the full body below runs.
     if(likely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
         return;
 
