@@ -867,6 +867,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         pgc_open_add_hot_page(
             (Word_t)ctx,
             metric_id,
+            mrg_metric_uuidmap_id(main_mrg, metric),
             vd.start_time_s,
             vd.end_time_s,
             vd.update_every_s,
