@@ -129,10 +129,47 @@ static inline void nd_ebpf_destroy_links(struct bpf_link ***links, size_t count)
 /* ------------------------------------------------------------------------
  * Per-PID map-walk helpers
  *
- * cachestat and dcstat walk their per-PID BPF map identically; only the counter
- * fields differ.  The field-agnostic steps live here so the per-module loop keeps
- * typed field access, which is where readability actually matters.
+ * cachestat, dcstat and fd walk their per-PID BPF map identically; only the
+ * counter fields differ.  The field-agnostic steps live here so the per-module
+ * loop keeps typed field access, which is where readability actually matters.
  * ------------------------------------------------------------------------ */
+
+/* One global-counter slot to read from the `tbl_*_global` map.  The key is the
+ * BPF-side enum value; the dst is the field of the per-collector output struct
+ * the sum is written into. */
+struct nd_ebpf_snap_global_entry {
+    uint64_t *dst;
+    uint32_t key;
+};
+
+/* Reads a list of global counters from a PERCPU_ARRAY map (or a non-percpu map
+ * — the post-load map type is re-queried for the actual layout) and writes
+ * nd_ebpf_sum_percpu_u64 into each entry's dst.  Caller is responsible for
+ * pre-zeroing dst so a missing key produces a clean zero rather than an
+ * undefined previous-cycle value.
+ *
+ * entries_count is sizeof(entries)/sizeof(entries[0]) at the call site; we
+ * pass it explicitly to avoid the macro dependency. */
+static inline void nd_ebpf_global_snap_aggregate(
+    struct bpf_map *map,
+    int map_fd,
+    uint64_t *percpu_u64,
+    int percpu_u64_cap,
+    const struct nd_ebpf_snap_global_entry *entries,
+    size_t entries_count)
+{
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && percpu_u64_cap > 0)
+                ? percpu_u64_cap : 1;
+
+    for (size_t i = 0; i < entries_count; i++) {
+        uint32_t key = entries[i].key;
+        *entries[i].dst = 0;
+
+        if (bpf_map_lookup_elem(map_fd, &key, percpu_u64) == 0)
+            *entries[i].dst = nd_ebpf_sum_percpu_u64(percpu_u64, count);
+    }
+}
 
 /* Resolves the TGID for one map entry.
  *
@@ -170,15 +207,16 @@ static inline void nd_ebpf_snapshot_reserve(void **items, size_t *cap, size_t it
     *cap = new_cap;
 }
 
-/* Folds one already-accumulated item into another with the same pid. */
-typedef void (*nd_ebpf_snapshot_merge_fn)(void *dst, const void *src);
-
 /* Collapses per-thread rows into one row per process.
  *
  * Threads of the same process produce separate map entries carrying the same
  * TGID, so the buffer is sorted by pid and consecutive duplicates are merged in
  * place.  Requires pid to be the first member of the item type — callers assert
  * that with ND_EBPF_ASSERT_PID_FIRST.  Returns the surviving item count. */
+
+/* Folds one already-accumulated item into another with the same pid. */
+typedef void (*nd_ebpf_snapshot_merge_fn)(void *dst, const void *src);
+
 static inline size_t nd_ebpf_snapshot_merge_same_pid(
     void *items,
     size_t count,
@@ -243,6 +281,83 @@ static inline int nd_ebpf_alloc_percpu_buffers(
     *percpu_entries_cap = ncpu;
 
     return 0;
+}
+
+/* Fold step for the apps snapshot iterator: take one per-CPU slot at
+ * values[cpu_index] (the underlying entry struct is module-specific) and add
+ * it into the pre-zeroed dst snapshot slot.  The iterator already wrote
+ * dst->pid = tgid; everything else is the caller's responsibility. */
+typedef void (*nd_ebpf_apps_snap_fold_fn)(void *dst, const void *values, int cpu_index);
+
+/* Walks the per-PID BPF map, accumulates one snapshot slot per TGID via the
+ * caller's fold callback, then runs the shared sort/merge-by-pid tail.  The
+ * resulting count is returned; the caller assigns out->items / out->count.
+ *
+ * pre-condition:
+ *   - dst_item has `pid` as its first field (use ND_EBPF_ASSERT_PID_FIRST).
+ *   - values points at percpu_entries_cap × entry_size bytes (the caller
+ *     owns the allocation).
+ *   - items_buf / items_cap is the persistent growable output buffer.
+ *   - fold copies the module's per-CPU counters into dst and updates comm/ct
+ *     as needed.
+ *
+ * Returns the merged item count, or 0 if the map is empty. */
+static inline size_t nd_ebpf_apps_snap_iterate(
+    struct bpf_map *map,
+    int map_fd,
+    int percpu_entries_cap,
+    const void *values,
+    size_t value_size,
+    size_t tgid_offset,
+    void **items_buf,
+    size_t *items_cap,
+    size_t item_size,
+    nd_ebpf_apps_snap_fold_fn fold,
+    nd_ebpf_snapshot_merge_fn merge_same_pid)
+{
+    /* Re-query the actual post-load map type; bpf_map__set_type can silently
+     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
+                ? percpu_entries_cap : 1;
+
+    size_t out_count = 0;
+    uint32_t key = 0, next_key = 0;
+    bool first_iter = true;
+
+    while (bpf_map_get_next_key(map_fd, first_iter ? NULL : &key, &next_key) == 0) {
+        first_iter = false;
+        if (bpf_map_lookup_elem(map_fd, &next_key, (void *)values)) {
+            key = next_key;
+            memset((void *)values, 0, (size_t)count * value_size);
+            continue;
+        }
+
+        nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
+
+        uint32_t tgid = nd_ebpf_snapshot_tgid(values, count, value_size, tgid_offset, next_key);
+
+        void *dst = (char *)*items_buf + out_count * item_size;
+        memset(dst, 0, item_size);
+        *(uint32_t *)dst = tgid;
+
+        for (int i = 0; i < count; i++)
+            fold(dst, values, i);
+
+        out_count++;
+        key = next_key;
+        memset((void *)values, 0, (size_t)count * value_size);
+    }
+
+    if (out_count == 0)
+        return 0;
+
+    /*
+     * Multiple threads of the same process produce separate BPF entries with the
+     * same TGID.  Sort by pid (TGID) and merge consecutive same-pid entries so
+     * each shared-memory slot represents one process.
+     */
+    return nd_ebpf_snapshot_merge_same_pid(*items_buf, out_count, item_size, merge_same_pid);
 }
 
 /* ------------------------------------------------------------------------

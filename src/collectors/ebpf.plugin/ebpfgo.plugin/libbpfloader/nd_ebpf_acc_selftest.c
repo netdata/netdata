@@ -97,6 +97,24 @@ static int nd_ebpf_snapshot_merge_selftest(void)
     return 0;
 }
 
+/* Verify growing a caller-owned buffer updates the caller's pointer. */
+static int nd_ebpf_snapshot_reserve_selftest(void)
+{
+    void *items = NULL;
+    size_t cap = 0;
+
+    nd_ebpf_snapshot_reserve(&items, &cap, sizeof(struct nd_ebpf_snapshot_selftest_item), 0);
+    if (!items || cap != 64)
+        return 37;
+
+    nd_ebpf_snapshot_reserve(&items, &cap, sizeof(struct nd_ebpf_snapshot_selftest_item), cap);
+    if (!items || cap != 128)
+        return 38;
+
+    freez(items);
+    return 0;
+}
+
 static int acc_selftest_body(void)
 {
     int rc = 0;
@@ -215,6 +233,10 @@ cleanup:
     int merge_rc = nd_ebpf_snapshot_merge_selftest();
     if (merge_rc)
         return merge_rc;
+
+    int reserve_rc = nd_ebpf_snapshot_reserve_selftest();
+    if (reserve_rc)
+        return reserve_rc;
 
     return 0;
 }

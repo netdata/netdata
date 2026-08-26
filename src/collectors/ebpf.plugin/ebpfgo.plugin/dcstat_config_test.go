@@ -46,24 +46,14 @@ func TestLoadDCStatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 	if cfg.Dcstat == nil || !*cfg.Dcstat {
 		t.Fatalf("unexpected dcstat enablement: %#v", cfg.Dcstat)
 	}
-	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 23 {
-		t.Fatalf("unexpected update every: %#v", cfg.UpdateEvery)
-	}
-	if cfg.PidTable == nil || *cfg.PidTable != 4096 {
-		t.Fatalf("unexpected pid table size: %#v", cfg.PidTable)
-	}
-	if cfg.MapsPerCore == nil || *cfg.MapsPerCore {
-		t.Fatalf("unexpected maps per core: %#v", cfg.MapsPerCore)
-	}
-	if cfg.BTFPath == nil || *cfg.BTFPath != "/stock/btf" {
-		t.Fatalf("unexpected btf path: %#v", cfg.BTFPath)
-	}
-	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "buffer" {
-		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
-	}
-	if cfg.CollectPidLevel == nil || *cfg.CollectPidLevel != 2 {
-		t.Fatalf("unexpected collect pid level: %#v", cfg.CollectPidLevel)
-	}
+	assertMergedCommonConfig(t, cfg, mergedCommonExpect{
+		UpdateEvery:     23,
+		PidTable:        4096,
+		MapsPerCore:     false,
+		BTFPath:         "/stock/btf",
+		ObjectFlavor:    "buffer",
+		CollectPidLevel: 2,
+	})
 }
 
 func TestLoadDCStatConfigFilesMissingReturnsNotFound(t *testing.T) {

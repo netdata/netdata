@@ -626,33 +626,22 @@ int netdata_fd_runtime_snapshot(
     if (fd < 0)
         return -1;
 
-    /* Re-query the actual post-load map type; bpf_map__set_type can silently
-     * fail before load, leaving a non-percpu map while percpu_u64_cap > 1. */
-    enum bpf_map_type mtype = bpf_map__type(map);
-    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && rt->percpu_u64_cap > 0)
-                ? rt->percpu_u64_cap : 1;
-    (void)maps_per_core;
     uint64_t *values = rt->percpu_u64;
     if (!values)
         return -1;
 
-    struct {
-        uint64_t *dst;
-        uint32_t key;
-    } entries[] = {
+    (void)maps_per_core;
+
+    const struct nd_ebpf_snap_global_entry entries[] = {
         {&out->open_call, NETDATA_FD_KEY_CALLS_OPEN},
         {&out->open_err, NETDATA_FD_KEY_ERROR_OPEN},
         {&out->close_call, NETDATA_FD_KEY_CALLS_CLOSE},
         {&out->close_err, NETDATA_FD_KEY_ERROR_CLOSE},
     };
 
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
-        uint32_t key = entries[i].key;
-        *entries[i].dst = 0;
-
-        if (bpf_map_lookup_elem(fd, &key, values) == 0)
-            *entries[i].dst = nd_ebpf_sum_percpu_u64(values, count);
-    }
+    nd_ebpf_global_snap_aggregate(
+        map, fd, values, rt->percpu_u64_cap,
+        entries, sizeof(entries) / sizeof(entries[0]));
 
     return 0;
 }
@@ -672,6 +661,24 @@ static void fd_snapshot_merge_same_pid(void *dst_v, const void *src_v)
     dst->close_err += src->close_err;
     if (!dst->comm[0] && src->comm[0])
         nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), src->comm, sizeof(src->comm));
+}
+
+/* nd_ebpf_apps_snap_iterate() per-CPU fold callback.  The iterator pre-zeros
+ * dst and writes dst->pid = tgid; this routine adds the fd-specific counters
+ * and the comm name. */
+static void fd_apps_snap_fold(void *dst_v, const void *values_v, int i)
+{
+    struct netdata_ebpf_fd_pid_snapshot *dst = dst_v;
+    const struct netdata_ebpf_fd_pid_entry *values = values_v;
+
+    if (values[i].ct > dst->ct)
+        dst->ct = values[i].ct;
+    dst->open_call += values[i].open_call;
+    dst->close_call += values[i].close_call;
+    dst->open_err += values[i].open_err;
+    dst->close_err += values[i].close_err;
+    if (!dst->comm[0] && values[i].name[0])
+        nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
 }
 
 int netdata_fd_runtime_snapshot_apps(
@@ -710,77 +717,24 @@ int netdata_fd_runtime_snapshot_apps(
     if (fd < 0)
         return -1;
 
-    /* Re-query the actual post-load map type; bpf_map__set_type can silently
-     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
-    enum bpf_map_type mtype = bpf_map__type(map);
-    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && rt->percpu_entries_cap > 0)
-                ? rt->percpu_entries_cap : 1;
     (void)maps_per_core;
 
     struct netdata_ebpf_fd_pid_entry *values = rt->percpu_entries;
     if (!values)
         return -1;
 
-    /* Single-pass with a growable persistent output buffer: no pre-count pass,
-     * no per-cycle alloc/free. */
-    size_t out_count = 0;
-    uint32_t key = 0, next_key = 0;
-    bool first_iter = true;
-
-    while (bpf_map_get_next_key(fd, first_iter ? NULL : &key, &next_key) == 0) {
-        first_iter = false;
-        if (bpf_map_lookup_elem(fd, &next_key, values)) {
-            key = next_key;
-            memset(values, 0, (size_t)count * sizeof(*values));
-            continue;
-        }
-
-        nd_ebpf_snapshot_reserve(
-            (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf), out_count);
-
-        /*
-         * With NETDATA_APPS_LEVEL_ALL the BPF key is the thread ID (TID); the
-         * process TGID is stored in values[i].tgid.  Shared memory must be
-         * indexed by TGID so cgroup.procs lookups succeed.  Fall back to
-         * next_key only when every per-CPU entry has tgid == 0 (race at entry
-         * creation; counters are zero then, so the entry is harmless).
-         */
-        uint32_t tgid = nd_ebpf_snapshot_tgid(
-            values, count, sizeof(*values), offsetof(struct netdata_ebpf_fd_pid_entry, tgid), next_key);
-
-        struct netdata_ebpf_fd_pid_snapshot *dst = &rt->items_buf[out_count];
-        memset(dst, 0, sizeof(*dst));
-        dst->pid = tgid;
-
-        for (int i = 0; i < count; i++) {
-            if (values[i].ct > dst->ct)
-                dst->ct = values[i].ct;
-            dst->open_call += values[i].open_call;
-            dst->close_call += values[i].close_call;
-            dst->open_err += values[i].open_err;
-            dst->close_err += values[i].close_err;
-            if (!dst->comm[0] && values[i].name[0])
-                nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
-        }
-        out_count++;
-
-        key = next_key;
-        memset(values, 0, (size_t)count * sizeof(*values));
-    }
+    size_t out_count = nd_ebpf_apps_snap_iterate(
+        map, fd, rt->percpu_entries_cap, values,
+        sizeof(*values),
+        offsetof(struct netdata_ebpf_fd_pid_entry, tgid),
+        (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
+        fd_apps_snap_fold, fd_snapshot_merge_same_pid);
 
     if (out_count == 0) {
         out->items = NULL;
         out->count = 0;
         return 0;
     }
-
-    /*
-     * Multiple threads of the same process produce separate BPF entries with the
-     * same TGID.  Sort by pid (TGID) and merge consecutive same-pid entries so
-     * each shared-memory slot represents one process.
-     */
-    out_count = nd_ebpf_snapshot_merge_same_pid(
-        rt->items_buf, out_count, sizeof(*rt->items_buf), fd_snapshot_merge_same_pid);
 
     out->items = rt->items_buf;
     out->count = out_count;
