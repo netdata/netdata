@@ -38,21 +38,21 @@ func publishTestTopologyBuilder(r *topologyRegistry, cache *topologyBuilder) {
 	}
 	current := r.acquireGeneration()
 	sequence := uint64(1)
-	states := make(map[string]deviceRefreshState)
+	states := make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState)
 	if current != nil {
 		sequence = current.sequence + 1
 		for _, device := range current.devices {
-			states[device.key] = deviceRefreshState{generation: device}
+			states[device.registrationID] = deviceRefreshState{generation: device}
 		}
 	}
-	key := fmt.Sprintf("test:%d", sequence)
+	registrationID := ddsnmp.DeviceRegistrationID(sequence)
 	publishedAt := time.Now()
-	states[key] = deviceRefreshState{generation: freezeTestTopologyBuilderAt(key, publishedAt, cache)}
+	states[registrationID] = deviceRefreshState{generation: freezeTestTopologyBuilderAt(registrationID, publishedAt, cache)}
 	r.publishGeneration(newTopologyGeneration(sequence, publishedAt, states))
 }
 
 func snapshotTestTopologyBuilder(c *topologyBuilder) (topologymodel.ObservationSnapshot, bool) {
-	generation := freezeTestTopologyBuilder("test", c)
+	generation := freezeTestTopologyBuilder(1, c)
 	if generation == nil || !generation.hasObservation {
 		return topologymodel.ObservationSnapshot{}, false
 	}
@@ -64,20 +64,20 @@ func trapEnrichmentForTest(c *topologyBuilder, ip, trapIfIndex string) *TrapTopo
 	if !ok {
 		return nil
 	}
-	generation := freezeTestTopologyBuilder("test", c)
+	generation := freezeTestTopologyBuilder(1, c)
 	if generation == nil {
 		return nil
 	}
 	return generation.trap.enrichmentForCanonicalSource(addr.String(), trapIfIndex)
 }
 
-func freezeTestTopologyBuilder(key string, builder *topologyBuilder) *topologyDeviceGeneration {
-	return freezeTestTopologyBuilderAt(key, time.Now(), builder)
+func freezeTestTopologyBuilder(registrationID ddsnmp.DeviceRegistrationID, builder *topologyBuilder) *topologyDeviceGeneration {
+	return freezeTestTopologyBuilderAt(registrationID, time.Now(), builder)
 }
 
-func freezeTestTopologyBuilderAt(key string, publishedAt time.Time, builder *topologyBuilder) *topologyDeviceGeneration {
+func freezeTestTopologyBuilderAt(registrationID ddsnmp.DeviceRegistrationID, publishedAt time.Time, builder *topologyBuilder) *topologyDeviceGeneration {
 	snapshot, _ := freezeTopologyBuilder(builder)
-	return activateTopologyDeviceSnapshot(key, publishedAt, snapshot)
+	return activateTopologyDeviceSnapshot(registrationID, publishedAt, snapshot)
 }
 
 func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.DeviceConnectionInfo) {

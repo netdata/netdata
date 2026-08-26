@@ -3,9 +3,10 @@
 package snmptopology
 
 import (
-	"sort"
+	"slices"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
@@ -23,7 +24,7 @@ type topologyDeviceSnapshot struct {
 // global publication boundary. Builders and unactivated snapshots are never
 // published to runtime readers.
 type topologyDeviceGeneration struct {
-	key            string
+	registrationID ddsnmp.DeviceRegistrationID
 	collectedAt    time.Time
 	expiresAt      time.Time
 	observation    topologymodel.ObservationSnapshot
@@ -60,7 +61,7 @@ func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, t
 }
 
 func activateTopologyDeviceSnapshot(
-	key string,
+	registrationID ddsnmp.DeviceRegistrationID,
 	publishedAt time.Time,
 	snapshot *topologyDeviceSnapshot,
 ) *topologyDeviceGeneration {
@@ -72,7 +73,7 @@ func activateTopologyDeviceSnapshot(
 		expiresAt = publishedAt.Add(snapshot.freshFor)
 	}
 	return &topologyDeviceGeneration{
-		key:            key,
+		registrationID: registrationID,
 		collectedAt:    snapshot.collectedAt,
 		expiresAt:      expiresAt,
 		observation:    snapshot.observation,
@@ -81,19 +82,19 @@ func activateTopologyDeviceSnapshot(
 	}
 }
 
-func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[string]deviceRefreshState) *topologyGeneration {
-	keys := make([]string, 0, len(states))
-	for key, state := range states {
+func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[ddsnmp.DeviceRegistrationID]deviceRefreshState) *topologyGeneration {
+	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(states))
+	for registrationID, state := range states {
 		if state.generation != nil {
-			keys = append(keys, key)
+			registrationIDs = append(registrationIDs, registrationID)
 		}
 	}
-	sort.Strings(keys)
+	slices.Sort(registrationIDs)
 
-	devices := make([]*topologyDeviceGeneration, 0, len(keys))
-	renderableDevices := make([]*topologyDeviceGeneration, 0, len(keys))
-	for _, key := range keys {
-		device := states[key].generation
+	devices := make([]*topologyDeviceGeneration, 0, len(registrationIDs))
+	renderableDevices := make([]*topologyDeviceGeneration, 0, len(registrationIDs))
+	for _, registrationID := range registrationIDs {
+		device := states[registrationID].generation
 		devices = append(devices, device)
 		if device.hasObservation && device.freshAt(publishedAt) {
 			renderableDevices = append(renderableDevices, device)

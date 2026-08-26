@@ -212,7 +212,7 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 
 	entries := deviceStore.Entries()
 	require.Len(t, entries, 1)
-	assert.Equal(t, collr.deviceStoreKey(), entries[0].Key)
+	assert.NotZero(t, entries[0].RegistrationID)
 	assert.Equal(t, "192.0.2.1", entries[0].Info.Hostname)
 	assert.Equal(t, 161, entries[0].Info.Port)
 	assert.Equal(t, gosnmp.Version2c.String(), entries[0].Info.SNMPVersion)

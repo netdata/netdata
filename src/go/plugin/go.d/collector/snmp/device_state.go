@@ -42,7 +42,7 @@ func (c *Collector) vnodeLabels() map[string]string {
 	return nil
 }
 
-func (c *Collector) deviceStoreKey() string {
+func (c *Collector) deviceStoreOwnerKey() string {
 	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
 }
 
@@ -60,7 +60,7 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		vnodeLabels,
 	)
 
-	c.deviceStore.Register(c.deviceStoreKey(), ddsnmp.DeviceConnectionInfo{
+	c.deviceStore.Register(c.deviceStoreOwnerKey(), ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
 		Port:            c.Options.Port,
 		SNMPVersion:     c.Options.Version,

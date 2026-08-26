@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
@@ -87,7 +88,7 @@ func testTopologyGenerationVector(sequence uint64, now time.Time, identity strin
 	devices := make([]*topologyDeviceGeneration, 2)
 	for i := range devices {
 		devices[i] = &topologyDeviceGeneration{
-			key:            fmt.Sprintf("%s-device-%d", identity, i),
+			registrationID: ddsnmp.DeviceRegistrationID(i + 1),
 			collectedAt:    now,
 			expiresAt:      now.Add(time.Hour),
 			hasObservation: true,

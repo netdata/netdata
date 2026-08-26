@@ -92,8 +92,9 @@ func TestSNMPTopologyFunctionAvailabilityChangesOnlyWithPublishedGeneration(t *t
 	builder.updateTime = publishedAt
 	builder.lastUpdate = publishedAt
 	builder.staleAfter = 20 * time.Millisecond
-	device := freezeTestTopologyBuilderAt("job-a", publishedAt, builder)
-	states := map[string]deviceRefreshState{"job-a": {generation: device}}
+	const registrationID ddsnmp.DeviceRegistrationID = 1
+	device := freezeTestTopologyBuilderAt(registrationID, publishedAt, builder)
+	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
 	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, publishedAt, states))
 
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))

@@ -341,8 +341,9 @@ func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
 				cache.lastUpdate = publishedAt
 				cache.updateTime = cache.lastUpdate
 				cache.staleAfter = time.Hour
-				device := freezeTestTopologyBuilderAt("job-a", publishedAt, cache)
-				states := map[string]deviceRefreshState{"job-a": {generation: device}}
+				const registrationID ddsnmp.DeviceRegistrationID = 1
+				device := freezeTestTopologyBuilderAt(registrationID, publishedAt, cache)
+				states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
 				registry.publishGeneration(newTopologyGeneration(2, time.Now(), states))
 			},
 			want: false,

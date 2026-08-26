@@ -69,7 +69,7 @@ flowchart TD
     Run["Run(ctx)"]
     TrapPublish["publish trap enrichment"]
     Tick["initial refresh, then every update_every"]
-    Devices["read keyed jobs from DeviceStore"]
+    Devices["read registered jobs from DeviceStore"]
     Fresh{"next retry/refresh due?"}
     Resolve["resolve DNS targets<br/>up to 8 workers, shared 5s budget"]
     Walk["SNMP walk topology profiles"]
@@ -95,18 +95,18 @@ Run(ctx)
     refreshTopologyRecovering(ctx)
 
 refreshTopology(ctx)
-  read keyed SNMP job entries from ddsnmp.DeviceStore
+  read SNMP job entries and store-owned registration IDs from ddsnmp.DeviceStore
   clone the current per-job refresh state for this sweep
   build a plan of jobs whose next retry/refresh is due
   resolve planned DNS targets with up to eight workers under one shared 5s budget
-  for each planned job, in registration-key order:
-    refreshDeviceTopology(ctx, key, device, targetManagementIPs)
+  for each planned job, in registration-ID order:
+    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
   activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, key, device, targetManagementIPs)
+refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
@@ -124,12 +124,16 @@ attempt retries after `update_every`, doubles the delay after each consecutive
 failure, and caps at `refresh_every`. Success resets the failure count and
 restores the normal interval. Retry timing is internal and has no public tuning
 option. Retryable client-construction, connection, and collection warnings use
-the logger's built-in hourly limiter keyed by opaque registration identity and
+the logger's built-in hourly limiter keyed by registration ID and
 bounded failure class; warning suppression does not change retry timing.
 
-Refresh ownership uses the opaque DeviceStore registration key, not a rebuilt
-`hostname:port` key. Two SNMP jobs targeting the same endpoint therefore keep
-independent refresh state and independent device generations.
+`DeviceStore` keeps each caller-owned key private and assigns a typed, monotonic
+registration ID to each uninterrupted registration lifetime. Updating a live
+registration retains its ID; unregistering and registering the same owner key
+again receives a new ID. Refresh ownership uses that ID, not the owner key or a
+rebuilt `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore
+keep independent refresh state and device generations, and a replacement job
+cannot inherit the removed job's retry or warning-limiter state.
 
 Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh
@@ -226,16 +230,16 @@ Finalization converts the builder into an immutable `topologyDeviceGeneration`:
   reverse-DNS readers;
 - immutable trap-match, interface-name, and neighbor indexes;
 - collection and expiry timestamps;
-- the opaque DeviceStore registration key.
+- the typed DeviceStore registration ID.
 
-The collector separately owns `deviceRefreshState` per registration key. It
+The collector separately owns `deviceRefreshState` per registration ID. It
 tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,
 consecutive failures, and the last successful device generation.
 
 ## Registry And Snapshot
 
 `topology_registry.go` owns one atomic pointer to the latest immutable
-`topologyGeneration`. The generation contains the complete, registration-key
+`topologyGeneration`. The generation contains the complete, registration-ID
 ordered vector produced by one refresh sweep.
 
 ```text

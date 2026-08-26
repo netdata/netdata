@@ -475,7 +475,7 @@ func BenchmarkTopologyGenerationAliasSnapshotRead(b *testing.B) {
 					IfIndex: fmt.Sprintf("%d", i+1),
 				}
 			}
-			generation := freezeTestTopologyBuilder("benchmark", cache)
+			generation := freezeTestTopologyBuilder(1, cache)
 			if generation == nil || !generation.hasObservation {
 				b.Fatal("benchmark cache is not renderable")
 			}

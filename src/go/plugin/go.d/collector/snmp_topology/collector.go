@@ -74,7 +74,7 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 	}
 	metricStore := metrix.NewCollectorStore()
 	return &Collector{
-		deviceStates:     make(map[string]deviceRefreshState),
+		deviceStates:     make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
 		topologyRegistry: newTopologyRegistryWithResolver(reverseDNS),
 		deviceSource:     deviceStore,
 		trapEnrichment:   trapEnrichment,
@@ -96,7 +96,7 @@ type (
 		collectorapi.Base `yaml:",inline"`
 		Config            `yaml:",inline"`
 
-		deviceStates       map[string]deviceRefreshState
+		deviceStates       map[ddsnmp.DeviceRegistrationID]deviceRefreshState
 		generationSequence uint64
 		topologyRegistry   *topologyRegistry
 		deviceSource       deviceSource
@@ -183,7 +183,7 @@ const (
 )
 
 type topologyRefreshDevicePlan struct {
-	key                 string
+	registrationID      ddsnmp.DeviceRegistrationID
 	device              ddsnmp.DeviceConnectionInfo
 	targetManagementIPs []netip.Addr
 }
@@ -226,7 +226,7 @@ func (c *Collector) Cleanup(context.Context) {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
-	c.deviceStates = make(map[string]deviceRefreshState)
+	c.deviceStates = make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState)
 	c.topologyRegistry.publishGeneration(nil)
 	c.recordCleanupStats()
 }
@@ -239,23 +239,23 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	entries := c.getRegisteredDevices()
 	refreshEvery := c.refreshEvery()
 	now := c.currentTime()
-	seen := make(map[string]bool, len(entries))
+	seen := make(map[ddsnmp.DeviceRegistrationID]bool, len(entries))
 	stats := refreshStats{
 		hasDeviceCounts:   true,
 		registeredDevices: len(entries),
 	}
 	nextStates := cloneDeviceRefreshStates(c.deviceStates)
-	successfulSnapshots := make(map[string]*topologyDeviceSnapshot)
+	successfulSnapshots := make(map[ddsnmp.DeviceRegistrationID]*topologyDeviceSnapshot)
 
 	plans := make([]topologyRefreshDevicePlan, 0, len(entries))
 	for _, entry := range entries {
-		key := entry.Key
+		registrationID := entry.RegistrationID
 		dev := entry.Info
-		seen[key] = true
+		seen[registrationID] = true
 
-		state, exists := nextStates[key]
+		state, exists := nextStates[registrationID]
 		if !exists || state.nextRetry.IsZero() || !now.Before(state.nextRetry) {
-			plans = append(plans, topologyRefreshDevicePlan{key: key, device: dev})
+			plans = append(plans, topologyRefreshDevicePlan{registrationID: registrationID, device: dev})
 		}
 	}
 
@@ -271,9 +271,9 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 			break
 		}
 		attemptedAt := c.currentTime()
-		state := nextStates[plan.key]
+		state := nextStates[plan.registrationID]
 		state.lastAttempt = attemptedAt
-		snapshot, outcome := c.refreshDeviceTopology(ctx, plan.key, plan.device, plan.targetManagementIPs)
+		snapshot, outcome := c.refreshDeviceTopology(ctx, plan.registrationID, plan.device, plan.targetManagementIPs)
 		if ctx.Err() != nil {
 			break
 		}
@@ -282,7 +282,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		state.outcome = outcome
 		switch outcome {
 		case deviceRefreshOutcomeSuccess:
-			successfulSnapshots[plan.key] = snapshot
+			successfulSnapshots[plan.registrationID] = snapshot
 			state.lastSuccess = completedAt
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
@@ -301,7 +301,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 				state.consecutiveFailures,
 			))
 		}
-		nextStates[plan.key] = state
+		nextStates[plan.registrationID] = state
 	}
 
 	if ctx.Err() != nil {
@@ -313,10 +313,10 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 
 	pruneUnregisteredDeviceStates(nextStates, seen)
 	publishedAt := c.currentTime()
-	for key, snapshot := range successfulSnapshots {
-		state := nextStates[key]
-		state.generation = activateTopologyDeviceSnapshot(key, publishedAt, snapshot)
-		nextStates[key] = state
+	for registrationID, snapshot := range successfulSnapshots {
+		state := nextStates[registrationID]
+		state.generation = activateTopologyDeviceSnapshot(registrationID, publishedAt, snapshot)
+		nextStates[registrationID] = state
 	}
 	c.deviceStates = nextStates
 	c.generationSequence++
@@ -358,7 +358,7 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 // changing the generation currently visible to readers.
 func (c *Collector) refreshDeviceTopology(
 	ctx context.Context,
-	key string,
+	registrationID ddsnmp.DeviceRegistrationID,
 	dev ddsnmp.DeviceConnectionInfo,
 	targetManagementIPs []netip.Addr,
 ) (*topologyDeviceSnapshot, deviceRefreshOutcome) {
@@ -368,7 +368,7 @@ func (c *Collector) refreshDeviceTopology(
 
 	snmpClient, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
 	if err != nil {
-		c.warnTopologyRefreshFailure(key, topologyRefreshFailureClient,
+		c.warnTopologyRefreshFailure(registrationID, topologyRefreshFailureClient,
 			"device '%s': failed to create SNMP client: %v", dev.Hostname, err)
 		return nil, deviceRefreshOutcomeFailed
 	}
@@ -379,7 +379,7 @@ func (c *Collector) refreshDeviceTopology(
 		if ctx.Err() != nil {
 			return nil, deviceRefreshOutcomeFailed
 		}
-		c.warnTopologyRefreshFailure(key, topologyRefreshFailureConnect,
+		c.warnTopologyRefreshFailure(registrationID, topologyRefreshFailureConnect,
 			"device '%s': failed to connect: %v", dev.Hostname, err)
 		return nil, deviceRefreshOutcomeFailed
 	}
@@ -413,7 +413,7 @@ func (c *Collector) refreshDeviceTopology(
 		if ctx.Err() != nil {
 			return nil, deviceRefreshOutcomeFailed
 		}
-		c.warnTopologyRefreshFailure(key, topologyRefreshFailureCollection,
+		c.warnTopologyRefreshFailure(registrationID, topologyRefreshFailureCollection,
 			"device '%s': topology collection failed: %v", dev.Hostname, err)
 		return nil, deviceRefreshOutcomeFailed
 	}
@@ -447,8 +447,8 @@ func (c *Collector) refreshDeviceTopology(
 	return c.freezeTopologyBuilder(next), deviceRefreshOutcomeSuccess
 }
 
-func (c *Collector) warnTopologyRefreshFailure(key, class, format string, args ...any) {
-	c.Limit("snmp_topology:refresh:"+key+":"+class, 1, topologyRefreshWarningEvery).Warningf(format, args...)
+func (c *Collector) warnTopologyRefreshFailure(registrationID ddsnmp.DeviceRegistrationID, class, format string, args ...any) {
+	c.Limit("snmp_topology:refresh:"+registrationID.String()+":"+class, 1, topologyRefreshWarningEvery).Warningf(format, args...)
 }
 
 func (c *Collector) resolveTopologyTargetManagementIPs(
@@ -458,8 +458,8 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	maxWorkers int,
 ) {
 	type lookupJob struct {
-		planIndex int
-		key       string
+		planIndex      int
+		registrationID ddsnmp.DeviceRegistrationID
 	}
 
 	jobs := make([]lookupJob, 0, len(plans))
@@ -473,7 +473,7 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 			continue
 		}
 		if c.resolveTargetIPs != nil {
-			jobs = append(jobs, lookupJob{planIndex: i, key: plans[i].key})
+			jobs = append(jobs, lookupJob{planIndex: i, registrationID: plans[i].registrationID})
 		}
 	}
 	if len(jobs) == 0 || budget <= 0 || maxWorkers <= 0 || ctx.Err() != nil {
@@ -481,8 +481,8 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	}
 
 	sort.SliceStable(jobs, func(i, j int) bool {
-		if jobs[i].key != jobs[j].key {
-			return jobs[i].key < jobs[j].key
+		if jobs[i].registrationID != jobs[j].registrationID {
+			return jobs[i].registrationID < jobs[j].registrationID
 		}
 		return jobs[i].planIndex < jobs[j].planIndex
 	})
@@ -570,18 +570,18 @@ func (c *Collector) resolveDeviceTargetManagementIPs(ctx context.Context, dev dd
 	return normalizeTargetManagementIPs(addrs)
 }
 
-func cloneDeviceRefreshStates(states map[string]deviceRefreshState) map[string]deviceRefreshState {
-	cloned := make(map[string]deviceRefreshState, len(states))
-	for key, state := range states {
-		cloned[key] = state
+func cloneDeviceRefreshStates(states map[ddsnmp.DeviceRegistrationID]deviceRefreshState) map[ddsnmp.DeviceRegistrationID]deviceRefreshState {
+	cloned := make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState, len(states))
+	for registrationID, state := range states {
+		cloned[registrationID] = state
 	}
 	return cloned
 }
 
-func pruneUnregisteredDeviceStates(states map[string]deviceRefreshState, seen map[string]bool) {
-	for key := range states {
-		if !seen[key] {
-			delete(states, key)
+func pruneUnregisteredDeviceStates(states map[ddsnmp.DeviceRegistrationID]deviceRefreshState, seen map[ddsnmp.DeviceRegistrationID]bool) {
+	for registrationID := range states {
+		if !seen[registrationID] {
+			delete(states, registrationID)
 		}
 	}
 }
