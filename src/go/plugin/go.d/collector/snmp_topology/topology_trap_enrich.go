@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"maps"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -171,9 +172,7 @@ func newTopologyTrapDeviceGeneration(builder *topologyBuilder) topologyTrapDevic
 	} else {
 		generation.sourceVnodeID = strings.TrimSpace(builder.localDevice.AgentID)
 	}
-	for ip, method := range builder.trapMatchMethodByIP {
-		generation.matchMethodByIP[ip] = method
-	}
+	maps.Copy(generation.matchMethodByIP, builder.trapMatchMethodByIP)
 	for ifIndex, ifName := range builder.ifNamesByIndex {
 		if ifName = strings.TrimSpace(ifName); ifName != "" {
 			generation.interfaceByIndex[ifIndex] = ifName

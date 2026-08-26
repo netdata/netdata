@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"net/netip"
 	"runtime/debug"
@@ -572,9 +573,7 @@ func (c *Collector) resolveDeviceTargetManagementIPs(ctx context.Context, dev dd
 
 func cloneDeviceRefreshStates(states map[ddsnmp.DeviceRegistrationID]deviceRefreshState) map[ddsnmp.DeviceRegistrationID]deviceRefreshState {
 	cloned := make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState, len(states))
-	for registrationID, state := range states {
-		cloned[registrationID] = state
-	}
+	maps.Copy(cloned, states)
 	return cloned
 }
 
