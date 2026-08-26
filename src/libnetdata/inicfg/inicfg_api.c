@@ -415,7 +415,7 @@ static STRING *reformat_duration_days_to_seconds(STRING *value) {
 
 time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *section, const char *name, unsigned default_value_seconds) {
     char default_str[128];
-    duration_snprintf(default_str, sizeof(default_str), (int)default_value_seconds, "s", false);
+    duration_snprintf(default_str, sizeof(default_str), (int64_t)default_value_seconds, "s", false);
 
     struct config_option *opt = inicfg_get_raw_value(
         root, section, name, default_str,
