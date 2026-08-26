@@ -415,7 +415,7 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
 // loop only ever look at the single rule they are given. Validating just the head of the chain let
 // a rule with no 'on' through, and such a rule then attached the alert to every chart of the host
 // (netdata/netdata#23483).
-const char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t) {
+static const char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t) {
     if(t->match.is_template) {
         if(!t->match.on.context)
             return "missing match 'on' parameter for context";
@@ -442,12 +442,12 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, const char **msg) {
         if(!reason)
             continue;
 
-        // t->config.name and t->config.source are only filled in for the head of a chain built
-        // from a dyncfg payload, so fall back to the head for a message that identifies the alert
+        // config.source is set only for prototypes loaded from a health .conf file
+        // (health_config.c); a dyncfg payload never carries one.
         netdata_log_error(
             "HEALTH: alert '%s' rule %zu is invalid: %s. Source: %s",
             string2str(ap->config.name), rule, reason,
-            string2str(t->config.source ? t->config.source : ap->config.source));
+            string2str(t->config.source));
 
         if(msg)
             *msg = reason;

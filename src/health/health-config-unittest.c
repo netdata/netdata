@@ -1089,7 +1089,12 @@ static int test_dyncfg_rejection_keeps_detail_in_response(int *passed) {
 }
 
 static int test_file_invalid_same_name_rule_is_skipped(int *passed) {
-    char filename[] = "./netdata-health-config-unittest-XXXXXX";
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/netdata-health-config-unittest-XXXXXX", tmpdir);
     int fd = mkstemp(filename);
     if(fd == -1) {
         fprintf(stderr, "FAILED [file invalid same-name rule]: cannot create fixture\n");
@@ -1130,6 +1135,7 @@ static int test_file_invalid_same_name_rule_is_skipped(int *passed) {
     dictionary_flush(health_globals.prototypes.dict);
 
     int failed = 0;
+    // healthconfigtest does not initialize db_meta, so prototype persistence logs SQLITE_MISUSE.
     bool loaded = health_readfile(filename, NULL, false) == 1;
     RRD_ALERT_PROTOTYPE *cpu = dictionary_get(health_globals.prototypes.dict, "10min_cpu_usage");
     RRD_ALERT_PROTOTYPE *windows = NULL;
