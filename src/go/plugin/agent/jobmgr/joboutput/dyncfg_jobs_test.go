@@ -841,7 +841,7 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(t *testing.T) {
 	}
 	controller.modules["module"] = creator
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(
+	require.NoError(t, controller.BindBackgroundWorkers(
 		commands,
 		1,
 		func(error) {},
@@ -948,8 +948,8 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(t *testing.T) {
 	require.Equal(t, []string{"autodetection", "current-stop", "current-finalize"}, events)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, retryTasks.LongLivedCensus())
 
-	controller.scheduler.StopAutoDetectionRetries()
-	require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+	controller.scheduler.StopBackgroundWorkers()
+	require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 }
 
 func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
@@ -1029,7 +1029,7 @@ func TestDiscoveredTransientConstructionFailureCommitsFailedAndSchedulesRetry(t 
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	installFailingFixtureResolver(t, controller)
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 1, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 1, func(error) {}))
 
 	config := factoryTestConfig(false)
 	config.Set("option", "${fixture:value}")
@@ -1107,7 +1107,7 @@ func TestManualEnableTransientConstructionFailureCommitsFailedAndSchedulesRetry(
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	installFailingFixtureResolver(t, controller)
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 1, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 1, func(error) {}))
 
 	config := factoryTestConfig(false)
 	config.Set("option", "${fixture:value}")
@@ -1165,7 +1165,7 @@ func TestRunningUpdateTransientConstructionFailureCommitsFailedAndSchedulesRetry
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	installFailingFixtureResolver(t, controller)
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 1, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 1, func(error) {}))
 
 	config := factoryTestConfig(false)
 	config.Set("autodetection_retry", 1)
