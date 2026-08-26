@@ -708,6 +708,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
             pgc_open_add_hot_page(
                 (Word_t)ctx,
                 descr->metric_id,
+                descr->uuid_id,
                 (time_t)(descr->start_time_ut / USEC_PER_SEC),
                 (time_t)(descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,

@@ -8,6 +8,29 @@
 #include "libnetdata/locks/locks.h"
 #include "rrddiskprotocol.h"
 
+// METRIC lifetime rules:
+//
+// 1. A METRIC is kept alive by its refcount. Only an acquired reference
+//    (metric_acquire(), mrg_metric_dup(), mrg_metric_get_and_acquire*())
+//    guarantees the object stays valid.
+//
+// 2. A bare METRIC pointer stored elsewhere -- notably PGC's page->metric_id,
+//    which is (Word_t)metric -- is NOT a reference and does NOT keep the
+//    metric alive. Such a pointer can be stale.
+//
+// 3. Acquiring from a possibly stale pointer is NOT safe: aral_freez() lets
+//    ARAL write its free-list header over the first 16 bytes of the element,
+//    which overlays uuid and refcount. A freed slot can therefore present a
+//    refcount that metric_acquire() happily accepts. Do not treat a successful
+//    acquire on an unowned pointer as proof the metric is alive.
+//
+// 4. uuid never changes and every live METRIC holds its uuidmap reference for
+//    its whole lifetime: metric_add_and_acquire() takes it, and metric_release()
+//    drops it via uuidmap_free() on the deletion branch below. So an id that
+//    resolves through the MRG index is necessarily backed by a live metric --
+//    which is why callers holding an unowned pointer should resolve the metric
+//    by id (mrg_metric_get_and_acquire_by_id()) instead of dereferencing it.
+//
 struct metric {
     Word_t section;                 // never changes
     UUIDMAP_ID uuid;                 // never changes

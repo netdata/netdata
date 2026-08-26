@@ -701,10 +701,1217 @@ static int mrg_stale_peeked_id_unittest(void) {
     return errors;
 }
 
+// Locks in the contract that pgc_open_cache_to_journal_v2() depends on when it
+// casts a PGC page's bare metric_id back to a METRIC *.
+//
+// PGC pages store metric_id = (Word_t)metric WITHOUT holding an MRG reference,
+// so that pointer can outlive the METRIC. Two things then matter:
+//
+//   1. mrg_metric_dup() CANNOT reject such a pointer. ARAL writes its free-list
+//      header over the first 16 bytes of a freed element, which on 64bit
+//      overlays metric->uuid and metric->refcount with the halves of the
+//      free-list 'next' pointer. With 'next' NULL the refcount reads 0, which
+//      is a legal unreferenced-but-alive value, so the acquire succeeds.
+//
+//   2. Because it succeeds, a NULL uuid is not a safe signal to act on: it is
+//      still the result of dereferencing a dead pointer. Production code must
+//      not dereference such a pointer at all; it carries the UUIDMAP_ID and
+//      resolves that through the MRG index instead.
+//
+// The guard below is keyed to FSANITIZE_ADDRESS, which is what makes ARAL fall
+// back to plain malloc/free (see aral_mallocz_internal() / aral_freez_internal()
+// in src/libnetdata/aral/aral.c). ONLY in that configuration is the access below
+// a real use-after-free, and only then must the test be skipped.
+//
+// -DENABLE_ADDRESS_SANITIZER defines FSANITIZE_ADDRESS itself
+// (packaging/cmake/Modules/NetdataCompilerFlags.cmake), so an ASan build skips
+// this test through the guard below; ARAL without its pooling is what ASan needs
+// to see the free at all.
+//
+// It is deliberately NOT keyed to __SANITIZE_ADDRESS__, which only says the
+// translation unit is instrumented. Instrumentation without the ARAL bypass
+// leaves the element inside a live ARAL page, so the access below is ordinary
+// in-bounds memory that ASan has nothing to say about, and skipping on it would
+// drop this coverage for no reason.
+static int mrg_stale_metric_pointer_unittest(void) {
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "\nTesting stale METRIC pointer contract... SKIPPED (FSANITIZE_ADDRESS)\n");
+    return 0;
+#else
+    fprintf(stderr, "\nTesting stale METRIC pointer contract (deterministic)...\n");
+    int errors = 0;
+
+    MRG *mrg = mrg_create_for_unittest();
+
+    nd_uuid_t victim;
+    uuid_generate_random(victim);
+
+    bool added = false;
+    MRG_ENTRY entry = {
+        .uuid = &victim,
+        .section = (Word_t)&test_ctx_0,
+        .first_time_s = 0,          // no retention, so it is deletable on release
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+    METRIC *metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!metric) {
+        fprintf(stderr, "ERROR: cannot add the victim metric\n");
+        (void)mrg_destroy(mrg);
+        return 1;
+    }
+
+    // Keep the raw pointer exactly the way a PGC page keeps page->metric_id:
+    // as a bare value, with no reference behind it.
+    METRIC *stale = (METRIC *)(uintptr_t)mrg_metric_id(mrg, metric);
+
+    // Delete it. From here on `stale` points into the MRG partition ARAL's
+    // free list - this is the situation a page with a stale metric_id is in.
+    if(!mrg_metric_release_and_delete(mrg, metric)) {
+        fprintf(stderr, "ERROR: the victim metric was not deleted\n");
+        (void)mrg_destroy(mrg);
+        return 1;
+    }
+
+    // Snapshot the overlaid bytes so we can put them back: the acquire below
+    // mutates the free-list 'next' pointer this slot now holds.
+    REFCOUNT refcount_before = __atomic_load_n(&stale->refcount, __ATOMIC_RELAXED);
+
+    METRIC *resurrected = mrg_metric_dup(mrg, stale);
+    if(!resurrected) {
+        // The acquire refused the freed slot. That is strictly better than what
+        // we expect, and it means the hazard below cannot arise in this build.
+        // Not an error - just record that the premise did not apply here.
+        fprintf(stderr, "  note: acquire refused the freed slot (refcount read %d)\n",
+                refcount_before);
+    }
+    else {
+        // THE assertion: an acquire that succeeded on a dead pointer must not
+        // also produce a resolvable uuid. This is a premise test only: neither
+        // outcome makes dereferencing an unowned pointer valid.
+        nd_uuid_t *uuid = mrg_metric_uuid(mrg, resurrected);
+        if(uuid) {
+            char b[UUID_STR_LEN] = "?";
+            uuid_unparse_lower(*uuid, b);
+            fprintf(stderr,
+                    "ERROR: a freed METRIC was re-acquired AND resolved to uuid %s - "
+                    "the stale-pointer contract is broken\n", b);
+            errors++;
+        }
+
+        // Undo the acquire by hand. mrg_metric_release() must NOT be used here:
+        // it is exactly the double free this test exists to describe. Restore
+        // the bytes the acquire changed, and the stats it bumped, so the ARAL
+        // free list and the MRG counters are consistent for mrg_destroy().
+        __atomic_store_n(&stale->refcount, refcount_before, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&mrg->index[stale->partition].stats.current_references, 1, __ATOMIC_RELAXED);
+        if(refcount_before == 0)
+            __atomic_sub_fetch(&mrg->index[stale->partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+    }
+
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
+        errors++;
+    }
+
+    if(errors)
+        fprintf(stderr, "Stale METRIC pointer test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "Stale METRIC pointer test: OK\n");
+
+    return errors;
+#endif
+}
+
+// Regression test for the jv2 stale-metric double free.
+//
+// Guards the !uuid branch of pgc_open_cache_to_journal_v2(): it must skip the
+// page WITHOUT releasing the metric. Releasing a stale METRIC takes the bogus
+// refcount it read out of the ARAL free list down to DELETED and aral_freez()es
+// an already-free element - the 'ARAL: mrg[N] double free' fatal seen in the
+// field.
+//
+// mrg_stale_metric_pointer_unittest() above establishes WHY a stale pointer
+// survives the acquire. This test drives the real function and asserts the
+// behaviour, so it fails against the pre-fix code instead of passing anyway.
+//
+// THE assertion is that the indexer leaves the freed slot COMPLETELY UNTOUCHED.
+// Anything weaker is not enough: an earlier version of this fix skipped the page
+// without RELEASING the metric, which stopped the double free but left the bogus
+// acquire's refcount CAS in place - and on a freed slot refcount is the high half
+// of ARAL's free-list 'next' pointer, so the free list stayed corrupted and the
+// next allocation from that page returned a wild pointer. A test that only
+// checked "was not released" passed that broken change.
+//
+// To keep every outcome an integer comparison rather than a crash, we plant
+// refcount = PLANTED (> 1) instead of the 0 that a NULL free-list 'next'
+// naturally produces. Untouched => PLANTED. Acquired and left outstanding =>
+// PLANTED+1. Acquired then released => PLANTED again, which refcount alone
+// cannot distinguish from correct - so we also assert on uuid and on the MRG
+// reference counter.
+//
+// Same guard rationale as mrg_stale_metric_pointer_unittest() above: keyed to
+// FSANITIZE_ADDRESS because that is what bypasses ARAL, not to the presence of
+// -fsanitize=address.
+static bool jv2_stale_metric_migrate_cb(
+    Word_t section __maybe_unused, unsigned datafile_fileno __maybe_unused,
+    uint8_t type __maybe_unused, Pvoid_t JudyL_metrics __maybe_unused,
+    Pvoid_t JudyL_extents_pos __maybe_unused, size_t count_of_unique_extents __maybe_unused,
+    size_t count_of_unique_metrics __maybe_unused, size_t count_of_unique_pages __maybe_unused,
+    void *data __maybe_unused) {
+    // false => the caller unwinds the pages without trying to write a journal
+    return false;
+}
+
+static void jv2_stale_metric_free_clean_cb(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused) { ; }
+static void jv2_stale_metric_save_dirty_cb(
+    PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused,
+    PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) { ; }
+
+static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC... SKIPPED (FSANITIZE_ADDRESS)\n");
+    return 0;
+#else
+    fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC (deterministic)...\n");
+    int errors = 0;
+
+    enum {
+        TEST_FILENO = 7,
+        PLANTED     = 5,        // > 1, so a release cannot reach aral_freez()
+    };
+    const Word_t section = (Word_t)&test_ctx_0;
+
+    MRG *mrg = mrg_create_for_unittest();
+
+    // pgc_open_cache_to_journal_v2() resolves metrics through the global
+    // main_mrg, so point it at our test MRG for the duration.
+    MRG *saved_main_mrg = main_mrg;
+    main_mrg = mrg;
+
+    PGC *cache = pgc_create(
+        "jv2-stale-metric-test",
+        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
+        64, NULL, jv2_stale_metric_save_dirty_cb,
+        10, 10, 1000, 10,
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+
+    // 1. a real metric, with no retention so it is deletable on release
+    nd_uuid_t victim;
+    uuid_generate_random(victim);
+    bool added = false;
+    MRG_ENTRY entry = {
+        .uuid = &victim,
+        .section = section,
+        .first_time_s = 0,
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+    METRIC *metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!metric) {
+        fprintf(stderr, "ERROR: cannot add the victim metric\n");
+        pgc_destroy(cache, false);
+        main_mrg = saved_main_mrg;
+        (void)mrg_destroy(mrg);
+        return 1;
+    }
+
+    METRIC *stale = (METRIC *)(uintptr_t)mrg_metric_id(mrg, metric);
+
+    // The id the open-cache page will carry. Captured while the metric is still
+    // alive, exactly as pgc_open_add_hot_page() does in production. After the
+    // delete below it no longer resolves, which is what the indexer must detect.
+    const UUIDMAP_ID stale_uuid_id = mrg_metric_uuidmap_id(mrg, metric);
+    const uint8_t stale_partition = stale->partition;   // survives the free (offset > 16)
+
+    // 2. delete it - `stale` now points into the partition ARAL's free list,
+    //    exactly like a PGC page holding a metric_id whose METRIC has gone.
+    if(!mrg_metric_release_and_delete(mrg, metric)) {
+        fprintf(stderr, "ERROR: the victim metric was not deleted\n");
+        pgc_destroy(cache, false);
+        main_mrg = saved_main_mrg;
+        (void)mrg_destroy(mrg);
+        return 1;
+    }
+
+    // 3. plant the overlaid bytes. uuid 0 makes mrg_metric_uuid() return NULL,
+    //    which is what a freed slot with a NULL free-list 'next' produces.
+    //    refcount PLANTED keeps a release away from the deletion path so the
+    //    pre-fix behaviour is measurable instead of fatal.
+    //
+    //    uuid and refcount together ARE this slot's free-list 'next' pointer.
+    //    Snapshot BOTH before overwriting and restore exactly these values at
+    //    teardown. Restoring zeros instead would be correct only while this
+    //    slot happens to be the tail of its incoming list; on any other slot it
+    //    would cut every entry behind it out of the free list.
+    const UUIDMAP_ID overlay_uuid_before = __atomic_load_n(&stale->uuid, __ATOMIC_RELAXED);
+    const REFCOUNT overlay_refcount_before = __atomic_load_n(&stale->refcount, __ATOMIC_RELAXED);
+
+    __atomic_store_n(&stale->uuid, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&stale->refcount, (REFCOUNT)PLANTED, __ATOMIC_RELAXED);
+
+    // 4. a hot page in the section/datafile the indexer will walk, carrying the
+    //    stale pointer as its metric_id - the production layout.
+    struct extent_io_data xio = {
+        .fileno = TEST_FILENO,
+        .block = 4096,
+        .bytes = 4096,
+        .uuid_id = stale_uuid_id,
+    };
+    bool page_added = false;
+    PGC_PAGE *page = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section,
+        .metric_id = (Word_t)stale,
+        .start_time_s = 100,
+        .end_time_s = 200,
+        .size = 4096,
+        .data = NULL,
+        .update_every_s = 1,
+        .hot = true,
+        .custom_data = (uint8_t *)&xio,
+    }, &page_added);
+
+    if(!page || !page_added) {
+        fprintf(stderr, "ERROR: cannot add the hot page carrying the stale metric_id\n");
+        if(page) pgc_page_release(cache, page);
+        pgc_destroy(cache, false);
+        main_mrg = saved_main_mrg;
+        (void)mrg_destroy(mrg);
+        return 1;
+    }
+
+    // 5. run the indexer over it.
+    //    Snapshot the partition's search-miss counter first: a correct indexer
+    //    resolves the metric through the MRG index, so a dead id MUST show up
+    //    here as a miss. A version that went back to dereferencing
+    //    page->metric_id would never perform a lookup at all, and this counter
+    //    would not move. That is what makes this test discriminate - the
+    //    slot-unchanged assertions below cannot, because an acquire followed by
+    //    a release restores every byte it touched.
+    const size_t misses_before =
+        __atomic_load_n(&mrg->index[stale_partition].stats.search_misses, __ATOMIC_RELAXED);
+
+    pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
+                                 jv2_stale_metric_migrate_cb, NULL, true);
+
+    const size_t misses_after =
+        __atomic_load_n(&mrg->index[stale_partition].stats.search_misses, __ATOMIC_RELAXED);
+
+    // 6. THE assertion: the freed slot must be bit-for-bit unchanged, and the
+    //    MRG must not have recorded a reference against it.
+    REFCOUNT after_refcount = __atomic_load_n(&stale->refcount, __ATOMIC_RELAXED);
+    UUIDMAP_ID after_uuid = __atomic_load_n(&stale->uuid, __ATOMIC_RELAXED);
+
+    if(after_refcount != (REFCOUNT)PLANTED) {
+        fprintf(stderr,
+                "ERROR: pgc_open_cache_to_journal_v2() mutated a freed slot's "
+                "refcount (%d -> %d). refcount is the high half of ARAL's "
+                "free-list 'next' pointer, so this corrupts the free list\n",
+                (int)PLANTED, (int)after_refcount);
+        errors++;
+    }
+
+    if(after_uuid != 0) {
+        fprintf(stderr,
+                "ERROR: pgc_open_cache_to_journal_v2() mutated a freed slot's "
+                "uuid (0 -> %" PRIu32 ") - the low half of the same free-list pointer\n",
+                after_uuid);
+        errors++;
+    }
+
+    if(__atomic_load_n(&mrg->index[stale_partition].stats.current_references,
+                       __ATOMIC_RELAXED) != 0) {
+        fprintf(stderr,
+                "ERROR: the indexer took an MRG reference on a dead metric "
+                "(current_references != 0)\n");
+        errors++;
+    }
+
+    if(misses_after == misses_before) {
+        fprintf(stderr,
+                "ERROR: the indexer did not look the metric up in the MRG index "
+                "(search_misses unchanged at %zu) - it must resolve the page's "
+                "uuid_id, never dereference page->metric_id\n",
+                misses_after);
+        errors++;
+    }
+
+    // 7. tear down without touching the stale slot through the MRG API.
+    pgc_page_release(cache, page);
+    pgc_destroy(cache, false);
+
+    // Restore the overlay bytes THIS TEST planted. A correct indexer changes
+    // nothing here, so there is nothing of its doing to undo - and no MRG stats
+    // compensation, because it never acquires the dead metric. The assertion
+    // above is what proves that.
+    //
+    // Restore the SNAPSHOT, not zeros: these two fields are the slot's
+    // free-list 'next' pointer, and zeroing a non-NULL one would cut every slot
+    // behind it out of the list.
+    __atomic_store_n(&stale->refcount, overlay_refcount_before, __ATOMIC_RELAXED);
+    __atomic_store_n(&stale->uuid, overlay_uuid_before, __ATOMIC_RELAXED);
+
+    main_mrg = saved_main_mrg;
+
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
+        errors++;
+    }
+
+    if(errors)
+        fprintf(stderr, "jv2 stale METRIC test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "jv2 stale METRIC test: OK\n");
+
+    return errors;
+#endif
+}
+
+// Captures what the indexer grouped, so the test can assert on it.
+struct jv2_group_capture {
+    size_t metrics;
+    size_t pages;
+    size_t pages_in_judy;       // pages actually reachable in the per-metric JudyLs
+    bool number_of_pages_ok;    // every mi->number_of_pages matched its JudyL count
+    bool called;
+    bool return_success;        // what the callback reports to the indexer
+
+    size_t extents;             // extents the indexer reports to the writer
+    bool writer_invariants_ok;  // what journalfile_migrate_to_v2_callback() would need
+
+    // the single indexed page, when there is exactly one
+    time_t only_end_time_s;
+    size_t only_page_length;
+    uint32_t only_update_every_s;
+    uint32_t only_extent_index;
+};
+
+static bool jv2_group_capture_cb(
+    Word_t section __maybe_unused, unsigned datafile_fileno __maybe_unused,
+    uint8_t type __maybe_unused, Pvoid_t JudyL_metrics,
+    Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents,
+    size_t count_of_unique_metrics, size_t count_of_unique_pages,
+    void *data) {
+    struct jv2_group_capture *c = data;
+    c->metrics = count_of_unique_metrics;
+    c->pages = count_of_unique_pages;
+    c->extents = count_of_unique_extents;
+    c->called = true;
+
+    // Re-derive what journalfile_migrate_to_v2_callback() relies on: it writes a
+    // metric's page descriptors by WALKING JudyL_pages_by_start_time, but advances
+    // pages_offset by mi->number_of_pages. If those two disagree its offset check
+    // fails and the entire migration is discarded, so assert the invariant here
+    // rather than only counting pages.
+    c->number_of_pages_ok = true;
+    c->writer_invariants_ok = true;
+    c->pages_in_judy = 0;
+
+    // The real writer sizes the file from count_of_unique_pages /
+    // count_of_unique_extents, but then addresses it through per-metric and
+    // per-extent numbers. Check the two things it would trip on, so a stubbed
+    // callback still catches a miscounted migration:
+    //
+    //   1. sum(mi->number_of_pages) == count_of_unique_pages, because pages_offset
+    //      is advanced per metric while the file was sized from the total.
+    //   2. extent indices are exactly 0..count_of_unique_extents-1, because
+    //      journalfile_v2_write_extent_list() writes at j2_extent_base[ei->index]
+    //      and returns base + count.
+    size_t total_pages_claimed = 0;
+
+    Pvoid_t seen_extent_index = NULL;
+    size_t extents_walked = 0;
+    Pvoid_t *ext_pptr;
+    bool ext_first = true;
+    Word_t ext_block = 0;
+    while((ext_pptr = JudyLFirstThenNext(JudyL_extents_pos, &ext_block, &ext_first))) {
+        struct jv2_extents_info *ei = *ext_pptr;
+        extents_walked++;
+
+        if(ei->index >= count_of_unique_extents) {
+            fprintf(stderr, "ERROR: extent index %u is out of range for %zu extents\n",
+                    ei->index, count_of_unique_extents);
+            c->writer_invariants_ok = false;
+            continue;
+        }
+
+        Pvoid_t *seen = JudyLIns(&seen_extent_index, (Word_t)ei->index, PJE0);
+        if(!seen || seen == PJERR) {
+            fprintf(stderr, "ERROR: cannot record extent index %u\n", ei->index);
+            c->writer_invariants_ok = false;
+        }
+        else if(*seen) {
+            fprintf(stderr, "ERROR: extent index %u is used twice\n", ei->index);
+            c->writer_invariants_ok = false;
+        }
+        else
+            *seen = (void *)ei;
+    }
+    JudyLFreeArray(&seen_extent_index, PJE0);
+
+    if(extents_walked != count_of_unique_extents) {
+        fprintf(stderr, "ERROR: %zu extents are reachable but %zu were reported\n",
+                extents_walked, count_of_unique_extents);
+        c->writer_invariants_ok = false;
+    }
+
+    Pvoid_t *mi_pptr;
+    bool mi_first = true;
+    Word_t uuid_id = 0;
+    while((mi_pptr = JudyLFirstThenNext(JudyL_metrics, &uuid_id, &mi_first))) {
+        struct jv2_metrics_info *mi = *mi_pptr;
+
+        size_t counted = 0;
+        Pvoid_t *pi_pptr;
+        bool pi_first = true;
+        Word_t start_time = 0;
+        while((pi_pptr = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &pi_first)))
+            counted++;
+
+        c->pages_in_judy += counted;
+        total_pages_claimed += mi->number_of_pages;
+
+        if(counted != mi->number_of_pages) {
+            fprintf(stderr, "ERROR: uuid id %" PRIu32 " claims %zu pages but its JudyL holds %zu\n",
+                    (UUIDMAP_ID)uuid_id, (size_t)mi->number_of_pages, counted);
+            c->number_of_pages_ok = false;
+        }
+    }
+
+    if(total_pages_claimed != count_of_unique_pages) {
+        fprintf(stderr, "ERROR: metrics claim %zu pages in total but %zu were reported - "
+                        "the writer's pages_offset would not land on its own trailer\n",
+                total_pages_claimed, count_of_unique_pages);
+        c->writer_invariants_ok = false;
+    }
+
+    if(c->pages_in_judy == 1) {
+        // record the surviving descriptor, so a caller that planted two DIFFERENT
+        // pages can assert WHICH one was kept
+        Word_t first_uuid_id = 0;
+        Pvoid_t *only_mi_pptr = JudyLFirst(JudyL_metrics, &first_uuid_id, PJE0);
+        if(only_mi_pptr) {
+            struct jv2_metrics_info *only_mi = *only_mi_pptr;
+
+            Word_t first_start_time = 0;
+            Pvoid_t *only_pi_pptr = JudyLFirst(only_mi->JudyL_pages_by_start_time, &first_start_time, PJE0);
+            if(only_pi_pptr) {
+                struct jv2_page_info *only_pi = *only_pi_pptr;
+                c->only_end_time_s = only_pi->end_time_s;
+                c->only_page_length = only_pi->page_length;
+                c->only_update_every_s = only_pi->update_every_s;
+                c->only_extent_index = only_pi->extent_index;
+            }
+        }
+    }
+
+    return c->return_success;
+}
+
+// The state a metric deletion + recreation leaves behind: two DIFFERENT METRIC
+// pointers for ONE uuidmap id.
+//
+// `pinned` emulates another tier's METRIC holding the uuid. Without it, deleting the
+// first metric would drop the uuidmap entry and the re-created metric would get a
+// DIFFERENT id, which is not the case under test.
+//
+// `decoy` consumes the ARAL slot the delete just freed, so the re-created metric is
+// forced onto a different address - otherwise ARAL hands the same slot straight back
+// and there is no "two pointers, one uuid" case at all. It shares the victim's uuid
+// partition (last byte) so it allocates from the same partition ARAL, and it is held
+// until teardown so the slot is not released again.
+//
+// Returns the number of errors. On success (0) the caller owns `pinned` (a uuidmap
+// reference) plus one MRG reference on each of `live` and `decoy`; on failure this
+// releases everything it took, so the caller has nothing to undo. A premise that does
+// not hold is REPORTED, never silently passed.
+struct jv2_two_pointers {
+    UUIDMAP_ID pinned;
+    UUIDMAP_ID shared_id;
+    METRIC *stale_ptr;      // the freed first metric's address - never dereferenced
+    METRIC *live;
+    METRIC *decoy;
+};
+
+// Releases everything jv2_make_two_pointers_one_uuid() took and zeroes the struct,
+// so the same struct can never be released twice - neither by a failure path inside
+// the maker, nor by the caller's cleanup afterwards.
+static void jv2_two_pointers_undo(MRG *mrg, struct jv2_two_pointers *tp) {
+    if(tp->live) {
+        mrg_metric_release_and_delete(mrg, tp->live);
+        tp->live = NULL;
+    }
+    if(tp->decoy) {
+        mrg_metric_release_and_delete(mrg, tp->decoy);
+        tp->decoy = NULL;
+    }
+    if(tp->pinned) {
+        uuidmap_free(tp->pinned);
+        tp->pinned = 0;
+    }
+    tp->shared_id = 0;
+    tp->stale_ptr = NULL;
+}
+
+static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_two_pointers *out) {
+    memset(out, 0, sizeof(*out));
+
+    nd_uuid_t shared;
+    uuid_generate_random(shared);
+
+    out->pinned = uuidmap_create(shared);
+
+    MRG_ENTRY entry = {
+        .uuid = &shared,
+        .section = section,
+        .first_time_s = 0,          // no retention, so it is deletable on release
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+
+    bool added = false;
+    METRIC *first = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!first) {
+        fprintf(stderr, "ERROR: cannot add the first metric\n");
+        jv2_two_pointers_undo(mrg, out);
+        return 1;
+    }
+    out->stale_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, first);
+
+    // delete it; `pinned` keeps the uuid (and therefore the id) alive
+    if(!mrg_metric_release_and_delete(mrg, first)) {
+        // the reference is dropped either way; false only means it was retained
+        fprintf(stderr, "ERROR: the first metric was not deleted\n");
+        jv2_two_pointers_undo(mrg, out);
+        return 1;
+    }
+
+    nd_uuid_t decoy_uuid;
+    uuid_generate_random(decoy_uuid);
+    decoy_uuid[15] = shared[15];
+    bool decoy_added = false;
+    MRG_ENTRY decoy_entry = {
+        .uuid = &decoy_uuid,
+        .section = section,
+        .first_time_s = 2,          // retention, so it is not deletable on release
+        .last_time_s = 3,
+        .latest_update_every_s = 1,
+    };
+    out->decoy = mrg_metric_add_and_acquire(mrg, decoy_entry, &decoy_added);
+    if(!out->decoy) {
+        fprintf(stderr, "ERROR: cannot add the decoy metric\n");
+        jv2_two_pointers_undo(mrg, out);
+        return 1;
+    }
+
+    // re-create for the same uuid -> new pointer, same id
+    added = false;
+    out->live = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!out->live || !added) {
+        fprintf(stderr, "ERROR: cannot re-create the metric for the same uuid\n");
+        jv2_two_pointers_undo(mrg, out);
+        return 1;
+    }
+    out->shared_id = mrg_metric_uuidmap_id(mrg, out->live);
+
+    METRIC *new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, out->live);
+    if(new_ptr == out->stale_ptr) {
+        // ARAL handed back the same slot, so there is no "two pointers, one uuid"
+        // situation. Not a product defect - an inconclusive run, and better reported
+        // than silently passing.
+        fprintf(stderr, "ERROR: re-created metric reused the same address; "
+                        "the case under test cannot be formed\n");
+        jv2_two_pointers_undo(mrg, out);
+        return 1;
+    }
+
+    if(out->shared_id != out->pinned) {
+        fprintf(stderr, "ERROR: re-created metric got uuid id %" PRIu32 ", expected the "
+                        "pinned %" PRIu32 " - the premise does not hold\n",
+                out->shared_id, out->pinned);
+        jv2_two_pointers_undo(mrg, out);
+        return 1;
+    }
+
+    return 0;
+}
+
+// Two open-cache pages for the SAME uuid but with DIFFERENT page->metric_id
+// values must be indexed as ONE metric.
+//
+// This happens in production when a metric is deleted and re-created for the
+// same uuid: the new METRIC gets a new pointer, while older open-cache pages
+// still carry the old one. The uuidmap id survives the deletion whenever
+// something else still references that uuid - another tier's METRIC for the same
+// dimension, for instance - so both pages legitimately carry the same uuid_id.
+//
+// It matters because journal v2 wants one entry per uuid:
+// journalfile_migrate_to_v2_callback() builds and sorts a uuid list, and its
+// readers bsearch() by uuid. Two entries for one uuid means one group's pages
+// are unreachable in the written journal.
+//
+// Keying JudyL_metrics by page->metric_id produces two groups here. Keying it by
+// the page's uuid_id produces one.
+//
+// Note this only became reachable once metrics were resolved by id: while the
+// indexer dereferenced page->metric_id, the older page failed to resolve and was
+// skipped, so the duplicate could not form.
+// start_old / start_new are the two pages' start times, and expected_pages is how
+// many pages the indexer should end up with. Distinct start times => both pages
+// are indexed. IDENTICAL start times => the two pages collide inside the single
+// uuid group, and exactly one of them must be kept.
+static int mrg_jv2_same_uuid_grouped_once_check(
+    const char *label, time_t start_old, time_t start_new,
+    time_t end_old, time_t end_new, size_t expected_pages,
+    time_t expected_end_time_s, size_t expected_extents, bool callback_success) {
+    fprintf(stderr, "\nTesting jv2 groups one uuid once, %s (deterministic)...\n", label);
+    int errors = 0;
+
+    enum { TEST_FILENO = 9 };
+    const Word_t section = (Word_t)&test_ctx_0;
+
+    MRG *mrg = mrg_create_for_unittest();
+    MRG *saved_main_mrg = main_mrg;
+    main_mrg = mrg;
+
+    PGC *cache = pgc_create(
+        "jv2-same-uuid-test",
+        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
+        64, NULL, jv2_stale_metric_save_dirty_cb,
+        10, 10, 1000, 10,
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+
+    // declared before the goto below, so jumping to cleanup cannot skip an
+    // initialization and leave the teardown reading indeterminate values
+    struct jv2_two_pointers tp = { 0 };
+    METRIC *old_ptr = NULL, *new_ptr = NULL, *second = NULL, *decoy = NULL;
+    UUIDMAP_ID shared_id = 0, pinned = 0;
+
+    if(jv2_make_two_pointers_one_uuid(mrg, section, &tp)) {
+        // the helper released everything it took, so there is nothing to undo
+        errors++;
+        goto cleanup_early;
+    }
+    old_ptr = tp.stale_ptr;
+    new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, tp.live);
+    shared_id = tp.shared_id;
+    pinned = tp.pinned;
+    second = tp.live;
+    decoy = tp.decoy;
+
+    // two hot pages, same section and datafile, same uuid_id, DIFFERENT
+    // metric_id; the start times decide whether they collide
+    struct extent_io_data xio_old = {
+        .fileno = TEST_FILENO, .block = 4096, .bytes = 4096, .uuid_id = shared_id,
+    };
+    struct extent_io_data xio_new = {
+        .fileno = TEST_FILENO, .block = 8192, .bytes = 4096, .uuid_id = shared_id,
+    };
+
+    bool a1 = false, a2 = false;
+    PGC_PAGE *p_old = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section, .metric_id = (Word_t)old_ptr,
+        .start_time_s = start_old, .end_time_s = end_old, .size = 4096, .data = NULL,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_old,
+    }, &a1);
+    PGC_PAGE *p_new = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section, .metric_id = (Word_t)new_ptr,
+        .start_time_s = start_new, .end_time_s = end_new, .size = 4096, .data = NULL,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_new,
+    }, &a2);
+
+    if(!p_old || !p_new || !a1 || !a2) {
+        fprintf(stderr, "ERROR: cannot add the two hot pages\n");
+        errors++;
+    }
+    else {
+        struct jv2_group_capture cap = { 0 };
+        cap.return_success = callback_success;
+        pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
+                                     jv2_group_capture_cb, &cap, true);
+
+        if(!cap.called) {
+            fprintf(stderr, "ERROR: the migrate callback was never invoked\n");
+            errors++;
+        }
+        else {
+            // THE assertion.
+            if(cap.metrics != 1) {
+                fprintf(stderr,
+                        "ERROR: the indexer grouped one uuid into %zu metric "
+                        "entries (expected 1) - journal v2 wants one entry per "
+                        "uuid, so the extra group's pages become unreachable\n",
+                        cap.metrics);
+                errors++;
+            }
+            if(cap.pages != expected_pages) {
+                fprintf(stderr,
+                        "ERROR: the indexer saw %zu pages (expected %zu)\n",
+                        cap.pages, expected_pages);
+                errors++;
+            }
+            if(cap.pages_in_judy != expected_pages) {
+                fprintf(stderr,
+                        "ERROR: %zu pages are reachable in the per-metric JudyLs "
+                        "(expected %zu)\n",
+                        cap.pages_in_judy, expected_pages);
+                errors++;
+            }
+            if(!cap.number_of_pages_ok) {
+                fprintf(stderr,
+                        "ERROR: mi->number_of_pages disagrees with the pages actually "
+                        "indexed - journalfile_migrate_to_v2_callback() would discard "
+                        "the whole migration\n");
+                errors++;
+            }
+            if(callback_success) {
+                // THE guard for the dropped page. Publishing the journal makes
+                // every page this datafile owns clean; a page the indexer dropped
+                // but forgot to dispose of stays hot, keeps its
+                // DATAFILE_ACQUIRE_OPEN_CACHE reference, and its datafile can then
+                // never be deleted (datafile.c refuses deletion while lockers
+                // remain).
+                size_t still_hot = pgc_hot_and_dirty_entries(cache);
+                if(still_hot != 0) {
+                    fprintf(stderr,
+                            "ERROR: %zu pages are still hot after the journal was "
+                            "published (expected 0) - a dropped page pins its "
+                            "datafile forever\n",
+                            still_hot);
+                    errors++;
+                }
+            }
+            if(!cap.writer_invariants_ok) {
+                fprintf(stderr,
+                        "ERROR: the indexer's output would break "
+                        "journalfile_migrate_to_v2_callback()\n");
+                errors++;
+            }
+            if(cap.extents != expected_extents) {
+                // A page that never entered the index must not leave an extent
+                // behind: journalfile_v2_write_extent_list() emits one
+                // journal_extent_list per extent and the file is sized from this
+                // count, so an empty extent inflates the journal and
+                // stats->extents_pages.
+                fprintf(stderr,
+                        "ERROR: the indexer reported %zu extents (expected %zu)\n",
+                        cap.extents, expected_extents);
+                errors++;
+            }
+            if(cap.pages_in_judy == 1 && cap.only_extent_index >= cap.extents) {
+                // extent indices are array positions in the written journal
+                fprintf(stderr,
+                        "ERROR: the surviving page points at extent index %u, but only "
+                        "%zu extents are written - compaction left a stale index\n",
+                        cap.only_extent_index, cap.extents);
+                errors++;
+            }
+            if(expected_end_time_s && cap.only_end_time_s != expected_end_time_s) {
+                fprintf(stderr,
+                        "ERROR: the indexer kept the page ending at %ld (expected %ld) - "
+                        "the surviving page must be chosen deterministically, not by the "
+                        "order the hot queue happens to yield\n",
+                        (long)cap.only_end_time_s, (long)expected_end_time_s);
+                errors++;
+            }
+        }
+    }
+
+    if(p_old) pgc_page_release(cache, p_old);
+    if(p_new) pgc_page_release(cache, p_new);
+
+    // reached only on the success path; the goto above jumps straight to cleanup_early
+    if(second) mrg_metric_release_and_delete(mrg, second);
+    if(decoy) mrg_metric_release_and_delete(mrg, decoy);
+
+cleanup_early:
+    pgc_destroy(cache, false);
+    if(pinned) uuidmap_free(pinned);
+    main_mrg = saved_main_mrg;
+
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
+        errors++;
+    }
+
+    if(errors)
+        fprintf(stderr, "jv2 same-uuid grouping test (%s): %d ERROR(S)\n", label, errors);
+    else
+        fprintf(stderr, "jv2 same-uuid grouping test (%s): OK\n", label);
+
+    return errors;
+}
+
+// The mkdtemp() template appended to the temporary directory.
+#define JV2_TMPDIR_TEMPLATE "/netdata-jv2-writer-XXXXXX"
+
+// Longest name journalfile_v2_generate_path() appends to dbfiles_path:
+// "/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
+// Round up generously - being wrong here means a silently truncated journal path.
+#define JV2_JOURNAL_NAME_MAX 64
+
+// Is this directory safe to build the test's temporary tree in?
+//
+// TMPDIR comes from the environment, so it is not trusted. The value ends up in
+// mkdtemp() and then in ctx.config.dbfiles_path, where journalfile_v2_generate_path()
+// snprintfz()es a filename onto it - so a bad value means creating directories in an
+// unexpected place, or a truncated path that the unlink() in teardown would then miss.
+//
+// Checks, in order:
+//   - non-empty, and absolute, so nothing is ever created relative to the cwd;
+//   - no control characters, so a mangled environment cannot produce odd filenames;
+//   - no ".." anywhere, so the path cannot be walked outside the directory it names;
+//   - an existing directory we may create in (W_OK|X_OK), rather than a path we would
+//     only discover was unusable after mkdtemp(). Symlinks are followed on purpose:
+//     /tmp itself is a symlink on macOS, so rejecting them would reject the fallback;
+//   - short enough that the template AND the journal filename still fit in every
+//     buffer downstream.
+//
+// Note this is a TEST-side guard, not a security boundary: whoever sets TMPDIR already
+// runs this binary. It exists so a hostile-looking or simply broken TMPDIR degrades to
+// /tmp instead of producing confusing failures or stray files.
+static bool jv2_tmpdir_is_usable(const char *dir, size_t dst_size) {
+    if(!dir || !*dir)
+        return false;
+
+    if(dir[0] != '/')
+        return false;
+
+    // the filesystem root is not a temporary directory, however writable it is
+    if(!dir[strspn(dir, "/")])
+        return false;
+
+    const size_t len = strlen(dir);
+    const size_t needed = len + sizeof(JV2_TMPDIR_TEMPLATE) + JV2_JOURNAL_NAME_MAX;
+    if(needed > dst_size || needed > RRDENG_PATH_MAX || needed > FILENAME_MAX)
+        return false;
+
+    for(size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)dir[i];
+        if(c < 0x20 || c == 0x7f)
+            return false;
+    }
+
+    if(strstr(dir, ".."))
+        return false;
+
+    struct stat st;
+    if(stat(dir, &st) != 0 || !S_ISDIR(st.st_mode))
+        return false;
+
+    if(access(dir, W_OK | X_OK) != 0)
+        return false;
+
+    return true;
+}
+
+// Create the test's temporary directory under a sanitized TMPDIR, falling back to
+// /tmp. Returns false only if neither can be used, in which case the caller skips
+// rather than fails - an unusable /tmp is an environment problem, not a defect in the
+// code under test.
+static bool jv2_make_tmpdir(char *dst, size_t dst_size) {
+    const char *base = getenv("TMPDIR");
+
+    if(!jv2_tmpdir_is_usable(base, dst_size)) {
+        if(base && *base)
+            fprintf(stderr, "TMPDIR is not usable for this test; falling back to /tmp\n");
+        base = "/tmp";
+
+        if(!jv2_tmpdir_is_usable(base, dst_size))
+            return false;
+    }
+
+    // trim trailing slashes so we never build a path containing "//"
+    size_t len = strlen(base);
+    while(len > 1 && base[len - 1] == '/')
+        len--;
+
+    snprintfz(dst, dst_size, "%.*s" JV2_TMPDIR_TEMPLATE, (int)len, base);
+
+    return mkdtemp(dst) != NULL;
+}
+
+// Drives the REAL writer end to end: journalfile_migrate_to_v2_callback() computes the
+// file size, writes the extent/metric/page structures, checksums them, and activates
+// the result through journalfile_v2_data_set(). We then read the SERIALIZED bytes back.
+//
+// The stub-callback cases above prove the indexer's in-memory output. This proves the
+// bytes it produces are the ones the reader expects - the offset arithmetic in
+// journalfile.c is driven by counters this change rewrote (mi->number_of_pages and the
+// extent indices), and a stub callback cannot exercise any of it.
+//
+// The collision is the interesting input: two pages of one uuid at one start time on
+// two different extents, so the writer must emit exactly one metric, one page and one
+// extent, with the surviving page's descriptor pointing at a valid extent.
+static int mrg_jv2_real_writer_unittest(void) {
+    fprintf(stderr, "\nTesting jv2 real writer publishes and reloads (deterministic)...\n");
+    int errors = 0;
+
+    enum { TEST_FILENO = 11 };
+    enum { START_TIME = 100, END_SHORT = 200, END_LONG = 400 };
+
+    char dbpath[FILENAME_MAX + 1];
+    if(!jv2_make_tmpdir(dbpath, sizeof(dbpath))) {
+        fprintf(stderr, "ERROR: cannot create a temporary directory for the journal\n");
+        return 1;
+    }
+
+    // A zeroed fixture is NOT enough: activation validates the datafile and takes
+    // locks that must be constructed, not merely zeroed. Mirror what production does.
+    //
+    //   - initialize_single_ctx() (rrdengineapi.c) builds the two ctx locks. It is
+    //     static, so they are constructed here: njfv2idx.spinlock is taken by
+    //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
+    //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the
+    //     datafile locks. It is static AND asserts tier == 1, so it is replicated.
+    //     Without the magic, datafile_ctx() fatals with "invalid magic" as soon as the
+    //     writer resolves the ctx from the datafile.
+    //   - journalfile_alloc_and_init() IS exported, so it is used rather than
+    //     hand-rolled: it builds data_spinlock (taken by journalfile_v2_data_set()),
+    //     builds unsafe.spinlock (read by journalfile_current_size()), sets
+    //     mmap.fd = -1, and links itself to the datafile.
+    struct rrdengine_instance ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.config.tier = 0;
+    strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
+    fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
+    rw_spinlock_init(&ctx.njfv2idx.spinlock);
+
+    struct rrdengine_datafile datafile;
+    memset(&datafile, 0, sizeof(datafile));
+    datafile.tier = 1;              // datafile_alloc_and_init() asserts exactly this
+    datafile.fileno = TEST_FILENO;
+    datafile.ctx = &ctx;
+    datafile.magic1 = datafile.magic2 = DATAFILE_MAGIC;
+    datafile.users.available = true;
+    fatal_assert(0 == netdata_rwlock_init(&datafile.extent_rwlock));
+    spinlock_tracked_init(&datafile.users.spinlock);
+    spinlock_init(&datafile.writers.spinlock);
+    rw_spinlock_init(&datafile.extent_epdl.spinlock);
+
+    struct rrdengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
+
+    const Word_t section = (Word_t)&ctx;
+
+    MRG *mrg = mrg_create_for_unittest();
+    MRG *saved_main_mrg = main_mrg;
+    main_mrg = mrg;
+
+    PGC *cache = pgc_create(
+        "jv2-real-writer-test",
+        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
+        64, NULL, jv2_stale_metric_save_dirty_cb,
+        10, 10, 1000, 10,
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+
+    // everything the cleanup path can touch, and everything the gotos below jump
+    // over, is declared and initialized up front
+    struct jv2_two_pointers tp = { 0 };
+    PGC_PAGE *p_old = NULL, *p_new = NULL;
+    bool published = false;
+    bool a1 = false, a2 = false;
+    struct extent_io_data xio_old = { 0 }, xio_new = { 0 };
+
+    if(jv2_make_two_pointers_one_uuid(mrg, section, &tp)) {
+        errors++;
+        goto cleanup;
+    }
+
+    // two different extents, so the rejected page's extent must not be serialized
+    xio_old.fileno = TEST_FILENO; xio_old.block = 4096;
+    xio_old.bytes = 4096; xio_old.uuid_id = tp.shared_id;
+
+    xio_new.fileno = TEST_FILENO; xio_new.block = 8192;
+    xio_new.bytes = 4096; xio_new.uuid_id = tp.shared_id;
+    p_old = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section, .metric_id = (Word_t)tp.stale_ptr,
+        .start_time_s = START_TIME, .end_time_s = END_SHORT, .size = 4096, .data = &datafile,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_old,
+    }, &a1);
+    p_new = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section, .metric_id = (Word_t)mrg_metric_id(mrg, tp.live),
+        .start_time_s = START_TIME, .end_time_s = END_LONG, .size = 4096, .data = &datafile,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_new,
+    }, &a2);
+
+    if(!p_old || !p_new || !a1 || !a2) {
+        fprintf(stderr, "ERROR: cannot add the two hot pages\n");
+        errors++;
+        goto cleanup;
+    }
+
+    pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
+                                 journalfile_migrate_to_v2_callback, journalfile, true);
+
+    if(!journalfile_v2_data_available(journalfile)) {
+        fprintf(stderr, "ERROR: the writer did not activate a v2 journal\n");
+        errors++;
+        goto cleanup;
+    }
+    published = true;
+
+    // Read the serialized structures back through the same mmap the reader uses.
+    {
+        struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, NULL, START_TIME, END_LONG);
+        if(!j2) {
+            fprintf(stderr, "ERROR: cannot acquire the published v2 journal data\n");
+            errors++;
+        }
+        else {
+            if(j2->magic != JOURVAL_V2_MAGIC) {
+                fprintf(stderr, "ERROR: published journal has magic 0x%x\n", j2->magic);
+                errors++;
+            }
+            if(j2->metric_count != 1) {
+                fprintf(stderr, "ERROR: published journal has %u metrics (expected 1)\n",
+                        j2->metric_count);
+                errors++;
+            }
+            if(j2->page_count != 1) {
+                fprintf(stderr, "ERROR: published journal has %u pages (expected 1) - the "
+                                "colliding duplicate must not be serialized\n", j2->page_count);
+                errors++;
+            }
+            if(j2->extent_count != 1) {
+                fprintf(stderr, "ERROR: published journal has %u extents (expected 1) - the "
+                                "rejected page's extent must not be serialized\n",
+                        j2->extent_count);
+                errors++;
+            }
+
+            if(!errors) {
+                // the single metric's single page descriptor must be the SURVIVOR
+                struct journal_metric_list *metric_list =
+                    (void *)((uint8_t *)j2 + j2->metric_offset);
+                time_t journal_start_s = (time_t)(j2->start_time_ut / USEC_PER_SEC);
+
+                struct journal_page_header *page_header =
+                    (void *)((uint8_t *)j2 + metric_list[0].page_offset);
+                struct journal_page_list *page_list =
+                    (void *)((uint8_t *)page_header + sizeof(*page_header));
+
+                // delta_end_s is what the reader turns back into the page end
+                time_t got_end_s = journal_start_s + (time_t)page_list[0].delta_end_s;
+
+                if(page_header->entries != 1) {
+                    fprintf(stderr, "ERROR: the metric's page header claims %u entries "
+                                    "(expected 1)\n", page_header->entries);
+                    errors++;
+                }
+                if(got_end_s != END_LONG) {
+                    fprintf(stderr, "ERROR: the serialized page ends at %ld (expected %d) - "
+                                    "the writer kept the wrong duplicate\n",
+                            (long)got_end_s, END_LONG);
+                    errors++;
+                }
+                if(page_list[0].extent_index >= j2->extent_count) {
+                    fprintf(stderr, "ERROR: the serialized page points at extent %u of %u\n",
+                            page_list[0].extent_index, j2->extent_count);
+                    errors++;
+                }
+            }
+
+            journalfile_v2_data_release(journalfile);
+        }
+    }
+
+cleanup:
+    if(p_old) pgc_page_release(cache, p_old);
+    if(p_new) pgc_page_release(cache, p_new);
+
+    if(tp.live) mrg_metric_release_and_delete(mrg, tp.live);
+    tp.live = NULL;
+    if(tp.decoy) mrg_metric_release_and_delete(mrg, tp.decoy);
+    tp.decoy = NULL;
+
+    pgc_destroy(cache, false);
+    jv2_two_pointers_undo(mrg, &tp);
+    main_mrg = saved_main_mrg;
+
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n",
+                referenced);
+        errors++;
+    }
+
+    // journalfile_close() removes the datafile from ctx.njfv2idx and unmaps the file;
+    // only valid once activation succeeded, otherwise it would close an unset uv_file.
+    if(published)
+        journalfile_close(journalfile, &datafile);
+    freez(journalfile);
+
+    netdata_rwlock_destroy(&datafile.extent_rwlock);
+    netdata_rwlock_destroy(&ctx.datafiles.rwlock);
+
+    {
+        char path[FILENAME_MAX + 1];
+        journalfile_v2_generate_path(&datafile, path, sizeof(path));
+        unlink(path);
+        rmdir(dbpath);
+    }
+
+    if(errors)
+        fprintf(stderr, "jv2 real writer test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "jv2 real writer test: OK\n");
+
+    return errors;
+}
+
+static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
+    // distinct start times: one group, both pages kept
+    int errors = mrg_jv2_same_uuid_grouped_once_check(
+        "distinct start times", 100, 300, 200, 400, 2, 0, 2, false);
+
+    // Identical start times: the two pages of the same uuid collide inside the
+    // group. Before this was handled, the second page hit
+    // internal_fatal("Page is already in JudyL metric pages") and, with internal
+    // checks off, still counted itself into mi->number_of_pages while never
+    // entering the JudyL - which made the journal v2 writer discard the migration.
+    //
+    // The two pages are NOT interchangeable, so assert WHICH one survives: the one
+    // covering more time.
+    //
+    // Both cases plant p_old first and p_new second, and the hot queue is walked in
+    // insertion order, so the page VISITED first is always the same. What the two
+    // cases swap is which page carries the larger end_time_s - that is what makes
+    // them discriminating: a comparator degenerating to "first visited always wins"
+    // fails one case, "last visited always wins" fails the other, and an inverted
+    // comparison fails both.
+    //
+    // Swapping it also drives both sides of the extent bookkeeping, because the two
+    // pages sit on DIFFERENT extent blocks and exactly one extent must be reported
+    // either way. When the larger page comes second it REPLACES an already indexed
+    // page, so the extent already created for the loser has to be dropped and the
+    // survivors renumbered; when it comes first the loser is rejected before it ever
+    // creates an extent.
+    errors += mrg_jv2_same_uuid_grouped_once_check(
+        "colliding start times, longer page second", 100, 100, 200, 400, 1, 400, 1, false);
+    errors += mrg_jv2_same_uuid_grouped_once_check(
+        "colliding start times, longer page first", 100, 100, 400, 200, 1, 400, 1, false);
+
+    // Same collision, but the callback now reports success, so the indexer really
+    // publishes the journal and has to dispose of the page it dropped. A dropped
+    // page left hot would hold its DATAFILE_ACQUIRE_OPEN_CACHE reference forever
+    // and its datafile could never be deleted.
+    errors += mrg_jv2_same_uuid_grouped_once_check(
+        "colliding start times, journal published", 100, 100, 200, 400, 1, 400, 1, true);
+
+    return errors;
+}
+
 int mrg_unittest(void) {
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
+    errors += mrg_stale_metric_pointer_unittest();
+    errors += mrg_jv2_stale_metric_not_dereferenced_unittest();
+    errors += mrg_jv2_same_uuid_grouped_once_unittest();
+    errors += mrg_jv2_real_writer_unittest();
     errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
