@@ -907,7 +907,7 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 
     if(likely(item)) {
         void *v = item->shared->value;
-        item_release(dict, item);
+        dictionary_acquired_item_release(dict, item);
         return v;
     }
 
@@ -959,7 +959,7 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
 
     if(likely(item)) {
         void *v = item->shared->value;
-        item_release(dict, item);
+        dictionary_acquired_item_release(dict, item);
         return v;
     }
 
@@ -994,7 +994,7 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 
     if(likely(item)) {
         void *v = item->shared->value;
-        item_release(dict, item);
+        dictionary_acquired_item_release(dict, item);
         return v;
     }
 
