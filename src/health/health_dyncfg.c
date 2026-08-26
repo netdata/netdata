@@ -786,7 +786,8 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                     if(!added) {
                         health_prototype_free(nap);
                         if(!msg || !*msg) msg = "required attributes are missing";
-                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, msg);
+                        code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+                        break;
                     }
                     else
                         freez(nap);
