@@ -2539,6 +2539,69 @@ size_t pgc_hot_and_dirty_entries(PGC *cache) {
     return entries;
 }
 
+// Two open-cache pages of the SAME uuid, in the SAME datafile, claiming the SAME
+// start time. Journal v2 can hold only one of them: its per-metric page list is a
+// JudyL keyed by start time, and the query path is the same shape - it keys page
+// details by start time and drops the second page it finds (see
+// list_has_time_gaps() / add_page_details_from_*), so two pages sharing a start
+// time were never both readable.
+//
+// Which one is kept must not depend on the order the hot queue happens to yield,
+// because these pages can differ: the one covering the most time wins, ties break
+// on the larger payload, then on the lower extent block. Deterministic, and it
+// keeps the page a query would have preferred.
+//
+// Coverage is ranked first deliberately. The winner's interval always CONTAINS the
+// loser's (same start time, end >= end), so no time range loses coverage - but if
+// the two carry a different update_every_s, the winner can cover that range at a
+// coarser resolution. A gap shows up in query results; a resolution drop does not.
+// Hand a page over to the migration's rejected set: it will NOT be described by the
+// journal, but it must not be abandoned while hot either. A hot open-cache page is
+// never evicted, so it never releases its DATAFILE_ACQUIRE_OPEN_CACHE reference and
+// its datafile can never be deleted (datafile.c refuses deletion while lockers
+// remain). The caller keeps the page acquired and transition-locked; the disposal
+// after the callback makes it clean on success and puts it back on failure.
+static void jv2_reject_page(Pvoid_t *JudyL_rejected_pages, PGC_PAGE *page) {
+    Pvoid_t *PValue = JudyLIns(JudyL_rejected_pages, (Word_t)page, PJE0);
+    if(!PValue || PValue == PJERR)
+        fatal("CACHE: JudyLIns(JudyL_rejected_pages, %p) failed", page);
+
+    *PValue = page;
+}
+
+static bool jv2_duplicate_page_wins(
+    time_t end_time_s, size_t page_length, uint32_t block, const struct jv2_page_info *incumbent) {
+
+    if(end_time_s != incumbent->end_time_s)
+        return end_time_s > incumbent->end_time_s;
+
+    if(page_length != incumbent->page_length)
+        return page_length > incumbent->page_length;
+
+    return block < incumbent->ei->block;
+}
+
+// Are any extents left describing zero pages? Cheap - O(extents) and read-only.
+//
+// This is the authority behind the maybe_orphaned_extents hint: the hint can fire
+// for an extent that a later page of the same loop re-populated, and renumbering is
+// NOT free (indices are handed out in page order but reassigned in block order, so
+// any renumbering forces an O(pages) pass to re-point every pi->extent_index).
+static size_t jv2_count_empty_extents(Pvoid_t JudyL_extents_pos) {
+    size_t empty = 0;
+
+    Pvoid_t *PValue;
+    bool first = true;
+    Word_t block = 0;
+    while ((PValue = JudyLFirstThenNext(JudyL_extents_pos, &block, &first))) {
+        struct jv2_extents_info *ei = *PValue;
+        if(!ei->number_of_pages)
+            empty++;
+    }
+
+    return empty;
+}
+
 void pgc_open_cache_to_journal_v2(
     PGC *cache,
     Word_t section,
@@ -2555,6 +2618,22 @@ void pgc_open_cache_to_journal_v2(
 
     Pvoid_t JudyL_metrics = NULL;
     Pvoid_t JudyL_extents_pos = NULL;
+
+    // Pages dropped as duplicates, keyed by page pointer. They are NOT unpinned
+    // inside the loop: a page left hot would never release its
+    // DATAFILE_ACQUIRE_OPEN_CACHE reference, and the datafile could then never be
+    // deleted. They are disposed of after the callback, with the same success
+    // semantics as the pages we indexed.
+    Pvoid_t JudyL_rejected_pages = NULL;
+
+    // Hint that a replacement emptied an extent, gating the compaction pass below
+    // so the normal path pays nothing for it.
+    //
+    // It is only a HINT: it is never decremented, and one extent can hold pages of
+    // several metrics, so an extent emptied by a replacement may be re-populated by
+    // a later page of this same loop. The extents themselves are the authority -
+    // the pass re-checks them before changing anything.
+    size_t maybe_orphaned_extents = 0;
 
     size_t count_of_unique_extents = 0;
     size_t count_of_unique_metrics = 0;
@@ -2600,59 +2679,68 @@ void pgc_open_cache_to_journal_v2(
             continue;
         }
 
-        METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)page->metric_id);
+        // Resolve the metric by uuidmap id, NEVER by dereferencing
+        // page->metric_id.
+        //
+        // page->metric_id is a bare METRIC pointer with no reference behind it
+        // (see pgc_open_add_hot_page()), so it can outlive the METRIC. It must
+        // not be dereferenced, not even to validate it: ARAL writes its
+        // free-list header over the first 16 bytes of a freed element, which on
+        // 64bit overlays metric->uuid and metric->refcount with the halves of
+        // the free-list 'next' pointer. mrg_metric_dup() would CAS that
+        // refcount, so merely attempting the acquire corrupts the free list --
+        // and when 'next' is NULL the refcount reads 0, a legal
+        // unreferenced-but-alive value, so the acquire SUCCEEDS and returns a
+        // pointer into the free list.
+        //
+        // mrg_metric_get_and_acquire_by_id() is an indexed lookup under the
+        // partition read lock. It cannot touch freed memory, and a metric that
+        // has been deleted simply misses. uuidmap ids are unique for the
+        // lifetime of the uuidmap, so a stale id cannot alias a different
+        // metric either (see mrg_metric_get_and_acquire_by_uuid()).
+        METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, xio->uuid_id, section);
         if(!metric) {
-            // metric has been deleted, skip this page
-            page_transition_unlock(cache, page);
-            page_release(cache, page, false);
+            // The metric is gone, so this page's data can no longer be referenced by
+            // anything and it must not go into the journal. It must not be left hot
+            // either: no later indexing pass will revisit this datafile once the
+            // journal is published (rrdengine.c skips datafiles that already have
+            // v2), so a page abandoned here pins its datafile for the lifetime of
+            // the agent. Reject it, exactly like a losing duplicate.
+            page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+            jv2_reject_page(&JudyL_rejected_pages, page);
             continue;
         }
 
-        // Check UUID validity early, before any JudyL modifications
+        // The metric is alive and we hold a reference, so its uuid resolves by
+        // construction; no NULL check is needed or meaningful here.
         nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
-        if (unlikely(!uuid)) {
-            mrg_metric_release(main_mrg, metric);
-            page_transition_unlock(cache, page);
-            page_release(cache, page, false);
-            continue;
-        }
 
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
+        // Read the hot page's end time ONCE. It is still being collected, so it
+        // can advance; reading it again per use would let the metric retention we
+        // record and the page descriptor we write disagree.
+        time_t page_end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
+
         pgc_queue_unlock(cache, &cache->hot);
 
-        // update the extents JudyL
-
-        size_t current_extent_index_id;
-        Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->block, PJE0);
-        if(!PValue || PValue == PJERR)
-            fatal("CACHE: JudyLIns(JudyL_extents_pos, %" PRIu64 ") failed, JudyL_extents_pos = %p, result = %p",
-                  BLOCK_TO_OFFSET(xio->block), JudyL_extents_pos, PValue);
-
-        struct jv2_extents_info *ei;
-        if(!*PValue) {
-            ei = aral_mallocz(ar_ei); // callocz(1, sizeof(struct jv2_extents_info));
-            ei->block = xio->block;
-            ei->bytes = xio->bytes;
-            ei->number_of_pages = 1;
-            ei->index = master_extent_index_id++;
-            *PValue = ei;
-
-            count_of_unique_extents++;
-        }
-        else {
-            ei = *PValue;
-            ei->number_of_pages++;
-        }
-
-        current_extent_index_id = ei->index;
-
         // update the metrics JudyL
-
-        PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
+        //
+        // Keyed by the uuidmap id, NOT by page->metric_id. The journal wants one
+        // entry per UUID: its reader bsearches the metric list by uuid and would
+        // only ever find one group, so two groups for the same uuid would make
+        // one group's pages invisible.
+        //
+        // page->metric_id cannot provide that guarantee. If a metric is deleted
+        // and recreated for the same uuid it gets a NEW pointer, so older pages
+        // can still carry the old one while newer pages carry the new one - two
+        // keys, one uuid. (Before metrics were resolved by id, such an old page
+        // failed to resolve and was skipped, which hid this; resolving by id
+        // makes both pages index successfully and exposes it.)
+        Pvoid_t *PValue = JudyLIns(&JudyL_metrics, (Word_t)xio->uuid_id, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("CACHE: JudyLIns(JudyL_metrics, 0x%lx) failed, JudyL_metrics = %p, result = %p",
-                  (long unsigned)page->metric_id, JudyL_metrics, PValue);
+            fatal("CACHE: JudyLIns(JudyL_metrics, uuid_id %" PRIu32 ") failed, JudyL_metrics = %p, result = %p",
+                  xio->uuid_id, JudyL_metrics, PValue);
 
         struct jv2_metrics_info *mi;
         if(!*PValue) {
@@ -2660,8 +2748,8 @@ void pgc_open_cache_to_journal_v2(
             mi->metric = metric;
             mi->uuid = uuid;
             mi->first_time_s = page->start_time_s;
-            mi->last_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
-            mi->number_of_pages = 1;
+            mi->last_time_s = page_end_time_s;
+            mi->number_of_pages = 0; // counted below, once a page is really indexed
             mi->page_list_header = 0;
             mi->JudyL_pages_by_start_time = NULL;
             *PValue = mi;
@@ -2669,65 +2757,183 @@ void pgc_open_cache_to_journal_v2(
             count_of_unique_metrics++;
         }
         else {
+            // mi already owns a reference for this uuid; ours is redundant
             mi = *PValue;
-            mi->number_of_pages++;
             mrg_metric_release(main_mrg, metric);
-            if(page->start_time_s < mi->first_time_s)
-                mi->first_time_s = page->start_time_s;
-            time_t page_end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
-            if(page_end_time_s > mi->last_time_s)
-                mi->last_time_s = page_end_time_s;
         }
 
+        // update the pages JudyL of this metric
+        //
+        // Resolve the duplicate BEFORE allocating anything for this page, so a
+        // page we are going to drop never creates an extent and never lands in
+        // any counter.
         PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_s, PJE0);
         if(!PValue || PValue == PJERR)
             fatal("CACHE: JudyLIns(JudyL_pages_by_start_time, %ld) failed, JudyL_pages_by_start_time = %p, result = %p",
                   (long)page->start_time_s, mi->JudyL_pages_by_start_time, PValue);
 
-        bool page_queued_for_jv2_cleanup = false;
-        if(!*PValue) {
-            struct jv2_page_info *pi = aral_mallocz(ar_pi);
-            pi->start_time_s = page->start_time_s;
-            pi->end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
-            pi->update_every_s = pgc_page_update_every_s(page);
-            pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
-            pi->page = page;
-            pi->extent_index = current_extent_index_id;
-            pi->custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL;
-            *PValue = pi;
+        const size_t page_length = page_size_from_assumed_size(cache, page->assumed_size);
+        struct jv2_page_info *pi = *PValue;
+        PGC_PAGE *rejected;
 
-            page_queued_for_jv2_cleanup = true;
-            count_of_unique_pages++;
+        if(pi && !jv2_duplicate_page_wins(page_end_time_s, page_length, xio->block, pi)) {
+            // the page already indexed is the better one; drop this one
+            rejected = page;
         }
         else {
-            // impossible situation
-            internal_fatal(true, "Page is already in JudyL metric pages");
+            // this page is going into the index, so it needs its extent
+
+            Pvoid_t *PValue1 = JudyLIns(&JudyL_extents_pos, xio->block, PJE0);
+            if(!PValue1 || PValue1 == PJERR)
+                fatal("CACHE: JudyLIns(JudyL_extents_pos, %" PRIu64 ") failed, JudyL_extents_pos = %p, result = %p",
+                      BLOCK_TO_OFFSET(xio->block), JudyL_extents_pos, PValue1);
+
+            struct jv2_extents_info *ei;
+            if(!*PValue1) {
+                ei = aral_mallocz(ar_ei); // callocz(1, sizeof(struct jv2_extents_info));
+                ei->block = xio->block;
+                ei->bytes = xio->bytes;
+                ei->number_of_pages = 0; // counted below
+                ei->index = master_extent_index_id++;
+                *PValue1 = ei;
+
+                count_of_unique_extents++;
+            }
+            else
+                ei = *PValue1;
+
+            if(pi) {
+                // this page replaces the one already indexed; that one loses its
+                // slot in its extent. If that empties the extent, the compaction
+                // pass after the loop drops it and renumbers - it cannot be dropped
+                // here, because extent indices are array positions that other
+                // pages already point at.
+                rejected = pi->page;
+                if(!--pi->ei->number_of_pages)
+                    maybe_orphaned_extents++;
+            }
+            else {
+                pi = aral_mallocz(ar_pi);
+                *PValue = pi;
+                rejected = NULL;
+
+                // Count the page only now that it is really in the index.
+                //
+                // mi->number_of_pages MUST equal the number of entries in
+                // mi->JudyL_pages_by_start_time. journalfile_migrate_to_v2_callback()
+                // sizes the file from count_of_unique_pages but writes descriptors
+                // by walking the JudyL, then advances pages_offset by
+                // mi->number_of_pages; if the two disagree its offset check fails
+                // and the whole migration is thrown away.
+                mi->number_of_pages++;
+                count_of_unique_pages++;
+            }
+
+            pi->start_time_s = page->start_time_s;
+            pi->end_time_s = page_end_time_s;
+            pi->update_every_s = pgc_page_update_every_s(page);
+            pi->page_length = page_length;
+            pi->page = page;
+            pi->ei = ei;
+            pi->extent_index = ei->index;
+            pi->custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL;
+
+            // journal_extent_list.pages is read back as stats->extents_pages
+            // (rrdengineapi.c), so it must count only the pages we indexed.
+            ei->number_of_pages++;
+
+            if(page->start_time_s < mi->first_time_s)
+                mi->first_time_s = page->start_time_s;
+            if(page_end_time_s > mi->last_time_s)
+                mi->last_time_s = page_end_time_s;
         }
 
+        if(rejected) {
+            jv2_reject_page(&JudyL_rejected_pages, rejected);
+
+            nd_log_limit_static_thread_var(erl, 10, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+                         "DBENGINE: journal v2 indexing of datafile %u (section %" PRIu64 "): "
+                         "uuid id %" PRIu32 " has two pages starting at %ld; keeping the higher ranked one",
+                         datafile_fileno, (uint64_t)section, xio->uuid_id, (long)page->start_time_s);
+        }
+
+        // Every page that gets here is now owned by this migration: it is either
+        // in mi->JudyL_pages_by_start_time or in JudyL_rejected_pages. Both are
+        // unpinned after the callback, so nothing is released inside the loop -
+        // the loop advances through page->link.next and needs the page to stay
+        // valid until the hot lock protects the cursor again.
         if (likely(false == startup))
             yield_the_processor(); // do not lock too aggressively
         pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
-
-        if(unlikely(!page_queued_for_jv2_cleanup)) {
-            // The loop advances through page->link.next; keep the page pinned
-            // until the hot lock protects the cursor again.
-            page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
-            page_transition_unlock(cache, page);
-            page_release(cache, page, false);
-        }
     }
 
     spinlock_unlock(&sp->migration_to_v2_spinlock);
     pgc_queue_unlock(cache, &cache->hot);
+
+    if(unlikely(maybe_orphaned_extents) && jv2_count_empty_extents(JudyL_extents_pos)) {
+        // A duplicate page replaced the only page of its extent, so that extent now
+        // describes nothing. journalfile_v2_write_extent_list() writes each extent at
+        // j2_extent_base[ei->index] and returns base + count, so indices MUST stay
+        // dense - which is why the extent could not simply be deleted when it
+        // emptied. Drop the empty ones now and renumber in JudyL order, the same
+        // order the writer walks.
+        //
+        Pvoid_t JudyL_empty_extents = NULL;
+        uint32_t next_index = 0;
+
+        Pvoid_t *PValue;
+        bool first = true;
+        Word_t block = 0;
+        while ((PValue = JudyLFirstThenNext(JudyL_extents_pos, &block, &first))) {
+            struct jv2_extents_info *ei = *PValue;
+
+            if(!ei->number_of_pages) {
+                Pvoid_t *PValue1 = JudyLIns(&JudyL_empty_extents, block, PJE0);
+                if(!PValue1 || PValue1 == PJERR)
+                    fatal("CACHE: JudyLIns(JudyL_empty_extents, %lu) failed", (unsigned long)block);
+                *PValue1 = ei;
+            }
+            else
+                ei->index = next_index++;
+        }
+
+        first = true;
+        block = 0;
+        while ((PValue = JudyLFirstThenNext(JudyL_empty_extents, &block, &first))) {
+            aral_freez(ar_ei, *PValue);
+            JudyLDel(&JudyL_extents_pos, block, PJE0);
+        }
+        JudyLFreeArray(&JudyL_empty_extents, PJE0);
+
+        count_of_unique_extents = next_index;
+
+        // the surviving extents were renumbered, so every page must be re-pointed
+        bool mi_first = true;
+        Word_t uuid_id = 0;
+        Pvoid_t *mi_pptr;
+        while ((mi_pptr = JudyLFirstThenNext(JudyL_metrics, &uuid_id, &mi_first))) {
+            struct jv2_metrics_info *mi = *mi_pptr;
+
+            bool pi_first = true;
+            Word_t start_time = 0;
+            Pvoid_t *pi_pptr;
+            while ((pi_pptr = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &pi_first))) {
+                struct jv2_page_info *pi = *pi_pptr;
+                pi->extent_index = pi->ei->index;
+            }
+        }
+    }
 
     // callback
     bool success = cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
 
     {
         Pvoid_t *PValue1;
-        bool metric_id_first = true;
-        Word_t metric_id = 0;
-        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &metric_id, &metric_id_first))) {
+        // the key is a uuidmap id, not a metric pointer - see the JudyLIns above
+        bool uuid_id_first = true;
+        Word_t uuid_id = 0;
+        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &uuid_id, &uuid_id_first))) {
             struct jv2_metrics_info *mi = *PValue1;
 
             Pvoid_t *PValue2;
@@ -2759,6 +2965,31 @@ void pgc_open_cache_to_journal_v2(
             aral_freez(ar_mi, mi);
         }
         JudyLFreeArray(&JudyL_metrics, PJE0);
+    }
+
+    {
+        // The pages we dropped as duplicates. On success they are NOT in the
+        // journal, but they must still be made clean: a page left hot keeps its
+        // DATAFILE_ACQUIRE_OPEN_CACHE reference forever and the datafile could
+        // then never be deleted. On failure nothing was written, so they are put
+        // back exactly like the indexed ones and the next indexing pass retries.
+        Pvoid_t *PValue1;
+        bool first = true;
+        Word_t page_ptr = 0;
+        while ((PValue1 = JudyLFirstThenNext(JudyL_rejected_pages, &page_ptr, &first))) {
+            PGC_PAGE *rejected = *PValue1;
+
+            if (likely(false == startup))
+                yield_the_processor(); // do not lock too aggressively
+            if (likely(success))
+                page_set_clean(cache, rejected, true, false, PGC_QUEUE_LOCK_PRIO_LOW);
+            else
+                page_flag_clear(rejected, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+
+            page_transition_unlock(cache, rejected);
+            page_release(cache, rejected, success);
+        }
+        JudyLFreeArray(&JudyL_rejected_pages, PJE0);
     }
 
     {
