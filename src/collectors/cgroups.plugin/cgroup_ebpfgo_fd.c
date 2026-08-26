@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup_ebpfgo_fd.h"
 #include "cgroup_ebpfgo_shared_memory.h"
 
 #if defined(OS_LINUX)
@@ -46,10 +47,10 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
     if (!cg->ebpf_pids_count)
         return;
 
-    uint64_t open_call = 0;
-    uint64_t close_call = 0;
-    uint64_t open_err = 0;
-    uint64_t close_err = 0;
+    long long open_call = 0;
+    long long close_call = 0;
+    long long open_err = 0;
+    long long close_err = 0;
 
     for (size_t i = 0; i < cg->ebpf_pids_count; i++) {
         pid_t pid = cg->ebpf_pids[i];
@@ -66,12 +67,18 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
         if (fd->ct <= prev_ct)
             continue;
 
-        open_call += fd->open_call;
-        close_call += fd->close_call;
-        open_err += fd->open_err;
-        close_err += fd->close_err;
-        if (fd->fd_update_every_s)
-            cg->fd.update_every_s = fd->fd_update_every_s;
+        uint32_t update_every_s = fd->fd_update_every_s;
+        if (!update_every_s && cgroup_update_every > 0)
+            update_every_s = (uint32_t)cgroup_update_every;
+
+        open_call = cgroup_ebpfgo_fd_add_rate(
+            open_call, cgroup_ebpfgo_fd_normalize_rate(fd->open_call, update_every_s));
+        close_call = cgroup_ebpfgo_fd_add_rate(
+            close_call, cgroup_ebpfgo_fd_normalize_rate(fd->close_call, update_every_s));
+        open_err = cgroup_ebpfgo_fd_add_rate(
+            open_err, cgroup_ebpfgo_fd_normalize_rate(fd->open_err, update_every_s));
+        close_err = cgroup_ebpfgo_fd_add_rate(
+            close_err, cgroup_ebpfgo_fd_normalize_rate(fd->close_err, update_every_s));
     }
 
     /* The consumed marker is a watermark and must only move forward.  It is the
@@ -83,10 +90,10 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
     if (ct > cg->fd.ct)
         cg->fd.ct = ct;
 
-    cg->fd.open_call = (long long)open_call;
-    cg->fd.close_call = (long long)close_call;
-    cg->fd.open_err = (long long)open_err;
-    cg->fd.close_err = (long long)close_err;
+    cg->fd.open_call = open_call;
+    cg->fd.close_call = close_call;
+    cg->fd.open_err = open_err;
+    cg->fd.close_err = close_err;
 }
 
 void cgroup_ebpfgo_fd_update_locked(void)
@@ -129,26 +136,7 @@ void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg)
     const char *close_err_context = is_service ? "systemd.service.fd_close_error" : "cgroup.fd_close_error";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5400;
 
-    /* The values are per-fd-collector-interval totals.  The shared-memory
-     * header belongs to whichever module owns publishing, so use fd's per-row
-     * cadence rather than cgroup_update_every. */
-    const collected_number divisor = cg->fd.update_every_s ?
-        (collected_number)cg->fd.update_every_s : cgroup_update_every;
-
-    if (unlikely(divisor != cg->last_fd_divisor)) {
-        {
-            RRDDIM *rd;
-            if (cg->st_fd_open && (rd = rrddim_find_active(cg->st_fd_open, "calls")))
-                rrddim_set_divisor(cg->st_fd_open, rd, (int32_t)divisor);
-            if (cg->st_fd_close && (rd = rrddim_find_active(cg->st_fd_close, "calls")))
-                rrddim_set_divisor(cg->st_fd_close, rd, (int32_t)divisor);
-            if (cg->st_fd_open_error && (rd = rrddim_find_active(cg->st_fd_open_error, "calls")))
-                rrddim_set_divisor(cg->st_fd_open_error, rd, (int32_t)divisor);
-            if (cg->st_fd_close_error && (rd = rrddim_find_active(cg->st_fd_close_error, "calls")))
-                rrddim_set_divisor(cg->st_fd_close_error, rd, (int32_t)divisor);
-        }
-        cg->last_fd_divisor = divisor;
-    }
+    const collected_number divisor = CGROUP_EBPFGO_FD_RATE_SCALE;
 
     cgroup_ebpfgo_update_single_chart(
         cg,

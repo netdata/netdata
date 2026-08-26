@@ -42,10 +42,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	fdCfg, err := resolveFDLegacyConfig()
+	fdCfg, fdConfigSkipped, err := resolveFDConfigForSelection(only, resolveFDLegacyConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: fd config load failed: %v\n", err)
 		os.Exit(1)
+	}
+	if fdConfigSkipped {
+		fmt.Fprintln(os.Stderr, "ebpf-go.plugin: fd config load failed; skipping fd for --dcstat")
 	}
 	if fdOverrides.reportErrors != nil {
 		fdCfg.ReportErrors = *fdOverrides.reportErrors
@@ -317,6 +320,20 @@ const (
 type fdCLIOverrides struct {
 	reportErrors *bool
 	loadMethod   *LoadMethod
+}
+
+type fdConfigResolver func() (FDLegacyConfig, error)
+
+// resolveFDConfigForSelection keeps an unrelated malformed fd.conf from
+// preventing the legacy --dcstat-only invocation. All other startup modes need
+// the FD configuration and retain its error.
+func resolveFDConfigForSelection(only moduleSelection, resolve fdConfigResolver) (FDLegacyConfig, bool, error) {
+	cfg, err := resolve()
+	if err != nil && only == moduleSelectionDCStat {
+		return defaultFDLegacyConfig(), true, nil
+	}
+
+	return cfg, false, err
 }
 
 func parsePluginArgs(args []string) (updateEvery int, only moduleSelection, fd fdCLIOverrides) {

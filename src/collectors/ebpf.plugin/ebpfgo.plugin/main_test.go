@@ -1,6 +1,50 @@
 package main
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+func TestResolveFDConfigForSelection(t *testing.T) {
+	resolveErr := errors.New("invalid fd config")
+	resolver := func() (FDLegacyConfig, error) {
+		return FDLegacyConfig{}, resolveErr
+	}
+
+	tests := map[string]struct {
+		only        moduleSelection
+		wantSkipped bool
+		wantErr     error
+	}{
+		"normal startup keeps the FD configuration error": {
+			only:    moduleSelectionNone,
+			wantErr: resolveErr,
+		},
+		"FD-only startup keeps the FD configuration error": {
+			only:    moduleSelectionFD,
+			wantErr: resolveErr,
+		},
+		"DCStat-only startup skips the unrelated FD configuration error": {
+			only:        moduleSelectionDCStat,
+			wantSkipped: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg, skipped, err := resolveFDConfigForSelection(tc.only, resolver)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("resolveFDConfigForSelection() error = %v, want %v", err, tc.wantErr)
+			}
+			if skipped != tc.wantSkipped {
+				t.Fatalf("resolveFDConfigForSelection() skipped = %t, want %t", skipped, tc.wantSkipped)
+			}
+			if skipped && cfg.Enabled {
+				t.Fatal("skipped FD config must leave fd disabled")
+			}
+		})
+	}
+}
 
 func TestParsePluginArgs(t *testing.T) {
 	tests := map[string]struct {
