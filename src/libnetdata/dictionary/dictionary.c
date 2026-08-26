@@ -250,6 +250,8 @@ void dictionary_garbage_collect(DICTIONARY *dict) {
 size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict) {
     if(!dict) return 0;
 
+    dictionary_api_enter(dict);
+
     // hard API misuse, same class (and same handling) as the view check in
     // dictionary_set_and_acquire_item_advanced(): a view here would scan
     // master items with is_view=false and skip the index wrlock the view GC
@@ -258,8 +260,10 @@ size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict) {
         fatal("DICTIONARY: dictionary_garbage_collect_and_deliver() does not support views.");
 
     // the happy path pays nothing
-    if(DICTIONARY_PENDING_DELETES_GET(dict) <= 0)
+    if(DICTIONARY_PENDING_DELETES_GET(dict) <= 0) {
+        dictionary_api_exit(dict);
         return 0;
+    }
 
     DICTIONARY_ITEM *detached = NULL;
 
@@ -309,6 +313,8 @@ size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict) {
         detached = next;
         delivered++;
     }
+
+    dictionary_api_exit(dict);
 
     return delivered;
 }
