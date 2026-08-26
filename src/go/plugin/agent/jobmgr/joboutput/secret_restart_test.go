@@ -36,10 +36,10 @@ func TestSecretDependentStartCommitsFailedAndWaitsForBusyRuntimeRelease(t *testi
 	controller.configModules.config.Modules = controller.modules
 
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 9, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 	t.Cleanup(func() {
-		controller.scheduler.StopAutoDetectionRetries()
-		require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+		controller.scheduler.StopBackgroundWorkers()
+		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 	})
 
 	config := factoryTestConfig(false)
@@ -197,10 +197,10 @@ func TestSecretDependentStartRetainsAbsentPendingAfterExternalDeadline(t *testin
 	release := make(chan struct{})
 	controller.factory.config.Attempts = busyPendingJobAuthority{release: release}
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 9, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 	t.Cleanup(func() {
-		controller.scheduler.StopAutoDetectionRetries()
-		require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+		controller.scheduler.StopBackgroundWorkers()
+		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 	})
 
 	config := factoryTestConfig(false)

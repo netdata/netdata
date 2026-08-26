@@ -363,7 +363,7 @@ func (rg *runGeneration) startWithRunContext(
 	rg.mu.Lock()
 	rg.started = true
 	rg.mu.Unlock()
-	if err := rg.dyncfg.BindAutoDetectionRetries(
+	if err := rg.dyncfg.BindBackgroundWorkers(
 		rg.kernel,
 		rg.run.Generation(),
 		func(err error) {
@@ -432,7 +432,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
-		rg.scheduler.StopAutoDetectionRetries()
+		rg.scheduler.StopBackgroundWorkers()
 		rg.kernel.Stop()
 	}
 }
@@ -444,10 +444,10 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
-		rg.scheduler.StopAutoDetectionRetries()
+		rg.scheduler.StopBackgroundWorkers()
 	default:
 	}
-	return errors.Join(waitErr, rg.scheduler.WaitAutoDetectionRetries(ctx))
+	return errors.Join(waitErr, rg.scheduler.WaitBackgroundWorkers(ctx))
 }
 
 type runMetricsRegistration struct {

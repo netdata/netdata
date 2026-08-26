@@ -103,6 +103,14 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	quarantinedFallback *ResourceActivationFallback,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	afterApply = composeAfterApply(dcjc.retrySettlement(scope.ID, retry), afterApply)
+	acceptedAfterApply, err := dcjc.acceptedActivationAfterApply(scope.ID, postimage)
+	if err != nil {
+		if successor != nil {
+			err = rollbackSuccessorMutation(successor, err)
+		}
+		return nil, err
+	}
+	afterApply = composeAfterApply(afterApply, acceptedAfterApply)
 	var dependencyCommit func()
 	if dcjc.dependencies != nil {
 		var err error
@@ -178,6 +186,11 @@ func (dcjc *DynCfgJobController) newActivationFallback(
 	if dcjc == nil || id == "" || cleanup == nil {
 		return nil, errors.New("job output: invalid activation fallback")
 	}
+	acceptedAfterApply, err := dcjc.acceptedActivationAfterApply(id, postimage)
+	if err != nil {
+		return nil, err
+	}
+	afterApply = composeAfterApply(afterApply, acceptedAfterApply)
 	var dependencyCommit func()
 	if dcjc.dependencies != nil {
 		var err error

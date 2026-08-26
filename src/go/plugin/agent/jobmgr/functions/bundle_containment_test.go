@@ -222,10 +222,19 @@ func (*failedRollbackBundleTestHandler) Cleanup(context.Context) {
 func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	delegate, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
+	firstIdentity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+		Key:       "1/module/agent/invocation/1",
+		Resource:  "module",
+	}
+	secondIdentity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+		Key:       "1/module/agent/invocation/2",
+		Resource:  "module",
+	}
 	attempts := &gatedAwaitAuthority{
 		delegate:    delegate,
-		namespace:   jobmgr.ProcessAttemptFunctionInvocation,
-		ordinal:     2,
+		identity:    secondIdentity,
 		settled:     make(chan struct{}),
 		allowReturn: make(chan struct{}),
 	}
@@ -294,11 +303,6 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 	require.NoError(t, <-firstDone)
 	require.True(t, functionBundleQuarantined(bundle))
 
-	firstIdentity := jobmgr.ProcessAttemptIdentity{
-		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
-		Key:       "1/module/agent/invocation/1",
-		Resource:  "module",
-	}
 	firstReleased, ok := attempts.ProcessAttemptReleased(firstIdentity)
 	require.True(t, ok)
 	close(firstRelease)
@@ -314,11 +318,6 @@ func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {
 
 	close(attempts.allowReturn)
 	require.NoError(t, <-secondDone)
-	secondIdentity := jobmgr.ProcessAttemptIdentity{
-		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
-		Key:       "1/module/agent/invocation/2",
-		Resource:  "module",
-	}
 	secondReleased, ok := attempts.ProcessAttemptReleased(secondIdentity)
 	require.True(t, ok)
 	close(secondRelease)
@@ -503,9 +502,12 @@ func TestContainedAvailabilityPollFencesInvocationBeforeAwaitReturns(t *testing.
 	delegate, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	attempts := &gatedAwaitAuthority{
-		delegate:    delegate,
-		namespace:   jobmgr.ProcessAttemptFunctionPoll,
-		ordinal:     1,
+		delegate: delegate,
+		identity: jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptFunctionPoll,
+			Key:       "1/module/agent",
+			Resource:  "module",
+		},
 		settled:     make(chan struct{}),
 		allowReturn: make(chan struct{}),
 	}
@@ -580,9 +582,12 @@ func TestContainedInvocationFencesSiblingBeforeAwaitReturns(t *testing.T) {
 	delegate, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	attempts := &gatedAwaitAuthority{
-		delegate:    delegate,
-		namespace:   jobmgr.ProcessAttemptFunctionInvocation,
-		ordinal:     1,
+		delegate: delegate,
+		identity: jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+			Key:       "1/module/agent/invocation/1",
+			Resource:  "module",
+		},
 		settled:     make(chan struct{}),
 		allowReturn: make(chan struct{}),
 	}
@@ -870,11 +875,95 @@ type availabilityPublicationPort struct {
 	published chan PublicationRecord
 }
 
+func TestGatedAwaitAuthorityTargetsPlannedAttemptWhenDelegateReturnsOutOfOrder(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	firstIdentity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+		Key:       "1/module/agent/invocation/1",
+		Resource:  "module",
+	}
+	secondIdentity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptFunctionInvocation,
+		Key:       "1/module/agent/invocation/2",
+		Resource:  "module",
+	}
+	delayed := &delayedAttemptStartAuthority{
+		ProcessAttemptAuthority: delegate,
+		identity:                firstIdentity,
+		entered:                 make(chan struct{}),
+		release:                 make(chan struct{}),
+	}
+	attempts := &gatedAwaitAuthority{
+		delegate:    delayed,
+		identity:    secondIdentity,
+		settled:     make(chan struct{}),
+		allowReturn: make(chan struct{}),
+	}
+	t.Cleanup(func() {
+		select {
+		case <-delayed.release:
+		default:
+			close(delayed.release)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = delegate.Shutdown(ctx)
+	})
+
+	type startResult struct {
+		attempt jobmgr.ProcessAttempt
+		err     error
+	}
+	firstResult := make(chan startResult, 1)
+	go func() {
+		attempt, startErr := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
+			Identity: firstIdentity,
+			Target:   1,
+			Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+		})
+		firstResult <- startResult{attempt: attempt, err: startErr}
+	}()
+	waitBundleContainmentTestValue(t, delayed.entered, "delayed first attempt start")
+
+	secondAttempt, err := attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
+		Identity: secondIdentity,
+		Target:   1,
+		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
+	})
+	require.NoError(t, err)
+	close(delayed.release)
+	first := waitBundleContainmentTestValue(t, firstResult, "delayed first attempt return")
+	require.NoError(t, first.err)
+
+	_, firstGated := first.attempt.(*gatedAwaitAttempt)
+	_, secondGated := secondAttempt.(*gatedAwaitAttempt)
+	require.False(t, firstGated)
+	require.True(t, secondGated)
+}
+
+type delayedAttemptStartAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	identity jobmgr.ProcessAttemptIdentity
+	entered  chan struct{}
+	release  chan struct{}
+}
+
+func (dasa *delayedAttemptStartAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	attempt, err := dasa.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+	if err == nil && plan.Identity == dasa.identity {
+		close(dasa.entered)
+		<-dasa.release
+	}
+	return attempt, err
+}
+
 type gatedAwaitAuthority struct {
 	delegate    jobmgr.ProcessAttemptAuthority
-	namespace   jobmgr.ProcessAttemptNamespace
-	ordinal     int32
-	started     atomic.Int32
+	identity    jobmgr.ProcessAttemptIdentity
 	settled     chan struct{}
 	allowReturn chan struct{}
 }
@@ -883,10 +972,9 @@ func (gaa *gatedAwaitAuthority) StartProcessAttempt(
 	ctx context.Context,
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
+	gate := plan.Identity == gaa.identity
 	attempt, err := gaa.delegate.StartProcessAttempt(ctx, plan)
-	if err != nil ||
-		plan.Identity.Namespace != gaa.namespace ||
-		gaa.started.Add(1) != gaa.ordinal {
+	if err != nil || !gate {
 		return attempt, err
 	}
 	return &gatedAwaitAttempt{
