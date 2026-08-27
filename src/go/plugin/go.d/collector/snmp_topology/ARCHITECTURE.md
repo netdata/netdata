@@ -135,6 +135,15 @@ rebuilt `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore
 keep independent refresh state and device generations, and a replacement job
 cannot inherit the removed job's retry or warning-limiter state.
 
+The registration lifetime now begins when the normal SNMP job enters `Init`,
+before system information, profile selection, or vnode setup can succeed.
+`LifecycleCut` provides a separately sequenced snapshot of every current job's
+credential-free configured identity, last completed lifecycle phase/outcome,
+and topology-readiness state. Later connection-state registration reuses the
+same registration ID, while `Entries` remains limited to topology-ready jobs.
+Lifecycle reporting is diagnostic-only: failures or panics are rate-limited and
+cannot change collector lifecycle results. Cleanup removes both views together.
+
 Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh
 context, and use a lookup-only child context, so expiry of the shared lookup

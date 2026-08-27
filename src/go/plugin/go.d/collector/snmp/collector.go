@@ -78,11 +78,12 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 			},
 		},
 
-		charts:            &collectorapi.Charts{},
-		seenScalarMetrics: make(map[string]bool),
-		seenTableMetrics:  make(map[string]bool),
-		seenProfiles:      make(map[string]bool),
-		deviceStore:       store,
+		charts:               &collectorapi.Charts{},
+		seenScalarMetrics:    make(map[string]bool),
+		seenTableMetrics:     make(map[string]bool),
+		seenProfiles:         make(map[string]bool),
+		deviceStore:          store,
+		deviceLifecycleStore: store,
 
 		ifaceCache: newIfaceCache(),
 		licensing:  newLicensingIntegration(),
@@ -107,11 +108,12 @@ type (
 
 		vnode *vnodes.VirtualNode
 
-		charts            *collectorapi.Charts
-		seenScalarMetrics map[string]bool
-		seenTableMetrics  map[string]bool
-		seenProfiles      map[string]bool
-		deviceStore       *ddsnmp.DeviceStore
+		charts               *collectorapi.Charts
+		seenScalarMetrics    map[string]bool
+		seenTableMetrics     map[string]bool
+		seenProfiles         map[string]bool
+		deviceStore          *ddsnmp.DeviceStore
+		deviceLifecycleStore deviceLifecycleStore
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		licensing  *licensingIntegration
@@ -145,7 +147,10 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(context.Context) (err error) {
+	c.beginDeviceLifecycle()
+	defer func() { c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseInit, err) }()
+
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation failed: %v", err)
 	}
@@ -165,7 +170,9 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(ctx context.Context) error {
+func (c *Collector) Check(ctx context.Context) (err error) {
+	defer func() { c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCheck, err) }()
+
 	if c.snmpClient == nil {
 		snmpClient, err := c.initAndConnectSNMPClient()
 		if err != nil {
@@ -193,6 +200,7 @@ func (c *Collector) Charts() *collectorapi.Charts {
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	mx, err := c.collect(ctx)
+	c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, err)
 	if err != nil {
 		c.Error(err)
 	}

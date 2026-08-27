@@ -5,6 +5,7 @@ package snmp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -205,7 +206,9 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	}
 
 	require.NoError(t, collr.Init(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseInit, ddsnmp.DeviceLifecycleOutcomeSuccess, false)
 	require.NoError(t, collr.Check(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCheck, ddsnmp.DeviceLifecycleOutcomeSuccess, false)
 	require.Empty(t, deviceStore.Entries())
 
 	_ = collr.Collect(context.Background())
@@ -220,9 +223,110 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	assert.Equal(t, "mock sysDescr", entries[0].Info.SysDescr)
 	assert.Equal(t, "mock sysContact", entries[0].Info.SysContact)
 	assert.Equal(t, "mock sysLocation", entries[0].Info.SysLocation)
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeSuccess, true)
 
 	collr.Cleanup(context.Background())
 	require.Empty(t, deviceStore.Entries())
+	require.Empty(t, deviceStore.LifecycleCut().Entries)
+}
+
+func TestCollector_InitFailurePublishesSafeLifecycle(t *testing.T) {
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV3Config()
+	collr.User.Name = ""
+	collr.Community = "must-not-appear-in-lifecycle"
+	collr.User.AuthKey = "must-not-appear-in-lifecycle"
+	collr.User.PrivKey = "must-not-appear-in-lifecycle"
+	collr.ManualProfiles = []string{"/must/not/appear/in/lifecycle.yaml"}
+
+	require.Error(t, collr.Init(context.Background()))
+	cut := deviceStore.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	entry := cut.Entries[0]
+	require.Equal(t, ddsnmp.DeviceLifecycleInfo{
+		Hostname:    collr.Hostname,
+		Port:        collr.Options.Port,
+		SNMPVersion: collr.Options.Version,
+	}, entry.Info)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, entry.LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, entry.LastCompleted.Outcome)
+	require.False(t, entry.TopologyReady)
+	require.NotZero(t, entry.LastCompleted.CompletedAt)
+
+	serialized := fmt.Sprintf("%+v", cut)
+	require.NotContains(t, serialized, collr.Community)
+	require.NotContains(t, serialized, collr.User.AuthKey)
+	require.NotContains(t, serialized, collr.User.PrivKey)
+	require.NotContains(t, serialized, collr.ManualProfiles[0])
+}
+
+func TestCollector_CheckFailureUpdatesLifecycleWithoutTopologyRegistration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientSetterExpect(mockSNMP)
+	mockSNMP.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
+
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.Error(t, collr.Check(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCheck, ddsnmp.DeviceLifecycleOutcomeFailed, false)
+	require.Empty(t, deviceStore.Entries())
+
+	require.Nil(t, collr.Collect(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed, false)
+	require.Empty(t, deviceStore.Entries())
+}
+
+func TestCollector_LifecycleDiagnosticsFailOpenOnPanic(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+
+	collr := New(ddsnmp.NewDeviceStore())
+	collr.Config = prepareV2Config()
+	collr.deviceLifecycleStore = panickingDeviceLifecycleStore{}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+
+	require.NotPanics(t, func() {
+		require.NoError(t, collr.Init(context.Background()))
+	})
+}
+
+func assertDeviceLifecycle(
+	t *testing.T,
+	store *ddsnmp.DeviceStore,
+	phase ddsnmp.DeviceLifecyclePhase,
+	outcome ddsnmp.DeviceLifecycleOutcome,
+	topologyReady bool,
+) {
+	t.Helper()
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, phase, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, outcome, cut.Entries[0].LastCompleted.Outcome)
+	require.Equal(t, topologyReady, cut.Entries[0].TopologyReady)
+	require.NotZero(t, cut.Entries[0].LastCompleted.CompletedAt)
+}
+
+type panickingDeviceLifecycleStore struct{}
+
+func (panickingDeviceLifecycleStore) RegisterJob(string, ddsnmp.DeviceLifecycleInfo) {
+	panic("register lifecycle")
+}
+
+func (panickingDeviceLifecycleStore) RecordJobLifecycle(string, ddsnmp.DeviceLifecycleStatus) {
+	panic("record lifecycle")
 }
 
 func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.T) {
