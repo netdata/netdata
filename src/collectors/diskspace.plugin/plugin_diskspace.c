@@ -650,6 +650,16 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         rrdlabels_add(mp.chart_labels, "mount_root", mi->root, RRDLABEL_SRC_AUTO);
 
         item = dictionary_set_and_acquire_item(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+
+        if(unlikely(!item)) {
+            // dict_mountpoints is being destroyed (shutdown): the insert
+            // callback never ran, so mountpoint_delete_cb() will never free
+            // what this candidate owns - do it here (mirrors that callback)
+            string_freez(mp.filesystem);
+            string_freez(mp.mountroot);
+            rrdlabels_destroy(mp.chart_labels);
+            goto cleanup;
+        }
     }
 
     struct mount_point_metadata *m = dictionary_acquired_item_value(item);
