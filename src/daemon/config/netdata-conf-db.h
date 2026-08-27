@@ -9,6 +9,12 @@ extern bool dbengine_enabled;
 extern bool dbengine_datafiles_present; // dbengine datafiles exist on disk, even if the agent is not currently running dbengine
 extern bool dbengine_use_direct_io;
 
+// dbengine tier sizing knobs, consumed by the daemon (tier setup, /api/v1/info, analytics, tests) - not by the engine
+extern int default_rrdeng_disk_quota_mb;
+extern int default_multidb_disk_quota_mb;
+extern bool new_dbengine_defaults;
+extern bool legacy_multihost_db_space;
+
 extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time_s;

@@ -26,10 +26,8 @@ uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
-size_t tier_quota_mb[RRD_STORAGE_TIERS] = {512, 512, 512, 0, 0};
 #else
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
-size_t tier_quota_mb[RRD_STORAGE_TIERS] = {1024, 1024, 1024, 128, 64};
 #endif
 
 #if RRDENG_PAGE_TYPE_MAX != 2
@@ -62,11 +60,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
 uint64_t dbengine_out_of_memory_protection = 0;
 bool dbengine_use_all_ram_for_caches = false;
 int db_engine_journal_check = 0;
-bool new_dbengine_defaults = false;
-bool legacy_multihost_db_space = false;
-int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
 
 #if defined(ENV32BIT)
 int default_rrdeng_page_cache_mb = 16;
