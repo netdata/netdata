@@ -411,6 +411,17 @@ sidebar:
             - unseen
             - transitions
       - meta:
+          label: Netdata Cloud Outbound IP Addresses
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/netdata-cloud-outbound-ips.md
+          description: The public endpoint listing the source IP addresses Netdata Cloud connects from, for firewall and IP allowlist hardening
+          keywords:
+            - outbound ips
+            - source ip
+            - firewall
+            - allowlist
+            - webhook
+            - mcp
+      - meta:
           label: Unclaim and Reclaim a Node
           edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md
       - meta:
