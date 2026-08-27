@@ -104,25 +104,6 @@ void rrdeng_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_M
 }
 
 // ----------------------------------------------------------------------------
-// metric handle for legacy dbs
-
-/* This UUID is not unique across hosts */
-void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, nd_uuid_t *ret_uuid)
-{
-    CLEAN_BUFFER *wb = buffer_create(100, NULL);
-    buffer_sprintf(wb,"%s.%s", dim_id, chart_id);
-    ND_UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
-    uuid_copy(*ret_uuid, uuid.uuid);
-}
-
-static METRIC *rrdeng_metric_unittest(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    nd_uuid_t legacy_uuid;
-    rrdeng_generate_unittest_uuid(rd_id, st_id, &legacy_uuid);
-    return mrg_metric_get_and_acquire_by_uuid(main_mrg, &legacy_uuid, (Word_t)ctx);
-}
-
-// ----------------------------------------------------------------------------
 // metric handle
 
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh) {
@@ -162,33 +143,14 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     return metric;
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    METRIC *metric;
 
-    metric = mrg_metric_get_and_acquire_by_id(main_mrg, rd->uuid, (Word_t) ctx);
-
-    if(unlikely(!metric)) {
-        if(unlikely(unittest_running)) {
-            metric = rrdeng_metric_unittest(si, rrddim_id(rd), rrdset_id(rd->rrdset));
-            if (metric)
-                rd->uuid = mrg_metric_uuidmap_id_dup(main_mrg, metric);
-        }
-
-        if(likely(!metric))
-            metric = rrdeng_metric_create(si, uuidmap_uuid_ptr(rd->uuid));
-    }
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t) ctx);
+    if(unlikely(!metric))
+        metric = rrdeng_metric_create(si, uuidmap_uuid_ptr(id));
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(!uuid_eq(*uuidmap_uuid_ptr(rd->uuid), *mrg_metric_uuid(main_mrg, metric))) {
-        char uuid1[UUID_STR_LEN + 1];
-        char uuid2[UUID_STR_LEN + 1];
-
-        uuid_unparse(*uuidmap_uuid_ptr(rd->uuid), uuid1);
-        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
-        fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
-    }
-
     if(mrg_metric_ctx(metric) != ctx)
         fatal("DBENGINE: mixed up db instances, asked for metric from %p, got from %p",
               ctx, mrg_metric_ctx(metric));
