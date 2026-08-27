@@ -111,7 +111,7 @@ __attribute__((destructor)) void destroy_rrdeng_async_mutex(void)
     netdata_mutex_destroy(&rrdeng_async_mutex);
 }
 
-void rrdeng_async_wakeup()
+void rrdeng_async_wakeup(void)
 {
 
     if (__atomic_load_n(&rrdeng_main.async_ready, __ATOMIC_RELAXED)) {
@@ -126,7 +126,7 @@ void rrdeng_async_wakeup()
     }
 }
 #else
-void rrdeng_async_wakeup()
+void rrdeng_async_wakeup(void)
 {
     int rc = uv_async_send(&rrdeng_main.async);
     if (rc)
@@ -2815,7 +2815,7 @@ void dbengine_event_loop(void* arg) {
     worker_unregister();
 }
 
-void dbengine_shutdown()
+void dbengine_shutdown(void)
 {
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
