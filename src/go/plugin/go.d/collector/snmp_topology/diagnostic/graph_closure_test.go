@@ -21,6 +21,34 @@ func TestGenerationValidationRejectsMissingObservationMember(t *testing.T) {
 	require.ErrorContains(t, err, "member not found")
 }
 
+func TestGenerationValidationAcceptsEqualSemanticKeysOrderedByRegistration(t *testing.T) {
+	collectedAt := "2026-08-27T12:00:00Z"
+	first := ObservationV1{
+		CaptureID: 1, Registration: 1, LocalDeviceID: "same-device", CollectedAt: collectedAt,
+	}
+	second := first
+	second.CaptureID = 2
+	second.Registration = 2
+	firstRef, firstData, err := Seal(MemberType{Kind: KindObservation, Schema: SchemaV1}, first)
+	require.NoError(t, err)
+	secondRef, secondData, err := Seal(MemberType{Kind: KindObservation, Schema: SchemaV1}, second)
+	require.NoError(t, err)
+	generation := validTestGeneration()
+	generation.Devices = []GenerationDeviceV1{
+		{Registration: 1, State: GenerationStateRefreshed, Renderable: true,
+			ObservationState: ObservationStateAvailable, Observation: &firstRef},
+		{Registration: 2, State: GenerationStateRetained, Renderable: true,
+			ObservationState: ObservationStateAvailable, Observation: &secondRef},
+	}
+	generation.Observations = []ContentRef{firstRef, secondRef}
+	source := MemorySource{firstRef.Key(): firstData, secondRef.Key(): secondData}
+
+	require.NoError(t, validateGenerationObservations(generation, source, testReaderLimits()))
+
+	generation.Observations[0], generation.Observations[1] = generation.Observations[1], generation.Observations[0]
+	require.ErrorContains(t, validateGenerationObservations(generation, source, testReaderLimits()), "ordered")
+}
+
 func TestGraphClosureV1_RejectsQueryGenerationMismatch(t *testing.T) {
 	generation := validTestGeneration()
 	generationRef, generationData, err := Seal(MemberType{Kind: KindGeneration, Schema: SchemaV1}, generation)

@@ -37,7 +37,9 @@ V1 currently defines these immutable capability closures:
   observation. Replay must reproduce the captured observation exactly.
 - `refresh_sweep@1` inventories the complete registration-ordered refresh plan, each registration's selection, target
   resolution, and terminal outcome, plus the publication result. A published sweep owns its resulting generation; a
-  canceled or panicked sweep explicitly publishes no generation.
+  canceled or panicked sweep explicitly publishes no generation. In a published sweep, `success` is equivalent to a
+  `refreshed` resulting row, cancellation/panic outcomes are prohibited, the generation publication time equals the
+  sweep finish time, and an available previous generation immediately precedes the result sequence.
 - `graph_replay@1` inventories the generation, normalized query, three-state DNS trace, and ordered OUI trace. Replay
   rebuilds `netdata.topology.v1` without ambient dependencies. Production-shaped tests compare it with the live output.
 - `capture_accounting@1` inventories one coalesced capture-gap record for attempts rejected before a capture transaction
@@ -65,11 +67,16 @@ ordering, reference, and count rules that JSON Schema cannot express.
 - A `MemberHandle` is process-local and resolves exactly once to `sealed(ContentRef)` or `failed`. Device generations
   retain the observation handle required by later generation capture; unchanged devices are referenced without
   re-projecting their rows.
+- A sink returns success only after it has accepted the newly sealed members and manifest for later archive-wide
+  reference. Sink rejection or panic fails the transaction handles; a later capability can never receive a sealed handle
+  for content the sink did not accept.
 - A capture result's `Members` map contains bytes newly sealed by that transaction. Its manifest can also inventory
   transitive content references sealed by earlier transactions. A sink therefore owns one archive-wide content-addressed
   store; it must not assume each result is a self-contained byte map.
 - Queue saturation is represented by bounded, coalesced `capture_gap` records. A capture admitted successfully but later
   aborted or failed sealing is emitted as `incomplete`; it is never silently downgraded to a weaker replay capability.
+  Every known capability has a fixed terminal section inventory. A recorder-level failure emits those exact sections as
+  empty `incomplete` sections; a caller-declared incomplete result may retain only a capability-valid partial inventory.
 
 This layer deliberately supplies no filesystem sink, retention policy, compression, export command, or operator setting.
 Those concerns consume this contract; they do not redefine it.
@@ -91,6 +98,10 @@ and v1 rendering. The same limiter covers both strict and probable projections. 
 charges a checked conservative envelope for data-dependent sorts and multiplicative work. Exhaustion is returned through
 the normal graph-build error path. Production passes no limiter and therefore does no accounting work.
 
+Semantic replay charges its ordered records and every data-dependent finalization sort before those sorts execute,
+including repeated per-neighbor interface ordering. Graph replay additionally charges FDB candidate-vector sorting,
+all-device focus statistics, and renderer label/detail-map ordering at their shared production-kernel boundaries.
+
 When no recorder is installed, the collector does not construct diagnostic DTOs, copy topology rows, wrap DNS/OUI
 lookups, or run an extra graph/render pass. The production topology and Function result remain authoritative if capture
 admission or asynchronous sealing fails.
@@ -101,7 +112,9 @@ Every reader supplies a fully nonzero `ReaderLimits` policy. Limits cover logica
 counts, decoded topology structure, JSON depth/tokens, and replay work. The graph reader enforces logical/member/reference
 limits. Member bytes plus JSON string, token, and depth limits are enforced before typed decoding. Schema-specific device,
 profile, row, tag, DNS, and OUI counts are checked after that bounded decode. V1 does not maintain a second type-aware
-predecode scanner. Operational defaults are not part of v1 validity.
+predecode scanner. Every generation reached through a requested closure, including a refresh sweep's previous generation,
+receives the same device/row/tag validation. The semantic device input's target, management-address, capability, chart,
+metric, and label collections are included in its structural policy. Operational defaults are not part of v1 validity.
 
 V1 exact artifacts are labelled `restricted`, `exact`, and `sanitized: false`.
 

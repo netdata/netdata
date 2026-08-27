@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/diagnostic"
@@ -83,10 +84,16 @@ func replayTopologySemanticV1(
 	}
 
 	applyTopologySemanticStream(builder, newTopologyMainSemanticStream(device.SysUptime, mainProfiles), nil)
+	if err := work.addSort(uint64(len(builder.vlanNameByID))); err != nil {
+		return nil, err
+	}
 	if err := verifyReplayVLANInventory(builder.vtpVLANContexts(), vlanResults); err != nil {
 		return nil, err
 	}
 	applyTopologySemanticStream(builder, newTopologyVLANSemanticStream(vlanResults), nil)
+	if err := chargeSemanticFinalizeWork(work, builder); err != nil {
+		return nil, err
+	}
 	snapshot, _ := freezeTopologyBuilder(builder)
 	if snapshot == nil {
 		return nil, errors.New("semantic replay produced no snapshot")
@@ -287,6 +294,45 @@ func addSemanticReplayWork(work *replayWorkBudget, records []diagnostic.Semantic
 	return nil
 }
 
+func chargeSemanticFinalizeWork(work *replayWorkBudget, builder *topologyBuilder) error {
+	if builder == nil {
+		return nil
+	}
+	interfaceKeys, err := worklimit.Sum(uint64(len(builder.ifNamesByIndex)), uint64(len(builder.ifStatusByIndex)))
+	if err != nil {
+		return err
+	}
+	for _, size := range []uint64{
+		uint64(len(builder.localDevice.Labels)),
+		uint64(len(builder.localDevice.ManagementAddresses)),
+		uint64(len(builder.fdbEntries)),
+		uint64(len(builder.ifStatusByIndex)),
+		interfaceKeys,
+		uint64(len(builder.bridgePortToIf)),
+		uint64(len(builder.fdbEntries)),
+		uint64(len(builder.stpPorts)),
+		uint64(len(builder.arpEntries)),
+		uint64(len(builder.lldpRemotes)),
+		uint64(len(builder.cdpRemotes)),
+		uint64(len(builder.l3InterfacesByIP)),
+		uint64(len(builder.ospfNeighborsByKey)),
+		uint64(len(builder.bgpPeersByKey)),
+	} {
+		if err := work.addSort(size); err != nil {
+			return err
+		}
+	}
+	interfaceSort, err := worklimit.SortEnvelope(uint64(len(builder.l3InterfacesByIP)))
+	if err != nil {
+		return err
+	}
+	perNeighbor, err := worklimit.Product(uint64(len(builder.ospfNeighborsByKey)), interfaceSort)
+	if err != nil {
+		return err
+	}
+	return work.add(perNeighbor)
+}
+
 func profileMetricsFromTags(record diagnostic.SemanticRecordV1) *ddsnmp.ProfileMetrics {
 	metadata := make(map[string]ddsnmp.MetaTag, len(record.Metadata))
 	for key, value := range record.Metadata {
@@ -340,11 +386,22 @@ type replayWorkBudget struct {
 }
 
 func (b *replayWorkBudget) add(value uint64) error {
-	if value > b.limit-b.used {
+	if b == nil {
+		return errors.New("diagnostic replay work budget is nil")
+	}
+	if b.used > b.limit || value > b.limit-b.used {
 		return fmt.Errorf("diagnostic replay work exceeds limit %d", b.limit)
 	}
 	b.used += value
 	return nil
+}
+
+func (b *replayWorkBudget) addSort(items uint64) error {
+	units, err := worklimit.SortEnvelope(items)
+	if err != nil {
+		return err
+	}
+	return b.add(units)
 }
 
 func semanticCapabilityRoot(manifest diagnostic.ManifestV1) (diagnostic.ContentRef, bool) {

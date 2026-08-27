@@ -495,6 +495,9 @@ schema and closures in that directory.
   unpublished sweeps MUST NOT synthesize one. Generation rows MUST distinguish
   refreshed, retained, expired, and absent registrations, and MUST represent a
   renderable observation whose capture was unavailable explicitly.
+  A published row is `refreshed` if and only if its terminal outcome is
+  `success`; published sweeps MUST reject cancellation/panic outcomes and bind
+  result publication time and available previous/result sequence chronology.
 - **Generation closure:** A graph query MUST acquire one immutable generation
   once. That generation references the exact ordered available observations for
   the view; unchanged devices reuse their sealed observation without row
@@ -515,6 +518,10 @@ schema and closures in that directory.
   callers on the nil-limiter path. `l2topology.ToGraph` is the single
   error-capable projection API; do not add a compatibility wrapper or a second
   checked entry point.
+- **Reader structure:** Apply the device/row/tag policy to every generation
+  reached by the requested closure, including a refresh sweep's previous
+  generation, and to all collection-bearing fields in the semantic device
+  input. Semantic replay MUST charge finalization sorts before execution.
 - **Integrity:** Content hashes prove typed byte identity and graph
   consistency. Exact v1 members remain `restricted` and `sanitized: false`.
 - **Recorder hot path:** Disabled capture MUST perform no DTO projection or

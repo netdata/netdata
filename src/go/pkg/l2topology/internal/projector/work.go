@@ -51,7 +51,14 @@ func chargeBridgeCollection(result model.Result, config topologyInferenceStrateg
 	}
 	// Pairwise FDB inference can compare every reporter attachment with every
 	// managed reporter before it collapses the compatible pair set.
-	if err := limiter.ChargeProduct(uint64(len(result.Attachments)), uint64(len(result.Devices))); err != nil {
+	fanout, err := worklimit.Product(uint64(len(result.Attachments)), uint64(len(result.Devices)))
+	if err != nil {
+		return err
+	}
+	if err := limiter.Charge(fanout); err != nil {
+		return err
+	}
+	if err := limiter.ChargeSort(fanout); err != nil {
 		return err
 	}
 	return limiter.ChargeSort(uint64(len(result.Attachments)))

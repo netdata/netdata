@@ -58,6 +58,9 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 			return fmt.Errorf("semantic_replay@1 section %d is %q, expected %q", i, root.Sections[i].Name, want)
 		}
 	}
+	if isEmptyIncompleteShape(root) {
+		return nil
+	}
 
 	var owner semanticOwnerV1
 	deviceSection := root.Sections[0]
@@ -74,10 +77,13 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 	if err := device.Validate(); err != nil {
 		return err
 	}
+	if _, _, err := validateSemanticDeviceLimits(device, limits); err != nil {
+		return err
+	}
 	owner = semanticOwnerV1{captureID: device.CaptureID, registration: device.Registration}
 
 	observationSection := root.Sections[1]
-	switch root.State {
+	switch observationSection.State {
 	case StateSuccess:
 		if observationSection.State != StateSuccess || observationSection.ExpectedRecords != 1 || len(observationSection.Members) != 1 {
 			return errors.New("successful semantic observation section must contain one record")
@@ -103,10 +109,22 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 			return errors.New("empty semantic observation section must contain no record")
 		}
 	default:
+		return fmt.Errorf("semantic observation section has unsupported terminal state %q", observationSection.State)
+	}
+	if root.State == StateSuccess && observationSection.State != StateSuccess {
+		return errors.New("successful semantic replay requires one observation")
+	}
+	if root.State == StateEmpty && observationSection.State != StateEmpty {
+		return errors.New("empty semantic replay must not contain an observation")
+	}
+	if root.State != StateSuccess && root.State != StateEmpty && root.State != StateIncomplete {
 		return fmt.Errorf("semantic_replay@1 has unsupported terminal state %q", root.State)
 	}
 
 	profileSection := root.Sections[2]
+	if !sectionHasCompleteInventory(profileSection, true) {
+		return errors.New("profile section has an invalid terminal inventory")
+	}
 	if uint64(len(profileSection.Members)) > limits.MaxProfiles || profileSection.ExpectedRecords > limits.MaxProfiles {
 		return fmt.Errorf("profile count exceeds limit %d", limits.MaxProfiles)
 	}
@@ -136,6 +154,9 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 	}
 
 	eventSection := root.Sections[3]
+	if eventSection.State != StateSuccess && eventSection.State != StateEmpty && eventSection.State != StateIncomplete {
+		return errors.New("semantic event section has an invalid terminal state")
+	}
 	if uint64(len(eventSection.Members)) > limits.MaxMembers {
 		return fmt.Errorf("semantic shard count exceeds limit %d", limits.MaxMembers)
 	}
@@ -212,6 +233,43 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 		}
 	}
 	return nil
+}
+
+func validateSemanticDeviceLimits(device SemanticDeviceV1, limits ReaderLimits) (rows uint64, tags uint64, err error) {
+	addRows := func(values ...int) error {
+		for _, value := range values {
+			rows, err = checkedAdd(rows, uint64(value))
+			if err != nil || rows > limits.MaxRows {
+				return fmt.Errorf("semantic device row count exceeds limit %d", limits.MaxRows)
+			}
+		}
+		return nil
+	}
+	addTags := func(values ...int) error {
+		for _, value := range values {
+			tags, err = checkedAdd(tags, uint64(value))
+			if err != nil || tags > limits.MaxTags {
+				return fmt.Errorf("semantic device tag count exceeds limit %d", limits.MaxTags)
+			}
+		}
+		return nil
+	}
+	local := device.LocalDevice
+	if err := addRows(
+		len(device.TargetManagementIPs), len(local.ManagementAddresses),
+		len(local.Capabilities), len(local.CapabilitiesSupported), len(local.CapabilitiesEnabled),
+	); err != nil {
+		return 0, 0, err
+	}
+	if err := addTags(len(local.Labels), len(local.DeviceCharts), len(local.InterfaceCharts)); err != nil {
+		return 0, 0, err
+	}
+	for _, chart := range local.InterfaceCharts {
+		if err := addRows(len(chart.AvailableMetrics)); err != nil {
+			return 0, 0, err
+		}
+	}
+	return rows, tags, nil
 }
 
 func validateSemanticGroupOrderV1(groups []semanticShardGroupV1, profiles []SemanticProfileV1, mainProfiles uint32) error {

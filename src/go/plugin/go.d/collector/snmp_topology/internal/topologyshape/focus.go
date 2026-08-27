@@ -21,6 +21,13 @@ func ApplyDepthFocusFilter(data *topologymodel.Data, options topologyoptions.Que
 	beforeLinks := len(data.Links)
 
 	if topologyoptions.IsManagedFocusAllDevices(options.ManagedDeviceFocus) {
+		items, err := worklimit.Sum(uint64(len(data.Actors)), uint64(len(data.Links)))
+		if err != nil {
+			return err
+		}
+		if err := options.WorkLimiter.Charge(items); err != nil {
+			return err
+		}
 		recordTopologyFocusAllDevicesStats(data, options)
 		return nil
 	}

@@ -117,8 +117,11 @@ func (c RecorderConfig) Validate() error {
 	return nil
 }
 
+// CaptureSink accepts ownership of a complete result. Store returns nil only
+// after every newly sealed member and the manifest can be referenced by later
+// captures; rejection leaves all transaction handles failed.
 type CaptureSink interface {
-	Store(CaptureResult)
+	Store(CaptureResult) error
 }
 
 type CaptureResult struct {
@@ -143,6 +146,9 @@ func (g CaptureGapV1) Validate() error {
 	}
 	if g.Count == 0 {
 		return errors.New("capture gap count must be nonzero")
+	}
+	if g.Count > g.LastAttempt-g.FirstAttempt+1 {
+		return errors.New("capture gap count exceeds its attempt range")
 	}
 	if !CaptureClass(g.CapabilityClass).valid() {
 		return fmt.Errorf("invalid capture gap capability class %q", g.CapabilityClass)
@@ -770,6 +776,7 @@ func (r *Recorder) process(job captureJob) {
 	local := make(map[uint64]sealedMember, len(job.members))
 	var sealed []sealedMember
 	captureErr := job.terminalErr
+	hardFailure := job.abortErr != nil
 	memberLimitExceeded := false
 
 	for i, member := range job.members {
@@ -792,10 +799,12 @@ func (r *Recorder) process(job captureJob) {
 					err = fmt.Errorf("referenced %s is %s", member.reference, state)
 				}
 				captureErr = errors.Join(captureErr, err)
+				hardFailure = true
 				continue
 			}
 			if err := inventory.addAll(referencedInventory); err != nil {
 				captureErr = errors.Join(captureErr, err)
+				hardFailure = true
 				memberLimitExceeded = true
 				continue
 			}
@@ -817,6 +826,7 @@ func (r *Recorder) process(job captureJob) {
 						resolution.Ref = ref
 						if err := memberInventory.addAll(dependencyInventory); err != nil {
 							captureErr = errors.Join(captureErr, err)
+							hardFailure = true
 							dependencyErr = err
 							memberLimitExceeded = true
 							optional = nil
@@ -831,6 +841,7 @@ func (r *Recorder) process(job captureJob) {
 						err = fmt.Errorf("dependency %s is %s", dependency, state)
 					}
 					captureErr = errors.Join(captureErr, err)
+					hardFailure = true
 					dependencyErr = err
 					resolved = nil
 					break
@@ -838,6 +849,7 @@ func (r *Recorder) process(job captureJob) {
 				resolved = append(resolved, ref)
 				if err := memberInventory.addAll(dependencyInventory); err != nil {
 					captureErr = errors.Join(captureErr, err)
+					hardFailure = true
 					dependencyErr = err
 					memberLimitExceeded = true
 					resolved = nil
@@ -856,6 +868,7 @@ func (r *Recorder) process(job captureJob) {
 			}
 			if err != nil {
 				captureErr = errors.Join(captureErr, err)
+				hardFailure = true
 				member.handle.future.resolve(ContentRef{}, nil, err)
 				continue
 			}
@@ -863,6 +876,7 @@ func (r *Recorder) process(job captureJob) {
 		ref, data, err := Seal(member.memberType, value)
 		if err != nil {
 			captureErr = errors.Join(captureErr, fmt.Errorf("seal %s@%s: %w", member.memberType.Kind, member.memberType.Schema, err))
+			hardFailure = true
 			member.handle.future.resolve(ContentRef{}, nil, err)
 			continue
 		}
@@ -870,6 +884,7 @@ func (r *Recorder) process(job captureJob) {
 		if memberInventory != nil {
 			if err := memberInventory.addAll(memberInventoryRefs); err != nil {
 				captureErr = errors.Join(captureErr, err)
+				hardFailure = true
 				memberLimitExceeded = true
 				member.handle.future.resolve(ContentRef{}, nil, err)
 				continue
@@ -879,6 +894,7 @@ func (r *Recorder) process(job captureJob) {
 		}
 		if err := inventory.addAll(memberInventoryRefs); err != nil {
 			captureErr = errors.Join(captureErr, err)
+			hardFailure = true
 			memberLimitExceeded = true
 			member.handle.future.resolve(ContentRef{}, nil, err)
 			continue
@@ -913,6 +929,23 @@ func (r *Recorder) process(job captureJob) {
 	}
 	if len(root.Sections) == 0 {
 		captureErr = errors.Join(captureErr, errors.New("capability transaction defined no terminal sections"))
+	}
+	if err := validateKnownCapabilityTerminalShape(root); err != nil {
+		captureErr = errors.Join(captureErr, err)
+		hardFailure = true
+	}
+	if hardFailure {
+		if fallback, ok := incompleteCapabilityRoot(job.capability); ok {
+			root = fallback
+			members = make(MemorySource, 1)
+			inventory = newBoundedManifestInventory(r.config.MaxMembers - 1)
+			sealed = nil
+		} else if len(root.Sections) == 0 {
+			terminalErr := errors.Join(job.abortErr, captureErr)
+			failPendingMembers(job.members, terminalErr)
+			_ = r.store(CaptureResult{CaptureID: job.captureID, RetainedBytes: job.retainedBytes, Err: terminalErr})
+			return
+		}
 	}
 	if err := root.Validate(); err != nil {
 		captureErr = errors.Join(captureErr, fmt.Errorf("validate capability root: %w", err))
@@ -958,6 +991,10 @@ func (r *Recorder) process(job captureJob) {
 		failPendingMembers(job.members, err)
 		return
 	}
+	if hardFailure {
+		failPendingMembers(job.members, errors.Join(job.abortErr, captureErr))
+		return
+	}
 	for _, member := range sealed {
 		member.handle.future.resolve(member.ref, member.inventory, nil)
 	}
@@ -976,8 +1013,7 @@ func (r *Recorder) store(result CaptureResult) (err error) {
 			err = fmt.Errorf("diagnostic sink panicked: %v", recovered)
 		}
 	}()
-	r.config.Sink.Store(result)
-	return nil
+	return r.config.Sink.Store(result)
 }
 
 func (r *Recorder) emitGaps() {
@@ -1050,9 +1086,9 @@ type MemorySink struct {
 	members MemorySource
 }
 
-func (s *MemorySink) Store(result CaptureResult) {
+func (s *MemorySink) Store(result CaptureResult) error {
 	if s == nil {
-		return
+		return nil
 	}
 	s.mu.Lock()
 	if s.members == nil {
@@ -1065,6 +1101,7 @@ func (s *MemorySink) Store(result CaptureResult) {
 	}
 	s.results = append(s.results, result)
 	s.mu.Unlock()
+	return nil
 }
 
 func (s *MemorySink) Source() MemorySource {

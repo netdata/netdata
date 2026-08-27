@@ -35,7 +35,11 @@ func assessGraphCapabilityV1(root CapabilityRootV1, source MemberSource, limits 
 	if !complete {
 		return false, false, nil
 	}
-	generation, err := decodeGenerationSection(root.Sections[1], source, limits)
+	generationSection := root.Sections[1]
+	if len(generationSection.Members) != 1 {
+		return false, false, errors.New("generation section must contain one member")
+	}
+	generation, err := decodeGeneration(generationSection.Members[0], source, limits)
 	if err != nil {
 		return false, false, err
 	}
@@ -79,6 +83,9 @@ func validateGraphCapabilityGraphV1(root CapabilityRootV1, source MemberSource, 
 			return fmt.Errorf("graph_replay@1 section %d is %q, expected %q", i, root.Sections[i].Name, name)
 		}
 	}
+	if isEmptyIncompleteShape(root) {
+		return nil
+	}
 
 	dnsSection := root.Sections[0]
 	generationSection := root.Sections[1]
@@ -88,11 +95,8 @@ func validateGraphCapabilityGraphV1(root CapabilityRootV1, source MemberSource, 
 	if generationSection.State != StateSuccess || generationSection.ExpectedRecords != 1 || len(generationSection.Members) != 1 {
 		return errors.New("graph generation section must contain one successful record")
 	}
-	generation, err := decodeGenerationSection(generationSection, source, limits)
+	_, err := decodeGenerationSection(generationSection, source, limits)
 	if err != nil {
-		return err
-	}
-	if err := validateGenerationObservations(generation, source, limits); err != nil {
 		return err
 	}
 
@@ -129,11 +133,29 @@ func validateGraphCapabilityGraphV1(root CapabilityRootV1, source MemberSource, 
 }
 
 func decodeGenerationSection(section SectionInventoryV1, source MemberSource, limits ReaderLimits) (GenerationV1, error) {
-	if section.Members[0].Type() != (MemberType{Kind: KindGeneration, Schema: SchemaV1}) {
+	if len(section.Members) != 1 {
+		return GenerationV1{}, errors.New("generation section must contain one member")
+	}
+	return decodeAndValidateGeneration(section.Members[0], source, limits)
+}
+
+func decodeAndValidateGeneration(ref ContentRef, source MemberSource, limits ReaderLimits) (GenerationV1, error) {
+	generation, err := decodeGeneration(ref, source, limits)
+	if err != nil {
+		return GenerationV1{}, err
+	}
+	if err := validateGenerationObservations(generation, source, limits); err != nil {
+		return GenerationV1{}, err
+	}
+	return generation, nil
+}
+
+func decodeGeneration(ref ContentRef, source MemberSource, limits ReaderLimits) (GenerationV1, error) {
+	if ref.Type() != (MemberType{Kind: KindGeneration, Schema: SchemaV1}) {
 		return GenerationV1{}, errors.New("generation section contains the wrong member type")
 	}
 	var generation GenerationV1
-	if err := decodeGraphMember(source, section.Members[0], limits, &generation); err != nil {
+	if err := decodeGraphMember(source, ref, limits, &generation); err != nil {
 		return GenerationV1{}, err
 	}
 	if err := generation.Validate(); err != nil {
@@ -208,7 +230,7 @@ func compareObservationV1(left, right ObservationV1) int {
 	if leftCollected.After(rightCollected) {
 		return 1
 	}
-	return 0
+	return cmp.Compare(left.Registration, right.Registration)
 }
 
 func observationIdentityV1(observation ObservationV1) (managementIP, hostname string) {

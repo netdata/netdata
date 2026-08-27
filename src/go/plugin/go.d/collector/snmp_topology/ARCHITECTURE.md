@@ -405,8 +405,10 @@ Recorder admission and sealing are asynchronous:
 - `Commit` and `Abort` never wait for the worker.
 - A process-local `MemberHandle` resolves to a portable `ContentRef` or a
   terminal failure and is never serialized.
+- A sink acknowledges ownership with an error-capable result. Handles seal only
+  after the sink has accepted the members and manifest for later references.
 - Saturated attempts become coalesced capture-gap records; admitted failures
-  become explicit incomplete capabilities.
+  become capability-specific, closure-valid incomplete artifacts.
 - Capture failures never fail collection, publication, graph construction, or
   Function rendering.
 

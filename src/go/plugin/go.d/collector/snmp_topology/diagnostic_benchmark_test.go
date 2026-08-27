@@ -21,8 +21,9 @@ type benchmarkDiagnosticSink struct {
 	results chan diagnostic.CaptureResult
 }
 
-func (s *benchmarkDiagnosticSink) Store(result diagnostic.CaptureResult) {
+func (s *benchmarkDiagnosticSink) Store(result diagnostic.CaptureResult) error {
 	s.results <- result
+	return nil
 }
 
 type benchmarkTopologySNMPHandler struct {

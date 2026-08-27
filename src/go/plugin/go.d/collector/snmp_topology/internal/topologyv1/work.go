@@ -55,6 +55,18 @@ func chargeRenderWork(data topologymodel.Data, limiter worklimit.Limiter) error 
 				return err
 			}
 		}
+		// Producer labels are sorted once for the label table and once by JSON
+		// encoding in the metadata table. The four status-count maps are sorted
+		// while deriving scalar labels.
+		for _, size := range []int{
+			len(actor.Labels), len(actor.Labels),
+			len(actor.Detail.L2.Device.AdminStatusCounts), len(actor.Detail.L2.Device.OperStatusCounts),
+			len(actor.Detail.L2.Device.LinkModeCounts), len(actor.Detail.L2.Device.TopologyRoleCounts),
+		} {
+			if err := limiter.ChargeSort(uint64(size)); err != nil {
+				return err
+			}
+		}
 	}
 	for _, link := range data.Links {
 		srcWork, err := matchRenderWork(link.Src.Match)

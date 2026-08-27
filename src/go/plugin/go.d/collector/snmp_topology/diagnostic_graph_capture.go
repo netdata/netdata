@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"cmp"
 	"errors"
 	"reflect"
 	"sort"
@@ -314,7 +315,10 @@ func (s *topologyDiagnosticRefreshSweep) generationBase(
 	}
 	devices := append([]*topologyDeviceGeneration(nil), generation.renderableDevices...)
 	sort.SliceStable(devices, func(i, j int) bool {
-		return compareTopologyObservationSnapshots(devices[i].observation, devices[j].observation) < 0
+		if value := compareTopologyObservationSnapshots(devices[i].observation, devices[j].observation); value != 0 {
+			return value < 0
+		}
+		return cmp.Compare(devices[i].registrationID, devices[j].registrationID) < 0
 	})
 	dependencies := make([]diagnostic.MemberHandle, 0, len(devices))
 	rows := make([]int, 0, len(devices))

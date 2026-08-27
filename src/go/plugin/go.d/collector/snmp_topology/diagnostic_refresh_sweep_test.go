@@ -89,7 +89,7 @@ func TestDiagnosticRefreshSweep_GenerationInventoriesUnavailableAndNonRenderable
 	})
 	require.NoError(t, err)
 
-	semanticTxn, err := recorder.Begin(diagnostic.SemanticCapabilityV1())
+	semanticTxn, err := recorder.Begin(diagnostic.CapabilityKey{Name: "test_observation", Revision: 1})
 	require.NoError(t, err)
 	require.NoError(t, semanticTxn.DefineSection(diagnostic.SemanticSectionObservation, diagnostic.StateSuccess, 1))
 	observationHandle, err := semanticTxn.AddOwned(
@@ -180,6 +180,48 @@ func TestDiagnosticRefreshSweep_GenerationInventoriesUnavailableAndNonRenderable
 	assert.Equal(t, diagnostic.ObservationStateNotApplicable, captured.Devices[2].ObservationState)
 	assert.Equal(t, diagnostic.GenerationStateAbsent, captured.Devices[3].State)
 	assert.False(t, captured.Replayable())
+}
+
+func TestDiagnosticGenerationBaseOrdersEqualObservationKeysByRegistration(t *testing.T) {
+	collectedAt := time.Date(2026, time.August, 27, 16, 0, 0, 0, time.UTC)
+	sink := &diagnostic.MemorySink{}
+	recorder, err := diagnostic.NewRecorder(diagnostic.RecorderConfig{
+		QueueCapacity: 1, MaxMembers: 8, MaxRetainedBytes: 1 << 20, Sink: sink,
+	})
+	require.NoError(t, err)
+	txn, err := recorder.Begin(diagnostic.CapabilityKey{Name: "test_observations", Revision: 1})
+	require.NoError(t, err)
+	require.NoError(t, txn.DefineSection("observations", diagnostic.StateSuccess, 2))
+	first, err := txn.AddOwned("observations", diagnostic.MemberType{Kind: diagnostic.KindObservation, Schema: diagnostic.SchemaV1},
+		diagnostic.ObservationV1{CaptureID: txn.CaptureID(), Registration: 1, LocalDeviceID: "same", CollectedAt: canonicalDiagnosticTime(collectedAt)}, 128)
+	require.NoError(t, err)
+	second, err := txn.AddOwned("observations", diagnostic.MemberType{Kind: diagnostic.KindObservation, Schema: diagnostic.SchemaV1},
+		diagnostic.ObservationV1{CaptureID: txn.CaptureID(), Registration: 2, LocalDeviceID: "same", CollectedAt: canonicalDiagnosticTime(collectedAt)}, 128)
+	require.NoError(t, err)
+	require.NoError(t, txn.Commit(diagnostic.StateSuccess))
+
+	entries := []ddsnmp.DeviceEntry{{RegistrationID: 1}, {RegistrationID: 2}}
+	sweep := newTopologyDiagnosticRefreshSweep(recorder, collectedAt, entries, nil)
+	device1 := &topologyDeviceGeneration{
+		registrationID: 1, hasObservation: true, diagnosticObservation: first,
+		observation: topologymodel.ObservationSnapshot{LocalDeviceID: "same", CollectedAt: collectedAt},
+	}
+	device2 := &topologyDeviceGeneration{
+		registrationID: 2, hasObservation: true, diagnosticObservation: second,
+		observation: topologymodel.ObservationSnapshot{LocalDeviceID: "same", CollectedAt: collectedAt},
+	}
+	generation := &topologyGeneration{
+		sequence: 1, publishedAt: collectedAt,
+		renderableDevices: []*topologyDeviceGeneration{device2, device1},
+	}
+	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
+		1: {generation: device1},
+		2: {generation: device2},
+	}
+	_, dependencies, rows := sweep.generationBase(newTestSNMPTopologyCollector(), generation, states, nil)
+	require.Equal(t, []uint64{first.ID(), second.ID()}, []uint64{dependencies[0].ID(), dependencies[1].ID()})
+	require.Equal(t, []int{0, 1}, rows)
+	recorder.Close()
 }
 
 func decodeDiagnosticRefreshSweep(

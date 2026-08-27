@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testSemanticCapability = CapabilityKey{Name: "semantic_replay", Revision: 1}
+var testSemanticCapability = CapabilityKey{Name: "test_capture", Revision: 1}
 
 func newTestRecorder(t *testing.T, sink CaptureSink, capacity uint64) *Recorder {
 	t.Helper()
@@ -389,9 +389,10 @@ type blockingCaptureSink struct {
 	release chan struct{}
 }
 
-func (s *blockingCaptureSink) Store(result CaptureResult) {
+func (s *blockingCaptureSink) Store(result CaptureResult) error {
 	s.entered <- result
 	<-s.release
+	return nil
 }
 
 func TestRecorder_BeginReservesNonBlockingTerminalCapacityAndCoalescesGaps(t *testing.T) {
@@ -514,7 +515,7 @@ func TestRecorder_WorkerPanicReleasesAdmissionAndFailsHandle(t *testing.T) {
 
 type panicCaptureSink struct{}
 
-func (panicCaptureSink) Store(CaptureResult) { panic("sink panic") }
+func (panicCaptureSink) Store(CaptureResult) error { panic("sink panic") }
 
 func TestRecorder_SinkPanicReleasesAdmissionAndFailsHandle(t *testing.T) {
 	t.Parallel()
@@ -536,6 +537,140 @@ func TestRecorder_SinkPanicReleasesAdmissionAndFailsHandle(t *testing.T) {
 	_, handleErr, state := handle.Resolve()
 	assert.Equal(t, HandleFailed, state)
 	require.ErrorContains(t, handleErr, "sink panicked")
+}
+
+type rejectingCaptureSink struct {
+	err error
+}
+
+func (s rejectingCaptureSink) Store(CaptureResult) error { return s.err }
+
+func TestRecorder_SinkMustAcceptOwnershipBeforeHandleSeals(t *testing.T) {
+	t.Parallel()
+
+	sinkErr := errors.New("archive rejected capture")
+	recorder := newTestRecorder(t, rejectingCaptureSink{err: sinkErr}, 1)
+	txn, err := recorder.Begin(CapabilityKey{Name: "test_capture", Revision: 1})
+	require.NoError(t, err)
+	require.NoError(t, txn.DefineSection("leaf", StateSuccess, 1))
+	handle, err := txn.AddOwned(
+		"leaf",
+		MemberType{Kind: "test_leaf", Schema: SchemaV1},
+		testLeaf{ID: "leaf-a"},
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, txn.Commit(StateSuccess))
+	recorder.Close()
+
+	_, handleErr, state := handle.Resolve()
+	assert.Equal(t, HandleFailed, state)
+	require.ErrorIs(t, handleErr, sinkErr)
+}
+
+func TestRecorder_ActualCapabilitiesEmitClosureValidAbortShapes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		capability CapabilityKey
+		closure    Closure
+		sections   []string
+	}{
+		{SemanticCapabilityV1(), SemanticClosureV1(), []string{
+			SemanticSectionDevice, SemanticSectionObservation, SemanticSectionProfiles, SemanticSectionEvents,
+		}},
+		{RefreshCapabilityV1(), RefreshClosureV1(), []string{
+			RefreshSectionGeneration, RefreshSectionSweep,
+		}},
+		{GraphCapabilityV1(), GraphClosureV1(), []string{
+			GraphSectionDNSTrace, GraphSectionGeneration, GraphSectionOUITrace, GraphSectionQuery,
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.capability.Name, func(t *testing.T) {
+			sink := &MemorySink{}
+			recorder := newTestRecorder(t, sink, 1)
+			txn, err := recorder.Begin(tc.capability)
+			require.NoError(t, err)
+			require.NoError(t, txn.Abort(errors.New("capture failed before section definition")))
+			recorder.Close()
+
+			results := sink.Results()
+			require.Len(t, results, 1)
+			result := results[0]
+			registry := NewRegistry()
+			require.NoError(t, registry.Register(tc.capability, tc.closure))
+			report, err := registry.ValidateCapability(
+				result.Manifest, result.Members, tc.capability, testReaderLimits(),
+			)
+			require.NoError(t, err)
+			assert.False(t, report.Completeness)
+			assert.False(t, report.Replayable)
+			assert.Equal(t, StateIncomplete, report.State)
+
+			var root CapabilityRootV1
+			require.NoError(t, DecodeReferenced(
+				result.Members, result.Manifest.Roots[0].Root, testReaderLimits(), &root,
+			))
+			require.Len(t, root.Sections, len(tc.sections))
+			for i, section := range root.Sections {
+				assert.Equal(t, tc.sections[i], section.Name)
+				assert.Equal(t, StateIncomplete, section.State)
+				assert.Zero(t, section.ExpectedRecords)
+				assert.Empty(t, section.Members)
+			}
+		})
+	}
+}
+
+func TestRecorder_SemanticDeclaredIncompleteShapeIsClosureValid(t *testing.T) {
+	t.Parallel()
+
+	sink := &MemorySink{}
+	recorder := newTestRecorder(t, sink, 1)
+	txn, err := recorder.Begin(SemanticCapabilityV1())
+	require.NoError(t, err)
+	require.NoError(t, txn.DefineSection(SemanticSectionDevice, StateSuccess, 1))
+	_, err = txn.AddOwned(
+		SemanticSectionDevice,
+		MemberType{Kind: KindSemanticDevice, Schema: SchemaV1},
+		SemanticDeviceV1{
+			CaptureID: txn.CaptureID(), Registration: 1, CollectedAt: "2026-08-27T12:00:00Z",
+			FreshForNanoseconds: 1, AgentID: "agent-a",
+		},
+		128,
+	)
+	require.NoError(t, err)
+	require.NoError(t, txn.DefineSection(SemanticSectionObservation, StateEmpty, 0))
+	require.NoError(t, txn.DefineSection(SemanticSectionProfiles, StateIncomplete, 0))
+	require.NoError(t, txn.DefineSection(SemanticSectionEvents, StateEmpty, 0))
+	require.NoError(t, txn.MarkIncomplete(errors.New("profile evidence unavailable")))
+	require.NoError(t, txn.Commit(StateIncomplete))
+	recorder.Close()
+
+	result := sink.Results()[0]
+	registry := NewRegistry()
+	require.NoError(t, registry.Register(SemanticCapabilityV1(), SemanticClosureV1()))
+	report, err := registry.ValidateCapability(
+		result.Manifest, result.Members, SemanticCapabilityV1(), testReaderLimits(),
+	)
+	require.NoError(t, err)
+	assert.False(t, report.Completeness)
+	assert.False(t, report.Replayable)
+}
+
+func TestCaptureGapV1_RejectsCountLargerThanAttemptRange(t *testing.T) {
+	t.Parallel()
+
+	err := (CaptureGapV1{
+		CapabilityClass: string(CaptureClassSemantic),
+		FirstAttempt:    10,
+		LastAttempt:     10,
+		Count:           2,
+		Reason:          "admission_saturated",
+	}).Validate()
+	require.ErrorContains(t, err, "count")
 }
 
 func TestCaptureTransaction_RejectsMemberWithoutTransferringHandle(t *testing.T) {

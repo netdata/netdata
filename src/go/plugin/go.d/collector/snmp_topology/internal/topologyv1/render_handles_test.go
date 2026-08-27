@@ -102,3 +102,32 @@ func TestRenderWorkLimiterPreservesOutputAndRejectsBeforeRendering(t *testing.T)
 	_, err = Render(data, func(uint64) error { return limitErr })
 	require.ErrorIs(t, err, limitErr)
 }
+
+func TestRenderWorkLimiterChargesLabelSortsBeforeRendering(t *testing.T) {
+	labels := make(map[string]string, 64)
+	for i := range 64 {
+		labels[string(rune('a'+i%26))+string(rune('A'+i/26))] = "value"
+	}
+	data := topologymodel.Data{
+		AgentID:     "agent-a",
+		CollectedAt: time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC),
+		Actors: []topologymodel.Actor{{
+			ActorHandle: topologyV1TestActorHandle("label-heavy-device"),
+			ActorID:     "label-heavy-device",
+			ActorType:   "device",
+			Labels:      labels,
+		}},
+	}
+	// The current linear actor+label charge is 65. The data-dependent label
+	// sorts must reject a budget that covers only that linear work.
+	remaining := uint64(65)
+	limitErr := errors.New("label sort work exhausted")
+	_, err := Render(data, func(units uint64) error {
+		if units > remaining {
+			return limitErr
+		}
+		remaining -= units
+		return nil
+	})
+	require.ErrorIs(t, err, limitErr)
+}

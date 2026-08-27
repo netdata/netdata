@@ -36,10 +36,22 @@ func (l Limiter) ChargeProduct(factors ...uint64) error {
 
 // ChargeSort charges an n*ceil(log2(n)) comparison envelope.
 func (l Limiter) ChargeSort(items uint64) error {
-	if items < 2 {
+	if l == nil {
 		return nil
 	}
-	return l.ChargeProduct(items, uint64(bits.Len64(items-1)))
+	units, err := SortEnvelope(items)
+	if err != nil {
+		return err
+	}
+	return l.Charge(units)
+}
+
+// SortEnvelope returns an n*ceil(log2(n)) comparison envelope.
+func SortEnvelope(items uint64) (uint64, error) {
+	if items < 2 {
+		return 0, nil
+	}
+	return Product(items, uint64(bits.Len64(items-1)))
 }
 
 func Sum(values ...uint64) (uint64, error) {

@@ -5,6 +5,8 @@ package diagnostic
 import (
 	"errors"
 	"fmt"
+	"math"
+	"time"
 )
 
 func RefreshCapabilityV1() CapabilityKey {
@@ -22,8 +24,8 @@ func RefreshClosureV1() Closure {
 			{Kind: KindObservation, Schema: SchemaV1}:    DecodeLeaf[ObservationV1](),
 		},
 		ValidateGraph: validateRefreshCapabilityGraphV1,
-		Assess: func(CapabilityRootV1) (bool, bool) {
-			return true, false
+		Assess: func(root CapabilityRootV1) (bool, bool) {
+			return root.State == StateSuccess || root.State == StateFailed, false
 		},
 	}
 }
@@ -49,6 +51,9 @@ func validateRefreshCapabilityGraphV1(root CapabilityRootV1, source MemberSource
 			return fmt.Errorf("refresh_sweep@1 section %d is %q, expected %q", i, root.Sections[i].Name, name)
 		}
 	}
+	if isEmptyIncompleteShape(root) {
+		return nil
+	}
 	generationSection := root.Sections[0]
 	sweepSection := root.Sections[1]
 	if sweepSection.State != StateSuccess || sweepSection.ExpectedRecords != 1 || len(sweepSection.Members) != 1 ||
@@ -65,6 +70,19 @@ func validateRefreshCapabilityGraphV1(root CapabilityRootV1, source MemberSource
 	if uint64(len(sweep.Registrations)) > limits.MaxDevices {
 		return fmt.Errorf("refresh registration count exceeds limit %d", limits.MaxDevices)
 	}
+	var previous *GenerationV1
+	if sweep.PreviousGeneration.Ref != nil {
+		value, err := decodeAndValidateGeneration(*sweep.PreviousGeneration.Ref, source, limits)
+		if err != nil {
+			return fmt.Errorf("previous generation: %w", err)
+		}
+		previous = &value
+		publishedAt, _ := time.Parse(time.RFC3339Nano, value.PublishedAt)
+		startedAt, _ := time.Parse(time.RFC3339Nano, sweep.StartedAt)
+		if publishedAt.After(startedAt) {
+			return errors.New("previous generation was published after the sweep started")
+		}
+	}
 
 	switch sweep.Publication.State {
 	case RefreshPublicationPublished:
@@ -79,8 +97,13 @@ func validateRefreshCapabilityGraphV1(root CapabilityRootV1, source MemberSource
 		if err != nil {
 			return err
 		}
-		if err := validateGenerationObservations(generation, source, limits); err != nil {
-			return err
+		if generation.PublishedAt != sweep.FinishedAt {
+			return errors.New("resulting generation published_at does not match sweep finished_at")
+		}
+		if previous != nil {
+			if previous.Sequence == math.MaxUint64 || generation.Sequence != previous.Sequence+1 {
+				return errors.New("resulting generation sequence does not follow the previous generation")
+			}
 		}
 		if len(generation.Devices) != len(sweep.Registrations) {
 			return errors.New("generation device inventory does not cover the complete refresh plan")
@@ -88,6 +111,14 @@ func validateRefreshCapabilityGraphV1(root CapabilityRootV1, source MemberSource
 		for i := range generation.Devices {
 			if generation.Devices[i].Registration != sweep.Registrations[i].Registration {
 				return fmt.Errorf("generation device %d does not match the refresh registration order", i)
+			}
+			outcome := sweep.Registrations[i].Outcome
+			if outcome == RefreshOutcomeCanceledInFlight || outcome == RefreshOutcomeCanceledNotStarted ||
+				outcome == RefreshOutcomePanicInFlight || outcome == RefreshOutcomePanicNotStarted {
+				return errors.New("published refresh sweep contains an unpublished terminal outcome")
+			}
+			if (outcome == RefreshOutcomeSuccess) != (generation.Devices[i].State == GenerationStateRefreshed) {
+				return errors.New("refresh outcome does not match resulting generation state")
 			}
 		}
 	case RefreshPublicationCanceled, RefreshPublicationPanic:

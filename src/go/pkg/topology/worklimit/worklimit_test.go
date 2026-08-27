@@ -29,7 +29,9 @@ func TestLimiterRejectsOverflowBeforeCallback(t *testing.T) {
 	})
 
 	require.ErrorIs(t, limiter.ChargeProduct(math.MaxUint64, 2), ErrOverflow)
+	require.ErrorIs(t, limiter.ChargeSort(math.MaxUint64), ErrOverflow)
 	require.False(t, called)
+	require.NoError(t, Limiter(nil).ChargeSort(math.MaxUint64), "the trusted nil path does no accounting")
 }
 
 func TestCheckedArithmetic(t *testing.T) {

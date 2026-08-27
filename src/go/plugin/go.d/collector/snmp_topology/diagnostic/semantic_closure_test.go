@@ -54,6 +54,30 @@ func TestSemanticBGPPeerV1_RejectsValuesHiddenBehindAbsentOptionals(t *testing.T
 	require.ErrorContains(t, peer.Validate(), "absent BGP state")
 }
 
+func TestSemanticClosureV1_EnforcesDeviceStructuralLimits(t *testing.T) {
+	device := SemanticDeviceV1{
+		CaptureID: 1, Registration: 1, CollectedAt: "2026-08-27T12:00:00Z",
+		FreshForNanoseconds: 1, AgentID: "agent-a",
+		TargetManagementIPs: []string{"192.0.2.1", "192.0.2.2"},
+	}
+	deviceRef, deviceData, err := Seal(MemberType{Kind: KindSemanticDevice, Schema: SchemaV1}, device)
+	require.NoError(t, err)
+	root := CapabilityRootV1{
+		Capability: SemanticCapabilityV1(), State: StateEmpty,
+		Sections: []SectionInventoryV1{
+			{Name: SemanticSectionDevice, State: StateSuccess, ExpectedRecords: 1, Members: []ContentRef{deviceRef}},
+			{Name: SemanticSectionObservation, State: StateEmpty},
+			{Name: SemanticSectionProfiles, State: StateEmpty},
+			{Name: SemanticSectionEvents, State: StateEmpty},
+		},
+	}
+	limits := testReaderLimits()
+	limits.MaxRows = 1
+	require.ErrorContains(t, validateSemanticGraphV1(
+		root, MemorySource{deviceRef.Key(): deviceData}, limits,
+	), "semantic device row count exceeds limit 1")
+}
+
 func semanticTestGroup(phase, context, profile uint32, records ...SemanticRecordV1) semanticShardGroupV1 {
 	return semanticShardGroupV1{
 		key:     semanticShardGroupKeyV1{phase: phase, context: context, profile: profile},

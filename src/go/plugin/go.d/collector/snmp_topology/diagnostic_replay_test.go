@@ -218,6 +218,10 @@ func TestCollectorDiagnosticCapture_ReplaysProductionSemanticPathAndExcludesCred
 	require.NoError(t, err)
 	require.NotNil(t, replayed)
 	require.True(t, replayed.hasObservation)
+	lowWorkLimits := topologyDiagnosticReaderLimits()
+	lowWorkLimits.MaxReplayWork = 2_000
+	_, err = replayTopologySemanticV1(result.Manifest, result.Members, lowWorkLimits)
+	require.ErrorContains(t, err, "diagnostic replay work exceeds limit")
 
 	entry := store.Entries()[0]
 	live := coll.deviceStates[entry.RegistrationID].generation
