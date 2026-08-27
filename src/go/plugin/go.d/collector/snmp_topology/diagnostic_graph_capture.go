@@ -18,14 +18,14 @@ func (c *Collector) captureTopologyDiagnosticGeneration(generation *topologyGene
 	if !ok {
 		return diagnostic.MemberHandle{}
 	}
-	transaction, err := c.diagnosticRecorder.Begin(generation.sequence)
+	transaction, err := c.diagnosticRecorder.Begin(diagnostic.GenerationCapabilityV1())
 	if err != nil {
 		return diagnostic.MemberHandle{}
 	}
 	abort := true
 	defer func() {
 		if abort {
-			_ = transaction.Abort(diagnostic.GenerationCapabilityV1(), errors.New("generation capture did not commit"))
+			_ = transaction.Abort(errors.New("generation capture did not commit"))
 		}
 	}()
 	if err := transaction.DefineSection(diagnostic.GenerationSectionGeneration, diagnostic.StateSuccess, 1); err != nil {
@@ -65,7 +65,7 @@ func (c *Collector) captureTopologyDiagnosticGeneration(generation *topologyGene
 	if err != nil {
 		return diagnostic.MemberHandle{}
 	}
-	if err := transaction.Commit(diagnostic.GenerationCapabilityV1(), diagnostic.StateSuccess); err != nil {
+	if err := transaction.Commit(diagnostic.StateSuccess); err != nil {
 		return diagnostic.MemberHandle{}
 	}
 	abort = false

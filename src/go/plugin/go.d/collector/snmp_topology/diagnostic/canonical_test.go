@@ -20,7 +20,6 @@ func (v testLeaf) Validate() error { return validateID("test leaf", v.ID) }
 
 func testReaderLimits() ReaderLimits {
 	return ReaderLimits{
-		MaxStoredBytes:    1 << 20,
 		MaxLogicalBytes:   1 << 20,
 		MaxMemberBytes:    1 << 18,
 		MaxMembers:        128,

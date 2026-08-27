@@ -47,7 +47,6 @@ func TestSchemaV1_CompilesAndValidatesKnownDocuments(t *testing.T) {
 		Format:           FormatV1,
 		Canonicalization: CanonicalJSONV1,
 		Sensitivity:      ExactRestrictedSensitivity(),
-		Authenticity:     AuthenticityV1{State: TrustUnauthenticated},
 		Roots:            []CapabilityRefV1{{CapabilityKey: capability, State: StateSuccess, Root: rootRef}},
 		Members:          members,
 	}
@@ -77,7 +76,8 @@ func TestSchemaV1_CompilesAndValidatesKnownDocuments(t *testing.T) {
 		"manifest":        manifest,
 		"capability root": root,
 		"capture gap": CaptureGapV1{
-			FirstAttempt: 1, LastAttempt: 1, Count: 1, Reason: "recorder_saturated",
+			CapabilityClass: string(CaptureClassSemantic),
+			FirstAttempt:    1, LastAttempt: 1, Count: 1, Reason: "recorder_saturated",
 		},
 		"semantic device": SemanticDeviceV1{
 			CaptureID: 1, Registration: 9, CollectedAt: timestamp, FreshForNanoseconds: 1,

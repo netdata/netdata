@@ -19,6 +19,7 @@ type Closure struct {
 	RootType      MemberType
 	Decode        map[MemberType]DecodeMemberFunc
 	ValidateGraph func(CapabilityRootV1, MemberSource, ReaderLimits) error
+	Assess        func(CapabilityRootV1) (complete bool, replayable bool)
 }
 
 type Registry struct {
@@ -71,8 +72,6 @@ type ValidationReport struct {
 	Schema       bool
 	Completeness bool
 	Replayable   bool
-	Preserved    bool
-	Authenticity TrustState
 	Capability   CapabilityKey
 	State        TerminalState
 	Members      uint64
@@ -85,7 +84,7 @@ func (r *Registry) ValidateCapability(
 	key CapabilityKey,
 	limits ReaderLimits,
 ) (ValidationReport, error) {
-	report := ValidationReport{Capability: key, Authenticity: manifest.Authenticity.State}
+	report := ValidationReport{Capability: key}
 	if r == nil {
 		return report, errors.New("nil registry")
 	}
@@ -121,11 +120,8 @@ func (r *Registry) ValidateCapability(
 			return report, err
 		}
 		memberInventory[ref.Key()] = ref
-		data, err := readMember(source, ref, limits)
+		_, err := readVerifiedMember(source, ref, limits)
 		if err != nil {
-			return report, fmt.Errorf("verify %s@%s %s: %w", ref.Kind, ref.Schema, ref.SHA256, err)
-		}
-		if err := VerifyContent(ref, data); err != nil {
 			return report, fmt.Errorf("verify %s@%s %s: %w", ref.Kind, ref.Schema, ref.SHA256, err)
 		}
 	}
@@ -137,7 +133,7 @@ func (r *Registry) ValidateCapability(
 		return report, fmt.Errorf("capability root has type %s@%s, expected %s@%s",
 			root.Root.Kind, root.Root.Schema, closure.RootType.Kind, closure.RootType.Schema)
 	}
-	rootData, err := readMember(source, root.Root, limits)
+	rootData, err := readVerifiedMember(source, root.Root, limits)
 	if err != nil {
 		return report, err
 	}
@@ -178,7 +174,7 @@ func (r *Registry) ValidateCapability(
 				ref.Kind, ref.Schema, root.Name, root.Revision)
 		}
 		visiting[key] = true
-		data, err := readMember(source, ref, limits)
+		data, err := readVerifiedMember(source, ref, limits)
 		if err != nil {
 			return err
 		}
@@ -210,10 +206,12 @@ func (r *Registry) ValidateCapability(
 		}
 	}
 	report.Schema = true
-	report.Completeness = root.State == StateSuccess || root.State == StateEmpty || root.State == StateNotApplicable
-	report.Replayable = report.Completeness
-	// Exact historical output preservation is a separate later capability.
-	report.Preserved = false
+	if closure.Assess != nil {
+		report.Completeness, report.Replayable = closure.Assess(rootDocument)
+	} else {
+		report.Completeness = root.State == StateSuccess || root.State == StateEmpty || root.State == StateNotApplicable
+		report.Replayable = root.State == StateSuccess || root.State == StateEmpty
+	}
 	return report, nil
 }
 
@@ -256,7 +254,7 @@ func manifestRoot(manifest ManifestV1, key CapabilityKey) (CapabilityRefV1, bool
 	return CapabilityRefV1{}, false
 }
 
-func readMember(source MemberSource, ref ContentRef, limits ReaderLimits) ([]byte, error) {
+func readVerifiedMember(source MemberSource, ref ContentRef, limits ReaderLimits) ([]byte, error) {
 	if ref.LogicalLength > limits.MaxMemberBytes {
 		return nil, fmt.Errorf("member logical length %d exceeds limit %d", ref.LogicalLength, limits.MaxMemberBytes)
 	}
@@ -275,17 +273,17 @@ func readMember(source MemberSource, ref ContentRef, limits ReaderLimits) ([]byt
 	if uint64(len(data)) != ref.LogicalLength {
 		return nil, fmt.Errorf("member length mismatch: reference=%d actual=%d", ref.LogicalLength, len(data))
 	}
+	if err := VerifyContent(ref, data); err != nil {
+		return nil, err
+	}
 	return data, nil
 }
 
 // DecodeReferenced reads and strictly decodes one referenced canonical member.
 // Capability validation should run first when closure completeness matters.
 func DecodeReferenced(source MemberSource, ref ContentRef, limits ReaderLimits, dst any) error {
-	data, err := readMember(source, ref, limits)
+	data, err := readVerifiedMember(source, ref, limits)
 	if err != nil {
-		return err
-	}
-	if err := VerifyContent(ref, data); err != nil {
 		return err
 	}
 	return DecodeCanonical(data, limits, dst)

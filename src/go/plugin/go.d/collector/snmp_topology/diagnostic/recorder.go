@@ -21,6 +21,7 @@ var (
 
 const (
 	CapabilityCaptureAccounting = "capture_accounting"
+	CapabilityRefreshSweep      = "refresh_sweep"
 	KindCaptureGap              = "capture_gap"
 )
 
@@ -44,6 +45,7 @@ type memberFuture struct {
 // It deliberately cannot cross the JSON wire boundary.
 type MemberHandle struct {
 	id     uint64
+	owner  *Recorder
 	future *memberFuture
 }
 
@@ -121,7 +123,6 @@ type CaptureSink interface {
 
 type CaptureResult struct {
 	CaptureID     uint64
-	Registration  uint64
 	Manifest      ManifestV1
 	Members       MemorySource
 	RetainedBytes uint64
@@ -129,10 +130,11 @@ type CaptureResult struct {
 }
 
 type CaptureGapV1 struct {
-	FirstAttempt uint64 `json:"first_attempt"`
-	LastAttempt  uint64 `json:"last_attempt"`
-	Count        uint64 `json:"count"`
-	Reason       string `json:"reason"`
+	CapabilityClass string `json:"capability_class"`
+	FirstAttempt    uint64 `json:"first_attempt"`
+	LastAttempt     uint64 `json:"last_attempt"`
+	Count           uint64 `json:"count"`
+	Reason          string `json:"reason"`
 }
 
 func (g CaptureGapV1) Validate() error {
@@ -142,10 +144,105 @@ func (g CaptureGapV1) Validate() error {
 	if g.Count == 0 {
 		return errors.New("capture gap count must be nonzero")
 	}
+	if !CaptureClass(g.CapabilityClass).valid() {
+		return fmt.Errorf("invalid capture gap capability class %q", g.CapabilityClass)
+	}
 	if err := validateID("capture gap reason", g.Reason); err != nil {
 		return err
 	}
 	return nil
+}
+
+func CaptureAccountingCapabilityV1() CapabilityKey {
+	return CapabilityKey{Name: CapabilityCaptureAccounting, Revision: 1}
+}
+
+func CaptureAccountingClosureV1() Closure {
+	capability := CaptureAccountingCapabilityV1()
+	return Closure{
+		RootType: MemberType{Kind: KindCapabilityRoot, Schema: SchemaV1},
+		Decode: map[MemberType]DecodeMemberFunc{
+			{Kind: KindCapabilityRoot, Schema: SchemaV1}: DecodeCapabilityRoot(capability),
+			{Kind: KindCaptureGap, Schema: SchemaV1}:     DecodeLeaf[CaptureGapV1](),
+		},
+		ValidateGraph: validateCaptureAccountingGraphV1,
+		Assess: func(CapabilityRootV1) (bool, bool) {
+			return true, false
+		},
+	}
+}
+
+func validateCaptureAccountingGraphV1(root CapabilityRootV1, source MemberSource, limits ReaderLimits) error {
+	if root.State != StateSuccess || len(root.Sections) != 1 || root.Sections[0].Name != "gaps" {
+		return errors.New("capture_accounting@1 requires one successful gaps section")
+	}
+	section := root.Sections[0]
+	if section.State != StateSuccess || len(section.Members) != 1 ||
+		section.Members[0].Type() != (MemberType{Kind: KindCaptureGap, Schema: SchemaV1}) {
+		return errors.New("capture accounting gaps section must contain one successful gap member")
+	}
+	var gap CaptureGapV1
+	if err := DecodeReferenced(source, section.Members[0], limits, &gap); err != nil {
+		return err
+	}
+	if err := gap.Validate(); err != nil {
+		return err
+	}
+	if section.ExpectedRecords != gap.Count {
+		return errors.New("capture accounting gap count does not match its section inventory")
+	}
+	return nil
+}
+
+type CaptureClass string
+
+const (
+	CaptureClassSemantic CaptureClass = "semantic"
+	CaptureClassRefresh  CaptureClass = "refresh"
+	CaptureClassGraph    CaptureClass = "graph"
+	CaptureClassOther    CaptureClass = "other"
+	captureClassCount                 = 4
+)
+
+func (c CaptureClass) valid() bool {
+	switch c {
+	case CaptureClassSemantic, CaptureClassRefresh, CaptureClassGraph, CaptureClassOther:
+		return true
+	default:
+		return false
+	}
+}
+
+func captureClassFor(capability CapabilityKey) CaptureClass {
+	switch capability.Name {
+	case CapabilitySemanticReplay:
+		return CaptureClassSemantic
+	case CapabilityRefreshSweep:
+		return CaptureClassRefresh
+	case CapabilityGraphReplay:
+		return CaptureClassGraph
+	default:
+		return CaptureClassOther
+	}
+}
+
+func captureClassIndex(class CaptureClass) int {
+	switch class {
+	case CaptureClassSemantic:
+		return 0
+	case CaptureClassRefresh:
+		return 1
+	case CaptureClassGraph:
+		return 2
+	default:
+		return 3
+	}
+}
+
+type gapAccumulator struct {
+	count uint64
+	first uint64
+	last  uint64
 }
 
 type Recorder struct {
@@ -161,9 +258,7 @@ type Recorder struct {
 	attemptSequence atomic.Uint64
 	handleSequence  atomic.Uint64
 	gapMu           sync.Mutex
-	rejectedCount   uint64
-	rejectedFirst   uint64
-	rejectedLast    uint64
+	rejected        [captureClassCount]gapAccumulator
 }
 
 func NewRecorder(config RecorderConfig) (*Recorder, error) {
@@ -183,14 +278,14 @@ func NewRecorder(config RecorderConfig) (*Recorder, error) {
 
 // Begin is non-blocking. Successful admission reserves one terminal queue
 // position, so Commit and Abort never wait for worker progress.
-func (r *Recorder) Begin(registration uint64) (*CaptureTransaction, error) {
+func (r *Recorder) Begin(capability CapabilityKey) (*CaptureTransaction, error) {
 	if r == nil {
 		return nil, ErrRecorderClosed
 	}
-	attempt := r.attemptSequence.Add(1)
-	if registration == 0 {
-		return nil, errors.New("registration must be nonzero")
+	if err := capability.Validate(); err != nil {
+		return nil, err
 	}
+	attempt := r.attemptSequence.Add(1)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -201,25 +296,26 @@ func (r *Recorder) Begin(registration uint64) (*CaptureTransaction, error) {
 	case r.admission <- struct{}{}:
 		r.active.Add(1)
 		return &CaptureTransaction{
-			recorder:     r,
-			captureID:    attempt,
-			registration: registration,
-			sections:     make(map[string]*captureSection),
+			recorder:   r,
+			captureID:  attempt,
+			capability: capability,
+			sections:   make(map[string]*captureSection),
 		}, nil
 	default:
-		r.recordRejected(attempt)
+		r.recordRejected(captureClassFor(capability), attempt)
 		return nil, ErrRecorderSaturated
 	}
 }
 
-func (r *Recorder) recordRejected(attempt uint64) {
+func (r *Recorder) recordRejected(class CaptureClass, attempt uint64) {
 	r.gapMu.Lock()
 	defer r.gapMu.Unlock()
-	r.rejectedCount++
-	if r.rejectedCount == 1 {
-		r.rejectedFirst = attempt
+	gap := &r.rejected[captureClassIndex(class)]
+	gap.count++
+	if gap.count == 1 {
+		gap.first = attempt
 	}
-	r.rejectedLast = attempt
+	gap.last = attempt
 }
 
 func (r *Recorder) Close() {
@@ -240,9 +336,9 @@ func (r *Recorder) Close() {
 }
 
 type CaptureTransaction struct {
-	recorder     *Recorder
-	captureID    uint64
-	registration uint64
+	recorder   *Recorder
+	captureID  uint64
+	capability CapabilityKey
 
 	mu            sync.Mutex
 	closed        bool
@@ -273,7 +369,6 @@ type DerivedMemberBuilder func([]ContentRef) (any, error)
 
 type captureJob struct {
 	captureID     uint64
-	registration  uint64
 	capability    CapabilityKey
 	state         TerminalState
 	members       []pendingMember
@@ -384,6 +479,9 @@ func (t *CaptureTransaction) AddDerivedOwned(
 		if dependency.id == 0 || dependency.future == nil {
 			return MemberHandle{}, fmt.Errorf("dependency %d is invalid", i)
 		}
+		if dependency.owner != t.recorder {
+			return MemberHandle{}, fmt.Errorf("dependency %d belongs to a different recorder", i)
+		}
 	}
 	return t.addOwned(section, memberType, nil, dependencies, build, retainedBytes)
 }
@@ -397,6 +495,9 @@ func (t *CaptureTransaction) AddReference(section string, handle MemberHandle) e
 	}
 	if handle.id == 0 || handle.future == nil {
 		return errors.New("referenced member handle is invalid")
+	}
+	if handle.owner != t.recorder {
+		return errors.New("referenced member handle belongs to a different recorder")
 	}
 
 	t.mu.Lock()
@@ -463,6 +564,7 @@ func (t *CaptureTransaction) addOwned(
 
 	handle := MemberHandle{
 		id:     t.recorder.handleSequence.Add(1),
+		owner:  t.recorder,
 		future: &memberFuture{state: HandlePending},
 	}
 	defined.members = append(defined.members, len(t.members))
@@ -478,14 +580,11 @@ func (t *CaptureTransaction) addOwned(
 	return handle, nil
 }
 
-func (t *CaptureTransaction) Commit(capability CapabilityKey, state TerminalState) error {
-	if err := capability.Validate(); err != nil {
-		return err
-	}
+func (t *CaptureTransaction) Commit(state TerminalState) error {
 	if !state.valid() {
 		return fmt.Errorf("invalid capability state %q", state)
 	}
-	return t.finish(capability, state, nil)
+	return t.finish(state, nil)
 }
 
 // MarkIncomplete records a non-fatal capture defect. Admitted members still
@@ -506,27 +605,33 @@ func (t *CaptureTransaction) MarkIncomplete(cause error) error {
 	return nil
 }
 
-func (t *CaptureTransaction) Abort(capability CapabilityKey, cause error) error {
-	if err := capability.Validate(); err != nil {
-		return err
-	}
+func (t *CaptureTransaction) Abort(cause error) error {
 	if cause == nil {
 		cause = ErrCaptureAborted
 	}
-	return t.finish(capability, StateIncomplete, errors.Join(ErrCaptureAborted, cause))
+	return t.finish(StateIncomplete, errors.Join(ErrCaptureAborted, cause))
 }
 
-func (t *CaptureTransaction) finish(capability CapabilityKey, state TerminalState, abortErr error) error {
+func (t *CaptureTransaction) finish(state TerminalState, abortErr error) (resultErr error) {
 	if t == nil || t.recorder == nil {
 		return ErrTransactionClosed
 	}
 
 	t.mu.Lock()
+	locked := true
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if locked {
+				t.mu.Unlock()
+			}
+			resultErr = fmt.Errorf("diagnostic transaction terminalization panicked: %v", recovered)
+		}
+	}()
 	if t.closed {
 		t.mu.Unlock()
+		locked = false
 		return ErrTransactionClosed
 	}
-	t.closed = true
 	if t.terminalErr != nil {
 		state = StateIncomplete
 	}
@@ -550,8 +655,7 @@ func (t *CaptureTransaction) finish(capability CapabilityKey, state TerminalStat
 	})
 	job := captureJob{
 		captureID:     t.captureID,
-		registration:  t.registration,
-		capability:    capability,
+		capability:    t.capability,
 		state:         state,
 		members:       t.members,
 		sections:      sections,
@@ -559,9 +663,11 @@ func (t *CaptureTransaction) finish(capability CapabilityKey, state TerminalStat
 		terminalErr:   t.terminalErr,
 		abortErr:      abortErr,
 	}
+	t.closed = true
 	t.members = nil
 	t.sections = nil
 	t.mu.Unlock()
+	locked = false
 
 	// Begin reserved this position. The default branch protects the invariant
 	// from future implementation changes without ever blocking this call.
@@ -582,20 +688,47 @@ func (t *CaptureTransaction) finish(capability CapabilityKey, state TerminalStat
 	}
 }
 
+type sealedMember struct {
+	handle    MemberHandle
+	ref       ContentRef
+	inventory []ContentRef
+}
+
 func (r *Recorder) run() {
 	defer r.worker.Done()
 	for job := range r.jobs {
-		r.emitGap()
-		r.process(job)
-		<-r.admission
+		r.runJob(job)
 	}
-	r.emitGap()
+	r.emitGaps()
+}
+
+func (r *Recorder) runJob(job captureJob) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err := fmt.Errorf("diagnostic recorder worker panicked: %v", recovered)
+			failPendingMembers(job.members, err)
+			_ = r.store(CaptureResult{CaptureID: job.captureID, RetainedBytes: job.retainedBytes, Err: err})
+		}
+		<-r.admission
+	}()
+	r.emitGaps()
+	r.process(job)
+}
+
+func failPendingMembers(members []pendingMember, err error) {
+	for _, member := range members {
+		if member.handle.future != nil {
+			member.handle.future.resolve(ContentRef{}, nil, err)
+		}
+	}
 }
 
 func (r *Recorder) process(job captureJob) {
 	members := make(MemorySource, len(job.members)+1)
 	refs := make([]ContentRef, len(job.members))
 	inventory := newBoundedManifestInventory(r.config.MaxMembers - 1)
+	local := make(map[uint64]sealedMember, len(job.members))
+	var sealed []sealedMember
 	captureErr := job.terminalErr
 	memberLimitExceeded := false
 
@@ -613,7 +746,7 @@ func (r *Recorder) process(job captureJob) {
 			continue
 		}
 		if member.reference.future != nil {
-			ref, referencedInventory, err, state := member.reference.resolveInventory()
+			ref, referencedInventory, err, state := resolveMemberHandle(member.reference, local)
 			if state != HandleSealed || err != nil {
 				if err == nil {
 					err = fmt.Errorf("referenced %s is %s", member.reference, state)
@@ -636,7 +769,7 @@ func (r *Recorder) process(job captureJob) {
 			resolved := make([]ContentRef, 0, len(member.dependencies))
 			var dependencyErr error
 			for _, dependency := range member.dependencies {
-				ref, dependencyInventory, err, state := dependency.resolveInventory()
+				ref, dependencyInventory, err, state := resolveMemberHandle(dependency, local)
 				if state != HandleSealed || err != nil {
 					if err == nil {
 						err = fmt.Errorf("dependency %s is %s", dependency, state)
@@ -692,7 +825,9 @@ func (r *Recorder) process(job captureJob) {
 		}
 		refs[i] = ref
 		members[ref.Key()] = data
-		member.handle.future.resolve(ref, memberInventoryRefs, nil)
+		resolved := sealedMember{handle: member.handle, ref: ref, inventory: memberInventoryRefs}
+		local[member.handle.id] = resolved
+		sealed = append(sealed, resolved)
 	}
 
 	state := job.state
@@ -717,25 +852,22 @@ func (r *Recorder) process(job captureJob) {
 		root.Sections = append(root.Sections, inventory)
 	}
 	if len(root.Sections) == 0 {
-		root.Sections = []SectionInventoryV1{{Name: "capture", State: StateIncomplete, ExpectedRecords: 0}}
-		root.State = StateIncomplete
+		captureErr = errors.Join(captureErr, errors.New("capability transaction defined no terminal sections"))
 	}
 	if err := root.Validate(); err != nil {
 		captureErr = errors.Join(captureErr, fmt.Errorf("validate capability root: %w", err))
-		r.config.Sink.Store(CaptureResult{
-			CaptureID: job.captureID, Registration: job.registration, RetainedBytes: job.retainedBytes,
-			Err: errors.Join(job.abortErr, captureErr),
-		})
+		terminalErr := errors.Join(job.abortErr, captureErr)
+		failPendingMembers(job.members, terminalErr)
+		_ = r.store(CaptureResult{CaptureID: job.captureID, RetainedBytes: job.retainedBytes, Err: terminalErr})
 		return
 	}
 
 	rootRef, rootData, err := Seal(MemberType{Kind: KindCapabilityRoot, Schema: SchemaV1}, root)
 	if err != nil {
 		captureErr = errors.Join(captureErr, fmt.Errorf("seal capability root: %w", err))
-		r.config.Sink.Store(CaptureResult{
-			CaptureID: job.captureID, Registration: job.registration, RetainedBytes: job.retainedBytes,
-			Err: errors.Join(job.abortErr, captureErr),
-		})
+		terminalErr := errors.Join(job.abortErr, captureErr)
+		failPendingMembers(job.members, terminalErr)
+		_ = r.store(CaptureResult{CaptureID: job.captureID, RetainedBytes: job.retainedBytes, Err: terminalErr})
 		return
 	}
 	members[rootRef.Key()] = rootData
@@ -749,7 +881,6 @@ func (r *Recorder) process(job captureJob) {
 		Format:           FormatV1,
 		Canonicalization: CanonicalJSONV1,
 		Sensitivity:      ExactRestrictedSensitivity(),
-		Authenticity:     AuthenticityV1{State: TrustNotProvided},
 		Roots: []CapabilityRefV1{{
 			CapabilityKey: job.capability,
 			State:         root.State,
@@ -757,36 +888,67 @@ func (r *Recorder) process(job captureJob) {
 		}},
 		Members: manifestRefs,
 	}
-	r.config.Sink.Store(CaptureResult{
+	if err := r.store(CaptureResult{
 		CaptureID:     job.captureID,
-		Registration:  job.registration,
 		Manifest:      manifest,
 		Members:       members,
 		RetainedBytes: job.retainedBytes,
 		Err:           errors.Join(job.abortErr, captureErr),
-	})
-}
-
-func (r *Recorder) emitGap() {
-	r.gapMu.Lock()
-	count := r.rejectedCount
-	if count == 0 {
-		r.gapMu.Unlock()
+	}); err != nil {
+		failPendingMembers(job.members, err)
 		return
 	}
-	gap := CaptureGapV1{
-		FirstAttempt: r.rejectedFirst,
-		LastAttempt:  r.rejectedLast,
-		Count:        count,
-		Reason:       "admission_saturated",
+	for _, member := range sealed {
+		member.handle.future.resolve(member.ref, member.inventory, nil)
 	}
-	r.rejectedCount = 0
-	r.rejectedFirst = 0
-	r.rejectedLast = 0
+}
+
+func resolveMemberHandle(handle MemberHandle, local map[uint64]sealedMember) (ContentRef, []ContentRef, error, HandleState) {
+	if member, ok := local[handle.id]; ok {
+		return member.ref, slices.Clone(member.inventory), nil, HandleSealed
+	}
+	return handle.resolveInventory()
+}
+
+func (r *Recorder) store(result CaptureResult) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("diagnostic sink panicked: %v", recovered)
+		}
+	}()
+	r.config.Sink.Store(result)
+	return nil
+}
+
+func (r *Recorder) emitGaps() {
+	r.gapMu.Lock()
+	gaps := r.rejected
+	r.rejected = [captureClassCount]gapAccumulator{}
 	r.gapMu.Unlock()
+	classes := [...]CaptureClass{
+		CaptureClassSemantic,
+		CaptureClassRefresh,
+		CaptureClassGraph,
+		CaptureClassOther,
+	}
+	for index, accumulated := range gaps {
+		if accumulated.count == 0 {
+			continue
+		}
+		r.emitGap(CaptureGapV1{
+			CapabilityClass: string(classes[index]),
+			FirstAttempt:    accumulated.first,
+			LastAttempt:     accumulated.last,
+			Count:           accumulated.count,
+			Reason:          "admission_saturated",
+		})
+	}
+}
+
+func (r *Recorder) emitGap(gap CaptureGapV1) {
 	gapRef, gapData, err := Seal(MemberType{Kind: KindCaptureGap, Schema: SchemaV1}, gap)
 	if err != nil {
-		r.config.Sink.Store(CaptureResult{Err: err})
+		_ = r.store(CaptureResult{Err: err})
 		return
 	}
 	capability := CapabilityKey{Name: CapabilityCaptureAccounting, Revision: 1}
@@ -802,18 +964,17 @@ func (r *Recorder) emitGap() {
 	}
 	rootRef, rootData, err := Seal(MemberType{Kind: KindCapabilityRoot, Schema: SchemaV1}, root)
 	if err != nil {
-		r.config.Sink.Store(CaptureResult{Err: err})
+		_ = r.store(CaptureResult{Err: err})
 		return
 	}
 	refs := []ContentRef{gapRef, rootRef}
 	SortContentRefs(refs)
-	r.config.Sink.Store(CaptureResult{
+	_ = r.store(CaptureResult{
 		CaptureID: gap.LastAttempt,
 		Manifest: ManifestV1{
 			Format:           FormatV1,
 			Canonicalization: CanonicalJSONV1,
 			Sensitivity:      ExactRestrictedSensitivity(),
-			Authenticity:     AuthenticityV1{State: TrustNotProvided},
 			Roots:            []CapabilityRefV1{{CapabilityKey: capability, State: StateSuccess, Root: rootRef}},
 			Members:          refs,
 		},

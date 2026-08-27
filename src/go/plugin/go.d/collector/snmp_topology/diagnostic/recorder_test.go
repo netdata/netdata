@@ -32,7 +32,7 @@ func TestRecorder_SealsHandleAndBuildsPortableGraph(t *testing.T) {
 
 	sink := &MemorySink{}
 	recorder := newTestRecorder(t, sink, 1)
-	txn, err := recorder.Begin(9)
+	txn, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
 	require.NoError(t, txn.DefineSection("semantic_inputs", StateSuccess, 1))
 	handle, err := txn.AddOwned(
@@ -47,8 +47,8 @@ func TestRecorder_SealsHandleAndBuildsPortableGraph(t *testing.T) {
 	_, err = json.Marshal(handle)
 	require.ErrorContains(t, err, "not serializable")
 
-	require.NoError(t, txn.Commit(testSemanticCapability, StateSuccess))
-	require.ErrorIs(t, txn.Commit(testSemanticCapability, StateSuccess), ErrTransactionClosed)
+	require.NoError(t, txn.Commit(StateSuccess))
+	require.ErrorIs(t, txn.Commit(StateSuccess), ErrTransactionClosed)
 	recorder.Close()
 
 	ref, err, state := handle.Resolve()
@@ -82,7 +82,7 @@ func TestRecorder_DeduplicatesInventoryWhilePreservingRepeatedReferences(t *test
 
 	sink := &MemorySink{}
 	recorder := newTestRecorder(t, sink, 1)
-	txn, err := recorder.Begin(9)
+	txn, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
 	require.NoError(t, txn.DefineSection("semantic_inputs", StateSuccess, 2))
 	value := testLeaf{ID: "leaf-a"}
@@ -90,7 +90,7 @@ func TestRecorder_DeduplicatesInventoryWhilePreservingRepeatedReferences(t *test
 	require.NoError(t, err)
 	handleB, err := txn.AddOwned("semantic_inputs", MemberType{Kind: "semantic_leaf", Schema: SchemaV1}, value, 32)
 	require.NoError(t, err)
-	require.NoError(t, txn.Commit(testSemanticCapability, StateSuccess))
+	require.NoError(t, txn.Commit(StateSuccess))
 	recorder.Close()
 
 	result := sink.Results()[0]
@@ -117,7 +117,7 @@ func TestRecorder_DerivedReferenceCarriesTransitivePortableInventory(t *testing.
 	sink := &MemorySink{}
 	recorder := newTestRecorder(t, sink, 3)
 
-	leafTxn, err := recorder.Begin(1)
+	leafTxn, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
 	require.NoError(t, leafTxn.DefineSection("leaf", StateSuccess, 1))
 	leafHandle, err := leafTxn.AddOwned(
@@ -127,9 +127,9 @@ func TestRecorder_DerivedReferenceCarriesTransitivePortableInventory(t *testing.
 		32,
 	)
 	require.NoError(t, err)
-	require.NoError(t, leafTxn.Commit(testSemanticCapability, StateSuccess))
+	require.NoError(t, leafTxn.Commit(StateSuccess))
 
-	derivedTxn, err := recorder.Begin(2)
+	derivedTxn, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
 	require.NoError(t, derivedTxn.DefineSection("derived", StateSuccess, 1))
 	derivedHandle, err := derivedTxn.AddDerivedOwned(
@@ -143,13 +143,13 @@ func TestRecorder_DerivedReferenceCarriesTransitivePortableInventory(t *testing.
 		64,
 	)
 	require.NoError(t, err)
-	require.NoError(t, derivedTxn.Commit(testSemanticCapability, StateSuccess))
+	require.NoError(t, derivedTxn.Commit(StateSuccess))
 
-	referenceTxn, err := recorder.Begin(3)
+	referenceTxn, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
 	require.NoError(t, referenceTxn.DefineSection("reference", StateSuccess, 1))
 	require.NoError(t, referenceTxn.AddReference("reference", derivedHandle))
-	require.NoError(t, referenceTxn.Commit(testSemanticCapability, StateSuccess))
+	require.NoError(t, referenceTxn.Commit(StateSuccess))
 	recorder.Close()
 
 	results := sink.Results()
@@ -174,6 +174,36 @@ func TestRecorder_DerivedReferenceCarriesTransitivePortableInventory(t *testing.
 	require.Equal(t, []ContentRef{derivedRef}, root.Sections[0].Members)
 }
 
+func TestCaptureTransaction_RejectsCrossRecorderHandles(t *testing.T) {
+	t.Parallel()
+
+	sinkA := &MemorySink{}
+	recorderA := newTestRecorder(t, sinkA, 1)
+	txnA, err := recorderA.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, txnA.DefineSection("leaf", StateSuccess, 1))
+	handle, err := txnA.AddOwned(
+		"leaf",
+		MemberType{Kind: "semantic_leaf", Schema: SchemaV1},
+		testLeaf{ID: "leaf-a"},
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, txnA.Commit(StateSuccess))
+	recorderA.Close()
+
+	sinkB := &MemorySink{}
+	recorderB := newTestRecorder(t, sinkB, 1)
+	txnB, err := recorderB.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, txnB.DefineSection("reference", StateSuccess, 1))
+	refErr := txnB.AddReference("reference", handle)
+	require.NoError(t, txnB.Commit(StateSuccess))
+	recorderB.Close()
+
+	require.ErrorContains(t, refErr, "different recorder")
+}
+
 func TestRecorder_RejectsTransitiveManifestAboveMemberLimit(t *testing.T) {
 	t.Parallel()
 
@@ -188,21 +218,22 @@ func TestRecorder_RejectsTransitiveManifestAboveMemberLimit(t *testing.T) {
 
 	dependencies := make([]MemberHandle, 0, 2)
 	for attempt := uint64(1); attempt <= 2; attempt++ {
-		txn, err := recorder.Begin(attempt)
+		capability := CapabilityKey{Name: "test_dependency", Revision: 1}
+		txn, err := recorder.Begin(capability)
 		require.NoError(t, err)
 		require.NoError(t, txn.DefineSection("items", StateSuccess, 1))
 		handle, err := txn.AddOwned(
 			"items",
 			MemberType{Kind: KindCaptureGap, Schema: SchemaV1},
-			CaptureGapV1{FirstAttempt: attempt, LastAttempt: attempt, Count: 1, Reason: "test"},
+			CaptureGapV1{CapabilityClass: string(CaptureClassOther), FirstAttempt: attempt, LastAttempt: attempt, Count: 1, Reason: "test"},
 			128,
 		)
 		require.NoError(t, err)
 		dependencies = append(dependencies, handle)
-		require.NoError(t, txn.Commit(CapabilityKey{Name: "test_dependency", Revision: 1}, StateSuccess))
+		require.NoError(t, txn.Commit(StateSuccess))
 	}
 
-	derivedTxn, err := recorder.Begin(3)
+	derivedTxn, err := recorder.Begin(CapabilityKey{Name: "test_derived", Revision: 1})
 	require.NoError(t, err)
 	require.NoError(t, derivedTxn.DefineSection("derived", StateSuccess, 1))
 	derivedHandle, err := derivedTxn.AddDerivedOwned(
@@ -210,14 +241,14 @@ func TestRecorder_RejectsTransitiveManifestAboveMemberLimit(t *testing.T) {
 		MemberType{Kind: KindCaptureGap, Schema: SchemaV1},
 		dependencies,
 		func([]ContentRef) (any, error) {
-			return CaptureGapV1{FirstAttempt: 3, LastAttempt: 3, Count: 1, Reason: "test"}, nil
+			return CaptureGapV1{CapabilityClass: string(CaptureClassOther), FirstAttempt: 3, LastAttempt: 3, Count: 1, Reason: "test"}, nil
 		},
 		128,
 	)
 	require.NoError(t, err)
-	require.NoError(t, derivedTxn.Commit(CapabilityKey{Name: "test_derived", Revision: 1}, StateSuccess))
+	require.NoError(t, derivedTxn.Commit(StateSuccess))
 
-	overflowTxn, err := recorder.Begin(4)
+	overflowTxn, err := recorder.Begin(CapabilityKey{Name: "test_overflow", Revision: 1})
 	require.NoError(t, err)
 	require.NoError(t, overflowTxn.DefineSection("reference", StateSuccess, 1))
 	require.NoError(t, overflowTxn.AddReference("reference", derivedHandle))
@@ -225,11 +256,11 @@ func TestRecorder_RejectsTransitiveManifestAboveMemberLimit(t *testing.T) {
 	overflowHandle, err := overflowTxn.AddOwned(
 		"owned",
 		MemberType{Kind: KindCaptureGap, Schema: SchemaV1},
-		CaptureGapV1{FirstAttempt: 4, LastAttempt: 4, Count: 1, Reason: "test"},
+		CaptureGapV1{CapabilityClass: string(CaptureClassOther), FirstAttempt: 4, LastAttempt: 4, Count: 1, Reason: "test"},
 		128,
 	)
 	require.NoError(t, err)
-	require.NoError(t, overflowTxn.Commit(CapabilityKey{Name: "test_overflow", Revision: 1}, StateSuccess))
+	require.NoError(t, overflowTxn.Commit(StateSuccess))
 	recorder.Close()
 
 	results := sink.Results()
@@ -266,14 +297,14 @@ func TestRecorder_AbortAndLateSealFailureAreExplicit(t *testing.T) {
 		"abort": {
 			value: testLeaf{ID: "leaf-a"},
 			terminate: func(txn *CaptureTransaction) error {
-				return txn.Abort(testSemanticCapability, errors.New("collection cancelled"))
+				return txn.Abort(errors.New("collection cancelled"))
 			},
 			wantErr: "capture aborted",
 		},
 		"late seal failure": {
 			value: func() {},
 			terminate: func(txn *CaptureTransaction) error {
-				return txn.Commit(testSemanticCapability, StateSuccess)
+				return txn.Commit(StateSuccess)
 			},
 			wantErr: "unsupported type",
 		},
@@ -284,7 +315,7 @@ func TestRecorder_AbortAndLateSealFailureAreExplicit(t *testing.T) {
 			t.Parallel()
 			sink := &MemorySink{}
 			recorder := newTestRecorder(t, sink, 1)
-			txn, err := recorder.Begin(9)
+			txn, err := recorder.Begin(testSemanticCapability)
 			require.NoError(t, err)
 			require.NoError(t, txn.DefineSection("semantic_inputs", StateSuccess, 1))
 			handle, err := txn.AddOwned(
@@ -326,17 +357,17 @@ func TestRecorder_BeginReservesNonBlockingTerminalCapacityAndCoalescesGaps(t *te
 		release: make(chan struct{}),
 	}
 	recorder := newTestRecorder(t, sink, 2)
-	txnA, err := recorder.Begin(1)
+	txnA, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
-	txnB, err := recorder.Begin(2)
+	txnB, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
-	_, err = recorder.Begin(3)
+	_, err = recorder.Begin(testSemanticCapability)
 	require.ErrorIs(t, err, ErrRecorderSaturated)
 
 	require.NoError(t, txnA.DefineSection("capture", StateEmpty, 0))
 	require.NoError(t, txnB.DefineSection("capture", StateEmpty, 0))
-	assertReturnsPromptly(t, func() error { return txnA.Commit(testSemanticCapability, StateEmpty) })
-	assertReturnsPromptly(t, func() error { return txnB.Abort(testSemanticCapability, errors.New("cancelled")) })
+	assertReturnsPromptly(t, func() error { return txnA.Commit(StateEmpty) })
+	assertReturnsPromptly(t, func() error { return txnB.Abort(errors.New("cancelled")) })
 
 	closeDone := make(chan struct{})
 	go func() {
@@ -368,9 +399,98 @@ func TestRecorder_BeginReservesNonBlockingTerminalCapacityAndCoalescesGaps(t *te
 			rootRef := result.Manifest.Roots[0].Root
 			require.NoError(t, DecodeCanonical(result.Members[rootRef.Key()], testReaderLimits(), &root))
 			require.Equal(t, uint64(1), root.Sections[0].ExpectedRecords)
+			registry := NewRegistry()
+			require.NoError(t, registry.Register(CaptureAccountingCapabilityV1(), CaptureAccountingClosureV1()))
+			report, err := registry.ValidateCapability(
+				result.Manifest,
+				result.Members,
+				CaptureAccountingCapabilityV1(),
+				testReaderLimits(),
+			)
+			require.NoError(t, err)
+			assert.True(t, report.Completeness)
+			assert.False(t, report.Replayable)
 		}
 	}
 	assert.Equal(t, 1, gaps)
+}
+
+func TestRecorder_NoAnonymousFallbackRoot(t *testing.T) {
+	t.Parallel()
+
+	sink := &MemorySink{}
+	recorder := newTestRecorder(t, sink, 1)
+	txn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, txn.Commit(StateSuccess))
+	recorder.Close()
+
+	result := sink.Results()[0]
+	require.ErrorContains(t, result.Err, "no terminal sections")
+	assert.Empty(t, result.Manifest.Roots)
+}
+
+func TestRecorder_WorkerPanicReleasesAdmissionAndFailsHandle(t *testing.T) {
+	t.Parallel()
+
+	sink := &MemorySink{}
+	recorder := newTestRecorder(t, sink, 2)
+	leafTxn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, leafTxn.DefineSection("leaf", StateSuccess, 1))
+	leaf, err := leafTxn.AddOwned(
+		"leaf",
+		MemberType{Kind: "semantic_leaf", Schema: SchemaV1},
+		testLeaf{ID: "leaf-a"},
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, leafTxn.Commit(StateSuccess))
+
+	derivedTxn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, derivedTxn.DefineSection("derived", StateSuccess, 1))
+	derived, err := derivedTxn.AddDerivedOwned(
+		"derived",
+		MemberType{Kind: "derived_leaf", Schema: SchemaV1},
+		[]MemberHandle{leaf},
+		func([]ContentRef) (any, error) { panic("builder panic") },
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, derivedTxn.Commit(StateSuccess))
+	recorder.Close()
+
+	_, handleErr, state := derived.Resolve()
+	assert.Equal(t, HandleFailed, state)
+	require.ErrorContains(t, handleErr, "worker panicked")
+	assert.Len(t, sink.Results(), 2)
+}
+
+type panicCaptureSink struct{}
+
+func (panicCaptureSink) Store(CaptureResult) { panic("sink panic") }
+
+func TestRecorder_SinkPanicReleasesAdmissionAndFailsHandle(t *testing.T) {
+	t.Parallel()
+
+	recorder := newTestRecorder(t, panicCaptureSink{}, 1)
+	txn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, txn.DefineSection("leaf", StateSuccess, 1))
+	handle, err := txn.AddOwned(
+		"leaf",
+		MemberType{Kind: "semantic_leaf", Schema: SchemaV1},
+		testLeaf{ID: "leaf-a"},
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, txn.Commit(StateSuccess))
+	recorder.Close()
+
+	_, handleErr, state := handle.Resolve()
+	assert.Equal(t, HandleFailed, state)
+	require.ErrorContains(t, handleErr, "sink panicked")
 }
 
 func TestCaptureTransaction_RejectsMemberWithoutTransferringHandle(t *testing.T) {
@@ -384,14 +504,14 @@ func TestCaptureTransaction_RejectsMemberWithoutTransferringHandle(t *testing.T)
 		Sink:             sink,
 	})
 	require.NoError(t, err)
-	txn, err := recorder.Begin(1)
+	txn, err := recorder.Begin(testSemanticCapability)
 	require.NoError(t, err)
 	require.NoError(t, txn.DefineSection("capture", StateSuccess, 1))
 
 	handle, err := txn.AddOwned("capture", MemberType{Kind: "semantic_leaf", Schema: SchemaV1}, testLeaf{ID: "leaf-a"}, 9)
 	require.ErrorContains(t, err, "retained-byte limit")
 	assert.Zero(t, handle.ID())
-	require.NoError(t, txn.Commit(testSemanticCapability, StateSuccess))
+	require.NoError(t, txn.Commit(StateSuccess))
 	recorder.Close()
 
 	result := sink.Results()[0]
@@ -411,7 +531,7 @@ func TestRecorder_ConcurrentTransactionsResolveExactlyOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			txn, err := recorder.Begin(uint64(i + 1))
+			txn, err := recorder.Begin(testSemanticCapability)
 			require.NoError(t, err)
 			require.NoError(t, txn.DefineSection("semantic_inputs", StateSuccess, 1))
 			handles[i], err = txn.AddOwned(
@@ -421,7 +541,7 @@ func TestRecorder_ConcurrentTransactionsResolveExactlyOnce(t *testing.T) {
 				32,
 			)
 			require.NoError(t, err)
-			require.NoError(t, txn.Commit(testSemanticCapability, StateSuccess))
+			require.NoError(t, txn.Commit(StateSuccess))
 		}()
 	}
 	wg.Wait()

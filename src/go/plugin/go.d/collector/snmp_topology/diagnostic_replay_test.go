@@ -289,7 +289,7 @@ func TestDiagnosticSemanticReplay_PreservesVLANContextResults(t *testing.T) {
 
 func topologyDiagnosticReaderLimits() diagnostic.ReaderLimits {
 	return diagnostic.ReaderLimits{
-		MaxStoredBytes: 64 << 20, MaxLogicalBytes: 64 << 20, MaxMemberBytes: 16 << 20,
+		MaxLogicalBytes: 64 << 20, MaxMemberBytes: 16 << 20,
 		MaxMembers: 4096, MaxDevices: 1024, MaxProfiles: 4096, MaxRows: 1 << 20,
 		MaxTags: 1 << 20, MaxStringBytes: 32 << 20, MaxDNSRecords: 1 << 16, MaxOUIRecords: 1 << 16,
 		MaxReferenceEdges: 1 << 20, MaxNestingDepth: 64, MaxJSONTokens: 1 << 24, MaxReplayWork: 1 << 24,

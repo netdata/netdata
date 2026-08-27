@@ -48,7 +48,7 @@ func (c *Collector) beginTopologyDiagnosticCapture(registrationID ddsnmp.DeviceR
 	if c == nil || c.diagnosticRecorder == nil {
 		return nil
 	}
-	transaction, err := c.diagnosticRecorder.Begin(uint64(registrationID))
+	transaction, err := c.diagnosticRecorder.Begin(diagnostic.SemanticCapabilityV1())
 	if err != nil {
 		return nil
 	}
@@ -226,9 +226,10 @@ func (c *topologyDiagnosticCapture) commit(snapshot *topologyDeviceSnapshot) {
 	if c == nil || c.finished {
 		return
 	}
-	c.finished = true
 	if c.device == nil || snapshot == nil || !snapshot.hasObservation {
-		_ = c.transaction.Abort(diagnostic.CapabilityKey{Name: diagnostic.CapabilitySemanticReplay, Revision: 1}, errors.New("semantic capture has no observation"))
+		if err := c.transaction.Abort(errors.New("semantic capture has no observation")); err == nil {
+			c.finished = true
+		}
 		return
 	}
 
@@ -292,9 +293,10 @@ func (c *topologyDiagnosticCapture) commit(snapshot *topologyDeviceSnapshot) {
 		state = diagnostic.StateIncomplete
 		_ = c.transaction.MarkIncomplete(c.err)
 	}
-	if err := c.transaction.Commit(diagnostic.CapabilityKey{Name: diagnostic.CapabilitySemanticReplay, Revision: 1}, state); err != nil {
+	if err := c.transaction.Commit(state); err != nil {
 		return
 	}
+	c.finished = true
 	snapshot.diagnosticObservation = observationHandle
 }
 
@@ -302,11 +304,9 @@ func (c *topologyDiagnosticCapture) abort() {
 	if c == nil || c.finished {
 		return
 	}
-	c.finished = true
-	_ = c.transaction.Abort(
-		diagnostic.CapabilityKey{Name: diagnostic.CapabilitySemanticReplay, Revision: 1},
-		errors.New("topology refresh did not produce a semantic generation"),
-	)
+	if err := c.transaction.Abort(errors.New("topology refresh did not produce a semantic generation")); err == nil {
+		c.finished = true
+	}
 }
 
 func (c *topologyDiagnosticCapture) defineSection(name string, state diagnostic.TerminalState, records uint64) {

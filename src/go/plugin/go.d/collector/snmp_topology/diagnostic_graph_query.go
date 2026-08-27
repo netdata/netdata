@@ -35,7 +35,7 @@ func beginTopologyGraphDiagnosticCapture(
 	if recorder == nil || generation == nil || generation.diagnosticMember.ID() == 0 {
 		return nil
 	}
-	transaction, err := recorder.Begin(generation.sequence)
+	transaction, err := recorder.Begin(diagnostic.GraphCapabilityV1())
 	if err != nil {
 		return nil
 	}
@@ -125,7 +125,6 @@ func (c *topologyGraphDiagnosticCapture) finish(ok bool, buildErr error) {
 	if c == nil || c.finished {
 		return
 	}
-	c.finished = true
 
 	c.defineTraceSections()
 	state := diagnostic.StateSuccess
@@ -136,7 +135,9 @@ func (c *topologyGraphDiagnosticCapture) finish(ok bool, buildErr error) {
 	case !ok:
 		state = diagnostic.StateEmpty
 	}
-	_ = c.transaction.Commit(diagnostic.GraphCapabilityV1(), state)
+	if err := c.transaction.Commit(state); err == nil {
+		c.finished = true
+	}
 }
 
 func (c *topologyGraphDiagnosticCapture) defineTraceSections() {
@@ -179,8 +180,9 @@ func (c *topologyGraphDiagnosticCapture) abort() {
 	if c == nil || c.finished {
 		return
 	}
-	c.finished = true
-	_ = c.transaction.Abort(diagnostic.GraphCapabilityV1(), errors.New("graph query did not reach a terminal result"))
+	if err := c.transaction.Abort(errors.New("graph query did not reach a terminal result")); err == nil {
+		c.finished = true
+	}
 }
 
 func diagnosticGraphQueryOptions(options topologyoptions.QueryOptions) diagnostic.GraphQueryOptionsV1 {

@@ -346,7 +346,7 @@ func semanticGroupIs(group semanticShardGroupV1, phase, context, profile uint32,
 }
 
 func decodeGraphMember(source MemberSource, ref ContentRef, limits ReaderLimits, dst any) error {
-	data, err := readMember(source, ref, limits)
+	data, err := readVerifiedMember(source, ref, limits)
 	if err != nil {
 		return err
 	}

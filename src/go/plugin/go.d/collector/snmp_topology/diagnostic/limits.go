@@ -11,7 +11,6 @@ import (
 // ReaderLimits is caller policy, not part of diagnostic v1 validity. Every
 // field is required so a reader cannot accidentally run without a bound.
 type ReaderLimits struct {
-	MaxStoredBytes    uint64
 	MaxLogicalBytes   uint64
 	MaxMemberBytes    uint64
 	MaxMembers        uint64
@@ -33,7 +32,6 @@ func (l ReaderLimits) Validate() error {
 		name  string
 		value uint64
 	}{
-		{"MaxStoredBytes", l.MaxStoredBytes},
 		{"MaxLogicalBytes", l.MaxLogicalBytes},
 		{"MaxMemberBytes", l.MaxMemberBytes},
 		{"MaxMembers", l.MaxMembers},

@@ -41,23 +41,6 @@ func (s TerminalState) valid() bool {
 	}
 }
 
-type TrustState string
-
-const (
-	TrustNotProvided     TrustState = "not_provided"
-	TrustUnauthenticated TrustState = "unauthenticated"
-	TrustAuthenticated   TrustState = "authenticated"
-)
-
-func (s TrustState) valid() bool {
-	switch s {
-	case TrustNotProvided, TrustUnauthenticated, TrustAuthenticated:
-		return true
-	default:
-		return false
-	}
-}
-
 type SensitivityV1 struct {
 	Classification string `json:"classification"`
 	Fidelity       string `json:"fidelity"`
@@ -77,24 +60,6 @@ func (s SensitivityV1) Validate() error {
 	}
 	if s.Sanitized {
 		return fmt.Errorf("v1 exact artifacts must not claim sanitization")
-	}
-	return nil
-}
-
-type AuthenticityV1 struct {
-	State  TrustState `json:"state"`
-	Method string     `json:"method,omitempty"`
-}
-
-func (a AuthenticityV1) Validate() error {
-	if !a.State.valid() {
-		return fmt.Errorf("invalid authenticity state %q", a.State)
-	}
-	if a.State == TrustAuthenticated && strings.TrimSpace(a.Method) == "" {
-		return errors.New("authenticated artifacts require a method")
-	}
-	if a.State != TrustAuthenticated && a.Method != "" {
-		return errors.New("unauthenticated artifacts must not claim an authentication method")
 	}
 	return nil
 }
@@ -204,7 +169,6 @@ type ManifestV1 struct {
 	Format           string            `json:"format"`
 	Canonicalization string            `json:"canonicalization"`
 	Sensitivity      SensitivityV1     `json:"sensitivity"`
-	Authenticity     AuthenticityV1    `json:"authenticity"`
 	Roots            []CapabilityRefV1 `json:"roots"`
 	Members          []ContentRef      `json:"members"`
 }
@@ -218,9 +182,6 @@ func (m ManifestV1) Validate() error {
 	}
 	if err := m.Sensitivity.Validate(); err != nil {
 		return fmt.Errorf("sensitivity: %w", err)
-	}
-	if err := m.Authenticity.Validate(); err != nil {
-		return fmt.Errorf("authenticity: %w", err)
 	}
 	if len(m.Roots) == 0 {
 		return errors.New("manifest has no capability roots")
