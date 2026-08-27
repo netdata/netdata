@@ -229,6 +229,20 @@ Ingestion is split by source area:
 - `topology_bgp_peers.go`
 - `topology_vlan_context_*.go`
 
+Every successful device refresh also retains a bounded semantic replay input.
+The live builder and the replay path share one ordered event dispatcher for
+system uptime, profile tags, topology rows, BGP rows, and successful VLAN-context
+rows. The retained projection keeps only fields consumed by those builder
+operations; credentials, profile source paths, metric names, values, and other
+collector output are not copied.
+
+Semantic capture has direct per-device record and logical-byte limits. The
+projection checks an event before copying it. Limit exhaustion, projection
+errors, or projection panics mark the generation's capture unavailable and
+release partial evidence without changing collection, builder ingestion, or
+topology publication. Replay reconstructs the allowlisted inputs and invokes
+the same event dispatcher; it rejects a missing or reordered main phase.
+
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately
 because they describe the device itself rather than one topology row.
@@ -240,6 +254,7 @@ Finalization converts the builder into an immutable `topologyDeviceGeneration`:
 - immutable trap-match, interface-name, and neighbor indexes;
 - collection and expiry timestamps;
 - the typed DeviceStore registration ID.
+- a generation-local evidence reference and semantic capture state/input.
 
 The collector separately owns `deviceRefreshState` per registration ID. It
 tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,

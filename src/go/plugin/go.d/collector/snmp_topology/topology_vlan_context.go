@@ -8,7 +8,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) collectTopologyVTPVLANContexts(ctx context.Context, cache *topologyBuilder, dev ddsnmp.DeviceConnectionInfo) {
+func (c *Collector) collectTopologyVTPVLANContexts(
+	ctx context.Context,
+	cache *topologyBuilder,
+	dev ddsnmp.DeviceConnectionInfo,
+	recorder *topologySemanticRecorder,
+) {
 	if cache == nil {
 		return
 	}
@@ -40,6 +45,11 @@ func (c *Collector) collectTopologyVTPVLANContexts(ctx context.Context, cache *t
 			c.Warningf("device '%s': topology vlan-context polling failed for vlan %s: %v", dev.Hostname, context.vlanID, err)
 			continue
 		}
-		cache.ingestTopologyVLANContextMetrics(context.vlanID, context.vlanName, pms)
+		consumeTopologySemanticEvent(cache, recorder, topologySemanticEvent{
+			kind:     topologySemanticEventVLANContext,
+			profiles: pms,
+			vlanID:   context.vlanID,
+			vlanName: context.vlanName,
+		})
 	}
 }

@@ -77,7 +77,7 @@ func freezeTestTopologyBuilder(registrationID ddsnmp.DeviceRegistrationID, build
 
 func freezeTestTopologyBuilderAt(registrationID ddsnmp.DeviceRegistrationID, publishedAt time.Time, builder *topologyBuilder) *topologyDeviceGeneration {
 	snapshot, _ := freezeTopologyBuilder(builder)
-	return activateTopologyDeviceSnapshot(registrationID, publishedAt, snapshot)
+	return activateTopologyDeviceSnapshot(registrationID, 1, publishedAt, snapshot)
 }
 
 func registerTestDeviceState(store *ddsnmp.DeviceStore, devices ...ddsnmp.DeviceConnectionInfo) {

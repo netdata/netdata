@@ -86,9 +86,10 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		resolveTargetIPs: func(ctx context.Context, host string) ([]netip.Addr, error) {
 			return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 		},
-		now:     time.Now,
-		store:   metricStore,
-		metrics: newCollectorMetrics(metricStore),
+		now:            time.Now,
+		semanticLimits: defaultTopologySemanticLimits,
+		store:          metricStore,
+		metrics:        newCollectorMetrics(metricStore),
 	}
 }
 
@@ -115,6 +116,7 @@ type (
 		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
 		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
 		now              func() time.Time
+		semanticLimits   topologySemanticLimits
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -314,13 +316,14 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 
 	pruneUnregisteredDeviceStates(nextStates, seen)
 	publishedAt := c.currentTime()
+	nextSequence := c.generationSequence + 1
 	for registrationID, snapshot := range successfulSnapshots {
 		state := nextStates[registrationID]
-		state.generation = activateTopologyDeviceSnapshot(registrationID, publishedAt, snapshot)
+		state.generation = activateTopologyDeviceSnapshot(registrationID, nextSequence, publishedAt, snapshot)
 		nextStates[registrationID] = state
 	}
 	c.deviceStates = nextStates
-	c.generationSequence++
+	c.generationSequence = nextSequence
 	generation := newTopologyGeneration(c.generationSequence, publishedAt, nextStates)
 	c.topologyRegistry.publishGeneration(generation)
 	stats.cachedDevices = generation.deviceCount()
@@ -434,18 +437,32 @@ func (c *Collector) refreshDeviceTopology(
 
 	// Build the next device generation off-registry. Function readers keep
 	// seeing the previous global generation until collection is fully ingested.
-	next := c.newDeviceTopologyBuilder(dev)
-	next.targetManagementIPs = append([]netip.Addr(nil), targetManagementIPs...)
+	deviceInput := topologySemanticDeviceInputFromConnection(dev)
+	next := newTopologyBuilderFromSemanticInput(
+		deviceInput,
+		targetManagementIPs,
+		c.currentTime(),
+		c.refreshEvery()+2*c.deviceCheckEvery(),
+	)
+	recorder := newTopologySemanticRecorder(
+		deviceInput,
+		targetManagementIPs,
+		next.updateTime,
+		next.staleAfter,
+		c.currentTopologySemanticLimits(),
+	)
 
-	next.updateTopologySysUptime(sysUptime)
-	next.updateTopologyProfileTags(pms)
-	next.ingestTopologyProfileMetrics(pms)
-	next.ingestTopologyBGPPeers(pms)
-	c.collectTopologyVTPVLANContexts(ctx, next, dev)
+	consumeTopologySemanticEvent(next, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: sysUptime})
+	consumeTopologySemanticEvent(next, recorder, topologySemanticEvent{kind: topologySemanticEventProfileTags, profiles: pms})
+	consumeTopologySemanticEvent(next, recorder, topologySemanticEvent{kind: topologySemanticEventTopologyMetrics, profiles: pms})
+	consumeTopologySemanticEvent(next, recorder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
+	c.collectTopologyVTPVLANContexts(ctx, next, dev, recorder)
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
 	}
-	return c.freezeTopologyBuilder(next), deviceRefreshOutcomeSuccess
+	snapshot := c.freezeTopologyBuilder(next)
+	snapshot.semantic = recorder.finish()
+	return snapshot, deviceRefreshOutcomeSuccess
 }
 
 func (c *Collector) warnTopologyRefreshFailure(registrationID ddsnmp.DeviceRegistrationID, class, format string, args ...any) {
@@ -527,12 +544,19 @@ func closeSNMPClientOnContextCancel(ctx context.Context, client gosnmp.Handler) 
 }
 
 func (c *Collector) newDeviceTopologyBuilder(dev ddsnmp.DeviceConnectionInfo) *topologyBuilder {
-	cache := newTopologyBuilder()
-	cache.updateTime = c.currentTime()
-	cache.staleAfter = c.refreshEvery() + 2*c.deviceCheckEvery()
-	cache.agentID = dev.Hostname
-	cache.localDevice = buildLocalTopologyDevice(dev)
-	return cache
+	return newTopologyBuilderFromSemanticInput(
+		topologySemanticDeviceInputFromConnection(dev),
+		nil,
+		c.currentTime(),
+		c.refreshEvery()+2*c.deviceCheckEvery(),
+	)
+}
+
+func (c *Collector) currentTopologySemanticLimits() topologySemanticLimits {
+	if c.semanticLimits.maxRecords == 0 || c.semanticLimits.maxLogicalBytes == 0 {
+		return defaultTopologySemanticLimits
+	}
+	return c.semanticLimits
 }
 
 func (c *Collector) currentTime() time.Time {

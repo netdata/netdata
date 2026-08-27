@@ -517,6 +517,13 @@ func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *t
 	require.Equal(t, now.Add(defaultRefreshEvery), successState.nextRetry)
 	require.Zero(t, successState.consecutiveFailures)
 	require.NotNil(t, successState.generation)
+	require.Equal(t, topologySemanticCaptureAvailable, successState.generation.semantic.state)
+	require.NotNil(t, successState.generation.semantic.evidence)
+	require.Equal(t, registrationID, successState.generation.evidenceRef.registrationID)
+	require.NotZero(t, successState.generation.evidenceRef.generation)
+	replayed, err := replayTopologySemanticEvidence(successState.generation.semantic.evidence)
+	require.NoError(t, err)
+	require.Equal(t, successState.generation.observation, replayed.observation)
 	lastSuccessGeneration := successState.generation
 
 	now = successState.nextRetry
@@ -530,6 +537,40 @@ func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *t
 	require.EqualValues(t, 1, failedState.consecutiveFailures)
 	require.False(t, failedState.generation.freshAt(failedState.generation.expiresAt.Add(time.Nanosecond)),
 		"failure retention must not extend the last successful collection's display freshness")
+}
+
+func TestCollectorSuccessfulRefreshSurvivesSemanticCaptureLimit(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: gosnmp.Version2c.String(),
+	}
+	mockHandler := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(mockHandler, dev)
+
+	coll := newTestSNMPTopologyCollector()
+	coll.semanticLimits = topologySemanticLimits{maxRecords: 1, maxLogicalBytes: 1 << 20}
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			return []*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{{
+				TopologyKind: ddsnmp.KindIfName,
+				Tags:         map[string]string{tagTopoIfIndex: "7", tagTopoIfName: "Gi1/0/7"},
+			}}}}, nil
+		})
+	}
+
+	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
+	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
+	require.NotNil(t, snapshot)
+	require.True(t, snapshot.hasObservation)
+	require.Equal(t, topologySemanticCaptureLimitExceeded, snapshot.semantic.state)
+	require.Equal(t, topologySemanticCaptureReasonRecordLimit, snapshot.semantic.reason)
+	require.Nil(t, snapshot.semantic.evidence)
 }
 
 func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(t *testing.T) {
