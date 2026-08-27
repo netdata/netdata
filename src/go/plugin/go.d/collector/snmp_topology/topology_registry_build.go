@@ -29,7 +29,7 @@ func buildSNMPTopologySnapshot(aggregate topologymodel.ObservationAggregate, opt
 }
 
 func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
-	result, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	result, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations, options.WorkLimiter)
 	if err != nil || !ok {
 		return topologymodel.Data{}, false, err
 	}
@@ -43,14 +43,20 @@ func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate
 		return topologymodel.Data{}, false, err
 	}
 	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
-	topologyshape.ApplyPolicies(&data, options)
-	topologyenrich.ApplyLayer3(&data, aggregate)
-	topologyshape.ApplyDepthFocusFilter(&data, options)
+	if err := topologyshape.ApplyPolicies(&data, options); err != nil {
+		return topologymodel.Data{}, false, err
+	}
+	if err := topologyenrich.ApplyLayer3(&data, aggregate, options.WorkLimiter); err != nil {
+		return topologymodel.Data{}, false, err
+	}
+	if err := topologyshape.ApplyDepthFocusFilter(&data, options); err != nil {
+		return topologymodel.Data{}, false, err
+	}
 	return data, true, nil
 }
 
 func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
-	result, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	result, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations, options.WorkLimiter)
 	if err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
 	}
@@ -70,7 +76,9 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
 	}
 	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
-	topologyshape.ApplyPolicies(&strictData, strictOptions)
+	if err := topologyshape.ApplyPolicies(&strictData, strictOptions); err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
+	}
 
 	probableOptions := options
 	probableOptions.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
@@ -84,10 +92,16 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
 	}
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
-	topologyshape.ApplyPolicies(&probableData, probableOptions)
+	if err := topologyshape.ApplyPolicies(&probableData, probableOptions); err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
+	}
 	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
-	topologyenrich.ApplyLayer3(&probableData, aggregate)
-	topologyshape.ApplyDepthFocusFilter(&probableData, options)
+	if err := topologyenrich.ApplyLayer3(&probableData, aggregate, options.WorkLimiter); err != nil {
+		return topologymodel.Data{}, false, err
+	}
+	if err := topologyshape.ApplyDepthFocusFilter(&probableData, options); err != nil {
+		return topologymodel.Data{}, false, err
+	}
 	return probableData, true, nil
 }
 
@@ -123,7 +137,10 @@ func augmentTopologySnapshotLocals(data *topologymodel.Data, snapshots []topolog
 	}
 }
 
-func buildSNMPL2TopologyResult(observations []topologyengine.L2Observation) (topologyengine.Result, bool, error) {
+func buildSNMPL2TopologyResult(
+	observations []topologyengine.L2Observation,
+	limiter topologyengine.WorkLimiter,
+) (topologyengine.Result, bool, error) {
 	if len(observations) == 0 {
 		return topologyengine.Result{}, false, nil
 	}
@@ -134,6 +151,7 @@ func buildSNMPL2TopologyResult(observations []topologyengine.L2Observation) (top
 		EnableBridge: true,
 		EnableARP:    true,
 		EnableSTP:    true,
+		WorkLimiter:  limiter,
 	})
 	if err != nil {
 		return topologyengine.Result{}, false, fmt.Errorf("build L2 topology result: %w", err)
@@ -147,7 +165,7 @@ func projectSNMPL2TopologyData(
 	collectedAt time.Time,
 	options topologyoptions.QueryOptions,
 ) (topologymodel.Data, error) {
-	projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{
+	projection, err := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:             topologymodel.SchemaVersion,
 		Source:                    "snmp",
 		Layer:                     "2",
@@ -160,7 +178,11 @@ func projectSNMPL2TopologyData(
 		EliminateNonIPInferred:    options.EliminateNonIPInferred,
 		ProbabilisticConnectivity: topologyoptions.IsMapTypeProbable(options.MapType),
 		InferenceStrategy:         options.InferenceStrategy,
+		WorkLimiter:               options.WorkLimiter,
 	})
+	if err != nil {
+		return topologymodel.Data{}, err
+	}
 	graphData := projection.Graph
 	data := topologymodel.Data{
 		SchemaVersion: graphData.SchemaVersion,

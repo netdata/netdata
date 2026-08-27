@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"testing"
 	"time"
@@ -181,13 +182,44 @@ func TestBuildProbableTopologySnapshotMatchesIndependentLegacyPath(t *testing.T)
 
 	want := buildProbableTopologySnapshotIndependentLegacyForTest(t, aggregate, options)
 	require.Equal(t, want, got)
-	wantPayload, err := topologyv1renderer.Render(want)
+	wantPayload, err := topologyv1renderer.Render(want, nil)
 	require.NoError(t, err)
-	gotPayload, err := topologyv1renderer.Render(got)
+	gotPayload, err := topologyv1renderer.Render(got, nil)
 	require.NoError(t, err)
 	wantJSON := topologyv1test.CanonicalJSON(t, topologyv1test.NormalizeData(t, wantPayload))
 	gotJSON := topologyv1test.CanonicalJSON(t, topologyv1test.NormalizeData(t, gotPayload))
 	require.Equal(t, wantJSON, gotJSON)
+
+	boundedOptions := options
+	var probableWork uint64
+	boundedOptions.WorkLimiter = func(units uint64) error {
+		probableWork += units
+		return nil
+	}
+	bounded, boundedOK, err := buildProbableTopologySnapshot(aggregate, boundedOptions)
+	require.NoError(t, err)
+	require.True(t, boundedOK)
+	require.Equal(t, got, bounded)
+	require.Positive(t, probableWork)
+
+	singleMapOptions := boundedOptions
+	singleMapOptions.MapType = topologyoptions.MapTypeHighConfidenceInferred
+	var singleMapWork uint64
+	singleMapOptions.WorkLimiter = func(units uint64) error {
+		singleMapWork += units
+		return nil
+	}
+	_, singleMapOK, err := buildSingleMapTopologySnapshot(aggregate, singleMapOptions)
+	require.NoError(t, err)
+	require.True(t, singleMapOK)
+	require.Greater(t, probableWork, singleMapWork)
+
+	limitErr := errors.New("topology work exhausted")
+	rejectedOptions := options
+	rejectedOptions.WorkLimiter = func(uint64) error { return limitErr }
+	_, rejectedOK, err := buildProbableTopologySnapshot(aggregate, rejectedOptions)
+	require.ErrorIs(t, err, limitErr)
+	require.False(t, rejectedOK)
 }
 
 func buildProbableTopologySnapshotIndependentLegacyForTest(
@@ -197,7 +229,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 ) topologymodel.Data {
 	t.Helper()
 
-	strictResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	strictResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations, nil)
 	require.NoError(t, err)
 	require.True(t, ok)
 	strictOptions := options
@@ -207,9 +239,9 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 	)
 	require.NoError(t, err)
 	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
-	topologyshape.ApplyPolicies(&strictData, strictOptions)
+	require.NoError(t, topologyshape.ApplyPolicies(&strictData, strictOptions))
 
-	probableResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	probableResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations, nil)
 	require.NoError(t, err)
 	require.True(t, ok)
 	probableOptions := options
@@ -219,11 +251,11 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 	)
 	require.NoError(t, err)
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
-	topologyshape.ApplyPolicies(&probableData, probableOptions)
+	require.NoError(t, topologyshape.ApplyPolicies(&probableData, probableOptions))
 
 	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
-	topologyenrich.ApplyLayer3(&probableData, aggregate)
-	topologyshape.ApplyDepthFocusFilter(&probableData, options)
+	require.NoError(t, topologyenrich.ApplyLayer3(&probableData, aggregate, nil))
+	require.NoError(t, topologyshape.ApplyDepthFocusFilter(&probableData, options))
 	return probableData
 }
 
@@ -305,7 +337,7 @@ func TestTopologyRegistry_ReverseDNSCandidatesExcludeDeviceAliases(t *testing.T)
 		netip.MustParseAddr("10.0.0.20"),
 	}, candidates.collectedCandidates())
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.Contains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "display_name"), "switch-a")
 	require.NotContains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "display_name"), "unrelated-alias.example")
@@ -1397,7 +1429,7 @@ func TestTopologyRegistry_DuplicateCachesPreserveReconciledManagementPrimary(t *
 	require.Equal(t, "192.0.2.20", actor.Detail.L2.Device.ManagementIP)
 	require.Equal(t, "192.0.2.20", topologymodel.ActorDetailManagementIP(*actor))
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"192.0.2.20"}, topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip"))
 }

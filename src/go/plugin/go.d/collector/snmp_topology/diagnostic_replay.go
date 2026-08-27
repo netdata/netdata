@@ -341,7 +341,7 @@ type replayWorkBudget struct {
 
 func (b *replayWorkBudget) add(value uint64) error {
 	if value > b.limit-b.used {
-		return fmt.Errorf("semantic replay work exceeds limit %d", b.limit)
+		return fmt.Errorf("diagnostic replay work exceeds limit %d", b.limit)
 	}
 	b.used += value
 	return nil

@@ -3,19 +3,22 @@
 package topologyshape
 
 import (
-	"sort"
-
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 func topologyShortestPathUnion(
 	data *topologymodel.Data,
 	roots map[topologymodel.ActorHandle]struct{},
-) (map[topologymodel.ActorHandle]struct{}, map[topologyActorPair]struct{}) {
+	limiter worklimit.Limiter,
+) (map[topologymodel.ActorHandle]struct{}, map[topologyActorPair]struct{}, error) {
 	includedActors := make(map[topologymodel.ActorHandle]struct{})
 	includedPairs := make(map[topologyActorPair]struct{})
 	if data == nil || len(roots) < 2 {
-		return includedActors, includedPairs
+		return includedActors, includedPairs, nil
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return nil, nil, err
 	}
 
 	adjacency := make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{})
@@ -35,12 +38,17 @@ func topologyShortestPathUnion(
 		adjacency[dst][src] = struct{}{}
 	}
 
-	actorOrder := topologyActorLexicalOrder(data.Actors)
 	rootIDs := make([]topologymodel.ActorHandle, 0, len(roots))
 	for actorHandle := range roots {
 		rootIDs = append(rootIDs, actorHandle)
 	}
-	sort.Slice(rootIDs, func(i, j int) bool { return actorOrder[rootIDs[i]] < actorOrder[rootIDs[j]] })
+	traversal, err := worklimit.Sum(uint64(len(adjacency)), uint64(len(data.Links)), uint64(len(data.Links)))
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := limiter.ChargeProduct(uint64(len(rootIDs)), traversal); err != nil {
+		return nil, nil, err
+	}
 
 	for i := 0; i < len(rootIDs); i++ {
 		source := rootIDs[i]
@@ -48,43 +56,42 @@ func topologyShortestPathUnion(
 			continue
 		}
 
-		parents, distance := topologyShortestParents(adjacency, actorOrder, source)
+		parents, distance := topologyShortestParents(adjacency, source)
+		visited := make(map[topologymodel.ActorHandle]struct{})
+		stack := make([]topologymodel.ActorHandle, 0, len(rootIDs)-i-1)
 		for j := i + 1; j < len(rootIDs); j++ {
 			target := rootIDs[j]
 			if _, ok := distance[target]; !ok {
 				continue
 			}
+			stack = append(stack, target)
+		}
+		for len(stack) > 0 {
+			node := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if _, seen := visited[node]; seen {
+				continue
+			}
+			visited[node] = struct{}{}
+			includedActors[node] = struct{}{}
+			if node == source {
+				continue
+			}
 
-			visited := make(map[topologymodel.ActorHandle]struct{})
-			stack := []topologymodel.ActorHandle{target}
-			for len(stack) > 0 {
-				node := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-				if _, seen := visited[node]; seen {
-					continue
-				}
-				visited[node] = struct{}{}
-				includedActors[node] = struct{}{}
-				if node == source {
-					continue
-				}
-
-				for _, parent := range parents[node] {
-					includedActors[parent] = struct{}{}
-					includedPairs[topologyActorPair{src: node, dst: parent}] = struct{}{}
-					includedPairs[topologyActorPair{src: parent, dst: node}] = struct{}{}
-					stack = append(stack, parent)
-				}
+			for _, parent := range parents[node] {
+				includedActors[parent] = struct{}{}
+				includedPairs[topologyActorPair{src: node, dst: parent}] = struct{}{}
+				includedPairs[topologyActorPair{src: parent, dst: node}] = struct{}{}
+				stack = append(stack, parent)
 			}
 		}
 	}
 
-	return includedActors, includedPairs
+	return includedActors, includedPairs, nil
 }
 
 func topologyShortestParents(
 	adjacency map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{},
-	actorOrder map[topologymodel.ActorHandle]int,
 	source topologymodel.ActorHandle,
 ) (map[topologymodel.ActorHandle][]topologymodel.ActorHandle, map[topologymodel.ActorHandle]int) {
 	parents := make(map[topologymodel.ActorHandle][]topologymodel.ActorHandle)
@@ -93,12 +100,7 @@ func topologyShortestParents(
 
 	for head := 0; head < len(queue); head++ {
 		current := queue[head]
-		neighbors := make([]topologymodel.ActorHandle, 0, len(adjacency[current]))
 		for neighbor := range adjacency[current] {
-			neighbors = append(neighbors, neighbor)
-		}
-		sort.Slice(neighbors, func(i, j int) bool { return actorOrder[neighbors[i]] < actorOrder[neighbors[j]] })
-		for _, neighbor := range neighbors {
 			nextDepth := distance[current] + 1
 			currentDepth, seen := distance[neighbor]
 			if !seen {
@@ -111,10 +113,6 @@ func topologyShortestParents(
 				parents[neighbor] = append(parents[neighbor], current)
 			}
 		}
-	}
-
-	for node := range parents {
-		sort.Slice(parents[node], func(i, j int) bool { return actorOrder[parents[node][i]] < actorOrder[parents[node][j]] })
 	}
 
 	return parents, distance

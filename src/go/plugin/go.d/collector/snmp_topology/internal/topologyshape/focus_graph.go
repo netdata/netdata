@@ -3,9 +3,6 @@
 package topologyshape
 
 import (
-	"sort"
-	"strings"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
@@ -153,24 +150,4 @@ func collectTopologyFocusDepthSets(
 	}
 
 	return includedNonSegment, includedActorsByDepth
-}
-
-func topologyActorLexicalOrder(actors []topologymodel.Actor) map[topologymodel.ActorHandle]int {
-	type entry struct {
-		handle  topologymodel.ActorHandle
-		actorID string
-	}
-	entries := make([]entry, 0, len(actors))
-	for _, actor := range actors {
-		if actor.ActorHandle.IsZero() {
-			continue
-		}
-		entries = append(entries, entry{handle: actor.ActorHandle, actorID: strings.TrimSpace(actor.ActorID)})
-	}
-	sort.SliceStable(entries, func(i, j int) bool { return entries[i].actorID < entries[j].actorID })
-	order := make(map[topologymodel.ActorHandle]int, len(entries))
-	for i, entry := range entries {
-		order[entry.handle] = i
-	}
-	return order
 }

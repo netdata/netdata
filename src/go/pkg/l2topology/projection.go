@@ -42,7 +42,7 @@ type ProjectionPortVLAN = model.ProjectionPortVLAN
 
 // ToGraph converts an L2 topology result to the graph projection consumed by
 // topology producers.
-func ToGraph(result Result, opts GraphOptions) Projection {
+func ToGraph(result Result, opts GraphOptions) (Projection, error) {
 	return projector.ToGraph(result, opts)
 }
 

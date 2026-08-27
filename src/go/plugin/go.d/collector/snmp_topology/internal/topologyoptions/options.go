@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -37,6 +38,7 @@ type QueryOptions struct {
 	Depth                  int
 	ResolveDNSName         func(ip string) string
 	LookupVendorByMAC      func(mac string) (vendor string, prefix string)
+	WorkLimiter            worklimit.Limiter
 }
 
 type ManagedFocusTarget struct {

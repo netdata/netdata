@@ -6,6 +6,7 @@ import (
 	"time"
 
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
@@ -34,7 +35,10 @@ const (
 	snmpTopologyV1LinkBGP                = topologymodel.BGPAdjacencyLinkType
 )
 
-func Render(data topologymodel.Data) (topologyapi.Data, error) {
+func Render(data topologymodel.Data, limiter worklimit.Limiter) (topologyapi.Data, error) {
+	if err := chargeRenderWork(data, limiter); err != nil {
+		return topologyapi.Data{}, err
+	}
 	if err := data.ValidateActorHandles(); err != nil {
 		return topologyapi.Data{}, err
 	}

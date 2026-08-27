@@ -1667,7 +1667,8 @@ func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.
 			}, topologyengine.DiscoverOptions{EnableBridge: true})
 			require.NoError(t, err)
 
-			projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{Source: "snmp", Layer: "2"})
+			projection, err := topologyengine.ToGraph(result, topologyengine.GraphOptions{Source: "snmp", Layer: "2"})
+			require.NoError(t, err)
 			segments := 0
 			fdbLinks := 0
 			for _, actor := range projection.Graph.Actors {

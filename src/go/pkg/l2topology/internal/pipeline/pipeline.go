@@ -25,6 +25,9 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		opts.EnableLLDP = true
 		opts.EnableCDP = true
 	}
+	if err := chargePipelineInput(observations, opts); err != nil {
+		return model.Result{}, err
+	}
 
 	state := newL2BuildState(len(observations))
 	if err := state.registerObservations(observations); err != nil {
@@ -46,6 +49,9 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		state.applyARP(observations)
 	}
 
+	if err := chargeIdentityReconciliation(opts.WorkLimiter, state); err != nil {
+		return model.Result{}, err
+	}
 	identityAliasStats := reconcileDeviceIdentityAliases(
 		state.devices,
 		state.interfaces,
@@ -55,6 +61,9 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		state.directManagementIPByDeviceID,
 	)
 	state.markManagedDevices()
+	if err := chargePipelineResult(opts.WorkLimiter, state); err != nil {
+		return model.Result{}, err
+	}
 
 	return state.buildResult(identityAliasStats, opts.CollectedAt), nil
 }

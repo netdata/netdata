@@ -47,7 +47,7 @@ func TestApplyLayer3MatchesStandaloneEnrichmentSequence(t *testing.T) {
 
 	got := newData()
 	assignTopologyEnrichTestHandles(t, &got)
-	ApplyLayer3(&got, aggregate)
+	require.NoError(t, ApplyLayer3(&got, aggregate, nil))
 
 	require.Equal(t, want.Stats, got.Stats)
 	require.Equal(t, topologyActorIDsForLayer3Test(want.Actors), topologyActorIDsForLayer3Test(got.Actors))

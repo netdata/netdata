@@ -72,7 +72,7 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 		a.registry.enqueueReverseDNSWarm(dnsCandidates.collectedCandidates())
 	}
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, options.WorkLimiter)
 	if err != nil {
 		capture.finish(false, err)
 		return topologyv1.Data{}, false, err

@@ -5,13 +5,29 @@ package topologyshape
 import (
 	"sort"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
-func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOptions) {
+func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOptions) error {
 	if data == nil {
-		return
+		return nil
+	}
+	if limiter := options.WorkLimiter; limiter != nil {
+		items, err := worklimit.Sum(uint64(len(data.Actors)), uint64(len(data.Links)))
+		if err != nil {
+			return err
+		}
+		if err := limiter.ChargeProduct(items, 6); err != nil {
+			return err
+		}
+		if err := limiter.ChargeSort(uint64(len(data.Actors))); err != nil {
+			return err
+		}
+		if err := limiter.ChargeSort(uint64(len(data.Links))); err != nil {
+			return err
+		}
 	}
 	mapType := topologyoptions.NormalizeMapType(options.MapType)
 	options.MapType = mapType
@@ -53,4 +69,5 @@ func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOption
 	}
 	data.Stats.HasShape = true
 	topologymodel.RecomputeLinkStats(data)
+	return nil
 }

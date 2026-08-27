@@ -16,7 +16,10 @@ type topologyGraphForTest struct {
 }
 
 func toGraphForTest(result model.Result, opts model.GraphOptions) (topologyGraphForTest, model.ProjectionStats) {
-	projection := ToGraph(result, opts)
+	projection, err := ToGraph(result, opts)
+	if err != nil {
+		panic(err)
+	}
 	return topologyGraphForTest{
 		Graph:        projection.Graph,
 		ActorDetails: projection.ActorDetails,

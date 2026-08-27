@@ -92,6 +92,7 @@ func replayTopologyGraphV1(
 	options := topologyQueryOptionsFromDiagnostic(query.Options)
 	options.ResolveDNSName = dnsReplay.lookup
 	options.LookupVendorByMAC = ouiReplay.lookup
+	options.WorkLimiter = work.add
 
 	data, ok, err := buildSNMPTopologySnapshot(aggregate, options)
 	if err != nil {
@@ -117,11 +118,8 @@ func replayTopologyGraphV1(
 		return topologyv1.Data{}, false, errors.New("successful graph capture replayed without a topology")
 	}
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, options.WorkLimiter)
 	if err != nil {
-		return topologyv1.Data{}, false, err
-	}
-	if err := work.add(uint64(payload.Actors.Rows + payload.Links.Rows)); err != nil {
 		return topologyv1.Data{}, false, err
 	}
 	return payload, true, nil

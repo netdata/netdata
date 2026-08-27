@@ -13,7 +13,7 @@ import (
 func topologyStatsToV1ForTest(t *testing.T, stats topologymodel.Stats) map[string]any {
 	t.Helper()
 
-	payload, err := topologyv1renderer.Render(topologymodel.Data{Stats: stats})
+	payload, err := topologyv1renderer.Render(topologymodel.Data{Stats: stats}, nil)
 	require.NoError(t, err)
 	return payload.Stats
 }

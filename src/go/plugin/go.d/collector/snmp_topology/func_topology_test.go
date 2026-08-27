@@ -281,7 +281,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
@@ -473,7 +473,7 @@ func TestSNMPTopologyToV1_PrefersSNMPMetadataAndReconciledL2Primary(t *testing.T
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -534,7 +534,7 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
@@ -594,7 +594,7 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
@@ -648,7 +648,7 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -718,7 +718,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -838,7 +838,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetMembershipPresentationAndEvidence(t *
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -966,7 +966,7 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 	handles := assignSNMPTopologyTestHandles(t, &data)
 	data.Actors[0].Detail.OSPF[0].RemoteActorHandle = handles["router-b"]
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -1093,7 +1093,7 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 	handles := assignSNMPTopologyTestHandles(t, &data)
 	data.Actors[0].Detail.BGP[0].RemoteActorHandle = handles["router-b"]
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -1181,7 +1181,7 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	_, err := topologyv1renderer.Render(data)
+	_, err := topologyv1renderer.Render(data, nil)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "l3_subnet link 0 is missing subnet")
@@ -1237,7 +1237,7 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
@@ -1288,7 +1288,7 @@ func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T
 		"snmp":     "snmp",
 		"probable": "probable",
 	}
-	payload, err := topologyv1renderer.Render(topologymodel.Data{})
+	payload, err := topologyv1renderer.Render(topologymodel.Data{}, nil)
 	require.NoError(t, err)
 
 	for name, linkType := range tests {
@@ -1336,7 +1336,7 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.Contains(t, payload.Evidence, "fdb")
@@ -1414,7 +1414,7 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 	}
 
 	assignSNMPTopologyTestHandles(t, &data)
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.Contains(t, payload.Evidence, "lldp")

@@ -2,7 +2,13 @@
 
 package l2topology
 
-import "github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
+)
+
+// WorkLimiter rejects topology work before a bounded stage executes.
+type WorkLimiter = worklimit.Limiter
 
 // DiscoverOptions controls which normalized L2 observation families contribute
 // to the result.

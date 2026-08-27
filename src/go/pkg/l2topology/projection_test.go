@@ -4,6 +4,7 @@ package l2topology
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -41,6 +42,66 @@ func TestOptionalValueDistinguishesAbsentAndPresentZero(t *testing.T) {
 			require.Equal(t, tt.want, tt.value.Value)
 		})
 	}
+}
+
+func TestGraphKernelWorkLimiterRejectsBeforeBoundedStagesAndPreservesNilParity(t *testing.T) {
+	collectedAt := time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC)
+	observations := []L2Observation{{
+		DeviceID: "switch-a", Hostname: "switch-a", ManagementIP: "192.0.2.1",
+		ChassisID:  "00:11:22:33:44:55",
+		Interfaces: []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+	}}
+
+	unboundedResult, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	var normalizedWork uint64
+	boundedResult, err := BuildL2ResultFromObservations(observations, DiscoverOptions{
+		EnableLLDP: true,
+		WorkLimiter: func(units uint64) error {
+			normalizedWork += units
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	require.Positive(t, normalizedWork)
+	require.Equal(t, unboundedResult, boundedResult)
+
+	limitErr := errors.New("test work limit exhausted")
+	_, err = BuildL2ResultFromObservations(observations, DiscoverOptions{
+		EnableLLDP: true,
+		WorkLimiter: func(uint64) error {
+			return limitErr
+		},
+	})
+	require.ErrorIs(t, err, limitErr)
+
+	unboundedProjection, err := ToGraph(unboundedResult, GraphOptions{Source: "snmp", Layer: "2", CollectedAt: collectedAt})
+	require.NoError(t, err)
+	var projectedWork uint64
+	boundedProjection, err := ToGraph(unboundedResult, GraphOptions{
+		Source: "snmp", Layer: "2", CollectedAt: collectedAt,
+		WorkLimiter: func(units uint64) error {
+			projectedWork += units
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	require.Positive(t, projectedWork)
+	require.Equal(t, unboundedProjection, boundedProjection)
+
+	resolverCalled := false
+	_, err = ToGraph(unboundedResult, GraphOptions{
+		Source: "snmp", Layer: "2", CollectedAt: collectedAt,
+		ResolveDNSName: func(string) string {
+			resolverCalled = true
+			return ""
+		},
+		WorkLimiter: func(uint64) error {
+			return limitErr
+		},
+	})
+	require.ErrorIs(t, err, limitErr)
+	require.False(t, resolverCalled)
 }
 
 func TestToGraph_ReusesResultWithoutMutationOrProjectionAliasing(t *testing.T) {
@@ -139,8 +200,8 @@ func TestToGraph_ReusesResultWithoutMutationOrProjectionAliasing(t *testing.T) {
 		return data
 	}
 
-	referenceStrict := ToGraph(mustBuild(), strictOptions)
-	referenceProbable := ToGraph(mustBuild(), probableOptions)
+	referenceStrict := mustToGraph(t, mustBuild(), strictOptions)
+	referenceProbable := mustToGraph(t, mustBuild(), probableOptions)
 	referenceStrictJSON := mustJSON(referenceStrict)
 	referenceProbableJSON := mustJSON(referenceProbable)
 
@@ -150,11 +211,11 @@ func TestToGraph_ReusesResultWithoutMutationOrProjectionAliasing(t *testing.T) {
 		require.Equal(t, sharedResultJSON, mustJSON(sharedResult))
 	}
 
-	sharedStrict := ToGraph(sharedResult, strictOptions)
+	sharedStrict := mustToGraph(t, sharedResult, strictOptions)
 	assertResultUnchanged()
-	sharedProbable := ToGraph(sharedResult, probableOptions)
+	sharedProbable := mustToGraph(t, sharedResult, probableOptions)
 	assertResultUnchanged()
-	sharedStrictAgain := ToGraph(sharedResult, strictOptions)
+	sharedStrictAgain := mustToGraph(t, sharedResult, strictOptions)
 	assertResultUnchanged()
 
 	require.Equal(t, referenceStrict, sharedStrict)
@@ -163,11 +224,11 @@ func TestToGraph_ReusesResultWithoutMutationOrProjectionAliasing(t *testing.T) {
 	require.Equal(t, referenceProbableJSON, mustJSON(sharedProbable))
 	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrictAgain))
 
-	sharedProbableAgain := ToGraph(sharedResult, probableOptions)
+	sharedProbableAgain := mustToGraph(t, sharedResult, probableOptions)
 	assertResultUnchanged()
-	sharedStrictAfterProbable := ToGraph(sharedResult, strictOptions)
+	sharedStrictAfterProbable := mustToGraph(t, sharedResult, strictOptions)
 	assertResultUnchanged()
-	sharedProbableAfterStrict := ToGraph(sharedResult, probableOptions)
+	sharedProbableAfterStrict := mustToGraph(t, sharedResult, probableOptions)
 	assertResultUnchanged()
 	require.Equal(t, referenceProbableJSON, mustJSON(sharedProbableAgain))
 	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrictAfterProbable))
@@ -206,8 +267,8 @@ func TestToGraph_ReusesResultWithoutMutationOrProjectionAliasing(t *testing.T) {
 
 	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrict))
 	assertResultUnchanged()
-	require.Equal(t, referenceStrictJSON, mustJSON(ToGraph(sharedResult, strictOptions)))
-	require.Equal(t, referenceProbableJSON, mustJSON(ToGraph(sharedResult, probableOptions)))
+	require.Equal(t, referenceStrictJSON, mustJSON(mustToGraph(t, sharedResult, strictOptions)))
+	require.Equal(t, referenceProbableJSON, mustJSON(mustToGraph(t, sharedResult, probableOptions)))
 }
 
 func TestProjectionPreservesSelectedManagementIPAfterARPAliasReconciliation(t *testing.T) {
@@ -243,7 +304,7 @@ func TestProjectionPreservesSelectedManagementIPAfterARPAliasReconciliation(t *t
 	require.NoError(t, err)
 	require.Len(t, result.Devices, 2)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion: "1.0.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -293,7 +354,7 @@ func TestProjectionDoesNotCollapseSelectedIPOwnerWithConflictingARPAlias(t *test
 	}, DiscoverOptions{EnableARP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion:      "1.0.0",
 		Source:             "snmp",
 		Layer:              "2",
@@ -336,7 +397,7 @@ func TestProjectionDoesNotReintroduceRejectedCDPAddressAsEndpointIdentity(t *tes
 	}, DiscoverOptions{EnableCDP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion: "1.0.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -386,7 +447,7 @@ func TestProjectionPreservesObservedCDPIfIndexAcrossNumericNameCollision(t *test
 	}, DiscoverOptions{EnableCDP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	require.Len(t, projection.Graph.Links, 1)
 	link := projection.Graph.Links[0]
 	require.Equal(t, "cdp", link.Protocol)
@@ -416,7 +477,7 @@ func TestProjectionDoesNotInferIfIndexFromNumericLLDPRawPortID(t *testing.T) {
 	}, DiscoverOptions{EnableLLDP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	require.Len(t, projection.Graph.Links, 1)
 	link := projection.Graph.Links[0]
 	require.Equal(t, "lldp", link.Protocol)
@@ -447,7 +508,7 @@ func TestProjectionDoesNotInferIfIndexFromNumericCDPRemotePort(t *testing.T) {
 	}, DiscoverOptions{EnableCDP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	require.Len(t, projection.Graph.Links, 1)
 	link := projection.Graph.Links[0]
 	require.Equal(t, "cdp", link.Protocol)
@@ -488,7 +549,7 @@ func TestProjectionKeepsLinkEndpointIPHintsConstantSized(t *testing.T) {
 	}}, DiscoverOptions{EnableLLDP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion: "1.0.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -556,7 +617,7 @@ func TestProjectionKeepsFDBLinkEndpointIPHintsConstantSized(t *testing.T) {
 	}}, DiscoverOptions{EnableBridge: true, EnableARP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion: "1.0.0",
 		Source:        "snmp",
 		Layer:         "2",
@@ -625,7 +686,7 @@ func TestProjectionKeepsFDBSegmentEndpointIPHintsConstantSized(t *testing.T) {
 	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true, EnableARP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion:             "1.0.0",
 		Source:                    "snmp",
 		Layer:                     "2",
@@ -709,7 +770,7 @@ func TestProjectionCorrelatesQBridgeFDBWithVLANScopedSTPSegment(t *testing.T) {
 	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion:     "1.0.0",
 		Source:            "snmp",
 		Layer:             "2",
@@ -797,7 +858,7 @@ func TestProjectionCoalescesOverlappingFDBSourcesBeforeAssignment(t *testing.T) 
 			result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
 			require.NoError(t, err)
 
-			projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+			projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 			var segments []ProjectionSegmentActorDetail
 			fdbLinks := 0
 			for _, detail := range projection.ActorDetails {
@@ -840,7 +901,7 @@ func TestProjectionKeepsUnmappedFDBBasePortOpaque(t *testing.T) {
 	}, DiscoverOptions{EnableBridge: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	bridgeLinks := 0
 	directFDBLinks := 0
 	for _, link := range projection.Graph.Links {
@@ -899,7 +960,7 @@ func TestProjectionPairwiseCoalescesOverlappingFDBSources(t *testing.T) {
 		"cdp_fdb_hybrid",
 	} {
 		t.Run(strategy, func(t *testing.T) {
-			projection := ToGraph(result, GraphOptions{
+			projection := mustToGraph(t, result, GraphOptions{
 				Source:            "snmp",
 				Layer:             "2",
 				InferenceStrategy: strategy,
@@ -946,7 +1007,7 @@ func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {
 	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		Source:            "snmp",
 		Layer:             "2",
 		InferenceStrategy: "stp_parent_tree",
@@ -990,7 +1051,7 @@ func TestProjectionDeduplicatesDirectSTPAcrossVLANScopes(t *testing.T) {
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	stpLinks := 0
 	stpLinkIndex := -1
 	for i := range projection.Graph.Links {
@@ -1030,7 +1091,7 @@ func TestProjectionKeepsUnresolvedSTPPortsInBridgePortNamespace(t *testing.T) {
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	var stpLinks []int
 	for i := range projection.Graph.Links {
 		if projection.Graph.Links[i].LinkType == "stp" {
@@ -1073,7 +1134,7 @@ func TestProjectionDisplaysDecodedUnresolvedSTPTargetPort(t *testing.T) {
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	for _, link := range projection.Graph.Links {
 		if link.LinkType != "stp" {
 			continue
@@ -1109,7 +1170,7 @@ func TestProjectionPreservesMappedSTPIfIndexWithoutInterfaceName(t *testing.T) {
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	for _, link := range projection.Graph.Links {
 		if link.LinkType != "stp" {
 			continue
@@ -1146,7 +1207,7 @@ func TestProjectionDoesNotResolveEncodedSTPPortAsInterfaceName(t *testing.T) {
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	for _, link := range projection.Graph.Links {
 		if link.LinkType != "stp" {
 			continue
@@ -1193,7 +1254,7 @@ func TestProjectionDoesNotReresolveObservedSTPIfIndexAsInterfaceName(t *testing.
 	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	for _, link := range projection.Graph.Links {
 		if link.LinkType != "stp" {
 			continue
@@ -1234,7 +1295,7 @@ func TestProjectionDoesNotReresolveObservedSTPSourceIfIndexAsInterfaceName(t *te
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	for _, link := range projection.Graph.Links {
 		if link.LinkType != "stp" {
 			continue
@@ -1275,7 +1336,7 @@ func TestProjectionDeduplicatesReciprocalSTPWithOnlyBridgePortIdentity(t *testin
 	}, DiscoverOptions{EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	stpLinks := 0
 	for _, link := range projection.Graph.Links {
 		if link.LinkType == "stp" {
@@ -1299,7 +1360,7 @@ func TestProjectionKeepsDistinctSTPLinksWithoutPortIdentity(t *testing.T) {
 		},
 	}
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2"})
 	stpLinks := 0
 	for _, link := range projection.Graph.Links {
 		if link.LinkType == "stp" {
@@ -1307,6 +1368,13 @@ func TestProjectionKeepsDistinctSTPLinksWithoutPortIdentity(t *testing.T) {
 		}
 	}
 	require.Equal(t, 2, stpLinks)
+}
+
+func mustToGraph(t testing.TB, result Result, options GraphOptions) Projection {
+	t.Helper()
+	projection, err := ToGraph(result, options)
+	require.NoError(t, err)
+	return projection
 }
 
 func TestProjectionDoesNotCorrelateAmbiguousVLANAliasWithSTP(t *testing.T) {
@@ -1330,7 +1398,7 @@ func TestProjectionDoesNotCorrelateAmbiguousVLANAliasWithSTP(t *testing.T) {
 	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2", InferenceStrategy: "stp_parent_tree"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2", InferenceStrategy: "stp_parent_tree"})
 	segments := make([]ProjectionSegmentActorDetail, 0, 2)
 	for _, detail := range projection.ActorDetails {
 		if detail.Segment.SegmentID != "" {
@@ -1362,7 +1430,7 @@ func TestProjectionDoesNotTreatDomainlessSTPAsQBridgeWildcard(t *testing.T) {
 	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
 	require.NoError(t, err)
 
-	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2", InferenceStrategy: "stp_parent_tree"})
+	projection := mustToGraph(t, result, GraphOptions{Source: "snmp", Layer: "2", InferenceStrategy: "stp_parent_tree"})
 	var segments []ProjectionSegmentActorDetail
 	for _, detail := range projection.ActorDetails {
 		if detail.Segment.SegmentID != "" {
@@ -1412,7 +1480,7 @@ func TestProjectionPairwiseMultiDomainIsDeterministic(t *testing.T) {
 		}
 		result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true, CollectedAt: collectedAt})
 		require.NoError(t, err)
-		projection := ToGraph(result, GraphOptions{
+		projection := mustToGraph(t, result, GraphOptions{
 			Source:            "snmp",
 			Layer:             "2",
 			CollectedAt:       collectedAt,
@@ -1464,7 +1532,7 @@ func TestProjectionResolvesConstantEndpointHintsPastSharedPrimary(t *testing.T) 
 
 	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
 	require.NoError(t, err)
-	projection := ToGraph(result, GraphOptions{
+	projection := mustToGraph(t, result, GraphOptions{
 		SchemaVersion: "1.0.0",
 		Source:        "snmp",
 		Layer:         "2",

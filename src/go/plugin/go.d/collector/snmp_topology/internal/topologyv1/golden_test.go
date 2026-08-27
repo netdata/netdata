@@ -28,7 +28,7 @@ const snmpTopologyV1GoldenPayloadPath = "../../testdata/topology_v1_normalized_g
 // Refresh with:
 // go test -count=1 ./plugin/go.d/collector/snmp_topology/internal/topologyv1 -run TestSNMPTopologyToV1_NormalizedGolden -update-snmp-topology-v1-golden
 func TestSNMPTopologyToV1_NormalizedGolden(t *testing.T) {
-	data, err := Render(snmpTopologyV1GoldenInput(t))
+	data, err := Render(snmpTopologyV1GoldenInput(t), nil)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(data))
 

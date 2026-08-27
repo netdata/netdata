@@ -4,6 +4,7 @@ package topologyv1
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestRenderRejectsInvalidActorHandles(t *testing.T) {
 
 	for name, data := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := Render(data)
+			_, err := Render(data, nil)
 			require.Error(t, err)
 		})
 	}
@@ -62,15 +63,42 @@ func TestRenderIsDeterministicForProducerLabels(t *testing.T) {
 		}},
 	}
 
-	first, err := Render(data)
+	first, err := Render(data, nil)
 	require.NoError(t, err)
 	want, err := json.Marshal(first)
 	require.NoError(t, err)
 	for range 100 {
-		next, err := Render(data)
+		next, err := Render(data, nil)
 		require.NoError(t, err)
 		got, err := json.Marshal(next)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
 	}
+}
+
+func TestRenderWorkLimiterPreservesOutputAndRejectsBeforeRendering(t *testing.T) {
+	data := topologymodel.Data{
+		AgentID:     "agent-a",
+		CollectedAt: time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC),
+		Actors: []topologymodel.Actor{{
+			ActorHandle: topologyV1TestActorHandle("limited-device"),
+			ActorID:     "limited-device",
+			ActorType:   "device",
+			Labels:      map[string]string{"site": "lab"},
+		}},
+	}
+	unbounded, err := Render(data, nil)
+	require.NoError(t, err)
+	var charged uint64
+	bounded, err := Render(data, func(units uint64) error {
+		charged += units
+		return nil
+	})
+	require.NoError(t, err)
+	require.Positive(t, charged)
+	require.Equal(t, unbounded, bounded)
+
+	limitErr := errors.New("render work exhausted")
+	_, err = Render(data, func(uint64) error { return limitErr })
+	require.ErrorIs(t, err, limitErr)
 }

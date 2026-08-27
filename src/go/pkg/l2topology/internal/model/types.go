@@ -5,6 +5,8 @@ package model
 import (
 	"net/netip"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 // DiscoverOptions controls which normalized L2 observation families contribute
@@ -16,6 +18,7 @@ type DiscoverOptions struct {
 	EnableARP    bool
 	EnableSTP    bool
 	CollectedAt  time.Time
+	WorkLimiter  worklimit.Limiter
 }
 
 // Result is the deterministic L2 topology result derived from normalized

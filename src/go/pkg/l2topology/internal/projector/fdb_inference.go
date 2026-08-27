@@ -109,8 +109,8 @@ func inferFDBPairwiseBridgeLinks(
 					// exactly one reciprocal managed-alias learning port in this scope.
 					continue
 				}
-				leftPort := firstSortedBridgePort(leftPorts)
-				rightPort := firstSortedBridgePort(rightPorts)
+				leftPort := onlyBridgePort(leftPorts)
+				rightPort := onlyBridgePort(rightPorts)
 				if bridgePortObservationKey(leftPort) == "" || bridgePortObservationKey(rightPort) == "" {
 					continue
 				}
@@ -179,14 +179,12 @@ func compatiblePairwiseScopes(
 	return scopes
 }
 
-func firstSortedBridgePort(ports map[string]bridgePortRef) bridgePortRef {
-	if len(ports) == 0 {
+func onlyBridgePort(ports map[string]bridgePortRef) bridgePortRef {
+	if len(ports) != 1 {
 		return bridgePortRef{}
 	}
-	keys := make([]string, 0, len(ports))
-	for key := range ports {
-		keys = append(keys, key)
+	for _, port := range ports {
+		return port
 	}
-	sort.Strings(keys)
-	return ports[keys[0]]
+	return bridgePortRef{}
 }

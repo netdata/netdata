@@ -61,7 +61,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.NotNil(t, payload.Stats)
 
@@ -196,7 +196,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(data, nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, payload.Stats["l3_subnet_candidate_links"])
 	require.Equal(t, 0, payload.Stats["l3_subnet_emitted_links"])

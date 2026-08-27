@@ -162,11 +162,12 @@ func TestToGraph_ProjectsTypedActorDetailsWithFieldPresence(t *testing.T) {
 		},
 	}
 
-	projection := ToGraph(result, model.GraphOptions{
+	projection, err := ToGraph(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
+	require.NoError(t, err)
 
 	actor := findActorBySysName(projection.Graph.Actors, "sw1")
 	require.NotNil(t, actor)
@@ -1459,11 +1460,12 @@ func TestToGraph_KeepsSameTrunkEndpointInDistinctRawForwardingDomains(t *testing
 		},
 	}
 
-	projection := ToGraph(result, model.GraphOptions{
+	projection, err := ToGraph(result, model.GraphOptions{
 		Source: "snmp",
 		Layer:  "2",
 		View:   "summary",
 	})
+	require.NoError(t, err)
 
 	segmentIDs := make([]string, 0, 2)
 	for _, detail := range projection.ActorDetails {

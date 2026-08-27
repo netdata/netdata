@@ -212,14 +212,35 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 
 // ToGraph converts an L2 topology result to the graph projection consumed by
 // topology producers.
-func ToGraph(result model.Result, opts model.GraphOptions) model.Projection {
+func ToGraph(result model.Result, opts model.GraphOptions) (model.Projection, error) {
+	if err := chargeProjectionPreparation(result, opts.WorkLimiter); err != nil {
+		return model.Projection{}, err
+	}
 	builder := newGraphBuilder(result, opts)
 	builder.prepareIndexes()
+	if err := chargeBridgeCollection(result, builder.strategyConfig, opts.WorkLimiter); err != nil {
+		return model.Projection{}, err
+	}
 	builder.collectBridgeTopologyInputs()
+	if err := chargeLinearProjectionStage(opts.WorkLimiter, len(result.Devices)); err != nil {
+		return model.Projection{}, err
+	}
 	builder.buildDeviceActors()
+	if err := chargeLinearProjectionStage(opts.WorkLimiter, len(result.Adjacencies)); err != nil {
+		return model.Projection{}, err
+	}
 	builder.projectAdjacencyTopology()
+	if err := chargeLinearProjectionStage(opts.WorkLimiter, len(result.Attachments), len(result.Enrichments)); err != nil {
+		return model.Projection{}, err
+	}
 	builder.buildEndpointTopology()
+	if err := chargeSegmentProjection(builder); err != nil {
+		return model.Projection{}, err
+	}
 	builder.buildSegmentTopology()
+	if err := chargeProjectionFinalization(builder); err != nil {
+		return model.Projection{}, err
+	}
 	builder.finalizeGraph()
 	builder.buildStats()
 	graphData := builder.graph()
@@ -227,5 +248,5 @@ func ToGraph(result model.Result, opts model.GraphOptions) model.Projection {
 		Graph:        graphData,
 		Stats:        builder.stats,
 		ActorDetails: builder.actorDetails(),
-	}
+	}, nil
 }

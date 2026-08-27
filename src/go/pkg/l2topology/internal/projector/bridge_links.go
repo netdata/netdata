@@ -224,12 +224,7 @@ func collectBridgeMacLinkRecords(
 	records := make([]bridgeMacLinkRecord, 0, len(attachments))
 	seen := make(map[string]struct{}, len(attachments))
 
-	attachmentsSorted := append([]model.Attachment(nil), attachments...)
-	sort.SliceStable(attachmentsSorted, func(i, j int) bool {
-		return bridgeAttachmentSortKey(attachmentsSorted[i]) < bridgeAttachmentSortKey(attachmentsSorted[j])
-	})
-
-	for _, attachment := range attachmentsSorted {
+	for _, attachment := range attachments {
 		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
 		portKey := bridgePortRefKey(port, false, true)
 		endpointID := strings.TrimSpace(attachment.EndpointID)

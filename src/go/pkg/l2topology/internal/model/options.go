@@ -2,7 +2,11 @@
 
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
+)
 
 // GraphOptions controls conversion from Result to the internal graph projection.
 type GraphOptions struct {
@@ -19,4 +23,5 @@ type GraphOptions struct {
 	EliminateNonIPInferred    bool
 	ProbabilisticConnectivity bool
 	InferenceStrategy         string
+	WorkLimiter               worklimit.Limiter
 }
