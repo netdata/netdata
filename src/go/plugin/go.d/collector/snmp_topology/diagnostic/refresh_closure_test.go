@@ -81,6 +81,55 @@ func TestRefreshClosureV1_EnforcesLimitsOnPreviousGeneration(t *testing.T) {
 	require.ErrorContains(t, validateRefreshCapabilityGraphV1(root, source, limits), "device count exceeds limit 1")
 }
 
+func TestRefreshClosureV1_BindsUnpublishedOutcomeClass(t *testing.T) {
+	tests := map[string]struct {
+		publication string
+		outcome     string
+	}{
+		"canceled publication rejects panic outcome": {
+			publication: RefreshPublicationCanceled,
+			outcome:     RefreshOutcomePanicNotStarted,
+		},
+		"panic publication rejects canceled outcome": {
+			publication: RefreshPublicationPanic,
+			outcome:     RefreshOutcomeCanceledInFlight,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			root, source := unpublishedRefreshClosureFixture(t, tc.publication, tc.outcome)
+			require.ErrorContains(t, validateRefreshCapabilityGraphV1(
+				root, source, testReaderLimits(),
+			), "does not match publication state")
+		})
+	}
+}
+
+func unpublishedRefreshClosureFixture(t *testing.T, publication, outcome string) (CapabilityRootV1, MemorySource) {
+	t.Helper()
+	sweep := RefreshSweepV1{
+		CaptureID: 1, StartedAt: "2026-08-27T12:00:00Z", FinishedAt: "2026-08-27T12:00:01Z",
+		PreviousGeneration: GenerationReferenceV1{State: GenerationReferenceNone},
+		Registrations: []RefreshRegistrationV1{{
+			Registration: 1,
+			Device:       RefreshDeviceIdentityV1{Hostname: "192.0.2.1", Port: 161, SNMPVersion: "2c"},
+			Selection:    RefreshSelectionDue, TargetResolution: TargetResolutionNotAttempted, Outcome: outcome,
+		}},
+		Publication: RefreshPublicationV1{
+			State: publication, Generation: GenerationReferenceV1{State: GenerationReferenceNone},
+		},
+	}
+	sweepRef, sweepData, err := Seal(MemberType{Kind: KindRefreshSweep, Schema: SchemaV1}, sweep)
+	require.NoError(t, err)
+	return CapabilityRootV1{
+		Capability: RefreshCapabilityV1(), State: StateFailed,
+		Sections: []SectionInventoryV1{
+			{Name: RefreshSectionGeneration, State: StateNotApplicable},
+			{Name: RefreshSectionSweep, State: StateSuccess, ExpectedRecords: 1, Members: []ContentRef{sweepRef}},
+		},
+	}, MemorySource{sweepRef.Key(): sweepData}
+}
+
 func publishedRefreshClosureFixture(
 	t *testing.T,
 	outcome, state string,

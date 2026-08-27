@@ -539,6 +539,33 @@ func TestRecorder_SinkPanicReleasesAdmissionAndFailsHandle(t *testing.T) {
 	require.ErrorContains(t, handleErr, "sink panicked")
 }
 
+func TestRecorder_TerminalizationPanicReleasesOwnership(t *testing.T) {
+	recorder := newTestRecorder(t, &MemorySink{}, 1)
+	txn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, txn.DefineSection("leaf", StateSuccess, 1))
+	handle, err := txn.AddOwned(
+		"leaf",
+		MemberType{Kind: "semantic_leaf", Schema: SchemaV1},
+		testLeaf{ID: "leaf-a"},
+		32,
+	)
+	require.NoError(t, err)
+
+	// Same-package corruption supplies a deterministic panic inside the
+	// terminalization boundary without adding a production test hook.
+	txn.sections["leaf"] = nil
+	require.ErrorContains(t, txn.Commit(StateSuccess), "terminalization panicked")
+	_, handleErr, state := handle.Resolve()
+	require.Equal(t, HandleFailed, state)
+	require.ErrorContains(t, handleErr, "terminalization panicked")
+
+	next, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, next.Abort(errors.New("done")))
+	recorder.Close()
+}
+
 type rejectingCaptureSink struct {
 	err error
 }

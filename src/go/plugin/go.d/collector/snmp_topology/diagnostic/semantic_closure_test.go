@@ -54,6 +54,22 @@ func TestSemanticBGPPeerV1_RejectsValuesHiddenBehindAbsentOptionals(t *testing.T
 	require.ErrorContains(t, peer.Validate(), "absent BGP state")
 }
 
+func TestSemanticBGPPeerV1_ValidatesStructuralOrigin(t *testing.T) {
+	require.NoError(t, (SemanticBGPPeerV1{Kind: "peer", OriginProfileID: "vendor-a/_bgp.yaml"}).Validate())
+	for _, origin := range []string{"/stock/vendor-a/_bgp.yaml", "../vendor-a/_bgp.yaml", `vendor-a\_bgp.yaml`} {
+		require.Error(t, (SemanticBGPPeerV1{Kind: "peer", OriginProfileID: origin}).Validate())
+	}
+}
+
+func TestSemanticRecordV1_RejectsUnreplayableVLANOutcomeStates(t *testing.T) {
+	for _, state := range []TerminalState{StateEmpty, StateNotApplicable} {
+		record := SemanticRecordV1{
+			Kind: "vlan_outcome", VLANID: "100", State: state, Reason: "collection_failed",
+		}
+		require.ErrorContains(t, record.Validate(), "invalid vlan_outcome")
+	}
+}
+
 func TestSemanticClosureV1_EnforcesDeviceStructuralLimits(t *testing.T) {
 	device := SemanticDeviceV1{
 		CaptureID: 1, Registration: 1, CollectedAt: "2026-08-27T12:00:00Z",

@@ -380,11 +380,7 @@ func diagnosticProfileEvidence(
 	}
 	origins := make([]string, 0, len(projected.BGP))
 	for _, row := range projected.BGP {
-		origin := row.OriginProfileID
-		if origin != "" {
-			origin = filepath.Base(origin)
-		}
-		origins = append(origins, origin)
+		origins = append(origins, row.OriginProfileID)
 	}
 	evidence := diagnostic.ProfileDefinitionEvidenceV1{
 		Encoding: "netdata.ddsnmp-topology-profile-evidence-yaml/v1", EffectiveDefinition: string(encoded),

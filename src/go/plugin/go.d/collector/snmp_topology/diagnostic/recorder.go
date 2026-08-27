@@ -665,12 +665,26 @@ func (t *CaptureTransaction) finish(state TerminalState, abortErr error) (result
 
 	t.mu.Lock()
 	locked := true
+	reservationOwned := true
+	var pending []pendingMember
 	defer func() {
 		if recovered := recover(); recovered != nil {
+			err := fmt.Errorf("diagnostic transaction terminalization panicked: %v", recovered)
 			if locked {
+				t.closed = true
+				pending = t.members
+				t.members = nil
+				t.sections = nil
 				t.mu.Unlock()
+				locked = false
 			}
-			resultErr = fmt.Errorf("diagnostic transaction terminalization panicked: %v", recovered)
+			if reservationOwned {
+				failPendingMembers(pending, err)
+				<-t.recorder.admission
+				t.recorder.active.Done()
+				reservationOwned = false
+			}
+			resultErr = err
 		}
 	}()
 	if t.closed {
@@ -709,6 +723,7 @@ func (t *CaptureTransaction) finish(state TerminalState, abortErr error) (result
 		terminalErr:   t.terminalErr,
 		abortErr:      abortErr,
 	}
+	pending = job.members
 	t.closed = true
 	t.members = nil
 	t.sections = nil
@@ -719,17 +734,15 @@ func (t *CaptureTransaction) finish(state TerminalState, abortErr error) (result
 	// from future implementation changes without ever blocking this call.
 	select {
 	case t.recorder.jobs <- job:
+		reservationOwned = false
 		t.recorder.active.Done()
 		return nil
 	default:
 		err := errors.New("reserved diagnostic terminal queue position was unavailable")
-		for _, member := range job.members {
-			if member.handle.future != nil {
-				member.handle.future.resolve(ContentRef{}, nil, err)
-			}
-		}
+		failPendingMembers(job.members, err)
 		<-t.recorder.admission
 		t.recorder.active.Done()
+		reservationOwned = false
 		return err
 	}
 }

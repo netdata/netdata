@@ -58,6 +58,29 @@ func TestDiagnosticProfileEvidence_UsesExplicitTopologyProjection(t *testing.T) 
 	assert.NotEqual(t, want.DefinitionSHA256, changed.DefinitionSHA256)
 }
 
+func TestDiagnosticProfileEvidence_PreservesBGPStructuralOrigin(t *testing.T) {
+	profile := func(origin string) *ddsnmp.Profile {
+		return &ddsnmp.Profile{
+			SourceFile: "/stock/profiles/device.yaml",
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{{
+					OriginProfileID: origin,
+					Kind:            ddprofiledefinition.BGPRowKindPeer,
+				}},
+			},
+		}
+	}
+
+	left, err := diagnosticProfileEvidence(1, 1, "main", "", 0, profile("vendor-a/_bgp.yaml"))
+	require.NoError(t, err)
+	right, err := diagnosticProfileEvidence(1, 1, "main", "", 0, profile("vendor-b/_bgp.yaml"))
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"vendor-a/_bgp.yaml"}, left.Definition.BGPOriginProfileIDs)
+	require.Equal(t, []string{"vendor-b/_bgp.yaml"}, right.Definition.BGPOriginProfileIDs)
+	require.NotEqual(t, left.DefinitionSHA256, right.DefinitionSHA256)
+}
+
 func TestCollectorDiagnosticCapture_ReplaysProductionSemanticPathAndExcludesCredentials(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

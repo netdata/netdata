@@ -25,6 +25,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/diagnostic"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -800,12 +801,17 @@ func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
 			return nil, nil
 		}
 
-		require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
+		got, state := coll.resolveDeviceTargetManagementIPsWithState(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "::ffff:192.0.2.10",
-		}))
-		require.Empty(t, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
+		})
+		require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, got)
+		require.Equal(t, diagnostic.TargetResolutionLiteral, state)
+
+		got, state = coll.resolveDeviceTargetManagementIPsWithState(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "127.0.0.1",
-		}))
+		})
+		require.Empty(t, got)
+		require.Equal(t, diagnostic.TargetResolutionLiteral, state)
 	})
 
 	t.Run("DNS target uses bounded deterministic eligible result", func(t *testing.T) {
@@ -825,7 +831,7 @@ func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
 			}, nil
 		}
 
-		got := coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
+		got, state := coll.resolveDeviceTargetManagementIPsWithState(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "switch.example",
 			Timeout:  5,
 		})
@@ -834,6 +840,7 @@ func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
 			netip.MustParseAddr("10.0.0.20"),
 			netip.MustParseAddr("198.51.100.20"),
 		}, got)
+		require.Equal(t, diagnostic.TargetResolutionResolved, state)
 		require.Equal(t, 1, calls)
 	})
 
@@ -843,9 +850,11 @@ func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
 			return nil, errors.New("lookup failed")
 		}
 
-		require.Empty(t, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
+		got, state := coll.resolveDeviceTargetManagementIPsWithState(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "switch.example",
-		}))
+		})
+		require.Empty(t, got)
+		require.Equal(t, diagnostic.TargetResolutionFailed, state)
 	})
 }
 
@@ -1082,13 +1091,14 @@ func TestCollectorResolveDeviceTargetManagementIPsHonorsShorterDeviceTimeout(t *
 
 	parent := context.Background()
 	started := time.Now()
-	got := coll.resolveDeviceTargetManagementIPs(parent, ddsnmp.DeviceConnectionInfo{
+	got, state := coll.resolveDeviceTargetManagementIPsWithState(parent, ddsnmp.DeviceConnectionInfo{
 		Hostname: "switch.example",
 		Timeout:  1,
 	})
 	elapsed := time.Since(started)
 
 	require.Empty(t, got)
+	require.Equal(t, diagnostic.TargetResolutionTimedOut, state)
 	require.GreaterOrEqual(t, elapsed, 750*time.Millisecond)
 	require.Less(t, elapsed, 2*time.Second)
 	require.NoError(t, parent.Err())

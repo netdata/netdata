@@ -607,11 +607,6 @@ func (c *Collector) currentTime() time.Time {
 	return time.Now()
 }
 
-func (c *Collector) resolveDeviceTargetManagementIPs(ctx context.Context, dev ddsnmp.DeviceConnectionInfo) []netip.Addr {
-	addrs, _ := c.resolveDeviceTargetManagementIPsWithState(ctx, dev)
-	return addrs
-}
-
 func (c *Collector) resolveDeviceTargetManagementIPsWithState(
 	ctx context.Context,
 	dev ddsnmp.DeviceConnectionInfo,

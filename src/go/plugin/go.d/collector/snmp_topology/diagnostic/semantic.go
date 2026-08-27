@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -191,7 +192,7 @@ func (e ProfileDefinitionEvidenceV1) Validate() error {
 		if origin == "" {
 			continue
 		}
-		if err := validatePortableOrigin(origin); err != nil {
+		if err := validatePortableRelativeOrigin(origin); err != nil {
 			return fmt.Errorf("bgp_origin_profile_ids[%d]: %w", i, err)
 		}
 	}
@@ -277,7 +278,9 @@ func (r SemanticRecordV1) Validate() error {
 			return errors.New("failed BGP outcome requires collection_failed reason")
 		}
 	case "vlan_outcome":
-		if strings.TrimSpace(r.VLANID) == "" || !r.State.valid() || r.Profile != 0 || r.Metadata != nil || r.Tags != nil ||
+		if strings.TrimSpace(r.VLANID) == "" ||
+			(r.State != StateSuccess && r.State != StateFailed && r.State != StateIncomplete) ||
+			r.Profile != 0 || r.Metadata != nil || r.Tags != nil ||
 			r.TopologyKind != "" || r.BGP != nil {
 			return errors.New("invalid vlan_outcome record")
 		}
@@ -329,6 +332,11 @@ type SemanticBGPPeerV1 struct {
 func (p SemanticBGPPeerV1) Validate() error {
 	if p.Kind == "" {
 		return errors.New("BGP row kind is required")
+	}
+	if p.OriginProfileID != "" {
+		if err := validatePortableRelativeOrigin(p.OriginProfileID); err != nil {
+			return fmt.Errorf("origin_profile_id: %w", err)
+		}
 	}
 	if !p.AdminEnabled.Has && p.AdminEnabled.Value {
 		return errors.New("absent BGP admin_enabled must carry the zero value")
@@ -385,6 +393,19 @@ func validateCanonicalTime(value string) error {
 func validatePortableOrigin(value string) error {
 	if value == "" || filepath.Base(value) != value || strings.Contains(value, "..") || strings.ContainsAny(value, `/\\`) {
 		return fmt.Errorf("profile origin %q is not portable", value)
+	}
+	return nil
+}
+
+func validatePortableRelativeOrigin(value string) error {
+	if value == "" || path.IsAbs(value) || path.Clean(value) != value ||
+		strings.ContainsRune(value, 0) || strings.ContainsAny(value, `\:`) {
+		return fmt.Errorf("profile origin %q is not a portable relative path", value)
+	}
+	for _, component := range strings.Split(value, "/") {
+		if component == "" || component == "." || component == ".." {
+			return fmt.Errorf("profile origin %q is not a portable relative path", value)
+		}
 	}
 	return nil
 }

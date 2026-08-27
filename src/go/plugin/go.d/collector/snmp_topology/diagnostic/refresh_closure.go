@@ -126,8 +126,24 @@ func validateRefreshCapabilityGraphV1(root CapabilityRootV1, source MemberSource
 			generationSection.ExpectedRecords != 0 || len(generationSection.Members) != 0 {
 			return errors.New("unpublished refresh sweep has an invalid generation section")
 		}
+		for _, registration := range sweep.Registrations {
+			if !refreshOutcomeMatchesPublication(registration.Outcome, sweep.Publication.State) {
+				return fmt.Errorf("refresh outcome %q does not match publication state %q", registration.Outcome, sweep.Publication.State)
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported refresh publication state %q", sweep.Publication.State)
 	}
 	return nil
+}
+
+func refreshOutcomeMatchesPublication(outcome, publication string) bool {
+	switch publication {
+	case RefreshPublicationCanceled:
+		return outcome != RefreshOutcomePanicInFlight && outcome != RefreshOutcomePanicNotStarted
+	case RefreshPublicationPanic:
+		return outcome != RefreshOutcomeCanceledInFlight && outcome != RefreshOutcomeCanceledNotStarted
+	default:
+		return true
+	}
 }
