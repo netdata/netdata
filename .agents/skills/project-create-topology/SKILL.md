@@ -489,10 +489,16 @@ schema and closures in that directory.
   `applyTopologySemanticStream` and the same primitive builder operations. Do
   not add a second topology algorithm or a marshal/unmarshal-back production
   path.
+- **Refresh closure:** `refresh_sweep@1` MUST inventory the complete
+  registration-ordered plan, including skipped registrations and terminal
+  canceled/panic outcomes. A published sweep owns its resulting generation;
+  unpublished sweeps MUST NOT synthesize one. Generation rows MUST distinguish
+  refreshed, retained, expired, and absent registrations, and MUST represent a
+  renderable observation whose capture was unavailable explicitly.
 - **Generation closure:** A graph query MUST acquire one immutable generation
-  once. Its diagnostic generation references the exact ordered observation
-  handles for that view; unchanged devices reuse their sealed observation
-  without row re-projection.
+  once. That generation references the exact ordered available observations for
+  the view; unchanged devices reuse their sealed observation without row
+  re-projection.
 - **Ambient inputs:** Global replay MUST inject normalized query options,
   three-state DNS results, every ordered OUI lookup attempt, and fixed time. It
   MUST fail rather than read live DNS, embedded OUI data, catalog/config, SNMP,
@@ -500,9 +506,16 @@ schema and closures in that directory.
 - **Versioning:** Existing member schemas and capability closures are
   immutable. Add a new member schema or capability revision when required
   fields, semantics, or replay dependencies change.
-- **Trust:** Content hashes prove typed byte identity, not producer
-  authenticity. Keep integrity, schema validity, completeness, replayability,
-  historical-payload preservation, and authenticity as separate results.
+- **Graph work bound:** Graph replay MUST pass one optional limiter through L2
+  normalization, projection, policies, L3 enrichment, focus shaping, and v1
+  rendering. The probable-map strict and probable projections MUST share that
+  limiter. Charge each data-dependent sort and multiplicative stage before it
+  executes, return exhaustion through the ordinary error path, and keep normal
+  production callers on the nil-limiter path. `l2topology.ToGraph` is the
+  single error-capable projection API; do not add a compatibility wrapper or a
+  second checked entry point.
+- **Integrity:** Content hashes prove typed byte identity and graph
+  consistency. Exact v1 members remain `restricted` and `sanitized: false`.
 - **Recorder hot path:** Disabled capture MUST perform no DTO projection or
   row-dependent work. Enabled capture MUST transfer bounded detached ownership
   once, bound both admitted members and the final unique transitive manifest
@@ -511,10 +524,12 @@ schema and closures in that directory.
   serialization. Per-transaction retained-byte accounting bounds transferred
   DTO ownership; it MUST NOT be presented as a measurement of whole-process
   peak memory.
-- **Proof:** Update schema fixtures and closure/replay tests. Run exact
-  observation-checkpoint and live/graph-replay parity, credential canaries, hostile-reader
-  limits, deterministic rendering, race tests, and focused disabled/enabled
-  allocation benchmarks for affected paths.
+- **Proof:** Update schema fixtures and closure/replay tests. Prove exact
+  semantic-observation replay, complete refresh-sweep terminalization,
+  nil/high-budget graph-output parity, bounded-work rejection, live/graph-replay
+  parity, credential canaries, hostile-reader limits, deterministic rendering,
+  race tests, and focused disabled/enabled allocation benchmarks for affected
+  paths.
 
 ## Validation Checklist
 

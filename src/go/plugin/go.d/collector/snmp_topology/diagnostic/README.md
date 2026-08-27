@@ -6,8 +6,8 @@ contract; a future archive is only one container for the same manifest and membe
 ## Compatibility
 
 - A member is identified by `(namespace, kind, schema, canonicalization, logical length, SHA-256)`.
-- The digest is domain-separated by all identity fields and the payload length. A digest proves byte identity and graph
-  integrity; it does not authenticate the producer.
+- The digest is domain-separated by all identity fields and the payload length. It proves byte identity and graph
+  integrity.
 - Known member schemas and capability closures are immutable. A semantic or required-field change uses a new member
   schema or capability revision.
 - Readers validate the raw integrity of every inventoried member. They may skip an unknown member outside the requested
@@ -33,19 +33,20 @@ byte sequence that does not round-trip to the same canonical bytes.
 
 V1 currently defines these immutable capability closures:
 
-- `semantic_replay@1` inventories the device input, ordered profile identity evidence, ordered semantic shards, exact
-  observation, and observation checkpoint. Replay must reproduce the captured observation exactly.
-- `generation_snapshot@1` inventories one published generation and its ordered observation references. It reconstructs
-  the exact immutable observation vector acquired by a graph query.
+- `semantic_replay@1` inventories the device input, ordered profile identity evidence, ordered semantic shards, and exact
+  observation. Replay must reproduce the captured observation exactly.
+- `refresh_sweep@1` inventories the complete registration-ordered refresh plan, each registration's selection, target
+  resolution, and terminal outcome, plus the publication result. A published sweep owns its resulting generation; a
+  canceled or panicked sweep explicitly publishes no generation.
 - `graph_replay@1` inventories the generation, normalized query, three-state DNS trace, and ordered OUI trace. Replay
   rebuilds `netdata.topology.v1` without ambient dependencies. Production-shaped tests compare it with the live output.
 - `capture_accounting@1` inventories one coalesced capture-gap record for attempts rejected before a capture transaction
   could begin.
 
 Known v1 member kinds are `capability_root`, `capture_gap`, `semantic_device`, `semantic_profile`, `semantic_shard`,
-`observation`, `observation_checkpoint`, `generation`, `graph_query`, `dns_trace`, and `oui_trace`.
+`observation`, `refresh_sweep`, `generation`, `graph_query`, `dns_trace`, and `oui_trace`.
 `schema-v1.json` validates each complete top-level member document; capability closures add the cross-member ownership,
-ordering, reference, count, and observation-checkpoint rules that JSON Schema cannot express.
+ordering, reference, and count rules that JSON Schema cannot express.
 
 ## Recorder and content lifetime
 
@@ -85,29 +86,24 @@ Graph replay is closed over the complete published generation and normalized que
 order, including unsuccessful candidates before a winner. Replay injects those traces and the recorded publication time;
 it does not consult live DNS, embedded OUI data, the profile catalog, SNMP, configuration, the filesystem, or the clock.
 
-The observation checkpoint binds canonical length, digest, and counts to semantic replay output. Graph replay v1 does
-not store historical output identity because doing so at this layer would serialize the live topology a second time.
-Historical Function-response identity and preservation belong to a separate capability at the one-pass encoded-response
-boundary.
+Graph replay uses one optional work limiter across L2 normalization, projection, policies, L3 enrichment, focus shaping,
+and v1 rendering. The same limiter covers both strict and probable projections. Each data-dependent sort or
+multiplicative stage charges before it executes; exhaustion is returned through the normal graph-build error path.
+Production passes no limiter and therefore does no accounting work.
 
 When no recorder is installed, the collector does not construct diagnostic DTOs, copy topology rows, wrap DNS/OUI
 lookups, or run an extra graph/render pass. The production topology and Function result remain authoritative if capture
 admission or asynchronous sealing fails.
 
-## Reader policy and trust
+## Reader policy and sensitivity
 
-Every reader supplies a fully nonzero `ReaderLimits` policy. Limits cover stored and logical bytes, member and reference
-counts, decoded topology structure, JSON depth/tokens, and replay work. Container readers enforce `MaxStoredBytes` before
-decompression; the graph reader enforces logical/member/reference limits. Member bytes plus JSON string, token, and depth
-limits are enforced before typed decoding. Schema-specific device, profile, row, tag, DNS, and OUI counts are checked
-after that bounded decode. V1 does not maintain a second type-aware predecode scanner. Operational defaults are not part
-of v1 validity.
+Every reader supplies a fully nonzero `ReaderLimits` policy. Limits cover logical/member bytes, member and reference
+counts, decoded topology structure, JSON depth/tokens, and replay work. The graph reader enforces logical/member/reference
+limits. Member bytes plus JSON string, token, and depth limits are enforced before typed decoding. Schema-specific device,
+profile, row, tag, DNS, and OUI counts are checked after that bounded decode. V1 does not maintain a second type-aware
+predecode scanner. Operational defaults are not part of v1 validity.
 
-Integrity, schema validity, capability completeness, replayability, historical payload preservation, and authenticity
-are separate results. V1 exact artifacts are labelled `restricted`, `exact`, and `sanitized: false`.
-
-`ContentRef` hashes prove typed byte identity and internal graph consistency. They do not prove which Agent produced an
-artifact. Authenticity defaults to `not_provided`; a future authenticated container must report that trust separately.
+V1 exact artifacts are labelled `restricted`, `exact`, and `sanitized: false`.
 
 ## Sensitive inputs
 

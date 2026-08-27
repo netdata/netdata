@@ -348,9 +348,11 @@ device refresh
   -> asynchronously seal typed members
   -> retain the sealed observation handle in the immutable device generation
 
-global publication
-  -> reference each renderable device's retained observation handle
-  -> asynchronously seal one generation member
+refresh sweep
+  -> inventory every registration in registration order
+  -> record due/skipped selection, target-resolution state, and terminal outcome
+  -> on publication, seal the resulting complete generation and sweep capability together
+  -> on cancellation or panic, seal the terminal sweep without a resulting generation
 
 Function snapshot
   -> acquire one generation once
@@ -365,7 +367,7 @@ ordered stream covers system uptime, main profile tags, topology rows, BGP
 outcomes and rows, and structured VLAN-context outcomes and rows. VLAN polling
 returns data to that stream; it no longer mutates a builder as a side effect.
 Replay uses the same builder operations and must reproduce the exact captured
-observation member and checkpoint.
+observation member.
 
 Profile evidence is identity-only. Its digest covers an explicit effective
 topology-collection projection after profile merge and deduplication, plus the
@@ -379,11 +381,15 @@ three-state DNS trace (`miss`, `positive`, `cached_negative`), ordered OUI trace
 and fixed publication time. It injects DNS and OUI results and must not read
 live DNS, embedded OUI data, the installed profile catalog, SNMP,
 configuration, the filesystem, or the clock. Production-shaped tests require
-the replayed payload to equal the live payload exactly. V1 deliberately stores
-no live graph-output checkpoint because producing one here would serialize the
-complete topology a second time. Historical Function-response identity and
-preservation belong to a separate capability at the one-pass encoded-response
-boundary.
+the replayed payload to equal the live payload exactly.
+
+Diagnostic graph replay passes one work limiter through L2 normalization,
+projection, policies, L3 enrichment, focus shaping, and v1 rendering. The
+low-confidence map charges both its strict and probable projections to that
+same budget. Data-dependent sorts and multiplicative stages charge before they
+execute, and exhaustion propagates through the ordinary graph-build error
+path. Normal production rendering supplies no limiter and performs no work
+accounting.
 
 Recorder admission and sealing are asynchronous:
 
@@ -430,6 +436,10 @@ aggregate observations
 For the low-confidence map type, the builder creates a strict map and a
 probable map, marks probable-only link deltas, then applies the same L3/OSPF/BGP
 enrichment and depth/focus filtering to the probable map.
+
+`l2topology.ToGraph` has one error-capable contract. Diagnostic replay supplies
+the optional shared limiter through the same production graph path; normal
+Function calls leave it nil.
 
 The default `managed_fabric` map keeps every monitored SNMP device, the legacy
 direct LLDP/CDP discovery surface, direct STP adjacencies between monitored
