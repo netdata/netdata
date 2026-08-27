@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef PROTECTED_ACCESS_H
-#define PROTECTED_ACCESS_H
+#ifndef NETDATA_PROTECTED_ACCESS_H
+#define NETDATA_PROTECTED_ACCESS_H
 
-#include "libnetdata/libnetdata.h"
+// Included from libnetdata.h after nd_log.h: PROTECTED_ACCESS_SETUP() logs through nd_log_limit().
 #include <setjmp.h>
+#include <signal.h>
 
 // Maximum nesting depth for protected access regions
 #define PROTECTED_ACCESS_MAX_NESTING 8
@@ -105,4 +106,4 @@ void signal_protected_access_check(int sig, siginfo_t *si, void *context);
 const protected_access_frame_t *protected_access_get_last_fault(void);
 void protected_access_format_error(char *buffer, size_t buffer_size);
 
-#endif // PROTECTED_ACCESS_H
+#endif // NETDATA_PROTECTED_ACCESS_H

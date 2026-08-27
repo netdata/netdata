@@ -20,7 +20,6 @@
 #include "pdc.h"
 #include "page.h"
 
-#include "daemon/protected-access.h"
 
 extern unsigned rrdeng_pages_per_extent;
 

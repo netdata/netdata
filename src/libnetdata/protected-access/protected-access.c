@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata/libnetdata.h"
-#include "protected-access.h"
+#include "../libnetdata.h"
 
 __thread protected_access_t protected_access_state = {0};
 

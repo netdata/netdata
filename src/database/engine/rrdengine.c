@@ -1487,7 +1487,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     struct uuid_first_time_s *uuid_first_t_entry;
     // PROTECTED_ACCESS_SETUP below uses sigsetjmp/siglongjmp (see
-    // src/daemon/protected-access.h). Per C11 7.13.2.1, non-volatile locals
+    // src/libnetdata/protected-access/protected-access.h). Per C11 7.13.2.1, non-volatile locals
     // that are modified between setjmp and longjmp have indeterminate values
     // on the recovery path. uuid_first_entry_list / count / added are all
     // mutated inside the protected region and then read afterwards (the

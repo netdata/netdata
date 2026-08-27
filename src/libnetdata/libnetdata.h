@@ -88,6 +88,7 @@ struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int
 #include "clocks/clocks.h"
 #include "simple_pattern/simple_pattern.h"
 #include "libnetdata/log/nd_log.h"
+#include "protected-access/protected-access.h"
 
 #include "socket/security.h"    // must be before windows.h
 
