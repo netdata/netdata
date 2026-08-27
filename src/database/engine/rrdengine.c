@@ -2413,14 +2413,10 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
 
 static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
 {
-    if (!localhost)
-        return;
-
     worker_is_busy(RRDENG_RETENTION_TIMER_CB);
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        STORAGE_ENGINE *eng = localhost->db[tier].eng;
-        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
+        if (!rrdhost_localhost_tier_is_dbengine(tier))
             continue;
         check_and_schedule_db_rotation(multidb_ctx[tier]);
     }

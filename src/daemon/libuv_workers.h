@@ -177,4 +177,17 @@ void release_cmd_pool(CmdPool *pool);
 void destroy_cmd_pool(CmdPool *pool);
 int test_cmd_pool_fifo();
 
+// size of the libuv worker thread pool, resolved from netdata.conf at startup
+#if defined(ENV32BIT)
+#define MIN_LIBUV_WORKER_THREADS 8
+#define MAX_LIBUV_WORKER_THREADS 128
+#define RESERVED_LIBUV_WORKER_THREADS 3
+#else
+#define MIN_LIBUV_WORKER_THREADS 16
+#define MAX_LIBUV_WORKER_THREADS 1024
+#define RESERVED_LIBUV_WORKER_THREADS 6
+#endif
+
+extern int libuv_worker_threads;
+
 #endif //NETDATA_EVENT_LOOP_H

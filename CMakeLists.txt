@@ -1942,6 +1942,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/dbengine-stresstest.c
             src/database/engine/dbengine-compression.c
             src/database/engine/dbengine-compression.h
+            src/database/engine/rrdengine-daemon.h
+            src/database/engine/rrdengine-daemon-check.c
     )
 
     # The engine is being decoupled from the daemon headers. Until that is complete, make a

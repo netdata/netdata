@@ -3,7 +3,7 @@
 #define DBENGINE_CACHE_H
 
 #include "datafile.h"
-#include "../rrd.h"
+#include "../storage-engine-types.h"
 
 // CACHE COMPILE TIME CONFIGURATION
 // #define PGC_COUNT_POINTS_COLLECTED 1
