@@ -4,6 +4,12 @@
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
 
+typedef struct dbengine_tier_stats {
+    RRDSET *st;
+    RRDDIM *rd_space;
+    RRDDIM *rd_time;
+} DBENGINE_TIER_STATS;
+
 void dbengine_retention_statistics(bool extended __maybe_unused) {
 
     static DBENGINE_TIER_STATS stats[RRD_STORAGE_TIERS];
