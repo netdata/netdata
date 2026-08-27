@@ -8,6 +8,8 @@
 #include "../common-contexts/common-contexts.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
+#define CONFIG_SECTION_PERFLIB_STORAGE "plugin:windows:PerflibStorage"
+
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
@@ -181,9 +183,22 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 }
 
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
+static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
+
+static inline bool logical_disk_is_excluded(const char *mount_point)
+{
+    return excluded_logical_disk_paths && simple_pattern_matches(excluded_logical_disk_paths, mount_point);
+}
+
 static void initialize(void)
 {
     physical_disk_initialize(&system_physical_total);
+
+    excluded_logical_disk_paths = simple_pattern_create(
+        inicfg_get(&netdata_config, CONFIG_SECTION_PERFLIB_STORAGE, "exclude space metrics on paths", ""),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        false);
 
     logicalDisks = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
@@ -318,6 +333,9 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        if (logical_disk_is_excluded(windows_shared_buffer))
             continue;
 
         struct logical_disk *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
