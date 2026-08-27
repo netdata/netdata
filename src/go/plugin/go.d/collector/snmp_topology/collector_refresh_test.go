@@ -748,6 +748,42 @@ func TestCollectorCancelsInFlightVLANContextRefresh(t *testing.T) {
 	}
 }
 
+func TestCollectorConsumesEachVLANContextBeforeCollectingNext(t *testing.T) {
+	coll := newTestSNMPTopologyCollector()
+	dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161}
+	contexts := []topologyVLANContext{
+		{vlanID: "100", vlanName: "users"},
+		{vlanID: "200", vlanName: "servers"},
+	}
+
+	consumedFirst := false
+	collections := 0
+	coll.newSnmpClient = func() gosnmp.Handler {
+		return &benchmarkTopologySNMPHandler{newTopologySNMPHandler(nil)}
+	}
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		ordinal := collections
+		collections++
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			if ordinal == 1 {
+				require.True(t, consumedFirst, "first VLAN context must be consumed before collecting the second")
+			}
+			return []*ddsnmp.ProfileMetrics{{}}, nil
+		})
+	}
+
+	var consumed []uint32
+	coll.collectTopologyVTPVLANContexts(context.Background(), contexts, dev, func(result topologyVLANContextResult) {
+		consumed = append(consumed, result.ordinal)
+		if result.ordinal == 0 {
+			consumedFirst = true
+		}
+	})
+
+	require.Equal(t, []uint32{0, 1}, consumed)
+	require.Equal(t, 2, collections)
+}
+
 func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
 

@@ -390,6 +390,12 @@ Recorder admission and sealing are asynchronous:
 - `Begin` is non-blocking and reserves terminal queue capacity.
 - Successful ownership transfer is charged by retained capacity before
   admission.
+- The configured member limit includes the capability root and bounds both
+  admitted transaction members and the final unique transitive manifest.
+- Admitted detached DTO ownership is bounded by queue capacity times the
+  per-transaction retained-byte limit, plus bounded recorder bookkeeping. Live
+  collection may also hold one current-device diagnostic projection; this
+  contract does not claim to measure the collector's whole-process peak.
 - `Commit` and `Abort` never wait for the worker.
 - A process-local `MemberHandle` resolves to a portable `ContentRef` or a
   terminal failure and is never serialized.

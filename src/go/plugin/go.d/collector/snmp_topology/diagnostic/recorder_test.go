@@ -174,6 +174,75 @@ func TestRecorder_DerivedReferenceCarriesTransitivePortableInventory(t *testing.
 	require.Equal(t, []ContentRef{derivedRef}, root.Sections[0].Members)
 }
 
+func TestRecorder_RejectsTransitiveManifestAboveMemberLimit(t *testing.T) {
+	t.Parallel()
+
+	sink := &MemorySink{}
+	recorder, err := NewRecorder(RecorderConfig{
+		QueueCapacity:    8,
+		MaxMembers:       4,
+		MaxRetainedBytes: 1 << 20,
+		Sink:             sink,
+	})
+	require.NoError(t, err)
+
+	dependencies := make([]MemberHandle, 0, 2)
+	for attempt := uint64(1); attempt <= 2; attempt++ {
+		txn, err := recorder.Begin(attempt)
+		require.NoError(t, err)
+		require.NoError(t, txn.DefineSection("items", StateSuccess, 1))
+		handle, err := txn.AddOwned(
+			"items",
+			MemberType{Kind: KindCaptureGap, Schema: SchemaV1},
+			CaptureGapV1{FirstAttempt: attempt, LastAttempt: attempt, Count: 1, Reason: "test"},
+			128,
+		)
+		require.NoError(t, err)
+		dependencies = append(dependencies, handle)
+		require.NoError(t, txn.Commit(CapabilityKey{Name: "test_dependency", Revision: 1}, StateSuccess))
+	}
+
+	derivedTxn, err := recorder.Begin(3)
+	require.NoError(t, err)
+	require.NoError(t, derivedTxn.DefineSection("derived", StateSuccess, 1))
+	derivedHandle, err := derivedTxn.AddDerivedOwned(
+		"derived",
+		MemberType{Kind: KindCaptureGap, Schema: SchemaV1},
+		dependencies,
+		func([]ContentRef) (any, error) {
+			return CaptureGapV1{FirstAttempt: 3, LastAttempt: 3, Count: 1, Reason: "test"}, nil
+		},
+		128,
+	)
+	require.NoError(t, err)
+	require.NoError(t, derivedTxn.Commit(CapabilityKey{Name: "test_derived", Revision: 1}, StateSuccess))
+
+	overflowTxn, err := recorder.Begin(4)
+	require.NoError(t, err)
+	require.NoError(t, overflowTxn.DefineSection("reference", StateSuccess, 1))
+	require.NoError(t, overflowTxn.AddReference("reference", derivedHandle))
+	require.NoError(t, overflowTxn.DefineSection("owned", StateSuccess, 1))
+	overflowHandle, err := overflowTxn.AddOwned(
+		"owned",
+		MemberType{Kind: KindCaptureGap, Schema: SchemaV1},
+		CaptureGapV1{FirstAttempt: 4, LastAttempt: 4, Count: 1, Reason: "test"},
+		128,
+	)
+	require.NoError(t, err)
+	require.NoError(t, overflowTxn.Commit(CapabilityKey{Name: "test_overflow", Revision: 1}, StateSuccess))
+	recorder.Close()
+
+	results := sink.Results()
+	require.Len(t, results, 4)
+	result := results[3]
+	require.ErrorContains(t, result.Err, "capture member limit exceeded")
+	require.LessOrEqual(t, len(result.Manifest.Members), 4)
+	require.NoError(t, result.Manifest.Validate())
+	_, handleErr, state := overflowHandle.Resolve()
+	require.Equal(t, HandleFailed, state)
+	require.ErrorContains(t, handleErr, "capture member limit exceeded")
+}
+
 type referencedTestLeaf struct {
 	ID    string     `json:"id"`
 	Child ContentRef `json:"child"`
@@ -310,7 +379,7 @@ func TestCaptureTransaction_RejectsMemberWithoutTransferringHandle(t *testing.T)
 	sink := &MemorySink{}
 	recorder, err := NewRecorder(RecorderConfig{
 		QueueCapacity:    1,
-		MaxMembers:       1,
+		MaxMembers:       2,
 		MaxRetainedBytes: 8,
 		Sink:             sink,
 	})

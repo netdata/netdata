@@ -41,11 +41,18 @@ func applyTopologySemanticStream(builder *topologyBuilder, stream topologySemant
 		if !ok {
 			return
 		}
-		if observer != nil {
-			observer(event)
-		}
-		applyTopologySemanticEvent(builder, event)
+		consumeTopologySemanticEvent(builder, event, observer)
 	}
+}
+
+func consumeTopologySemanticEvent(builder *topologyBuilder, event topologySemanticEvent, observer topologySemanticObserver) {
+	if builder == nil {
+		return
+	}
+	if observer != nil {
+		observer(event)
+	}
+	applyTopologySemanticEvent(builder, event)
 }
 
 func applyTopologySemanticEvent(builder *topologyBuilder, event topologySemanticEvent) {

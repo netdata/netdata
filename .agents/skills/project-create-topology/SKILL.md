@@ -505,8 +505,12 @@ schema and closures in that directory.
   historical-payload preservation, and authenticity as separate results.
 - **Recorder hot path:** Disabled capture MUST perform no DTO projection or
   row-dependent work. Enabled capture MUST transfer bounded detached ownership
-  once, keep encoding/hashing off the refresh lock, and never run an artificial
-  graph/render pass or a second Function serialization.
+  once, bound both admitted members and the final unique transitive manifest
+  including its capability root, keep encoding/hashing off the refresh lock,
+  and never run an artificial graph/render pass or a second Function
+  serialization. Per-transaction retained-byte accounting bounds transferred
+  DTO ownership; it MUST NOT be presented as a measurement of whole-process
+  peak memory.
 - **Proof:** Update schema fixtures and closure/replay tests. Run exact
   observation-checkpoint and live/graph-replay parity, credential canaries, hostile-reader
   limits, deterministic rendering, race tests, and focused disabled/enabled

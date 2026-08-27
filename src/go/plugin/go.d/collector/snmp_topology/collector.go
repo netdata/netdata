@@ -452,8 +452,12 @@ func (c *Collector) refreshDeviceTopology(
 		semanticObserver = diagnosticCapture.observe
 	}
 	applyTopologySemanticStream(next, newTopologyMainSemanticStream(sysUptime, pms), semanticObserver)
-	vlanResults := c.collectTopologyVTPVLANContexts(ctx, next.vtpVLANContexts(), dev)
-	applyTopologySemanticStream(next, newTopologyVLANSemanticStream(vlanResults), semanticObserver)
+	c.collectTopologyVTPVLANContexts(ctx, next.vtpVLANContexts(), dev, func(result topologyVLANContextResult) {
+		consumeTopologySemanticEvent(next, topologySemanticEvent{
+			kind: topologySemanticEventVLANContext,
+			vlan: result,
+		}, semanticObserver)
+	})
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
 	}

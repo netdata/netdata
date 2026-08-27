@@ -53,6 +53,14 @@ ordering, reference, count, and observation-checkpoint rules that JSON Schema ca
   `Commit` or `Abort`.
 - `AddOwned` transfers one detached immutable DTO and charges its retained capacity before admission. `AddDerivedOwned`
   runs only on the recorder worker after all dependency handles have sealed.
+- `MaxMembers` bounds both admitted transaction members and the final unique transitive manifest inventory, including
+  its capability root. The minimum valid value is therefore two. A transitive dependency that would exceed the limit
+  fails its handle and makes the capability incomplete; the recorder never publishes an oversized manifest.
+- `MaxRetainedBytes` accounts for detached DTO ownership transferred directly by one transaction. It does not claim to
+  measure the collector's current live projection, encoded bytes, or content already owned by earlier captures. Across
+  admitted recorder work, detached DTO ownership is bounded by `QueueCapacity * MaxRetainedBytes`, plus bounded member,
+  reference, and queue bookkeeping. Live collection may additionally hold one current-device diagnostic projection;
+  whole-process peak-memory measurement and production defaults belong to the storage stage.
 - A `MemberHandle` is process-local and resolves exactly once to `sealed(ContentRef)` or `failed`. Device generations
   retain the observation handle required by later generation capture; unchanged devices are referenced without
   re-projecting their rows.
@@ -90,8 +98,10 @@ admission or asynchronous sealing fails.
 
 Every reader supplies a fully nonzero `ReaderLimits` policy. Limits cover stored and logical bytes, member and reference
 counts, decoded topology structure, JSON depth/tokens, and replay work. Container readers enforce `MaxStoredBytes` before
-decompression; the graph reader enforces logical/member/reference limits. Operational defaults are not part of v1
-validity.
+decompression; the graph reader enforces logical/member/reference limits. Member bytes plus JSON string, token, and depth
+limits are enforced before typed decoding. Schema-specific device, profile, row, tag, DNS, and OUI counts are checked
+after that bounded decode. V1 does not maintain a second type-aware predecode scanner. Operational defaults are not part
+of v1 validity.
 
 Integrity, schema validity, capability completeness, replayability, historical payload preservation, and authenticity
 are separate results. V1 exact artifacts are labelled `restricted`, `exact`, and `sanitized: false`.

@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	ErrRecorderClosed    = errors.New("diagnostic recorder is closed")
-	ErrRecorderSaturated = errors.New("diagnostic recorder is saturated")
-	ErrTransactionClosed = errors.New("diagnostic transaction is already closed")
-	ErrCaptureAborted    = errors.New("diagnostic capture aborted")
+	ErrRecorderClosed     = errors.New("diagnostic recorder is closed")
+	ErrRecorderSaturated  = errors.New("diagnostic recorder is saturated")
+	ErrTransactionClosed  = errors.New("diagnostic transaction is already closed")
+	ErrCaptureAborted     = errors.New("diagnostic capture aborted")
+	errCaptureMemberLimit = errors.New("capture member limit exceeded")
 )
 
 const (
@@ -99,8 +100,8 @@ func (c RecorderConfig) Validate() error {
 	if c.QueueCapacity == 0 {
 		return errors.New("queue capacity must be nonzero")
 	}
-	if c.MaxMembers == 0 {
-		return errors.New("max members must be nonzero")
+	if c.MaxMembers < 2 {
+		return errors.New("max members must allow a capability root and one payload member")
 	}
 	if c.MaxRetainedBytes == 0 {
 		return errors.New("max retained bytes must be nonzero")
@@ -282,6 +283,39 @@ type captureJob struct {
 	abortErr      error
 }
 
+type boundedManifestInventory struct {
+	limit uint64
+	refs  []ContentRef
+	seen  map[string]struct{}
+}
+
+func newBoundedManifestInventory(limit uint64) *boundedManifestInventory {
+	return &boundedManifestInventory{limit: limit, seen: make(map[string]struct{})}
+}
+
+func (i *boundedManifestInventory) addAll(refs []ContentRef) error {
+	start := len(i.refs)
+	for _, ref := range refs {
+		if ref == (ContentRef{}) {
+			continue
+		}
+		key := ref.Key()
+		if _, exists := i.seen[key]; exists {
+			continue
+		}
+		if uint64(len(i.refs)) >= i.limit {
+			for _, added := range i.refs[start:] {
+				delete(i.seen, added.Key())
+			}
+			i.refs = i.refs[:start]
+			return errCaptureMemberLimit
+		}
+		i.seen[key] = struct{}{}
+		i.refs = append(i.refs, ref)
+	}
+	return nil
+}
+
 func (t *CaptureTransaction) CaptureID() uint64 {
 	if t == nil {
 		return 0
@@ -334,18 +368,24 @@ func (t *CaptureTransaction) AddDerivedOwned(
 	build DerivedMemberBuilder,
 	retainedBytes uint64,
 ) (MemberHandle, error) {
+	if t == nil || t.recorder == nil {
+		return MemberHandle{}, ErrTransactionClosed
+	}
 	if len(dependencies) == 0 {
 		return MemberHandle{}, errors.New("derived member requires dependencies")
 	}
 	if build == nil {
 		return MemberHandle{}, errors.New("derived member builder is nil")
 	}
+	if uint64(len(dependencies)) > t.recorder.config.MaxMembers-1 {
+		return t.addOwned(section, memberType, nil, dependencies, build, retainedBytes)
+	}
 	for i, dependency := range dependencies {
 		if dependency.id == 0 || dependency.future == nil {
 			return MemberHandle{}, fmt.Errorf("dependency %d is invalid", i)
 		}
 	}
-	return t.addOwned(section, memberType, nil, slices.Clone(dependencies), build, retainedBytes)
+	return t.addOwned(section, memberType, nil, dependencies, build, retainedBytes)
 }
 
 // AddReference attaches an earlier process-local handle to this capability
@@ -368,10 +408,10 @@ func (t *CaptureTransaction) AddReference(section string, handle MemberHandle) e
 	if !ok {
 		return fmt.Errorf("section %q is not defined", section)
 	}
-	if uint64(len(t.members)) >= t.recorder.config.MaxMembers {
-		t.terminalErr = errors.Join(t.terminalErr, errors.New("capture member limit exceeded"))
+	if uint64(len(t.members)) >= t.recorder.config.MaxMembers-1 {
+		t.terminalErr = errors.Join(t.terminalErr, errCaptureMemberLimit)
 		defined.state = StateIncomplete
-		return errors.New("capture member limit exceeded")
+		return errCaptureMemberLimit
 	}
 
 	defined.members = append(defined.members, len(t.members))
@@ -409,10 +449,10 @@ func (t *CaptureTransaction) addOwned(
 	if !ok {
 		return MemberHandle{}, fmt.Errorf("section %q is not defined", section)
 	}
-	if uint64(len(t.members)) >= t.recorder.config.MaxMembers {
-		t.terminalErr = errors.Join(t.terminalErr, errors.New("capture member limit exceeded"))
+	if uint64(len(t.members)) >= t.recorder.config.MaxMembers-1 || uint64(len(dependencies)) > t.recorder.config.MaxMembers-1 {
+		t.terminalErr = errors.Join(t.terminalErr, errCaptureMemberLimit)
 		defined.state = StateIncomplete
-		return MemberHandle{}, errors.New("capture member limit exceeded")
+		return MemberHandle{}, errCaptureMemberLimit
 	}
 	nextBytes, err := checkedAdd(t.retainedBytes, retainedBytes)
 	if err != nil || nextBytes > t.recorder.config.MaxRetainedBytes {
@@ -429,7 +469,7 @@ func (t *CaptureTransaction) addOwned(
 	t.members = append(t.members, pendingMember{
 		memberType:    memberType,
 		value:         value,
-		dependencies:  dependencies,
+		dependencies:  slices.Clone(dependencies),
 		build:         build,
 		handle:        handle,
 		retainedBytes: retainedBytes,
@@ -555,8 +595,9 @@ func (r *Recorder) run() {
 func (r *Recorder) process(job captureJob) {
 	members := make(MemorySource, len(job.members)+1)
 	refs := make([]ContentRef, len(job.members))
-	inventoryRefs := make([]ContentRef, 0, len(job.members))
+	inventory := newBoundedManifestInventory(r.config.MaxMembers - 1)
 	captureErr := job.terminalErr
+	memberLimitExceeded := false
 
 	for i, member := range job.members {
 		if job.abortErr != nil {
@@ -565,8 +606,14 @@ func (r *Recorder) process(job captureJob) {
 			}
 			continue
 		}
+		if memberLimitExceeded {
+			if member.handle.future != nil {
+				member.handle.future.resolve(ContentRef{}, nil, errCaptureMemberLimit)
+			}
+			continue
+		}
 		if member.reference.future != nil {
-			ref, inventory, err, state := member.reference.resolveInventory()
+			ref, referencedInventory, err, state := member.reference.resolveInventory()
 			if state != HandleSealed || err != nil {
 				if err == nil {
 					err = fmt.Errorf("referenced %s is %s", member.reference, state)
@@ -574,29 +621,42 @@ func (r *Recorder) process(job captureJob) {
 				captureErr = errors.Join(captureErr, err)
 				continue
 			}
+			if err := inventory.addAll(referencedInventory); err != nil {
+				captureErr = errors.Join(captureErr, err)
+				memberLimitExceeded = true
+				continue
+			}
 			refs[i] = ref
-			inventoryRefs = append(inventoryRefs, inventory...)
 			continue
 		}
 		value := member.value
-		memberInventory := make([]ContentRef, 0, 1)
+		var memberInventory *boundedManifestInventory
 		if member.build != nil {
+			memberInventory = newBoundedManifestInventory(r.config.MaxMembers - 1)
 			resolved := make([]ContentRef, 0, len(member.dependencies))
+			var dependencyErr error
 			for _, dependency := range member.dependencies {
-				ref, inventory, err, state := dependency.resolveInventory()
+				ref, dependencyInventory, err, state := dependency.resolveInventory()
 				if state != HandleSealed || err != nil {
 					if err == nil {
 						err = fmt.Errorf("dependency %s is %s", dependency, state)
 					}
 					captureErr = errors.Join(captureErr, err)
+					dependencyErr = err
 					resolved = nil
 					break
 				}
 				resolved = append(resolved, ref)
-				memberInventory = append(memberInventory, inventory...)
+				if err := memberInventory.addAll(dependencyInventory); err != nil {
+					captureErr = errors.Join(captureErr, err)
+					dependencyErr = err
+					memberLimitExceeded = true
+					resolved = nil
+					break
+				}
 			}
 			if resolved == nil {
-				member.handle.future.resolve(ContentRef{}, nil, errors.New("derived member dependency failed"))
+				member.handle.future.resolve(ContentRef{}, nil, errors.Join(errors.New("derived member dependency failed"), dependencyErr))
 				continue
 			}
 			var err error
@@ -613,13 +673,26 @@ func (r *Recorder) process(job captureJob) {
 			member.handle.future.resolve(ContentRef{}, nil, err)
 			continue
 		}
+		memberInventoryRefs := []ContentRef{ref}
+		if memberInventory != nil {
+			if err := memberInventory.addAll(memberInventoryRefs); err != nil {
+				captureErr = errors.Join(captureErr, err)
+				memberLimitExceeded = true
+				member.handle.future.resolve(ContentRef{}, nil, err)
+				continue
+			}
+			SortContentRefs(memberInventory.refs)
+			memberInventoryRefs = memberInventory.refs
+		}
+		if err := inventory.addAll(memberInventoryRefs); err != nil {
+			captureErr = errors.Join(captureErr, err)
+			memberLimitExceeded = true
+			member.handle.future.resolve(ContentRef{}, nil, err)
+			continue
+		}
 		refs[i] = ref
 		members[ref.Key()] = data
-		memberInventory = append(memberInventory, ref)
-		SortContentRefs(memberInventory)
-		memberInventory = compactContentRefs(memberInventory)
-		inventoryRefs = append(inventoryRefs, memberInventory...)
-		member.handle.future.resolve(ref, memberInventory, nil)
+		member.handle.future.resolve(ref, memberInventoryRefs, nil)
 	}
 
 	state := job.state
@@ -666,18 +739,10 @@ func (r *Recorder) process(job captureJob) {
 		return
 	}
 	members[rootRef.Key()] = rootData
-	manifestRefs := make([]ContentRef, 0, len(members))
-	manifestRefs = append(manifestRefs, rootRef)
-	seenRefs := map[string]struct{}{rootRef.Key(): {}}
-	for _, ref := range inventoryRefs {
-		if ref == (ContentRef{}) {
-			continue
-		}
-		if _, exists := seenRefs[ref.Key()]; exists {
-			continue
-		}
-		seenRefs[ref.Key()] = struct{}{}
-		manifestRefs = append(manifestRefs, ref)
+	manifestRefs := make([]ContentRef, 0, len(inventory.refs)+1)
+	manifestRefs = append(manifestRefs, inventory.refs...)
+	if _, exists := inventory.seen[rootRef.Key()]; !exists {
+		manifestRefs = append(manifestRefs, rootRef)
 	}
 	SortContentRefs(manifestRefs)
 	manifest := ManifestV1{
@@ -700,21 +765,6 @@ func (r *Recorder) process(job captureJob) {
 		RetainedBytes: job.retainedBytes,
 		Err:           errors.Join(job.abortErr, captureErr),
 	})
-}
-
-func compactContentRefs(refs []ContentRef) []ContentRef {
-	if len(refs) < 2 {
-		return refs
-	}
-	write := 1
-	for read := 1; read < len(refs); read++ {
-		if refs[read] == refs[write-1] {
-			continue
-		}
-		refs[write] = refs[read]
-		write++
-	}
-	return refs[:write]
 }
 
 func (r *Recorder) emitGap() {
