@@ -36,7 +36,8 @@ func (l Limiter) ChargeProduct(factors ...uint64) error {
 	return l.Charge(product)
 }
 
-// ChargeSort charges an n*ceil(log2(n)) comparison envelope.
+// ChargeSort charges a conservative envelope for the standard-library sort
+// operations used by topology code, including stable-sort merge movement.
 func (l Limiter) ChargeSort(items uint64) error {
 	if l == nil {
 		return nil
@@ -46,6 +47,19 @@ func (l Limiter) ChargeSort(items uint64) error {
 		return err
 	}
 	return l.Charge(units)
+}
+
+// ChargeStringComparisons charges the worst-case byte comparisons for a sort
+// whose comparator can inspect at most maxItemBytes from either item.
+func (l Limiter) ChargeStringComparisons(items, maxItemBytes uint64) error {
+	if l == nil || items < 2 || maxItemBytes == 0 {
+		return nil
+	}
+	envelope, err := SortEnvelope(items)
+	if err != nil {
+		return err
+	}
+	return l.ChargeProduct(envelope, 2, maxItemBytes)
 }
 
 // SortFunc charges the comparison envelope immediately before sorting.
@@ -84,6 +98,49 @@ func SortSliceStable[S ~[]E, E any](l Limiter, values S, less func(i, j int) boo
 	}
 	sort.SliceStable(values, less)
 	return nil
+}
+
+// SortSliceWithStringWork charges repeated variable-width comparisons before
+// executing an index-based sort. Source normalization/materialization must be
+// charged by the caller before maxItemBytes is derived.
+func SortSliceWithStringWork[S ~[]E, E any](
+	l Limiter,
+	values S,
+	maxItemBytes uint64,
+	less func(i, j int) bool,
+) error {
+	if err := l.ChargeStringComparisons(uint64(len(values)), maxItemBytes); err != nil {
+		return err
+	}
+	return SortSlice(l, values, less)
+}
+
+// SortSliceStableWithStringWork is the stable form of
+// SortSliceWithStringWork.
+func SortSliceStableWithStringWork[S ~[]E, E any](
+	l Limiter,
+	values S,
+	maxItemBytes uint64,
+	less func(i, j int) bool,
+) error {
+	if err := l.ChargeStringComparisons(uint64(len(values)), maxItemBytes); err != nil {
+		return err
+	}
+	return SortSliceStable(l, values, less)
+}
+
+// SortStableFuncWithStringWork charges repeated variable-width comparisons
+// before executing a stable comparator sort.
+func SortStableFuncWithStringWork[S ~[]E, E any](
+	l Limiter,
+	values S,
+	maxItemBytes uint64,
+	compare func(a, b E) int,
+) error {
+	if err := l.ChargeStringComparisons(uint64(len(values)), maxItemBytes); err != nil {
+		return err
+	}
+	return SortStableFunc(l, values, compare)
 }
 
 type preparedStringKey[E any] struct {
@@ -149,19 +206,23 @@ func sortByPreparedStringKey[S ~[]E, E any](
 		return err
 	}
 	prepared := make([]preparedStringKey[E], len(values))
+	var maxKeyBytes uint64
 	for i, value := range values {
 		key, err := prepare(value)
 		if err != nil {
 			return err
 		}
 		prepared[i] = preparedStringKey[E]{value: value, key: key}
+		if bytes := uint64(len(key)); bytes > maxKeyBytes {
+			maxKeyBytes = bytes
+		}
 	}
 	less := func(i, j int) bool { return prepared[i].key < prepared[j].key }
 	if stable {
-		if err := SortSliceStable(l, prepared, less); err != nil {
+		if err := SortSliceStableWithStringWork(l, prepared, maxKeyBytes, less); err != nil {
 			return err
 		}
-	} else if err := SortSlice(l, prepared, less); err != nil {
+	} else if err := SortSliceWithStringWork(l, prepared, maxKeyBytes, less); err != nil {
 		return err
 	}
 	if err := l.Charge(uint64(len(values))); err != nil {
@@ -195,10 +256,63 @@ func ChargeStrings[S ~[]string](l Limiter, values S) error {
 	return nil
 }
 
+// ChargeStringValues charges a fixed-cost scan and the source bytes of a
+// collection before variable string work begins. It returns the maximum bytes
+// one item can expose to a later comparator.
+func ChargeStringValues[S ~[]E, E any](
+	l Limiter,
+	values S,
+	itemBytes func(E) (uint64, error),
+) (uint64, error) {
+	if l == nil || len(values) == 0 {
+		return 0, nil
+	}
+	if err := l.Charge(uint64(len(values))); err != nil {
+		return 0, err
+	}
+	var total, maximum uint64
+	for _, value := range values {
+		bytes, err := itemBytes(value)
+		if err != nil {
+			return 0, err
+		}
+		total, err = Sum(total, bytes)
+		if err != nil {
+			return 0, err
+		}
+		if bytes > maximum {
+			maximum = bytes
+		}
+	}
+	if err := l.Charge(total); err != nil {
+		return 0, err
+	}
+	return maximum, nil
+}
+
+// StringBytes returns the checked byte sum for a fixed tuple of strings.
+func StringBytes(values ...string) (uint64, error) {
+	var total uint64
+	for _, value := range values {
+		var err error
+		total, err = Sum(total, uint64(len(value)))
+		if err != nil {
+			return 0, err
+		}
+	}
+	return total, nil
+}
+
 // SortStrings charges the string scan, key bytes, and comparison envelope
 // immediately before their respective operations.
 func SortStrings[S ~[]string](l Limiter, values S) error {
-	if err := ChargeStrings(l, values); err != nil {
+	maximum, err := ChargeStringValues(l, values, func(value string) (uint64, error) {
+		return uint64(len(value)), nil
+	})
+	if err != nil {
+		return err
+	}
+	if err := l.ChargeStringComparisons(uint64(len(values)), maximum); err != nil {
 		return err
 	}
 	if err := l.ChargeSort(uint64(len(values))); err != nil {
@@ -225,12 +339,15 @@ func SortedStringKeys[V any](l Limiter, values map[string]V) ([]string, error) {
 	return keys, nil
 }
 
-// SortEnvelope returns an n*ceil(log2(n)) comparison envelope.
+// SortEnvelope returns a conservative n*ceil(log2(n))^2 operation envelope.
+// The extra logarithmic factor covers the movement performed by Go's stable
+// merge sort and safely dominates the small insertion-sort blocks.
 func SortEnvelope(items uint64) (uint64, error) {
 	if items < 2 {
 		return 0, nil
 	}
-	return Product(items, uint64(bits.Len64(items-1)))
+	levels := uint64(bits.Len64(items - 1))
+	return Product(items, levels, levels)
 }
 
 func Sum(values ...uint64) (uint64, error) {

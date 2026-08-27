@@ -1567,6 +1567,28 @@ func TestTopologyCache_VTPVLANContexts_SortedAndValidated(t *testing.T) {
 	require.Equal(t, "servers", contexts[1].vlanName)
 }
 
+func TestTopologyCache_VTPVLANContextsChargesSourceBytesAndPreservesOrdering(t *testing.T) {
+	build := func(name string) ([]topologyVLANContext, uint64) {
+		cache := newTopologyBuilder()
+		cache.vlanNameByID["200"] = vlanNameMapping{name: name}
+		cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
+		var charged uint64
+		cache.workLimiter = func(units uint64) error {
+			charged += units
+			return nil
+		}
+		contexts := cache.vtpVLANContexts()
+		require.NoError(t, cache.workErr)
+		return contexts, charged
+	}
+
+	short, shortWork := build("s")
+	long, longWork := build(strings.Repeat("s", 4096))
+	require.Equal(t, []string{"10", "200"}, []string{short[0].vlanID, short[1].vlanID})
+	require.Equal(t, []string{"10", "200"}, []string{long[0].vlanID, long[1].vlanID})
+	require.Greater(t, longWork, shortWork)
+}
+
 func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
 	cache := newTopologyBuilder()
 	cache.updateBridgePortMap(map[string]string{

@@ -12,8 +12,23 @@ type topologySegmentPortRef struct {
 }
 
 func topologySegmentDisplayName(actor projectedActor, deviceDisplayByID map[string]string) string {
+	return topologySegmentDisplayNameWithWork(nil, actor, deviceDisplayByID)
+}
+
+func topologySegmentDisplayNameWithWork(
+	work *projectionWork,
+	actor projectedActor,
+	deviceDisplayByID map[string]string,
+) string {
 	detail := actor.Detail.Segment
 	if detail.SegmentID == "" && detail.DesignatedPort == "" && len(detail.ParentDevices) == 0 {
+		return ""
+	}
+	if work != nil && (!work.chargeStrings([]string{detail.SegmentID, detail.DesignatedPort}) ||
+		!work.chargeStrings(detail.ParentDevices) ||
+		!work.chargeStrings(detail.IfNames) ||
+		!work.chargeStrings(detail.BridgePorts) ||
+		!work.charge(uint64(len(detail.ParentDevices)+len(detail.IfNames)+len(detail.BridgePorts)))) {
 		return ""
 	}
 
@@ -43,8 +58,11 @@ func topologySegmentDisplayName(actor projectedActor, deviceDisplayByID map[stri
 			}
 		}
 	}
-	parents := sortedTopologySet(parentCandidates)
-	ports := sortedTopologySet(portCandidates)
+	parents := sortedTopologySetWithWork(work, parentCandidates)
+	if work.failure() != nil {
+		return ""
+	}
+	ports := sortedTopologySetWithWork(work, portCandidates)
 	if len(parents) > 0 && len(ports) > 0 {
 		return parents[0] + "." + ports[0] + ".segment"
 	}

@@ -63,7 +63,13 @@ func setToCSV(limiter worklimit.Limiter, in map[string]struct{}) (string, error)
 	return strings.Join(out, ","), nil
 }
 
-func csvToTopologySet(value string) map[string]struct{} {
+func csvToTopologySet(limiter worklimit.Limiter, value string) (map[string]struct{}, error) {
+	if err := limiter.Charge(1); err != nil {
+		return nil, err
+	}
+	if err := limiter.Charge(uint64(len(value))); err != nil {
+		return nil, err
+	}
 	out := make(map[string]struct{})
 	for token := range strings.SplitSeq(strings.TrimSpace(value), ",") {
 		token = strings.TrimSpace(strings.ToLower(token))
@@ -72,7 +78,7 @@ func csvToTopologySet(value string) map[string]struct{} {
 		}
 		out[token] = struct{}{}
 	}
-	return out
+	return out, nil
 }
 
 func observationProtocolsUsed(obs model.L2Observation) map[string]struct{} {

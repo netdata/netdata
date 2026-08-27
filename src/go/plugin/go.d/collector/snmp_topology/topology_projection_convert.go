@@ -7,6 +7,7 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
@@ -25,15 +26,18 @@ func topologyActorFromGraph(actor graph.Actor, detail topologyengine.ProjectionA
 	}
 }
 
-func topologyLinksFromGraph(links []graph.Link) []topologymodel.Link {
+func topologyLinksFromGraph(limiter worklimit.Limiter, links []graph.Link) ([]topologymodel.Link, error) {
 	if len(links) == 0 {
-		return nil
+		return nil, nil
+	}
+	if err := limiter.Charge(uint64(len(links))); err != nil {
+		return nil, err
 	}
 	out := make([]topologymodel.Link, len(links))
 	for i, link := range links {
 		out[i] = topologyLinkFromGraph(link)
 	}
-	return out
+	return out, nil
 }
 
 func topologyLinkFromGraph(link graph.Link) topologymodel.Link {

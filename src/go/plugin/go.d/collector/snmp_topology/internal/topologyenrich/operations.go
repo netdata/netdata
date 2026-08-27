@@ -62,15 +62,20 @@ func sortEnrichmentSlice[S ~[]E, E any](w *enrichmentWork, values S, less func(i
 	return w.err == nil
 }
 
-func sortEnrichmentSliceStable[S ~[]E, E any](w *enrichmentWork, values S, less func(i, j int) bool) bool {
+func sortEnrichmentSliceStableWithStringWork[S ~[]E, E any](
+	w *enrichmentWork,
+	values S,
+	maxItemBytes uint64,
+	less func(i, j int) bool,
+) bool {
 	if w == nil {
-		_ = worklimit.SortSliceStable(nil, values, less)
+		_ = worklimit.SortSliceStableWithStringWork(nil, values, maxItemBytes, less)
 		return true
 	}
 	if w.err != nil {
 		return false
 	}
-	w.err = worklimit.SortSliceStable(w.limiter, values, less)
+	w.err = worklimit.SortSliceStableWithStringWork(w.limiter, values, maxItemBytes, less)
 	return w.err == nil
 }
 

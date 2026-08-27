@@ -62,6 +62,32 @@ func run(values []string) {
 	require.ElementsMatch(t, []string{"sort.Strings", "slices.Sort"}, rawDynamicSortCalls(source))
 }
 
+func TestPipelineStringOrderingDoesNotUseCountOnlySortHelpers(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	path := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "l2topology", "internal", "pipeline", "sorting.go"))
+	source, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+	require.NoError(t, err)
+
+	var countOnly []string
+	ast.Inspect(source, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "SortSlice" && selector.Sel.Name != "SortSliceStable" {
+			return true
+		}
+		identifier, ok := selector.X.(*ast.Ident)
+		if ok && identifier.Name == "worklimit" {
+			countOnly = append(countOnly, selector.Sel.Name)
+		}
+		return true
+	})
+	require.Empty(t, countOnly, "pipeline string ordering must use string-aware worklimit helpers")
+}
+
 func rawDynamicSortCalls(file *ast.File) []string {
 	if file == nil {
 		return nil

@@ -11,7 +11,13 @@ import (
 func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDeviceInterfaceSummary {
 	out := make(map[string]topologyDeviceInterfaceSummary, len(b.collectors))
 	for deviceID, col := range b.collectors {
-		if !sortProjectionSlice(b.work, col.portStatuses, func(i, j int) bool {
+		maxIfNameBytes, ok := chargeProjectionStringValues(b.work, col.portStatuses, func(status topologyDevicePortStatus) (uint64, error) {
+			return uint64(len(status.IfName)), nil
+		})
+		if !ok {
+			return nil
+		}
+		if !sortProjectionSliceStableWithStringWork(b.work, col.portStatuses, maxIfNameBytes, func(i, j int) bool {
 			left, right := col.portStatuses[i], col.portStatuses[j]
 			if left.IfIndex != right.IfIndex {
 				return left.IfIndex < right.IfIndex

@@ -27,11 +27,34 @@ func (w *renderWork) charge(units uint64) bool {
 	return w.err == nil
 }
 
+func (w *renderWork) chargeProduct(factors ...uint64) bool {
+	if w == nil || w.err != nil {
+		return w == nil
+	}
+	w.err = w.limiter.ChargeProduct(factors...)
+	return w.err == nil
+}
+
+func (w *renderWork) chargeTable(rows, columns uint64) bool {
+	// Each table cell is written by the renderer, copied into its encoding,
+	// decoded for validation, and then validated. Column descriptors and
+	// encodings are each copied once by NewTable.
+	return w.chargeProduct(rows, columns, 4) && w.chargeProduct(columns, 2)
+}
+
 func (w *renderWork) chargeMatch(match topologymodel.Match) bool {
 	if w == nil || w.err != nil {
 		return w == nil
 	}
 	w.err = topologymodel.ChargeMatch(w.limiter, match)
+	return w.err == nil
+}
+
+func (w *renderWork) chargeStrings(values []string) bool {
+	if w == nil || w.err != nil {
+		return w == nil
+	}
+	w.err = worklimit.ChargeStrings(w.limiter, values)
 	return w.err == nil
 }
 

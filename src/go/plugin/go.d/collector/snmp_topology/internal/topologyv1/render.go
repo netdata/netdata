@@ -40,7 +40,7 @@ func Render(data topologymodel.Data, limiter worklimit.Limiter) (topologyapi.Dat
 	if limiter != nil {
 		work = &renderWork{limiter: limiter}
 	}
-	if !work.charge(uint64(len(data.Actors) + len(data.Links))) {
+	if !work.chargeProduct(uint64(len(data.Actors)), 2) || !work.charge(uint64(len(data.Links))) {
 		return topologyapi.Data{}, work.failure()
 	}
 	if err := data.ValidateActorHandles(); err != nil {
@@ -58,6 +58,9 @@ func Render(data topologymodel.Data, limiter worklimit.Limiter) (topologyapi.Dat
 	}
 
 	portNeighborSummaries := buildSNMPTopologyV1PortNeighborSummariesWithWork(work, data.Links, actorIndex)
+	if err := work.failure(); err != nil {
+		return topologyapi.Data{}, err
+	}
 	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetailsWithWork(work, data.Actors, actorIndex, stringsDict, portNeighborSummaries)
 	if err != nil {
 		return topologyapi.Data{}, err
@@ -126,6 +129,9 @@ func Render(data topologymodel.Data, limiter worklimit.Limiter) (topologyapi.Dat
 
 	if len(types.TableTypes) == 0 {
 		types.TableTypes = nil
+	}
+	if !work.charge(uint64(stringsDict.Len())) {
+		return topologyapi.Data{}, work.failure()
 	}
 
 	payload := topologyapi.Data{

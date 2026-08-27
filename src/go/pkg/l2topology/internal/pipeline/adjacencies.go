@@ -44,7 +44,11 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) error {
 			),
 		}
 		applyAdjacencyPairMetadata(&adj, lldpPairMetadata[link.index])
-		if addAdjacency(s.adjacencies, adj) {
+		added, err := addAdjacency(s.workLimiter, s.adjacencies, adj)
+		if err != nil {
+			return err
+		}
+		if added {
 			s.linksLLDP++
 		}
 	}
@@ -93,7 +97,11 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) error {
 			}
 		}
 		applyAdjacencyPairMetadata(&adj, cdpPairMetadata[link.index])
-		if addAdjacency(s.adjacencies, adj) {
+		added, err := addAdjacency(s.workLimiter, s.adjacencies, adj)
+		if err != nil {
+			return err
+		}
+		if added {
 			s.linksCDP++
 		}
 	}
@@ -188,7 +196,11 @@ func (s *l2BuildState) applySTP(observations []model.L2Observation) error {
 			if len(labels) > 0 {
 				adj.Labels = labels
 			}
-			if addAdjacency(s.adjacencies, adj) {
+			added, err := addAdjacency(s.workLimiter, s.adjacencies, adj)
+			if err != nil {
+				return err
+			}
+			if added {
 				s.linksSTP++
 			}
 		}

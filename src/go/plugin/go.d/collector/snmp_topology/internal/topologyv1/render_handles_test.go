@@ -5,10 +5,12 @@ package topologyv1
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
@@ -130,4 +132,23 @@ func TestRenderWorkLimiterChargesLabelSortsBeforeRendering(t *testing.T) {
 		return nil
 	})
 	require.ErrorIs(t, err, limitErr)
+}
+
+func TestActorTableChargesColumnFanoutBeforeMaterialization(t *testing.T) {
+	actors := make([]topologymodel.Actor, 11)
+	for i := range actors {
+		actors[i] = topologymodel.Actor{
+			ActorHandle: topologyV1TestActorHandle(fmt.Sprintf("actor-%d", i)),
+			ActorID:     fmt.Sprintf("actor-%d", i),
+			ActorType:   "device",
+		}
+	}
+	var charged []uint64
+	work := &renderWork{limiter: func(units uint64) error {
+		charged = append(charged, units)
+		return nil
+	}}
+	_, _ = buildSNMPTopologyV1ActorsWithWork(work, actors, &topologyapi.StringDictionary{})
+	require.NoError(t, work.err)
+	require.Contains(t, charged, uint64(len(actors)*snmpTopologyV1ActorColumnCount*4))
 }

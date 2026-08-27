@@ -5,6 +5,8 @@ package worklimit
 import (
 	"errors"
 	"math"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,7 +21,7 @@ func TestLimiterChargesExactProductsAndSortEnvelope(t *testing.T) {
 
 	require.NoError(t, limiter.ChargeProduct(3, 7))
 	require.NoError(t, limiter.ChargeSort(9))
-	require.Equal(t, []uint64{21, 36}, charged)
+	require.Equal(t, []uint64{21, 144}, charged)
 }
 
 func TestOperationOwnedSortsRejectBeforeExecution(t *testing.T) {
@@ -74,6 +76,42 @@ func TestPreparedStringKeySortRejectsBeforePreparationAndPreparesOnce(t *testing
 	require.Equal(t, 3, prepared)
 	require.Positive(t, charged)
 	require.Equal(t, []string{"a", "b", "c"}, values)
+}
+
+func TestSortEnvelopeBoundsStableSortComparisons(t *testing.T) {
+	values := make([]int, 13)
+	for i := range values {
+		values[i] = len(values) - i
+	}
+	var charged uint64
+	comparisons := 0
+	require.NoError(t, SortStableFunc(func(units uint64) error {
+		charged += units
+		return nil
+	}, values, func(a, b int) int {
+		comparisons++
+		return a - b
+	}))
+	require.True(t, slices.IsSorted(values))
+	require.GreaterOrEqual(t, charged, uint64(comparisons))
+}
+
+func TestPreparedStringKeySortChargesRepeatedComparisonBytes(t *testing.T) {
+	measure := func(prefix string) uint64 {
+		values := []string{prefix + "c", prefix + "b", prefix + "a"}
+		var charged uint64
+		require.NoError(t, SortStableByPreparedStringKey(func(units uint64) error {
+			charged += units
+			return nil
+		}, values, func(value string) (string, error) {
+			return value, nil
+		}))
+		return charged
+	}
+
+	short := measure("")
+	long := measure(strings.Repeat("x", 4_096))
+	require.Greater(t, long, short)
 }
 
 func TestLimiterRejectsOverflowBeforeCallback(t *testing.T) {

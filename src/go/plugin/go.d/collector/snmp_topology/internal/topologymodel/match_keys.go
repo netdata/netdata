@@ -119,14 +119,18 @@ func SortActors(limiter worklimit.Limiter, actors []Actor) error {
 		actor Actor
 	}
 	ordered := make([]orderedActor, len(actors))
+	var maxKeyBytes uint64
 	for i, actor := range actors {
 		key, err := canonicalMatchKey(actor.Match, limiter)
 		if err != nil {
 			return err
 		}
 		ordered[i] = orderedActor{key: key, actor: actor}
+		if size := uint64(len(key)); size > maxKeyBytes {
+			maxKeyBytes = size
+		}
 	}
-	if err := worklimit.SortStableFunc(limiter, ordered, func(a, b orderedActor) int {
+	if err := worklimit.SortStableFuncWithStringWork(limiter, ordered, maxKeyBytes, func(a, b orderedActor) int {
 		return strings.Compare(a.key, b.key)
 	}); err != nil {
 		return err
@@ -154,14 +158,18 @@ func SortLinks(limiter worklimit.Limiter, links []Link) error {
 		link Link
 	}
 	ordered := make([]orderedLink, len(links))
+	var maxKeyBytes uint64
 	for i, link := range links {
 		key, err := linkSortKey(link, limiter)
 		if err != nil {
 			return err
 		}
 		ordered[i] = orderedLink{key: key, link: link}
+		if size := uint64(len(key)); size > maxKeyBytes {
+			maxKeyBytes = size
+		}
 	}
-	if err := worklimit.SortStableFunc(limiter, ordered, func(a, b orderedLink) int {
+	if err := worklimit.SortStableFuncWithStringWork(limiter, ordered, maxKeyBytes, func(a, b orderedLink) int {
 		return strings.Compare(a.key, b.key)
 	}); err != nil {
 		return err

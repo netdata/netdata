@@ -20,11 +20,16 @@ func (c *topologyBuilder) sortStrings(values []string) bool {
 	return c.workErr == nil
 }
 
-func sortBuilderSlice[S ~[]E, E any](c *topologyBuilder, values S, less func(i, j int) bool) bool {
+func sortBuilderSliceWithStringWork[S ~[]E, E any](
+	c *topologyBuilder,
+	values S,
+	maxItemBytes uint64,
+	less func(i, j int) bool,
+) bool {
 	if c == nil || c.workErr != nil {
 		return c != nil && c.workErr == nil
 	}
-	c.workErr = worklimit.SortSlice(c.workLimiter, values, less)
+	c.workErr = worklimit.SortSliceWithStringWork(c.workLimiter, values, maxItemBytes, less)
 	return c.workErr == nil
 }
 

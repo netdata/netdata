@@ -9,7 +9,8 @@ import (
 )
 
 func TestCSVToTopologySet_NormalizesAndDeduplicates(t *testing.T) {
-	set := csvToTopologySet(" LLDP, cdp , , lldp, STP ")
+	set, err := csvToTopologySet(nil, " LLDP, cdp , , lldp, STP ")
+	require.NoError(t, err)
 	require.Equal(t, map[string]struct{}{
 		"lldp": {},
 		"cdp":  {},

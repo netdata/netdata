@@ -40,6 +40,6 @@ func assignTopologyV1TestHandles(t testing.TB, data *topologymodel.Data) map[str
 		data.Actors[i].ActorHandle = topologyV1TestActorHandle(data.Actors[i].ActorID)
 		byActorID[strings.TrimSpace(data.Actors[i].ActorID)] = data.Actors[i].ActorHandle
 	}
-	require.NoError(t, data.InitializeActorHandles())
+	require.NoError(t, data.InitializeActorHandles(nil))
 	return byActorID
 }

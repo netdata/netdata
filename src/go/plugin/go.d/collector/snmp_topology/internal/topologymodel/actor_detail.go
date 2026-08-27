@@ -207,6 +207,9 @@ func ActorDetailScalarLabelValuesWithLimiter(actor Actor, limiter worklimit.Limi
 	if err != nil {
 		return nil, err
 	}
+	if err := limiter.Charge(25); err != nil {
+		return nil, err
+	}
 	out := map[string]string{
 		"vendor":                  ActorDetailVendor(actor),
 		"vendor_derived":          ActorDetailVendorDerived(actor),
@@ -243,6 +246,14 @@ func ActorDetailScalarLabelValuesWithLimiter(actor Actor, limiter worklimit.Limi
 }
 
 func ActorDetailArrayLabelValues(actor Actor) map[string][]string {
+	values, _ := ActorDetailArrayLabelValuesWithLimiter(actor, nil)
+	return values
+}
+
+func ActorDetailArrayLabelValuesWithLimiter(actor Actor, limiter worklimit.Limiter) (map[string][]string, error) {
+	if err := limiter.Charge(8); err != nil {
+		return nil, err
+	}
 	out := map[string][]string{
 		"protocols":              actor.Detail.L2.Device.Protocols,
 		"protocols_collected":    actor.Detail.L2.Device.ProtocolsCollected,
@@ -258,7 +269,7 @@ func ActorDetailArrayLabelValues(actor Actor) map[string][]string {
 			delete(out, key)
 		}
 	}
-	return out
+	return out, nil
 }
 
 func scalarOptionalInt(value topologyengine.OptionalValue[int]) string {

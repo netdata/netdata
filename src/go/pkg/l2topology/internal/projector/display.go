@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 type topologyDisplayNameResolver struct {
 	lookup func(ip string) string
 	cache  map[string]string
+	work   *projectionWork
 }
 
 type topologyDisplayName struct {
@@ -19,9 +21,17 @@ type topologyDisplayName struct {
 }
 
 func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, lookup func(ip string) string) {
+	applyTopologyDisplayNamesWithWork(nil, actors, links, lookup)
+}
+
+func applyTopologyDisplayNamesWithWork(work *projectionWork, actors []projectedActor, links []graph.Link, lookup func(ip string) string) {
+	if !work.chargeProduct(uint64(len(actors)), 3) {
+		return
+	}
 	resolver := topologyDisplayNameResolver{
 		lookup: lookup,
 		cache:  make(map[string]string),
+		work:   work,
 	}
 
 	deviceDisplayByID := make(map[string]string, len(actors))
@@ -33,11 +43,19 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 		if actors[i].Actor.ActorType == "segment" {
 			continue
 		}
-		display := topologyActorDisplayName(actors[i], nil, &resolver)
-		if display.name == "" {
-			display = topologyFallbackActorDisplayName(actors[i])
+		if !work.charge(1) {
+			return
 		}
-		topologySetActorDisplay(&actors[i], display)
+		display := topologyActorDisplayNameWithWork(work, actors[i], nil, &resolver)
+		if work.failure() != nil {
+			return
+		}
+		if display.name == "" {
+			display = topologyFallbackActorDisplayNameWithWork(work, actors[i])
+		}
+		if !topologySetActorDisplayWithWork(work, &actors[i], display) {
+			return
+		}
 		if IsDeviceActorType(actors[i].Actor.ActorType) {
 			if handle := actors[i].Actor.ActorHandle; !handle.IsZero() {
 				deviceDisplayByActorHandle[handle] = display.name
@@ -46,8 +64,11 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 				deviceDisplayByID[deviceID] = display.name
 			}
 		} else {
-			if matchKey := canonicalTopologyMatchKey(actors[i].Actor.Match); matchKey != "" {
+			if matchKey := canonicalTopologyMatchKeyWithWork(work, actors[i].Actor.Match); matchKey != "" {
 				displayByMatchKey[matchKey] = display.name
+			}
+			if work.failure() != nil {
+				return
 			}
 		}
 	}
@@ -57,28 +78,54 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 		if actors[i].Actor.ActorType != "segment" {
 			continue
 		}
-		display := topologyActorDisplayName(actors[i], deviceDisplayByID, &resolver)
-		if display.name == "" {
-			display = topologyFallbackActorDisplayName(actors[i])
+		if !work.charge(1) {
+			return
 		}
-		topologySetActorDisplay(&actors[i], display)
-		if matchKey := canonicalTopologyMatchKey(actors[i].Actor.Match); matchKey != "" {
+		display := topologyActorDisplayNameWithWork(work, actors[i], deviceDisplayByID, &resolver)
+		if work.failure() != nil {
+			return
+		}
+		if display.name == "" {
+			display = topologyFallbackActorDisplayNameWithWork(work, actors[i])
+		}
+		if !topologySetActorDisplayWithWork(work, &actors[i], display) {
+			return
+		}
+		if matchKey := canonicalTopologyMatchKeyWithWork(work, actors[i].Actor.Match); matchKey != "" {
 			displayByMatchKey[matchKey] = display.name
+		}
+		if work.failure() != nil {
+			return
 		}
 	}
 
 	for i := range links {
-		src := topologyEndpointDisplayName(links[i].Src, links[i].SrcActorHandle, deviceDisplayByActorHandle, displayByMatchKey, &resolver)
+		if !work.charge(1) {
+			return
+		}
+		src := topologyEndpointDisplayNameWithWork(work, links[i].Src, links[i].SrcActorHandle, deviceDisplayByActorHandle, displayByMatchKey, &resolver)
+		if work.failure() != nil {
+			return
+		}
 		if src.name == "" {
 			src = topologyDisplayName{name: "[unset]", source: "fallback"}
 		}
-		srcPortName := topologySetEndpointDisplayAndCanonicalPortName(&links[i].Src, src)
+		srcPortName := topologySetEndpointDisplayAndCanonicalPortNameWithWork(work, &links[i].Src, src)
+		if work.failure() != nil {
+			return
+		}
 
-		dst := topologyEndpointDisplayName(links[i].Dst, links[i].DstActorHandle, deviceDisplayByActorHandle, displayByMatchKey, &resolver)
+		dst := topologyEndpointDisplayNameWithWork(work, links[i].Dst, links[i].DstActorHandle, deviceDisplayByActorHandle, displayByMatchKey, &resolver)
+		if work.failure() != nil {
+			return
+		}
 		if dst.name == "" {
 			dst = topologyDisplayName{name: "[unset]", source: "fallback"}
 		}
-		dstPortName := topologySetEndpointDisplayAndCanonicalPortName(&links[i].Dst, dst)
+		dstPortName := topologySetEndpointDisplayAndCanonicalPortNameWithWork(work, &links[i].Dst, dst)
+		if work.failure() != nil {
+			return
+		}
 
 		linkName := topologyCanonicalLinkName(src.name, srcPortName, dst.name, dstPortName)
 		links[i].Display = &graph.LinkDisplay{
@@ -89,9 +136,36 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 	}
 }
 
+func chargeProjectionStringMapWork(work *projectionWork, labels map[string]string) bool {
+	if work == nil || len(labels) == 0 {
+		return true
+	}
+	if !work.charge(uint64(len(labels))) {
+		return false
+	}
+	var bytes uint64
+	for key, value := range labels {
+		var err error
+		bytes, err = worklimit.Sum(bytes, uint64(len(key)), uint64(len(value)))
+		if err != nil {
+			work.err = err
+			return false
+		}
+	}
+	return work.charge(bytes)
+}
+
 func topologySetActorDisplay(actor *projectedActor, display topologyDisplayName) {
+	topologySetActorDisplayWithWork(nil, actor, display)
+}
+
+func topologySetActorDisplayWithWork(work *projectionWork, actor *projectedActor, display topologyDisplayName) bool {
 	if actor == nil {
-		return
+		return true
+	}
+	if work != nil && (!chargeProjectionStringMapWork(work, actor.Actor.Labels) ||
+		!work.chargeStrings([]string{display.name, display.source})) {
+		return false
 	}
 	labels := cloneStringMap(actor.Actor.Labels)
 	if labels == nil {
@@ -104,10 +178,25 @@ func topologySetActorDisplay(actor *projectedActor, display topologyDisplayName)
 	actor.Actor.Labels = labels
 	actor.Detail.DisplayName = strings.TrimSpace(display.name)
 	actor.Detail.DisplaySource = strings.TrimSpace(display.source)
+	return true
 }
 
 func topologySetEndpointDisplayAndCanonicalPortName(endpoint *graph.LinkEndpoint, display topologyDisplayName) string {
+	return topologySetEndpointDisplayAndCanonicalPortNameWithWork(nil, endpoint, display)
+}
+
+func topologySetEndpointDisplayAndCanonicalPortNameWithWork(
+	work *projectionWork,
+	endpoint *graph.LinkEndpoint,
+	display topologyDisplayName,
+) string {
 	if endpoint == nil {
+		return ""
+	}
+	if work != nil && !work.chargeStrings([]string{
+		display.name, display.source,
+		endpoint.IfName, endpoint.PortID, endpoint.PortName,
+	}) {
 		return ""
 	}
 	endpoint.DisplayName = strings.TrimSpace(display.name)
@@ -124,23 +213,56 @@ func topologyEndpointDisplayName(
 	actorDisplayByMatch map[string]string,
 	resolver *topologyDisplayNameResolver,
 ) topologyDisplayName {
+	return topologyEndpointDisplayNameWithWork(nil, endpoint, actorHandle, deviceDisplayByActorHandle, actorDisplayByMatch, resolver)
+}
+
+func topologyEndpointDisplayNameWithWork(
+	work *projectionWork,
+	endpoint graph.LinkEndpoint,
+	actorHandle graph.ActorHandle,
+	deviceDisplayByActorHandle map[graph.ActorHandle]string,
+	actorDisplayByMatch map[string]string,
+	resolver *topologyDisplayNameResolver,
+) topologyDisplayName {
 	if !actorHandle.IsZero() {
 		if name := strings.TrimSpace(deviceDisplayByActorHandle[actorHandle]); name != "" {
 			return topologyDisplayName{name: name, source: "actor"}
 		}
 	}
-	if key := canonicalTopologyMatchKey(endpoint.Match); key != "" {
+	if key := canonicalTopologyMatchKeyWithWork(work, endpoint.Match); key != "" {
 		if name := strings.TrimSpace(actorDisplayByMatch[key]); name != "" {
 			return topologyDisplayName{name: name, source: "actor"}
 		}
 	}
-	return topologyDisplayNameFromMatch(endpoint.Match, resolver)
+	if work.failure() != nil {
+		return topologyDisplayName{}
+	}
+	return topologyDisplayNameFromMatchWithWork(work, endpoint.Match, resolver)
 }
 
 func topologyActorDisplayName(actor projectedActor, deviceDisplayByID map[string]string, resolver *topologyDisplayNameResolver) topologyDisplayName {
+	return topologyActorDisplayNameWithWork(nil, actor, deviceDisplayByID, resolver)
+}
+
+func topologyActorDisplayNameWithWork(
+	work *projectionWork,
+	actor projectedActor,
+	deviceDisplayByID map[string]string,
+	resolver *topologyDisplayNameResolver,
+) topologyDisplayName {
+	if work != nil && !work.chargeStrings([]string{
+		actor.Actor.ActorType,
+		actor.Detail.Device.ManagementIP,
+		actor.Detail.Segment.SegmentID,
+	}) {
+		return topologyDisplayName{}
+	}
 	if actor.Actor.ActorType == "segment" {
-		if name := topologySegmentDisplayName(actor, deviceDisplayByID); name != "" {
+		if name := topologySegmentDisplayNameWithWork(work, actor, deviceDisplayByID); name != "" {
 			return topologyDisplayName{name: name, source: "segment"}
+		}
+		if work.failure() != nil {
+			return topologyDisplayName{}
 		}
 	}
 
@@ -148,9 +270,12 @@ func topologyActorDisplayName(actor projectedActor, deviceDisplayByID map[string
 	if IsDeviceActorType(actor.Actor.ActorType) {
 		displayMatch = topologyDeviceDisplayMatch(displayMatch, actor.Detail.Device.ManagementIP)
 	}
-	display := topologyDisplayNameFromMatch(displayMatch, resolver)
+	display := topologyDisplayNameFromMatchWithWork(work, displayMatch, resolver)
 	if display.name != "" {
 		return display
+	}
+	if work.failure() != nil {
+		return topologyDisplayName{}
 	}
 
 	if segmentID := strings.TrimSpace(actor.Detail.Segment.SegmentID); segmentID != "" {
@@ -168,12 +293,26 @@ func topologyDeviceDisplayMatch(match graph.Match, managementIP string) graph.Ma
 }
 
 func topologyFallbackActorDisplayName(actor projectedActor) topologyDisplayName {
+	return topologyFallbackActorDisplayNameWithWork(nil, actor)
+}
+
+func topologyFallbackActorDisplayNameWithWork(work *projectionWork, actor projectedActor) topologyDisplayName {
+	if work != nil && !work.chargeStrings([]string{
+		actor.Actor.ActorType,
+		actor.Detail.Device.ManagementIP,
+		actor.Detail.Segment.SegmentID,
+	}) {
+		return topologyDisplayName{}
+	}
 	match := actor.Actor.Match
 	if IsDeviceActorType(actor.Actor.ActorType) {
 		match = topologyDeviceDisplayMatch(match, actor.Detail.Device.ManagementIP)
 	}
-	if matchKey := canonicalTopologyMatchKey(match); matchKey != "" {
+	if matchKey := canonicalTopologyMatchKeyWithWork(work, match); matchKey != "" {
 		return topologyDisplayName{name: matchKey, source: "fallback_match"}
+	}
+	if work.failure() != nil {
+		return topologyDisplayName{}
 	}
 	if segmentID := strings.TrimSpace(actor.Detail.Segment.SegmentID); segmentID != "" {
 		return topologyDisplayName{name: topologyCompactSegmentID(segmentID), source: "segment_id"}
@@ -190,25 +329,57 @@ func topologyActorDeviceID(actor projectedActor) string {
 }
 
 func topologyDisplayNameFromMatch(match graph.Match, resolver *topologyDisplayNameResolver) topologyDisplayName {
-	if dns := topologyMatchPreferredDNSName(match, resolver); dns != "" {
+	return topologyDisplayNameFromMatchWithWork(nil, match, resolver)
+}
+
+func topologyDisplayNameFromMatchWithWork(
+	work *projectionWork,
+	match graph.Match,
+	resolver *topologyDisplayNameResolver,
+) topologyDisplayName {
+	if dns := topologyMatchPreferredDNSNameWithWork(work, match, resolver); dns != "" {
 		return topologyDisplayName{name: dns, source: "dns"}
+	}
+	if work.failure() != nil {
+		return topologyDisplayName{}
+	}
+	if work != nil && !work.chargeStrings([]string{match.SysName}) {
+		return topologyDisplayName{}
 	}
 	if sysName := topologyMatchPreferredSysName(match); sysName != "" {
 		return topologyDisplayName{name: sysName, source: "sys_name"}
 	}
-	if hostname := topologyMatchPreferredHostname(match); hostname != "" {
+	if hostname := topologyMatchPreferredHostnameWithWork(work, match); hostname != "" {
 		return topologyDisplayName{name: hostname, source: "hostname"}
 	}
-	if ip := topologyMatchPreferredIP(match); ip != "" {
+	if work.failure() != nil {
+		return topologyDisplayName{}
+	}
+	if ip := topologyMatchPreferredIPWithWork(work, match); ip != "" {
 		return topologyDisplayName{name: ip, source: "ip"}
 	}
-	if mac := topologyMatchPreferredMAC(match); mac != "" {
+	if work.failure() != nil {
+		return topologyDisplayName{}
+	}
+	if mac := topologyMatchPreferredMACWithWork(work, match); mac != "" {
 		return topologyDisplayName{name: mac, source: "mac"}
 	}
 	return topologyDisplayName{}
 }
 
 func topologyMatchPreferredDNSName(match graph.Match, resolver *topologyDisplayNameResolver) string {
+	return topologyMatchPreferredDNSNameWithWork(nil, match, resolver)
+}
+
+func topologyMatchPreferredDNSNameWithWork(
+	work *projectionWork,
+	match graph.Match,
+	resolver *topologyDisplayNameResolver,
+) string {
+	if !work.chargeStrings(match.DNSNames) || !work.chargeStrings(match.IPAddresses) ||
+		!work.chargeProduct(uint64(len(match.DNSNames)+len(match.IPAddresses)), 2) {
+		return ""
+	}
 	candidates := make(map[string]struct{})
 	for _, value := range match.DNSNames {
 		if normalized := normalizeDNSName(value); normalized != "" {
@@ -225,7 +396,7 @@ func topologyMatchPreferredDNSName(match graph.Match, resolver *topologyDisplayN
 			}
 		}
 	}
-	names := sortedTopologySet(candidates)
+	names := sortedTopologySetWithWork(work, candidates)
 	if len(names) == 0 {
 		return ""
 	}
@@ -237,7 +408,11 @@ func topologyMatchPreferredSysName(match graph.Match) string {
 }
 
 func topologyMatchPreferredHostname(match graph.Match) string {
-	hostnames := uniqueTopologyStrings(match.Hostnames)
+	return topologyMatchPreferredHostnameWithWork(nil, match)
+}
+
+func topologyMatchPreferredHostnameWithWork(work *projectionWork, match graph.Match) string {
+	hostnames := uniqueTopologyStringsWithWork(work, match.Hostnames)
 	if len(hostnames) == 0 {
 		return ""
 	}
@@ -245,13 +420,20 @@ func topologyMatchPreferredHostname(match graph.Match) string {
 }
 
 func topologyMatchPreferredIP(match graph.Match) string {
+	return topologyMatchPreferredIPWithWork(nil, match)
+}
+
+func topologyMatchPreferredIPWithWork(work *projectionWork, match graph.Match) string {
+	if !work.chargeStrings(match.IPAddresses) {
+		return ""
+	}
 	ips := make([]string, 0, len(match.IPAddresses))
 	for _, value := range match.IPAddresses {
 		if ip := normalizeTopologyIP(value); ip != "" {
 			ips = append(ips, ip)
 		}
 	}
-	ips = uniqueTopologyStrings(ips)
+	ips = uniqueTopologyStringsWithWork(work, ips)
 	if len(ips) == 0 {
 		return ""
 	}
@@ -259,6 +441,13 @@ func topologyMatchPreferredIP(match graph.Match) string {
 }
 
 func topologyMatchPreferredMAC(match graph.Match) string {
+	return topologyMatchPreferredMACWithWork(nil, match)
+}
+
+func topologyMatchPreferredMACWithWork(work *projectionWork, match graph.Match) string {
+	if !work.chargeStrings(match.MacAddresses) || !work.chargeStrings(match.ChassisIDs) {
+		return ""
+	}
 	macs := make([]string, 0, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {
@@ -270,7 +459,7 @@ func topologyMatchPreferredMAC(match graph.Match) string {
 			macs = append(macs, mac)
 		}
 	}
-	macs = uniqueTopologyStrings(macs)
+	macs = uniqueTopologyStringsWithWork(work, macs)
 	if len(macs) == 0 {
 		return ""
 	}
@@ -288,6 +477,9 @@ func normalizeDNSName(name string) string {
 
 func (r *topologyDisplayNameResolver) resolve(ip string) string {
 	if r == nil || r.lookup == nil {
+		return ""
+	}
+	if r.work != nil && (!r.work.chargeStrings([]string{ip}) || !r.work.charge(1)) {
 		return ""
 	}
 	ip = normalizeTopologyIP(ip)

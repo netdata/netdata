@@ -12,6 +12,8 @@ import (
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
+const snmpTopologyV1LinkColumnCount = 11
+
 func buildSNMPTopologyV1Links(
 	links []topologymodel.Link,
 	actorIndex topologyV1ActorIndex,
@@ -27,6 +29,9 @@ func buildSNMPTopologyV1LinksWithWork(
 	stringsDict *topologyapi.StringDictionary,
 ) (topologyapi.Table, topologyapi.EvidenceMap, error) {
 	if !work.charge(uint64(len(links))) {
+		return topologyapi.Table{}, nil, work.err
+	}
+	if !work.chargeTable(uint64(len(links)), snmpTopologyV1LinkColumnCount) {
 		return topologyapi.Table{}, nil, work.err
 	}
 	srcActors := make([]any, len(links))
@@ -77,8 +82,11 @@ func buildSNMPTopologyV1LinksWithWork(
 			evidenceRowsByType[linkType] = evidenceRows
 		}
 		if linkType == snmpTopologyV1LinkL3SubnetMembership {
-			if link.Detail.L3SubnetMembership != nil && !work.charge(uint64(len(link.Detail.L3SubnetMembership.Interfaces))) {
-				return topologyapi.Table{}, nil, work.err
+			if link.Detail.L3SubnetMembership != nil {
+				rows := uint64(len(link.Detail.L3SubnetMembership.Interfaces))
+				if !work.chargeTable(rows, snmpTopologyV1EvidenceColumnCount(linkType)) {
+					return topologyapi.Table{}, nil, work.err
+				}
 			}
 			count, err := appendSNMPTopologyV1L3SubnetMembershipEvidenceRows(evidenceRows, i, src, dst, link, protocol, stringsDict)
 			if err != nil {
@@ -86,6 +94,9 @@ func buildSNMPTopologyV1LinksWithWork(
 			}
 			evidenceCounts[i] = count
 			continue
+		}
+		if !work.chargeTable(1, snmpTopologyV1EvidenceColumnCount(linkType)) {
+			return topologyapi.Table{}, nil, work.err
 		}
 		evidenceCounts[i] = 1
 		evidenceRows.linkRefs = append(evidenceRows.linkRefs, i)
@@ -159,6 +170,9 @@ func buildSNMPTopologyV1LinksWithWork(
 		},
 	)
 
+	if !work.charge(uint64(len(evidenceRowsByType))) {
+		return topologyapi.Table{}, nil, work.err
+	}
 	evidenceSections := make(topologyapi.EvidenceMap, len(evidenceRowsByType))
 	for linkType, rows := range evidenceRowsByType {
 		evidenceSections[linkType] = topologyapi.EvidenceSection{
@@ -168,6 +182,22 @@ func buildSNMPTopologyV1LinksWithWork(
 	}
 
 	return linkTable, evidenceSections, nil
+}
+
+func snmpTopologyV1EvidenceColumnCount(linkType string) uint64 {
+	const base = 17
+	switch linkType {
+	case snmpTopologyV1LinkOSPF:
+		return base + 9
+	case snmpTopologyV1LinkBGP:
+		return base + 8
+	case snmpTopologyV1LinkL3Subnet:
+		return base + 7
+	case snmpTopologyV1LinkL3SubnetMembership:
+		return base + 11
+	default:
+		return base
+	}
 }
 
 func appendSNMPTopologyV1L3SubnetMembershipEvidenceRows(

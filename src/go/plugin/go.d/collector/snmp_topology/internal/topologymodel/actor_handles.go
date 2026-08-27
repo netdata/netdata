@@ -6,13 +6,20 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 // InitializeActorHandles continues the imported graph generation and validates
 // that every actor and link belongs to it.
-func (d *Data) InitializeActorHandles() error {
+func (d *Data) InitializeActorHandles(limiter worklimit.Limiter) error {
 	if d == nil {
 		return fmt.Errorf("cannot initialize actor handles on nil topology data")
+	}
+	if err := limiter.ChargeProduct(uint64(len(d.Actors)), 2); err != nil {
+		return err
+	}
+	if err := limiter.Charge(uint64(len(d.Links))); err != nil {
+		return err
 	}
 
 	var allocator graph.ActorHandleAllocator

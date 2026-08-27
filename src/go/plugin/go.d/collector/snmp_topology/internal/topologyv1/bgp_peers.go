@@ -13,6 +13,18 @@ func buildSNMPTopologyV1BGPPeersTable(
 	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 ) topologyapi.Table {
+	return buildSNMPTopologyV1BGPPeersTableWithWork(nil, rows, actorIndex, stringsDict)
+}
+
+func buildSNMPTopologyV1BGPPeersTableWithWork(
+	work *renderWork,
+	rows []topologyV1DynamicRow,
+	actorIndex topologyV1ActorIndex,
+	stringsDict *topologyapi.StringDictionary,
+) topologyapi.Table {
+	if !work.chargeTable(uint64(len(rows)), 17) {
+		return topologyapi.Table{}
+	}
 	actorRefs := make([]any, len(rows))
 	remoteActors := make([]any, len(rows))
 	routingInstances := make([]any, len(rows))

@@ -8,6 +8,7 @@ import (
 	"net"
 
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/diagnostic"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
@@ -64,6 +65,9 @@ func replayTopologyGraphV1(
 	}
 
 	work := &replayWorkBudget{limit: limits.MaxReplayWork}
+	if err := work.add(uint64(len(generation.Observations))); err != nil {
+		return topologyv1.Data{}, false, err
+	}
 	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(generation.Observations))
 	for i, ref := range generation.Observations {
 		var observation diagnostic.ObservationV1
@@ -76,7 +80,11 @@ func replayTopologyGraphV1(
 		}
 		snapshots = append(snapshots, snapshot)
 	}
-	if err := work.add(uint64(len(dnsTrace.Records) + len(ouiTrace.Records))); err != nil {
+	traceRecords, err := worklimit.Sum(uint64(len(dnsTrace.Records)), uint64(len(ouiTrace.Records)))
+	if err != nil {
+		return topologyv1.Data{}, false, err
+	}
+	if err := work.add(traceRecords); err != nil {
 		return topologyv1.Data{}, false, err
 	}
 

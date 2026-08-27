@@ -4,12 +4,32 @@ package pipeline
 
 import (
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildL2ResultChargesObservedLabelBytes(t *testing.T) {
+	measure := func(value string) uint64 {
+		var charged uint64
+		_, err := BuildL2ResultFromObservations([]model.L2Observation{{
+			DeviceID: "switch-a",
+			Labels:   map[string]string{"site": value},
+		}}, model.DiscoverOptions{WorkLimiter: func(units uint64) error {
+			charged += units
+			return nil
+		}})
+		require.NoError(t, err)
+		return charged
+	}
+
+	short := measure("a")
+	long := measure(strings.Repeat("a", 4_096))
+	require.Greater(t, long, short)
+}
 
 func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 	observations := []model.L2Observation{

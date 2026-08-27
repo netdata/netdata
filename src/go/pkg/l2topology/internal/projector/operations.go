@@ -43,27 +43,36 @@ func (w *projectionWork) chargeStrings(values []string) bool {
 	return w.err == nil
 }
 
-func sortProjectionSlice[S ~[]E, E any](w *projectionWork, values S, less func(i, j int) bool) bool {
+func chargeProjectionStringValues[S ~[]E, E any](
+	w *projectionWork,
+	values S,
+	itemBytes func(E) (uint64, error),
+) (uint64, bool) {
 	if w == nil {
-		_ = worklimit.SortSlice(nil, values, less)
-		return true
+		return 0, true
 	}
 	if w.err != nil {
-		return false
+		return 0, false
 	}
-	w.err = worklimit.SortSlice(w.limiter, values, less)
-	return w.err == nil
+	maximum, err := worklimit.ChargeStringValues(w.limiter, values, itemBytes)
+	w.err = err
+	return maximum, err == nil
 }
 
-func sortProjectionSliceStable[S ~[]E, E any](w *projectionWork, values S, less func(i, j int) bool) bool {
+func sortProjectionSliceStableWithStringWork[S ~[]E, E any](
+	w *projectionWork,
+	values S,
+	maxItemBytes uint64,
+	less func(i, j int) bool,
+) bool {
 	if w == nil {
-		_ = worklimit.SortSliceStable(nil, values, less)
+		_ = worklimit.SortSliceStableWithStringWork(nil, values, maxItemBytes, less)
 		return true
 	}
 	if w.err != nil {
 		return false
 	}
-	w.err = worklimit.SortSliceStable(w.limiter, values, less)
+	w.err = worklimit.SortSliceStableWithStringWork(w.limiter, values, maxItemBytes, less)
 	return w.err == nil
 }
 

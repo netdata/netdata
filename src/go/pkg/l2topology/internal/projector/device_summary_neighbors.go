@@ -105,7 +105,17 @@ func sortedTopologyPortNeighborsWithWork(work *projectionWork, neighbors map[str
 		return nil
 	}
 	out := make([]topologyPortNeighborStatus, 0, len(neighbors))
+	var maxStringBytes uint64
 	for _, neighbor := range neighbors {
+		if work != nil && !work.chargeStrings([]string{
+			neighbor.Protocol,
+			neighbor.RemoteDevice,
+			neighbor.RemotePort,
+			neighbor.RemoteIP,
+			neighbor.RemoteChassisID,
+		}) {
+			return nil
+		}
 		neighbor.Protocol = strings.ToLower(strings.TrimSpace(neighbor.Protocol))
 		neighbor.RemoteDevice = strings.TrimSpace(neighbor.RemoteDevice)
 		neighbor.RemotePort = strings.TrimSpace(neighbor.RemotePort)
@@ -115,9 +125,12 @@ func sortedTopologyPortNeighborsWithWork(work *projectionWork, neighbors map[str
 		if topologyPortNeighborStatusKey(neighbor) == "" {
 			continue
 		}
+		if bytes := uint64(len(neighbor.Protocol) + len(neighbor.RemoteDevice) + len(neighbor.RemotePort) + len(neighbor.RemoteIP) + len(neighbor.RemoteChassisID)); bytes > maxStringBytes {
+			maxStringBytes = bytes
+		}
 		out = append(out, neighbor)
 	}
-	if !sortProjectionSlice(work, out, func(i, j int) bool {
+	if !sortProjectionSliceStableWithStringWork(work, out, maxStringBytes, func(i, j int) bool {
 		left, right := out[i], out[j]
 		if left.Protocol != right.Protocol {
 			return left.Protocol < right.Protocol

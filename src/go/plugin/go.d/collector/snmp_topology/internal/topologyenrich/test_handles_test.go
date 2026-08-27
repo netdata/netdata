@@ -40,6 +40,6 @@ func assignTopologyEnrichTestHandles(t testing.TB, data *topologymodel.Data) map
 		data.Actors[i].ActorHandle = topologyEnrichTestActorHandle(data.Actors[i].ActorID)
 		byActorID[strings.TrimSpace(data.Actors[i].ActorID)] = data.Actors[i].ActorHandle
 	}
-	require.NoError(t, data.InitializeActorHandles())
+	require.NoError(t, data.InitializeActorHandles(nil))
 	return byActorID
 }

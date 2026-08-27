@@ -11,6 +11,7 @@ import (
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyenrich"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
@@ -232,6 +233,14 @@ func projectSNMPL2TopologyData(
 		return topologymodel.Data{}, err
 	}
 	graphData := projection.Graph
+	actors, err := topologyActorsFromProjection(options.WorkLimiter, graphData.Actors, projection.ActorDetails)
+	if err != nil {
+		return topologymodel.Data{}, err
+	}
+	links, err := topologyLinksFromGraph(options.WorkLimiter, graphData.Links)
+	if err != nil {
+		return topologymodel.Data{}, err
+	}
 	data := topologymodel.Data{
 		SchemaVersion: graphData.SchemaVersion,
 		Source:        graphData.Source,
@@ -239,26 +248,33 @@ func projectSNMPL2TopologyData(
 		AgentID:       graphData.AgentID,
 		CollectedAt:   graphData.CollectedAt,
 		View:          graphData.View,
-		Actors:        topologyActorsFromProjection(graphData.Actors, projection.ActorDetails),
-		Links:         topologyLinksFromGraph(graphData.Links),
+		Actors:        actors,
+		Links:         links,
 		Stats: topologymodel.Stats{
 			L2:    projection.Stats,
 			HasL2: true,
 		},
 	}
-	if err := data.InitializeActorHandles(); err != nil {
+	if err := data.InitializeActorHandles(options.WorkLimiter); err != nil {
 		return topologymodel.Data{}, fmt.Errorf("initialize topology actor handles: %w", err)
 	}
 	return data, nil
 }
 
-func topologyActorsFromProjection(actors []graph.Actor, details map[string]topologyengine.ProjectionActorDetail) []topologymodel.Actor {
+func topologyActorsFromProjection(
+	limiter worklimit.Limiter,
+	actors []graph.Actor,
+	details map[string]topologyengine.ProjectionActorDetail,
+) ([]topologymodel.Actor, error) {
 	if len(actors) == 0 {
-		return nil
+		return nil, nil
+	}
+	if err := limiter.Charge(uint64(len(actors))); err != nil {
+		return nil, err
 	}
 	out := make([]topologymodel.Actor, len(actors))
 	for i, actor := range actors {
 		out[i] = topologyActorFromGraph(actor, details[strings.TrimSpace(actor.ActorID)])
 	}
-	return out
+	return out, nil
 }

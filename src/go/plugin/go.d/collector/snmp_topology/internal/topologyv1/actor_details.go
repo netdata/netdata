@@ -35,6 +35,9 @@ func buildSNMPTopologyV1ActorDetailsWithWork(
 	tableTypes := make(map[string]topologyapi.TableType)
 
 	labelsTable := buildSNMPTopologyV1ActorLabelsTableWithWork(work, actors, stringsDict)
+	if err := work.failure(); err != nil {
+		return nil, nil, err
+	}
 	details["actor_labels"] = topologyapi.DetailTable{
 		Type:  "actor_labels",
 		Table: labelsTable,
@@ -46,6 +49,9 @@ func buildSNMPTopologyV1ActorDetailsWithWork(
 	}
 
 	metadataTable := buildSNMPTopologyV1ActorMetadataTableWithWork(work, actors)
+	if err := work.failure(); err != nil {
+		return nil, nil, err
+	}
 	if metadataTable.Rows > 0 {
 		tableID := "actor_metadata"
 		details[tableID] = topologyapi.DetailTable{
@@ -87,15 +93,18 @@ func buildSNMPTopologyV1ActorDetailsWithWork(
 		switch tableName {
 		case "ports":
 			tableID = "actor_ports"
-			table = buildSNMPTopologyV1ActorPortsTable(rows, stringsDict, portNeighborSummaries)
+			table = buildSNMPTopologyV1ActorPortsTableWithWork(work, rows, stringsDict, portNeighborSummaries)
 		case "ospf_neighbors":
 			tableID = "actor_ospf_neighbors"
-			table = buildSNMPTopologyV1OSPFNeighborsTable(rows, actorIndex, stringsDict)
+			table = buildSNMPTopologyV1OSPFNeighborsTableWithWork(work, rows, actorIndex, stringsDict)
 		case "bgp_peers":
 			tableID = "actor_bgp_peers"
-			table = buildSNMPTopologyV1BGPPeersTable(rows, actorIndex, stringsDict)
+			table = buildSNMPTopologyV1BGPPeersTableWithWork(work, rows, actorIndex, stringsDict)
 		default:
 			continue
+		}
+		if err := work.failure(); err != nil {
+			return nil, nil, err
 		}
 		details[tableID] = topologyapi.DetailTable{
 			Type:  tableID,
@@ -120,6 +129,9 @@ func buildSNMPTopologyV1ActorMetadataTable(actors []topologymodel.Actor) topolog
 
 func buildSNMPTopologyV1ActorMetadataTableWithWork(work *renderWork, actors []topologymodel.Actor) topologyapi.Table {
 	if !work.charge(uint64(len(actors))) {
+		return topologyapi.Table{}
+	}
+	if !work.chargeTable(uint64(len(actors)), 2) {
 		return topologyapi.Table{}
 	}
 	actorRefs := make([]any, 0, len(actors))
@@ -170,12 +182,18 @@ func buildSNMPTopologyV1ActorLabelsTableWithWork(
 		valueIndex any
 	}
 
+	if !work.chargeProduct(uint64(len(actors)), 8) {
+		return topologyapi.Table{}
+	}
 	rows := make([]labelRow, 0, len(actors)*8)
-	add := func(actor int, key, value, source, kind string, valueIndex any) {
+	add := func(actor int, key, value, source, kind string, valueIndex any) bool {
+		if work != nil && (!work.chargeStrings([]string{key, value, source, kind}) || !work.charge(1)) {
+			return false
+		}
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
 		if key == "" || value == "" {
-			return
+			return true
 		}
 		rows = append(rows, labelRow{
 			actor:      actor,
@@ -185,34 +203,43 @@ func buildSNMPTopologyV1ActorLabelsTableWithWork(
 			kind:       kind,
 			valueIndex: valueIndex,
 		})
+		return true
 	}
-	addSlice := func(actor int, key string, values []string, source, kind string) {
+	addSlice := func(actor int, key string, values []string, source, kind string) bool {
 		index := 0
 		for _, value := range values {
+			if work != nil && !work.chargeStrings([]string{value}) {
+				return false
+			}
 			value = strings.TrimSpace(value)
 			if value == "" {
 				continue
 			}
-			add(actor, key, value, source, kind, index)
+			if !add(actor, key, value, source, kind, index) {
+				return false
+			}
 			index++
 		}
+		return true
 	}
 
 	for actorIndex, actor := range actors {
 		if !work.chargeMatch(actor.Match) || !work.charge(uint64(len(actor.Labels))) {
 			return topologyapi.Table{}
 		}
-		add(actorIndex, "actor_type", snmpTopologyV1ActorType(actor.ActorType), snmpTopologyV1ProducerSource, "identity", nil)
-		add(actorIndex, "layer", snmpTopologyV1ActorLayer(actor), snmpTopologyV1ProducerSource, "identity", nil)
-		add(actorIndex, "source", topologyutil.FirstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource), snmpTopologyV1ProducerSource, "identity", nil)
-		add(actorIndex, "display_name", snmpTopologyV1DisplayName(actor), snmpTopologyV1ProducerSource, "attribute", nil)
-		add(actorIndex, "sys_name", actor.Match.SysName, snmpTopologyV1ProducerSource, "match", nil)
-		add(actorIndex, "sys_object_id", actor.Match.SysObjectID, snmpTopologyV1ProducerSource, "match", nil)
-		addSlice(actorIndex, "chassis_id", actor.Match.ChassisIDs, snmpTopologyV1ProducerSource, "match")
-		addSlice(actorIndex, "mac_address", actor.Match.MacAddresses, snmpTopologyV1ProducerSource, "match")
-		addSlice(actorIndex, "ip_address", actor.Match.IPAddresses, snmpTopologyV1ProducerSource, "match")
-		addSlice(actorIndex, "hostname", actor.Match.Hostnames, snmpTopologyV1ProducerSource, "match")
-		addSlice(actorIndex, "dns_name", actor.Match.DNSNames, snmpTopologyV1ProducerSource, "match")
+		if !add(actorIndex, "actor_type", snmpTopologyV1ActorType(actor.ActorType), snmpTopologyV1ProducerSource, "identity", nil) ||
+			!add(actorIndex, "layer", snmpTopologyV1ActorLayer(actor), snmpTopologyV1ProducerSource, "identity", nil) ||
+			!add(actorIndex, "source", topologyutil.FirstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource), snmpTopologyV1ProducerSource, "identity", nil) ||
+			!add(actorIndex, "display_name", snmpTopologyV1DisplayName(actor), snmpTopologyV1ProducerSource, "attribute", nil) ||
+			!add(actorIndex, "sys_name", actor.Match.SysName, snmpTopologyV1ProducerSource, "match", nil) ||
+			!add(actorIndex, "sys_object_id", actor.Match.SysObjectID, snmpTopologyV1ProducerSource, "match", nil) ||
+			!addSlice(actorIndex, "chassis_id", actor.Match.ChassisIDs, snmpTopologyV1ProducerSource, "match") ||
+			!addSlice(actorIndex, "mac_address", actor.Match.MacAddresses, snmpTopologyV1ProducerSource, "match") ||
+			!addSlice(actorIndex, "ip_address", actor.Match.IPAddresses, snmpTopologyV1ProducerSource, "match") ||
+			!addSlice(actorIndex, "hostname", actor.Match.Hostnames, snmpTopologyV1ProducerSource, "match") ||
+			!addSlice(actorIndex, "dns_name", actor.Match.DNSNames, snmpTopologyV1ProducerSource, "match") {
+			return topologyapi.Table{}
+		}
 
 		var labelKeys []string
 		if work == nil {
@@ -221,7 +248,9 @@ func buildSNMPTopologyV1ActorLabelsTableWithWork(
 		labelKeys = sortedRenderKeys(work, actor.Labels, labelKeys)
 		for _, key := range labelKeys {
 			value := actor.Labels[key]
-			add(actorIndex, key, value, "producer_label", "label", nil)
+			if !add(actorIndex, key, value, "producer_label", "label", nil) {
+				return topologyapi.Table{}
+			}
 		}
 		var limiter worklimit.Limiter
 		if work != nil {
@@ -238,19 +267,30 @@ func buildSNMPTopologyV1ActorLabelsTableWithWork(
 		}
 		scalarKeys = sortedRenderKeys(work, scalarValues, scalarKeys)
 		for _, key := range scalarKeys {
-			add(actorIndex, key, scalarValues[key], snmpTopologyV1ProducerSource, "attribute", nil)
+			if !add(actorIndex, key, scalarValues[key], snmpTopologyV1ProducerSource, "attribute", nil) {
+				return topologyapi.Table{}
+			}
 		}
-		arrayValues := topologymodel.ActorDetailArrayLabelValues(actor)
+		arrayValues, err := topologymodel.ActorDetailArrayLabelValuesWithLimiter(actor, limiter)
+		if err != nil {
+			work.err = err
+			return topologyapi.Table{}
+		}
 		var arrayKeys []string
 		if work == nil {
 			arrayKeys = make([]string, 0, len(arrayValues))
 		}
 		arrayKeys = sortedRenderKeys(work, arrayValues, arrayKeys)
 		for _, key := range arrayKeys {
-			addSlice(actorIndex, key, arrayValues[key], snmpTopologyV1ProducerSource, "attribute")
+			if !addSlice(actorIndex, key, arrayValues[key], snmpTopologyV1ProducerSource, "attribute") {
+				return topologyapi.Table{}
+			}
 		}
 	}
 
+	if !work.chargeTable(uint64(len(rows)), 6) {
+		return topologyapi.Table{}
+	}
 	actorRefs := make([]any, len(rows))
 	keys := make([]any, len(rows))
 	values := make([]any, len(rows))

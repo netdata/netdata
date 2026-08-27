@@ -43,3 +43,10 @@ func (dict *StringDictionary) Values() []any {
 	}
 	return values
 }
+
+func (dict *StringDictionary) Len() int {
+	if dict == nil {
+		return 0
+	}
+	return len(dict.values)
+}

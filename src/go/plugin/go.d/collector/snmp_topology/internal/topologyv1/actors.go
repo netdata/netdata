@@ -14,12 +14,17 @@ import (
 
 type topologyV1ActorIndex map[topologymodel.ActorHandle]int
 
+const snmpTopologyV1ActorColumnCount = 29
+
 func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, topologyV1ActorIndex) {
 	return buildSNMPTopologyV1ActorsWithWork(nil, actors, stringsDict)
 }
 
 func buildSNMPTopologyV1ActorsWithWork(work *renderWork, actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, topologyV1ActorIndex) {
 	if !work.charge(uint64(len(actors))) {
+		return topologyapi.Table{}, nil
+	}
+	if !work.chargeTable(uint64(len(actors)), snmpTopologyV1ActorColumnCount) {
 		return topologyapi.Table{}, nil
 	}
 	actorIndex := make(topologyV1ActorIndex, len(actors))

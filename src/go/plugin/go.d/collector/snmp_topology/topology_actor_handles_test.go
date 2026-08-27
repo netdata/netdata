@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,31 @@ var snmpTopologyTestHandles = struct {
 }{
 	allocator: graph.NewActorHandleAllocator(),
 	byActorID: make(map[string]topologymodel.ActorHandle),
+}
+
+func TestProjectionConversionsChargeBeforeMaterialization(t *testing.T) {
+	limitErr := errors.New("topology work exhausted")
+	tests := map[string]func(func(uint64) error) error{
+		"actors": func(limiter func(uint64) error) error {
+			_, err := topologyActorsFromProjection(limiter, []graph.Actor{{ActorID: "actor-a"}}, nil)
+			return err
+		},
+		"links": func(limiter func(uint64) error) error {
+			_, err := topologyLinksFromGraph(limiter, []graph.Link{{Protocol: "lldp"}})
+			return err
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			var charged []uint64
+			err := run(func(units uint64) error {
+				charged = append(charged, units)
+				return limitErr
+			})
+			require.ErrorIs(t, err, limitErr)
+			require.Equal(t, []uint64{1}, charged)
+		})
+	}
 }
 
 func snmpTopologyTestActorHandle(actorID string) topologymodel.ActorHandle {
@@ -48,6 +74,6 @@ func assignSNMPTopologyTestHandles(t testing.TB, data *topologymodel.Data) map[s
 	for _, actor := range data.Actors {
 		byActorID[strings.TrimSpace(actor.ActorID)] = actor.ActorHandle
 	}
-	require.NoError(t, data.InitializeActorHandles())
+	require.NoError(t, data.InitializeActorHandles(nil))
 	return byActorID
 }

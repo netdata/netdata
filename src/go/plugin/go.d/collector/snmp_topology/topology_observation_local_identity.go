@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -65,16 +66,27 @@ func (c *topologyBuilder) deriveLocalBridgeMACFromInterfacePhysAddress(localMana
 		}
 	}
 
-	keys := make([]string, 0, len(c.ifStatusByIndex))
+	type orderedInterface struct {
+		key   string
+		index int
+	}
+	interfaces := make([]orderedInterface, 0, len(c.ifStatusByIndex))
 	if !c.chargeWork(uint64(len(c.ifStatusByIndex))) {
 		return ""
 	}
 	for key := range c.ifStatusByIndex {
-		keys = append(keys, key)
+		interfaces = append(interfaces, orderedInterface{key: key, index: topologyutil.ParseIndex(key)})
 	}
-	sortBuilderSlice(c, keys, func(i, j int) bool {
-		left := topologyutil.ParseIndex(keys[i])
-		right := topologyutil.ParseIndex(keys[j])
+	maxKeyBytes, err := worklimit.ChargeStringValues(c.workLimiter, interfaces, func(value orderedInterface) (uint64, error) {
+		return uint64(len(value.key)), nil
+	})
+	if err != nil {
+		c.workErr = err
+		return ""
+	}
+	sortBuilderSliceWithStringWork(c, interfaces, maxKeyBytes, func(i, j int) bool {
+		left := interfaces[i].index
+		right := interfaces[j].index
 		if left > 0 && right > 0 && left != right {
 			return left < right
 		}
@@ -84,13 +96,14 @@ func (c *topologyBuilder) deriveLocalBridgeMACFromInterfacePhysAddress(localMana
 		if left <= 0 && right > 0 {
 			return false
 		}
-		return keys[i] < keys[j]
+		return interfaces[i].key < interfaces[j].key
 	})
-	if !c.chargeWork(uint64(len(keys))) {
+	if !c.chargeWork(uint64(len(interfaces))) {
 		return ""
 	}
 
-	for _, key := range keys {
+	for _, iface := range interfaces {
+		key := iface.key
 		mac := topologyutil.NormalizeMAC(c.ifStatusByIndex[key].mac)
 		if mac == "" || mac == "00:00:00:00:00:00" {
 			continue

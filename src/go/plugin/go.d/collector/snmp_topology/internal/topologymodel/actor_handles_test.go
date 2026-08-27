@@ -3,6 +3,7 @@
 package topologymodel
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -19,12 +20,27 @@ func TestInitializeActorHandlesPreservesGenerationHighWater(t *testing.T) {
 		Links:  []Link{{SrcActorHandle: first, DstActorHandle: third}},
 	}
 
-	require.NoError(t, data.InitializeActorHandles())
+	require.NoError(t, data.InitializeActorHandles(nil))
 	next := data.NextActorHandle()
 	require.NotEqual(t, first, next)
 	require.NotEqual(t, third, next)
 	data.Actors = append(data.Actors, Actor{ActorHandle: next})
 	require.NoError(t, data.ValidateActorHandles())
+}
+
+func TestInitializeActorHandlesChargesBeforeMaterialization(t *testing.T) {
+	handles := graph.NewActorHandleAllocator()
+	data := Data{Actors: []Actor{{ActorHandle: handles.Next()}}}
+	limitErr := errors.New("topology work exhausted")
+	var charged []uint64
+
+	err := data.InitializeActorHandles(func(units uint64) error {
+		charged = append(charged, units)
+		return limitErr
+	})
+
+	require.ErrorIs(t, err, limitErr)
+	require.Equal(t, []uint64{2}, charged)
 }
 
 func TestValidateActorHandlesRejectsBrokenIdentityGraph(t *testing.T) {
@@ -56,7 +72,7 @@ func TestValidateActorHandlesRejectsBrokenIdentityGraph(t *testing.T) {
 
 	for name, data := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Error(t, data.InitializeActorHandles())
+			require.Error(t, data.InitializeActorHandles(nil))
 			require.Error(t, data.ValidateActorHandles())
 		})
 	}

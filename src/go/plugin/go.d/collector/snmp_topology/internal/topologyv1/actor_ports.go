@@ -54,7 +54,7 @@ func buildSNMPTopologyV1PortNeighborSummariesWithWork(
 	links []topologymodel.Link,
 	actorIndex topologyV1ActorIndex,
 ) map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary {
-	if !work.charge(uint64(len(links))) {
+	if !work.chargeProduct(uint64(len(links)), 3) {
 		return nil
 	}
 	summaries := make(map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary)
@@ -154,7 +154,9 @@ func collectSNMPTopologyV1ActorTableRowsWithWork(work *renderWork, actors []topo
 			return nil
 		}
 		for _, port := range actor.Detail.L2.Device.Ports {
-			if !work.charge(uint64(len(port.Neighbors) + len(port.VLANs))) {
+			if !work.charge(26) ||
+				!work.chargeProduct(uint64(len(port.Neighbors)), 6) ||
+				!work.chargeProduct(uint64(len(port.VLANs)), 3) {
 				return nil
 			}
 			tables["ports"] = append(tables["ports"], topologyV1DynamicRow{
@@ -163,6 +165,9 @@ func collectSNMPTopologyV1ActorTableRowsWithWork(work *renderWork, actors []topo
 			})
 		}
 		for _, row := range actor.Detail.OSPF {
+			if !work.charge(8) {
+				return nil
+			}
 			tables["ospf_neighbors"] = append(tables["ospf_neighbors"], topologyV1DynamicRow{
 				actorRef:          actorIndex,
 				remoteActorHandle: row.RemoteActorHandle,
@@ -170,6 +175,9 @@ func collectSNMPTopologyV1ActorTableRowsWithWork(work *renderWork, actors []topo
 			})
 		}
 		for _, row := range actor.Detail.BGP {
+			if !work.charge(15) {
+				return nil
+			}
 			tables["bgp_peers"] = append(tables["bgp_peers"], topologyV1DynamicRow{
 				actorRef:          actorIndex,
 				remoteActorHandle: row.RemoteActorHandle,
@@ -249,6 +257,18 @@ func buildSNMPTopologyV1ActorPortsTable(
 	stringsDict *topologyapi.StringDictionary,
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) topologyapi.Table {
+	return buildSNMPTopologyV1ActorPortsTableWithWork(nil, rows, stringsDict, portNeighborSummaries)
+}
+
+func buildSNMPTopologyV1ActorPortsTableWithWork(
+	work *renderWork,
+	rows []topologyV1DynamicRow,
+	stringsDict *topologyapi.StringDictionary,
+	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
+) topologyapi.Table {
+	if !work.chargeTable(uint64(len(rows)), 29) {
+		return topologyapi.Table{}
+	}
 	actorRefs := make([]any, len(rows))
 	ifIndexes := make([]any, len(rows))
 	portIDs := make([]any, len(rows))
@@ -390,6 +410,9 @@ func buildSNMPTopologyV1ActorPortLinksTableWithWork(
 	stringsDict *topologyapi.StringDictionary,
 ) (topologyapi.Table, error) {
 	if !work.charge(uint64(len(links))) {
+		return topologyapi.Table{}, work.err
+	}
+	if !work.chargeProduct(uint64(len(links)), 2, 18) {
 		return topologyapi.Table{}, work.err
 	}
 	rows := &snmpTopologyV1ActorPortLinkRows{}

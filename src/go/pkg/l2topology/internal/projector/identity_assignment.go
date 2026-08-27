@@ -415,17 +415,21 @@ func sortProjectedTopologyActorsWithWork(work *projectionWork, actors []projecte
 	}
 
 	entries := make([]projectedTopologyActorSortEntry, len(actors))
+	var maxKeyBytes uint64
 	for i := range actors {
 		entries[i] = projectedTopologyActorSortEntry{
 			actor: actors[i],
 			key:   topologyActorSortKeyWithWork(work, actors[i].Actor),
+		}
+		if size := uint64(len(entries[i].key)); size > maxKeyBytes {
+			maxKeyBytes = size
 		}
 		if work != nil && work.err != nil {
 			return
 		}
 	}
 
-	if !sortProjectionSliceStable(work, entries, func(i, j int) bool {
+	if !sortProjectionSliceStableWithStringWork(work, entries, maxKeyBytes, func(i, j int) bool {
 		return entries[i].key < entries[j].key
 	}) {
 		return
@@ -449,17 +453,21 @@ func sortTopologyLinksWithWork(work *projectionWork, links []graph.Link) {
 	}
 
 	entries := make([]topologyLinkSortEntry, len(links))
+	var maxKeyBytes uint64
 	for i := range links {
 		entries[i] = topologyLinkSortEntry{
 			link: links[i],
 			key:  topologyLinkSortKeyWithWork(work, links[i]),
+		}
+		if size := uint64(len(entries[i].key)); size > maxKeyBytes {
+			maxKeyBytes = size
 		}
 		if work != nil && work.err != nil {
 			return
 		}
 	}
 
-	if !sortProjectionSliceStable(work, entries, func(i, j int) bool {
+	if !sortProjectionSliceStableWithStringWork(work, entries, maxKeyBytes, func(i, j int) bool {
 		return entries[i].key < entries[j].key
 	}) {
 		return

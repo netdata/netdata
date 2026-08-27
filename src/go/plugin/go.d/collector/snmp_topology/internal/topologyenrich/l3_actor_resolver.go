@@ -246,6 +246,7 @@ func topologyL3ActorLexicalOrderWithWork(work *enrichmentWork, actors []topology
 		return nil
 	}
 	entries := make([]entry, 0, len(actors))
+	var maxActorIDBytes uint64
 	for _, actor := range actors {
 		if actor.ActorHandle.IsZero() {
 			continue
@@ -253,9 +254,15 @@ func topologyL3ActorLexicalOrderWithWork(work *enrichmentWork, actors []topology
 		if work != nil && !work.chargeStrings([]string{actor.ActorID}) {
 			return nil
 		}
-		entries = append(entries, entry{handle: actor.ActorHandle, actorID: strings.TrimSpace(actor.ActorID)})
+		actorID := strings.TrimSpace(actor.ActorID)
+		entries = append(entries, entry{handle: actor.ActorHandle, actorID: actorID})
+		if size := uint64(len(actorID)); size > maxActorIDBytes {
+			maxActorIDBytes = size
+		}
 	}
-	if !sortEnrichmentSliceStable(work, entries, func(i, j int) bool { return entries[i].actorID < entries[j].actorID }) {
+	if !sortEnrichmentSliceStableWithStringWork(work, entries, maxActorIDBytes, func(i, j int) bool {
+		return entries[i].actorID < entries[j].actorID
+	}) {
 		return nil
 	}
 	if !work.charge(uint64(len(entries))) {

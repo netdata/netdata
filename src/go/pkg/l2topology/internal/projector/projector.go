@@ -243,10 +243,20 @@ func ToGraph(result model.Result, opts model.GraphOptions) (model.Projection, er
 		return model.Projection{}, err
 	}
 	builder.buildStats()
+	if err := builder.work.failure(); err != nil {
+		return model.Projection{}, err
+	}
 	graphData := builder.graph()
+	if err := builder.work.failure(); err != nil {
+		return model.Projection{}, err
+	}
+	actorDetails := builder.actorDetails()
+	if err := builder.work.failure(); err != nil {
+		return model.Projection{}, err
+	}
 	return model.Projection{
 		Graph:        graphData,
 		Stats:        builder.stats,
-		ActorDetails: builder.actorDetails(),
+		ActorDetails: actorDetails,
 	}, nil
 }

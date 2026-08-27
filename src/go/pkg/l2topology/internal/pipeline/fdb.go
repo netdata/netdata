@@ -114,7 +114,13 @@ func buildFDBCandidates(
 	for _, candidate := range candidatesByEndpoint {
 		out = append(out, candidate)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, out, func(candidate fdbCandidate) (uint64, error) {
+		return worklimit.StringBytes(candidate.mac, candidate.fdbDomainID, candidate.vlanID, candidate.bridgePort)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		if out[i].mac != out[j].mac {
 			return out[i].mac < out[j].mac
 		}

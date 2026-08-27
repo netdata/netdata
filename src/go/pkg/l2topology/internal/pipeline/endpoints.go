@@ -72,7 +72,11 @@ func (s *l2BuildState) applyBridge(observations []model.L2Observation) error {
 				attachment.Labels = labels
 			}
 
-			if addAttachment(s.attachments, attachment) {
+			added, err := addAttachment(s.workLimiter, s.attachments, attachment)
+			if err != nil {
+				return err
+			}
+			if added {
 				s.attachmentsFDB++
 				s.endpointIDs[endpointID] = struct{}{}
 				if domain := attachmentDomain(attachment); domain != "" {

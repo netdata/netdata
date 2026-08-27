@@ -27,13 +27,17 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	if deviceID == "" {
 		return fmt.Errorf("observation with empty device id")
 	}
+	labels, err := mergeObservedDeviceLabels(s.workLimiter, nil, obs.Labels)
+	if err != nil {
+		return err
+	}
 
 	device := model.Device{
 		ID:        deviceID,
 		Hostname:  strings.TrimSpace(obs.Hostname),
 		SysObject: strings.TrimSpace(obs.SysObjectID),
 		ChassisID: strings.TrimSpace(obs.ChassisID),
-		Labels:    mergeObservedDeviceLabels(nil, obs.Labels),
+		Labels:    labels,
 	}
 	if primaryMAC := primaryL2MACIdentity(obs.ChassisID, obs.BaseBridgeAddress); primaryMAC != "" {
 		device.ChassisID = primaryMAC
@@ -83,7 +87,11 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		if device.Labels == nil {
 			device.Labels = make(map[string]string)
 		}
-		for protocol := range csvToTopologySet(existing.Labels["protocols_observed"]) {
+		priorProtocols, err := csvToTopologySet(s.workLimiter, existing.Labels["protocols_observed"])
+		if err != nil {
+			return err
+		}
+		for protocol := range priorProtocols {
 			observedProtocols[protocol] = struct{}{}
 		}
 	}
@@ -335,7 +343,10 @@ func mergeObservedDevice(
 	if err != nil {
 		return model.Device{}, err
 	}
-	out.Labels = mergeObservedDeviceLabels(existing.Labels, incoming.Labels)
+	out.Labels, err = mergeObservedDeviceLabels(limiter, existing.Labels, incoming.Labels)
+	if err != nil {
+		return model.Device{}, err
+	}
 	if strings.TrimSpace(out.Hostname) == "" {
 		out.Hostname = out.ID
 	}
@@ -397,9 +408,37 @@ func mergeObservedDeviceAddresses(
 	return sortedAddrValues(limiter, merged)
 }
 
-func mergeObservedDeviceLabels(existing, incoming map[string]string) map[string]string {
+func mergeObservedDeviceLabels(
+	limiter worklimit.Limiter,
+	existing, incoming map[string]string,
+) (map[string]string, error) {
 	if len(existing) == 0 && len(incoming) == 0 {
-		return nil
+		return nil, nil
+	}
+	items, err := worklimit.Sum(uint64(len(existing)), uint64(len(incoming)))
+	if err != nil {
+		return nil, err
+	}
+	if err := limiter.Charge(items); err != nil {
+		return nil, err
+	}
+	if limiter != nil {
+		var bytes uint64
+		for key, value := range existing {
+			bytes, err = worklimit.Sum(bytes, uint64(len(key)), uint64(len(value)))
+			if err != nil {
+				return nil, err
+			}
+		}
+		for key, value := range incoming {
+			bytes, err = worklimit.Sum(bytes, uint64(len(key)), uint64(len(value)))
+			if err != nil {
+				return nil, err
+			}
+		}
+		if err := limiter.Charge(bytes); err != nil {
+			return nil, err
+		}
 	}
 	out := make(map[string]string, len(existing)+len(incoming))
 	for key, value := range existing {
@@ -416,7 +455,7 @@ func mergeObservedDeviceLabels(existing, incoming map[string]string) map[string]
 		}
 	}
 	if len(out) == 0 {
-		return nil
+		return nil, nil
 	}
-	return out
+	return out, nil
 }

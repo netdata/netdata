@@ -13,6 +13,16 @@ func sortedLLDPRemotes(limiter worklimit.Limiter, in []model.LLDPRemoteObservati
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, in, func(remote model.LLDPRemoteObservation) (uint64, error) {
+		return worklimit.StringBytes(
+			remote.LocalPortNum, remote.RemoteIndex, remote.LocalPortID, remote.LocalPortIDSubtype,
+			remote.LocalPortDesc, remote.ChassisID, remote.SysName, remote.PortID,
+			remote.PortIDSubtype, remote.PortDesc, remote.ManagementIP,
+		)
+	})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]model.LLDPRemoteObservation, 0, len(in))
 	for _, remote := range in {
 		if strings.TrimSpace(remote.ChassisID) == "" && strings.TrimSpace(remote.SysName) == "" {
@@ -20,7 +30,7 @@ func sortedLLDPRemotes(limiter worklimit.Limiter, in []model.LLDPRemoteObservati
 		}
 		out = append(out, remote)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.LocalPortNum != b.LocalPortNum {
 			return a.LocalPortNum < b.LocalPortNum
@@ -60,6 +70,15 @@ func sortedCDPRemotes(limiter worklimit.Limiter, in []model.CDPRemoteObservation
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, in, func(remote model.CDPRemoteObservation) (uint64, error) {
+		return worklimit.StringBytes(
+			remote.LocalIfName, remote.DeviceIndex, remote.DeviceID, remote.SysName,
+			remote.DevicePort, remote.Address, remote.RawAddress,
+		)
+	})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]model.CDPRemoteObservation, 0, len(in))
 	for _, remote := range in {
 		if strings.TrimSpace(remote.DeviceID) == "" && strings.TrimSpace(remote.Address) == "" {
@@ -67,7 +86,7 @@ func sortedCDPRemotes(limiter worklimit.Limiter, in []model.CDPRemoteObservation
 		}
 		out = append(out, remote)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.LocalIfIndex != b.LocalIfIndex {
 			return a.LocalIfIndex < b.LocalIfIndex
@@ -101,6 +120,12 @@ func sortedBridgePorts(limiter worklimit.Limiter, in []model.BridgePortObservati
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, in, func(port model.BridgePortObservation) (uint64, error) {
+		return uint64(len(port.BasePort)), nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]model.BridgePortObservation, 0, len(in))
 	for _, bridgePort := range in {
 		if strings.TrimSpace(bridgePort.BasePort) == "" || bridgePort.IfIndex <= 0 {
@@ -108,7 +133,7 @@ func sortedBridgePorts(limiter worklimit.Limiter, in []model.BridgePortObservati
 		}
 		out = append(out, bridgePort)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.BasePort != b.BasePort {
 			return a.BasePort < b.BasePort
@@ -124,6 +149,15 @@ func sortedSTPPortEntries(limiter worklimit.Limiter, in []model.STPPortObservati
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, in, func(entry model.STPPortObservation) (uint64, error) {
+		return worklimit.StringBytes(
+			entry.Port, entry.IfName, entry.VLANID, entry.VLANName, entry.State, entry.Enable,
+			entry.PathCost, entry.DesignatedRoot, entry.DesignatedBridge, entry.DesignatedPort,
+		)
+	})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]model.STPPortObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.Port) == "" {
@@ -131,7 +165,7 @@ func sortedSTPPortEntries(limiter worklimit.Limiter, in []model.STPPortObservati
 		}
 		out = append(out, entry)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Port != b.Port {
 			return a.Port < b.Port
@@ -156,6 +190,14 @@ func sortedFDBEntries(limiter worklimit.Limiter, in []model.FDBObservation) ([]m
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, in, func(entry model.FDBObservation) (uint64, error) {
+		return worklimit.StringBytes(
+			entry.MAC, entry.BridgePort, entry.Status, entry.FDBDomainID, entry.VLANID, entry.VLANName,
+		)
+	})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]model.FDBObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.MAC) == "" {
@@ -163,7 +205,7 @@ func sortedFDBEntries(limiter worklimit.Limiter, in []model.FDBObservation) ([]m
 		}
 		out = append(out, entry)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.BridgePort != b.BridgePort {
 			return a.BridgePort < b.BridgePort
@@ -188,6 +230,12 @@ func sortedARPNDEntries(limiter worklimit.Limiter, in []model.ARPNDObservation) 
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, in, func(entry model.ARPNDObservation) (uint64, error) {
+		return worklimit.StringBytes(entry.Protocol, entry.IfName, entry.IP, entry.MAC, entry.State, entry.AddrType)
+	})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]model.ARPNDObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.MAC) == "" && strings.TrimSpace(entry.IP) == "" {
@@ -195,7 +243,7 @@ func sortedARPNDEntries(limiter worklimit.Limiter, in []model.ARPNDObservation) 
 		}
 		out = append(out, entry)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Protocol != b.Protocol {
 			return a.Protocol < b.Protocol
@@ -227,7 +275,13 @@ func sortedDevices(limiter worklimit.Limiter, in map[string]model.Device) ([]mod
 	for _, dev := range in {
 		out = append(out, dev)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, out, func(device model.Device) (uint64, error) {
+		return worklimit.StringBytes(device.ID, device.Hostname)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		if out[i].ID != out[j].ID {
 			return out[i].ID < out[j].ID
 		}
@@ -246,7 +300,13 @@ func sortedInterfaces(limiter worklimit.Limiter, in map[string]model.Interface) 
 	for _, iface := range in {
 		out = append(out, iface)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, out, func(iface model.Interface) (uint64, error) {
+		return worklimit.StringBytes(iface.DeviceID, iface.IfName)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.DeviceID != b.DeviceID {
 			return a.DeviceID < b.DeviceID
@@ -265,11 +325,60 @@ func sortedAdjacencies(limiter worklimit.Limiter, in map[string]model.Adjacency)
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	if limiter != nil {
+		type entry struct {
+			value model.Adjacency
+			key   string
+		}
+		entries := make([]entry, 0, len(in))
+		for key, adjacency := range in {
+			entries = append(entries, entry{value: adjacency, key: key})
+		}
+		maxStringBytes, err := worklimit.ChargeStringValues(limiter, entries, func(item entry) (uint64, error) {
+			adjacency := item.value
+			return worklimit.StringBytes(
+				adjacency.Protocol, adjacency.SourceID, adjacency.SourcePort,
+				adjacency.TargetID, adjacency.TargetPort, item.key,
+			)
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := worklimit.SortSliceWithStringWork(limiter, entries, maxStringBytes, func(i, j int) bool {
+			a, b := entries[i], entries[j]
+			if a.value.Protocol != b.value.Protocol {
+				return a.value.Protocol < b.value.Protocol
+			}
+			if a.value.SourceID != b.value.SourceID {
+				return a.value.SourceID < b.value.SourceID
+			}
+			if a.value.SourcePort != b.value.SourcePort {
+				return a.value.SourcePort < b.value.SourcePort
+			}
+			if a.value.TargetID != b.value.TargetID {
+				return a.value.TargetID < b.value.TargetID
+			}
+			if a.value.TargetPort != b.value.TargetPort {
+				return a.value.TargetPort < b.value.TargetPort
+			}
+			return a.key < b.key
+		}); err != nil {
+			return nil, err
+		}
+		if err := limiter.Charge(uint64(len(entries))); err != nil {
+			return nil, err
+		}
+		out := make([]model.Adjacency, len(entries))
+		for i, item := range entries {
+			out[i] = item.value
+		}
+		return out, nil
+	}
 	out := make([]model.Adjacency, 0, len(in))
 	for _, adj := range in {
 		out = append(out, adj)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, 0, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Protocol != b.Protocol {
 			return a.Protocol < b.Protocol
@@ -297,11 +406,56 @@ func sortedAttachments(limiter worklimit.Limiter, in map[string]model.Attachment
 	if err := limiter.Charge(uint64(len(in))); err != nil {
 		return nil, err
 	}
+	if limiter != nil {
+		type entry struct {
+			value model.Attachment
+			key   string
+		}
+		entries := make([]entry, 0, len(in))
+		for key, attachment := range in {
+			entries = append(entries, entry{value: attachment, key: key})
+		}
+		maxStringBytes, err := worklimit.ChargeStringValues(limiter, entries, func(item entry) (uint64, error) {
+			attachment := item.value
+			return worklimit.StringBytes(
+				attachment.DeviceID, attachment.EndpointID, attachment.Method, item.key,
+			)
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := worklimit.SortSliceWithStringWork(limiter, entries, maxStringBytes, func(i, j int) bool {
+			a, b := entries[i], entries[j]
+			if a.value.DeviceID != b.value.DeviceID {
+				return a.value.DeviceID < b.value.DeviceID
+			}
+			if a.value.IfIndex != b.value.IfIndex {
+				return a.value.IfIndex < b.value.IfIndex
+			}
+			if a.value.EndpointID != b.value.EndpointID {
+				return a.value.EndpointID < b.value.EndpointID
+			}
+			if a.value.Method != b.value.Method {
+				return a.value.Method < b.value.Method
+			}
+			return a.key < b.key
+		}); err != nil {
+			return nil, err
+		}
+		if err := limiter.Charge(uint64(len(entries))); err != nil {
+			return nil, err
+		}
+		out := make([]model.Attachment, len(entries))
+		for i, item := range entries {
+			out[i] = item.value
+		}
+		return out, nil
+	}
 	out := make([]model.Attachment, 0, len(in))
 	for _, attachment := range in {
 		out = append(out, attachment)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	if err := worklimit.SortSliceWithStringWork(limiter, out, 0, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.DeviceID != b.DeviceID {
 			return a.DeviceID < b.DeviceID
@@ -371,7 +525,13 @@ func sortedEnrichments(limiter worklimit.Limiter, in map[string]*enrichmentAccum
 		pruneEmptyLabels(enrichment.Labels)
 		out = append(out, enrichment)
 	}
-	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
+	maxStringBytes, err := worklimit.ChargeStringValues(limiter, out, func(enrichment model.Enrichment) (uint64, error) {
+		return worklimit.StringBytes(enrichment.EndpointID, enrichment.MAC)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := worklimit.SortSliceWithStringWork(limiter, out, maxStringBytes, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.EndpointID != b.EndpointID {
 			return a.EndpointID < b.EndpointID
