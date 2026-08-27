@@ -66,7 +66,7 @@ func TestLayer3ResolverProviderStaysLazyWithoutUsableSubnetCandidates(t *testing
 	assignTopologyEnrichTestHandles(t, &data)
 	provider := newTopologyL3ActorResolverProvider(&data, aggregate.Snapshots)
 
-	applyL3SubnetWithResolver(&data, aggregate, provider)
+	applyL3SubnetWithResolver(nil, &data, aggregate, provider)
 
 	require.False(t, provider.initialized)
 }

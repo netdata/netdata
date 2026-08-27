@@ -2,12 +2,13 @@
 
 package projector
 
-import (
-	"sort"
-	"strings"
-)
+import "strings"
 
 func filterManagedDeviceHints(hints []string, managedDeviceIDs map[string]struct{}) []string {
+	return filterManagedDeviceHintsWithWork(nil, hints, managedDeviceIDs)
+}
+
+func filterManagedDeviceHintsWithWork(work *projectionWork, hints []string, managedDeviceIDs map[string]struct{}) []string {
 	if len(hints) == 0 || len(managedDeviceIDs) == 0 {
 		return hints
 	}
@@ -24,22 +25,32 @@ func filterManagedDeviceHints(hints []string, managedDeviceIDs map[string]struct
 	if len(managed) == 0 {
 		return nil
 	}
-	managed = uniqueTopologyStrings(managed)
-	sort.Strings(managed)
+	managed = uniqueTopologyStringsWithWork(work, managed)
 	return managed
 }
 
 func topologyEndpointLabelDeviceIDs(labels map[string]string) []string {
+	return topologyEndpointLabelDeviceIDsWithWork(nil, labels)
+}
+
+func topologyEndpointLabelDeviceIDsWithWork(work *projectionWork, labels map[string]string) []string {
 	out := labelsCSVToSlice(labels, "learned_device_ids")
 	if len(out) == 0 {
 		out = labelsCSVToSlice(labels, "device_ids")
 	}
-	out = uniqueTopologyStrings(out)
-	sort.Strings(out)
+	out = uniqueTopologyStringsWithWork(work, out)
 	return out
 }
 
 func resolveTopologyEndpointDeviceHints(
+	hints []string,
+	aliasOwnerIDs map[string]map[string]struct{},
+) []string {
+	return resolveTopologyEndpointDeviceHintsWithWork(nil, hints, aliasOwnerIDs)
+}
+
+func resolveTopologyEndpointDeviceHintsWithWork(
+	work *projectionWork,
 	hints []string,
 	aliasOwnerIDs map[string]map[string]struct{},
 ) []string {
@@ -66,7 +77,7 @@ func resolveTopologyEndpointDeviceHints(
 	if len(set) == 0 {
 		return nil
 	}
-	return sortedTopologySet(set)
+	return sortedTopologySetWithWork(work, set)
 }
 
 func normalizeTopologyEndpointDeviceAlias(hint string) string {

@@ -9,7 +9,6 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/diagnostic"
@@ -56,11 +55,13 @@ func replayTopologySemanticV1(
 	if err := diagnostic.DecodeReferenced(source, deviceSection.Members[0], limits, &device); err != nil {
 		return nil, err
 	}
-	groups, err := decodeReplaySemanticGroups(source, eventSection.Members, limits)
+	work := &replayWorkBudget{limit: limits.MaxReplayWork}
+	groups, err := decodeReplaySemanticGroups(
+		source, eventSection.Members, limits, work, eventSection.ExpectedRecords,
+	)
 	if err != nil {
 		return nil, err
 	}
-	work := &replayWorkBudget{limit: limits.MaxReplayWork}
 	mainProfiles, vlanResults, err := replaySemanticInputs(groups, work)
 	if err != nil {
 		return nil, err
@@ -71,10 +72,17 @@ func replayTopologySemanticV1(
 		return nil, errors.New("semantic device has invalid collected_at")
 	}
 	builder := newTopologyBuilder()
+	builder.workLimiter = work.add
 	builder.updateTime = collectedAt
 	builder.staleAfter = time.Duration(device.FreshForNanoseconds)
 	builder.agentID = device.AgentID
-	builder.localDevice = diagnosticDeviceToModel(device.LocalDevice)
+	builder.localDevice, err = diagnosticDeviceToModelWithWork(device.LocalDevice, work)
+	if err != nil {
+		return nil, err
+	}
+	if err := work.add(uint64(len(device.TargetManagementIPs))); err != nil {
+		return nil, err
+	}
 	for _, value := range device.TargetManagementIPs {
 		addr, err := netip.ParseAddr(value)
 		if err != nil {
@@ -84,17 +92,17 @@ func replayTopologySemanticV1(
 	}
 
 	applyTopologySemanticStream(builder, newTopologyMainSemanticStream(device.SysUptime, mainProfiles), nil)
-	if err := work.addSort(uint64(len(builder.vlanNameByID))); err != nil {
-		return nil, err
-	}
 	if err := verifyReplayVLANInventory(builder.vtpVLANContexts(), vlanResults); err != nil {
 		return nil, err
 	}
-	applyTopologySemanticStream(builder, newTopologyVLANSemanticStream(vlanResults), nil)
-	if err := chargeSemanticFinalizeWork(work, builder); err != nil {
-		return nil, err
+	if builder.workErr != nil {
+		return nil, builder.workErr
 	}
-	snapshot, _ := freezeTopologyBuilder(builder)
+	applyTopologySemanticStream(builder, newTopologyVLANSemanticStream(vlanResults), nil)
+	snapshot, _ := freezeTopologyBuilderObservation(builder)
+	if builder.workErr != nil {
+		return nil, builder.workErr
+	}
 	if snapshot == nil {
 		return nil, errors.New("semantic replay produced no snapshot")
 	}
@@ -127,7 +135,15 @@ func decodeReplaySemanticGroups(
 	source diagnostic.MemberSource,
 	refs []diagnostic.ContentRef,
 	limits diagnostic.ReaderLimits,
+	work *replayWorkBudget,
+	expectedRecords uint64,
 ) ([]replaySemanticGroup, error) {
+	if err := work.add(uint64(len(refs))); err != nil {
+		return nil, err
+	}
+	if err := work.add(expectedRecords); err != nil {
+		return nil, err
+	}
 	var groups []replaySemanticGroup
 	for _, ref := range refs {
 		var shard diagnostic.SemanticShardV1
@@ -157,15 +173,16 @@ func replaySemanticInputs(
 		if group.context != 0 {
 			return nil, nil, errors.New("main semantic group has a VLAN context")
 		}
-		if err := addSemanticReplayWork(work, group.records); err != nil {
-			return nil, nil, err
-		}
 		switch group.phase {
 		case diagnostic.SemanticPhaseProfileTags:
 			if int(group.profile) != len(profiles) || len(group.records) != 1 || group.records[0].Kind != "profile_tags" {
 				return nil, nil, errors.New("invalid main profile_tags group")
 			}
-			profiles = append(profiles, profileMetricsFromTags(group.records[0]))
+			metrics, err := profileMetricsFromTags(work, group.records[0])
+			if err != nil {
+				return nil, nil, err
+			}
+			profiles = append(profiles, metrics)
 		case diagnostic.SemanticPhaseTopologyMetrics:
 			if int(group.profile) >= len(profiles) {
 				return nil, nil, errors.New("topology metric group references an unknown profile")
@@ -174,13 +191,20 @@ func replaySemanticInputs(
 				if record.Kind != "topology_metric" || record.Profile != group.profile || record.VLANID != "" {
 					return nil, nil, errors.New("invalid main topology metric record")
 				}
-				profiles[group.profile].TopologyMetrics = append(profiles[group.profile].TopologyMetrics, metricFromRecord(record))
+				metric, err := metricFromRecord(work, record)
+				if err != nil {
+					return nil, nil, err
+				}
+				profiles[group.profile].TopologyMetrics = append(profiles[group.profile].TopologyMetrics, metric)
 			}
 		case diagnostic.SemanticPhaseBGPPeers:
 			if int(group.profile) >= len(profiles) || len(group.records) == 0 || group.records[0].Kind != "bgp_outcome" {
 				return nil, nil, errors.New("invalid BGP semantic group")
 			}
 			if group.records[0].State == diagnostic.StateFailed {
+				if err := work.add(1); err != nil {
+					return nil, nil, err
+				}
 				profiles[group.profile].BGPCollectError = errors.New("captured BGP collection failure")
 				if len(group.records) != 1 {
 					return nil, nil, errors.New("failed BGP group contains peer rows")
@@ -190,7 +214,11 @@ func replaySemanticInputs(
 					if record.Kind != "bgp_peer" || record.Profile != group.profile {
 						return nil, nil, errors.New("invalid BGP peer record")
 					}
-					profiles[group.profile].BGPRows = append(profiles[group.profile].BGPRows, bgpRowFromRecord(record))
+					row, err := bgpRowFromRecord(work, record)
+					if err != nil {
+						return nil, nil, err
+					}
+					profiles[group.profile].BGPRows = append(profiles[group.profile].BGPRows, row)
 				}
 			}
 		default:
@@ -212,7 +240,7 @@ func replaySemanticInputs(
 			outcomeGroup.context != uint32(len(vlanResults)) || len(outcomeGroup.records) != 1 {
 			return nil, nil, errors.New("invalid VLAN outcome group order")
 		}
-		if err := addSemanticReplayWork(work, outcomeGroup.records); err != nil {
+		if err := work.add(1); err != nil {
 			return nil, nil, err
 		}
 		outcome := outcomeGroup.records[0]
@@ -242,10 +270,11 @@ func replaySemanticInputs(
 				if int(group.profile) != len(result.profiles) || len(group.records) != 1 || group.records[0].Kind != "profile_tags" {
 					return nil, nil, errors.New("invalid VLAN profile_tags group")
 				}
-				if err := addSemanticReplayWork(work, group.records); err != nil {
+				metrics, err := profileMetricsFromTags(work, group.records[0])
+				if err != nil {
 					return nil, nil, err
 				}
-				result.profiles = append(result.profiles, profileMetricsFromTags(group.records[0]))
+				result.profiles = append(result.profiles, metrics)
 				position++
 			}
 			for position < len(groups) && groups[position].phase == diagnostic.SemanticPhaseVLANMetrics &&
@@ -254,16 +283,17 @@ func replaySemanticInputs(
 				if int(group.profile) >= len(result.profiles) {
 					return nil, nil, errors.New("VLAN metric group references an unknown profile")
 				}
-				if err := addSemanticReplayWork(work, group.records); err != nil {
-					return nil, nil, err
-				}
 				for _, record := range group.records {
 					if record.Kind != "topology_metric" || record.Profile != group.profile || record.VLANID != result.vlanID {
 						return nil, nil, errors.New("invalid VLAN topology metric record")
 					}
+					metric, err := metricFromRecord(work, record)
+					if err != nil {
+						return nil, nil, err
+					}
 					result.profiles[group.profile].TopologyMetrics = append(
 						result.profiles[group.profile].TopologyMetrics,
-						metricFromRecord(record),
+						metric,
 					)
 				}
 				position++
@@ -274,79 +304,29 @@ func replaySemanticInputs(
 	return profiles, vlanResults, nil
 }
 
-func addSemanticReplayWork(work *replayWorkBudget, records []diagnostic.SemanticRecordV1) error {
-	for _, record := range records {
-		if err := work.add(1); err != nil {
-			return err
-		}
-		if err := work.add(uint64(len(record.Tags))); err != nil {
-			return err
-		}
-		if err := work.add(uint64(len(record.Metadata))); err != nil {
-			return err
-		}
-		if record.BGP != nil {
-			if err := work.add(uint64(len(record.BGP.Tags))); err != nil {
-				return err
-			}
-		}
+func profileMetricsFromTags(work *replayWorkBudget, record diagnostic.SemanticRecordV1) (*ddsnmp.ProfileMetrics, error) {
+	if err := work.add(uint64(1 + len(record.Tags) + len(record.Metadata))); err != nil {
+		return nil, err
 	}
-	return nil
-}
-
-func chargeSemanticFinalizeWork(work *replayWorkBudget, builder *topologyBuilder) error {
-	if builder == nil {
-		return nil
-	}
-	interfaceKeys, err := worklimit.Sum(uint64(len(builder.ifNamesByIndex)), uint64(len(builder.ifStatusByIndex)))
-	if err != nil {
-		return err
-	}
-	for _, size := range []uint64{
-		uint64(len(builder.localDevice.Labels)),
-		uint64(len(builder.localDevice.ManagementAddresses)),
-		uint64(len(builder.fdbEntries)),
-		uint64(len(builder.ifStatusByIndex)),
-		interfaceKeys,
-		uint64(len(builder.bridgePortToIf)),
-		uint64(len(builder.fdbEntries)),
-		uint64(len(builder.stpPorts)),
-		uint64(len(builder.arpEntries)),
-		uint64(len(builder.lldpRemotes)),
-		uint64(len(builder.cdpRemotes)),
-		uint64(len(builder.l3InterfacesByIP)),
-		uint64(len(builder.ospfNeighborsByKey)),
-		uint64(len(builder.bgpPeersByKey)),
-	} {
-		if err := work.addSort(size); err != nil {
-			return err
-		}
-	}
-	interfaceSort, err := worklimit.SortEnvelope(uint64(len(builder.l3InterfacesByIP)))
-	if err != nil {
-		return err
-	}
-	perNeighbor, err := worklimit.Product(uint64(len(builder.ospfNeighborsByKey)), interfaceSort)
-	if err != nil {
-		return err
-	}
-	return work.add(perNeighbor)
-}
-
-func profileMetricsFromTags(record diagnostic.SemanticRecordV1) *ddsnmp.ProfileMetrics {
 	metadata := make(map[string]ddsnmp.MetaTag, len(record.Metadata))
 	for key, value := range record.Metadata {
 		metadata[key] = ddsnmp.MetaTag{Value: value.Value, IsExactMatch: value.IsExactMatch}
 	}
-	return &ddsnmp.ProfileMetrics{DeviceMetadata: metadata, Tags: maps.Clone(record.Tags)}
+	return &ddsnmp.ProfileMetrics{DeviceMetadata: metadata, Tags: maps.Clone(record.Tags)}, nil
 }
 
-func metricFromRecord(record diagnostic.SemanticRecordV1) ddsnmp.Metric {
-	return ddsnmp.Metric{TopologyKind: ddprofiledefinition.TopologyKind(record.TopologyKind), Tags: maps.Clone(record.Tags)}
+func metricFromRecord(work *replayWorkBudget, record diagnostic.SemanticRecordV1) (ddsnmp.Metric, error) {
+	if err := work.add(uint64(1 + len(record.Tags))); err != nil {
+		return ddsnmp.Metric{}, err
+	}
+	return ddsnmp.Metric{TopologyKind: ddprofiledefinition.TopologyKind(record.TopologyKind), Tags: maps.Clone(record.Tags)}, nil
 }
 
-func bgpRowFromRecord(record diagnostic.SemanticRecordV1) ddsnmp.BGPRow {
+func bgpRowFromRecord(work *replayWorkBudget, record diagnostic.SemanticRecordV1) (ddsnmp.BGPRow, error) {
 	value := record.BGP
+	if err := work.add(uint64(1 + len(value.Tags))); err != nil {
+		return ddsnmp.BGPRow{}, err
+	}
 	return ddsnmp.BGPRow{
 		OriginProfileID: value.OriginProfileID, Table: value.Table, RowKey: value.RowKey, StructuralID: value.StructuralID,
 		Kind: ddprofiledefinition.BGPRowKind(value.Kind),
@@ -365,7 +345,7 @@ func bgpRowFromRecord(record diagnostic.SemanticRecordV1) ddsnmp.BGPRow {
 			LastReceivedUpdateAge: ddsnmp.BGPInt64{Has: value.LastReceivedUpdateAge.Has, Value: value.LastReceivedUpdateAge.Value},
 		},
 		Tags: maps.Clone(value.Tags),
-	}
+	}, nil
 }
 
 func verifyReplayVLANInventory(want []topologyVLANContext, got []topologyVLANContextResult) error {
@@ -394,14 +374,6 @@ func (b *replayWorkBudget) add(value uint64) error {
 	}
 	b.used += value
 	return nil
-}
-
-func (b *replayWorkBudget) addSort(items uint64) error {
-	units, err := worklimit.SortEnvelope(items)
-	if err != nil {
-		return err
-	}
-	return b.add(units)
 }
 
 func semanticCapabilityRoot(manifest diagnostic.ManifestV1) (diagnostic.ContentRef, bool) {

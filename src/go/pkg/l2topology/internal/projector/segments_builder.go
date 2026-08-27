@@ -10,6 +10,7 @@ import (
 )
 
 type segmentProjectionBuilder struct {
+	work                      *projectionWork
 	attachments               []model.Attachment
 	adjacencies               []model.Adjacency
 	layer                     string
@@ -58,6 +59,7 @@ type segmentProjectionBuilder struct {
 }
 
 func newSegmentProjectionBuilder(
+	work *projectionWork,
 	attachments []model.Attachment,
 	adjacencies []model.Adjacency,
 	layer string,
@@ -78,6 +80,7 @@ func newSegmentProjectionBuilder(
 	strategyConfig topologyInferenceStrategyConfig,
 ) *segmentProjectionBuilder {
 	return &segmentProjectionBuilder{
+		work:                      work,
 		attachments:               attachments,
 		adjacencies:               adjacencies,
 		layer:                     layer,
@@ -114,6 +117,6 @@ func (b *segmentProjectionBuilder) build() projectedSegments {
 	b.assignProbableEndpoints(endpointIDs)
 	b.assignRemainingProbableEndpoints(endpointIDs)
 	b.emitLinks()
-	sortTopologyLinks(b.out.links)
+	sortTopologyLinksWithWork(b.work, b.out.links)
 	return b.out
 }

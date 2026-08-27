@@ -4,29 +4,30 @@ package projector
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/stretchr/testify/require"
 )
 
-func TestChargeBridgeCollectionChargesPairwiseRecordSortBeforeInference(t *testing.T) {
+func TestInferFDBPairwiseBridgeLinksRejectsDenseFanoutBeforeMaterialization(t *testing.T) {
 	const size = 8
-	result := model.Result{
-		Devices:     make([]model.Device, size),
-		Attachments: make([]model.Attachment, size),
+	attachments := make([]model.Attachment, size)
+	reporterAliases := make(map[string][]string, size)
+	for i := range size {
+		reporterAliases[fmt.Sprintf("switch-%d", i)] = []string{fmt.Sprintf("02:00:00:00:00:%02x", i)}
 	}
-	// Existing linear preparation + fanout + attachment sorting fits this
-	// budget. Sorting the product-sized candidate vector does not.
-	const budget = uint64(104)
-	remaining := budget
+
 	limitErr := errors.New("pairwise work exhausted")
-	err := chargeBridgeCollection(result, topologyInferenceStrategyConfig{enableFDBPairwiseLinks: true}, func(units uint64) error {
-		if units > remaining {
-			return limitErr
-		}
-		remaining -= units
-		return nil
-	})
-	require.ErrorIs(t, err, limitErr)
+	var charged []uint64
+	work := &projectionWork{limiter: func(units uint64) error {
+		charged = append(charged, units)
+		return limitErr
+	}}
+	links := inferFDBPairwiseBridgeLinksWithWork(work, attachments, nil, reporterAliases)
+
+	require.Nil(t, links)
+	require.ErrorIs(t, work.err, limitErr)
+	require.Equal(t, []uint64{size * size}, charged)
 }

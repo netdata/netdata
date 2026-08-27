@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -13,6 +12,17 @@ func buildFDBReporterAliases(
 	deviceByID map[string]model.Device,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) map[string][]string {
+	return buildFDBReporterAliasesWithWork(nil, deviceByID, ifaceByDeviceIndex)
+}
+
+func buildFDBReporterAliasesWithWork(
+	work *projectionWork,
+	deviceByID map[string]model.Device,
+	ifaceByDeviceIndex map[string]model.Interface,
+) map[string][]string {
+	if !work.charge(uint64(len(deviceByID))) || !work.charge(uint64(len(ifaceByDeviceIndex))) {
+		return nil
+	}
 	aliases := make(map[string]map[string]struct{}, len(deviceByID))
 
 	for _, device := range deviceByID {
@@ -47,7 +57,7 @@ func buildFDBReporterAliases(
 
 	out := make(map[string][]string, len(aliases))
 	for deviceID, set := range aliases {
-		values := sortedTopologySet(set)
+		values := sortedTopologySetWithWork(work, set)
 		if len(values) == 0 {
 			continue
 		}
@@ -117,21 +127,33 @@ func normalizeFDBEndpointID(endpointID string) string {
 }
 
 func buildFDBAliasOwnerMap(reporterAliases map[string][]string) map[string]map[string]struct{} {
+	return buildFDBAliasOwnerMapWithWork(nil, reporterAliases)
+}
+
+func buildFDBAliasOwnerMapWithWork(work *projectionWork, reporterAliases map[string][]string) map[string]map[string]struct{} {
 	if len(reporterAliases) == 0 {
 		return nil
 	}
 	aliasOwners := make(map[string]map[string]struct{})
-	reporterIDs := make([]string, 0, len(reporterAliases))
-	for reporterID := range reporterAliases {
+	var reporterIDs []string
+	if work == nil {
+		reporterIDs = make([]string, 0, len(reporterAliases))
+	}
+	reporterIDs = sortedProjectionKeys(work, reporterAliases, reporterIDs)
+	if work != nil && work.err != nil {
+		return nil
+	}
+	filteredReporterIDs := reporterIDs[:0]
+	for _, reporterID := range reporterIDs {
 		reporterID = strings.TrimSpace(reporterID)
 		if reporterID == "" {
 			continue
 		}
-		reporterIDs = append(reporterIDs, reporterID)
+		filteredReporterIDs = append(filteredReporterIDs, reporterID)
 	}
-	sort.Strings(reporterIDs)
+	reporterIDs = filteredReporterIDs
 	for _, reporterID := range reporterIDs {
-		aliases := uniqueTopologyStrings(reporterAliases[reporterID])
+		aliases := uniqueTopologyStringsWithWork(work, reporterAliases[reporterID])
 		for _, alias := range aliases {
 			alias = normalizeFDBEndpointID(alias)
 			if alias == "" {

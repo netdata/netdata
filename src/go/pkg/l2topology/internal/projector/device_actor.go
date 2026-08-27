@@ -27,7 +27,11 @@ func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Mat
 }
 
 func buildDeviceActorMatchWithAddresses(dev model.Device, reporterAliases, addresses []string) graph.Match {
-	match := buildDeviceBaseMatch(dev, reporterAliases)
+	return buildDeviceActorMatchWithAddressesAndWork(nil, dev, reporterAliases, addresses)
+}
+
+func buildDeviceActorMatchWithAddressesAndWork(work *projectionWork, dev model.Device, reporterAliases, addresses []string) graph.Match {
+	match := buildDeviceBaseMatchWithWork(work, dev, reporterAliases)
 	match.IPAddresses = slices.Clone(addresses)
 	return match
 }
@@ -37,12 +41,23 @@ func buildDeviceEndpointMatch(dev model.Device) graph.Match {
 }
 
 func buildDeviceEndpointMatchWithAddresses(dev model.Device, addresses []string) graph.Match {
-	match := buildDeviceBaseMatch(dev, nil)
+	return buildDeviceEndpointMatchWithAddressesAndWork(nil, dev, addresses)
+}
+
+func buildDeviceEndpointMatchWithAddressesAndWork(work *projectionWork, dev model.Device, addresses []string) graph.Match {
+	match := buildDeviceBaseMatchWithWork(work, dev, nil)
 	match.IPAddresses = addresses
 	return graph.LinkEndpointMatch(match, selectedDeviceManagementIP(dev))
 }
 
 func buildDeviceBaseMatch(dev model.Device, reporterAliases []string) graph.Match {
+	return buildDeviceBaseMatchWithWork(nil, dev, reporterAliases)
+}
+
+func buildDeviceBaseMatchWithWork(work *projectionWork, dev model.Device, reporterAliases []string) graph.Match {
+	if !work.chargeStrings(reporterAliases) {
+		return graph.Match{}
+	}
 	match := graph.Match{
 		SysObjectID: strings.TrimSpace(dev.SysObject),
 		SysName:     strings.TrimSpace(dev.Hostname),
@@ -72,7 +87,7 @@ func buildDeviceBaseMatch(dev model.Device, reporterAliases []string) graph.Matc
 		}
 	}
 	if len(macSet) > 0 {
-		match.MacAddresses = sortedTopologySet(macSet)
+		match.MacAddresses = sortedTopologySetWithWork(work, macSet)
 	}
 
 	return match

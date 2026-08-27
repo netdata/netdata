@@ -4,7 +4,6 @@ package topologyenrich
 
 import (
 	"net/netip"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -42,8 +41,15 @@ type topologyL3SubnetGroup struct {
 }
 
 func buildTopologyL3SubnetCandidates(rows []topologymodel.L3Interface) (topologyL3SubnetCandidates, topologymodel.L3SubnetBuildStats) {
+	return buildTopologyL3SubnetCandidatesWithWork(nil, rows)
+}
+
+func buildTopologyL3SubnetCandidatesWithWork(work *enrichmentWork, rows []topologymodel.L3Interface) (topologyL3SubnetCandidates, topologymodel.L3SubnetBuildStats) {
 	var stats topologymodel.L3SubnetBuildStats
 	if len(rows) == 0 {
+		return topologyL3SubnetCandidates{}, stats
+	}
+	if !work.charge(uint64(len(rows))) {
 		return topologyL3SubnetCandidates{}, stats
 	}
 
@@ -67,11 +73,11 @@ func buildTopologyL3SubnetCandidates(rows []topologymodel.L3Interface) (topology
 		existing.rows = append(existing.rows, row)
 	}
 
-	keys := make([]string, 0, len(groups))
-	for key := range groups {
-		keys = append(keys, key)
+	var keys []string
+	if work == nil {
+		keys = make([]string, 0, len(groups))
 	}
-	sort.Strings(keys)
+	keys = sortedEnrichmentKeys(work, groups, keys)
 
 	var candidates topologyL3SubnetCandidates
 	candidates.Adjacencies = make([]topologyL3SubnetAdjacency, 0, len(keys))
@@ -79,7 +85,7 @@ func buildTopologyL3SubnetCandidates(rows []topologymodel.L3Interface) (topology
 	for _, key := range keys {
 		group := groups[key]
 		stats.CandidateSubnets++
-		sortTopologyL3Interfaces(group.rows)
+		sortTopologyL3InterfacesWithWork(work, group.rows)
 
 		switch {
 		case topologyL3SubnetDirectPrefixSupported(group.prefix):
@@ -179,9 +185,18 @@ func topologyL3SubnetKey(network netip.Addr, prefix int) string {
 }
 
 func sortTopologyL3Interfaces(rows []topologymodel.L3Interface) {
-	sort.Slice(rows, func(i, j int) bool {
-		return topologyL3InterfaceSortKey(rows[i]) < topologyL3InterfaceSortKey(rows[j])
-	})
+	sortTopologyL3InterfacesWithWork(nil, rows)
+}
+
+func sortTopologyL3InterfacesWithWork(work *enrichmentWork, rows []topologymodel.L3Interface) {
+	sortEnrichmentByPreparedStringKey(work, rows, topologyL3InterfaceSortKeyWithWork)
+}
+
+func topologyL3InterfaceSortKeyWithWork(work *enrichmentWork, row topologymodel.L3Interface) (string, bool) {
+	if work != nil && !work.chargeStrings([]string{row.DeviceID, row.IP, row.IfIndex}) {
+		return "", false
+	}
+	return topologyL3InterfaceSortKey(row), true
 }
 
 func topologyL3InterfaceSortKey(row topologymodel.L3Interface) string {

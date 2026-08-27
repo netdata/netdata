@@ -3,7 +3,6 @@
 package topologyenrich
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -30,6 +29,7 @@ type topologyL3ActorResolver struct {
 }
 
 type topologyL3ActorResolverProvider struct {
+	work        *enrichmentWork
 	data        *topologymodel.Data
 	snapshots   []topologymodel.ObservationSnapshot
 	resolver    topologyL3ActorResolver
@@ -40,18 +40,30 @@ func newTopologyL3ActorResolverProvider(
 	data *topologymodel.Data,
 	snapshots []topologymodel.ObservationSnapshot,
 ) *topologyL3ActorResolverProvider {
-	return &topologyL3ActorResolverProvider{data: data, snapshots: snapshots}
+	return newTopologyL3ActorResolverProviderWithWork(nil, data, snapshots)
+}
+
+func newTopologyL3ActorResolverProviderWithWork(
+	work *enrichmentWork,
+	data *topologymodel.Data,
+	snapshots []topologymodel.ObservationSnapshot,
+) *topologyL3ActorResolverProvider {
+	return &topologyL3ActorResolverProvider{work: work, data: data, snapshots: snapshots}
 }
 
 func (p *topologyL3ActorResolverProvider) resolve() topologyL3ActorResolver {
 	if !p.initialized {
-		p.resolver = newTopologyL3ActorResolver(p.data, p.snapshots)
+		p.resolver = newTopologyL3ActorResolverWithWork(p.work, p.data, p.snapshots)
 		p.initialized = true
 	}
 	return p.resolver
 }
 
 func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) topologyL3ActorResolver {
+	return newTopologyL3ActorResolverWithWork(nil, data, snapshots)
+}
+
+func newTopologyL3ActorResolverWithWork(work *enrichmentWork, data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) topologyL3ActorResolver {
 	resolver := topologyL3ActorResolver{
 		byActorID:  make(map[string]topologyL3ActorRef),
 		byDeviceID: make(map[string]topologyL3ActorRef),
@@ -61,29 +73,44 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 	if data == nil || len(data.Actors) == 0 {
 		return resolver
 	}
+	if !work.charge(uint64(len(data.Actors))) || !work.charge(uint64(len(snapshots))) {
+		return resolver
+	}
 
 	managedActors := make([]topologyL3ActorRef, 0, len(data.Actors))
-	actorOrder := topologyL3ActorLexicalOrder(data.Actors)
+	actorOrder := topologyL3ActorLexicalOrderWithWork(work, data.Actors)
 	localMatchIndex := topologymodel.NewLocalActorMatchIndex()
 	for _, actor := range data.Actors {
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
+		managementIP := topologymodel.ActorDetailManagementIP(actor)
+		if work != nil && (!work.chargeStrings(actor.Match.IPAddresses) || !work.chargeStrings([]string{managementIP})) {
+			return resolver
+		}
 		ref := topologyL3ActorRef{
 			actorHandle:   actor.ActorHandle,
 			actorID:       strings.TrimSpace(actor.ActorID),
 			actorOrder:    actorOrder[actor.ActorHandle],
-			endpointMatch: graph.LinkEndpointMatch(actor.Match, topologymodel.ActorDetailManagementIP(actor)),
+			endpointMatch: graph.LinkEndpointMatch(actor.Match, managementIP),
 		}
 		managedActors = append(managedActors, ref)
-		localMatchIndex.AddMatch(len(managedActors)-1, actor.Match)
+		if err := localMatchIndex.AddMatchWithLimiter(len(managedActors)-1, actor.Match, work.limiterValue()); err != nil {
+			work.fail(err)
+			return resolver
+		}
 		if ref.actorID != "" {
 			resolver.byActorID[ref.actorID] = ref
 		}
 		if deviceID := topologymodel.ActorDetailDeviceID(actor); deviceID != "" {
 			resolver.addUniqueDeviceID(deviceID, ref)
 		}
-		for _, ip := range topologymodel.NormalizedMatchIPs(actor.Match) {
+		matchIPs, err := topologymodel.NormalizedMatchIPsWithLimiter(actor.Match, work.limiterValue())
+		if err != nil {
+			work.fail(err)
+			return resolver
+		}
+		for _, ip := range matchIPs {
 			resolver.addUniqueIPAddress(ip, ref)
 		}
 		for _, routerID := range topologyL3ActorRouterIDs(actor) {
@@ -97,7 +124,12 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 		if deviceID == "" {
 			continue
 		}
-		matches = localMatchIndex.MatchIndexes(matches[:0], snapshot.LocalDevice)
+		var err error
+		matches, err = localMatchIndex.MatchIndexesWithLimiter(matches[:0], snapshot.LocalDevice, work.limiterValue())
+		if err != nil {
+			work.fail(err)
+			return resolver
+		}
 		for _, actorIndex := range matches {
 			ref := managedActors[actorIndex]
 			resolver.addUniqueDeviceID(deviceID, ref)
@@ -202,18 +234,33 @@ func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topology
 }
 
 func topologyL3ActorLexicalOrder(actors []topologymodel.Actor) map[topologymodel.ActorHandle]int {
+	return topologyL3ActorLexicalOrderWithWork(nil, actors)
+}
+
+func topologyL3ActorLexicalOrderWithWork(work *enrichmentWork, actors []topologymodel.Actor) map[topologymodel.ActorHandle]int {
 	type entry struct {
 		handle  topologymodel.ActorHandle
 		actorID string
+	}
+	if !work.charge(uint64(len(actors))) {
+		return nil
 	}
 	entries := make([]entry, 0, len(actors))
 	for _, actor := range actors {
 		if actor.ActorHandle.IsZero() {
 			continue
 		}
+		if work != nil && !work.chargeStrings([]string{actor.ActorID}) {
+			return nil
+		}
 		entries = append(entries, entry{handle: actor.ActorHandle, actorID: strings.TrimSpace(actor.ActorID)})
 	}
-	sort.SliceStable(entries, func(i, j int) bool { return entries[i].actorID < entries[j].actorID })
+	if !sortEnrichmentSliceStable(work, entries, func(i, j int) bool { return entries[i].actorID < entries[j].actorID }) {
+		return nil
+	}
+	if !work.charge(uint64(len(entries))) {
+		return nil
+	}
 	order := make(map[topologymodel.ActorHandle]int, len(entries))
 	for i, entry := range entries {
 		order[entry.handle] = i

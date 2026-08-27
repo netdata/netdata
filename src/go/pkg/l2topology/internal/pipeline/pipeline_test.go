@@ -2233,7 +2233,7 @@ func TestMatchLLDPLinksEnlinkdPassOrder_DoesNotDropLinksWhenSysNamesAreEmpty(t *
 }
 
 func TestResolveKnownRemote_RejectsHostnameMatchWhenMACMismatchesWithoutMgmtIP(t *testing.T) {
-	state := newL2BuildState(1)
+	state := newL2BuildState(1, nil)
 	state.devices["known-device"] = model.Device{
 		ID:        "known-device",
 		Hostname:  "shared-host",
@@ -2245,7 +2245,7 @@ func TestResolveKnownRemote_RejectsHostnameMatchWhenMACMismatchesWithoutMgmtIP(t
 }
 
 func TestResolveRemote_UsesMACDerivedIDWhenManagedHostnameCollidesWithoutMgmtIP(t *testing.T) {
-	state := newL2BuildState(1)
+	state := newL2BuildState(1, nil)
 	state.devices["known-device"] = model.Device{
 		ID:        "known-device",
 		Hostname:  "shared-host",
@@ -2262,7 +2262,7 @@ func TestResolveRemote_UsesMACDerivedIDWhenManagedHostnameCollidesWithoutMgmtIP(
 }
 
 func TestResolveRemote_ReusesHostnameIDForUnmanagedRemoteCollisions(t *testing.T) {
-	state := newL2BuildState(1)
+	state := newL2BuildState(1, nil)
 
 	firstID := state.resolveRemote("shared-host", "00:11:22:33:44:55", "", "")
 	secondID := state.resolveRemote("shared-host", "00:11:22:33:44:66", "", "")
@@ -2273,7 +2273,7 @@ func TestResolveRemote_ReusesHostnameIDForUnmanagedRemoteCollisions(t *testing.T
 }
 
 func TestResolveRemoteEnforcingHostnameMACGuard_SplitsUnmanagedHostnameCollisions(t *testing.T) {
-	state := newL2BuildState(1)
+	state := newL2BuildState(1, nil)
 
 	firstID := state.resolveRemoteEnforcingHostnameMACGuard("shared-host", "00:11:22:33:44:55", "", "")
 	secondID := state.resolveRemoteEnforcingHostnameMACGuard("shared-host", "00:11:22:33:44:66", "", "")
@@ -2285,7 +2285,7 @@ func TestResolveRemoteEnforcingHostnameMACGuard_SplitsUnmanagedHostnameCollision
 }
 
 func TestRegisterObservation_ReinitializesLabelsAfterEmptyMerge(t *testing.T) {
-	state := newL2BuildState(1)
+	state := newL2BuildState(1, nil)
 	state.devices["switch-a"] = model.Device{ID: "switch-a", Hostname: "switch-a"}
 
 	err := state.registerObservation(model.L2Observation{

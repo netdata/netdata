@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -25,9 +24,9 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		b.ifaceByDeviceIndex,
 		b.bridgePortAliases,
 	)
-	seedMacLinks := collectBridgeMacLinkRecords(b.attachments, b.ifaceByDeviceIndex, deterministicTransitPortKeys)
+	seedMacLinks := collectBridgeMacLinkRecordsWithWork(b.work, b.attachments, b.ifaceByDeviceIndex, deterministicTransitPortKeys)
 	b.rawFDBObservations = buildFDBReporterObservations(seedMacLinks)
-	model := buildBridgeDomainModel(b.bridgeLinks, seedMacLinks)
+	model := buildBridgeDomainModelWithWork(b.work, b.bridgeLinks, seedMacLinks)
 	if len(model.domains) == 0 {
 		return false
 	}
@@ -42,7 +41,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 			if segment == nil || len(segment.endpointIDs) == 0 {
 				continue
 			}
-			segmentID := bridgeDomainSegmentID(segment)
+			segmentID := bridgeDomainSegmentIDWithWork(b.work, segment)
 			if _, exists := b.segmentByID[segmentID]; exists {
 				continue
 			}
@@ -50,7 +49,9 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 			b.segmentIDs = append(b.segmentIDs, segmentID)
 		}
 	}
-	sort.Strings(b.segmentIDs)
+	if !sortProjectionStrings(b.work, b.segmentIDs) {
+		return false
+	}
 	if len(b.segmentIDs) == 0 {
 		return false
 	}
@@ -60,8 +61,8 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		if segment == nil {
 			continue
 		}
-		match, actor := buildBridgeSegmentActor(segmentID, segment, b.layer, b.source)
-		keys := topologyMatchIdentityKeys(actor.Actor.Match)
+		match, actor := buildBridgeSegmentActorWithWork(b.work, segmentID, segment, b.layer, b.source)
+		keys := topologyMatchIdentityKeysWithWork(b.work, actor.Actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(b.actorIndex, keys) {
 			addTopologyIdentityKeys(b.actorIndex, keys)
 		}
@@ -109,10 +110,10 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		}
 	}
 
-	b.rawFDBReporterHints = buildFDBEndpointReporterHints(seedMacLinks)
+	b.rawFDBReporterHints = buildFDBEndpointReporterHintsWithWork(b.work, seedMacLinks)
 	b.fdbObservations = buildFDBReporterObservations(seedMacLinks)
-	b.fdbOwners = inferFDBEndpointOwners(b.fdbObservations, b.reporterAliases, deterministicTransitPortKeys)
-	for endpointID, owner := range inferSinglePortEndpointOwners(seedMacLinks, deterministicTransitPortKeys) {
+	b.fdbOwners = inferFDBEndpointOwnersWithWork(b.work, b.fdbObservations, b.reporterAliases, deterministicTransitPortKeys)
+	for endpointID, owner := range inferSinglePortEndpointOwnersWithWork(b.work, seedMacLinks, deterministicTransitPortKeys) {
 		if strings.TrimSpace(endpointID) == "" {
 			continue
 		}
@@ -128,9 +129,9 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		b.out.endpointDirectOwners[endpointID] = owner
 	}
 
-	b.deviceIdentityByID = buildDeviceIdentityKeySetByID(b.deviceByID, b.adjacencies, b.ifaceByDeviceIndex)
-	b.reporterSegmentIndex = buildSegmentReporterIndex(b.segmentIDs, b.segmentByID)
-	b.aliasOwnerIDs = buildFDBAliasOwnerMap(b.reporterAliases)
+	b.deviceIdentityByID = buildDeviceIdentityKeySetByID(b.work, b.deviceByID, b.adjacencies, b.ifaceByDeviceIndex)
+	b.reporterSegmentIndex = buildSegmentReporterIndexWithWork(b.work, b.segmentIDs, b.segmentByID)
+	b.aliasOwnerIDs = buildFDBAliasOwnerMapWithWork(b.work, b.reporterAliases)
 	b.managedDeviceIDs = make(map[string]struct{}, len(b.deviceByID))
 	for deviceID := range b.deviceByID {
 		deviceID = strings.TrimSpace(deviceID)
@@ -139,7 +140,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		}
 		b.managedDeviceIDs[deviceID] = struct{}{}
 	}
-	b.managedDeviceIDList = sortedTopologySet(b.managedDeviceIDs)
+	b.managedDeviceIDList = sortedTopologySetWithWork(b.work, b.managedDeviceIDs)
 	b.allowedEndpointBySegment = make(map[string]map[string]struct{})
 	b.strictEndpointBySegment = make(map[string]map[string]struct{})
 	b.probableEndpointBySegment = make(map[string]map[string]struct{})

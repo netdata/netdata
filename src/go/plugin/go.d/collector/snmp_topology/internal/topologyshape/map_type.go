@@ -5,26 +5,40 @@ package topologyshape
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 func applyMapTypePolicy(data *topologymodel.Data, mapType string) int {
+	removed, _ := applyMapTypePolicyWithLimiter(data, mapType, nil)
+	return removed
+}
+
+func applyMapTypePolicyWithLimiter(data *topologymodel.Data, mapType string, limiter worklimit.Limiter) (int, error) {
 	switch topologyoptions.NormalizeMapType(mapType) {
 	case topologyoptions.MapTypeManagedFabric:
-		return applyManagedFabricMapPolicy(data)
+		return applyManagedFabricMapPolicyWithLimiter(data, limiter)
 	case topologyoptions.MapTypeLLDPCDPManaged:
-		return applyLLDPCDPManagedMapPolicy(data)
+		return applyLLDPCDPManagedMapPolicyWithLimiter(data, limiter)
 	case topologyoptions.MapTypeHighConfidenceInferred:
-		return suppressUnlinkedInferredEndpoints(data)
+		return suppressUnlinkedInferredEndpointsWithLimiter(data, limiter)
 	default:
-		return 0
+		return 0, nil
 	}
 }
 
 func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
+	removed, _ := applyManagedFabricMapPolicyWithLimiter(data, nil)
+	return removed
+}
+
+func applyManagedFabricMapPolicyWithLimiter(data *topologymodel.Data, limiter worklimit.Limiter) (int, error) {
 	if data == nil || len(data.Actors) == 0 {
-		return 0
+		return 0, nil
+	}
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
 	}
 
 	actorsByHandle := make(map[topologymodel.ActorHandle]topologymodel.Actor, len(data.Actors))
@@ -40,6 +54,9 @@ func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return 0, err
+	}
 	managedNeighborsBySegment := make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{})
 	for _, link := range data.Links {
 		segmentHandle, managedHandle, ok := managedFabricSegmentLeg(link, segmentHandles, managedHandles)
@@ -54,6 +71,9 @@ func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
 		neighbors[managedHandle] = struct{}{}
 	}
 
+	if err := limiter.Charge(uint64(len(managedNeighborsBySegment))); err != nil {
+		return 0, err
+	}
 	qualifiedSegments := make(map[topologymodel.ActorHandle]struct{})
 	for segmentHandle, neighbors := range managedNeighborsBySegment {
 		if len(neighbors) >= 2 {
@@ -61,9 +81,15 @@ func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(managedHandles))); err != nil {
+		return 0, err
+	}
 	keptHandles := make(map[topologymodel.ActorHandle]struct{}, len(managedHandles)+len(qualifiedSegments))
 	for handle := range managedHandles {
 		keptHandles[handle] = struct{}{}
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return 0, err
 	}
 	keptLinks := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
@@ -91,6 +117,9 @@ func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	keptActors := make([]topologymodel.Actor, 0, len(keptHandles))
 	for _, actor := range data.Actors {
 		if _, ok := keptHandles[actor.ActorHandle]; ok {
@@ -100,7 +129,7 @@ func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
 	removed := len(data.Actors) - len(keptActors)
 	data.Actors = keptActors
 	data.Links = keptLinks
-	return removed
+	return removed, nil
 }
 
 func managedFabricSegmentLeg(
@@ -126,8 +155,16 @@ func managedFabricSegmentLeg(
 }
 
 func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
+	removed, _ := applyLLDPCDPManagedMapPolicyWithLimiter(data, nil)
+	return removed
+}
+
+func applyLLDPCDPManagedMapPolicyWithLimiter(data *topologymodel.Data, limiter worklimit.Limiter) (int, error) {
 	if data == nil || len(data.Actors) == 0 {
-		return 0
+		return 0, nil
+	}
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
 	}
 
 	managedHandles := make(map[topologymodel.ActorHandle]struct{})
@@ -138,6 +175,9 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 		managedHandles[actor.ActorHandle] = struct{}{}
 	}
 
+	if err := limiter.Charge(uint64(len(managedHandles))); err != nil {
+		return 0, err
+	}
 	keepLink := func(link topologymodel.Link) bool {
 		protocol := strings.ToLower(strings.TrimSpace(link.Protocol))
 		return protocol == "lldp" || protocol == "cdp"
@@ -147,6 +187,9 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 	linkedHandles := make(map[topologymodel.ActorHandle]struct{}, len(managedHandles))
 	for managedHandle := range managedHandles {
 		linkedHandles[managedHandle] = struct{}{}
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return 0, err
 	}
 	for _, link := range data.Links {
 		if !keepLink(link) {
@@ -162,6 +205,9 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 	}
 	data.Links = keptLinks
 
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	keptActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	removed := 0
 	for _, actor := range data.Actors {
@@ -172,12 +218,20 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 		removed++
 	}
 	data.Actors = keptActors
-	return removed
+	return removed, nil
 }
 
 func suppressUnlinkedInferredEndpoints(data *topologymodel.Data) int {
+	removed, _ := suppressUnlinkedInferredEndpointsWithLimiter(data, nil)
+	return removed
+}
+
+func suppressUnlinkedInferredEndpointsWithLimiter(data *topologymodel.Data, limiter worklimit.Limiter) (int, error) {
 	if data == nil || len(data.Actors) == 0 {
-		return 0
+		return 0, nil
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return 0, err
 	}
 
 	linked := make(map[topologymodel.ActorHandle]struct{}, len(data.Links)*2)
@@ -190,6 +244,9 @@ func suppressUnlinkedInferredEndpoints(data *topologymodel.Data) int {
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	removed := 0
 	removedHandles := make(map[topologymodel.ActorHandle]struct{})
 	kept := make([]topologymodel.Actor, 0, len(data.Actors))
@@ -206,11 +263,14 @@ func suppressUnlinkedInferredEndpoints(data *topologymodel.Data) int {
 		removedHandles[actor.ActorHandle] = struct{}{}
 	}
 	if removed == 0 {
-		return 0
+		return 0, nil
 	}
 	data.Actors = kept
 	if len(data.Links) == 0 {
-		return removed
+		return removed, nil
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return 0, err
 	}
 	filtered := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
@@ -223,5 +283,5 @@ func suppressUnlinkedInferredEndpoints(data *topologymodel.Data) int {
 		filtered = append(filtered, link)
 	}
 	data.Links = filtered
-	return removed
+	return removed, nil
 }

@@ -3,14 +3,15 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func (b *segmentProjectionBuilder) emitLinks() {
-	sort.Strings(b.segmentIDs)
+	if !sortProjectionStrings(b.work, b.segmentIDs) {
+		return
+	}
 	probableOnlyAnchorPortIDBySegment := b.buildProbableOnlyAnchorPortIDBySegment()
 	segmentsWithAnyLinks := make(map[string]struct{})
 
@@ -23,11 +24,11 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			Match: b.segmentMatchByID[segmentID],
 		}
 
-		portIDs := make([]string, 0, len(segment.ports))
-		for portID := range segment.ports {
-			portIDs = append(portIDs, portID)
+		var portIDs []string
+		if b.work == nil {
+			portIDs = make([]string, 0, len(segment.ports))
 		}
-		sort.Strings(portIDs)
+		portIDs = sortedProjectionKeys(b.work, segment.ports, portIDs)
 		probableOnlyAnchorPortID := probableOnlyAnchorPortIDBySegment[segmentID]
 		for _, portID := range portIDs {
 			if probableOnlyAnchorPortID != "" && portID != probableOnlyAnchorPortID {
@@ -85,7 +86,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 		for endpointID := range allowedEndpoints {
 			endpointSet[endpointID] = struct{}{}
 		}
-		endpointIDs := sortedTopologySet(endpointSet)
+		endpointIDs := sortedTopologySetWithWork(b.work, endpointSet)
 		for _, endpointID := range endpointIDs {
 			if _, ok := allowedEndpoints[endpointID]; !ok {
 				continue
@@ -94,7 +95,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			endpointMatch, ok := b.endpointMatchByID[endpointID]
 			if !ok {
 				endpointMatch = endpointMatchFromID(endpointID)
-				if len(topologyMatchIdentityKeys(endpointMatch)) == 0 {
+				if len(topologyMatchIdentityKeysWithWork(b.work, endpointMatch)) == 0 {
 					continue
 				}
 			}
@@ -102,7 +103,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			if !ok {
 				endpointLinkMatch = graph.LinkEndpointMatch(endpointMatch, "")
 			}
-			overlappingDeviceIDs := endpointMatchOverlappingKnownDeviceIDs(endpointMatch, b.deviceIdentityByID)
+			overlappingDeviceIDs := endpointMatchOverlappingKnownDeviceIDs(b.work, endpointMatch, b.deviceIdentityByID)
 			if len(overlappingDeviceIDs) > 0 {
 				matchedManagedDeviceIDs := make([]string, 0, len(overlappingDeviceIDs))
 				for _, overlapID := range overlappingDeviceIDs {

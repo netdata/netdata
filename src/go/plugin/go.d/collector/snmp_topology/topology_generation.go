@@ -46,10 +46,22 @@ type topologyGeneration struct {
 }
 
 func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
+	snapshot, stats := freezeTopologyBuilderObservation(builder)
+	if snapshot == nil {
+		return nil, stats
+	}
+	snapshot.trap = newTopologyTrapDeviceGeneration(builder)
+	return snapshot, stats
+}
+
+func freezeTopologyBuilderObservation(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
 	if builder == nil {
 		return nil, topologyBuilderFinalizeStats{}
 	}
 	stats := builder.finalize()
+	if builder.workErr != nil {
+		return nil, stats
+	}
 
 	collectedAt := builder.lastUpdate
 	if collectedAt.IsZero() {
@@ -60,7 +72,6 @@ func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, t
 		freshFor:       builder.staleAfter,
 		observation:    builder.preparedSnapshot,
 		hasObservation: builder.hasPreparedSnapshot,
-		trap:           newTopologyTrapDeviceGeneration(builder),
 	}, stats
 }
 

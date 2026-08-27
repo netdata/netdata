@@ -15,6 +15,7 @@ type deviceInterfaceCollector struct {
 }
 
 type deviceInterfaceSummaryBuilder struct {
+	work                *projectionWork
 	interfaces          []model.Interface
 	attachments         []model.Attachment
 	adjacencies         []model.Adjacency
@@ -35,7 +36,21 @@ func buildTopologyDeviceInterfaceSummaries(
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
 ) map[string]topologyDeviceInterfaceSummary {
+	return buildTopologyDeviceInterfaceSummariesWithWork(nil, interfaces, attachments, adjacencies, deviceByID, ifIndexByDeviceName, bridgeLinks, reporterAliases)
+}
+
+func buildTopologyDeviceInterfaceSummariesWithWork(
+	work *projectionWork,
+	interfaces []model.Interface,
+	attachments []model.Attachment,
+	adjacencies []model.Adjacency,
+	deviceByID map[string]model.Device,
+	ifIndexByDeviceName map[string]int,
+	bridgeLinks []bridgeBridgeLinkRecord,
+	reporterAliases map[string][]string,
+) map[string]topologyDeviceInterfaceSummary {
 	return newDeviceInterfaceSummaryBuilder(
+		work,
 		interfaces,
 		attachments,
 		adjacencies,
@@ -47,6 +62,7 @@ func buildTopologyDeviceInterfaceSummaries(
 }
 
 func newDeviceInterfaceSummaryBuilder(
+	work *projectionWork,
 	interfaces []model.Interface,
 	attachments []model.Attachment,
 	adjacencies []model.Adjacency,
@@ -56,6 +72,7 @@ func newDeviceInterfaceSummaryBuilder(
 	reporterAliases map[string][]string,
 ) *deviceInterfaceSummaryBuilder {
 	return &deviceInterfaceSummaryBuilder{
+		work:                work,
 		interfaces:          interfaces,
 		attachments:         attachments,
 		adjacencies:         adjacencies,
@@ -77,7 +94,7 @@ func (b *deviceInterfaceSummaryBuilder) build() map[string]topologyDeviceInterfa
 		return nil
 	}
 
-	b.managedAliasOwners = buildFDBAliasOwnerMap(b.reporterAliases)
+	b.managedAliasOwners = buildFDBAliasOwnerMapWithWork(b.work, b.reporterAliases)
 	b.collectFDBAttachments()
 	b.collectAdjacencyEvidence()
 	b.collectBridgeLinkEvidence()

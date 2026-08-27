@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
@@ -25,11 +24,14 @@ func (c *topologyBuilder) deriveLocalBridgeMACFromFDBSelfEntries() string {
 		return ""
 	}
 
-	keys := make([]string, 0, len(c.fdbEntries))
-	for key := range c.fdbEntries {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.fdbEntries))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.fdbEntries, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return ""
+	}
 
 	for _, key := range keys {
 		entry := c.fdbEntries[key]
@@ -64,10 +66,13 @@ func (c *topologyBuilder) deriveLocalBridgeMACFromInterfacePhysAddress(localMana
 	}
 
 	keys := make([]string, 0, len(c.ifStatusByIndex))
+	if !c.chargeWork(uint64(len(c.ifStatusByIndex))) {
+		return ""
+	}
 	for key := range c.ifStatusByIndex {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i, j int) bool {
+	sortBuilderSlice(c, keys, func(i, j int) bool {
 		left := topologyutil.ParseIndex(keys[i])
 		right := topologyutil.ParseIndex(keys[j])
 		if left > 0 && right > 0 && left != right {
@@ -81,6 +86,9 @@ func (c *topologyBuilder) deriveLocalBridgeMACFromInterfacePhysAddress(localMana
 		}
 		return keys[i] < keys[j]
 	})
+	if !c.chargeWork(uint64(len(keys))) {
+		return ""
+	}
 
 	for _, key := range keys {
 		mac := topologyutil.NormalizeMAC(c.ifStatusByIndex[key].mac)

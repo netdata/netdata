@@ -3,7 +3,6 @@
 package topologyenrich
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -15,9 +14,18 @@ func isBGPPeerEstablished(row topologymodel.BGPPeer) bool {
 }
 
 func sortTopologyBGPPeerDetailRows(rows []topologymodel.BGPPeerDetailRow) {
-	sort.Slice(rows, func(i, j int) bool {
-		return topologyBGPPeerActorRowSortKey(rows[i]) < topologyBGPPeerActorRowSortKey(rows[j])
-	})
+	sortTopologyBGPPeerDetailRowsWithWork(nil, rows)
+}
+
+func sortTopologyBGPPeerDetailRowsWithWork(work *enrichmentWork, rows []topologymodel.BGPPeerDetailRow) {
+	sortEnrichmentByPreparedStringKey(work, rows, topologyBGPPeerActorRowSortKeyWithWork)
+}
+
+func topologyBGPPeerActorRowSortKeyWithWork(work *enrichmentWork, row topologymodel.BGPPeerDetailRow) (string, bool) {
+	if work != nil && !work.chargeStrings([]string{row.RoutingInstance, row.RemoteAS, row.NeighborIP, row.PeerIdentifier, row.State}) {
+		return "", false
+	}
+	return topologyBGPPeerActorRowSortKey(row), true
 }
 
 func topologyBGPPeerActorRowSortKey(row topologymodel.BGPPeerDetailRow) string {

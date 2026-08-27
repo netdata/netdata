@@ -158,7 +158,7 @@ func TestTopologyShortestPathUnionChargesOneTraversalEnvelopePerRoot(t *testing.
 	require.NoError(t, err)
 	require.Len(t, actors, rootCount)
 	require.Len(t, pairs, 2*(rootCount-1))
-	want := uint64(len(data.Links)) + rootCount*uint64(nodeCount+2*len(data.Links))
+	want := uint64(len(data.Links)+len(roots)) + rootCount*uint64(nodeCount+2*len(data.Links))
 	require.Equal(t, want, charged)
 }
 

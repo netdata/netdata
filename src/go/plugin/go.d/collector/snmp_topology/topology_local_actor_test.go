@@ -38,7 +38,7 @@ func TestAugmentTopologySnapshotLocalsMaterializesMissingPolledManagedActor(t *t
 	}
 
 	snapshots = append(snapshots, snapshots[0])
-	augmentTopologySnapshotLocals(&data, snapshots)
+	require.NoError(t, augmentTopologySnapshotLocals(&data, snapshots, nil))
 
 	require.Len(t, data.Actors, 2)
 	actor := data.Actors[1]
@@ -95,7 +95,7 @@ func TestAugmentTopologySnapshotLocalsPreservesActorOrderAndEligibility(t *testi
 		SysDescr:     "selected first eligible actor",
 	}
 
-	augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{LocalDevice: local}})
+	require.NoError(t, augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{LocalDevice: local}}, nil))
 
 	require.Empty(t, data.Actors[0].Detail.SNMP.SysDescr)
 	require.Equal(t, local.SysDescr, data.Actors[1].Detail.SNMP.SysDescr)
@@ -114,10 +114,10 @@ func TestAugmentTopologySnapshotLocalsKeepsFallbackActorIDExistenceGlobal(t *tes
 		},
 	}
 
-	augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{
+	require.NoError(t, augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{
 		LocalDeviceID: "existing-id",
 		LocalDevice:   local,
-	}})
+	}}, nil))
 
 	require.Len(t, data.Actors, 1)
 }
@@ -135,10 +135,10 @@ func TestAugmentTopologySnapshotLocalsDoesNotMatchDiagnosticManagementAddress(t 
 		},
 	}
 
-	augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{
+	require.NoError(t, augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{
 		LocalDeviceID: "router-b",
 		LocalDevice:   local,
-	}})
+	}}, nil))
 
 	require.Len(t, data.Actors, 2)
 	require.Equal(t, "router-b", data.Actors[1].ActorID)
@@ -159,7 +159,7 @@ func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
 		},
 	}
 
-	enrichLocalActorChartReferences(actor, map[string]topologymodel.InterfaceChartRef{
+	require.NoError(t, enrichLocalActorChartReferences(actor, map[string]topologymodel.InterfaceChartRef{
 		"Gi0/1": {
 			ChartIDSuffix:    "gi0_1",
 			AvailableMetrics: []string{"errors", "traffic", "traffic"},
@@ -167,7 +167,7 @@ func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
 		"gi0/2": {
 			AvailableMetrics: []string{"drops"},
 		},
-	})
+	}, nil))
 
 	tests := map[string]struct {
 		port        topologyengine.ProjectionPortDetail

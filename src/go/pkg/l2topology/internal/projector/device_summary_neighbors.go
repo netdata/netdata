@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -11,6 +10,10 @@ import (
 )
 
 func topologyNeighborCapabilitiesFromLabels(labels map[string]string) []string {
+	return topologyNeighborCapabilitiesFromLabelsWithWork(nil, labels)
+}
+
+func topologyNeighborCapabilitiesFromLabelsWithWork(work *projectionWork, labels map[string]string) []string {
 	if len(labels) == 0 {
 		return nil
 	}
@@ -24,10 +27,14 @@ func topologyNeighborCapabilitiesFromLabels(labels map[string]string) []string {
 			seen[capability] = struct{}{}
 		}
 	}
-	return sortedTopologySet(seen)
+	return sortedTopologySetWithWork(work, seen)
 }
 
 func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, deviceByID map[string]model.Device) topologyPortNeighborStatus {
+	return buildTopologyPortNeighborStatusWithWork(nil, protocol, adj, deviceByID)
+}
+
+func buildTopologyPortNeighborStatusWithWork(work *projectionWork, protocol string, adj model.Adjacency, deviceByID map[string]model.Device) topologyPortNeighborStatus {
 	protocol = strings.ToLower(strings.TrimSpace(protocol))
 	targetID := strings.TrimSpace(adj.TargetID)
 	remotePort := strings.TrimSpace(adj.TargetPort)
@@ -60,7 +67,7 @@ func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, devic
 	}
 	neighbor.RemoteIP = selectedDeviceManagementIP(remote)
 	neighbor.RemoteChassisID = strings.TrimSpace(remote.ChassisID)
-	neighbor.RemoteCapabilities = topologyNeighborCapabilitiesFromLabels(remote.Labels)
+	neighbor.RemoteCapabilities = topologyNeighborCapabilitiesFromLabelsWithWork(work, remote.Labels)
 	return neighbor
 }
 
@@ -87,7 +94,14 @@ func topologyPortNeighborStatusKey(status topologyPortNeighborStatus) string {
 }
 
 func sortedTopologyPortNeighbors(neighbors map[string]topologyPortNeighborStatus) []topologyPortNeighborStatus {
+	return sortedTopologyPortNeighborsWithWork(nil, neighbors)
+}
+
+func sortedTopologyPortNeighborsWithWork(work *projectionWork, neighbors map[string]topologyPortNeighborStatus) []topologyPortNeighborStatus {
 	if len(neighbors) == 0 {
+		return nil
+	}
+	if !work.charge(uint64(len(neighbors))) {
 		return nil
 	}
 	out := make([]topologyPortNeighborStatus, 0, len(neighbors))
@@ -97,13 +111,13 @@ func sortedTopologyPortNeighbors(neighbors map[string]topologyPortNeighborStatus
 		neighbor.RemotePort = strings.TrimSpace(neighbor.RemotePort)
 		neighbor.RemoteIP = strings.TrimSpace(neighbor.RemoteIP)
 		neighbor.RemoteChassisID = strings.TrimSpace(neighbor.RemoteChassisID)
-		neighbor.RemoteCapabilities = uniqueTopologyStrings(neighbor.RemoteCapabilities)
+		neighbor.RemoteCapabilities = uniqueTopologyStringsWithWork(work, neighbor.RemoteCapabilities)
 		if topologyPortNeighborStatusKey(neighbor) == "" {
 			continue
 		}
 		out = append(out, neighbor)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if !sortProjectionSlice(work, out, func(i, j int) bool {
 		left, right := out[i], out[j]
 		if left.Protocol != right.Protocol {
 			return left.Protocol < right.Protocol
@@ -118,7 +132,9 @@ func sortedTopologyPortNeighbors(neighbors map[string]topologyPortNeighborStatus
 			return left.RemoteIP < right.RemoteIP
 		}
 		return left.RemoteChassisID < right.RemoteChassisID
-	})
+	}) {
+		return nil
+	}
 	if len(out) == 0 {
 		return nil
 	}

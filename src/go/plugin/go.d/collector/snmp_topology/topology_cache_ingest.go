@@ -12,6 +12,9 @@ func (c *topologyBuilder) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics
 	if c == nil {
 		return
 	}
+	if !c.chargeWork(uint64(len(pms))) {
+		return
+	}
 
 	profileIdentity := make(map[string]ddsnmp.MetaTag, 2)
 	for _, pm := range pms {
@@ -21,9 +24,15 @@ func (c *topologyBuilder) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics
 	local.Vendor, local.Model = ddsnmp.ResolveDeviceIdentity(local.Vendor, local.Model, profileIdentity, local.Labels)
 	c.localDevice = local
 
+	if !c.chargeWork(uint64(len(pms))) {
+		return
+	}
 	for _, pm := range pms {
-		tags := topologyMetadataValues(pm.DeviceMetadata)
+		tags := topologyMetadataValuesWithBuilder(c, pm.DeviceMetadata)
 		if len(pm.Tags) > 0 {
+			if !c.chargeWork(uint64(len(pm.Tags))) {
+				return
+			}
 			if tags == nil {
 				tags = make(map[string]string, len(pm.Tags))
 			}
@@ -66,19 +75,32 @@ func (c *topologyBuilder) updateTopologySysUptime(value int64) {
 }
 
 func (c *topologyBuilder) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
+	if !c.chargeWork(uint64(len(pms))) {
+		return
+	}
 	for _, pm := range pms {
 		c.ingestTopologyMetricSet(pm.TopologyMetrics)
 	}
 }
 
 func (c *topologyBuilder) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
+	if !c.chargeWork(uint64(len(metrics))) {
+		return
+	}
 	for _, metric := range metrics {
 		c.updateTopologyCacheEntry(metric)
 	}
 }
 
 func topologyMetadataValues(meta map[string]ddsnmp.MetaTag) map[string]string {
+	return topologyMetadataValuesWithBuilder(&topologyBuilder{}, meta)
+}
+
+func topologyMetadataValuesWithBuilder(c *topologyBuilder, meta map[string]ddsnmp.MetaTag) map[string]string {
 	if len(meta) == 0 {
+		return nil
+	}
+	if !c.chargeWork(uint64(len(meta))) {
 		return nil
 	}
 

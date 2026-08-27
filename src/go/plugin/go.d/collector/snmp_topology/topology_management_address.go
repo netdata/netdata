@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
@@ -158,6 +158,14 @@ func pickManagementIP(addrs []topologymodel.ManagementAddress) string {
 }
 
 func normalizeTargetManagementIPs(addrs []netip.Addr) []netip.Addr {
+	out, _ := normalizeTargetManagementIPsWithLimiter(addrs, nil)
+	return out
+}
+
+func normalizeTargetManagementIPsWithLimiter(addrs []netip.Addr, limiter worklimit.Limiter) ([]netip.Addr, error) {
+	if err := limiter.Charge(uint64(len(addrs))); err != nil {
+		return nil, err
+	}
 	seen := make(map[netip.Addr]struct{}, len(addrs))
 	for _, addr := range addrs {
 		addr = addr.Unmap()
@@ -170,8 +178,10 @@ func normalizeTargetManagementIPs(addrs []netip.Addr) []netip.Addr {
 	for addr := range seen {
 		out = append(out, addr)
 	}
-	slices.SortFunc(out, netip.Addr.Compare)
-	return out
+	if err := worklimit.SortFunc(limiter, out, netip.Addr.Compare); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *managementIPSelector) add(addr netip.Addr, source string) {
@@ -284,8 +294,20 @@ func finalizeLocalManagementAddresses(
 	targets []netip.Addr,
 	netmasks map[string]string,
 ) {
+	_ = finalizeLocalManagementAddressesWithLimiter(device, targets, netmasks, nil)
+}
+
+func finalizeLocalManagementAddressesWithLimiter(
+	device *topologymodel.Device,
+	targets []netip.Addr,
+	netmasks map[string]string,
+	limiter worklimit.Limiter,
+) error {
 	if device == nil {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(targets) + len(device.ManagementAddresses))); err != nil {
+		return err
 	}
 
 	var selector managementIPSelector
@@ -317,6 +339,7 @@ func finalizeLocalManagementAddresses(
 	clear(addrs[len(filtered):])
 	device.ManagementAddresses = filtered
 	device.ManagementIP = selector.selected()
+	return nil
 }
 
 func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -109,12 +110,19 @@ type BGPEnrichmentStats struct {
 }
 
 func RecomputeLinkStats(data *Data) {
+	_ = RecomputeLinkStatsWithLimiter(data, nil)
+}
+
+func RecomputeLinkStatsWithLimiter(data *Data, limiter worklimit.Limiter) error {
 	if data == nil {
-		return
+		return nil
 	}
 	data.Stats.Recomputed.ActorsTotal = len(data.Actors)
 	data.Stats.Recomputed.LinksTotal = len(data.Links)
 
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return err
+	}
 	probable := 0
 	for _, link := range data.Links {
 		state := strings.ToLower(strings.TrimSpace(link.State))
@@ -126,14 +134,25 @@ func RecomputeLinkStats(data *Data) {
 	}
 	data.Stats.Recomputed.LinksProbable = probable
 	data.Stats.HasComputed = true
-	RecomputeL3VisibleLinkStats(data)
-	RecomputeOSPFVisibleLinkStats(data)
-	RecomputeBGPVisibleLinkStats(data)
+	if err := recomputeL3VisibleLinkStatsWithLimiter(data, limiter); err != nil {
+		return err
+	}
+	if err := recomputeOSPFVisibleLinkStatsWithLimiter(data, limiter); err != nil {
+		return err
+	}
+	return recomputeBGPVisibleLinkStatsWithLimiter(data, limiter)
 }
 
 func RecomputeL3VisibleLinkStats(data *Data) {
+	_ = recomputeL3VisibleLinkStatsWithLimiter(data, nil)
+}
+
+func recomputeL3VisibleLinkStatsWithLimiter(data *Data, limiter worklimit.Limiter) error {
 	if data == nil || !data.Stats.HasL3 {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return err
 	}
 	directCount := 0
 	membershipCount := 0
@@ -147,11 +166,19 @@ func RecomputeL3VisibleLinkStats(data *Data) {
 	}
 	data.Stats.Recomputed.L3SubnetVisibleLinks = directCount
 	data.Stats.Recomputed.L3SubnetMembershipVisibleLinks = membershipCount
+	return nil
 }
 
 func RecomputeOSPFVisibleLinkStats(data *Data) {
+	_ = recomputeOSPFVisibleLinkStatsWithLimiter(data, nil)
+}
+
+func recomputeOSPFVisibleLinkStatsWithLimiter(data *Data, limiter worklimit.Limiter) error {
 	if data == nil || !data.Stats.HasOSPF {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return err
 	}
 	count := 0
 	for _, link := range data.Links {
@@ -160,11 +187,19 @@ func RecomputeOSPFVisibleLinkStats(data *Data) {
 		}
 	}
 	data.Stats.Recomputed.OSPFAdjacencyVisibleLinks = count
+	return nil
 }
 
 func RecomputeBGPVisibleLinkStats(data *Data) {
+	_ = recomputeBGPVisibleLinkStatsWithLimiter(data, nil)
+}
+
+func recomputeBGPVisibleLinkStatsWithLimiter(data *Data, limiter worklimit.Limiter) error {
 	if data == nil || !data.Stats.HasBGP {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return err
 	}
 	count := 0
 	for _, link := range data.Links {
@@ -173,4 +208,5 @@ func RecomputeBGPVisibleLinkStats(data *Data) {
 		}
 	}
 	data.Stats.Recomputed.BGPAdjacencyVisibleLinks = count
+	return nil
 }

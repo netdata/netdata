@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 type lldpMatchLink struct {
@@ -39,7 +40,13 @@ type lldpMatchedPair struct {
 	pass        string
 }
 
-func buildLLDPMatchLinks(observations []model.L2Observation) []lldpMatchLink {
+func buildLLDPMatchLinks(
+	observations []model.L2Observation,
+	limiter worklimit.Limiter,
+) ([]lldpMatchLink, error) {
+	if err := limiter.Charge(uint64(len(observations))); err != nil {
+		return nil, err
+	}
 	links := make([]lldpMatchLink, 0)
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
@@ -49,7 +56,10 @@ func buildLLDPMatchLinks(observations []model.L2Observation) []lldpMatchLink {
 		localChassisID := strings.TrimSpace(obs.ChassisID)
 		localSysName := strings.TrimSpace(obs.Hostname)
 
-		remotes := sortedLLDPRemotes(obs.LLDPRemotes)
+		remotes, err := sortedLLDPRemotes(limiter, obs.LLDPRemotes)
+		if err != nil {
+			return nil, err
+		}
 		for _, remote := range remotes {
 			localPortID := strings.TrimSpace(remote.LocalPortID)
 			localPortDescr := strings.TrimSpace(remote.LocalPortDesc)
@@ -92,7 +102,7 @@ func buildLLDPMatchLinks(observations []model.L2Observation) []lldpMatchLink {
 			})
 		}
 	}
-	return links
+	return links, nil
 }
 
 func annotateLLDPLinkMatchIdentities(

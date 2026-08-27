@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 type cdpMatchLink struct {
@@ -32,7 +33,13 @@ type cdpMatchedPair struct {
 	pass        string
 }
 
-func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
+func buildCDPMatchLinks(
+	observations []model.L2Observation,
+	limiter worklimit.Limiter,
+) ([]cdpMatchLink, error) {
+	if err := limiter.Charge(uint64(len(observations))); err != nil {
+		return nil, err
+	}
 	links := make([]cdpMatchLink, 0)
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
@@ -45,7 +52,10 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 			sourceGlobalID = sourceID
 		}
 
-		remotes := sortedCDPRemotes(obs.CDPRemotes)
+		remotes, err := sortedCDPRemotes(limiter, obs.CDPRemotes)
+		if err != nil {
+			return nil, err
+		}
 		for _, remote := range remotes {
 			localIfIndex := max(remote.LocalIfIndex, 0)
 			localObservedName := strings.TrimSpace(remote.LocalIfName)
@@ -82,7 +92,7 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 			})
 		}
 	}
-	return links
+	return links, nil
 }
 
 func buildCDPLookupMap(links []cdpMatchLink) map[string]int {

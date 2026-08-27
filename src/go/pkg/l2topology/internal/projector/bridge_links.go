@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -16,6 +15,20 @@ func collectBridgeLinkRecords(
 	aliases bridgePortAliasIndex,
 	strategy topologyInferenceStrategyConfig,
 ) []bridgeBridgeLinkRecord {
+	return collectBridgeLinkRecordsWithWork(nil, adjacencies, ifIndexByDeviceName, ifaceByDeviceIndex, aliases, strategy)
+}
+
+func collectBridgeLinkRecordsWithWork(
+	work *projectionWork,
+	adjacencies []model.Adjacency,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
+	strategy topologyInferenceStrategyConfig,
+) []bridgeBridgeLinkRecord {
+	if !work.charge(uint64(len(adjacencies))) {
+		return nil
+	}
 	records := make([]bridgeBridgeLinkRecord, 0)
 	seen := make(map[string]struct{})
 
@@ -51,7 +64,12 @@ func collectBridgeLinkRecords(
 				other = dst
 			}
 		} else {
-			if bridgePortRefSortKey(src) > bridgePortRefSortKey(dst) {
+			srcSortKey, srcOK := bridgePortRefSortKeyWithWork(work, src)
+			dstSortKey, dstOK := bridgePortRefSortKeyWithWork(work, dst)
+			if !srcOK || !dstOK {
+				return nil
+			}
+			if srcSortKey > dstSortKey {
 				designated = dst
 				other = src
 			}
@@ -63,20 +81,25 @@ func collectBridgeLinkRecords(
 		})
 	}
 
-	sort.SliceStable(records, func(i, j int) bool {
-		li := portSortKey(records[i].designatedPort) + keySep + portSortKey(records[i].port)
-		lj := portSortKey(records[j].designatedPort) + keySep + portSortKey(records[j].port)
-		return li < lj
-	})
+	if !sortProjectionByPreparedStringKeyStable(work, records, bridgeBridgeLinkRecordSortKeyWithWork) {
+		return nil
+	}
 	return records
 }
 
 func normalizeBridgeMacLinkRecords(records []bridgeMacLinkRecord) []bridgeMacLinkRecord {
+	return normalizeBridgeMacLinkRecordsWithWork(nil, records)
+}
+
+func normalizeBridgeMacLinkRecordsWithWork(work *projectionWork, records []bridgeMacLinkRecord) []bridgeMacLinkRecord {
 	if len(records) == 0 {
 		return nil
 	}
 	if !bridgeMacLinksNeedNormalization(records) {
 		return records
+	}
+	if !work.charge(uint64(len(records))) {
+		return nil
 	}
 
 	aliases := buildBridgeVLANAliasIndex(records)
@@ -120,11 +143,9 @@ func normalizeBridgeMacLinkRecords(records []bridgeMacLinkRecord) []bridgeMacLin
 		out = append(out, record)
 	}
 
-	sort.SliceStable(out, func(i, j int) bool {
-		left := portSortKey(out[i].port) + keySep + out[i].endpointID + keySep + out[i].method
-		right := portSortKey(out[j].port) + keySep + out[j].endpointID + keySep + out[j].method
-		return left < right
-	})
+	if !sortProjectionByPreparedStringKeyStable(work, out, bridgeMacLinkRecordSortKeyWithWork) {
+		return nil
+	}
 	return out
 }
 
@@ -185,9 +206,21 @@ func (s topologyInferenceStrategyConfig) acceptsBridgeProtocol(protocol string) 
 	}
 }
 
-func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBridgeLinkRecord {
+func mergeBridgeLinkRecordSets(
+	base, extra []bridgeBridgeLinkRecord,
+) []bridgeBridgeLinkRecord {
+	return mergeBridgeLinkRecordSetsWithWork(nil, base, extra)
+}
+
+func mergeBridgeLinkRecordSetsWithWork(
+	work *projectionWork,
+	base, extra []bridgeBridgeLinkRecord,
+) []bridgeBridgeLinkRecord {
 	if len(extra) == 0 {
 		return base
+	}
+	if !work.charge(uint64(len(base)) + uint64(len(extra))) {
+		return nil
 	}
 	out := make([]bridgeBridgeLinkRecord, 0, len(base)+len(extra))
 	out = append(out, base...)
@@ -208,12 +241,30 @@ func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBri
 		seen[key] = struct{}{}
 		out = append(out, link)
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		li := portSortKey(out[i].designatedPort) + keySep + portSortKey(out[i].port)
-		lj := portSortKey(out[j].designatedPort) + keySep + portSortKey(out[j].port)
-		return li < lj
-	})
+	if !sortProjectionByPreparedStringKeyStable(work, out, bridgeBridgeLinkRecordSortKeyWithWork) {
+		return nil
+	}
 	return out
+}
+
+func bridgeBridgeLinkRecordSortKeyWithWork(work *projectionWork, record bridgeBridgeLinkRecord) (string, bool) {
+	designated, ok := portSortKeyWithWork(work, record.designatedPort)
+	if !ok {
+		return "", false
+	}
+	port, ok := portSortKeyWithWork(work, record.port)
+	if !ok {
+		return "", false
+	}
+	return designated + keySep + port, true
+}
+
+func bridgeMacLinkRecordSortKeyWithWork(work *projectionWork, record bridgeMacLinkRecord) (string, bool) {
+	port, ok := portSortKeyWithWork(work, record.port)
+	if !ok || work != nil && !work.chargeStrings([]string{record.endpointID, record.method}) {
+		return "", false
+	}
+	return port + keySep + record.endpointID + keySep + record.method, true
 }
 
 func collectBridgeMacLinkRecords(
@@ -221,6 +272,18 @@ func collectBridgeMacLinkRecords(
 	ifaceByDeviceIndex map[string]model.Interface,
 	switchFacingPortKeys map[string]struct{},
 ) []bridgeMacLinkRecord {
+	return collectBridgeMacLinkRecordsWithWork(nil, attachments, ifaceByDeviceIndex, switchFacingPortKeys)
+}
+
+func collectBridgeMacLinkRecordsWithWork(
+	work *projectionWork,
+	attachments []model.Attachment,
+	ifaceByDeviceIndex map[string]model.Interface,
+	switchFacingPortKeys map[string]struct{},
+) []bridgeMacLinkRecord {
+	if !work.charge(uint64(len(attachments))) {
+		return nil
+	}
 	records := make([]bridgeMacLinkRecord, 0, len(attachments))
 	seen := make(map[string]struct{}, len(attachments))
 
@@ -256,5 +319,5 @@ func collectBridgeMacLinkRecords(
 		})
 	}
 
-	return normalizeBridgeMacLinkRecords(records)
+	return normalizeBridgeMacLinkRecordsWithWork(work, records)
 }

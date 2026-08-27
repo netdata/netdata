@@ -2198,7 +2198,7 @@ func TestAugmentTopologySnapshotLocalsInjectsIdentityFields(t *testing.T) {
 		},
 	}
 
-	augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{LocalDevice: local}})
+	require.NoError(t, augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{LocalDevice: local}}, nil))
 
 	actor := findDeviceActorBySysName(data, "sw1")
 	require.NotNil(t, actor)

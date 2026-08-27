@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -185,6 +186,27 @@ func ActorDetailOSPFRouterID(actor Actor) string {
 }
 
 func ActorDetailScalarLabelValues(actor Actor) map[string]string {
+	values, _ := ActorDetailScalarLabelValuesWithLimiter(actor, nil)
+	return values
+}
+
+func ActorDetailScalarLabelValuesWithLimiter(actor Actor, limiter worklimit.Limiter) (map[string]string, error) {
+	adminStatuses, err := intMapLabelWithLimiter(actor.Detail.L2.Device.AdminStatusCounts, limiter)
+	if err != nil {
+		return nil, err
+	}
+	operStatuses, err := intMapLabelWithLimiter(actor.Detail.L2.Device.OperStatusCounts, limiter)
+	if err != nil {
+		return nil, err
+	}
+	linkModes, err := intMapLabelWithLimiter(actor.Detail.L2.Device.LinkModeCounts, limiter)
+	if err != nil {
+		return nil, err
+	}
+	topologyRoles, err := intMapLabelWithLimiter(actor.Detail.L2.Device.TopologyRoleCounts, limiter)
+	if err != nil {
+		return nil, err
+	}
 	out := map[string]string{
 		"vendor":                  ActorDetailVendor(actor),
 		"vendor_derived":          ActorDetailVendorDerived(actor),
@@ -207,17 +229,17 @@ func ActorDetailScalarLabelValues(actor Actor) map[string]string {
 		"lldp_neighbor_count":     scalarOptionalInt(ActorDetailLLDPNeighborCount(actor)),
 		"cdp_neighbor_count":      scalarOptionalInt(ActorDetailCDPNeighborCount(actor)),
 		"endpoints_total":         scalarOptionalInt(ActorDetailEndpointsTotal(actor)),
-		"if_admin_status_counts":  intMapLabel(actor.Detail.L2.Device.AdminStatusCounts),
-		"if_oper_status_counts":   intMapLabel(actor.Detail.L2.Device.OperStatusCounts),
-		"if_link_mode_counts":     intMapLabel(actor.Detail.L2.Device.LinkModeCounts),
-		"if_topology_role_counts": intMapLabel(actor.Detail.L2.Device.TopologyRoleCounts),
+		"if_admin_status_counts":  adminStatuses,
+		"if_oper_status_counts":   operStatuses,
+		"if_link_mode_counts":     linkModes,
+		"if_topology_role_counts": topologyRoles,
 	}
 	for key, value := range out {
 		if strings.TrimSpace(value) == "" {
 			delete(out, key)
 		}
 	}
-	return out
+	return out, nil
 }
 
 func ActorDetailArrayLabelValues(actor Actor) map[string][]string {
@@ -247,12 +269,27 @@ func scalarOptionalInt(value topologyengine.OptionalValue[int]) string {
 }
 
 func intMapLabel(values map[string]int) string {
+	value, _ := intMapLabelWithLimiter(values, nil)
+	return value
+}
+
+func intMapLabelWithLimiter(values map[string]int, limiter worklimit.Limiter) (string, error) {
 	if len(values) == 0 {
-		return ""
+		return "", nil
 	}
 	parts := make([]string, 0, len(values))
-	for _, key := range topologyutil.SortedMapKeys(values) {
+	keys, err := worklimit.SortedStringKeys(limiter, values)
+	if err != nil {
+		return "", err
+	}
+	if err := limiter.Charge(uint64(len(keys))); err != nil {
+		return "", err
+	}
+	for _, key := range keys {
 		parts = append(parts, fmt.Sprintf("%s:%d", key, values[key]))
 	}
-	return strings.Join(parts, ",")
+	if err := worklimit.ChargeStrings(limiter, parts); err != nil {
+		return "", err
+	}
+	return strings.Join(parts, ","), nil
 }

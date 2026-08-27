@@ -2001,6 +2001,7 @@ func TestSelectProbableEndpointReporterHint_PrefersManagedHintsOverUnmanagedOwne
 	}
 
 	hint := selectProbableEndpointReporterHint(
+		nil,
 		endpointLabels,
 		reporterHints,
 		owner,
@@ -2030,6 +2031,7 @@ func TestProbableCandidateSegmentsFromReporterHints_PrefersManagedReporterSegmen
 	}
 
 	segments := probableCandidateSegmentsFromReporterHints(
+		nil,
 		map[string]string{
 			"learned_device_ids": "ghost-switch,managed-switch",
 			"learned_if_indexes": "7",
@@ -2060,6 +2062,7 @@ func TestEnsureManagedProbableReporterHint_UpgradesUnmanagedHint(t *testing.T) {
 	}
 
 	updated := ensureManagedProbableReporterHint(
+		nil,
 		hint,
 		endpointLabels,
 		nil,
@@ -2075,6 +2078,7 @@ func TestEnsureManagedProbableReporterHint_UpgradesUnmanagedHint(t *testing.T) {
 
 func TestEnsureManagedProbableReporterHint_FallsBackToFirstManagedDevice(t *testing.T) {
 	updated := ensureManagedProbableReporterHint(
+		nil,
 		probableEndpointReporterHint{deviceID: "ghost-switch"},
 		nil,
 		nil,

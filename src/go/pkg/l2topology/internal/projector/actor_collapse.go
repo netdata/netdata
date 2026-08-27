@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -11,8 +10,15 @@ import (
 )
 
 func collapseActorsByIP(actors []projectedActor) []projectedActor {
+	return collapseActorsByIPWithWork(nil, actors)
+}
+
+func collapseActorsByIPWithWork(work *projectionWork, actors []projectedActor) []projectedActor {
 	if len(actors) <= 1 {
 		return actors
+	}
+	if !work.charge(uint64(len(actors))) {
+		return nil
 	}
 
 	parent := make([]int, len(actors))
@@ -44,7 +50,7 @@ func collapseActorsByIP(actors []projectedActor) []projectedActor {
 		if strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "segment") {
 			continue
 		}
-		ips := normalizedTopologyActorIPs(actor)
+		ips := normalizedTopologyActorIPsWithWork(work, actor)
 		if len(ips) == 0 {
 			continue
 		}
@@ -73,7 +79,7 @@ func collapseActorsByIP(actors []projectedActor) []projectedActor {
 		}
 		rep := members[0]
 		for _, idx := range members[1:] {
-			if compareTopologyActorCollapsePriority(actors[idx], actors[rep]) < 0 {
+			if compareTopologyActorCollapsePriorityWithWork(work, actors[idx], actors[rep]) < 0 {
 				rep = idx
 			}
 		}
@@ -90,12 +96,12 @@ func collapseActorsByIP(actors []projectedActor) []projectedActor {
 			member := actors[idx]
 			lists.add(member)
 			clearTopologyActorCollapseLists(&member)
-			merged.Actor.Match = mergeTopologyActorMatch(merged.Actor.Match, member.Actor.Match)
+			merged.Actor.Match = mergeTopologyActorMatch(work, merged.Actor.Match, member.Actor.Match)
 			merged.Actor.Labels = mergeTopologyActorLabels(merged.Actor.Labels, member.Actor.Labels)
-			merged.Detail = mergeProjectionActorDetail(merged.Detail, member.Detail)
+			merged.Detail = mergeProjectionActorDetail(work, merged.Detail, member.Detail)
 			keep[idx] = false
 		}
-		lists.apply(&merged)
+		lists.apply(work, &merged)
 		if collapsedCount > 1 {
 			merged.Detail.CollapsedByIP = true
 			merged.Detail.CollapsedCount = collapsedCount
@@ -114,14 +120,18 @@ func collapseActorsByIP(actors []projectedActor) []projectedActor {
 }
 
 func eliminateNonIPInferredActors(actors []projectedActor, links []graph.Link) ([]projectedActor, []graph.Link) {
+	return eliminateNonIPInferredActorsWithWork(nil, actors, links)
+}
+
+func eliminateNonIPInferredActorsWithWork(work *projectionWork, actors []projectedActor, links []graph.Link) ([]projectedActor, []graph.Link) {
 	if len(actors) == 0 {
 		return actors, links
 	}
 	removedIdentityKeys := make(map[string]struct{})
 	filteredActors := make([]projectedActor, 0, len(actors))
 	for _, actor := range actors {
-		if topologyActorIsInferred(actor) && len(normalizedTopologyActorIPs(actor)) == 0 {
-			for _, key := range topologyMatchIdentityKeys(actor.Actor.Match) {
+		if topologyActorIsInferred(actor) && len(normalizedTopologyActorIPsWithWork(work, actor)) == 0 {
+			for _, key := range topologyMatchIdentityKeysWithWork(work, actor.Actor.Match) {
 				removedIdentityKeys[key] = struct{}{}
 			}
 			continue
@@ -134,8 +144,8 @@ func eliminateNonIPInferredActors(actors []projectedActor, links []graph.Link) (
 
 	filteredLinks := make([]graph.Link, 0, len(links))
 	for _, link := range links {
-		srcKeys := topologyMatchIdentityKeys(link.Src.Match)
-		dstKeys := topologyMatchIdentityKeys(link.Dst.Match)
+		srcKeys := topologyMatchIdentityKeysWithWork(work, link.Src.Match)
+		dstKeys := topologyMatchIdentityKeysWithWork(work, link.Dst.Match)
 		if topologyIdentityKeysOverlap(srcKeys, removedIdentityKeys) {
 			continue
 		}
@@ -160,6 +170,10 @@ func topologyIdentityKeysOverlap(keys []string, set map[string]struct{}) bool {
 }
 
 func normalizedTopologyActorIPs(actor projectedActor) []string {
+	return normalizedTopologyActorIPsWithWork(nil, actor)
+}
+
+func normalizedTopologyActorIPsWithWork(work *projectionWork, actor projectedActor) []string {
 	if len(actor.Actor.Match.IPAddresses) == 0 {
 		return nil
 	}
@@ -176,11 +190,17 @@ func normalizedTopologyActorIPs(actor projectedActor) []string {
 		seen[ip] = struct{}{}
 		out = append(out, ip)
 	}
-	sort.Strings(out)
+	if !sortProjectionStrings(work, out) {
+		return nil
+	}
 	return out
 }
 
 func compareTopologyActorCollapsePriority(left, right projectedActor) int {
+	return compareTopologyActorCollapsePriorityWithWork(nil, left, right)
+}
+
+func compareTopologyActorCollapsePriorityWithWork(work *projectionWork, left, right projectedActor) int {
 	leftDevice := IsDeviceActorType(left.Actor.ActorType)
 	rightDevice := IsDeviceActorType(right.Actor.ActorType)
 	if leftDevice != rightDevice {
@@ -197,17 +217,17 @@ func compareTopologyActorCollapsePriority(left, right projectedActor) int {
 		}
 		return 1
 	}
-	leftKey := canonicalTopologyMatchKey(left.Actor.Match)
-	rightKey := canonicalTopologyMatchKey(right.Actor.Match)
+	leftKey := canonicalTopologyMatchKeyWithWork(work, left.Actor.Match)
+	rightKey := canonicalTopologyMatchKeyWithWork(work, right.Actor.Match)
 	return strings.Compare(leftKey, rightKey)
 }
 
-func mergeTopologyActorMatch(base, other graph.Match) graph.Match {
-	base.ChassisIDs = mergeTopologyStringLists(base.ChassisIDs, other.ChassisIDs)
-	base.MacAddresses = mergeTopologyStringLists(base.MacAddresses, other.MacAddresses)
-	base.IPAddresses = mergeTopologyStringLists(base.IPAddresses, other.IPAddresses)
-	base.Hostnames = mergeTopologyStringLists(base.Hostnames, other.Hostnames)
-	base.DNSNames = mergeTopologyStringLists(base.DNSNames, other.DNSNames)
+func mergeTopologyActorMatch(work *projectionWork, base, other graph.Match) graph.Match {
+	base.ChassisIDs = mergeTopologyStringLists(work, base.ChassisIDs, other.ChassisIDs)
+	base.MacAddresses = mergeTopologyStringLists(work, base.MacAddresses, other.MacAddresses)
+	base.IPAddresses = mergeTopologyStringLists(work, base.IPAddresses, other.IPAddresses)
+	base.Hostnames = mergeTopologyStringLists(work, base.Hostnames, other.Hostnames)
+	base.DNSNames = mergeTopologyStringLists(work, base.DNSNames, other.DNSNames)
 	if strings.TrimSpace(base.SysName) == "" {
 		base.SysName = strings.TrimSpace(other.SysName)
 	}
@@ -217,7 +237,10 @@ func mergeTopologyActorMatch(base, other graph.Match) graph.Match {
 	return base
 }
 
-func mergeTopologyStringLists(base []string, extra []string) []string {
+func mergeTopologyStringLists(work *projectionWork, base []string, extra []string) []string {
+	if !work.chargeStrings(base) || !work.chargeStrings(extra) {
+		return nil
+	}
 	seen := make(map[string]struct{}, len(base)+len(extra))
 	out := make([]string, 0, len(base)+len(extra))
 	for _, value := range append(base, extra...) {
@@ -231,7 +254,9 @@ func mergeTopologyStringLists(base []string, extra []string) []string {
 		seen[value] = struct{}{}
 		out = append(out, value)
 	}
-	sort.Strings(out)
+	if !sortProjectionStrings(work, out) {
+		return nil
+	}
 	if len(out) == 0 {
 		return nil
 	}
@@ -290,30 +315,30 @@ func (a *topologyActorCollapseLists) add(actor projectedActor) {
 	a.segmentSources = append(a.segmentSources, actor.Detail.Segment.LearnedSources...)
 }
 
-func (a *topologyActorCollapseLists) apply(actor *projectedActor) {
-	actor.Actor.Match.ChassisIDs = mergeTopologyStringLists(nil, a.matchChassisIDs)
-	actor.Actor.Match.MacAddresses = mergeTopologyStringLists(nil, a.matchMACs)
-	actor.Actor.Match.IPAddresses = mergeTopologyStringLists(nil, a.matchIPs)
-	actor.Actor.Match.Hostnames = mergeTopologyStringLists(nil, a.matchHostnames)
-	actor.Actor.Match.DNSNames = mergeTopologyStringLists(nil, a.matchDNSNames)
-	actor.Detail.Device.ManagementAddresses = mergeTopologyStringLists(nil, a.managementAddrs)
-	actor.Detail.Device.Protocols = mergeTopologyStringLists(nil, a.protocols)
-	actor.Detail.Device.ProtocolsCollected = mergeTopologyStringLists(nil, a.protocolsCollected)
-	actor.Detail.Device.Capabilities = mergeTopologyStringLists(nil, a.capabilities)
-	actor.Detail.Device.CapabilitiesSupported = mergeTopologyStringLists(nil, a.capabilitiesSupported)
-	actor.Detail.Device.CapabilitiesEnabled = mergeTopologyStringLists(nil, a.capabilitiesEnabled)
-	actor.Detail.Device.IfIndexes = mergeTopologyStringLists(nil, a.deviceIfIndexes)
-	actor.Detail.Device.IfNames = mergeTopologyStringLists(nil, a.deviceIfNames)
-	actor.Detail.Endpoint.LearnedSources = mergeTopologyStringLists(nil, a.endpointSources)
-	actor.Detail.Endpoint.LearnedDeviceIDs = mergeTopologyStringLists(nil, a.endpointDeviceIDs)
-	actor.Detail.Endpoint.LearnedIfIndexes = mergeTopologyStringLists(nil, a.endpointIfIndexes)
-	actor.Detail.Endpoint.LearnedIfNames = mergeTopologyStringLists(nil, a.endpointIfNames)
-	actor.Detail.Segment.ParentDevices = mergeTopologyStringLists(nil, a.segmentParents)
-	actor.Detail.Segment.IfNames = mergeTopologyStringLists(nil, a.segmentIfNames)
-	actor.Detail.Segment.IfIndexes = mergeTopologyStringLists(nil, a.segmentIfIndexes)
-	actor.Detail.Segment.BridgePorts = mergeTopologyStringLists(nil, a.segmentBridgePorts)
-	actor.Detail.Segment.VLANIDs = mergeTopologyStringLists(nil, a.segmentVLANIDs)
-	actor.Detail.Segment.LearnedSources = mergeTopologyStringLists(nil, a.segmentSources)
+func (a *topologyActorCollapseLists) apply(work *projectionWork, actor *projectedActor) {
+	actor.Actor.Match.ChassisIDs = mergeTopologyStringLists(work, nil, a.matchChassisIDs)
+	actor.Actor.Match.MacAddresses = mergeTopologyStringLists(work, nil, a.matchMACs)
+	actor.Actor.Match.IPAddresses = mergeTopologyStringLists(work, nil, a.matchIPs)
+	actor.Actor.Match.Hostnames = mergeTopologyStringLists(work, nil, a.matchHostnames)
+	actor.Actor.Match.DNSNames = mergeTopologyStringLists(work, nil, a.matchDNSNames)
+	actor.Detail.Device.ManagementAddresses = mergeTopologyStringLists(work, nil, a.managementAddrs)
+	actor.Detail.Device.Protocols = mergeTopologyStringLists(work, nil, a.protocols)
+	actor.Detail.Device.ProtocolsCollected = mergeTopologyStringLists(work, nil, a.protocolsCollected)
+	actor.Detail.Device.Capabilities = mergeTopologyStringLists(work, nil, a.capabilities)
+	actor.Detail.Device.CapabilitiesSupported = mergeTopologyStringLists(work, nil, a.capabilitiesSupported)
+	actor.Detail.Device.CapabilitiesEnabled = mergeTopologyStringLists(work, nil, a.capabilitiesEnabled)
+	actor.Detail.Device.IfIndexes = mergeTopologyStringLists(work, nil, a.deviceIfIndexes)
+	actor.Detail.Device.IfNames = mergeTopologyStringLists(work, nil, a.deviceIfNames)
+	actor.Detail.Endpoint.LearnedSources = mergeTopologyStringLists(work, nil, a.endpointSources)
+	actor.Detail.Endpoint.LearnedDeviceIDs = mergeTopologyStringLists(work, nil, a.endpointDeviceIDs)
+	actor.Detail.Endpoint.LearnedIfIndexes = mergeTopologyStringLists(work, nil, a.endpointIfIndexes)
+	actor.Detail.Endpoint.LearnedIfNames = mergeTopologyStringLists(work, nil, a.endpointIfNames)
+	actor.Detail.Segment.ParentDevices = mergeTopologyStringLists(work, nil, a.segmentParents)
+	actor.Detail.Segment.IfNames = mergeTopologyStringLists(work, nil, a.segmentIfNames)
+	actor.Detail.Segment.IfIndexes = mergeTopologyStringLists(work, nil, a.segmentIfIndexes)
+	actor.Detail.Segment.BridgePorts = mergeTopologyStringLists(work, nil, a.segmentBridgePorts)
+	actor.Detail.Segment.VLANIDs = mergeTopologyStringLists(work, nil, a.segmentVLANIDs)
+	actor.Detail.Segment.LearnedSources = mergeTopologyStringLists(work, nil, a.segmentSources)
 }
 
 func clearTopologyActorCollapseLists(actor *projectedActor) {
@@ -363,10 +388,10 @@ func mergeTopologyActorLabels(base, extra map[string]string) map[string]string {
 	return base
 }
 
-func mergeProjectionActorDetail(base, extra model.ProjectionActorDetail) model.ProjectionActorDetail {
-	base.Device = mergeProjectionDeviceActorDetail(base.Device, extra.Device)
-	base.Endpoint = mergeProjectionEndpointActorDetail(base.Endpoint, extra.Endpoint)
-	base.Segment = mergeProjectionSegmentActorDetail(base.Segment, extra.Segment)
+func mergeProjectionActorDetail(work *projectionWork, base, extra model.ProjectionActorDetail) model.ProjectionActorDetail {
+	base.Device = mergeProjectionDeviceActorDetail(work, base.Device, extra.Device)
+	base.Endpoint = mergeProjectionEndpointActorDetail(work, base.Endpoint, extra.Endpoint)
+	base.Segment = mergeProjectionSegmentActorDetail(work, base.Segment, extra.Segment)
 	if strings.TrimSpace(base.DisplayName) == "" {
 		base.DisplayName = strings.TrimSpace(extra.DisplayName)
 	}
@@ -376,7 +401,7 @@ func mergeProjectionActorDetail(base, extra model.ProjectionActorDetail) model.P
 	return base
 }
 
-func mergeProjectionDeviceActorDetail(base, extra model.ProjectionDeviceActorDetail) model.ProjectionDeviceActorDetail {
+func mergeProjectionDeviceActorDetail(work *projectionWork, base, extra model.ProjectionDeviceActorDetail) model.ProjectionDeviceActorDetail {
 	if strings.TrimSpace(base.DeviceID) == "" {
 		base.DeviceID = strings.TrimSpace(extra.DeviceID)
 	}
@@ -385,12 +410,12 @@ func mergeProjectionDeviceActorDetail(base, extra model.ProjectionDeviceActorDet
 	if strings.TrimSpace(base.ManagementIP) == "" {
 		base.ManagementIP = strings.TrimSpace(extra.ManagementIP)
 	}
-	base.ManagementAddresses = mergeTopologyStringLists(base.ManagementAddresses, extra.ManagementAddresses)
-	base.Protocols = mergeTopologyStringLists(base.Protocols, extra.Protocols)
-	base.ProtocolsCollected = mergeTopologyStringLists(base.ProtocolsCollected, extra.ProtocolsCollected)
-	base.Capabilities = mergeTopologyStringLists(base.Capabilities, extra.Capabilities)
-	base.CapabilitiesSupported = mergeTopologyStringLists(base.CapabilitiesSupported, extra.CapabilitiesSupported)
-	base.CapabilitiesEnabled = mergeTopologyStringLists(base.CapabilitiesEnabled, extra.CapabilitiesEnabled)
+	base.ManagementAddresses = mergeTopologyStringLists(work, base.ManagementAddresses, extra.ManagementAddresses)
+	base.Protocols = mergeTopologyStringLists(work, base.Protocols, extra.Protocols)
+	base.ProtocolsCollected = mergeTopologyStringLists(work, base.ProtocolsCollected, extra.ProtocolsCollected)
+	base.Capabilities = mergeTopologyStringLists(work, base.Capabilities, extra.Capabilities)
+	base.CapabilitiesSupported = mergeTopologyStringLists(work, base.CapabilitiesSupported, extra.CapabilitiesSupported)
+	base.CapabilitiesEnabled = mergeTopologyStringLists(work, base.CapabilitiesEnabled, extra.CapabilitiesEnabled)
 	if strings.TrimSpace(base.Vendor) == "" {
 		base.Vendor = strings.TrimSpace(extra.Vendor)
 	}
@@ -415,8 +440,8 @@ func mergeProjectionDeviceActorDetail(base, extra model.ProjectionDeviceActorDet
 	if strings.TrimSpace(base.VendorMatchPrefix) == "" {
 		base.VendorMatchPrefix = strings.TrimSpace(extra.VendorMatchPrefix)
 	}
-	base.IfIndexes = mergeTopologyStringLists(base.IfIndexes, extra.IfIndexes)
-	base.IfNames = mergeTopologyStringLists(base.IfNames, extra.IfNames)
+	base.IfIndexes = mergeTopologyStringLists(work, base.IfIndexes, extra.IfIndexes)
+	base.IfNames = mergeTopologyStringLists(work, base.IfNames, extra.IfNames)
 	if !base.PortsTotal.Has {
 		base.PortsTotal = extra.PortsTotal
 	}
@@ -454,11 +479,11 @@ func mergeProjectionDeviceActorDetail(base, extra model.ProjectionDeviceActorDet
 	return base
 }
 
-func mergeProjectionEndpointActorDetail(base, extra model.ProjectionEndpointActorDetail) model.ProjectionEndpointActorDetail {
-	base.LearnedSources = mergeTopologyStringLists(base.LearnedSources, extra.LearnedSources)
-	base.LearnedDeviceIDs = mergeTopologyStringLists(base.LearnedDeviceIDs, extra.LearnedDeviceIDs)
-	base.LearnedIfIndexes = mergeTopologyStringLists(base.LearnedIfIndexes, extra.LearnedIfIndexes)
-	base.LearnedIfNames = mergeTopologyStringLists(base.LearnedIfNames, extra.LearnedIfNames)
+func mergeProjectionEndpointActorDetail(work *projectionWork, base, extra model.ProjectionEndpointActorDetail) model.ProjectionEndpointActorDetail {
+	base.LearnedSources = mergeTopologyStringLists(work, base.LearnedSources, extra.LearnedSources)
+	base.LearnedDeviceIDs = mergeTopologyStringLists(work, base.LearnedDeviceIDs, extra.LearnedDeviceIDs)
+	base.LearnedIfIndexes = mergeTopologyStringLists(work, base.LearnedIfIndexes, extra.LearnedIfIndexes)
+	base.LearnedIfNames = mergeTopologyStringLists(work, base.LearnedIfNames, extra.LearnedIfNames)
 	if !base.Discovered {
 		base.Discovered = extra.Discovered
 	}
@@ -501,7 +526,7 @@ func mergeProjectionEndpointActorDetail(base, extra model.ProjectionEndpointActo
 	return base
 }
 
-func mergeProjectionSegmentActorDetail(base, extra model.ProjectionSegmentActorDetail) model.ProjectionSegmentActorDetail {
+func mergeProjectionSegmentActorDetail(work *projectionWork, base, extra model.ProjectionSegmentActorDetail) model.ProjectionSegmentActorDetail {
 	if strings.TrimSpace(base.SegmentID) == "" {
 		base.SegmentID = strings.TrimSpace(extra.SegmentID)
 	}
@@ -511,12 +536,12 @@ func mergeProjectionSegmentActorDetail(base, extra model.ProjectionSegmentActorD
 	if strings.TrimSpace(base.SegmentKind) == "" {
 		base.SegmentKind = strings.TrimSpace(extra.SegmentKind)
 	}
-	base.ParentDevices = mergeTopologyStringLists(base.ParentDevices, extra.ParentDevices)
-	base.IfNames = mergeTopologyStringLists(base.IfNames, extra.IfNames)
-	base.IfIndexes = mergeTopologyStringLists(base.IfIndexes, extra.IfIndexes)
-	base.BridgePorts = mergeTopologyStringLists(base.BridgePorts, extra.BridgePorts)
-	base.VLANIDs = mergeTopologyStringLists(base.VLANIDs, extra.VLANIDs)
-	base.LearnedSources = mergeTopologyStringLists(base.LearnedSources, extra.LearnedSources)
+	base.ParentDevices = mergeTopologyStringLists(work, base.ParentDevices, extra.ParentDevices)
+	base.IfNames = mergeTopologyStringLists(work, base.IfNames, extra.IfNames)
+	base.IfIndexes = mergeTopologyStringLists(work, base.IfIndexes, extra.IfIndexes)
+	base.BridgePorts = mergeTopologyStringLists(work, base.BridgePorts, extra.BridgePorts)
+	base.VLANIDs = mergeTopologyStringLists(work, base.VLANIDs, extra.VLANIDs)
+	base.LearnedSources = mergeTopologyStringLists(work, base.LearnedSources, extra.LearnedSources)
 	if !base.PortsTotal.Has {
 		base.PortsTotal = extra.PortsTotal
 	}

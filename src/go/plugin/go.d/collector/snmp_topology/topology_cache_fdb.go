@@ -110,6 +110,9 @@ func (c *topologyBuilder) updateVtpVlanEntry(tags map[string]string) {
 }
 
 func (c *topologyBuilder) finalizeFDBVLANs() {
+	if !c.chargeWork(uint64(len(c.fdbEntries))) {
+		return
+	}
 	for _, entry := range c.fdbEntries {
 		if entry == nil {
 			continue

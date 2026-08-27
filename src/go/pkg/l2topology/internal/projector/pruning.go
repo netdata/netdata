@@ -3,15 +3,21 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
 func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]projectedActor, []graph.Link, int) {
+	return pruneSegmentArtifactsWithWork(nil, actors, links)
+}
+
+func pruneSegmentArtifactsWithWork(work *projectionWork, actors []projectedActor, links []graph.Link) ([]projectedActor, []graph.Link, int) {
 	if len(actors) == 0 || len(links) == 0 {
 		return actors, links, 0
+	}
+	if !work.charge(uint64(len(actors))) || !work.charge(uint64(len(links))) {
+		return nil, nil, 0
 	}
 
 	segmentKeys := make(map[string]struct{})
@@ -20,7 +26,7 @@ func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]proje
 		if !strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "segment") {
 			continue
 		}
-		key := canonicalTopologyMatchKey(actor.Actor.Match)
+		key := canonicalTopologyMatchKeyWithWork(work, actor.Actor.Match)
 		if key == "" {
 			continue
 		}
@@ -33,7 +39,9 @@ func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]proje
 	if len(segmentKeys) == 0 {
 		return actors, links, 0
 	}
-	sort.Strings(segmentOrder)
+	if !sortProjectionStrings(work, segmentOrder) {
+		return nil, nil, 0
+	}
 
 	discoveryPairs := make(map[string]struct{})
 	for _, link := range links {
@@ -41,8 +49,8 @@ func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]proje
 		if protocol != "lldp" && protocol != "cdp" {
 			continue
 		}
-		src := canonicalTopologyMatchKey(link.Src.Match)
-		dst := canonicalTopologyMatchKey(link.Dst.Match)
+		src := canonicalTopologyMatchKeyWithWork(work, link.Src.Match)
+		dst := canonicalTopologyMatchKeyWithWork(work, link.Dst.Match)
 		if src == "" || dst == "" {
 			continue
 		}
@@ -59,11 +67,14 @@ func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]proje
 
 	suppressed := make(map[string]struct{})
 	for {
+		if !work.charge(uint64(len(links) + len(segmentOrder))) {
+			return nil, nil, 0
+		}
 		changed := false
 		neighborsBySegment := make(map[string]map[string]struct{})
 		for _, link := range links {
-			src := canonicalTopologyMatchKey(link.Src.Match)
-			dst := canonicalTopologyMatchKey(link.Dst.Match)
+			src := canonicalTopologyMatchKeyWithWork(work, link.Src.Match)
+			dst := canonicalTopologyMatchKeyWithWork(work, link.Dst.Match)
 			if src == "" || dst == "" {
 				continue
 			}
@@ -134,7 +145,7 @@ func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]proje
 
 	filteredActors := make([]projectedActor, 0, len(actors))
 	for _, actor := range actors {
-		key := canonicalTopologyMatchKey(actor.Actor.Match)
+		key := canonicalTopologyMatchKeyWithWork(work, actor.Actor.Match)
 		if key == "" {
 			filteredActors = append(filteredActors, actor)
 			continue
@@ -147,8 +158,8 @@ func pruneSegmentArtifacts(actors []projectedActor, links []graph.Link) ([]proje
 
 	filteredLinks := make([]graph.Link, 0, len(links))
 	for _, link := range links {
-		src := canonicalTopologyMatchKey(link.Src.Match)
-		dst := canonicalTopologyMatchKey(link.Dst.Match)
+		src := canonicalTopologyMatchKeyWithWork(work, link.Src.Match)
+		dst := canonicalTopologyMatchKeyWithWork(work, link.Dst.Match)
 		if src != "" {
 			if _, srcSuppressed := suppressed[src]; srcSuppressed {
 				continue
@@ -211,6 +222,7 @@ func summarizeTopologyLinks(links []graph.Link) topologyLinkCounts {
 }
 
 func pruneManagedOverlapUnlinkedEndpointActors(
+	work *projectionWork,
 	actors []projectedActor,
 	links []graph.Link,
 	suppressedEndpointIDs map[string]struct{},
@@ -226,7 +238,7 @@ func pruneManagedOverlapUnlinkedEndpointActors(
 			continue
 		}
 		match := endpointMatchFromID(endpointID)
-		for _, key := range topologyMatchIdentityKeys(match) {
+		for _, key := range topologyMatchIdentityKeysWithWork(work, match) {
 			key = strings.TrimSpace(key)
 			if key == "" {
 				continue
@@ -240,14 +252,14 @@ func pruneManagedOverlapUnlinkedEndpointActors(
 
 	linkedIdentityKeys := make(map[string]struct{}, len(links)*2)
 	for _, link := range links {
-		for _, key := range topologyMatchIdentityKeys(link.Src.Match) {
+		for _, key := range topologyMatchIdentityKeysWithWork(work, link.Src.Match) {
 			key = strings.TrimSpace(key)
 			if key == "" {
 				continue
 			}
 			linkedIdentityKeys[key] = struct{}{}
 		}
-		for _, key := range topologyMatchIdentityKeys(link.Dst.Match) {
+		for _, key := range topologyMatchIdentityKeysWithWork(work, link.Dst.Match) {
 			key = strings.TrimSpace(key)
 			if key == "" {
 				continue
@@ -264,7 +276,7 @@ func pruneManagedOverlapUnlinkedEndpointActors(
 			continue
 		}
 
-		actorKeys := topologyMatchIdentityKeys(actor.Actor.Match)
+		actorKeys := topologyMatchIdentityKeysWithWork(work, actor.Actor.Match)
 		if !topologyIdentityKeysOverlap(actorKeys, suppressedIdentityKeys) {
 			filtered = append(filtered, actor)
 			continue

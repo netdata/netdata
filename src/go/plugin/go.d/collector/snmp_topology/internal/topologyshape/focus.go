@@ -3,9 +3,6 @@
 package topologyshape
 
 import (
-	"sort"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
@@ -14,78 +11,72 @@ func ApplyDepthFocusFilter(data *topologymodel.Data, options topologyoptions.Que
 	if data == nil || len(data.Actors) == 0 {
 		return nil
 	}
-	options = topologyoptions.NormalizeQueryOptions(options)
-	focusIPs := topologyoptions.ManagedFocusSelectedIPs(options.ManagedDeviceFocus)
+	var err error
+	options, err = topologyoptions.PrepareQueryOptions(options)
+	if err != nil {
+		return err
+	}
+	focusIPs := options.ManagedFocusIPs()
 
 	beforeActors := len(data.Actors)
 	beforeLinks := len(data.Links)
 
-	if topologyoptions.IsManagedFocusAllDevices(options.ManagedDeviceFocus) {
-		items, err := worklimit.Sum(uint64(len(data.Actors)), uint64(len(data.Links)))
-		if err != nil {
-			return err
-		}
-		if err := options.WorkLimiter.Charge(items); err != nil {
-			return err
-		}
-		recordTopologyFocusAllDevicesStats(data, options)
-		return nil
+	if options.ManagedFocusIsAllDevices() {
+		return recordTopologyFocusAllDevicesStats(data, options)
 	}
-	items, err := worklimit.Sum(uint64(len(data.Actors)), uint64(len(data.Links)))
+	graph, err := buildTopologyFocusGraphWithLimiter(data, options.WorkLimiter)
 	if err != nil {
 		return err
 	}
-	if err := options.WorkLimiter.ChargeProduct(items, 4); err != nil {
-		return err
-	}
-
-	graph := buildTopologyFocusGraph(data)
 	if len(graph.nonSegmentSet) == 0 || len(focusIPs) == 0 {
-		topologymodel.RecomputeLinkStats(data)
-		return nil
+		return topologymodel.RecomputeLinkStatsWithLimiter(data, options.WorkLimiter)
 	}
-	if err := options.WorkLimiter.ChargeProduct(uint64(len(graph.actorByHandle)), uint64(len(focusIPs))); err != nil {
+	roots, err := collectTopologyFocusRootsWithLimiter(graph, focusIPs, options.WorkLimiter)
+	if err != nil {
 		return err
 	}
-
-	roots := collectTopologyFocusRoots(graph, focusIPs)
 	if len(roots) == 0 {
-		recordTopologyFocusStats(data, options, beforeActors, beforeLinks)
-		return nil
+		return recordTopologyFocusStats(data, options, beforeActors, beforeLinks)
 	}
 
-	distance := traverseTopologyFocusDepth(graph, roots, options.Depth)
-	includedNonSegment, includedActorsByDepth := collectTopologyFocusDepthSets(graph, distance, options.Depth)
+	distance, err := traverseTopologyFocusDepthWithLimiter(graph, roots, options.Depth, options.WorkLimiter)
+	if err != nil {
+		return err
+	}
+	includedNonSegment, includedActorsByDepth, err := collectTopologyFocusDepthSetsWithLimiter(graph, distance, options.Depth, options.WorkLimiter)
+	if err != nil {
+		return err
+	}
 	if len(includedNonSegment) == 0 {
-		topologymodel.RecomputeLinkStats(data)
-		return nil
+		return topologymodel.RecomputeLinkStatsWithLimiter(data, options.WorkLimiter)
 	}
 
 	shortestPathActors, shortestPathPairs, err := topologyShortestPathUnion(data, roots, options.WorkLimiter)
 	if err != nil {
 		return err
 	}
-	filterTopologyDataByFocus(data, includedActorsByDepth, shortestPathActors, shortestPathPairs)
+	if err := filterTopologyDataByFocusWithLimiter(data, includedActorsByDepth, shortestPathActors, shortestPathPairs, options.WorkLimiter); err != nil {
+		return err
+	}
 
-	filterDanglingLinks(data)
+	if err := filterDanglingLinksWithLimiter(data, options.WorkLimiter); err != nil {
+		return err
+	}
 	if options.EliminateNonIPInferred {
-		pruneSparseSegments(data, 1)
-		filterDanglingLinks(data)
+		if _, err := pruneSparseSegmentsWithLimiter(data, 1, options.WorkLimiter); err != nil {
+			return err
+		}
+		if err := filterDanglingLinksWithLimiter(data, options.WorkLimiter); err != nil {
+			return err
+		}
 	}
 
-	if err := options.WorkLimiter.ChargeSort(uint64(len(data.Actors))); err != nil {
+	if err := topologymodel.SortActors(options.WorkLimiter, data.Actors); err != nil {
 		return err
 	}
-	sort.Slice(data.Actors, func(i, j int) bool {
-		return topologymodel.CanonicalMatchKey(data.Actors[i].Match) < topologymodel.CanonicalMatchKey(data.Actors[j].Match)
-	})
-	if err := options.WorkLimiter.ChargeSort(uint64(len(data.Links))); err != nil {
+	if err := topologymodel.SortLinks(options.WorkLimiter, data.Links); err != nil {
 		return err
 	}
-	sort.Slice(data.Links, func(i, j int) bool {
-		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
-	})
 
-	recordTopologyFocusStats(data, options, beforeActors, beforeLinks)
-	return nil
+	return recordTopologyFocusStats(data, options, beforeActors, beforeLinks)
 }

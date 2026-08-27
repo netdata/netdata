@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -12,13 +11,15 @@ import (
 func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDeviceInterfaceSummary {
 	out := make(map[string]topologyDeviceInterfaceSummary, len(b.collectors))
 	for deviceID, col := range b.collectors {
-		sort.Slice(col.portStatuses, func(i, j int) bool {
+		if !sortProjectionSlice(b.work, col.portStatuses, func(i, j int) bool {
 			left, right := col.portStatuses[i], col.portStatuses[j]
 			if left.IfIndex != right.IfIndex {
 				return left.IfIndex < right.IfIndex
 			}
 			return left.IfName < right.IfName
-		})
+		}) {
+			return nil
+		}
 
 		modeCounts := make(map[string]int)
 		roleCounts := make(map[string]int)
@@ -33,7 +34,7 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 		portStatuses := make([]model.ProjectionPortDetail, 0, len(col.portStatuses))
 		for _, st := range col.portStatuses {
 			evidence := col.portEvidence[st.IfIndex]
-			mode, confidence, sources, vlans := classifyTopologyPortLinkMode(evidence)
+			mode, confidence, sources, vlans := classifyTopologyPortLinkModeWithWork(b.work, evidence)
 			role, roleConfidence, roleSources := classifyTopologyPortRole(evidence)
 			st.LinkMode = mode
 			st.ModeConfidence = confidence
@@ -45,8 +46,8 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 			if evidence != nil {
 				st.FDBMACCount = len(evidence.fdbEndpointIDs)
 				st.STPState = summarizeTopologySTPState(evidence.stpStates)
-				st.VLANs = topologyPortVLANDetails(st.VLANIDs, evidence.vlanNames, st.LinkMode)
-				st.Neighbors = sortedTopologyPortNeighbors(evidence.neighbors)
+				st.VLANs = topologyPortVLANDetailsWithWork(b.work, st.VLANIDs, evidence.vlanNames, st.LinkMode)
+				st.Neighbors = sortedTopologyPortNeighborsWithWork(b.work, evidence.neighbors)
 			}
 
 			for _, vlanID := range st.VLANIDs {
@@ -78,12 +79,12 @@ func (b *deviceInterfaceSummaryBuilder) buildSummaries() map[string]topologyDevi
 
 		out[deviceID] = topologyDeviceInterfaceSummary{
 			portsTotal:        len(col.ifIndexes),
-			ifIndexes:         sortedTopologySet(col.ifIndexes),
-			ifNames:           sortedTopologySet(col.ifNames),
-			adminStatusCount:  normalizedIntCountMap(col.adminCounts),
-			operStatusCount:   normalizedIntCountMap(col.operCounts),
-			linkModeCount:     normalizedIntCountMap(modeCounts),
-			roleCount:         normalizedIntCountMap(roleCounts),
+			ifIndexes:         sortedTopologySetWithWork(b.work, col.ifIndexes),
+			ifNames:           sortedTopologySetWithWork(b.work, col.ifNames),
+			adminStatusCount:  normalizedIntCountMapWithWork(b.work, col.adminCounts),
+			operStatusCount:   normalizedIntCountMapWithWork(b.work, col.operCounts),
+			linkModeCount:     normalizedIntCountMapWithWork(b.work, modeCounts),
+			roleCount:         normalizedIntCountMapWithWork(b.work, roleCounts),
 			portsUp:           portsUp,
 			portsDown:         portsDown,
 			portsAdminDown:    portsAdminDown,

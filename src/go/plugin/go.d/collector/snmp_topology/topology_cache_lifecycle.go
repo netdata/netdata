@@ -53,11 +53,23 @@ func (c *topologyBuilder) finalize() topologyBuilderFinalizeStats {
 		return topologyBuilderFinalizeStats{}
 	}
 
-	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
+	if err := finalizeLocalManagementAddressesWithLimiter(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP, c.workLimiter); err != nil {
+		c.workErr = err
+		return topologyBuilderFinalizeStats{}
+	}
 	c.localManagementAddressKeys = nil
 	c.rebuildTrapSourceMatchMethods()
+	if c.workErr != nil {
+		return topologyBuilderFinalizeStats{}
+	}
 	c.finalizeFDBVLANs()
+	if c.workErr != nil {
+		return topologyBuilderFinalizeStats{}
+	}
 	c.updateFDBDiagnostics()
+	if c.workErr != nil {
+		return topologyBuilderFinalizeStats{}
+	}
 	stats := topologyBuilderFinalizeStats{
 		agentID:      c.agentID,
 		droppedNoMAC: c.fdbRowsDroppedNoMAC,
@@ -71,6 +83,9 @@ func (c *topologyBuilder) finalize() topologyBuilderFinalizeStats {
 }
 
 func (c *topologyBuilder) rebuildTrapSourceMatchMethods() {
+	if !c.chargeWork(uint64(len(c.ifIndexByIP) + len(c.localDevice.ManagementAddresses))) {
+		return
+	}
 	methods := make(map[string]string, len(c.ifIndexByIP)+len(c.localDevice.ManagementAddresses)+1)
 	for value := range c.ifIndexByIP {
 		if addr, ok := topologyutil.ParseIPAddress(value); ok {
@@ -89,6 +104,9 @@ func (c *topologyBuilder) rebuildTrapSourceMatchMethods() {
 }
 
 func (c *topologyBuilder) updateFDBDiagnostics() {
+	if !c.chargeWork(uint64(len(c.fdbEntries))) {
+		return
+	}
 	c.fdbRowsUnmappedPort = 0
 	for _, entry := range c.fdbEntries {
 		if entry == nil || strings.TrimSpace(entry.mac) == "" {

@@ -5,6 +5,7 @@ package topologyv1
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 
@@ -17,10 +18,23 @@ func buildSNMPTopologyV1ActorDetails(
 	stringsDict *topologyapi.StringDictionary,
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) (map[string]topologyapi.DetailTable, map[string]topologyapi.TableType, error) {
+	return buildSNMPTopologyV1ActorDetailsWithWork(nil, actors, actorIndex, stringsDict, portNeighborSummaries)
+}
+
+func buildSNMPTopologyV1ActorDetailsWithWork(
+	work *renderWork,
+	actors []topologymodel.Actor,
+	actorIndex topologyV1ActorIndex,
+	stringsDict *topologyapi.StringDictionary,
+	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
+) (map[string]topologyapi.DetailTable, map[string]topologyapi.TableType, error) {
+	if !work.charge(uint64(len(actors))) {
+		return nil, nil, work.err
+	}
 	details := make(map[string]topologyapi.DetailTable)
 	tableTypes := make(map[string]topologyapi.TableType)
 
-	labelsTable := buildSNMPTopologyV1ActorLabelsTable(actors, stringsDict)
+	labelsTable := buildSNMPTopologyV1ActorLabelsTableWithWork(work, actors, stringsDict)
 	details["actor_labels"] = topologyapi.DetailTable{
 		Type:  "actor_labels",
 		Table: labelsTable,
@@ -31,7 +45,7 @@ func buildSNMPTopologyV1ActorDetails(
 		"actor_port_links": {},
 	}
 
-	metadataTable := buildSNMPTopologyV1ActorMetadataTable(actors)
+	metadataTable := buildSNMPTopologyV1ActorMetadataTableWithWork(work, actors)
 	if metadataTable.Rows > 0 {
 		tableID := "actor_metadata"
 		details[tableID] = topologyapi.DetailTable{
@@ -54,11 +68,19 @@ func buildSNMPTopologyV1ActorDetails(
 		usedTableIDs[tableID] = struct{}{}
 	}
 
-	tableRowsByName := collectSNMPTopologyV1ActorTableRows(actors)
-	for _, tableName := range topologyutil.SortedMapKeys(tableRowsByName) {
+	tableRowsByName := collectSNMPTopologyV1ActorTableRowsWithWork(work, actors)
+	var tableNames []string
+	if work == nil {
+		tableNames = make([]string, 0, len(tableRowsByName))
+	}
+	tableNames = sortedRenderKeys(work, tableRowsByName, tableNames)
+	for _, tableName := range tableNames {
 		rows := tableRowsByName[tableName]
 		if len(rows) == 0 {
 			continue
+		}
+		if !work.charge(uint64(len(rows))) {
+			return nil, nil, work.err
 		}
 		tableID := ""
 		var table topologyapi.Table
@@ -93,11 +115,21 @@ func buildSNMPTopologyV1ActorDetails(
 }
 
 func buildSNMPTopologyV1ActorMetadataTable(actors []topologymodel.Actor) topologyapi.Table {
+	return buildSNMPTopologyV1ActorMetadataTableWithWork(nil, actors)
+}
+
+func buildSNMPTopologyV1ActorMetadataTableWithWork(work *renderWork, actors []topologymodel.Actor) topologyapi.Table {
+	if !work.charge(uint64(len(actors))) {
+		return topologyapi.Table{}
+	}
 	actorRefs := make([]any, 0, len(actors))
 	labels := make([]any, 0, len(actors))
 	for i, actor := range actors {
 		if len(actor.Labels) == 0 {
 			continue
+		}
+		if !work.charge(uint64(len(actor.Labels))) {
+			return topologyapi.Table{}
 		}
 		actorRefs = append(actorRefs, i)
 		labels = append(labels, nullableJSON(actor.Labels))
@@ -118,6 +150,14 @@ func buildSNMPTopologyV1ActorMetadataTable(actors []topologymodel.Actor) topolog
 }
 
 func buildSNMPTopologyV1ActorLabelsTable(
+	actors []topologymodel.Actor,
+	stringsDict *topologyapi.StringDictionary,
+) topologyapi.Table {
+	return buildSNMPTopologyV1ActorLabelsTableWithWork(nil, actors, stringsDict)
+}
+
+func buildSNMPTopologyV1ActorLabelsTableWithWork(
+	work *renderWork,
 	actors []topologymodel.Actor,
 	stringsDict *topologyapi.StringDictionary,
 ) topologyapi.Table {
@@ -159,6 +199,9 @@ func buildSNMPTopologyV1ActorLabelsTable(
 	}
 
 	for actorIndex, actor := range actors {
+		if !work.chargeMatch(actor.Match) || !work.charge(uint64(len(actor.Labels))) {
+			return topologyapi.Table{}
+		}
 		add(actorIndex, "actor_type", snmpTopologyV1ActorType(actor.ActorType), snmpTopologyV1ProducerSource, "identity", nil)
 		add(actorIndex, "layer", snmpTopologyV1ActorLayer(actor), snmpTopologyV1ProducerSource, "identity", nil)
 		add(actorIndex, "source", topologyutil.FirstNonEmptyString(actor.Source, snmpTopologyV1ProducerSource), snmpTopologyV1ProducerSource, "identity", nil)
@@ -171,16 +214,39 @@ func buildSNMPTopologyV1ActorLabelsTable(
 		addSlice(actorIndex, "hostname", actor.Match.Hostnames, snmpTopologyV1ProducerSource, "match")
 		addSlice(actorIndex, "dns_name", actor.Match.DNSNames, snmpTopologyV1ProducerSource, "match")
 
-		for _, key := range topologyutil.SortedMapKeys(actor.Labels) {
+		var labelKeys []string
+		if work == nil {
+			labelKeys = make([]string, 0, len(actor.Labels))
+		}
+		labelKeys = sortedRenderKeys(work, actor.Labels, labelKeys)
+		for _, key := range labelKeys {
 			value := actor.Labels[key]
 			add(actorIndex, key, value, "producer_label", "label", nil)
 		}
-		scalarValues := topologymodel.ActorDetailScalarLabelValues(actor)
-		for _, key := range topologyutil.SortedMapKeys(scalarValues) {
+		var limiter worklimit.Limiter
+		if work != nil {
+			limiter = work.limiter
+		}
+		scalarValues, err := topologymodel.ActorDetailScalarLabelValuesWithLimiter(actor, limiter)
+		if err != nil {
+			work.err = err
+			return topologyapi.Table{}
+		}
+		var scalarKeys []string
+		if work == nil {
+			scalarKeys = make([]string, 0, len(scalarValues))
+		}
+		scalarKeys = sortedRenderKeys(work, scalarValues, scalarKeys)
+		for _, key := range scalarKeys {
 			add(actorIndex, key, scalarValues[key], snmpTopologyV1ProducerSource, "attribute", nil)
 		}
 		arrayValues := topologymodel.ActorDetailArrayLabelValues(actor)
-		for _, key := range topologyutil.SortedMapKeys(arrayValues) {
+		var arrayKeys []string
+		if work == nil {
+			arrayKeys = make([]string, 0, len(arrayValues))
+		}
+		arrayKeys = sortedRenderKeys(work, arrayValues, arrayKeys)
+		for _, key := range arrayKeys {
 			addSlice(actorIndex, key, arrayValues[key], snmpTopologyV1ProducerSource, "attribute")
 		}
 	}

@@ -39,13 +39,21 @@ func topologyLinkConfidence(link graph.Link) string {
 }
 
 func bridgeDomainSegmentID(segment *bridgeDomainSegment) string {
+	return bridgeDomainSegmentIDWithWork(nil, segment)
+}
+
+func bridgeDomainSegmentIDWithWork(work *projectionWork, segment *bridgeDomainSegment) string {
 	if segment == nil {
 		return ""
 	}
-	portKeys := sortedBridgePortSet(segment.ports)
+	portKeys := sortedBridgePortSetWithWork(work, segment.ports)
 	sig := strings.Join(portKeys, "<->")
 	if sig == "" {
-		sig = portSortKey(segment.designatedPort)
+		var ok bool
+		sig, ok = portSortKeyWithWork(work, segment.designatedPort)
+		if !ok {
+			return ""
+		}
 	}
 	return "bridge-domain:" + sig
 }
@@ -242,6 +250,23 @@ func bridgePortCanonicalIdentity(port bridgePortRef) string {
 
 func bridgePortRefSortKey(port bridgePortRef) string {
 	return bridgePortRefKey(port, true, true)
+}
+
+func bridgePortRefSortKeyWithWork(work *projectionWork, port bridgePortRef) (string, bool) {
+	if work != nil && !work.chargeStrings(bridgePortKeySourceStrings(port)) {
+		return "", false
+	}
+	return bridgePortRefSortKey(port), true
+}
+
+func bridgePortKeySourceStrings(port bridgePortRef) []string {
+	return []string{
+		port.deviceID,
+		port.ifName,
+		port.bridgePort,
+		port.fdbDomainID,
+		port.vlanID,
+	}
 }
 
 func bridgePortRefDisplayKey(port bridgePortRef) string {

@@ -15,6 +15,13 @@ import (
 type topologyV1ActorIndex map[topologymodel.ActorHandle]int
 
 func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, topologyV1ActorIndex) {
+	return buildSNMPTopologyV1ActorsWithWork(nil, actors, stringsDict)
+}
+
+func buildSNMPTopologyV1ActorsWithWork(work *renderWork, actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, topologyV1ActorIndex) {
+	if !work.charge(uint64(len(actors))) {
+		return topologyapi.Table{}, nil
+	}
 	actorIndex := make(topologyV1ActorIndex, len(actors))
 	usedActorIDs := make(map[string]struct{}, len(actors))
 	for _, actor := range actors {
@@ -53,6 +60,9 @@ func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topolo
 	netdataHostIDs := make([]any, len(actors))
 
 	for i, actor := range actors {
+		if !work.chargeMatch(actor.Match) {
+			return topologyapi.Table{}, nil
+		}
 		actorID := strings.TrimSpace(actor.ActorID)
 		if actorID == "" {
 			actorID = snmpTopologyV1FallbackActorID(actor, i, usedActorIDs)

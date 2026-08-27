@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildFDBCandidates_KeepsDistinctVLANScopedCandidates(t *testing.T) {
-	candidates := buildFDBCandidates([]model.FDBObservation{
+	candidates, err := buildFDBCandidates(nil, []model.FDBObservation{
 		{
 			MAC:        "70:49:a2:65:72:cd",
 			BridgePort: "7",
@@ -24,6 +24,7 @@ func TestBuildFDBCandidates_KeepsDistinctVLANScopedCandidates(t *testing.T) {
 			VLANID:     "100\x00vlan:200",
 		},
 	}, nil)
+	require.NoError(t, err)
 
 	require.Len(t, candidates, 2)
 	require.Equal(t, "100", candidates[0].vlanID)
@@ -31,7 +32,7 @@ func TestBuildFDBCandidates_KeepsDistinctVLANScopedCandidates(t *testing.T) {
 }
 
 func TestBuildFDBCandidates_DoesNotReintroduceDuplicateEndpoint(t *testing.T) {
-	candidates := buildFDBCandidates([]model.FDBObservation{
+	candidates, err := buildFDBCandidates(nil, []model.FDBObservation{
 		{
 			MAC:        "70:49:a2:65:72:cd",
 			BridgePort: "1",
@@ -52,12 +53,13 @@ func TestBuildFDBCandidates_DoesNotReintroduceDuplicateEndpoint(t *testing.T) {
 		"2": 2,
 		"3": 3,
 	})
+	require.NoError(t, err)
 
 	require.Empty(t, candidates)
 }
 
 func TestBuildFDBCandidates_KeepsDistinctForwardingDomainsWithoutDisplayVLAN(t *testing.T) {
-	candidates := buildFDBCandidates([]model.FDBObservation{
+	candidates, err := buildFDBCandidates(nil, []model.FDBObservation{
 		{
 			MAC:         "70:49:a2:65:72:cd",
 			BridgePort:  "1",
@@ -71,6 +73,7 @@ func TestBuildFDBCandidates_KeepsDistinctForwardingDomainsWithoutDisplayVLAN(t *
 			FDBDomainID: "fdb:200",
 		},
 	}, map[string]int{"1": 1, "2": 2})
+	require.NoError(t, err)
 
 	require.Len(t, candidates, 2)
 	require.Empty(t, candidates[0].vlanID)
@@ -80,7 +83,7 @@ func TestBuildFDBCandidates_KeepsDistinctForwardingDomainsWithoutDisplayVLAN(t *
 }
 
 func TestBuildFDBCandidates_DropsConflictingDestinationsWithinForwardingDomain(t *testing.T) {
-	candidates := buildFDBCandidates([]model.FDBObservation{
+	candidates, err := buildFDBCandidates(nil, []model.FDBObservation{
 		{
 			MAC:         "70:49:a2:65:72:cd",
 			BridgePort:  "1",
@@ -94,6 +97,7 @@ func TestBuildFDBCandidates_DropsConflictingDestinationsWithinForwardingDomain(t
 			FDBDomainID: "fdb:100",
 		},
 	}, map[string]int{"1": 1, "2": 2})
+	require.NoError(t, err)
 
 	require.Empty(t, candidates)
 }

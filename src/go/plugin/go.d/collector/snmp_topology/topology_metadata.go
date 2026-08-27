@@ -2,10 +2,7 @@
 
 package snmptopology
 
-import (
-	"sort"
-	"strings"
-)
+import "strings"
 
 var (
 	topologyMetadataAliasSysDescr = []string{
@@ -56,16 +53,20 @@ func topologyCanonicalMetadataKey(key string) string {
 type topologyMetadataIndex map[string]string
 
 func newTopologyMetadataIndex(labels map[string]string) topologyMetadataIndex {
+	return newTopologyMetadataIndexWithBuilder(&topologyBuilder{}, labels)
+}
+
+func newTopologyMetadataIndexWithBuilder(builder *topologyBuilder, labels map[string]string) topologyMetadataIndex {
 	if len(labels) == 0 {
 		return nil
 	}
 
 	byKey := make(topologyMetadataIndex, len(labels))
-	keys := make([]string, 0, len(labels))
-	for key := range labels {
-		keys = append(keys, key)
+	var keys []string
+	if builder != nil && builder.workLimiter == nil {
+		keys = make([]string, 0, len(labels))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(builder, labels, keys)
 	for _, key := range keys {
 		value := strings.TrimSpace(labels[key])
 		if value == "" {

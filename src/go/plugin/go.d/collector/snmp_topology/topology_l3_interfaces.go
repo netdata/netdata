@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -15,11 +14,14 @@ func (c *topologyBuilder) snapshotL3Interfaces(localDeviceID string) []topologym
 		return nil
 	}
 
-	ips := make([]string, 0, len(c.l3InterfacesByIP))
-	for ip := range c.l3InterfacesByIP {
-		ips = append(ips, ip)
+	var ips []string
+	if c.workLimiter == nil {
+		ips = make([]string, 0, len(c.l3InterfacesByIP))
 	}
-	sort.Strings(ips)
+	ips = sortedBuilderKeys(c, c.l3InterfacesByIP, ips)
+	if !c.chargeWork(uint64(len(ips))) {
+		return nil
+	}
 
 	rows := make([]topologymodel.L3Interface, 0, len(ips))
 	for _, ip := range ips {

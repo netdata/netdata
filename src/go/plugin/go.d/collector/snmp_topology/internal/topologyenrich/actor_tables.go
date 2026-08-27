@@ -4,8 +4,11 @@ package topologyenrich
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
-func attachTopologyOSPFNeighborRows(data *topologymodel.Data, rowsByActor map[topologymodel.ActorHandle][]topologymodel.OSPFNeighborDetailRow) {
+func attachTopologyOSPFNeighborRows(work *enrichmentWork, data *topologymodel.Data, rowsByActor map[topologymodel.ActorHandle][]topologymodel.OSPFNeighborDetailRow) {
 	if data == nil || len(rowsByActor) == 0 {
+		return
+	}
+	if !work.charge(uint64(len(data.Actors))) {
 		return
 	}
 	for i := range data.Actors {
@@ -14,13 +17,16 @@ func attachTopologyOSPFNeighborRows(data *topologymodel.Data, rowsByActor map[to
 		if len(rows) == 0 {
 			continue
 		}
-		sortTopologyOSPFNeighborDetailRows(rows)
+		sortTopologyOSPFNeighborDetailRowsWithWork(work, rows)
 		actor.Detail.OSPF = rows
 	}
 }
 
-func attachTopologyBGPPeerRows(data *topologymodel.Data, rowsByActor map[topologymodel.ActorHandle][]topologymodel.BGPPeerDetailRow) {
+func attachTopologyBGPPeerRows(work *enrichmentWork, data *topologymodel.Data, rowsByActor map[topologymodel.ActorHandle][]topologymodel.BGPPeerDetailRow) {
 	if data == nil || len(rowsByActor) == 0 {
+		return
+	}
+	if !work.charge(uint64(len(data.Actors))) {
 		return
 	}
 	for i := range data.Actors {
@@ -29,7 +35,7 @@ func attachTopologyBGPPeerRows(data *topologymodel.Data, rowsByActor map[topolog
 		if len(rows) == 0 {
 			continue
 		}
-		sortTopologyBGPPeerDetailRows(rows)
+		sortTopologyBGPPeerDetailRowsWithWork(work, rows)
 		actor.Detail.BGP = rows
 	}
 }

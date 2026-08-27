@@ -26,9 +26,9 @@ func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T
 		if idx == rep {
 			continue
 		}
-		expected.Actor.Match = mergeTopologyActorMatch(expected.Actor.Match, expectedActors[idx].Actor.Match)
+		expected.Actor.Match = mergeTopologyActorMatch(nil, expected.Actor.Match, expectedActors[idx].Actor.Match)
 		expected.Actor.Labels = mergeTopologyActorLabels(expected.Actor.Labels, expectedActors[idx].Actor.Labels)
-		expected.Detail = mergeProjectionActorDetail(expected.Detail, expectedActors[idx].Detail)
+		expected.Detail = mergeProjectionActorDetail(nil, expected.Detail, expectedActors[idx].Detail)
 	}
 	expected.Detail.CollapsedByIP = true
 	expected.Detail.CollapsedCount = len(expectedActors)

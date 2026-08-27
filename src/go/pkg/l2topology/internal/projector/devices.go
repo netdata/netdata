@@ -32,7 +32,18 @@ func deviceToTopologyActorWithAddresses(
 	reporterAliases, addresses []string,
 	lookupVendorByMAC func(string) (string, string),
 ) projectedActor {
-	match := buildDeviceActorMatchWithAddresses(dev, reporterAliases, addresses)
+	return deviceToTopologyActorWithAddressesAndWork(nil, dev, source, layer, localDeviceID, ifaceSummary, reporterAliases, addresses, lookupVendorByMAC)
+}
+
+func deviceToTopologyActorWithAddressesAndWork(
+	work *projectionWork,
+	dev model.Device,
+	source, layer, localDeviceID string,
+	ifaceSummary topologyDeviceInterfaceSummary,
+	reporterAliases, addresses []string,
+	lookupVendorByMAC func(string) (string, string),
+) projectedActor {
+	match := buildDeviceActorMatchWithAddressesAndWork(work, dev, reporterAliases, addresses)
 
 	return projectedActor{
 		Actor: graph.Actor{

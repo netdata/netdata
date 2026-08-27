@@ -512,16 +512,21 @@ schema and closures in that directory.
 - **Graph work bound:** Graph replay MUST pass one optional limiter through L2
   normalization, projection, policies, L3 enrichment, focus shaping, and v1
   rendering. The probable-map strict and probable projections MUST share that
-  limiter. Before a bounded stage executes, charge a checked conservative
-  envelope for its data-dependent sorts and multiplicative work. Return
-  exhaustion through the ordinary error path and keep normal production
-  callers on the nil-limiter path. `l2topology.ToGraph` is the single
+  limiter. The function performing each replay-reachable dynamic sort,
+  multiplicative fanout, variable-cost canonicalization, or whole-input
+  materialization MUST charge it immediately before execution. Prepare
+  variable-length canonical keys once for bounded sorting; MUST NOT add a
+  detached phase estimator that mirrors graph complexity. Return exhaustion
+  through the ordinary error path and keep normal production free of accounting
+  and bounded-only preparation allocations. `l2topology.ToGraph` is the single
   error-capable projection API; do not add a compatibility wrapper or a second
   checked entry point.
 - **Reader structure:** Apply the device/row/tag policy to every generation
   reached by the requested closure, including a refresh sweep's previous
   generation, and to all collection-bearing fields in the semantic device
-  input. Semantic replay MUST charge finalization sorts before execution.
+  input. Semantic replay MUST establish its work budget before constructing the
+  decoded event corpus and use the same operation-owned charging contract while
+  applying and finalizing it.
 - **Integrity:** Content hashes prove typed byte identity and graph
   consistency. Exact v1 members remain `restricted` and `sanitized: false`.
 - **Recorder hot path:** Disabled capture MUST perform no DTO projection or
@@ -534,10 +539,11 @@ schema and closures in that directory.
   peak memory.
 - **Proof:** Update schema fixtures and closure/replay tests. Prove exact
   semantic-observation replay, complete refresh-sweep terminalization,
-  nil/high-budget graph-output parity, bounded-work rejection, live/graph-replay
-  parity, credential canaries, hostile-reader limits, deterministic rendering,
-  race tests, and focused disabled/enabled allocation benchmarks for affected
-  paths.
+  nil/high-budget graph-output parity, reject-before-operation and overflow
+  behavior, structural rejection of raw sorts in bounded packages,
+  live/graph-replay parity, credential canaries, hostile-reader limits,
+  deterministic rendering, race tests, and focused disabled/enabled allocation
+  benchmarks for affected paths.
 
 ## Validation Checklist
 

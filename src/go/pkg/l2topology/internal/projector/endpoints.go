@@ -4,7 +4,6 @@ package projector
 
 import (
 	"net/netip"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -30,6 +29,23 @@ func buildEndpointActors(
 	actorMACIndex map[string]struct{},
 	lookupVendorByMAC func(string) (string, string),
 ) builtEndpointActors {
+	return buildEndpointActorsWithWork(nil, attachments, enrichments, ifaceByDeviceIndex, source, layer, actorIndex, actorMACIndex, lookupVendorByMAC)
+}
+
+func buildEndpointActorsWithWork(
+	work *projectionWork,
+	attachments []model.Attachment,
+	enrichments []model.Enrichment,
+	ifaceByDeviceIndex map[string]model.Interface,
+	source string,
+	layer string,
+	actorIndex map[string]struct{},
+	actorMACIndex map[string]struct{},
+	lookupVendorByMAC func(string) (string, string),
+) builtEndpointActors {
+	if !work.charge(uint64(len(attachments))) || !work.charge(uint64(len(enrichments))) {
+		return builtEndpointActors{}
+	}
 	accumulators := make(map[string]*endpointActorAccumulator)
 
 	for _, attachment := range attachments {
@@ -101,11 +117,14 @@ func buildEndpointActors(
 		}
 	}
 
-	keys := make([]string, 0, len(accumulators))
-	for endpointID := range accumulators {
-		keys = append(keys, endpointID)
+	var keys []string
+	if work == nil {
+		keys = make([]string, 0, len(accumulators))
 	}
-	sort.Strings(keys)
+	keys = sortedProjectionKeys(work, accumulators, keys)
+	if work != nil && work.err != nil {
+		return builtEndpointActors{}
+	}
 
 	actors := make([]projectedActor, 0, len(keys))
 	endpointCount := 0
@@ -123,22 +142,22 @@ func buildEndpointActors(
 			match.ChassisIDs = []string{acc.mac}
 			match.MacAddresses = []string{acc.mac}
 		}
-		match.IPAddresses = sortedEndpointIPs(acc.ips)
+		match.IPAddresses = sortedEndpointIPsWithWork(work, acc.ips)
 		matchByEndpointID[endpointID] = match
 		linkMatchByEndpointID[endpointID] = graph.LinkEndpointMatch(match, "")
 		labelsByEndpointID[endpointID] = map[string]string{
-			"learned_sources":    strings.Join(sortedTopologySet(acc.sources), ","),
-			"learned_device_ids": strings.Join(sortedTopologySet(acc.deviceIDs), ","),
-			"learned_if_indexes": strings.Join(sortedTopologySet(acc.ifIndexes), ","),
-			"learned_if_names":   strings.Join(sortedTopologySet(acc.ifNames), ","),
+			"learned_sources":    strings.Join(sortedTopologySetWithWork(work, acc.sources), ","),
+			"learned_device_ids": strings.Join(sortedTopologySetWithWork(work, acc.deviceIDs), ","),
+			"learned_if_indexes": strings.Join(sortedTopologySetWithWork(work, acc.ifIndexes), ","),
+			"learned_if_names":   strings.Join(sortedTopologySetWithWork(work, acc.ifNames), ","),
 		}
 
 		detail := model.ProjectionEndpointActorDetail{
 			Discovered:       true,
-			LearnedSources:   sortedTopologySet(acc.sources),
-			LearnedDeviceIDs: sortedTopologySet(acc.deviceIDs),
-			LearnedIfIndexes: sortedTopologySet(acc.ifIndexes),
-			LearnedIfNames:   sortedTopologySet(acc.ifNames),
+			LearnedSources:   sortedTopologySetWithWork(work, acc.sources),
+			LearnedDeviceIDs: sortedTopologySetWithWork(work, acc.deviceIDs),
+			LearnedIfIndexes: sortedTopologySetWithWork(work, acc.ifIndexes),
+			LearnedIfNames:   sortedTopologySetWithWork(work, acc.ifNames),
 		}
 		derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match, lookupVendorByMAC)
 		if derivedVendor != "" {
@@ -163,11 +182,11 @@ func buildEndpointActors(
 			},
 		}
 
-		keys := topologyMatchIdentityKeys(actor.Actor.Match)
+		keys := topologyMatchIdentityKeysWithWork(work, actor.Actor.Match)
 		if len(keys) == 0 {
 			continue
 		}
-		macKeys := topologyMatchHardwareIdentityKeys(actor.Actor.Match)
+		macKeys := topologyMatchHardwareIdentityKeysWithWork(work, actor.Actor.Match)
 		if len(macKeys) > 0 {
 			if topologyIdentityIndexOverlaps(actorMACIndex, macKeys) {
 				continue

@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
@@ -17,6 +16,9 @@ func (c *topologyBuilder) appendObservedInterfaces(observation *topologyengine.L
 	}
 
 	ifaceKeys := make(map[string]struct{}, len(c.ifNamesByIndex)+len(c.ifStatusByIndex))
+	if !c.chargeWork(uint64(len(c.ifNamesByIndex) + len(c.ifStatusByIndex))) {
+		return
+	}
 	for key := range c.ifNamesByIndex {
 		ifaceKeys[key] = struct{}{}
 	}
@@ -24,11 +26,14 @@ func (c *topologyBuilder) appendObservedInterfaces(observation *topologyengine.L
 		ifaceKeys[key] = struct{}{}
 	}
 
-	ifaceKeyList := make([]string, 0, len(ifaceKeys))
-	for key := range ifaceKeys {
-		ifaceKeyList = append(ifaceKeyList, key)
+	var ifaceKeyList []string
+	if c.workLimiter == nil {
+		ifaceKeyList = make([]string, 0, len(ifaceKeys))
 	}
-	sort.Strings(ifaceKeyList)
+	ifaceKeyList = sortedBuilderKeys(c, ifaceKeys, ifaceKeyList)
+	if !c.chargeWork(uint64(len(ifaceKeyList))) {
+		return
+	}
 
 	for _, ifIndex := range ifaceKeyList {
 		idx := topologyutil.ParseIndex(ifIndex)
@@ -65,11 +70,14 @@ func (c *topologyBuilder) appendObservedBridgePorts(observation *topologyengine.
 		return
 	}
 
-	keys := make([]string, 0, len(c.bridgePortToIf))
-	for key := range c.bridgePortToIf {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.bridgePortToIf))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.bridgePortToIf, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return
+	}
 
 	for _, basePort := range keys {
 		ifIndex := topologyutil.ParseIndex(c.bridgePortToIf[basePort])

@@ -13,46 +13,20 @@ func ApplyLayer3(
 	aggregate topologymodel.ObservationAggregate,
 	limiter worklimit.Limiter,
 ) error {
+	var work *enrichmentWork
 	if limiter != nil {
-		rows, err := worklimit.Sum(
-			uint64(len(aggregate.L3Interfaces)), uint64(len(aggregate.OSPFNeighbors)), uint64(len(aggregate.BGPPeers)),
-		)
-		if err != nil {
-			return err
-		}
-		actors := uint64(0)
-		links := uint64(0)
-		if data != nil {
-			actors = uint64(len(data.Actors))
-			links = uint64(len(data.Links))
-		}
-		items, err := worklimit.Sum(rows, actors, links, uint64(len(aggregate.Snapshots)))
-		if err != nil {
-			return err
-		}
-		if err := limiter.Charge(items); err != nil {
-			return err
-		}
-		actorLookups, err := worklimit.Sum(actors, 1)
-		if err != nil {
-			return err
-		}
-		if err := limiter.ChargeProduct(rows, actorLookups); err != nil {
-			return err
-		}
-		for _, size := range [...]uint64{
-			uint64(len(aggregate.L3Interfaces)), uint64(len(aggregate.OSPFNeighbors)), uint64(len(aggregate.BGPPeers)),
-			actors, items,
-		} {
-			if err := limiter.ChargeSort(size); err != nil {
-				return err
-			}
-		}
+		work = &enrichmentWork{limiter: limiter}
 	}
-	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
-	applyL3SubnetWithResolver(data, aggregate, resolver)
-	applyOSPFAdjacencyWithResolver(data, aggregate, resolver)
+	resolver := newTopologyL3ActorResolverProviderWithWork(work, data, aggregate.Snapshots)
+	applyL3SubnetWithResolver(work, data, aggregate, resolver)
+	if err := work.failure(); err != nil {
+		return err
+	}
+	applyOSPFAdjacencyWithResolver(work, data, aggregate, resolver)
+	if err := work.failure(); err != nil {
+		return err
+	}
 	// BGP extends IP identity after L3 and OSPF have consumed the shared base resolver.
-	applyBGPAdjacencyWithResolver(data, aggregate, resolver)
-	return nil
+	applyBGPAdjacencyWithResolver(work, data, aggregate, resolver)
+	return work.failure()
 }

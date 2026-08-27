@@ -12,9 +12,16 @@ import (
 )
 
 func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
+	return normalizeTopologyDeviceWithBuilder(&topologyBuilder{}, dev)
+}
+
+func normalizeTopologyDeviceWithBuilder(builder *topologyBuilder, dev topologymodel.Device) topologymodel.Device {
 	// dev is a shallow copy of the caller's value, so dev.Labels still aliases
 	// the builder's map. Clone it before normalization mutates labels so the
 	// immutable generation never shares writable label state with its builder.
+	if !builder.chargeWork(uint64(len(dev.Labels))) {
+		return topologymodel.Device{}
+	}
 	dev.Labels = maps.Clone(dev.Labels)
 
 	if dev.ChartIDPrefix == "" {
@@ -45,7 +52,10 @@ func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 		dev.ChassisIDType = "unknown"
 	}
 	dev.Vendor, dev.Model = ddsnmp.ResolveDeviceIdentity(dev.Vendor, dev.Model, nil, dev.Labels)
-	metadata := newTopologyMetadataIndex(dev.Labels)
+	metadata := newTopologyMetadataIndexWithBuilder(builder, dev.Labels)
+	if builder.workErr != nil {
+		return topologymodel.Device{}
+	}
 	if value := metadata.value(topologyMetadataAliasSysDescr); value != "" && dev.SysDescr == "" {
 		dev.SysDescr = value
 	}

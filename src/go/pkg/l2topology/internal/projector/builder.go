@@ -13,6 +13,7 @@ import (
 type graphBuilder struct {
 	result model.Result
 	opts   model.GraphOptions
+	work   *projectionWork
 
 	schemaVersion string
 	source        string
@@ -53,6 +54,9 @@ func newGraphBuilder(result model.Result, opts model.GraphOptions) *graphBuilder
 		result: result,
 		opts:   opts,
 	}
+	if opts.WorkLimiter != nil {
+		builder.work = &projectionWork{limiter: opts.WorkLimiter}
+	}
 
 	builder.schemaVersion = strings.TrimSpace(opts.SchemaVersion)
 	if builder.schemaVersion == "" {
@@ -87,6 +91,9 @@ func newGraphBuilder(result model.Result, opts model.GraphOptions) *graphBuilder
 }
 
 func (b *graphBuilder) prepareIndexes() {
+	if !b.work.charge(uint64(len(b.result.Devices) + len(b.result.Interfaces))) {
+		return
+	}
 	b.deviceByID = make(map[string]model.Device, len(b.result.Devices))
 	b.deviceAddressesByID = make(map[string][]string, len(b.result.Devices))
 	b.deviceLinkMatchByID = make(map[string]graph.Match, len(b.result.Devices))
@@ -94,10 +101,10 @@ func (b *graphBuilder) prepareIndexes() {
 	b.ifIndexByDeviceName = make(map[string]int, len(b.result.Interfaces))
 
 	for _, dev := range b.result.Devices {
-		addresses := deviceAddressStrings(dev)
+		addresses := deviceAddressStringsWithWork(b.work, dev)
 		b.deviceByID[dev.ID] = dev
 		b.deviceAddressesByID[dev.ID] = addresses
-		b.deviceLinkMatchByID[dev.ID] = buildDeviceEndpointMatchWithAddresses(dev, addresses)
+		b.deviceLinkMatchByID[dev.ID] = buildDeviceEndpointMatchWithAddressesAndWork(b.work, dev, addresses)
 	}
 
 	for _, iface := range b.result.Interfaces {
@@ -105,7 +112,7 @@ func (b *graphBuilder) prepareIndexes() {
 			continue
 		}
 		b.ifaceByDeviceIndex[deviceIfIndexKey(iface.DeviceID, iface.IfIndex)] = iface
-		for _, alias := range interfaceNameLookupAliases(iface.IfName, iface.IfDescr) {
+		for _, alias := range interfaceNameLookupAliasesWithWork(b.work, iface.IfName, iface.IfDescr) {
 			b.ifIndexByDeviceName[deviceIfNameKey(iface.DeviceID, alias)] = iface.IfIndex
 		}
 	}
@@ -117,18 +124,20 @@ func (b *graphBuilder) prepareIndexes() {
 }
 
 func (b *graphBuilder) collectBridgeTopologyInputs() {
-	b.bridgeLinks = collectBridgeLinkRecords(
+	b.bridgeLinks = collectBridgeLinkRecordsWithWork(
+		b.work,
 		b.result.Adjacencies,
 		b.ifIndexByDeviceName,
 		b.ifaceByDeviceIndex,
 		b.bridgePortAliases,
 		b.strategyConfig,
 	)
-	b.reporterAliases = buildFDBReporterAliases(b.deviceByID, b.ifaceByDeviceIndex)
+	b.reporterAliases = buildFDBReporterAliasesWithWork(b.work, b.deviceByID, b.ifaceByDeviceIndex)
 	if b.strategyConfig.enableFDBPairwiseLinks {
-		b.bridgeLinks = mergeBridgeLinkRecordSets(
+		b.bridgeLinks = mergeBridgeLinkRecordSetsWithWork(
+			b.work,
 			b.bridgeLinks,
-			inferFDBPairwiseBridgeLinks(b.result.Attachments, b.ifaceByDeviceIndex, b.reporterAliases),
+			inferFDBPairwiseBridgeLinksWithWork(b.work, b.result.Attachments, b.ifaceByDeviceIndex, b.reporterAliases),
 		)
 	}
 
@@ -145,7 +154,8 @@ func (b *graphBuilder) collectBridgeTopologyInputs() {
 		discoveryDevicePairs,
 	)
 
-	b.ifaceSummaryByDevice = buildTopologyDeviceInterfaceSummaries(
+	b.ifaceSummaryByDevice = buildTopologyDeviceInterfaceSummariesWithWork(
+		b.work,
 		b.result.Interfaces,
 		b.result.Attachments,
 		b.result.Adjacencies,
@@ -162,7 +172,8 @@ func (b *graphBuilder) buildDeviceActors() {
 	b.actorMACIndex = make(map[string]struct{}, len(b.result.Devices))
 
 	for _, dev := range b.result.Devices {
-		actor := deviceToTopologyActorWithAddresses(
+		actor := deviceToTopologyActorWithAddressesAndWork(
+			b.work,
 			dev,
 			b.source,
 			b.layer,
@@ -172,11 +183,11 @@ func (b *graphBuilder) buildDeviceActors() {
 			b.deviceAddressesByID[dev.ID],
 			b.opts.LookupVendorByMAC,
 		)
-		keys := topologyMatchIdentityKeys(actor.Actor.Match)
+		keys := topologyMatchIdentityKeysWithWork(b.work, actor.Actor.Match)
 		if len(keys) == 0 {
 			continue
 		}
-		macKeys := topologyMatchHardwareIdentityKeys(actor.Actor.Match)
+		macKeys := topologyMatchHardwareIdentityKeysWithWork(b.work, actor.Actor.Match)
 		if len(macKeys) > 0 {
 			if topologyIdentityIndexOverlaps(b.actorMACIndex, macKeys) {
 				continue
@@ -191,7 +202,8 @@ func (b *graphBuilder) buildDeviceActors() {
 }
 
 func (b *graphBuilder) projectAdjacencyTopology() {
-	b.projectedAdjacencies = projectAdjacencyLinks(
+	b.projectedAdjacencies = projectAdjacencyLinksWithWork(
+		b.work,
 		b.result.Adjacencies,
 		b.layer,
 		b.collectedAt,
@@ -204,7 +216,8 @@ func (b *graphBuilder) projectAdjacencyTopology() {
 }
 
 func (b *graphBuilder) buildEndpointTopology() {
-	b.endpointActors = buildEndpointActors(
+	b.endpointActors = buildEndpointActorsWithWork(
+		b.work,
 		b.result.Attachments,
 		b.result.Enrichments,
 		b.ifaceByDeviceIndex,
@@ -218,7 +231,8 @@ func (b *graphBuilder) buildEndpointTopology() {
 }
 
 func (b *graphBuilder) buildSegmentTopology() {
-	b.segmentProjection = projectSegmentTopology(
+	b.segmentProjection = projectSegmentTopologyWithWork(
+		b.work,
 		b.result.Attachments,
 		b.result.Adjacencies,
 		b.layer,
@@ -239,6 +253,7 @@ func (b *graphBuilder) buildSegmentTopology() {
 		b.strategyConfig,
 	)
 	annotateEndpointActorsWithDirectOwners(
+		b.work,
 		b.actors,
 		b.endpointActors.matchByEndpointID,
 		b.segmentProjection.endpointDirectOwners,
@@ -248,35 +263,36 @@ func (b *graphBuilder) buildSegmentTopology() {
 }
 
 func (b *graphBuilder) finalizeGraph() {
-	sortProjectedTopologyActors(b.actors)
+	sortProjectedTopologyActorsWithWork(b.work, b.actors)
 
 	b.links = make([]graph.Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
 	b.links = append(b.links, b.projectedAdjacencies.links...)
 	b.links = append(b.links, b.segmentProjection.links...)
-	sortTopologyLinks(b.links)
+	sortTopologyLinksWithWork(b.work, b.links)
 
-	b.actors, b.links, b.segmentSuppressed = pruneSegmentArtifacts(b.actors, b.links)
+	b.actors, b.links, b.segmentSuppressed = pruneSegmentArtifactsWithWork(b.work, b.actors, b.links)
 	if b.opts.CollapseActorsByIP {
-		b.actors = collapseActorsByIP(b.actors)
+		b.actors = collapseActorsByIPWithWork(b.work, b.actors)
 	}
 	if b.opts.EliminateNonIPInferred {
-		b.actors, b.links = eliminateNonIPInferredActors(b.actors, b.links)
+		b.actors, b.links = eliminateNonIPInferredActorsWithWork(b.work, b.actors, b.links)
 	}
 	if b.opts.CollapseActorsByIP {
 		b.actors, b.unlinkedSuppressed = pruneManagedOverlapUnlinkedEndpointActors(
+			b.work,
 			b.actors,
 			b.links,
 			b.segmentProjection.suppressedManagedOverlapIDs,
 		)
 	}
 	var additionalSegmentSuppressed int
-	b.actors, b.links, additionalSegmentSuppressed = pruneSegmentArtifacts(b.actors, b.links)
+	b.actors, b.links, additionalSegmentSuppressed = pruneSegmentArtifactsWithWork(b.work, b.actors, b.links)
 	b.segmentSuppressed += additionalSegmentSuppressed
-	sortProjectedTopologyActors(b.actors)
-	sortTopologyLinks(b.links)
-	assignTopologyActorIDsAndLinkEndpoints(b.actors, b.links)
+	sortProjectedTopologyActorsWithWork(b.work, b.actors)
+	sortTopologyLinksWithWork(b.work, b.links)
+	assignTopologyActorIDsAndLinkEndpointsWithWork(b.work, b.actors, b.links)
 	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
-	enrichTopologyPortDetailsWithLinkCounts(b.actors, b.links)
+	enrichTopologyPortDetailsWithLinkCountsWithWork(b.work, b.actors, b.links)
 
 	b.linkCounts = summarizeTopologyLinks(b.links)
 	b.probableLinks = 0

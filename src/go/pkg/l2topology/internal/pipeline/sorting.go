@@ -3,13 +3,16 @@
 package pipeline
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
-func sortedLLDPRemotes(in []model.LLDPRemoteObservation) []model.LLDPRemoteObservation {
+func sortedLLDPRemotes(limiter worklimit.Limiter, in []model.LLDPRemoteObservation) ([]model.LLDPRemoteObservation, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.LLDPRemoteObservation, 0, len(in))
 	for _, remote := range in {
 		if strings.TrimSpace(remote.ChassisID) == "" && strings.TrimSpace(remote.SysName) == "" {
@@ -17,7 +20,7 @@ func sortedLLDPRemotes(in []model.LLDPRemoteObservation) []model.LLDPRemoteObser
 		}
 		out = append(out, remote)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.LocalPortNum != b.LocalPortNum {
 			return a.LocalPortNum < b.LocalPortNum
@@ -47,11 +50,16 @@ func sortedLLDPRemotes(in []model.LLDPRemoteObservation) []model.LLDPRemoteObser
 			return a.LocalPortDesc < b.LocalPortDesc
 		}
 		return a.ManagementIP < b.ManagementIP
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedCDPRemotes(in []model.CDPRemoteObservation) []model.CDPRemoteObservation {
+func sortedCDPRemotes(limiter worklimit.Limiter, in []model.CDPRemoteObservation) ([]model.CDPRemoteObservation, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.CDPRemoteObservation, 0, len(in))
 	for _, remote := range in {
 		if strings.TrimSpace(remote.DeviceID) == "" && strings.TrimSpace(remote.Address) == "" {
@@ -59,7 +67,7 @@ func sortedCDPRemotes(in []model.CDPRemoteObservation) []model.CDPRemoteObservat
 		}
 		out = append(out, remote)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.LocalIfIndex != b.LocalIfIndex {
 			return a.LocalIfIndex < b.LocalIfIndex
@@ -83,11 +91,16 @@ func sortedCDPRemotes(in []model.CDPRemoteObservation) []model.CDPRemoteObservat
 			return a.Address < b.Address
 		}
 		return a.RawAddress < b.RawAddress
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedBridgePorts(in []model.BridgePortObservation) []model.BridgePortObservation {
+func sortedBridgePorts(limiter worklimit.Limiter, in []model.BridgePortObservation) ([]model.BridgePortObservation, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.BridgePortObservation, 0, len(in))
 	for _, bridgePort := range in {
 		if strings.TrimSpace(bridgePort.BasePort) == "" || bridgePort.IfIndex <= 0 {
@@ -95,17 +108,22 @@ func sortedBridgePorts(in []model.BridgePortObservation) []model.BridgePortObser
 		}
 		out = append(out, bridgePort)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.BasePort != b.BasePort {
 			return a.BasePort < b.BasePort
 		}
 		return a.IfIndex < b.IfIndex
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedSTPPortEntries(in []model.STPPortObservation) []model.STPPortObservation {
+func sortedSTPPortEntries(limiter worklimit.Limiter, in []model.STPPortObservation) ([]model.STPPortObservation, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.STPPortObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.Port) == "" {
@@ -113,7 +131,7 @@ func sortedSTPPortEntries(in []model.STPPortObservation) []model.STPPortObservat
 		}
 		out = append(out, entry)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Port != b.Port {
 			return a.Port < b.Port
@@ -128,11 +146,16 @@ func sortedSTPPortEntries(in []model.STPPortObservation) []model.STPPortObservat
 			return a.IfName < b.IfName
 		}
 		return a.DesignatedBridge < b.DesignatedBridge
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedFDBEntries(in []model.FDBObservation) []model.FDBObservation {
+func sortedFDBEntries(limiter worklimit.Limiter, in []model.FDBObservation) ([]model.FDBObservation, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.FDBObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.MAC) == "" {
@@ -140,7 +163,7 @@ func sortedFDBEntries(in []model.FDBObservation) []model.FDBObservation {
 		}
 		out = append(out, entry)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.BridgePort != b.BridgePort {
 			return a.BridgePort < b.BridgePort
@@ -155,11 +178,16 @@ func sortedFDBEntries(in []model.FDBObservation) []model.FDBObservation {
 			return a.MAC < b.MAC
 		}
 		return a.Status < b.Status
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedARPNDEntries(in []model.ARPNDObservation) []model.ARPNDObservation {
+func sortedARPNDEntries(limiter worklimit.Limiter, in []model.ARPNDObservation) ([]model.ARPNDObservation, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.ARPNDObservation, 0, len(in))
 	for _, entry := range in {
 		if strings.TrimSpace(entry.MAC) == "" && strings.TrimSpace(entry.IP) == "" {
@@ -167,7 +195,7 @@ func sortedARPNDEntries(in []model.ARPNDObservation) []model.ARPNDObservation {
 		}
 		out = append(out, entry)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Protocol != b.Protocol {
 			return a.Protocol < b.Protocol
@@ -185,30 +213,40 @@ func sortedARPNDEntries(in []model.ARPNDObservation) []model.ARPNDObservation {
 			return a.State < b.State
 		}
 		return a.AddrType < b.AddrType
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedDevices(in map[string]model.Device) []model.Device {
+func sortedDevices(limiter worklimit.Limiter, in map[string]model.Device) ([]model.Device, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.Device, 0, len(in))
 	for _, dev := range in {
 		out = append(out, dev)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		if out[i].ID != out[j].ID {
 			return out[i].ID < out[j].ID
 		}
 		return out[i].Hostname < out[j].Hostname
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedInterfaces(in map[string]model.Interface) []model.Interface {
+func sortedInterfaces(limiter worklimit.Limiter, in map[string]model.Interface) ([]model.Interface, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.Interface, 0, len(in))
 	for _, iface := range in {
 		out = append(out, iface)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.DeviceID != b.DeviceID {
 			return a.DeviceID < b.DeviceID
@@ -217,16 +255,21 @@ func sortedInterfaces(in map[string]model.Interface) []model.Interface {
 			return a.IfIndex < b.IfIndex
 		}
 		return a.IfName < b.IfName
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedAdjacencies(in map[string]model.Adjacency) []model.Adjacency {
+func sortedAdjacencies(limiter worklimit.Limiter, in map[string]model.Adjacency) ([]model.Adjacency, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.Adjacency, 0, len(in))
 	for _, adj := range in {
 		out = append(out, adj)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Protocol != b.Protocol {
 			return a.Protocol < b.Protocol
@@ -244,16 +287,21 @@ func sortedAdjacencies(in map[string]model.Adjacency) []model.Adjacency {
 			return a.TargetPort < b.TargetPort
 		}
 		return adjacencyKey(a) < adjacencyKey(b)
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedAttachments(in map[string]model.Attachment) []model.Attachment {
+func sortedAttachments(limiter worklimit.Limiter, in map[string]model.Attachment) ([]model.Attachment, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.Attachment, 0, len(in))
 	for _, attachment := range in {
 		out = append(out, attachment)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.DeviceID != b.DeviceID {
 			return a.DeviceID < b.DeviceID
@@ -268,33 +316,62 @@ func sortedAttachments(in map[string]model.Attachment) []model.Attachment {
 			return a.Method < b.Method
 		}
 		return attachmentKey(a) < attachmentKey(b)
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func sortedEnrichments(in map[string]*enrichmentAccumulator) []model.Enrichment {
+func sortedEnrichments(limiter worklimit.Limiter, in map[string]*enrichmentAccumulator) ([]model.Enrichment, error) {
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
+	}
 	out := make([]model.Enrichment, 0, len(in))
 	for _, acc := range in {
 		if acc == nil || strings.TrimSpace(acc.EndpointID) == "" {
 			continue
 		}
+		ips, err := sortedAddrValues(limiter, acc.IPs)
+		if err != nil {
+			return nil, err
+		}
+		labels := make(map[string]string, 6)
+		addLabel := func(key string, values map[string]struct{}) error {
+			value, err := setToCSV(limiter, values)
+			if err != nil {
+				return err
+			}
+			labels[key] = value
+			return nil
+		}
+		if err := addLabel("sources", acc.Protocols); err != nil {
+			return nil, err
+		}
+		if err := addLabel("device_ids", acc.DeviceIDs); err != nil {
+			return nil, err
+		}
+		if err := addLabel("if_indexes", acc.IfIndexes); err != nil {
+			return nil, err
+		}
+		if err := addLabel("if_names", acc.IfNames); err != nil {
+			return nil, err
+		}
+		if err := addLabel("states", acc.States); err != nil {
+			return nil, err
+		}
+		if err := addLabel("addr_types", acc.AddrTypes); err != nil {
+			return nil, err
+		}
 		enrichment := model.Enrichment{
 			EndpointID: acc.EndpointID,
 			MAC:        acc.MAC,
-			IPs:        sortedAddrValues(acc.IPs),
-			Labels: map[string]string{
-				"sources":    setToCSV(acc.Protocols),
-				"device_ids": setToCSV(acc.DeviceIDs),
-				"if_indexes": setToCSV(acc.IfIndexes),
-				"if_names":   setToCSV(acc.IfNames),
-				"states":     setToCSV(acc.States),
-				"addr_types": setToCSV(acc.AddrTypes),
-			},
+			IPs:        ips,
+			Labels:     labels,
 		}
 		pruneEmptyLabels(enrichment.Labels)
 		out = append(out, enrichment)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.EndpointID != b.EndpointID {
 			return a.EndpointID < b.EndpointID
@@ -303,6 +380,8 @@ func sortedEnrichments(in map[string]*enrichmentAccumulator) []model.Enrichment 
 			return a.MAC < b.MAC
 		}
 		return len(a.IPs) < len(b.IPs)
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

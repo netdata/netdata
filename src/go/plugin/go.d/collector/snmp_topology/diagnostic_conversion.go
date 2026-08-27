@@ -60,6 +60,24 @@ func diagnosticDeviceFromModel(value topologymodel.Device) diagnostic.SemanticDe
 }
 
 func diagnosticDeviceToModel(value diagnostic.SemanticDeviceDTO) topologymodel.Device {
+	device, _ := diagnosticDeviceToModelWithWork(value, nil)
+	return device
+}
+
+func diagnosticDeviceToModelWithWork(value diagnostic.SemanticDeviceDTO, work *replayWorkBudget) (topologymodel.Device, error) {
+	if work != nil {
+		if err := work.add(uint64(
+			len(value.ManagementAddresses) + len(value.Capabilities) + len(value.CapabilitiesSupported) +
+				len(value.CapabilitiesEnabled) + len(value.Labels) + len(value.DeviceCharts) + len(value.InterfaceCharts),
+		)); err != nil {
+			return topologymodel.Device{}, err
+		}
+		for _, chart := range value.InterfaceCharts {
+			if err := work.add(uint64(len(chart.AvailableMetrics))); err != nil {
+				return topologymodel.Device{}, err
+			}
+		}
+	}
 	device := topologymodel.Device{
 		ChassisID:             value.ChassisID,
 		ChassisIDType:         value.ChassisIDType,
@@ -103,7 +121,7 @@ func diagnosticDeviceToModel(value diagnostic.SemanticDeviceDTO) topologymodel.D
 			}
 		}
 	}
-	return device
+	return device, nil
 }
 
 func diagnosticObservationFromSnapshot(
@@ -213,18 +231,35 @@ func cloneInt64(value *int64) *int64 {
 }
 
 func diagnosticObservationToSnapshot(value diagnostic.ObservationV1) (topologymodel.ObservationSnapshot, error) {
+	return diagnosticObservationToSnapshotWithWork(value, nil)
+}
+
+func diagnosticObservationToSnapshotWithWork(value diagnostic.ObservationV1, work *replayWorkBudget) (topologymodel.ObservationSnapshot, error) {
+	if work != nil {
+		if err := work.add(uint64(1 + len(value.L2) + len(value.L3Interfaces) + len(value.OSPFNeighbors) + len(value.BGPPeers))); err != nil {
+			return topologymodel.ObservationSnapshot{}, err
+		}
+	}
 	collectedAt, err := time.Parse(time.RFC3339Nano, value.CollectedAt)
 	if err != nil || collectedAt.IsZero() {
 		return topologymodel.ObservationSnapshot{}, err
 	}
+	localDevice, err := diagnosticDeviceToModelWithWork(value.LocalDevice, work)
+	if err != nil {
+		return topologymodel.ObservationSnapshot{}, err
+	}
 	snapshot := topologymodel.ObservationSnapshot{
-		LocalDevice:   diagnosticDeviceToModel(value.LocalDevice),
+		LocalDevice:   localDevice,
 		LocalDeviceID: value.LocalDeviceID,
 		AgentID:       value.AgentID,
 		CollectedAt:   collectedAt,
 	}
 	for _, row := range value.L2 {
-		snapshot.L2Observations = append(snapshot.L2Observations, diagnosticL2ObservationToModel(row))
+		converted, err := diagnosticL2ObservationToModelWithWork(row, work)
+		if err != nil {
+			return topologymodel.ObservationSnapshot{}, err
+		}
+		snapshot.L2Observations = append(snapshot.L2Observations, converted)
 	}
 	for _, row := range value.L3Interfaces {
 		snapshot.L3Interfaces = append(snapshot.L3Interfaces, topologymodel.L3Interface{
@@ -251,6 +286,19 @@ func diagnosticObservationToSnapshot(value diagnostic.ObservationV1) (topologymo
 }
 
 func diagnosticL2ObservationToModel(value diagnostic.L2ObservationV1) topologyengine.L2Observation {
+	row, _ := diagnosticL2ObservationToModelWithWork(value, nil)
+	return row
+}
+
+func diagnosticL2ObservationToModelWithWork(value diagnostic.L2ObservationV1, work *replayWorkBudget) (topologyengine.L2Observation, error) {
+	if work != nil {
+		if err := work.add(uint64(
+			len(value.ManagementAliases) + len(value.Interfaces) + len(value.BridgePorts) + len(value.STPPorts) +
+				len(value.FDBEntries) + len(value.ARPNDEntries) + len(value.LLDPRemotes) + len(value.CDPRemotes) + len(value.Labels),
+		)); err != nil {
+			return topologyengine.L2Observation{}, err
+		}
+	}
 	row := topologyengine.L2Observation{
 		DeviceID: value.DeviceID, Inferred: value.Inferred, Hostname: value.Hostname, ManagementIP: value.ManagementIP,
 		ManagementAliases: slices.Clone(value.ManagementAliases), SysObjectID: value.SysObjectID, ChassisID: value.ChassisID,
@@ -300,5 +348,5 @@ func diagnosticL2ObservationToModel(value diagnostic.L2ObservationV1) topologyen
 			Address: item.Address, RawAddress: item.RawAddress,
 		})
 	}
-	return row
+	return row, nil
 }

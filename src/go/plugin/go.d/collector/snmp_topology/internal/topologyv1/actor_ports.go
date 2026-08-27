@@ -46,6 +46,17 @@ func buildSNMPTopologyV1PortNeighborSummaries(
 	links []topologymodel.Link,
 	actorIndex topologyV1ActorIndex,
 ) map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary {
+	return buildSNMPTopologyV1PortNeighborSummariesWithWork(nil, links, actorIndex)
+}
+
+func buildSNMPTopologyV1PortNeighborSummariesWithWork(
+	work *renderWork,
+	links []topologymodel.Link,
+	actorIndex topologyV1ActorIndex,
+) map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary {
+	if !work.charge(uint64(len(links))) {
+		return nil
+	}
 	summaries := make(map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary)
 	appendSide := func(actorHandle, remoteActorHandle topologymodel.ActorHandle, endpoint, remoteEndpoint topologymodel.LinkEndpoint) {
 		actorRef, ok := actorIndex[actorHandle]
@@ -133,9 +144,19 @@ func snmpTopologyV1PortNeighborSummaryFor(
 }
 
 func collectSNMPTopologyV1ActorTableRows(actors []topologymodel.Actor) map[string][]topologyV1DynamicRow {
+	return collectSNMPTopologyV1ActorTableRowsWithWork(nil, actors)
+}
+
+func collectSNMPTopologyV1ActorTableRowsWithWork(work *renderWork, actors []topologymodel.Actor) map[string][]topologyV1DynamicRow {
 	tables := make(map[string][]topologyV1DynamicRow)
 	for actorIndex, actor := range actors {
+		if !work.charge(uint64(len(actor.Detail.L2.Device.Ports) + len(actor.Detail.OSPF) + len(actor.Detail.BGP))) {
+			return nil
+		}
 		for _, port := range actor.Detail.L2.Device.Ports {
+			if !work.charge(uint64(len(port.Neighbors) + len(port.VLANs))) {
+				return nil
+			}
 			tables["ports"] = append(tables["ports"], topologyV1DynamicRow{
 				actorRef: actorIndex,
 				values:   snmpTopologyV1PortValues(port),
@@ -359,6 +380,18 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 ) (topologyapi.Table, error) {
+	return buildSNMPTopologyV1ActorPortLinksTableWithWork(nil, links, actorIndex, stringsDict)
+}
+
+func buildSNMPTopologyV1ActorPortLinksTableWithWork(
+	work *renderWork,
+	links []topologymodel.Link,
+	actorIndex topologyV1ActorIndex,
+	stringsDict *topologyapi.StringDictionary,
+) (topologyapi.Table, error) {
+	if !work.charge(uint64(len(links))) {
+		return topologyapi.Table{}, work.err
+	}
 	rows := &snmpTopologyV1ActorPortLinkRows{}
 	appendSide := func(linkIndex int, link topologymodel.Link, actorHandle, remoteActorHandle topologymodel.ActorHandle, endpoint, remoteEndpoint topologymodel.LinkEndpoint) error {
 		actorRef, ok := actorIndex[actorHandle]

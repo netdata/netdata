@@ -7,26 +7,44 @@ import (
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func augmentLocalActor(actor *topologymodel.Actor, local topologymodel.Device) {
+func augmentLocalActor(actor *topologymodel.Actor, local topologymodel.Device, limiter worklimit.Limiter) error {
 	if actor == nil {
-		return
+		return nil
 	}
 	actor.Detail.SNMP = topologySNMPActorDetailFromDevice(local)
-	applyLocalActorLabels(actor, local)
-	enrichLocalActorChartReferences(actor, local.InterfaceCharts)
+	if err := applyLocalActorLabelsWithLimiter(actor, local, limiter); err != nil {
+		return err
+	}
+	return enrichLocalActorChartReferences(actor, local.InterfaceCharts, limiter)
 }
 
 func topologyLocalActorFromCache(localDeviceID string, local topologymodel.Device) (topologymodel.Actor, bool) {
+	actor, ok, _ := topologyLocalActorFromCacheWithLimiter(localDeviceID, local, nil)
+	return actor, ok
+}
+
+func topologyLocalActorFromCacheWithLimiter(
+	localDeviceID string,
+	local topologymodel.Device,
+	limiter worklimit.Limiter,
+) (topologymodel.Actor, bool, error) {
+	if err := worklimit.ChargeStrings(limiter, []string{localDeviceID}); err != nil {
+		return topologymodel.Actor{}, false, err
+	}
 	actorID := strings.TrimSpace(localDeviceID)
 	if actorID == "" {
 		actorID = ensureTopologyObservationDeviceID(local, "")
 	}
 	if actorID == "" {
-		return topologymodel.Actor{}, false
+		return topologymodel.Actor{}, false, nil
+	}
+	if err := limiter.Charge(uint64(len(local.Labels))); err != nil {
+		return topologymodel.Actor{}, false, err
 	}
 
 	labels := cloneTopologyLabels(local.Labels)
@@ -44,7 +62,10 @@ func topologyLocalActorFromCache(localDeviceID string, local topologymodel.Devic
 	if actor.ActorType == "" {
 		actor.ActorType = "device"
 	}
-	return actor, true
+	if err := topologymodel.ChargeMatch(limiter, actor.Match); err != nil {
+		return topologymodel.Actor{}, false, err
+	}
+	return actor, true, nil
 }
 
 func topologyLocalActorMatch(local topologymodel.Device) topologymodel.Match {
@@ -95,31 +116,59 @@ func topologySNMPActorDetailFromDevice(local topologymodel.Device) topologymodel
 }
 
 func applyLocalActorLabels(actor *topologymodel.Actor, local topologymodel.Device) {
+	_ = applyLocalActorLabelsWithLimiter(actor, local, nil)
+}
+
+func applyLocalActorLabelsWithLimiter(
+	actor *topologymodel.Actor,
+	local topologymodel.Device,
+	limiter worklimit.Limiter,
+) error {
 	if actor == nil {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(local.Labels))); err != nil {
+		return err
 	}
 	if actor.Labels == nil {
 		actor.Labels = make(map[string]string)
 	}
 	maps.Copy(actor.Labels, cloneTopologyLabels(local.Labels))
+	return nil
 }
 
-func enrichLocalActorChartReferences(actor *topologymodel.Actor, interfaceCharts map[string]topologymodel.InterfaceChartRef) {
+func enrichLocalActorChartReferences(
+	actor *topologymodel.Actor,
+	interfaceCharts map[string]topologymodel.InterfaceChartRef,
+	limiter worklimit.Limiter,
+) error {
 	if actor == nil || len(interfaceCharts) == 0 {
-		return
+		return nil
 	}
 
-	lookup := topologyInterfaceChartLookup(interfaceCharts)
+	lookup, err := topologyInterfaceChartLookup(interfaceCharts, limiter)
+	if err != nil {
+		return err
+	}
 	if len(lookup) == 0 {
-		return
+		return nil
 	}
 
-	enrichTopologyPortDetailsWithChartRefs(actor.Detail.L2.Device.Ports, lookup)
+	return enrichTopologyPortDetailsWithChartRefs(actor.Detail.L2.Device.Ports, lookup, limiter)
 }
 
-func topologyInterfaceChartLookup(interfaceCharts map[string]topologymodel.InterfaceChartRef) map[string]topologymodel.InterfaceChartRef {
+func topologyInterfaceChartLookup(
+	interfaceCharts map[string]topologymodel.InterfaceChartRef,
+	limiter worklimit.Limiter,
+) (map[string]topologymodel.InterfaceChartRef, error) {
+	keys, err := worklimit.SortedStringKeys(limiter, interfaceCharts)
+	if err != nil {
+		return nil, err
+	}
 	lookup := make(map[string]topologymodel.InterfaceChartRef, len(interfaceCharts))
-	for ifName, ref := range interfaceCharts {
+	for _, rawIfName := range keys {
+		ifName := rawIfName
+		ref := interfaceCharts[rawIfName]
 		ifName = strings.ToLower(strings.TrimSpace(ifName))
 		if ifName == "" {
 			continue
@@ -127,15 +176,25 @@ func topologyInterfaceChartLookup(interfaceCharts map[string]topologymodel.Inter
 		if strings.TrimSpace(ref.ChartIDSuffix) == "" {
 			ref.ChartIDSuffix = ifName
 		}
-		ref.AvailableMetrics = topologyutil.DeduplicateSortedStrings(ref.AvailableMetrics)
+		ref.AvailableMetrics, err = topologyutil.DeduplicateSortedStringsWithLimiter(limiter, ref.AvailableMetrics)
+		if err != nil {
+			return nil, err
+		}
 		lookup[ifName] = ref
 	}
-	return lookup
+	return lookup, nil
 }
 
-func enrichTopologyPortDetailsWithChartRefs(ports []topologyengine.ProjectionPortDetail, lookup map[string]topologymodel.InterfaceChartRef) {
+func enrichTopologyPortDetailsWithChartRefs(
+	ports []topologyengine.ProjectionPortDetail,
+	lookup map[string]topologymodel.InterfaceChartRef,
+	limiter worklimit.Limiter,
+) error {
 	if len(lookup) == 0 || len(ports) == 0 {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(ports))); err != nil {
+		return err
 	}
 
 	for i := range ports {
@@ -156,4 +215,5 @@ func enrichTopologyPortDetailsWithChartRefs(ports []topologyengine.ProjectionPor
 			ports[i].AvailableMetrics = ref.AvailableMetrics
 		}
 	}
+	return nil
 }

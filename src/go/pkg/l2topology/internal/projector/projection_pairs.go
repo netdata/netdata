@@ -20,6 +20,23 @@ func projectAdjacencyLinks(
 	ifaceByDeviceIndex map[string]model.Interface,
 	bridgePortAliases bridgePortAliasIndex,
 ) projectedLinks {
+	return projectAdjacencyLinksWithWork(nil, adjacencies, layer, collectedAt, deviceByID, deviceLinkMatchByID, ifIndexByDeviceName, ifaceByDeviceIndex, bridgePortAliases)
+}
+
+func projectAdjacencyLinksWithWork(
+	work *projectionWork,
+	adjacencies []model.Adjacency,
+	layer string,
+	collectedAt time.Time,
+	deviceByID map[string]model.Device,
+	deviceLinkMatchByID map[string]graph.Match,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	bridgePortAliases bridgePortAliasIndex,
+) projectedLinks {
+	if !work.charge(uint64(len(adjacencies))) {
+		return projectedLinks{}
+	}
 	out := projectedLinks{
 		links: make([]graph.Link, 0, len(adjacencies)),
 	}
@@ -109,7 +126,7 @@ func projectAdjacencyLinks(
 		}
 	}
 
-	sortTopologyLinks(out.links)
+	sortTopologyLinksWithWork(work, out.links)
 	return out
 }
 

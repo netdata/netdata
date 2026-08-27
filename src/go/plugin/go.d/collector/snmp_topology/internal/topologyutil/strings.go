@@ -3,9 +3,10 @@
 package topologyutil
 
 import (
-	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 func FirstNonEmptyString(values ...string) string {
@@ -55,11 +56,7 @@ func FirstNonZeroInt64(values ...int64) int64 {
 }
 
 func SortedMapKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys, _ := worklimit.SortedStringKeys(nil, m)
 	return keys
 }
 
@@ -74,8 +71,16 @@ func JoinKeyParts(parts ...string) string {
 }
 
 func DeduplicateSortedStrings(values []string) []string {
+	out, _ := DeduplicateSortedStringsWithLimiter(nil, values)
+	return out
+}
+
+func DeduplicateSortedStringsWithLimiter(limiter worklimit.Limiter, values []string) ([]string, error) {
 	if len(values) == 0 {
-		return nil
+		return nil, nil
+	}
+	if err := worklimit.ChargeStrings(limiter, values); err != nil {
+		return nil, err
 	}
 	out := make([]string, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
@@ -90,9 +95,11 @@ func DeduplicateSortedStrings(values []string) []string {
 		seen[value] = struct{}{}
 		out = append(out, value)
 	}
-	sort.Strings(out)
-	if len(out) == 0 {
-		return nil
+	if err := worklimit.SortStrings(limiter, out); err != nil {
+		return nil, err
 	}
-	return out
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
 }

@@ -3,6 +3,7 @@
 package worklimit
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -19,6 +20,60 @@ func TestLimiterChargesExactProductsAndSortEnvelope(t *testing.T) {
 	require.NoError(t, limiter.ChargeProduct(3, 7))
 	require.NoError(t, limiter.ChargeSort(9))
 	require.Equal(t, []uint64{21, 36}, charged)
+}
+
+func TestOperationOwnedSortsRejectBeforeExecution(t *testing.T) {
+	limitErr := errors.New("limit")
+	compared := false
+	values := []int{2, 1}
+	err := SortFunc(func(uint64) error { return limitErr }, values, func(a, b int) int {
+		compared = true
+		return a - b
+	})
+	require.ErrorIs(t, err, limitErr)
+	require.False(t, compared)
+	require.Equal(t, []int{2, 1}, values)
+
+	strings := []string{"b", "a"}
+	err = SortStrings(func(uint64) error { return limitErr }, strings)
+	require.ErrorIs(t, err, limitErr)
+	require.Equal(t, []string{"b", "a"}, strings)
+}
+
+func TestOperationOwnedSortsPreserveNilLimiterBehavior(t *testing.T) {
+	values := []string{"b", "a", "c"}
+	require.NoError(t, SortStrings(nil, values))
+	require.Equal(t, []string{"a", "b", "c"}, values)
+
+	keys, err := SortedStringKeys(nil, map[string]int{"b": 2, "a": 1})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a", "b"}, keys)
+}
+
+func TestPreparedStringKeySortRejectsBeforePreparationAndPreparesOnce(t *testing.T) {
+	limitErr := errors.New("limit")
+	values := []string{"b", "a", "c"}
+	prepared := 0
+	err := SortStableByPreparedStringKey(func(uint64) error { return limitErr }, values, func(value string) (string, error) {
+		prepared++
+		return value, nil
+	})
+	require.ErrorIs(t, err, limitErr)
+	require.Zero(t, prepared)
+	require.Equal(t, []string{"b", "a", "c"}, values)
+
+	var charged uint64
+	err = SortStableByPreparedStringKey(func(units uint64) error {
+		charged += units
+		return nil
+	}, values, func(value string) (string, error) {
+		prepared++
+		return value, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 3, prepared)
+	require.Positive(t, charged)
+	require.Equal(t, []string{"a", "b", "c"}, values)
 }
 
 func TestLimiterRejectsOverflowBeforeCallback(t *testing.T) {

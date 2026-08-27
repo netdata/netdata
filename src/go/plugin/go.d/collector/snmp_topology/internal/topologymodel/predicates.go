@@ -3,16 +3,24 @@
 package topologymodel
 
 import (
-	"sort"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func NormalizedMatchIPs(match Match) []string {
+	out, _ := NormalizedMatchIPsWithLimiter(match, nil)
+	return out
+}
+
+func NormalizedMatchIPsWithLimiter(match Match, limiter worklimit.Limiter) ([]string, error) {
 	if len(match.IPAddresses) == 0 {
-		return nil
+		return nil, nil
+	}
+	if err := worklimit.ChargeStrings(limiter, match.IPAddresses); err != nil {
+		return nil, err
 	}
 	out := make([]string, 0, len(match.IPAddresses))
 	seen := make(map[string]struct{}, len(match.IPAddresses))
@@ -27,8 +35,10 @@ func NormalizedMatchIPs(match Match) []string {
 		seen[ip] = struct{}{}
 		out = append(out, ip)
 	}
-	sort.Strings(out)
-	return out
+	if err := worklimit.SortStrings(limiter, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func ActorIsInferred(actor Actor) bool {

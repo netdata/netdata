@@ -65,7 +65,11 @@ func (r *topologyRegistry) snapshotGenerationWithOptions(
 	if r == nil {
 		return topologymodel.Data{}, false, nil
 	}
-	options = topologyoptions.NormalizeQueryOptions(options)
+	var err error
+	options, err = topologyoptions.PrepareQueryOptions(options)
+	if err != nil {
+		return topologymodel.Data{}, false, err
+	}
 
 	aggregate, ok := aggregateTopologyObservationSnapshots(topologyObservationSnapshots(generation))
 	if !ok {

@@ -3,9 +3,6 @@
 package topologyshape
 
 import (
-	"sort"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
@@ -14,50 +11,55 @@ func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOption
 	if data == nil {
 		return nil
 	}
-	if limiter := options.WorkLimiter; limiter != nil {
-		items, err := worklimit.Sum(uint64(len(data.Actors)), uint64(len(data.Links)))
-		if err != nil {
-			return err
-		}
-		if err := limiter.ChargeProduct(items, 6); err != nil {
-			return err
-		}
-		if err := limiter.ChargeSort(uint64(len(data.Actors))); err != nil {
-			return err
-		}
-		if err := limiter.ChargeSort(uint64(len(data.Links))); err != nil {
-			return err
-		}
-	}
 	mapType := topologyoptions.NormalizeMapType(options.MapType)
 	options.MapType = mapType
 
 	collapsed := 0
 	if options.CollapseActorsByIP {
-		collapsed = collapseActorsByIP(data)
+		var err error
+		collapsed, err = collapseActorsByIPWithLimiter(data, options.WorkLimiter)
+		if err != nil {
+			return err
+		}
 	}
 
 	removedNonIP := 0
 	if options.EliminateNonIPInferred {
-		removedNonIP = eliminateNonIPInferredActors(data)
+		var err error
+		removedNonIP, err = eliminateNonIPInferredActorsWithLimiter(data, options.WorkLimiter)
+		if err != nil {
+			return err
+		}
 	}
 
-	filterDanglingLinks(data)
-	removedByMapType := applyMapTypePolicy(data, options.MapType)
-	filterDanglingLinks(data)
+	if err := filterDanglingLinksWithLimiter(data, options.WorkLimiter); err != nil {
+		return err
+	}
+	removedByMapType, err := applyMapTypePolicyWithLimiter(data, options.MapType, options.WorkLimiter)
+	if err != nil {
+		return err
+	}
+	if err := filterDanglingLinksWithLimiter(data, options.WorkLimiter); err != nil {
+		return err
+	}
 
 	removedSparseSegments := 0
 	if options.EliminateNonIPInferred {
-		removedSparseSegments = pruneSparseSegments(data, 1)
+		removedSparseSegments, err = pruneSparseSegmentsWithLimiter(data, 1, options.WorkLimiter)
+		if err != nil {
+			return err
+		}
 	}
-	filterDanglingLinks(data)
+	if err := filterDanglingLinksWithLimiter(data, options.WorkLimiter); err != nil {
+		return err
+	}
 
-	sort.Slice(data.Actors, func(i, j int) bool {
-		return topologymodel.CanonicalMatchKey(data.Actors[i].Match) < topologymodel.CanonicalMatchKey(data.Actors[j].Match)
-	})
-	sort.Slice(data.Links, func(i, j int) bool {
-		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
-	})
+	if err := topologymodel.SortActors(options.WorkLimiter, data.Actors); err != nil {
+		return err
+	}
+	if err := topologymodel.SortLinks(options.WorkLimiter, data.Links); err != nil {
+		return err
+	}
 
 	data.Stats.Shape.ActorsCollapsedByIP = collapsed
 	data.Stats.Shape.ActorsNonIPInferredSuppressed = removedNonIP
@@ -68,6 +70,5 @@ func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOption
 		data.Stats.Shape.InferenceStrategy = strategy
 	}
 	data.Stats.HasShape = true
-	topologymodel.RecomputeLinkStats(data)
-	return nil
+	return topologymodel.RecomputeLinkStatsWithLimiter(data, options.WorkLimiter)
 }

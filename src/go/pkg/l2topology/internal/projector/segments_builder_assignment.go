@@ -48,7 +48,8 @@ func (b *segmentProjectionBuilder) allowEndpoint(segmentID, endpointID string, p
 }
 
 func (b *segmentProjectionBuilder) initializeEndpointCandidates() []string {
-	endpointIDs := collectTopologyEndpointIDs(
+	endpointIDs := collectTopologyEndpointIDsWithWork(
+		b.work,
 		b.endpointMatchByID,
 		b.endpointLabelsByID,
 		b.endpointSegmentCandidates,
@@ -69,7 +70,7 @@ func (b *segmentProjectionBuilder) initializeEndpointCandidates() []string {
 			}
 			candidateSet[candidate] = struct{}{}
 		}
-		sortedCandidates := sortedTopologySet(candidateSet)
+		sortedCandidates := sortedTopologySetWithWork(b.work, candidateSet)
 		b.out.endpointLinksCandidates += len(sortedCandidates)
 		b.baseCandidatesByEndpoint[endpointID] = sortedCandidates
 		strictSegmentID := ""
@@ -111,6 +112,7 @@ func (b *segmentProjectionBuilder) initializeEndpointCandidates() []string {
 
 func (b *segmentProjectionBuilder) selectManagedProbableHint(endpointID string) probableEndpointReporterHint {
 	hint := selectProbableEndpointReporterHint(
+		b.work,
 		b.endpointLabelsByID[endpointID],
 		b.rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
 		b.fdbOwners[endpointID],
@@ -118,6 +120,7 @@ func (b *segmentProjectionBuilder) selectManagedProbableHint(endpointID string) 
 		b.managedDeviceIDs,
 	)
 	return ensureManagedProbableReporterHint(
+		b.work,
 		hint,
 		b.endpointLabelsByID[endpointID],
 		b.rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
@@ -131,7 +134,7 @@ func (b *segmentProjectionBuilder) registerProbableSegment(endpointID string, hi
 	if strings.TrimSpace(hint.deviceID) == "" {
 		return ""
 	}
-	segmentID, created := ensureProbablePortlessSegment(b.segmentByID, hint)
+	segmentID, created := ensureProbablePortlessSegment(b.work, b.segmentByID, hint)
 	if strings.TrimSpace(segmentID) == "" {
 		return ""
 	}
@@ -145,8 +148,8 @@ func (b *segmentProjectionBuilder) registerProbableSegment(endpointID string, hi
 		if ifName := strings.ToLower(strings.TrimSpace(hint.ifName)); ifName != "" {
 			b.segmentIfNames[segmentID][ifName] = struct{}{}
 		}
-		match, actor := buildBridgeSegmentActor(segmentID, b.segmentByID[segmentID], b.layer, b.source)
-		keys := topologyMatchIdentityKeys(actor.Actor.Match)
+		match, actor := buildBridgeSegmentActorWithWork(b.work, segmentID, b.segmentByID[segmentID], b.layer, b.source)
+		keys := topologyMatchIdentityKeysWithWork(b.work, actor.Actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(b.actorIndex, keys) {
 			addTopologyIdentityKeys(b.actorIndex, keys)
 		}
@@ -174,6 +177,7 @@ func (b *segmentProjectionBuilder) assignProbableEndpoints(endpointIDs []string)
 			probableCandidates := append([]string(nil), b.probableCandidatesByEP[endpointID]...)
 			if len(probableCandidates) == 0 {
 				probableCandidates = probableCandidateSegmentsFromReporterHints(
+					b.work,
 					b.endpointLabelsByID[endpointID],
 					b.rawFDBObservations.byEndpoint[normalizeFDBEndpointID(endpointID)],
 					b.reporterSegmentIndex,
@@ -260,7 +264,7 @@ func (b *segmentProjectionBuilder) buildProbableOnlyAnchorPortIDBySegment() map[
 		if segment == nil {
 			continue
 		}
-		if portID := pickProbableSegmentAnchorPortID(segment, b.probableEndpointBySegment[segmentID], b.fdbOwners, b.managedDeviceIDs); portID != "" {
+		if portID := pickProbableSegmentAnchorPortIDWithWork(b.work, segment, b.probableEndpointBySegment[segmentID], b.fdbOwners, b.managedDeviceIDs); portID != "" {
 			out[segmentID] = portID
 		}
 	}

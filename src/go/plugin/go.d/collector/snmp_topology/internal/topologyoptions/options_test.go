@@ -3,9 +3,11 @@
 package topologyoptions
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseDepth(t *testing.T) {
@@ -76,9 +78,40 @@ func TestNormalizeQueryOptions(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, NormalizeQueryOptions(tc.in))
+			got := NormalizeQueryOptions(tc.in)
+			public := got
+			public.prepared = false
+			public.managedFocus = preparedManagedFocus{}
+			assert.Equal(t, tc.want, public)
+			assert.True(t, got.prepared)
+			assert.Equal(t, IsManagedFocusAllDevices(tc.want.ManagedDeviceFocus), got.ManagedFocusIsAllDevices())
+			assert.Equal(t, ManagedFocusSelectedIPs(tc.want.ManagedDeviceFocus), got.ManagedFocusIPs())
 		})
 	}
+}
+
+func TestPrepareQueryOptionsChargesFocusOnlyOnce(t *testing.T) {
+	charges := 0
+	options := QueryOptions{
+		ManagedDeviceFocus: "ip:10.0.0.2,ip:10.0.0.1",
+		WorkLimiter: func(uint64) error {
+			charges++
+			return nil
+		},
+	}
+	prepared, err := PrepareQueryOptions(options)
+	require.NoError(t, err)
+	require.Positive(t, charges)
+	firstCharges := charges
+	prepared, err = PrepareQueryOptions(prepared)
+	require.NoError(t, err)
+	require.Equal(t, firstCharges, charges)
+	require.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, prepared.ManagedFocusIPs())
+
+	limitErr := errors.New("limit")
+	options.WorkLimiter = func(uint64) error { return limitErr }
+	_, err = PrepareQueryOptions(options)
+	require.ErrorIs(t, err, limitErr)
 }
 
 func TestNormalizeMapTypeUsesOneManagedFabricFallback(t *testing.T) {

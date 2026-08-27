@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -14,16 +13,28 @@ func inferFDBPairwiseBridgeLinks(
 	ifaceByDeviceIndex map[string]model.Interface,
 	reporterAliases map[string][]string,
 ) []bridgeBridgeLinkRecord {
+	return inferFDBPairwiseBridgeLinksWithWork(nil, attachments, ifaceByDeviceIndex, reporterAliases)
+}
+
+func inferFDBPairwiseBridgeLinksWithWork(
+	work *projectionWork,
+	attachments []model.Attachment,
+	ifaceByDeviceIndex map[string]model.Interface,
+	reporterAliases map[string][]string,
+) []bridgeBridgeLinkRecord {
 	if len(attachments) == 0 || len(reporterAliases) == 0 {
 		return nil
 	}
+	if !work.chargeProduct(uint64(len(attachments)), uint64(len(reporterAliases))) {
+		return nil
+	}
 
-	aliasOwnerIDs := buildFDBAliasOwnerMap(reporterAliases)
+	aliasOwnerIDs := buildFDBAliasOwnerMapWithWork(work, reporterAliases)
 	if len(aliasOwnerIDs) == 0 {
 		return nil
 	}
 
-	macLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, nil)
+	macLinks := collectBridgeMacLinkRecordsWithWork(work, attachments, ifaceByDeviceIndex, nil)
 	vlanAliases := buildBridgeVLANAliasIndex(macLinks)
 
 	// reporterA -> reporterB -> compatible scope -> unique canonical reporter
@@ -80,28 +91,28 @@ func inferFDBPairwiseBridgeLinks(
 
 	records := make([]bridgeBridgeLinkRecord, 0)
 	seen := make(map[string]struct{})
-	leftIDs := make([]string, 0, len(pairs))
-	for leftID := range pairs {
-		leftIDs = append(leftIDs, leftID)
+	var leftIDs []string
+	if work == nil {
+		leftIDs = make([]string, 0, len(pairs))
 	}
-	sort.Strings(leftIDs)
+	leftIDs = sortedProjectionKeys(work, pairs, leftIDs)
 	for _, leftID := range leftIDs {
 		neighbors := pairs[leftID]
 		if len(neighbors) == 0 {
 			continue
 		}
-		rightIDs := make([]string, 0, len(neighbors))
-		for rightID := range neighbors {
-			rightIDs = append(rightIDs, rightID)
+		var rightIDs []string
+		if work == nil {
+			rightIDs = make([]string, 0, len(neighbors))
 		}
-		sort.Strings(rightIDs)
+		rightIDs = sortedProjectionKeys(work, neighbors, rightIDs)
 		for _, rightID := range rightIDs {
 			if leftID >= rightID {
 				continue
 			}
 			leftByScope := pairs[leftID][rightID]
 			rightByScope := pairs[rightID][leftID]
-			for _, scope := range compatiblePairwiseScopes(leftByScope, rightByScope) {
+			for _, scope := range compatiblePairwiseScopes(work, leftByScope, rightByScope) {
 				leftPorts := leftByScope[scope]
 				rightPorts := rightByScope[scope]
 				if len(leftPorts) != 1 || len(rightPorts) != 1 {
@@ -123,9 +134,14 @@ func inferFDBPairwiseBridgeLinks(
 				}
 				seen[key] = struct{}{}
 
+				leftSortKey, leftOK := bridgePortRefSortKeyWithWork(work, leftPort)
+				rightSortKey, rightOK := bridgePortRefSortKeyWithWork(work, rightPort)
+				if !leftOK || !rightOK {
+					return nil
+				}
 				designated := leftPort
 				other := rightPort
-				if bridgePortRefSortKey(leftPort) > bridgePortRefSortKey(rightPort) {
+				if leftSortKey > rightSortKey {
 					designated = rightPort
 					other = leftPort
 				}
@@ -140,11 +156,9 @@ func inferFDBPairwiseBridgeLinks(
 	if len(records) == 0 {
 		return nil
 	}
-	sort.SliceStable(records, func(i, j int) bool {
-		li := portSortKey(records[i].designatedPort) + keySep + portSortKey(records[i].port)
-		lj := portSortKey(records[j].designatedPort) + keySep + portSortKey(records[j].port)
-		return li < lj
-	})
+	if !sortProjectionByPreparedStringKeyStable(work, records, bridgeBridgeLinkRecordSortKeyWithWork) {
+		return nil
+	}
 	return records
 }
 
@@ -164,9 +178,13 @@ func pairwiseCorrelationScope(port bridgePortRef, aliases bridgeVLANAliasIndex) 
 }
 
 func compatiblePairwiseScopes(
+	work *projectionWork,
 	left, right map[string]map[string]bridgePortRef,
 ) []string {
 	if len(left) == 0 || len(right) == 0 {
+		return nil
+	}
+	if !work.charge(uint64(len(left))) {
 		return nil
 	}
 	scopes := make([]string, 0, len(left))
@@ -175,7 +193,9 @@ func compatiblePairwiseScopes(
 			scopes = append(scopes, scope)
 		}
 	}
-	sort.Strings(scopes)
+	if !sortProjectionStrings(work, scopes) {
+		return nil
+	}
 	return scopes
 }
 

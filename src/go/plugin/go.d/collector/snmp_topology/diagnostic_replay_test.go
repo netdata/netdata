@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/netip"
 	"strings"
 	"testing"
@@ -79,6 +80,29 @@ func TestDiagnosticProfileEvidence_PreservesBGPStructuralOrigin(t *testing.T) {
 	require.Equal(t, []string{"vendor-a/_bgp.yaml"}, left.Definition.BGPOriginProfileIDs)
 	require.Equal(t, []string{"vendor-b/_bgp.yaml"}, right.Definition.BGPOriginProfileIDs)
 	require.NotEqual(t, left.DefinitionSHA256, right.DefinitionSHA256)
+}
+
+func TestDecodeReplaySemanticGroups_ChargesMaterializationBeforeOpeningMembers(t *testing.T) {
+	source := &countingOpenMemberSource{}
+	work := &replayWorkBudget{limit: 0}
+	_, err := decodeReplaySemanticGroups(
+		source,
+		[]diagnostic.ContentRef{{Kind: diagnostic.KindSemanticShard, Schema: diagnostic.SchemaV1}},
+		topologyDiagnosticReaderLimits(),
+		work,
+		1,
+	)
+	require.ErrorContains(t, err, "diagnostic replay work exceeds limit")
+	require.Zero(t, source.opens)
+}
+
+type countingOpenMemberSource struct {
+	opens int
+}
+
+func (s *countingOpenMemberSource) Open(diagnostic.ContentRef) (io.ReadCloser, error) {
+	s.opens++
+	return nil, fmt.Errorf("unexpected member open")
 }
 
 func TestCollectorDiagnosticCapture_ReplaysProductionSemanticPathAndExcludesCredentials(t *testing.T) {

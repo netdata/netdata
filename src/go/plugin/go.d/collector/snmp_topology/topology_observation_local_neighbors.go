@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -15,11 +14,14 @@ func (c *topologyBuilder) appendObservedLLDPRemotes(observation *topologyengine.
 		return
 	}
 
-	keys := make([]string, 0, len(c.lldpRemotes))
-	for key := range c.lldpRemotes {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.lldpRemotes))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.lldpRemotes, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return
+	}
 
 	for _, key := range keys {
 		remote := c.lldpRemotes[key]
@@ -60,11 +62,14 @@ func (c *topologyBuilder) appendObservedCDPRemotes(observation *topologyengine.L
 		return
 	}
 
-	keys := make([]string, 0, len(c.cdpRemotes))
-	for key := range c.cdpRemotes {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.cdpRemotes))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.cdpRemotes, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return
+	}
 
 	for _, key := range keys {
 		remote := c.cdpRemotes[key]

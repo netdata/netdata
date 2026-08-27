@@ -3,7 +3,6 @@
 package topologyenrich
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -14,23 +13,33 @@ import (
 
 func ApplyOSPFAdjacency(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.OSPFEnrichmentStats {
 	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
-	return applyOSPFAdjacencyWithResolver(data, aggregate, resolver)
+	return applyOSPFAdjacencyWithResolver(nil, data, aggregate, resolver)
 }
 
 func applyOSPFAdjacencyWithResolver(
+	work *enrichmentWork,
 	data *topologymodel.Data,
 	aggregate topologymodel.ObservationAggregate,
 	resolver *topologyL3ActorResolverProvider,
 ) topologymodel.OSPFEnrichmentStats {
 	var stats topologymodel.OSPFEnrichmentStats
 	if data == nil || len(aggregate.OSPFNeighbors) == 0 {
-		return finishTopologyOSPFAdjacencyEnrichment(data, stats)
+		return finishTopologyOSPFAdjacencyEnrichment(work, data, stats)
 	}
 
 	actorResolver := resolver.resolve()
+	if work != nil && work.err != nil {
+		return stats
+	}
+	if !work.charge(uint64(len(data.Links))) {
+		return stats
+	}
 	seen := existingTopologyOSPFLinkKeys(data.Links)
 	neighborRowsByActor := make(map[topologymodel.ActorHandle][]topologymodel.OSPFNeighborDetailRow)
 
+	if !work.charge(uint64(len(aggregate.OSPFNeighbors))) {
+		return stats
+	}
 	for _, row := range aggregate.OSPFNeighbors {
 		stats.ObservedRows++
 		localRef, localOK := actorResolver.resolveDeviceID(row.DeviceID)
@@ -73,16 +82,21 @@ func applyOSPFAdjacencyWithResolver(
 		stats.EmittedLinks++
 	}
 
-	attachTopologyOSPFNeighborRows(data, neighborRowsByActor)
-	sort.Slice(data.Links, func(i, j int) bool {
-		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
-	})
-	return finishTopologyOSPFAdjacencyEnrichment(data, stats)
+	attachTopologyOSPFNeighborRows(work, data, neighborRowsByActor)
+	if work != nil && work.err != nil {
+		return stats
+	}
+	if !sortEnrichmentLinks(work, data.Links) {
+		return stats
+	}
+	return finishTopologyOSPFAdjacencyEnrichment(work, data, stats)
 }
 
-func finishTopologyOSPFAdjacencyEnrichment(data *topologymodel.Data, stats topologymodel.OSPFEnrichmentStats) topologymodel.OSPFEnrichmentStats {
+func finishTopologyOSPFAdjacencyEnrichment(work *enrichmentWork, data *topologymodel.Data, stats topologymodel.OSPFEnrichmentStats) topologymodel.OSPFEnrichmentStats {
 	recordTopologyOSPFEnrichmentStats(data, stats)
-	topologymodel.RecomputeLinkStats(data)
+	if err := topologymodel.RecomputeLinkStatsWithLimiter(data, work.limiterValue()); err != nil {
+		work.fail(err)
+	}
 	return stats
 }
 
@@ -136,9 +150,21 @@ func topologyOSPFNeighborActorRow(row topologymodel.OSPFNeighbor) topologymodel.
 }
 
 func sortTopologyOSPFNeighborDetailRows(rows []topologymodel.OSPFNeighborDetailRow) {
-	sort.Slice(rows, func(i, j int) bool {
-		return topologyOSPFNeighborActorRowSortKey(rows[i]) < topologyOSPFNeighborActorRowSortKey(rows[j])
-	})
+	sortTopologyOSPFNeighborDetailRowsWithWork(nil, rows)
+}
+
+func sortTopologyOSPFNeighborDetailRowsWithWork(work *enrichmentWork, rows []topologymodel.OSPFNeighborDetailRow) {
+	sortEnrichmentByPreparedStringKey(work, rows, topologyOSPFNeighborActorRowSortKeyWithWork)
+}
+
+func topologyOSPFNeighborActorRowSortKeyWithWork(
+	work *enrichmentWork,
+	row topologymodel.OSPFNeighborDetailRow,
+) (string, bool) {
+	if work != nil && !work.chargeStrings([]string{row.NeighborRouterID, row.NeighborIP, row.AddresslessIndex, row.State}) {
+		return "", false
+	}
+	return topologyOSPFNeighborActorRowSortKey(row), true
 }
 
 func topologyOSPFNeighborActorRowSortKey(row topologymodel.OSPFNeighborDetailRow) string {

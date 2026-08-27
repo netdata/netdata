@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 	"time"
 
@@ -31,7 +30,32 @@ func projectSegmentTopology(
 	probabilisticConnectivity bool,
 	strategyConfig topologyInferenceStrategyConfig,
 ) projectedSegments {
+	return projectSegmentTopologyWithWork(nil, attachments, adjacencies, layer, source, collectedAt, deviceByID, deviceLinkMatchByID, ifaceByDeviceIndex, ifIndexByDeviceName, bridgePortAliases, bridgeLinks, reporterAliases, endpointMatchByID, endpointLinkMatchByID, endpointLabelsByID, actorIndex, probabilisticConnectivity, strategyConfig)
+}
+
+func projectSegmentTopologyWithWork(
+	work *projectionWork,
+	attachments []model.Attachment,
+	adjacencies []model.Adjacency,
+	layer string,
+	source string,
+	collectedAt time.Time,
+	deviceByID map[string]model.Device,
+	deviceLinkMatchByID map[string]graph.Match,
+	ifaceByDeviceIndex map[string]model.Interface,
+	ifIndexByDeviceName map[string]int,
+	bridgePortAliases bridgePortAliasIndex,
+	bridgeLinks []bridgeBridgeLinkRecord,
+	reporterAliases map[string][]string,
+	endpointMatchByID map[string]graph.Match,
+	endpointLinkMatchByID map[string]graph.Match,
+	endpointLabelsByID map[string]map[string]string,
+	actorIndex map[string]struct{},
+	probabilisticConnectivity bool,
+	strategyConfig topologyInferenceStrategyConfig,
+) projectedSegments {
 	return newSegmentProjectionBuilder(
+		work,
 		attachments,
 		adjacencies,
 		layer,
@@ -54,6 +78,16 @@ func projectSegmentTopology(
 }
 
 func pickProbableSegmentAnchorPortID(
+	segment *bridgeDomainSegment,
+	probableEndpoints map[string]struct{},
+	fdbOwners map[string]fdbEndpointOwner,
+	managedDeviceIDs map[string]struct{},
+) string {
+	return pickProbableSegmentAnchorPortIDWithWork(nil, segment, probableEndpoints, fdbOwners, managedDeviceIDs)
+}
+
+func pickProbableSegmentAnchorPortIDWithWork(
+	work *projectionWork,
 	segment *bridgeDomainSegment,
 	probableEndpoints map[string]struct{},
 	fdbOwners map[string]fdbEndpointOwner,
@@ -86,7 +120,9 @@ func pickProbableSegmentAnchorPortID(
 			managedPortIDs[portID] = struct{}{}
 		}
 	}
-	sort.Strings(portIDs)
+	if !sortProjectionStrings(work, portIDs) {
+		return ""
+	}
 	preferManaged := len(managedPortIDs) > 0
 	allowPortID := func(portID string) bool {
 		if !preferManaged {
@@ -96,7 +132,7 @@ func pickProbableSegmentAnchorPortID(
 		return ok
 	}
 
-	endpointIDs := sortedTopologySet(probableEndpoints)
+	endpointIDs := sortedTopologySetWithWork(work, probableEndpoints)
 	for _, endpointID := range endpointIDs {
 		owner, ok := fdbOwners[endpointID]
 		if !ok {
@@ -122,7 +158,9 @@ func pickProbableSegmentAnchorPortID(
 		for portID := range managedPortIDs {
 			managedPortIDList = append(managedPortIDList, portID)
 		}
-		sort.Strings(managedPortIDList)
+		if !sortProjectionStrings(work, managedPortIDList) {
+			return ""
+		}
 		if len(managedPortIDList) > 0 {
 			return managedPortIDList[0]
 		}

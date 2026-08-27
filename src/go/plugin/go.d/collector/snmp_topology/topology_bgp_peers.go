@@ -17,6 +17,9 @@ func (c *topologyBuilder) ingestTopologyBGPPeers(pms []*ddsnmp.ProfileMetrics) {
 	if c == nil {
 		return
 	}
+	if !c.chargeWork(uint64(len(pms))) {
+		return
+	}
 
 	if c.bgpPeersByKey == nil {
 		c.bgpPeersByKey = make(map[string]topologymodel.BGPPeer)
@@ -24,6 +27,9 @@ func (c *topologyBuilder) ingestTopologyBGPPeers(pms []*ddsnmp.ProfileMetrics) {
 	for _, pm := range pms {
 		if pm == nil || pm.BGPCollectError != nil {
 			continue
+		}
+		if !c.chargeWork(uint64(len(pm.BGPRows))) {
+			return
 		}
 		for _, row := range pm.BGPRows {
 			peer, ok := topologyBGPPeerFromRow(row)
@@ -88,7 +94,14 @@ func (c *topologyBuilder) snapshotBGPPeers(localDeviceID string) []topologymodel
 		return nil
 	}
 
-	keys := topologyutil.SortedMapKeys(c.bgpPeersByKey)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.bgpPeersByKey))
+	}
+	keys = sortedBuilderKeys(c, c.bgpPeersByKey, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return nil
+	}
 	rows := make([]topologymodel.BGPPeer, 0, len(keys))
 	for _, key := range keys {
 		row := c.bgpPeersByKey[key]

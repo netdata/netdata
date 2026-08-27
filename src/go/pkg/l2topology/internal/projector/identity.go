@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -26,6 +25,13 @@ func deviceIfNameKey(deviceID, ifName string) string {
 }
 
 func interfaceNameLookupAliases(values ...string) []string {
+	return interfaceNameLookupAliasesWithWork(nil, values...)
+}
+
+func interfaceNameLookupAliasesWithWork(work *projectionWork, values ...string) []string {
+	if !work.chargeStrings(values) {
+		return nil
+	}
 	set := make(map[string]struct{}, len(values)*2)
 	for _, value := range values {
 		trimmed := strings.TrimSpace(value)
@@ -44,7 +50,9 @@ func interfaceNameLookupAliases(values ...string) []string {
 	for value := range set {
 		out = append(out, value)
 	}
-	sort.Strings(out)
+	if !sortProjectionStrings(work, out) {
+		return nil
+	}
 	return out
 }
 
@@ -106,6 +114,7 @@ func addTopologyIdentityKeys(index map[string]struct{}, keys []string) {
 }
 
 func buildDeviceIdentityKeySetByID(
+	work *projectionWork,
 	deviceByID map[string]model.Device,
 	adjacencies []model.Adjacency,
 	ifaceByDeviceIndex map[string]model.Interface,
@@ -119,9 +128,9 @@ func buildDeviceIdentityKeySetByID(
 		if deviceID == "" {
 			continue
 		}
-		keys := topologyMatchIdentityKeys(
-			deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}, nil).Actor.Match,
-		)
+		keys := topologyMatchIdentityKeysWithWork(work, buildDeviceActorMatchWithAddressesAndWork(
+			work, device, nil, deviceAddressStringsWithWork(work, device),
+		))
 		if len(keys) == 0 {
 			continue
 		}
@@ -183,6 +192,17 @@ func buildDeviceIdentityKeySetByID(
 }
 
 func topologyMatchIdentityKeys(match graph.Match) []string {
+	return topologyMatchIdentityKeysWithWork(nil, match)
+}
+
+func topologyMatchIdentityKeysWithWork(work *projectionWork, match graph.Match) []string {
+	if !work.chargeStrings(match.ChassisIDs) ||
+		!work.chargeStrings(match.MacAddresses) ||
+		!work.chargeStrings(match.IPAddresses) ||
+		!work.chargeStrings(match.Hostnames) ||
+		!work.chargeStrings(match.DNSNames) {
+		return nil
+	}
 	seen := make(map[string]struct{}, 8)
 	add := func(kind, value string) {
 		value = strings.TrimSpace(value)
@@ -235,15 +255,21 @@ func topologyMatchIdentityKeys(match graph.Match) []string {
 		return nil
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
+	var keys []string
+	if work == nil {
+		keys = make([]string, 0, len(seen))
 	}
-	sort.Strings(keys)
-	return keys
+	return sortedProjectionKeys(work, seen, keys)
 }
 
 func topologyMatchHardwareIdentityKeys(match graph.Match) []string {
+	return topologyMatchHardwareIdentityKeysWithWork(nil, match)
+}
+
+func topologyMatchHardwareIdentityKeysWithWork(work *projectionWork, match graph.Match) []string {
+	if !work.chargeStrings(match.MacAddresses) || !work.chargeStrings(match.ChassisIDs) {
+		return nil
+	}
 	seen := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	add := func(value string) {
 		if mac := normalizeMAC(value); mac != "" {
@@ -261,15 +287,15 @@ func topologyMatchHardwareIdentityKeys(match graph.Match) []string {
 	if len(seen) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
+	var keys []string
+	if work == nil {
+		keys = make([]string, 0, len(seen))
 	}
-	sort.Strings(keys)
-	return keys
+	return sortedProjectionKeys(work, seen, keys)
 }
 
 func endpointMatchOverlappingKnownDeviceIDs(
+	work *projectionWork,
 	endpointMatch graph.Match,
 	deviceIdentityByID map[string]topologyIdentityKeySet,
 ) []string {
@@ -277,23 +303,31 @@ func endpointMatchOverlappingKnownDeviceIDs(
 		return nil
 	}
 
-	endpointKeys := topologyMatchHardwareIdentityKeys(endpointMatch)
+	endpointKeys := topologyMatchHardwareIdentityKeysWithWork(work, endpointMatch)
 	if len(endpointKeys) == 0 {
-		endpointKeys = topologyMatchIdentityKeys(endpointMatch)
+		endpointKeys = topologyMatchIdentityKeysWithWork(work, endpointMatch)
 	}
 	if len(endpointKeys) == 0 {
 		return nil
 	}
 
-	deviceIDs := make([]string, 0, len(deviceIdentityByID))
-	for deviceID := range deviceIdentityByID {
+	var deviceIDs []string
+	if work == nil {
+		deviceIDs = make([]string, 0, len(deviceIdentityByID))
+	}
+	deviceIDs = sortedProjectionKeys(work, deviceIdentityByID, deviceIDs)
+	if work != nil && work.err != nil {
+		return nil
+	}
+	filteredDeviceIDs := deviceIDs[:0]
+	for _, deviceID := range deviceIDs {
 		deviceID = strings.TrimSpace(deviceID)
 		if deviceID == "" {
 			continue
 		}
-		deviceIDs = append(deviceIDs, deviceID)
+		filteredDeviceIDs = append(filteredDeviceIDs, deviceID)
 	}
-	sort.Strings(deviceIDs)
+	deviceIDs = filteredDeviceIDs
 	if len(deviceIDs) == 0 {
 		return nil
 	}

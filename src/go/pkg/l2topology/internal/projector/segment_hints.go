@@ -3,12 +3,12 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 )
 
 func selectProbableEndpointReporterHint(
+	work *projectionWork,
 	endpointLabels map[string]string,
 	reporterHints map[string][]bridgePortRef,
 	owner fdbEndpointOwner,
@@ -33,8 +33,8 @@ func selectProbableEndpointReporterHint(
 		}
 	}
 
-	deviceIDs := resolveTopologyEndpointDeviceHints(
-		topologyEndpointLabelDeviceIDs(endpointLabels),
+	deviceIDs := resolveTopologyEndpointDeviceHintsWithWork(work,
+		topologyEndpointLabelDeviceIDsWithWork(work, endpointLabels),
 		aliasOwnerIDs,
 	)
 	if len(deviceIDs) == 0 {
@@ -45,9 +45,9 @@ func selectProbableEndpointReporterHint(
 			}
 			deviceIDs = append(deviceIDs, reporterID)
 		}
-		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
+		deviceIDs = resolveTopologyEndpointDeviceHintsWithWork(work, deviceIDs, aliasOwnerIDs)
 	}
-	deviceIDs = filterManagedDeviceHints(deviceIDs, managedDeviceIDs)
+	deviceIDs = filterManagedDeviceHintsWithWork(work, deviceIDs, managedDeviceIDs)
 	if len(deviceIDs) == 0 {
 		return probableEndpointReporterHint{}
 	}
@@ -87,9 +87,9 @@ func selectProbableEndpointReporterHint(
 		ifName:   parsedIfName,
 	}
 	if ports := reporterHints[selectedDeviceID]; len(ports) > 0 {
-		sort.SliceStable(ports, func(i, j int) bool {
-			return bridgePortRefSortKey(ports[i]) < bridgePortRefSortKey(ports[j])
-		})
+		if !sortProjectionByPreparedStringKeyStable(work, ports, bridgePortRefSortKeyWithWork) {
+			return probableEndpointReporterHint{}
+		}
 		port := ports[0]
 		if hint.ifIndex == 0 && port.ifIndex > 0 {
 			hint.ifIndex = port.ifIndex
@@ -106,6 +106,7 @@ func selectProbableEndpointReporterHint(
 }
 
 func ensureManagedProbableReporterHint(
+	work *projectionWork,
 	hint probableEndpointReporterHint,
 	endpointLabels map[string]string,
 	reporterHints map[string][]bridgePortRef,
@@ -123,8 +124,8 @@ func ensureManagedProbableReporterHint(
 		}
 	}
 
-	deviceIDs := resolveTopologyEndpointDeviceHints(
-		topologyEndpointLabelDeviceIDs(endpointLabels),
+	deviceIDs := resolveTopologyEndpointDeviceHintsWithWork(work,
+		topologyEndpointLabelDeviceIDsWithWork(work, endpointLabels),
 		aliasOwnerIDs,
 	)
 	if len(deviceIDs) == 0 {
@@ -135,9 +136,9 @@ func ensureManagedProbableReporterHint(
 			}
 			deviceIDs = append(deviceIDs, reporterID)
 		}
-		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
+		deviceIDs = resolveTopologyEndpointDeviceHintsWithWork(work, deviceIDs, aliasOwnerIDs)
 	}
-	deviceIDs = filterManagedDeviceHints(deviceIDs, managedDeviceIDs)
+	deviceIDs = filterManagedDeviceHintsWithWork(work, deviceIDs, managedDeviceIDs)
 	if len(deviceIDs) == 0 {
 		deviceIDs = managedDeviceIDList
 	}
@@ -149,9 +150,9 @@ func ensureManagedProbableReporterHint(
 
 	ports := reporterHints[hint.deviceID]
 	if len(ports) > 0 {
-		sort.SliceStable(ports, func(i, j int) bool {
-			return bridgePortRefSortKey(ports[i]) < bridgePortRefSortKey(ports[j])
-		})
+		if !sortProjectionByPreparedStringKeyStable(work, ports, bridgePortRefSortKeyWithWork) {
+			return probableEndpointReporterHint{}
+		}
 		port := ports[0]
 		if hint.ifIndex == 0 && port.ifIndex > 0 {
 			hint.ifIndex = port.ifIndex
@@ -189,6 +190,7 @@ func ensureManagedProbableReporterHint(
 }
 
 func ensureProbablePortlessSegment(
+	work *projectionWork,
 	segmentByID map[string]*bridgeDomainSegment,
 	hint probableEndpointReporterHint,
 ) (string, bool) {
@@ -205,7 +207,11 @@ func ensureProbablePortlessSegment(
 		port.ifName = "0"
 	}
 
-	segmentID := "bridge-domain:probable:" + bridgePortRefSortKey(port)
+	portKey, ok := bridgePortRefSortKeyWithWork(work, port)
+	if !ok {
+		return "", false
+	}
+	segmentID := "bridge-domain:probable:" + portKey
 	if _, ok := segmentByID[segmentID]; ok {
 		return segmentID, false
 	}

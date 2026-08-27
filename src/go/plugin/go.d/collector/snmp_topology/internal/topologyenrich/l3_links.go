@@ -5,7 +5,6 @@ package topologyenrich
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -20,27 +19,37 @@ const topologyL3SubnetSource = "ip_mib"
 
 func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.L3EnrichmentStats {
 	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
-	return applyL3SubnetWithResolver(data, aggregate, resolver)
+	return applyL3SubnetWithResolver(nil, data, aggregate, resolver)
 }
 
 func applyL3SubnetWithResolver(
+	work *enrichmentWork,
 	data *topologymodel.Data,
 	aggregate topologymodel.ObservationAggregate,
 	resolver *topologyL3ActorResolverProvider,
 ) topologymodel.L3EnrichmentStats {
 	var stats topologymodel.L3EnrichmentStats
 	if data == nil || len(aggregate.L3Interfaces) == 0 {
-		return finishTopologyL3SubnetEnrichment(data, stats)
+		return finishTopologyL3SubnetEnrichment(work, data, stats)
 	}
 
-	candidates, subnetStats := buildTopologyL3SubnetCandidates(aggregate.L3Interfaces)
+	candidates, subnetStats := buildTopologyL3SubnetCandidatesWithWork(work, aggregate.L3Interfaces)
 	stats.SubnetStats = subnetStats
 	if len(candidates.Adjacencies) == 0 && len(candidates.Segments) == 0 {
-		return finishTopologyL3SubnetEnrichment(data, stats)
+		return finishTopologyL3SubnetEnrichment(work, data, stats)
 	}
 
 	actorResolver := resolver.resolve()
+	if work != nil && work.err != nil {
+		return stats
+	}
+	if !work.charge(uint64(len(data.Links))) {
+		return stats
+	}
 	directSeen := existingTopologyL3LinkKeys(data.Links)
+	if !work.charge(uint64(len(candidates.Adjacencies))) {
+		return stats
+	}
 	for _, adjacency := range candidates.Adjacencies {
 		srcRef, ok := actorResolver.resolve(adjacency.A)
 		if !ok {
@@ -68,20 +77,25 @@ func applyL3SubnetWithResolver(
 		stats.EmittedLinks++
 	}
 
-	applyTopologyL3SubnetSegments(data, candidates.Segments, actorResolver, strings.TrimSpace(aggregate.ProducerScopeID), &stats)
+	applyTopologyL3SubnetSegments(work, data, candidates.Segments, actorResolver, strings.TrimSpace(aggregate.ProducerScopeID), &stats)
+	if work != nil && work.err != nil {
+		return stats
+	}
 
-	sort.Slice(data.Actors, func(i, j int) bool {
-		return strings.TrimSpace(data.Actors[i].ActorID) < strings.TrimSpace(data.Actors[j].ActorID)
-	})
-	sort.Slice(data.Links, func(i, j int) bool {
-		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
-	})
-	return finishTopologyL3SubnetEnrichment(data, stats)
+	if !sortEnrichmentActorsByID(work, data.Actors) {
+		return stats
+	}
+	if !sortEnrichmentLinks(work, data.Links) {
+		return stats
+	}
+	return finishTopologyL3SubnetEnrichment(work, data, stats)
 }
 
-func finishTopologyL3SubnetEnrichment(data *topologymodel.Data, stats topologymodel.L3EnrichmentStats) topologymodel.L3EnrichmentStats {
+func finishTopologyL3SubnetEnrichment(work *enrichmentWork, data *topologymodel.Data, stats topologymodel.L3EnrichmentStats) topologymodel.L3EnrichmentStats {
 	recordTopologyL3EnrichmentStats(data, stats)
-	topologymodel.RecomputeLinkStats(data)
+	if err := topologymodel.RecomputeLinkStatsWithLimiter(data, work.limiterValue()); err != nil {
+		work.fail(err)
+	}
 	return stats
 }
 
@@ -129,6 +143,7 @@ type topologyL3SubnetMember struct {
 }
 
 func applyTopologyL3SubnetSegments(
+	work *enrichmentWork,
 	data *topologymodel.Data,
 	segments []topologyL3SubnetSegment,
 	resolver topologyL3ActorResolver,
@@ -142,11 +157,14 @@ func applyTopologyL3SubnetSegments(
 		stats.SuppressedNoProducerScope += len(segments)
 		return
 	}
+	if !work.charge(uint64(len(segments))) || !work.charge(uint64(len(data.Actors))) || !work.charge(uint64(len(data.Links))) {
+		return
+	}
 
 	actorSeen := existingTopologyActorRefs(data.Actors)
 	membershipSeen := existingTopologyL3MembershipLinkKeys(data.Links)
 	for _, segment := range segments {
-		members := topologyL3SubnetSegmentMembers(segment, resolver, stats)
+		members := topologyL3SubnetSegmentMembers(work, segment, resolver, stats)
 		if len(members) < 2 {
 			stats.SuppressedMembershipUnmatched++
 			continue
@@ -181,10 +199,14 @@ func applyTopologyL3SubnetSegments(
 }
 
 func topologyL3SubnetSegmentMembers(
+	work *enrichmentWork,
 	segment topologyL3SubnetSegment,
 	resolver topologyL3ActorResolver,
 	stats *topologymodel.L3EnrichmentStats,
 ) []topologyL3SubnetMember {
+	if !work.charge(uint64(len(segment.Rows))) {
+		return nil
+	}
 	byActor := make(map[topologymodel.ActorHandle]*topologyL3SubnetMember, len(segment.Rows))
 	for _, row := range segment.Rows {
 		ref, ok := resolver.resolve(row)
@@ -204,20 +226,26 @@ func topologyL3SubnetSegmentMembers(
 		member.interfaces = append(member.interfaces, topologyL3SubnetMembershipInterface(row))
 	}
 
+	if !work.charge(uint64(len(byActor))) {
+		return nil
+	}
 	actorHandles := make([]topologymodel.ActorHandle, 0, len(byActor))
 	for actorHandle := range byActor {
 		actorHandles = append(actorHandles, actorHandle)
 	}
-	sort.Slice(actorHandles, func(i, j int) bool {
+	sortEnrichmentSlice(work, actorHandles, func(i, j int) bool {
 		return byActor[actorHandles[i]].ref.actorOrder < byActor[actorHandles[j]].ref.actorOrder
 	})
 
+	if !work.charge(uint64(len(actorHandles))) {
+		return nil
+	}
 	out := make([]topologyL3SubnetMember, 0, len(actorHandles))
 	for _, actorHandle := range actorHandles {
 		member := byActor[actorHandle]
-		sort.Slice(member.interfaces, func(i, j int) bool {
-			return topologyL3SubnetMembershipInterfaceSortKey(member.interfaces[i]) < topologyL3SubnetMembershipInterfaceSortKey(member.interfaces[j])
-		})
+		if !sortEnrichmentByPreparedStringKey(work, member.interfaces, topologyL3SubnetMembershipInterfaceSortKeyWithWork) {
+			return nil
+		}
 		out = append(out, *member)
 	}
 	return out
@@ -239,6 +267,16 @@ func topologyL3SubnetMembershipInterfaceSortKey(row topologymodel.L3SubnetMember
 		strings.TrimSpace(row.IfName),
 		strings.TrimSpace(row.IfDescr),
 	}, "\x00")
+}
+
+func topologyL3SubnetMembershipInterfaceSortKeyWithWork(
+	work *enrichmentWork,
+	row topologymodel.L3SubnetMembershipInterface,
+) (string, bool) {
+	if work != nil && !work.chargeStrings([]string{row.MemberIP, row.IfName, row.IfDescr}) {
+		return "", false
+	}
+	return topologyL3SubnetMembershipInterfaceSortKey(row), true
 }
 
 func topologyL3SubnetSegmentActor(producerScopeID string, segment topologyL3SubnetSegment, members []topologyL3SubnetMember) topologymodel.Actor {

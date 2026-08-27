@@ -4,15 +4,18 @@ package pipeline
 
 import (
 	"net/netip"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
-func sortedAddrValues(in map[string]netip.Addr) []netip.Addr {
+func sortedAddrValues(limiter worklimit.Limiter, in map[string]netip.Addr) ([]netip.Addr, error) {
 	if len(in) == 0 {
-		return nil
+		return nil, nil
+	}
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return nil, err
 	}
 	out := make([]netip.Addr, 0, len(in))
 	seen := make(map[netip.Addr]struct{}, len(in))
@@ -27,13 +30,18 @@ func sortedAddrValues(in map[string]netip.Addr) []netip.Addr {
 		seen[addr] = struct{}{}
 		out = append(out, addr)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Compare(out[j]) < 0 })
-	return out
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool { return out[i].Compare(out[j]) < 0 }); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func setToCSV(in map[string]struct{}) string {
+func setToCSV(limiter worklimit.Limiter, in map[string]struct{}) (string, error) {
 	if len(in) == 0 {
-		return ""
+		return "", nil
+	}
+	if err := limiter.Charge(uint64(len(in))); err != nil {
+		return "", err
 	}
 	out := make([]string, 0, len(in))
 	for value := range in {
@@ -44,10 +52,15 @@ func setToCSV(in map[string]struct{}) string {
 		out = append(out, value)
 	}
 	if len(out) == 0 {
-		return ""
+		return "", nil
 	}
-	sort.Strings(out)
-	return strings.Join(out, ",")
+	if err := worklimit.SortStrings(limiter, out); err != nil {
+		return "", err
+	}
+	if err := worklimit.ChargeStrings(limiter, out); err != nil {
+		return "", err
+	}
+	return strings.Join(out, ","), nil
 }
 
 func csvToTopologySet(value string) map[string]struct{} {

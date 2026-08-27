@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -62,6 +61,14 @@ func buildBridgeDomainModel(
 	bridgeLinks []bridgeBridgeLinkRecord,
 	macLinks []bridgeMacLinkRecord,
 ) bridgeDomainModel {
+	return buildBridgeDomainModelWithWork(nil, bridgeLinks, macLinks)
+}
+
+func buildBridgeDomainModelWithWork(
+	work *projectionWork,
+	bridgeLinks []bridgeBridgeLinkRecord,
+	macLinks []bridgeMacLinkRecord,
+) bridgeDomainModel {
 	model := bridgeDomainModel{domains: make([]*bridgeBroadcastDomain, 0)}
 	if len(bridgeLinks) == 0 && len(macLinks) == 0 {
 		return model
@@ -87,7 +94,7 @@ func buildBridgeDomainModel(
 			bblIndex.addSegment(segment)
 		}
 
-		mergeRootDomainSets(rootToNodes, designatedNodeID, nodeID)
+		mergeRootDomainSetsWithWork(work, rootToNodes, designatedNodeID, nodeID)
 	}
 
 	bmlSegments := make([]*bridgeDomainSegment, 0)
@@ -117,7 +124,11 @@ func buildBridgeDomainModel(
 		bmlIndex.addSegment(segment)
 	}
 
-	rootIDs := sortedStringKeys(rootToNodes)
+	var rootIDs []string
+	if work == nil {
+		rootIDs = make([]string, 0, len(rootToNodes))
+	}
+	rootIDs = sortedProjectionKeys(work, rootToNodes, rootIDs)
 	domainByBridge := make(map[string]*bridgeBroadcastDomain)
 	domainPosition := make(map[*bridgeBroadcastDomain]int)
 	for _, rootID := range rootIDs {
@@ -135,13 +146,13 @@ func buildBridgeDomainModel(
 	}
 
 	for _, segment := range bblSegments {
-		if domain := bridgeDomainForSegment(domainByBridge, domainPosition, segment); domain != nil {
+		if domain := bridgeDomainForSegmentWithWork(work, domainByBridge, domainPosition, segment); domain != nil {
 			domain.segments = append(domain.segments, segment)
 		}
 	}
 
 	for _, segment := range bmlSegments {
-		if domain := bridgeDomainForSegment(domainByBridge, domainPosition, segment); domain != nil {
+		if domain := bridgeDomainForSegmentWithWork(work, domainByBridge, domainPosition, segment); domain != nil {
 			domain.segments = append(domain.segments, segment)
 			continue
 		}
@@ -162,11 +173,17 @@ func buildBridgeDomainModel(
 		indexBridgeDomain(domainByBridge, domain)
 	}
 
-	sort.SliceStable(model.domains, func(i, j int) bool {
-		return model.domains[i].sortKey() < model.domains[j].sortKey()
-	})
+	if !sortProjectionByPreparedStringKeyStable(work, model.domains, func(
+		work *projectionWork,
+		domain *bridgeBroadcastDomain,
+	) (string, bool) {
+		key := domain.sortKeyWithWork(work)
+		return key, work == nil || work.err == nil
+	}) {
+		return bridgeDomainModel{}
+	}
 	for _, domain := range model.domains {
-		domain.sortSegments()
+		domain.sortSegmentsWithWork(work)
 	}
 
 	return model
@@ -190,7 +207,19 @@ func bridgeDomainForSegment(
 	position map[*bridgeBroadcastDomain]int,
 	segment *bridgeDomainSegment,
 ) *bridgeBroadcastDomain {
+	return bridgeDomainForSegmentWithWork(nil, index, position, segment)
+}
+
+func bridgeDomainForSegmentWithWork(
+	work *projectionWork,
+	index map[string]*bridgeBroadcastDomain,
+	position map[*bridgeBroadcastDomain]int,
+	segment *bridgeDomainSegment,
+) *bridgeBroadcastDomain {
 	if segment == nil {
+		return nil
+	}
+	if !work.charge(uint64(len(segment.ports))) {
 		return nil
 	}
 	var selected *bridgeBroadcastDomain
@@ -207,13 +236,17 @@ func bridgeDomainForSegment(
 }
 
 func mergeRootDomainSets(rootToNodes map[string]bridgeNodeSet, designatedNodeID, nodeID string) {
+	mergeRootDomainSetsWithWork(nil, rootToNodes, designatedNodeID, nodeID)
+}
+
+func mergeRootDomainSetsWithWork(work *projectionWork, rootToNodes map[string]bridgeNodeSet, designatedNodeID, nodeID string) {
 	designatedNodeID = strings.TrimSpace(designatedNodeID)
 	nodeID = strings.TrimSpace(nodeID)
 	if designatedNodeID == "" || nodeID == "" {
 		return
 	}
 
-	targetRoot := findRootForNode(rootToNodes, designatedNodeID)
+	targetRoot := findRootForNodeWithWork(work, rootToNodes, designatedNodeID)
 	if targetRoot == "" {
 		targetRoot = designatedNodeID
 	}
@@ -225,7 +258,7 @@ func mergeRootDomainSets(rootToNodes map[string]bridgeNodeSet, designatedNodeID,
 		targetSet.add(designatedNodeID)
 	}
 
-	sourceRoot := findRootForNode(rootToNodes, nodeID)
+	sourceRoot := findRootForNodeWithWork(work, rootToNodes, nodeID)
 	if sourceRoot != "" && sourceRoot != targetRoot {
 		if sourceSet, ok := rootToNodes[sourceRoot]; ok {
 			for id := range sourceSet {
@@ -243,6 +276,10 @@ func mergeRootDomainSets(rootToNodes map[string]bridgeNodeSet, designatedNodeID,
 }
 
 func findRootForNode(rootToNodes map[string]bridgeNodeSet, nodeID string) string {
+	return findRootForNodeWithWork(nil, rootToNodes, nodeID)
+}
+
+func findRootForNodeWithWork(work *projectionWork, rootToNodes map[string]bridgeNodeSet, nodeID string) string {
 	nodeID = strings.TrimSpace(nodeID)
 	if nodeID == "" {
 		return ""
@@ -250,13 +287,20 @@ func findRootForNode(rootToNodes map[string]bridgeNodeSet, nodeID string) string
 	if _, ok := rootToNodes[nodeID]; ok {
 		return nodeID
 	}
-	if rootID := findRootContaining(rootToNodes, nodeID); rootID != "" {
+	if rootID := findRootContainingWithWork(work, rootToNodes, nodeID); rootID != "" {
 		return rootID
 	}
 	return ""
 }
 
 func findRootContaining(rootToNodes map[string]bridgeNodeSet, nodeID string) string {
+	return findRootContainingWithWork(nil, rootToNodes, nodeID)
+}
+
+func findRootContainingWithWork(work *projectionWork, rootToNodes map[string]bridgeNodeSet, nodeID string) string {
+	if !work.charge(uint64(len(rootToNodes))) {
+		return ""
+	}
 	for rootID, set := range rootToNodes {
 		if _, ok := set[nodeID]; ok {
 			return rootID
@@ -382,36 +426,69 @@ func bridgeDomainPortIdentityKey(port bridgePortRef) string {
 }
 
 func (s *bridgeDomainSegment) sortKey() string {
-	return portSortKey(s.designatedPort) + keySep + strings.Join(sortedBridgePortSet(s.ports), ",")
+	return s.sortKeyWithWork(nil)
+}
+
+func (s *bridgeDomainSegment) sortKeyWithWork(work *projectionWork) string {
+	designated, ok := portSortKeyWithWork(work, s.designatedPort)
+	if !ok {
+		return ""
+	}
+	return designated + keySep + strings.Join(sortedBridgePortSetWithWork(work, s.ports), ",")
 }
 
 func (d *bridgeBroadcastDomain) sortKey() string {
+	return d.sortKeyWithWork(nil)
+}
+
+func (d *bridgeBroadcastDomain) sortKeyWithWork(work *projectionWork) string {
 	if d == nil {
 		return ""
 	}
-	ids := make([]string, 0, len(d.bridges))
-	for id := range d.bridges {
-		ids = append(ids, id)
+	var ids []string
+	if work == nil {
+		ids = make([]string, 0, len(d.bridges))
 	}
-	sort.Strings(ids)
+	ids = sortedProjectionKeys(work, d.bridges, ids)
 	return strings.Join(ids, ",")
 }
 
 func (d *bridgeBroadcastDomain) sortSegments() {
+	d.sortSegmentsWithWork(nil)
+}
+
+func (d *bridgeBroadcastDomain) sortSegmentsWithWork(work *projectionWork) {
 	if d == nil {
 		return
 	}
-	sort.SliceStable(d.segments, func(i, j int) bool {
-		return d.segments[i].sortKey() < d.segments[j].sortKey()
+	sortProjectionByPreparedStringKeyStable(work, d.segments, func(
+		work *projectionWork,
+		segment *bridgeDomainSegment,
+	) (string, bool) {
+		key := segment.sortKeyWithWork(work)
+		return key, work == nil || work.err == nil
 	})
 }
 
 func sortedBridgePortSet(m map[string]bridgePortRef) []string {
+	return sortedBridgePortSetWithWork(nil, m)
+}
+
+func sortedBridgePortSetWithWork(work *projectionWork, m map[string]bridgePortRef) []string {
+	if !work.charge(uint64(len(m))) {
+		return nil
+	}
 	out := make([]string, 0, len(m))
 	for _, port := range m {
-		out = append(out, portSortKey(port))
+		key, ok := portSortKeyWithWork(work, port)
+		if !ok {
+			return nil
+		}
+		out = append(out, key)
 	}
-	sort.Strings(out)
+	if !sortProjectionStrings(work, out) {
+		return nil
+	}
 	return out
 }
 
@@ -425,18 +502,16 @@ func portSortKey(port bridgePortRef) string {
 	}, keySep)
 }
 
+func portSortKeyWithWork(work *projectionWork, port bridgePortRef) (string, bool) {
+	if work != nil && !work.chargeStrings(bridgePortKeySourceStrings(port)) {
+		return "", false
+	}
+	return portSortKey(port), true
+}
+
 func strconvItoa(v int) string {
 	if v <= 0 {
 		return ""
 	}
 	return strconv.Itoa(v)
-}
-
-func sortedStringKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

@@ -7,21 +7,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
-func recordTopologyFocusAllDevicesStats(data *topologymodel.Data, options topologyoptions.QueryOptions) {
+func recordTopologyFocusAllDevicesStats(data *topologymodel.Data, options topologyoptions.QueryOptions) error {
 	if data == nil {
-		return
+		return nil
 	}
 	data.Stats.Focus.ManagedSNMPDeviceFocus = options.ManagedDeviceFocus
 	data.Stats.Focus.Depth = topologymodel.FocusDepth{All: true}
 	data.Stats.Focus.ActorsDepthFiltered = 0
 	data.Stats.Focus.LinksDepthFiltered = 0
 	data.Stats.HasFocus = true
-	topologymodel.RecomputeLinkStats(data)
+	return topologymodel.RecomputeLinkStatsWithLimiter(data, options.WorkLimiter)
 }
 
-func recordTopologyFocusStats(data *topologymodel.Data, options topologyoptions.QueryOptions, beforeActors, beforeLinks int) {
+func recordTopologyFocusStats(data *topologymodel.Data, options topologyoptions.QueryOptions, beforeActors, beforeLinks int) error {
 	if data == nil {
-		return
+		return nil
 	}
 	data.Stats.Focus.ManagedSNMPDeviceFocus = options.ManagedDeviceFocus
 	if options.Depth == topologyoptions.DepthAllInternal {
@@ -32,5 +32,5 @@ func recordTopologyFocusStats(data *topologymodel.Data, options topologyoptions.
 	data.Stats.Focus.ActorsDepthFiltered = beforeActors - len(data.Actors)
 	data.Stats.Focus.LinksDepthFiltered = beforeLinks - len(data.Links)
 	data.Stats.HasFocus = true
-	topologymodel.RecomputeLinkStats(data)
+	return topologymodel.RecomputeLinkStatsWithLimiter(data, options.WorkLimiter)
 }

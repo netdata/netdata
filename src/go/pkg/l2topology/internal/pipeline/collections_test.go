@@ -10,12 +10,13 @@ import (
 )
 
 func TestSortedAddrValuesUsesCanonicalNumericOrder(t *testing.T) {
-	got := sortedAddrValues(map[string]netip.Addr{
+	got, err := sortedAddrValues(nil, map[string]netip.Addr{
 		"mapped":  netip.MustParseAddr("::ffff:10.0.0.2"),
 		"native":  netip.MustParseAddr("10.0.0.2"),
 		"lexical": netip.MustParseAddr("10.0.0.10"),
 		"invalid": {},
 	})
+	require.NoError(t, err)
 
 	require.Equal(t, []netip.Addr{
 		netip.MustParseAddr("10.0.0.2"),

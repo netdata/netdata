@@ -3,6 +3,7 @@
 package topologyshape
 
 import (
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
@@ -18,6 +19,14 @@ type topologyFocusGraph struct {
 }
 
 func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
+	graph, _ := buildTopologyFocusGraphWithLimiter(data, nil)
+	return graph
+}
+
+func buildTopologyFocusGraphWithLimiter(data *topologymodel.Data, limiter worklimit.Limiter) (topologyFocusGraph, error) {
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return topologyFocusGraph{}, err
+	}
 	graph := topologyFocusGraph{
 		actorByHandle:    make(map[topologymodel.ActorHandle]topologymodel.Actor, len(data.Actors)),
 		segmentSet:       make(map[topologymodel.ActorHandle]struct{}),
@@ -42,14 +51,23 @@ func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(graph.nonSegmentSet))); err != nil {
+		return topologyFocusGraph{}, err
+	}
 	for actorHandle := range graph.nonSegmentSet {
 		graph.nonSegmentAdj[actorHandle] = make(map[topologymodel.ActorHandle]struct{})
 		graph.nodeSegments[actorHandle] = make(map[topologymodel.ActorHandle]struct{})
+	}
+	if err := limiter.Charge(uint64(len(graph.segmentSet))); err != nil {
+		return topologyFocusGraph{}, err
 	}
 	for segmentHandle := range graph.segmentSet {
 		graph.segmentNeighbors[segmentHandle] = make(map[topologymodel.ActorHandle]struct{})
 	}
 
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return topologyFocusGraph{}, err
+	}
 	for _, link := range data.Links {
 		src := link.SrcActorHandle
 		dst := link.DstActorHandle
@@ -74,10 +92,18 @@ func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 		}
 	}
 
-	return graph
+	return graph, nil
 }
 
 func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[topologymodel.ActorHandle]struct{}, depth int) map[topologymodel.ActorHandle]int {
+	distance, _ := traverseTopologyFocusDepthWithLimiter(graph, roots, depth, nil)
+	return distance
+}
+
+func traverseTopologyFocusDepthWithLimiter(graph topologyFocusGraph, roots map[topologymodel.ActorHandle]struct{}, depth int, limiter worklimit.Limiter) (map[topologymodel.ActorHandle]int, error) {
+	if err := limiter.Charge(uint64(len(roots))); err != nil {
+		return nil, err
+	}
 	distance := make(map[topologymodel.ActorHandle]int, len(graph.nonSegmentSet))
 	queue := make([]topologymodel.ActorHandle, 0, len(roots))
 	for root := range roots {
@@ -93,6 +119,9 @@ func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[topologymode
 			continue
 		}
 
+		if err := limiter.Charge(uint64(len(graph.nonSegmentAdj[current]) + len(graph.nodeSegments[current]))); err != nil {
+			return nil, err
+		}
 		for neighbor := range graph.nonSegmentAdj[current] {
 			if _, seen := distance[neighbor]; seen {
 				continue
@@ -109,6 +138,9 @@ func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[topologymode
 				continue
 			}
 			segmentExpandedDepth[segmentID] = currentDepth
+			if err := limiter.Charge(uint64(len(graph.segmentNeighbors[segmentID]))); err != nil {
+				return nil, err
+			}
 			for neighbor := range graph.segmentNeighbors[segmentID] {
 				if _, seen := distance[neighbor]; seen {
 					continue
@@ -119,7 +151,7 @@ func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[topologymode
 		}
 	}
 
-	return distance
+	return distance, nil
 }
 
 func collectTopologyFocusDepthSets(
@@ -127,6 +159,19 @@ func collectTopologyFocusDepthSets(
 	distance map[topologymodel.ActorHandle]int,
 	depth int,
 ) (map[topologymodel.ActorHandle]struct{}, map[topologymodel.ActorHandle]struct{}) {
+	includedNonSegment, includedActorsByDepth, _ := collectTopologyFocusDepthSetsWithLimiter(graph, distance, depth, nil)
+	return includedNonSegment, includedActorsByDepth
+}
+
+func collectTopologyFocusDepthSetsWithLimiter(
+	graph topologyFocusGraph,
+	distance map[topologymodel.ActorHandle]int,
+	depth int,
+	limiter worklimit.Limiter,
+) (map[topologymodel.ActorHandle]struct{}, map[topologymodel.ActorHandle]struct{}, error) {
+	if err := limiter.Charge(uint64(len(distance))); err != nil {
+		return nil, nil, err
+	}
 	includedNonSegment := make(map[topologymodel.ActorHandle]struct{}, len(distance))
 	for actorHandle, currentDepth := range distance {
 		if depth == topologyoptions.DepthAllInternal || currentDepth <= depth {
@@ -134,11 +179,17 @@ func collectTopologyFocusDepthSets(
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(includedNonSegment))); err != nil {
+		return nil, nil, err
+	}
 	includedActorsByDepth := make(map[topologymodel.ActorHandle]struct{}, len(includedNonSegment)+len(graph.segmentSet))
 	for actorHandle := range includedNonSegment {
 		includedActorsByDepth[actorHandle] = struct{}{}
 	}
 	if depth == topologyoptions.DepthAllInternal || depth > 0 {
+		if err := limiter.Charge(uint64(len(graph.segmentNeighbors))); err != nil {
+			return nil, nil, err
+		}
 		for segmentHandle, neighbors := range graph.segmentNeighbors {
 			for actorHandle := range neighbors {
 				if _, ok := includedNonSegment[actorHandle]; ok {
@@ -149,5 +200,5 @@ func collectTopologyFocusDepthSets(
 		}
 	}
 
-	return includedNonSegment, includedActorsByDepth
+	return includedNonSegment, includedActorsByDepth, nil
 }

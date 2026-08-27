@@ -94,13 +94,16 @@ order, including unsuccessful candidates before a winner. Replay injects those t
 it does not consult live DNS, embedded OUI data, the profile catalog, SNMP, configuration, the filesystem, or the clock.
 
 Graph replay uses one optional work limiter across L2 normalization, projection, policies, L3 enrichment, focus shaping,
-and v1 rendering. The same limiter covers both strict and probable projections. Before each bounded stage executes, it
-charges a checked conservative envelope for data-dependent sorts and multiplicative work. Exhaustion is returned through
-the normal graph-build error path. Production passes no limiter and therefore does no accounting work.
+and v1 rendering. The same limiter covers both strict and probable projections. The function performing each dynamic
+sort, multiplicative fanout, variable-cost canonicalization, or whole-input materialization charges that operation
+immediately before it runs. Bounded sorts prepare variable-length keys once instead of rebuilding them in comparators;
+there is no detached phase-level estimator. Exhaustion is returned through the normal graph-build error path. Production
+passes no limiter and retains the direct path without accounting or bounded-only preparation allocations.
 
-Semantic replay charges its ordered records and every data-dependent finalization sort before those sorts execute,
-including repeated per-neighbor interface ordering. Graph replay additionally charges FDB candidate-vector sorting,
-all-device focus statistics, and renderer label/detail-map ordering at their shared production-kernel boundaries.
+Semantic replay establishes its budget before constructing the decoded event corpus, then uses the same operation-owned
+contract while applying and finalizing the ordered stream. Graph replay applies that contract to FDB fanout and sorting,
+focus traversal and statistics, actor/link canonical ordering, interface metrics, and renderer label/detail ordering at
+their shared production-kernel boundaries.
 
 When no recorder is installed, the collector does not construct diagnostic DTOs, copy topology rows, wrap DNS/OUI
 lookups, or run an extra graph/render pass. The production topology and Function result remain authoritative if capture

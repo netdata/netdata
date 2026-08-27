@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func (s *l2BuildState) applyBridge(observations []model.L2Observation) {
+func (s *l2BuildState) applyBridge(observations []model.L2Observation) error {
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
 		if sourceID == "" {
@@ -17,7 +17,11 @@ func (s *l2BuildState) applyBridge(observations []model.L2Observation) {
 		}
 
 		bridgePortToIfIndex := make(map[string]int, len(obs.BridgePorts))
-		for _, bridgePort := range sortedBridgePorts(obs.BridgePorts) {
+		bridgePorts, err := sortedBridgePorts(s.workLimiter, obs.BridgePorts)
+		if err != nil {
+			return err
+		}
+		for _, bridgePort := range bridgePorts {
 			basePort := strings.TrimSpace(bridgePort.BasePort)
 			if basePort == "" || bridgePort.IfIndex <= 0 {
 				continue
@@ -25,7 +29,11 @@ func (s *l2BuildState) applyBridge(observations []model.L2Observation) {
 			bridgePortToIfIndex[basePort] = bridgePort.IfIndex
 		}
 
-		for _, candidate := range buildFDBCandidates(obs.FDBEntries, bridgePortToIfIndex) {
+		candidates, err := buildFDBCandidates(s.workLimiter, obs.FDBEntries, bridgePortToIfIndex)
+		if err != nil {
+			return err
+		}
+		for _, candidate := range candidates {
 			endpointID := "mac:" + candidate.mac
 			attachment := model.Attachment{
 				DeviceID:   sourceID,
@@ -73,15 +81,20 @@ func (s *l2BuildState) applyBridge(observations []model.L2Observation) {
 			}
 		}
 	}
+	return nil
 }
 
-func (s *l2BuildState) applyARP(observations []model.L2Observation) {
+func (s *l2BuildState) applyARP(observations []model.L2Observation) error {
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
 		if sourceID == "" {
 			continue
 		}
-		for _, entry := range sortedARPNDEntries(obs.ARPNDEntries) {
+		entries, err := sortedARPNDEntries(s.workLimiter, obs.ARPNDEntries)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
 			mac := normalizeMAC(entry.MAC)
 			ip := canonicalIP(entry.IP)
 			if mac == "" {
@@ -122,4 +135,5 @@ func (s *l2BuildState) applyARP(observations []model.L2Observation) {
 	}
 	s.refreshEndpointIndex()
 	s.enrichmentsARPND = len(s.enrichments)
+	return nil
 }

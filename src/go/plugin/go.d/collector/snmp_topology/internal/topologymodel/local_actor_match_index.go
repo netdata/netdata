@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -35,27 +36,50 @@ func NewLocalActorMatchIndex() *LocalActorMatchIndex {
 
 // AddActorID records an exact, trimmed actor ID for fallback existence checks.
 func (idx *LocalActorMatchIndex) AddActorID(actorID string) {
+	_ = idx.AddActorIDWithLimiter(actorID, nil)
+}
+
+func (idx *LocalActorMatchIndex) AddActorIDWithLimiter(actorID string, limiter worklimit.Limiter) error {
 	if idx == nil {
-		return
+		return nil
+	}
+	if err := worklimit.ChargeStrings(limiter, []string{actorID}); err != nil {
+		return err
 	}
 	if actorID = strings.TrimSpace(actorID); actorID != "" {
 		idx.actorIDs[actorID] = struct{}{}
 	}
+	return nil
 }
 
 // ContainsActorID reports whether an exact, trimmed actor ID was recorded.
 func (idx *LocalActorMatchIndex) ContainsActorID(actorID string) bool {
+	ok, _ := idx.ContainsActorIDWithLimiter(actorID, nil)
+	return ok
+}
+
+func (idx *LocalActorMatchIndex) ContainsActorIDWithLimiter(actorID string, limiter worklimit.Limiter) (bool, error) {
 	if idx == nil {
-		return false
+		return false, nil
+	}
+	if err := worklimit.ChargeStrings(limiter, []string{actorID}); err != nil {
+		return false, err
 	}
 	_, ok := idx.actorIDs[strings.TrimSpace(actorID)]
-	return ok
+	return ok, nil
 }
 
 // AddMatch records the local-identity subset of one actor match at its stable generation-local position.
 func (idx *LocalActorMatchIndex) AddMatch(position int, match Match) {
+	_ = idx.AddMatchWithLimiter(position, match, nil)
+}
+
+func (idx *LocalActorMatchIndex) AddMatchWithLimiter(position int, match Match, limiter worklimit.Limiter) error {
 	if idx == nil || position < 0 {
-		return
+		return nil
+	}
+	if err := ChargeMatch(limiter, match); err != nil {
+		return err
 	}
 	for _, chassisID := range match.ChassisIDs {
 		addLocalActorMatchPosition(idx.byChassisID, normalizeFoldedLocalActorKey(chassisID), position)
@@ -64,12 +88,21 @@ func (idx *LocalActorMatchIndex) AddMatch(position int, match Match) {
 	for _, value := range match.IPAddresses {
 		addLocalActorMatchPosition(idx.byIP, topologyutil.NormalizeIPAddress(value), position)
 	}
+	return nil
 }
 
 // FirstMatch returns the earliest recorded actor matching chassis ID, system name, or selected management IP.
 func (idx *LocalActorMatchIndex) FirstMatch(local Device) (int, bool) {
+	position, ok, _ := idx.FirstMatchWithLimiter(local, nil)
+	return position, ok
+}
+
+func (idx *LocalActorMatchIndex) FirstMatchWithLimiter(local Device, limiter worklimit.Limiter) (int, bool, error) {
 	if idx == nil {
-		return 0, false
+		return 0, false, nil
+	}
+	if err := worklimit.ChargeStrings(limiter, []string{local.ChassisID, local.SysName, local.ManagementIP}); err != nil {
+		return 0, false, err
 	}
 	keys := localActorMatchKeys(local)
 	best := 0
@@ -82,13 +115,21 @@ func (idx *LocalActorMatchIndex) FirstMatch(local Device) (int, bool) {
 			}
 		}
 	}
-	return best, found
+	return best, found, nil
 }
 
 // MatchIndexes appends every unique matching actor position in actor order.
 func (idx *LocalActorMatchIndex) MatchIndexes(dst []int, local Device) []int {
+	result, _ := idx.MatchIndexesWithLimiter(dst, local, nil)
+	return result
+}
+
+func (idx *LocalActorMatchIndex) MatchIndexesWithLimiter(dst []int, local Device, limiter worklimit.Limiter) ([]int, error) {
 	if idx == nil {
-		return dst
+		return dst, nil
+	}
+	if err := worklimit.ChargeStrings(limiter, []string{local.ChassisID, local.SysName, local.ManagementIP}); err != nil {
+		return nil, err
 	}
 	keys := localActorMatchKeys(local)
 	values := [...]map[string]localActorMatchPositions{idx.byChassisID, idx.bySysName, idx.byIP}
@@ -114,9 +155,12 @@ func (idx *LocalActorMatchIndex) MatchIndexes(dst []int, local Device) []int {
 			}
 		}
 		if best == -1 {
-			return dst
+			return dst, nil
 		}
 		if best != last {
+			if err := limiter.Charge(1); err != nil {
+				return nil, err
+			}
 			dst = append(dst, best)
 			last = best
 		}

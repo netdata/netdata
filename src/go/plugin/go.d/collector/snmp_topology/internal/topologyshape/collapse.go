@@ -6,14 +6,24 @@ import (
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func collapseActorsByIP(data *topologymodel.Data) int {
+	collapsed, _ := collapseActorsByIPWithLimiter(data, nil)
+	return collapsed
+}
+
+func collapseActorsByIPWithLimiter(data *topologymodel.Data, limiter worklimit.Limiter) (int, error) {
 	if data == nil || len(data.Actors) <= 1 {
-		return 0
+		return 0, nil
 	}
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
+	var err error
 
 	type dsu struct {
 		parent []int
@@ -43,12 +53,18 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		d.parent[i] = i
 	}
 
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	ipOwner := make(map[string]int)
 	for idx, actor := range data.Actors {
 		if topologymodel.ActorIsSegment(actor) {
 			continue
 		}
-		ips := topologymodel.NormalizedMatchIPs(actor.Match)
+		ips, err := topologymodel.NormalizedMatchIPsWithLimiter(actor.Match, limiter)
+		if err != nil {
+			return 0, err
+		}
 		if len(ips) == 0 {
 			continue
 		}
@@ -61,6 +77,9 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	groupMembers := make(map[int][]int)
 	for idx := range data.Actors {
 		root := find(d, idx)
@@ -68,15 +87,29 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 	}
 
 	replaceActor := make(map[topologymodel.ActorHandle]topologymodel.ActorHandle)
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	keep := make([]bool, len(data.Actors))
 	for i := range keep {
 		keep[i] = true
 	}
 
 	collapsed := 0
+	if err := limiter.Charge(uint64(len(groupMembers))); err != nil {
+		return 0, err
+	}
 	for _, members := range groupMembers {
 		if len(members) <= 1 {
 			continue
+		}
+		if err := limiter.Charge(uint64(len(members))); err != nil {
+			return 0, err
+		}
+		for _, idx := range members {
+			if err := worklimit.ChargeStrings(limiter, []string{data.Actors[idx].ActorID}); err != nil {
+				return 0, err
+			}
 		}
 		rep := members[0]
 		for _, idx := range members[1:] {
@@ -87,9 +120,14 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 
 		repActor := data.Actors[rep]
 		var matchLists topologyMatchCollapseLists
-		matchLists.add(repActor.Match)
+		if err := matchLists.addWithLimiter(repActor.Match, limiter); err != nil {
+			return 0, err
+		}
 		clearTopologyMatchCollapseLists(&repActor.Match)
 		collapsedCount := 1
+		if err := limiter.Charge(uint64(len(members))); err != nil {
+			return 0, err
+		}
 		for _, idx := range members {
 			if idx == rep {
 				continue
@@ -98,15 +136,28 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 			collapsed++
 			replaceActor[data.Actors[idx].ActorHandle] = repActor.ActorHandle
 			member := data.Actors[idx]
-			matchLists.add(member.Match)
+			if err := matchLists.addWithLimiter(member.Match, limiter); err != nil {
+				return 0, err
+			}
 			clearTopologyMatchCollapseLists(&member.Match)
-			repActor.Match = mergeTopologyMatch(repActor.Match, member.Match)
-			repActor.Labels = mergeTopologyStringMap(repActor.Labels, member.Labels)
+			repActor.Match, err = mergeTopologyMatchWithLimiter(repActor.Match, member.Match, limiter)
+			if err != nil {
+				return 0, err
+			}
+			repActor.Labels, err = mergeTopologyStringMapWithLimiter(repActor.Labels, member.Labels, limiter)
+			if err != nil {
+				return 0, err
+			}
 			repActor.SegmentKind = topologyutil.FirstNonEmptyString(repActor.SegmentKind, member.SegmentKind)
+			if err := limiter.Charge(uint64(len(member.Detail.OSPF) + len(member.Detail.BGP))); err != nil {
+				return 0, err
+			}
 			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, member.Detail)
 			keep[idx] = false
 		}
-		matchLists.apply(&repActor.Match)
+		if err := matchLists.applyWithLimiter(&repActor.Match, limiter); err != nil {
+			return 0, err
+		}
 		if collapsedCount > 1 {
 			repActor.Detail.L2.CollapsedByIP = true
 			repActor.Detail.L2.CollapsedCount = collapsedCount
@@ -115,9 +166,12 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 	}
 
 	if collapsed == 0 {
-		return 0
+		return 0, nil
 	}
 
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return 0, err
+	}
 	actors := make([]topologymodel.Actor, 0, len(data.Actors)-collapsed)
 	for idx, actor := range data.Actors {
 		if !keep[idx] {
@@ -127,6 +181,9 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 	}
 	data.Actors = actors
 
+	if err := limiter.Charge(uint64(len(data.Links))); err != nil {
+		return 0, err
+	}
 	links := make([]topologymodel.Link, 0, len(data.Links))
 	seen := make(map[topologyLinkActorKeyValue]struct{}, len(data.Links))
 	for _, link := range data.Links {
@@ -142,7 +199,10 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		if link.SrcActorHandle == link.DstActorHandle {
 			continue
 		}
-		key := topologyLinkActorKey(link)
+		key, err := topologyLinkActorKeyWithLimiter(link, limiter)
+		if err != nil {
+			return 0, err
+		}
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -150,7 +210,7 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		links = append(links, link)
 	}
 	data.Links = links
-	return collapsed
+	return collapsed, nil
 }
 
 func compareCollapseActorPriority(left, right topologymodel.Actor) int {

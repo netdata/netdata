@@ -25,34 +25,41 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		opts.EnableLLDP = true
 		opts.EnableCDP = true
 	}
-	if err := chargePipelineInput(observations, opts); err != nil {
+	if err := opts.WorkLimiter.Charge(uint64(len(observations))); err != nil {
 		return model.Result{}, err
 	}
-
-	state := newL2BuildState(len(observations))
+	state := newL2BuildState(len(observations), opts.WorkLimiter)
 	if err := state.registerObservations(observations); err != nil {
 		return model.Result{}, err
 	}
 	if opts.EnableLLDP {
-		state.applyLLDP(observations)
+		if err := state.applyLLDP(observations); err != nil {
+			return model.Result{}, err
+		}
 	}
 	if opts.EnableCDP {
-		state.applyCDP(observations)
+		if err := state.applyCDP(observations); err != nil {
+			return model.Result{}, err
+		}
 	}
 	if opts.EnableSTP {
-		state.applySTP(observations)
+		if err := state.applySTP(observations); err != nil {
+			return model.Result{}, err
+		}
 	}
 	if opts.EnableBridge {
-		state.applyBridge(observations)
+		if err := state.applyBridge(observations); err != nil {
+			return model.Result{}, err
+		}
 	}
 	if opts.EnableARP {
-		state.applyARP(observations)
+		if err := state.applyARP(observations); err != nil {
+			return model.Result{}, err
+		}
 	}
 
-	if err := chargeIdentityReconciliation(opts.WorkLimiter, state); err != nil {
-		return model.Result{}, err
-	}
-	identityAliasStats := reconcileDeviceIdentityAliases(
+	identityAliasStats, err := reconcileDeviceIdentityAliases(
+		opts.WorkLimiter,
 		state.devices,
 		state.interfaces,
 		state.enrichments,
@@ -60,10 +67,9 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		state.remoteManagementByDeviceID,
 		state.directManagementIPByDeviceID,
 	)
-	state.markManagedDevices()
-	if err := chargePipelineResult(opts.WorkLimiter, state); err != nil {
+	if err != nil {
 		return model.Result{}, err
 	}
-
-	return state.buildResult(identityAliasStats, opts.CollectedAt), nil
+	state.markManagedDevices()
+	return state.buildResult(identityAliasStats, opts.CollectedAt)
 }

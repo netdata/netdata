@@ -80,6 +80,7 @@ func TestGraphTraceReplay_RejectsChangedDecisionOrder(t *testing.T) {
 
 func TestGraphReplayWorkBudget_CoversNestedObservationStructure(t *testing.T) {
 	observation := diagnostic.ObservationV1{
+		CollectedAt: "2026-01-01T00:00:00Z",
 		LocalDevice: diagnostic.SemanticDeviceDTO{
 			Labels: map[string]string{"site": "lab"},
 			InterfaceCharts: map[string]diagnostic.SemanticChartRefV1{
@@ -89,5 +90,6 @@ func TestGraphReplayWorkBudget_CoversNestedObservationStructure(t *testing.T) {
 		L2: []diagnostic.L2ObservationV1{{ManagementAliases: []string{"192.0.2.2"}}},
 	}
 	work := replayWorkBudget{limit: 6}
-	require.ErrorContains(t, addGraphObservationWork(&work, observation), "replay work exceeds limit 6")
+	_, err := diagnosticObservationToSnapshotWithWork(observation, &work)
+	require.ErrorContains(t, err, "replay work exceeds limit 6")
 }

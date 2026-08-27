@@ -3,7 +3,6 @@
 package topologyenrich
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -14,23 +13,37 @@ import (
 
 func ApplyBGPAdjacency(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.BGPEnrichmentStats {
 	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
-	return applyBGPAdjacencyWithResolver(data, aggregate, resolver)
+	return applyBGPAdjacencyWithResolver(nil, data, aggregate, resolver)
 }
 
 func applyBGPAdjacencyWithResolver(
+	work *enrichmentWork,
 	data *topologymodel.Data,
 	aggregate topologymodel.ObservationAggregate,
 	l3Resolver *topologyL3ActorResolverProvider,
 ) topologymodel.BGPEnrichmentStats {
 	var stats topologymodel.BGPEnrichmentStats
 	if data == nil || len(aggregate.BGPPeers) == 0 {
-		return finishTopologyBGPAdjacencyEnrichment(data, stats)
+		return finishTopologyBGPAdjacencyEnrichment(work, data, stats)
 	}
 
-	resolver := newTopologyBGPActorResolver(l3Resolver.resolve(), aggregate)
+	l3 := l3Resolver.resolve()
+	if work != nil && work.err != nil {
+		return stats
+	}
+	if !work.charge(uint64(len(aggregate.L3Interfaces))) || !work.charge(uint64(len(aggregate.BGPPeers))) {
+		return stats
+	}
+	resolver := newTopologyBGPActorResolver(l3, aggregate)
+	if !work.charge(uint64(len(data.Links))) {
+		return stats
+	}
 	seen := existingTopologyBGPLinkKeys(data.Links)
 	peerRowsByActor := make(map[topologymodel.ActorHandle][]topologymodel.BGPPeerDetailRow)
 
+	if !work.charge(uint64(len(aggregate.BGPPeers))) {
+		return stats
+	}
 	for _, row := range aggregate.BGPPeers {
 		stats.ObservedRows++
 		localRef, localOK := resolver.resolveDeviceID(row.DeviceID)
@@ -72,16 +85,21 @@ func applyBGPAdjacencyWithResolver(
 		stats.EmittedLinks++
 	}
 
-	attachTopologyBGPPeerRows(data, peerRowsByActor)
-	sort.Slice(data.Links, func(i, j int) bool {
-		return topologymodel.LinkSortKey(data.Links[i]) < topologymodel.LinkSortKey(data.Links[j])
-	})
-	return finishTopologyBGPAdjacencyEnrichment(data, stats)
+	attachTopologyBGPPeerRows(work, data, peerRowsByActor)
+	if work != nil && work.err != nil {
+		return stats
+	}
+	if !sortEnrichmentLinks(work, data.Links) {
+		return stats
+	}
+	return finishTopologyBGPAdjacencyEnrichment(work, data, stats)
 }
 
-func finishTopologyBGPAdjacencyEnrichment(data *topologymodel.Data, stats topologymodel.BGPEnrichmentStats) topologymodel.BGPEnrichmentStats {
+func finishTopologyBGPAdjacencyEnrichment(work *enrichmentWork, data *topologymodel.Data, stats topologymodel.BGPEnrichmentStats) topologymodel.BGPEnrichmentStats {
 	recordTopologyBGPEnrichmentStats(data, stats)
-	topologymodel.RecomputeLinkStats(data)
+	if err := topologymodel.RecomputeLinkStatsWithLimiter(data, work.limiterValue()); err != nil {
+		work.fail(err)
+	}
 	return stats
 }
 

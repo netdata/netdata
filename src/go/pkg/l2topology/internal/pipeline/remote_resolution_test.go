@@ -10,7 +10,7 @@ import (
 )
 
 func TestIsMACCompatibleWithDevice_NormalizesRemoteMAC(t *testing.T) {
-	state := newL2BuildState(1)
+	state := newL2BuildState(1, nil)
 	state.devices["known-device"] = model.Device{
 		ID:        "known-device",
 		Hostname:  "switch-a",

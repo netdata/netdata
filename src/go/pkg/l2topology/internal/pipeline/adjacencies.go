@@ -8,8 +8,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
-func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
-	lldpLinks := buildLLDPMatchLinks(observations)
+func (s *l2BuildState) applyLLDP(observations []model.L2Observation) error {
+	lldpLinks, err := buildLLDPMatchLinks(observations, s.workLimiter)
+	if err != nil {
+		return err
+	}
 	annotateLLDPLinkMatchIdentities(lldpLinks, s.hostToID, s.chassisToID, s.directIPToID)
 	lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
 	lldpTargetOverrides := buildLLDPTargetOverrides(lldpLinks, lldpPairs)
@@ -45,10 +48,14 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 			s.linksLLDP++
 		}
 	}
+	return nil
 }
 
-func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
-	cdpLinks := buildCDPMatchLinks(observations)
+func (s *l2BuildState) applyCDP(observations []model.L2Observation) error {
+	cdpLinks, err := buildCDPMatchLinks(observations, s.workLimiter)
+	if err != nil {
+		return err
+	}
 	cdpPairs := matchCDPLinksEnlinkdPassOrder(cdpLinks)
 	cdpTargetOverrides := buildCDPTargetOverrides(cdpLinks, cdpPairs)
 	cdpPairMetadata := buildCDPPairMetadata(cdpLinks, cdpPairs)
@@ -90,9 +97,10 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 			s.linksCDP++
 		}
 	}
+	return nil
 }
 
-func (s *l2BuildState) applySTP(observations []model.L2Observation) {
+func (s *l2BuildState) applySTP(observations []model.L2Observation) error {
 	for _, obs := range observations {
 		sourceID := strings.TrimSpace(obs.DeviceID)
 		if sourceID == "" {
@@ -101,7 +109,11 @@ func (s *l2BuildState) applySTP(observations []model.L2Observation) {
 
 		localBridgeAddr := canonicalBridgeAddr(obs.BaseBridgeAddress, obs.ChassisID)
 		bridgePortToIfIndex := make(map[string]int, len(obs.BridgePorts))
-		for _, bridgePort := range sortedBridgePorts(obs.BridgePorts) {
+		bridgePorts, err := sortedBridgePorts(s.workLimiter, obs.BridgePorts)
+		if err != nil {
+			return err
+		}
+		for _, bridgePort := range bridgePorts {
 			basePort := strings.TrimSpace(bridgePort.BasePort)
 			if basePort == "" || bridgePort.IfIndex <= 0 {
 				continue
@@ -109,7 +121,11 @@ func (s *l2BuildState) applySTP(observations []model.L2Observation) {
 			bridgePortToIfIndex[basePort] = bridgePort.IfIndex
 		}
 
-		for _, entry := range sortedSTPPortEntries(obs.STPPorts) {
+		stpPorts, err := sortedSTPPortEntries(s.workLimiter, obs.STPPorts)
+		if err != nil {
+			return err
+		}
+		for _, entry := range stpPorts {
 			remoteBridgeAddr := canonicalBridgeAddr(entry.DesignatedBridge, "")
 			if remoteBridgeAddr == "" {
 				continue
@@ -177,4 +193,5 @@ func (s *l2BuildState) applySTP(observations []model.L2Observation) {
 			}
 		}
 	}
+	return nil
 }

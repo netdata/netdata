@@ -17,6 +17,11 @@ import (
 )
 
 func buildSNMPTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+	var err error
+	options, err = topologyoptions.PrepareQueryOptions(options)
+	if err != nil {
+		return topologymodel.Data{}, false, err
+	}
 	if len(aggregate.L2Observations) == 0 {
 		return topologymodel.Data{}, false, nil
 	}
@@ -42,7 +47,9 @@ func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate
 	if err != nil {
 		return topologymodel.Data{}, false, err
 	}
-	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
+	if err := augmentTopologySnapshotLocals(&data, aggregate.Snapshots, options.WorkLimiter); err != nil {
+		return topologymodel.Data{}, false, err
+	}
 	if err := topologyshape.ApplyPolicies(&data, options); err != nil {
 		return topologymodel.Data{}, false, err
 	}
@@ -75,7 +82,9 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 	if err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
 	}
-	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
+	if err := augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots, options.WorkLimiter); err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
+	}
 	if err := topologyshape.ApplyPolicies(&strictData, strictOptions); err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
 	}
@@ -91,11 +100,15 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 	if err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
 	}
-	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
+	if err := augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots, options.WorkLimiter); err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
+	}
 	if err := topologyshape.ApplyPolicies(&probableData, probableOptions); err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
 	}
-	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
+	if err := topologyshape.MarkProbableDeltaLinksWithLimiter(&strictData, &probableData, options.WorkLimiter); err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("mark probable topology delta: %w", err)
+	}
 	if err := topologyenrich.ApplyLayer3(&probableData, aggregate, options.WorkLimiter); err != nil {
 		return topologymodel.Data{}, false, err
 	}
@@ -105,36 +118,71 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 	return probableData, true, nil
 }
 
-func augmentTopologySnapshotLocals(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) {
+func augmentTopologySnapshotLocals(
+	data *topologymodel.Data,
+	snapshots []topologymodel.ObservationSnapshot,
+	limiter topologyengine.WorkLimiter,
+) error {
 	if data == nil || len(snapshots) == 0 {
-		return
+		return nil
+	}
+	if err := limiter.Charge(uint64(len(data.Actors))); err != nil {
+		return err
 	}
 	index := topologymodel.NewLocalActorMatchIndex()
 	for i := range data.Actors {
 		actor := data.Actors[i]
-		index.AddActorID(actor.ActorID)
+		if err := index.AddActorIDWithLimiter(actor.ActorID, limiter); err != nil {
+			return err
+		}
 		if topologyengine.IsDeviceActorType(actor.ActorType) {
-			index.AddMatch(i, actor.Match)
+			if err := index.AddMatchWithLimiter(i, actor.Match, limiter); err != nil {
+				return err
+			}
 		}
 	}
 
+	if err := limiter.Charge(uint64(len(snapshots))); err != nil {
+		return err
+	}
 	for _, snapshot := range snapshots {
-		if actorIndex, ok := index.FirstMatch(snapshot.LocalDevice); ok {
-			augmentLocalActor(&data.Actors[actorIndex], snapshot.LocalDevice)
+		actorIndex, found, err := index.FirstMatchWithLimiter(snapshot.LocalDevice, limiter)
+		if err != nil {
+			return err
+		}
+		if found {
+			if err := augmentLocalActor(&data.Actors[actorIndex], snapshot.LocalDevice, limiter); err != nil {
+				return err
+			}
 			continue
 		}
 		// The default map is a managed-device map: show polled SNMP devices even
 		// when no L2 relationship emitted a local actor yet.
-		actor, ok := topologyLocalActorFromCache(snapshot.LocalDeviceID, snapshot.LocalDevice)
-		if !ok || index.ContainsActorID(actor.ActorID) {
+		actor, ok, err := topologyLocalActorFromCacheWithLimiter(snapshot.LocalDeviceID, snapshot.LocalDevice, limiter)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		contains, err := index.ContainsActorIDWithLimiter(actor.ActorID, limiter)
+		if err != nil {
+			return err
+		}
+		if contains {
 			continue
 		}
 		actor.ActorHandle = data.NextActorHandle()
 		data.Actors = append(data.Actors, actor)
-		actorIndex := len(data.Actors) - 1
-		index.AddActorID(actor.ActorID)
-		index.AddMatch(actorIndex, actor.Match)
+		actorIndex = len(data.Actors) - 1
+		if err := index.AddActorIDWithLimiter(actor.ActorID, limiter); err != nil {
+			return err
+		}
+		if err := index.AddMatchWithLimiter(actorIndex, actor.Match, limiter); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func buildSNMPL2TopologyResult(

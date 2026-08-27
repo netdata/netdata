@@ -5,10 +5,10 @@ package pipeline
 import (
 	"maps"
 	"net/netip"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 type enrichmentAccumulator struct {
@@ -78,21 +78,22 @@ type identityAliasReconcileStats struct {
 }
 
 func reconcileDeviceIdentityAliases(
+	limiter worklimit.Limiter,
 	devices map[string]model.Device,
 	interfaces map[string]model.Interface,
 	enrichments map[string]*enrichmentAccumulator,
 	directOwnersByIP map[string]map[string]struct{},
 	remoteManagementByDeviceID map[string]map[string]netip.Addr,
 	directManagementIPByDeviceID map[string]bool,
-) identityAliasReconcileStats {
+) (identityAliasReconcileStats, error) {
 	stats := identityAliasReconcileStats{}
 	if len(devices) == 0 {
-		return stats
+		return stats, nil
 	}
 	// Direct observation ownership is finalized during registration. Without remote
 	// management claims or ARP/ND enrichment there is nothing left to reconcile.
 	if len(remoteManagementByDeviceID) == 0 && len(enrichments) == 0 {
-		return stats
+		return stats, nil
 	}
 
 	ownersByIP := make(map[string]map[string]struct{}, len(directOwnersByIP))
@@ -143,11 +144,10 @@ func reconcileDeviceIdentityAliases(
 
 	uniqueMACToDeviceID, ambiguousMACs := buildUniqueMACToDeviceIndex(devices, interfaces)
 	ipToMACs := make(map[string]map[string]struct{})
-	enrichmentKeys := make([]string, 0, len(enrichments))
-	for endpointID := range enrichments {
-		enrichmentKeys = append(enrichmentKeys, endpointID)
+	enrichmentKeys, err := worklimit.SortedStringKeys(limiter, enrichments)
+	if err != nil {
+		return stats, err
 	}
-	sort.Strings(enrichmentKeys)
 
 	for _, endpointID := range enrichmentKeys {
 		acc := enrichments[endpointID]
@@ -158,7 +158,11 @@ func reconcileDeviceIdentityAliases(
 		if mac == "" {
 			continue
 		}
-		for _, ipKey := range sortedIPKeys(acc.IPs) {
+		ipKeys, err := sortedIPKeys(limiter, acc.IPs)
+		if err != nil {
+			return stats, err
+		}
+		for _, ipKey := range ipKeys {
 			addr, ok := acc.IPs[ipKey]
 			if !ok || !isUsableAliasIPAddress(addr) {
 				continue
@@ -200,7 +204,11 @@ func reconcileDeviceIdentityAliases(
 		}
 		stats.endpointsMapped++
 
-		for _, ipKey := range sortedIPKeys(acc.IPs) {
+		ipKeys, err := sortedIPKeys(limiter, acc.IPs)
+		if err != nil {
+			return stats, err
+		}
+		for _, ipKey := range ipKeys {
 			addr, ok := acc.IPs[ipKey]
 			if !ok || !isUsableAliasIPAddress(addr) {
 				continue
@@ -232,10 +240,18 @@ func reconcileDeviceIdentityAliases(
 		return true
 	}
 
-	for _, deviceID := range sortedDeviceClaimIDs(remoteClaims) {
+	remoteDeviceIDs, err := sortedDeviceClaimIDs(limiter, remoteClaims)
+	if err != nil {
+		return stats, err
+	}
+	for _, deviceID := range remoteDeviceIDs {
 		device := devices[deviceID]
 		addresses := deviceIdentityAddressMap(device)
-		for _, ip := range sortedIPKeys(remoteClaims[deviceID]) {
+		ipKeys, err := sortedIPKeys(limiter, remoteClaims[deviceID])
+		if err != nil {
+			return stats, err
+		}
+		for _, ip := range ipKeys {
 			addr := remoteClaims[deviceID][ip]
 			if !claimIsExclusive(deviceID, ip) {
 				continue
@@ -245,14 +261,25 @@ func reconcileDeviceIdentityAliases(
 				device.ManagementIP, _ = selectObservedManagementIP(device.ManagementIP, addr, false, false)
 			}
 		}
-		device.Addresses = sortedAddrValues(addresses)
+		device.Addresses, err = sortedAddrValues(limiter, addresses)
+		if err != nil {
+			return stats, err
+		}
 		devices[deviceID] = device
 	}
 
-	for _, deviceID := range sortedDeviceClaimIDs(arpClaims) {
+	arpDeviceIDs, err := sortedDeviceClaimIDs(limiter, arpClaims)
+	if err != nil {
+		return stats, err
+	}
+	for _, deviceID := range arpDeviceIDs {
 		device := devices[deviceID]
 		addresses := deviceIdentityAddressMap(device)
-		for _, ip := range sortedIPKeys(arpClaims[deviceID]) {
+		ipKeys, err := sortedIPKeys(limiter, arpClaims[deviceID])
+		if err != nil {
+			return stats, err
+		}
+		for _, ip := range ipKeys {
 			if !claimIsExclusive(deviceID, ip) {
 				stats.ipsConflictSkipped++
 				continue
@@ -262,23 +289,21 @@ func reconcileDeviceIdentityAliases(
 				stats.ipsMerged++
 			}
 		}
-		device.Addresses = sortedAddrValues(addresses)
+		device.Addresses, err = sortedAddrValues(limiter, addresses)
+		if err != nil {
+			return stats, err
+		}
 		devices[deviceID] = device
 	}
 
-	return stats
+	return stats, nil
 }
 
-func sortedDeviceClaimIDs(claims map[string]map[string]netip.Addr) []string {
-	if len(claims) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(claims))
-	for deviceID := range claims {
-		ids = append(ids, deviceID)
-	}
-	sort.Strings(ids)
-	return ids
+func sortedDeviceClaimIDs(
+	limiter worklimit.Limiter,
+	claims map[string]map[string]netip.Addr,
+) ([]string, error) {
+	return worklimit.SortedStringKeys(limiter, claims)
 }
 
 func deviceIdentityAddressMap(device model.Device) map[string]netip.Addr {
@@ -343,14 +368,6 @@ func isUsableAliasIPAddress(addr netip.Addr) bool {
 	return !addr.Is4() || addr != netip.AddrFrom4([4]byte{255, 255, 255, 255})
 }
 
-func sortedIPKeys(in map[string]netip.Addr) []string {
-	if len(in) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(in))
-	for key := range in {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
+func sortedIPKeys(limiter worklimit.Limiter, in map[string]netip.Addr) ([]string, error) {
+	return worklimit.SortedStringKeys(limiter, in)
 }

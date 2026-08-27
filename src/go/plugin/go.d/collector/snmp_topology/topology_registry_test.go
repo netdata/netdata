@@ -238,7 +238,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 		strictResult, aggregate.AgentID, aggregate.CollectedAt, strictOptions,
 	)
 	require.NoError(t, err)
-	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
+	require.NoError(t, augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots, nil))
 	require.NoError(t, topologyshape.ApplyPolicies(&strictData, strictOptions))
 
 	probableResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations, nil)
@@ -250,7 +250,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 		probableResult, aggregate.AgentID, aggregate.CollectedAt, probableOptions,
 	)
 	require.NoError(t, err)
-	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
+	require.NoError(t, augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots, nil))
 	require.NoError(t, topologyshape.ApplyPolicies(&probableData, probableOptions))
 
 	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)

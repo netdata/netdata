@@ -3,11 +3,19 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 )
 
 func inferFDBEndpointOwners(
+	observations fdbReporterObservation,
+	reporterAliases map[string][]string,
+	switchFacingPortKeys map[string]struct{},
+) map[string]fdbEndpointOwner {
+	return inferFDBEndpointOwnersWithWork(nil, observations, reporterAliases, switchFacingPortKeys)
+}
+
+func inferFDBEndpointOwnersWithWork(
+	work *projectionWork,
 	observations fdbReporterObservation,
 	reporterAliases map[string][]string,
 	switchFacingPortKeys map[string]struct{},
@@ -17,11 +25,11 @@ func inferFDBEndpointOwners(
 	}
 
 	owners := make(map[string]fdbEndpointOwner, len(observations.byEndpoint))
-	endpointIDs := make([]string, 0, len(observations.byEndpoint))
-	for endpointID := range observations.byEndpoint {
-		endpointIDs = append(endpointIDs, endpointID)
+	var endpointIDs []string
+	if work == nil {
+		endpointIDs = make([]string, 0, len(observations.byEndpoint))
 	}
-	sort.Strings(endpointIDs)
+	endpointIDs = sortedProjectionKeys(work, observations.byEndpoint, endpointIDs)
 
 	for _, endpointID := range endpointIDs {
 		reportersMap := observations.byEndpoint[endpointID]
@@ -29,15 +37,15 @@ func inferFDBEndpointOwners(
 			continue
 		}
 
-		reporterIDs := make([]string, 0, len(reportersMap))
-		for reporterID := range reportersMap {
-			reporterIDs = append(reporterIDs, reporterID)
+		var reporterIDs []string
+		if work == nil {
+			reporterIDs = make([]string, 0, len(reportersMap))
 		}
-		sort.Strings(reporterIDs)
+		reporterIDs = sortedProjectionKeys(work, reportersMap, reporterIDs)
 
 		validPortsByReporter := make(map[string][]string)
 		for _, reporterID := range reporterIDs {
-			ports := sortedTopologySet(reportersMap[reporterID])
+			ports := sortedTopologySetWithWork(work, reportersMap[reporterID])
 			if len(ports) == 0 {
 				continue
 			}
@@ -57,7 +65,7 @@ func inferFDBEndpointOwners(
 			continue
 		}
 		for _, ports := range validPortsByReporter {
-			ports = uniqueTopologyStrings(ports)
+			ports = uniqueTopologyStringsWithWork(work, ports)
 			if len(ports) == 0 {
 				continue
 			}
@@ -120,7 +128,18 @@ func inferSinglePortEndpointOwners(
 	macLinks []bridgeMacLinkRecord,
 	switchFacingPortKeys map[string]struct{},
 ) map[string]fdbEndpointOwner {
+	return inferSinglePortEndpointOwnersWithWork(nil, macLinks, switchFacingPortKeys)
+}
+
+func inferSinglePortEndpointOwnersWithWork(
+	work *projectionWork,
+	macLinks []bridgeMacLinkRecord,
+	switchFacingPortKeys map[string]struct{},
+) map[string]fdbEndpointOwner {
 	if len(macLinks) == 0 {
+		return nil
+	}
+	if !work.charge(uint64(len(macLinks))) {
 		return nil
 	}
 
@@ -174,11 +193,11 @@ func inferSinglePortEndpointOwners(
 	}
 
 	candidatesByEndpoint := make(map[string]map[string]fdbEndpointOwner)
-	scopeKeys := make([]string, 0, len(byPortScope))
-	for key := range byPortScope {
-		scopeKeys = append(scopeKeys, key)
+	var scopeKeys []string
+	if work == nil {
+		scopeKeys = make([]string, 0, len(byPortScope))
 	}
-	sort.Strings(scopeKeys)
+	scopeKeys = sortedProjectionKeys(work, byPortScope, scopeKeys)
 
 	for _, scopeKey := range scopeKeys {
 		scope := byPortScope[scopeKey]
@@ -211,11 +230,11 @@ func inferSinglePortEndpointOwners(
 	}
 
 	owners := make(map[string]fdbEndpointOwner)
-	endpointIDs := make([]string, 0, len(candidatesByEndpoint))
-	for endpointID := range candidatesByEndpoint {
-		endpointIDs = append(endpointIDs, endpointID)
+	var endpointIDs []string
+	if work == nil {
+		endpointIDs = make([]string, 0, len(candidatesByEndpoint))
 	}
-	sort.Strings(endpointIDs)
+	endpointIDs = sortedProjectionKeys(work, candidatesByEndpoint, endpointIDs)
 
 	for _, endpointID := range endpointIDs {
 		candidates := candidatesByEndpoint[endpointID]

@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -14,6 +13,9 @@ type topologyVLANContext struct {
 }
 
 func (c *topologyBuilder) vtpVLANContexts() []topologyVLANContext {
+	if !c.chargeWork(uint64(len(c.vlanNameByID))) {
+		return nil
+	}
 	contexts := make([]topologyVLANContext, 0, len(c.vlanNameByID))
 	for vlanID, mapping := range c.vlanNameByID {
 		id := strings.TrimSpace(vlanID)
@@ -29,7 +31,7 @@ func (c *topologyBuilder) vtpVLANContexts() []topologyVLANContext {
 		})
 	}
 
-	sortTopologyVLANContexts(contexts)
+	sortTopologyVLANContextsWithBuilder(c, contexts)
 	return contexts
 }
 
@@ -41,7 +43,11 @@ func resolvedVLANName(mapping vlanNameMapping) string {
 }
 
 func sortTopologyVLANContexts(contexts []topologyVLANContext) {
-	sort.Slice(contexts, func(i, j int) bool {
+	sortTopologyVLANContextsWithBuilder(&topologyBuilder{}, contexts)
+}
+
+func sortTopologyVLANContextsWithBuilder(builder *topologyBuilder, contexts []topologyVLANContext) {
+	sortBuilderSlice(builder, contexts, func(i, j int) bool {
 		left, leftErr := strconv.Atoi(contexts[i].vlanID)
 		right, rightErr := strconv.Atoi(contexts[j].vlanID)
 		if leftErr == nil && rightErr == nil && left != right {

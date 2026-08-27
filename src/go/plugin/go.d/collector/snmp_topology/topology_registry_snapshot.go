@@ -15,7 +15,10 @@ func (c *topologyBuilder) buildObservationSnapshot() (topologymodel.ObservationS
 	if c == nil {
 		return topologymodel.ObservationSnapshot{}, false
 	}
-	local := normalizeTopologyDevice(c.localDevice)
+	local := normalizeTopologyDeviceWithBuilder(c, c.localDevice)
+	if c.workErr != nil {
+		return topologymodel.ObservationSnapshot{}, false
+	}
 	localObservation := c.buildEngineObservation(local)
 	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)
 	if localObservation.DeviceID == "" {

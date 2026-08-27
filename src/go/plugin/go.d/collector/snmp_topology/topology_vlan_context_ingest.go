@@ -16,10 +16,19 @@ func (c *topologyBuilder) ingestTopologyVLANContextMetrics(vlanID, vlanName stri
 
 	c.updateTopologyProfileTags(pms)
 
+	if !c.chargeWork(uint64(len(pms))) {
+		return
+	}
 	for _, pm := range pms {
+		if !c.chargeWork(uint64(len(pm.TopologyMetrics))) {
+			return
+		}
 		for _, metric := range pm.TopologyMetrics {
 			if !isTopologyVLANContextMetric(metric.TopologyKind) {
 				continue
+			}
+			if !c.chargeWork(uint64(len(metric.Tags))) {
+				return
 			}
 
 			tags := withTopologyVLANContextTags(metric.Tags, vlanID, vlanName)

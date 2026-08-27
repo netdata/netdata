@@ -3,7 +3,6 @@
 package topologyoptions
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -39,6 +38,13 @@ type QueryOptions struct {
 	ResolveDNSName         func(ip string) string
 	LookupVendorByMAC      func(mac string) (vendor string, prefix string)
 	WorkLimiter            worklimit.Limiter
+	prepared               bool
+	managedFocus           preparedManagedFocus
+}
+
+type preparedManagedFocus struct {
+	all bool
+	ips []string
 }
 
 type ManagedFocusTarget struct {
@@ -58,14 +64,50 @@ func DefaultQueryOptions() QueryOptions {
 }
 
 func NormalizeQueryOptions(options QueryOptions) QueryOptions {
+	options, _ = PrepareQueryOptions(options)
+	return options
+}
+
+// PrepareQueryOptions canonicalizes query input once. Repeated calls on a
+// prepared value are no-ops so downstream stages consume the same focus truth.
+func PrepareQueryOptions(options QueryOptions) (QueryOptions, error) {
+	if options.prepared {
+		return options, nil
+	}
 	options.MapType = NormalizeMapType(options.MapType)
 	options.InferenceStrategy = NormalizeInferenceStrategy(options.InferenceStrategy)
 	if options.InferenceStrategy == "" {
 		options.InferenceStrategy = InferenceStrategyFDBMinimumKnowledge
 	}
-	options.ManagedDeviceFocus = FormatManagedFocuses(ParseManagedFocuses(options.ManagedDeviceFocus))
+	focuses, err := normalizeManagedFocuses([]string{options.ManagedDeviceFocus}, options.WorkLimiter)
+	if err != nil {
+		return QueryOptions{}, err
+	}
+	if err := worklimit.ChargeStrings(options.WorkLimiter, focuses); err != nil {
+		return QueryOptions{}, err
+	}
+	options.ManagedDeviceFocus = strings.Join(focuses, ",")
+	options.managedFocus.all = len(focuses) == 1 && focuses[0] == ManagedFocusAllDevices
+	if !options.managedFocus.all {
+		if err := options.WorkLimiter.Charge(uint64(len(focuses))); err != nil {
+			return QueryOptions{}, err
+		}
+		options.managedFocus.ips = make([]string, 0, len(focuses))
+		for _, focus := range focuses {
+			options.managedFocus.ips = append(options.managedFocus.ips, focus[len(ManagedFocusIPPrefix):])
+		}
+	}
 	options.Depth = NormalizeDepth(options.Depth)
-	return options
+	options.prepared = true
+	return options, nil
+}
+
+func (o QueryOptions) ManagedFocusIsAllDevices() bool {
+	return o.managedFocus.all
+}
+
+func (o QueryOptions) ManagedFocusIPs() []string {
+	return o.managedFocus.ips
 }
 
 func NormalizeMapType(v string) string {
@@ -147,9 +189,17 @@ func NormalizeManagedFocusValue(v string) string {
 }
 
 func NormalizeManagedFocuses(values []string) []string {
-	expanded := SplitManagedFocusValues(values)
+	normalized, _ := normalizeManagedFocuses(values, nil)
+	return normalized
+}
+
+func normalizeManagedFocuses(values []string, limiter worklimit.Limiter) ([]string, error) {
+	expanded, err := splitManagedFocusValues(values, limiter)
+	if err != nil {
+		return nil, err
+	}
 	if len(expanded) == 0 {
-		return []string{ManagedFocusAllDevices}
+		return []string{ManagedFocusAllDevices}, nil
 	}
 
 	seen := make(map[string]struct{}, len(expanded))
@@ -160,7 +210,7 @@ func NormalizeManagedFocuses(values []string) []string {
 			continue
 		}
 		if normalized == ManagedFocusAllDevices {
-			return []string{ManagedFocusAllDevices}
+			return []string{ManagedFocusAllDevices}, nil
 		}
 		if _, ok := seen[normalized]; ok {
 			continue
@@ -170,15 +220,25 @@ func NormalizeManagedFocuses(values []string) []string {
 	}
 
 	if len(out) == 0 {
-		return []string{ManagedFocusAllDevices}
+		return []string{ManagedFocusAllDevices}, nil
 	}
-	sort.Strings(out)
-	return out
+	if err := worklimit.SortStrings(limiter, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func SplitManagedFocusValues(values []string) []string {
+	out, _ := splitManagedFocusValues(values, nil)
+	return out
+}
+
+func splitManagedFocusValues(values []string, limiter worklimit.Limiter) ([]string, error) {
 	if len(values) == 0 {
-		return nil
+		return nil, nil
+	}
+	if err := worklimit.ChargeStrings(limiter, values); err != nil {
+		return nil, err
 	}
 
 	out := make([]string, 0, len(values))
@@ -191,7 +251,7 @@ func SplitManagedFocusValues(values []string) []string {
 			out = append(out, token)
 		}
 	}
-	return out
+	return out, nil
 }
 
 func ParseManagedFocuses(value string) []string {

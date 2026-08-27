@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 type l2BuildState struct {
+	workLimiter                  worklimit.Limiter
 	devices                      map[string]model.Device
 	managedObservationByDeviceID map[string]bool
 	directManagementIPByDeviceID map[string]bool
@@ -44,8 +46,9 @@ type directAddressClaims struct {
 	aliasOwners   map[string]struct{}
 }
 
-func newL2BuildState(observationCount int) *l2BuildState {
+func newL2BuildState(observationCount int, limiter worklimit.Limiter) *l2BuildState {
 	return &l2BuildState{
+		workLimiter:                  limiter,
 		devices:                      make(map[string]model.Device, observationCount),
 		managedObservationByDeviceID: make(map[string]bool, observationCount),
 		directManagementIPByDeviceID: make(map[string]bool, observationCount),
@@ -102,7 +105,7 @@ func (s *l2BuildState) markManagedDevices() {
 	}
 }
 
-func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStats, collectedAt time.Time) model.Result {
+func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStats, collectedAt time.Time) (model.Result, error) {
 	if !collectedAt.IsZero() {
 		collectedAt = collectedAt.UTC()
 	}
@@ -125,13 +128,33 @@ func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStat
 		IdentityAliasIPsConflictSkipped:    identityAliasStats.ipsConflictSkipped,
 	}
 
+	devices, err := sortedDevices(s.workLimiter, s.devices)
+	if err != nil {
+		return model.Result{}, err
+	}
+	interfaces, err := sortedInterfaces(s.workLimiter, s.interfaces)
+	if err != nil {
+		return model.Result{}, err
+	}
+	adjacencies, err := sortedAdjacencies(s.workLimiter, s.adjacencies)
+	if err != nil {
+		return model.Result{}, err
+	}
+	attachments, err := sortedAttachments(s.workLimiter, s.attachments)
+	if err != nil {
+		return model.Result{}, err
+	}
+	enrichments, err := sortedEnrichments(s.workLimiter, s.enrichments)
+	if err != nil {
+		return model.Result{}, err
+	}
 	return model.Result{
 		CollectedAt: collectedAt,
-		Devices:     sortedDevices(s.devices),
-		Interfaces:  sortedInterfaces(s.interfaces),
-		Adjacencies: sortedAdjacencies(s.adjacencies),
-		Attachments: sortedAttachments(s.attachments),
-		Enrichments: sortedEnrichments(s.enrichments),
+		Devices:     devices,
+		Interfaces:  interfaces,
+		Adjacencies: adjacencies,
+		Attachments: attachments,
+		Enrichments: enrichments,
 		Stats:       stats,
-	}
+	}, nil
 }

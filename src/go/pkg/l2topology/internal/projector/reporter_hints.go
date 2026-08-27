@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -17,6 +16,20 @@ func collectTopologyEndpointIDs(
 	rawFDBObservations fdbReporterObservation,
 	filteredFDBObservations fdbReporterObservation,
 ) []string {
+	return collectTopologyEndpointIDsWithWork(nil, endpointMatchByID, endpointLabelsByID, endpointSegmentCandidates, rawFDBObservations, filteredFDBObservations)
+}
+
+func collectTopologyEndpointIDsWithWork(
+	work *projectionWork,
+	endpointMatchByID map[string]graph.Match,
+	endpointLabelsByID map[string]map[string]string,
+	endpointSegmentCandidates map[string][]string,
+	rawFDBObservations fdbReporterObservation,
+	filteredFDBObservations fdbReporterObservation,
+) []string {
+	if !work.charge(uint64(len(endpointMatchByID) + len(endpointLabelsByID) + len(endpointSegmentCandidates) + len(rawFDBObservations.byEndpoint) + len(filteredFDBObservations.byEndpoint))) {
+		return nil
+	}
 	set := make(map[string]struct{})
 	for endpointID := range endpointMatchByID {
 		endpointID = strings.TrimSpace(endpointID)
@@ -48,11 +61,18 @@ func collectTopologyEndpointIDs(
 			set[endpointID] = struct{}{}
 		}
 	}
-	return sortedTopologySet(set)
+	return sortedTopologySetWithWork(work, set)
 }
 
 func buildFDBEndpointReporterHints(macLinks []bridgeMacLinkRecord) map[string]map[string][]bridgePortRef {
+	return buildFDBEndpointReporterHintsWithWork(nil, macLinks)
+}
+
+func buildFDBEndpointReporterHintsWithWork(work *projectionWork, macLinks []bridgeMacLinkRecord) map[string]map[string][]bridgePortRef {
 	if len(macLinks) == 0 {
+		return nil
+	}
+	if !work.charge(uint64(len(macLinks))) {
 		return nil
 	}
 
@@ -83,21 +103,21 @@ func buildFDBEndpointReporterHints(macLinks []bridgeMacLinkRecord) map[string]ma
 	out := make(map[string]map[string][]bridgePortRef, len(byEndpointReporterPorts))
 	for endpointID, reporters := range byEndpointReporterPorts {
 		reporterHints := make(map[string][]bridgePortRef, len(reporters))
-		reporterIDs := make([]string, 0, len(reporters))
-		for reporterID := range reporters {
-			reporterIDs = append(reporterIDs, reporterID)
+		var reporterIDs []string
+		if work == nil {
+			reporterIDs = make([]string, 0, len(reporters))
 		}
-		sort.Strings(reporterIDs)
+		reporterIDs = sortedProjectionKeys(work, reporters, reporterIDs)
 		for _, reporterID := range reporterIDs {
 			portsMap := reporters[reporterID]
 			if len(portsMap) == 0 {
 				continue
 			}
-			portKeys := make([]string, 0, len(portsMap))
-			for key := range portsMap {
-				portKeys = append(portKeys, key)
+			var portKeys []string
+			if work == nil {
+				portKeys = make([]string, 0, len(portsMap))
 			}
-			sort.Strings(portKeys)
+			portKeys = sortedProjectionKeys(work, portsMap, portKeys)
 			ports := make([]bridgePortRef, 0, len(portKeys))
 			for _, key := range portKeys {
 				ports = append(ports, portsMap[key])
@@ -118,6 +138,17 @@ func buildSegmentReporterIndex(
 	segmentIDs []string,
 	segmentByID map[string]*bridgeDomainSegment,
 ) segmentReporterIndex {
+	return buildSegmentReporterIndexWithWork(nil, segmentIDs, segmentByID)
+}
+
+func buildSegmentReporterIndexWithWork(
+	work *projectionWork,
+	segmentIDs []string,
+	segmentByID map[string]*bridgeDomainSegment,
+) segmentReporterIndex {
+	if !work.chargeStrings(segmentIDs) {
+		return segmentReporterIndex{}
+	}
 	index := segmentReporterIndex{
 		byDevice:        make(map[string]map[string]struct{}),
 		byDeviceIfIndex: make(map[string]map[string]struct{}),
@@ -127,6 +158,9 @@ func buildSegmentReporterIndex(
 		segment := segmentByID[segmentID]
 		if segment == nil {
 			continue
+		}
+		if !work.charge(uint64(len(segment.ports))) {
+			return segmentReporterIndex{}
 		}
 		for _, port := range segment.ports {
 			deviceID := strings.TrimSpace(port.deviceID)
@@ -160,14 +194,15 @@ func addStringSet(out map[string]map[string]struct{}, key string, value string) 
 }
 
 func probableCandidateSegmentsFromReporterHints(
+	work *projectionWork,
 	endpointLabels map[string]string,
 	fdbReporters map[string]map[string]struct{},
 	reporterSegmentIndex segmentReporterIndex,
 	aliasOwnerIDs map[string]map[string]struct{},
 	managedDeviceIDs map[string]struct{},
 ) []string {
-	deviceIDs := resolveTopologyEndpointDeviceHints(
-		topologyEndpointLabelDeviceIDs(endpointLabels),
+	deviceIDs := resolveTopologyEndpointDeviceHintsWithWork(work,
+		topologyEndpointLabelDeviceIDsWithWork(work, endpointLabels),
 		aliasOwnerIDs,
 	)
 	if len(deviceIDs) == 0 {
@@ -178,9 +213,9 @@ func probableCandidateSegmentsFromReporterHints(
 			}
 			deviceIDs = append(deviceIDs, reporterID)
 		}
-		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
+		deviceIDs = resolveTopologyEndpointDeviceHintsWithWork(work, deviceIDs, aliasOwnerIDs)
 	}
-	deviceIDs = filterManagedDeviceHints(deviceIDs, managedDeviceIDs)
+	deviceIDs = filterManagedDeviceHintsWithWork(work, deviceIDs, managedDeviceIDs)
 	if len(deviceIDs) == 0 {
 		return nil
 	}
@@ -235,5 +270,5 @@ func probableCandidateSegmentsFromReporterHints(
 	if len(candidateSet) == 0 {
 		return nil
 	}
-	return sortedTopologySet(candidateSet)
+	return sortedTopologySetWithWork(work, candidateSet)
 }

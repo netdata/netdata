@@ -3,14 +3,20 @@
 package projector
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func topologyPortVLANDetails(vlanIDs []string, vlanNames map[string]string, linkMode string) []model.ProjectionPortVLAN {
+	return topologyPortVLANDetailsWithWork(nil, vlanIDs, vlanNames, linkMode)
+}
+
+func topologyPortVLANDetailsWithWork(work *projectionWork, vlanIDs []string, vlanNames map[string]string, linkMode string) []model.ProjectionPortVLAN {
 	if len(vlanIDs) == 0 {
+		return nil
+	}
+	if !work.chargeStrings(vlanIDs) {
 		return nil
 	}
 	tagged := len(vlanIDs) != 1 || !strings.EqualFold(strings.TrimSpace(linkMode), "access")
@@ -121,6 +127,10 @@ func resolveAdjacencySourceIfIndex(adj model.Adjacency, ifIndexByDeviceName map[
 }
 
 func classifyTopologyPortLinkMode(evidence *topologyDevicePortEvidence) (mode string, confidence string, sources []string, vlans []string) {
+	return classifyTopologyPortLinkModeWithWork(nil, evidence)
+}
+
+func classifyTopologyPortLinkModeWithWork(work *projectionWork, evidence *topologyDevicePortEvidence) (mode string, confidence string, sources []string, vlans []string) {
 	mode = "unknown"
 	confidence = "low"
 	if evidence == nil {
@@ -128,7 +138,7 @@ func classifyTopologyPortLinkMode(evidence *topologyDevicePortEvidence) (mode st
 	}
 
 	if len(evidence.vlanIDs) > 0 {
-		vlans = sortedTopologySet(evidence.vlanIDs)
+		vlans = sortedTopologySetWithWork(work, evidence.vlanIDs)
 	}
 	if evidence.hasFDB {
 		sources = append(sources, "fdb")
@@ -217,6 +227,10 @@ func isTopologyLAGInterfaceType(ifType string) bool {
 }
 
 func normalizedIntCountMap(in map[string]int) map[string]int {
+	return normalizedIntCountMapWithWork(nil, in)
+}
+
+func normalizedIntCountMapWithWork(work *projectionWork, in map[string]int) map[string]int {
 	if len(in) == 0 {
 		return nil
 	}
@@ -231,7 +245,9 @@ func normalizedIntCountMap(in map[string]int) map[string]int {
 	if len(keys) == 0 {
 		return nil
 	}
-	sort.Strings(keys)
+	if !sortProjectionStrings(work, keys) {
+		return nil
+	}
 	out := make(map[string]int, len(keys))
 	for _, key := range keys {
 		out[key] = in[key]

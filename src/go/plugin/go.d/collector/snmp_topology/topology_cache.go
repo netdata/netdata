@@ -6,12 +6,16 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 // topologyBuilder is a mutable, collection-only builder. Runtime readers only
 // receive immutable topologyDeviceGeneration values produced from it.
 type topologyBuilder struct {
+	workLimiter worklimit.Limiter
+	workErr     error
+
 	lastUpdate time.Time
 	updateTime time.Time
 	staleAfter time.Duration

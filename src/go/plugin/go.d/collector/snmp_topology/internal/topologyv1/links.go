@@ -17,6 +17,18 @@ func buildSNMPTopologyV1Links(
 	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 ) (topologyapi.Table, topologyapi.EvidenceMap, error) {
+	return buildSNMPTopologyV1LinksWithWork(nil, links, actorIndex, stringsDict)
+}
+
+func buildSNMPTopologyV1LinksWithWork(
+	work *renderWork,
+	links []topologymodel.Link,
+	actorIndex topologyV1ActorIndex,
+	stringsDict *topologyapi.StringDictionary,
+) (topologyapi.Table, topologyapi.EvidenceMap, error) {
+	if !work.charge(uint64(len(links))) {
+		return topologyapi.Table{}, nil, work.err
+	}
 	srcActors := make([]any, len(links))
 	dstActors := make([]any, len(links))
 	linkTypes := make([]any, len(links))
@@ -31,6 +43,9 @@ func buildSNMPTopologyV1Links(
 	evidenceRowsByType := make(map[string]*snmpTopologyV1EvidenceRows)
 
 	for i, link := range links {
+		if !work.chargeMatch(link.Src.Match) || !work.chargeMatch(link.Dst.Match) {
+			return topologyapi.Table{}, nil, work.err
+		}
 		src, ok := actorIndex[link.SrcActorHandle]
 		if !ok {
 			return topologyapi.Table{}, nil, fmt.Errorf("link %d references an unknown source actor handle", i)
@@ -62,6 +77,9 @@ func buildSNMPTopologyV1Links(
 			evidenceRowsByType[linkType] = evidenceRows
 		}
 		if linkType == snmpTopologyV1LinkL3SubnetMembership {
+			if link.Detail.L3SubnetMembership != nil && !work.charge(uint64(len(link.Detail.L3SubnetMembership.Interfaces))) {
+				return topologyapi.Table{}, nil, work.err
+			}
 			count, err := appendSNMPTopologyV1L3SubnetMembershipEvidenceRows(evidenceRows, i, src, dst, link, protocol, stringsDict)
 			if err != nil {
 				return topologyapi.Table{}, nil, err

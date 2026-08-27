@@ -38,6 +38,9 @@ func topologyShortestPathUnion(
 		adjacency[dst][src] = struct{}{}
 	}
 
+	if err := limiter.Charge(uint64(len(roots))); err != nil {
+		return nil, nil, err
+	}
 	rootIDs := make([]topologymodel.ActorHandle, 0, len(roots))
 	for actorHandle := range roots {
 		rootIDs = append(rootIDs, actorHandle)

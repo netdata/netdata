@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 func (s *l2BuildState) registerObservations(observations []model.L2Observation) error {
@@ -18,8 +19,7 @@ func (s *l2BuildState) registerObservations(observations []model.L2Observation) 
 			return err
 		}
 	}
-	s.finalizeDirectIPIndex()
-	return nil
+	return s.finalizeDirectIPIndex()
 }
 
 func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
@@ -44,7 +44,10 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		device.Hostname = device.ID
 	}
 	managementAddr := canonicalUsableIPAddress(obs.ManagementIP)
-	managementAliases := canonicalManagementAliases(obs.ManagementAliases)
+	managementAliases, err := canonicalManagementAliases(s.workLimiter, obs.ManagementAliases)
+	if err != nil {
+		return err
+	}
 	if incomingManaged {
 		addresses := make(map[string]netip.Addr, 1+len(managementAliases))
 		for _, addr := range managementAliases {
@@ -54,7 +57,10 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 			device.ManagementIP = managementAddr
 			addresses[managementAddr.String()] = managementAddr
 		}
-		device.Addresses = sortedAddrValues(addresses)
+		device.Addresses, err = sortedAddrValues(s.workLimiter, addresses)
+		if err != nil {
+			return err
+		}
 	}
 	selectedManagementIPDirect := incomingManaged && device.ManagementIP.IsValid()
 	if len(device.Labels) == 0 {
@@ -68,7 +74,10 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 			existingManagementIPDirect,
 			selectedManagementIPDirect,
 		)
-		device = mergeObservedDevice(existing, device)
+		device, err = mergeObservedDevice(s.workLimiter, existing, device)
+		if err != nil {
+			return err
+		}
 		device.ManagementIP = selectedManagementIP
 		selectedManagementIPDirect = selectedDirect
 		if device.Labels == nil {
@@ -87,7 +96,10 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		delete(s.directManagementIPByDeviceID, deviceID)
 	}
 	if len(observedProtocols) > 0 {
-		device.Labels["protocols_observed"] = setToCSV(observedProtocols)
+		device.Labels["protocols_observed"], err = setToCSV(s.workLimiter, observedProtocols)
+		if err != nil {
+			return err
+		}
 	}
 	s.devices[device.ID] = device
 	if incomingManaged {
@@ -123,6 +135,9 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		}
 	}
 
+	if err := s.workLimiter.Charge(uint64(len(obs.Interfaces))); err != nil {
+		return err
+	}
 	for _, iface := range obs.Interfaces {
 		if iface.IfIndex <= 0 {
 			continue
@@ -200,7 +215,10 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	return nil
 }
 
-func canonicalManagementAliases(values []string) []netip.Addr {
+func canonicalManagementAliases(limiter worklimit.Limiter, values []string) ([]netip.Addr, error) {
+	if err := worklimit.ChargeStrings(limiter, values); err != nil {
+		return nil, err
+	}
 	aliases := make(map[string]netip.Addr, len(values))
 	for _, value := range values {
 		addr := canonicalUsableIPAddress(value)
@@ -209,7 +227,7 @@ func canonicalManagementAliases(values []string) []netip.Addr {
 		}
 		aliases[addr.String()] = addr
 	}
-	return sortedAddrValues(aliases)
+	return sortedAddrValues(limiter, aliases)
 }
 
 func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip.Addr, selectedPrimary bool) {
@@ -234,7 +252,10 @@ func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip
 	}
 }
 
-func (s *l2BuildState) finalizeDirectIPIndex() {
+func (s *l2BuildState) finalizeDirectIPIndex() error {
+	if err := s.workLimiter.Charge(uint64(len(s.directAddressClaimsByIP))); err != nil {
+		return err
+	}
 	s.directIPToID = make(map[string]string, len(s.directAddressClaimsByIP))
 	s.directOwnersByIP = make(map[string]map[string]struct{}, len(s.directAddressClaimsByIP))
 	for ip, claims := range s.directAddressClaimsByIP {
@@ -263,10 +284,15 @@ func (s *l2BuildState) finalizeDirectIPIndex() {
 			}
 			addresses[addr.String()] = addr
 		}
-		device.Addresses = sortedAddrValues(addresses)
+		var err error
+		device.Addresses, err = sortedAddrValues(s.workLimiter, addresses)
+		if err != nil {
+			return err
+		}
 		s.devices[deviceID] = device
 	}
 	s.directAddressClaimsByIP = nil
+	return nil
 }
 
 func (s *l2BuildState) keepDirectManagementAddress(deviceID, ip string) bool {
@@ -287,7 +313,10 @@ func (s *l2BuildState) keepDirectManagementAddress(deviceID, ip string) bool {
 	return owned
 }
 
-func mergeObservedDevice(existing, incoming model.Device) model.Device {
+func mergeObservedDevice(
+	limiter worklimit.Limiter,
+	existing, incoming model.Device,
+) (model.Device, error) {
 	out := existing
 	if strings.TrimSpace(out.ID) == "" {
 		out.ID = incoming.ID
@@ -301,12 +330,16 @@ func mergeObservedDevice(existing, incoming model.Device) model.Device {
 	if strings.TrimSpace(out.ChassisID) == "" {
 		out.ChassisID = incoming.ChassisID
 	}
-	out.Addresses = mergeObservedDeviceAddresses(existing.Addresses, incoming.Addresses)
+	var err error
+	out.Addresses, err = mergeObservedDeviceAddresses(limiter, existing.Addresses, incoming.Addresses)
+	if err != nil {
+		return model.Device{}, err
+	}
 	out.Labels = mergeObservedDeviceLabels(existing.Labels, incoming.Labels)
 	if strings.TrimSpace(out.Hostname) == "" {
 		out.Hostname = out.ID
 	}
-	return out
+	return out, nil
 }
 
 func selectObservedManagementIP(existing, incoming netip.Addr, existingDirect, incomingDirect bool) (netip.Addr, bool) {
@@ -336,9 +369,19 @@ func selectObservedManagementIP(existing, incoming netip.Addr, existingDirect, i
 	return existing, existingDirect
 }
 
-func mergeObservedDeviceAddresses(existing, incoming []netip.Addr) []netip.Addr {
+func mergeObservedDeviceAddresses(
+	limiter worklimit.Limiter,
+	existing, incoming []netip.Addr,
+) ([]netip.Addr, error) {
 	if len(existing) == 0 && len(incoming) == 0 {
-		return nil
+		return nil, nil
+	}
+	items, err := worklimit.Sum(uint64(len(existing)), uint64(len(incoming)))
+	if err != nil {
+		return nil, err
+	}
+	if err := limiter.Charge(items); err != nil {
+		return nil, err
 	}
 	merged := make(map[string]netip.Addr, len(existing)+len(incoming))
 	for _, addr := range existing {
@@ -351,7 +394,7 @@ func mergeObservedDeviceAddresses(existing, incoming []netip.Addr) []netip.Addr 
 			merged[addr.String()] = addr
 		}
 	}
-	return sortedAddrValues(merged)
+	return sortedAddrValues(limiter, merged)
 }
 
 func mergeObservedDeviceLabels(existing, incoming map[string]string) map[string]string {

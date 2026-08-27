@@ -3,10 +3,10 @@
 package pipeline
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 )
 
 type fdbCandidate struct {
@@ -19,12 +19,19 @@ type fdbCandidate struct {
 	vlanName    string
 }
 
-func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[string]int) []fdbCandidate {
+func buildFDBCandidates(
+	limiter worklimit.Limiter,
+	entries []model.FDBObservation,
+	bridgePortToIfIndex map[string]int,
+) ([]fdbCandidate, error) {
 	if len(entries) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	sorted := sortedFDBEntries(entries)
+	sorted, err := sortedFDBEntries(limiter, entries)
+	if err != nil {
+		return nil, err
+	}
 	selfMACs := make(map[string]struct{}, len(sorted))
 	for _, entry := range sorted {
 		if canonicalFDBStatus(entry.Status) != fdbStatusSelf {
@@ -100,11 +107,14 @@ func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[
 		duplicates[candidateKey] = struct{}{}
 	}
 
+	if err := limiter.Charge(uint64(len(candidatesByEndpoint))); err != nil {
+		return nil, err
+	}
 	out := make([]fdbCandidate, 0, len(candidatesByEndpoint))
 	for _, candidate := range candidatesByEndpoint {
 		out = append(out, candidate)
 	}
-	sort.Slice(out, func(i, j int) bool {
+	if err := worklimit.SortSlice(limiter, out, func(i, j int) bool {
 		if out[i].mac != out[j].mac {
 			return out[i].mac < out[j].mac
 		}
@@ -118,8 +128,10 @@ func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[
 			return out[i].ifIndex < out[j].ifIndex
 		}
 		return out[i].bridgePort < out[j].bridgePort
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func canonicalFDBStatus(status string) string {

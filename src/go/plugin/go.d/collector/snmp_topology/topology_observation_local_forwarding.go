@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -17,11 +16,14 @@ func (c *topologyBuilder) appendObservedFDBEntries(observation *topologyengine.L
 		return
 	}
 
-	keys := make([]string, 0, len(c.fdbEntries))
-	for key := range c.fdbEntries {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.fdbEntries))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.fdbEntries, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return
+	}
 
 	for _, key := range keys {
 		entry := c.fdbEntries[key]
@@ -52,11 +54,14 @@ func (c *topologyBuilder) appendObservedSTPPorts(observation *topologyengine.L2O
 		return
 	}
 
-	keys := make([]string, 0, len(c.stpPorts))
-	for key := range c.stpPorts {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.stpPorts))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.stpPorts, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return
+	}
 
 	for _, key := range keys {
 		entry := c.stpPorts[key]
@@ -93,11 +98,14 @@ func (c *topologyBuilder) appendObservedARPNDEntries(observation *topologyengine
 		return
 	}
 
-	keys := make([]string, 0, len(c.arpEntries))
-	for key := range c.arpEntries {
-		keys = append(keys, key)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.arpEntries))
 	}
-	sort.Strings(keys)
+	keys = sortedBuilderKeys(c, c.arpEntries, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return
+	}
 
 	for _, key := range keys {
 		entry := c.arpEntries[key]

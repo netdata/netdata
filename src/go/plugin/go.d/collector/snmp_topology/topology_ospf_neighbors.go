@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"net/netip"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -47,7 +46,14 @@ func (c *topologyBuilder) snapshotOSPFNeighbors(localDeviceID string) []topology
 		return nil
 	}
 
-	keys := topologyutil.SortedMapKeys(c.ospfNeighborsByKey)
+	var keys []string
+	if c.workLimiter == nil {
+		keys = make([]string, 0, len(c.ospfNeighborsByKey))
+	}
+	keys = sortedBuilderKeys(c, c.ospfNeighborsByKey, keys)
+	if !c.chargeWork(uint64(len(keys))) {
+		return nil
+	}
 	rows := make([]topologymodel.OSPFNeighbor, 0, len(keys))
 	for _, key := range keys {
 		row := c.ospfNeighborsByKey[key]
@@ -87,11 +93,14 @@ func (c *topologyBuilder) matchOSPFNeighborLocalInterface(neighborIP string) (to
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
 
-	ips := make([]string, 0, len(c.l3InterfacesByIP))
-	for ip := range c.l3InterfacesByIP {
-		ips = append(ips, ip)
+	var ips []string
+	if c.workLimiter == nil {
+		ips = make([]string, 0, len(c.l3InterfacesByIP))
 	}
-	sort.Strings(ips)
+	ips = sortedBuilderKeys(c, c.l3InterfacesByIP, ips)
+	if !c.chargeWork(uint64(len(ips))) {
+		return topologyOSPFLocalInterfaceMatch{}, false
+	}
 
 	var best topologyOSPFLocalInterfaceMatch
 	found := false

@@ -23,7 +23,11 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 		return topologyv1.Data{}, false, nil
 	}
 
-	options = topologyoptions.NormalizeQueryOptions(options)
+	var err error
+	options, err = topologyoptions.PrepareQueryOptions(options)
+	if err != nil {
+		return topologyv1.Data{}, false, err
+	}
 	generation := a.registry.acquireGeneration()
 	capture := beginTopologyGraphDiagnosticCapture(a.diagnosticRecorder, generation, options)
 	if capture != nil {

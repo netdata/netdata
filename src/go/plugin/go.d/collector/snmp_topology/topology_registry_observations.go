@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"sort"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/worklimit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -60,8 +61,19 @@ func topologyObservationSnapshotIdentity(snapshot topologymodel.ObservationSnaps
 }
 
 func aggregateTopologyObservationSnapshots(snapshots []topologymodel.ObservationSnapshot) (topologymodel.ObservationAggregate, bool) {
+	aggregate, ok, _ := aggregateTopologyObservationSnapshotsWithLimiter(snapshots, nil)
+	return aggregate, ok
+}
+
+func aggregateTopologyObservationSnapshotsWithLimiter(
+	snapshots []topologymodel.ObservationSnapshot,
+	limiter worklimit.Limiter,
+) (topologymodel.ObservationAggregate, bool, error) {
 	if len(snapshots) == 0 {
-		return topologymodel.ObservationAggregate{}, false
+		return topologymodel.ObservationAggregate{}, false, nil
+	}
+	if err := limiter.Charge(uint64(len(snapshots))); err != nil {
+		return topologymodel.ObservationAggregate{}, false, err
 	}
 
 	totalObservations := 0
@@ -73,6 +85,18 @@ func aggregateTopologyObservationSnapshots(snapshots []topologymodel.Observation
 		totalL3Interfaces += len(snapshot.L3Interfaces)
 		totalOSPFNeighbors += len(snapshot.OSPFNeighbors)
 		totalBGPPeers += len(snapshot.BGPPeers)
+	}
+	totalRows, err := worklimit.Sum(
+		uint64(totalObservations),
+		uint64(totalL3Interfaces),
+		uint64(totalOSPFNeighbors),
+		uint64(totalBGPPeers),
+	)
+	if err != nil {
+		return topologymodel.ObservationAggregate{}, false, err
+	}
+	if err := limiter.Charge(totalRows); err != nil {
+		return topologymodel.ObservationAggregate{}, false, err
 	}
 
 	aggregate := topologymodel.ObservationAggregate{
@@ -95,5 +119,5 @@ func aggregateTopologyObservationSnapshots(snapshots []topologymodel.Observation
 		}
 	}
 
-	return aggregate, len(aggregate.L2Observations) > 0
+	return aggregate, len(aggregate.L2Observations) > 0, nil
 }

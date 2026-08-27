@@ -70,10 +70,7 @@ func replayTopologyGraphV1(
 		if err := diagnostic.DecodeReferenced(source, ref, limits, &observation); err != nil {
 			return topologyv1.Data{}, false, fmt.Errorf("decode graph observation %d: %w", i, err)
 		}
-		if err := addGraphObservationWork(work, observation); err != nil {
-			return topologyv1.Data{}, false, err
-		}
-		snapshot, err := diagnosticObservationToSnapshot(observation)
+		snapshot, err := diagnosticObservationToSnapshotWithWork(observation, work)
 		if err != nil {
 			return topologyv1.Data{}, false, fmt.Errorf("convert graph observation %d: %w", i, err)
 		}
@@ -83,7 +80,10 @@ func replayTopologyGraphV1(
 		return topologyv1.Data{}, false, err
 	}
 
-	aggregate, aggregateOK := aggregateTopologyObservationSnapshots(snapshots)
+	aggregate, aggregateOK, err := aggregateTopologyObservationSnapshotsWithLimiter(snapshots, work.add)
+	if err != nil {
+		return topologyv1.Data{}, false, err
+	}
 	if aggregateOK {
 		aggregate.ProducerScopeID = generation.ProducerScopeID
 	}
@@ -223,39 +223,6 @@ func topologyQueryOptionsFromDiagnostic(value diagnostic.GraphQueryOptionsV1) to
 		ManagedDeviceFocus:     value.ManagedDeviceFocus,
 		Depth:                  value.Depth,
 	}
-}
-
-func addGraphObservationWork(work *replayWorkBudget, observation diagnostic.ObservationV1) error {
-	if err := work.add(1); err != nil {
-		return err
-	}
-	for _, count := range []int{
-		len(observation.L2), len(observation.L3Interfaces), len(observation.OSPFNeighbors), len(observation.BGPPeers),
-		len(observation.LocalDevice.ManagementAddresses), len(observation.LocalDevice.Capabilities),
-		len(observation.LocalDevice.CapabilitiesSupported), len(observation.LocalDevice.CapabilitiesEnabled),
-		len(observation.LocalDevice.Labels), len(observation.LocalDevice.DeviceCharts),
-		len(observation.LocalDevice.InterfaceCharts),
-	} {
-		if err := work.add(uint64(count)); err != nil {
-			return err
-		}
-	}
-	for _, chart := range observation.LocalDevice.InterfaceCharts {
-		if err := work.add(uint64(len(chart.AvailableMetrics))); err != nil {
-			return err
-		}
-	}
-	for _, row := range observation.L2 {
-		for _, count := range []int{
-			len(row.ManagementAliases), len(row.Interfaces), len(row.BridgePorts), len(row.STPPorts), len(row.FDBEntries),
-			len(row.ARPNDEntries), len(row.LLDPRemotes), len(row.CDPRemotes), len(row.Labels),
-		} {
-			if err := work.add(uint64(count)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func diagnosticCapabilityRoot(

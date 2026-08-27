@@ -5,7 +5,6 @@ package projector
 import (
 	"maps"
 	"net/netip"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -21,7 +20,14 @@ func cloneStringMap(in map[string]string) map[string]string {
 }
 
 func addressStrings(addresses []netip.Addr) []string {
+	return addressStringsWithWork(nil, addresses)
+}
+
+func addressStringsWithWork(work *projectionWork, addresses []netip.Addr) []string {
 	if len(addresses) == 0 {
+		return nil
+	}
+	if !work.charge(uint64(len(addresses))) {
 		return nil
 	}
 	out := make([]string, 0, len(addresses))
@@ -31,7 +37,7 @@ func addressStrings(addresses []netip.Addr) []string {
 		}
 		out = append(out, addr.Unmap().String())
 	}
-	out = uniqueTopologyStrings(out)
+	out = uniqueTopologyStringsWithWork(work, out)
 	if len(out) == 0 {
 		return nil
 	}
@@ -48,7 +54,15 @@ func deviceAddressValues(dev model.Device) []netip.Addr {
 }
 
 func deviceAddressStrings(dev model.Device) []string {
-	return addressStrings(deviceAddressValues(dev))
+	return deviceAddressStringsWithWork(nil, dev)
+
+}
+
+func deviceAddressStringsWithWork(work *projectionWork, dev model.Device) []string {
+	if !work.charge(uint64(len(dev.Addresses) + 1)) {
+		return nil
+	}
+	return addressStringsWithWork(work, deviceAddressValues(dev))
 }
 
 func selectedDeviceManagementIP(dev model.Device) string {
@@ -64,7 +78,14 @@ func selectedDeviceManagementIP(dev model.Device) string {
 }
 
 func uniqueTopologyStrings(values []string) []string {
+	return uniqueTopologyStringsWithWork(nil, values)
+}
+
+func uniqueTopologyStringsWithWork(work *projectionWork, values []string) []string {
 	if len(values) == 0 {
+		return nil
+	}
+	if !work.chargeStrings(values) {
 		return nil
 	}
 	seen := make(map[string]struct{}, len(values))
@@ -80,7 +101,9 @@ func uniqueTopologyStrings(values []string) []string {
 		seen[value] = struct{}{}
 		out = append(out, value)
 	}
-	sort.Strings(out)
+	if !sortProjectionStrings(work, out) {
+		return nil
+	}
 	if len(out) == 0 {
 		return nil
 	}
@@ -88,14 +111,21 @@ func uniqueTopologyStrings(values []string) []string {
 }
 
 func sortedEndpointIPs(in map[string]netip.Addr) []string {
+	return sortedEndpointIPsWithWork(nil, in)
+}
+
+func sortedEndpointIPsWithWork(work *projectionWork, in map[string]netip.Addr) []string {
 	if len(in) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(in))
-	for key := range in {
-		keys = append(keys, key)
+	var keys []string
+	if work == nil {
+		keys = make([]string, 0, len(in))
 	}
-	sort.Strings(keys)
+	keys = sortedProjectionKeys(work, in, keys)
+	if work != nil && work.err != nil {
+		return nil
+	}
 
 	out := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -105,7 +135,7 @@ func sortedEndpointIPs(in map[string]netip.Addr) []string {
 		}
 		out = append(out, addr.Unmap().String())
 	}
-	out = uniqueTopologyStrings(out)
+	out = uniqueTopologyStringsWithWork(work, out)
 	if len(out) == 0 {
 		return nil
 	}
@@ -113,7 +143,14 @@ func sortedEndpointIPs(in map[string]netip.Addr) []string {
 }
 
 func sortedTopologySet(in map[string]struct{}) []string {
+	return sortedTopologySetWithWork(nil, in)
+}
+
+func sortedTopologySetWithWork(work *projectionWork, in map[string]struct{}) []string {
 	if len(in) == 0 {
+		return nil
+	}
+	if !work.charge(uint64(len(in))) {
 		return nil
 	}
 	out := make([]string, 0, len(in))
@@ -124,7 +161,9 @@ func sortedTopologySet(in map[string]struct{}) []string {
 		}
 		out = append(out, value)
 	}
-	sort.Strings(out)
+	if !sortProjectionStrings(work, out) {
+		return nil
+	}
 	if len(out) == 0 {
 		return nil
 	}

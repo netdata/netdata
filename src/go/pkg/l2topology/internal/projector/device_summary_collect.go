@@ -163,7 +163,7 @@ func (b *deviceInterfaceSummaryBuilder) collectAdjacencyEvidence() {
 			}
 		case "lldp", "cdp":
 			evidence.hasPeer = true
-			neighbor := buildTopologyPortNeighborStatus(protocol, adj, b.deviceByID)
+			neighbor := buildTopologyPortNeighborStatusWithWork(b.work, protocol, adj, b.deviceByID)
 			if key := topologyPortNeighborStatusKey(neighbor); key != "" {
 				evidence.neighbors[key] = neighbor
 			}

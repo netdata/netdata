@@ -4,7 +4,6 @@ package projector
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -32,19 +31,23 @@ type topologyLinkSortEntry struct {
 }
 
 func canonicalTopologyMatchKey(match graph.Match) string {
-	if key := canonicalTopologyPrimaryMACKey(match); key != "" {
+	return canonicalTopologyMatchKeyWithWork(nil, match)
+}
+
+func canonicalTopologyMatchKeyWithWork(work *projectionWork, match graph.Match) string {
+	if key := canonicalTopologyPrimaryMACKeyWithWork(work, match); key != "" {
 		return "mac:" + key
 	}
-	if key := canonicalTopologyHardwareKey(match.ChassisIDs); key != "" {
+	if key := canonicalTopologyHardwareKeyWithWork(work, match.ChassisIDs); key != "" {
 		return "chassis:" + key
 	}
-	if key := canonicalTopologyIPListKey(match.IPAddresses); key != "" {
+	if key := canonicalTopologyIPListKeyWithWork(work, match.IPAddresses); key != "" {
 		return "ip:" + key
 	}
-	if key := canonicalTopologyStringListKey(match.Hostnames); key != "" {
+	if key := canonicalTopologyStringListKeyWithWork(work, match.Hostnames); key != "" {
 		return "hostname:" + key
 	}
-	if key := canonicalTopologyStringListKey(match.DNSNames); key != "" {
+	if key := canonicalTopologyStringListKeyWithWork(work, match.DNSNames); key != "" {
 		return "dns:" + key
 	}
 	if sysName := strings.ToLower(strings.TrimSpace(match.SysName)); sysName != "" {
@@ -56,8 +59,22 @@ func canonicalTopologyMatchKey(match graph.Match) string {
 	return ""
 }
 
-func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []graph.Link) {
+func assignTopologyActorIDsAndLinkEndpoints(
+	actors []projectedActor,
+	links []graph.Link,
+) {
+	assignTopologyActorIDsAndLinkEndpointsWithWork(nil, actors, links)
+}
+
+func assignTopologyActorIDsAndLinkEndpointsWithWork(
+	work *projectionWork,
+	actors []projectedActor,
+	links []graph.Link,
+) {
 	if len(actors) == 0 {
+		return
+	}
+	if !work.charge(uint64(len(actors))) || !work.charge(uint64(len(links))) {
 		return
 	}
 
@@ -68,7 +85,7 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []gra
 	handles := graph.NewActorHandleAllocator()
 
 	for i := range actors {
-		actorLookups[i] = newTopologyMatchLookup(actors[i].Actor.Match)
+		actorLookups[i] = newTopologyMatchLookup(work, actors[i].Actor.Match)
 
 		baseID := actorLookups[i].canonical
 		if baseID == "" {
@@ -97,8 +114,8 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []gra
 	}
 
 	for i := range links {
-		srcLookup := newTopologyMatchLookup(links[i].Src.Match)
-		dstLookup := newTopologyMatchLookup(links[i].Dst.Match)
+		srcLookup := newTopologyMatchLookup(work, links[i].Src.Match)
+		dstLookup := newTopologyMatchLookup(work, links[i].Dst.Match)
 		srcRef := resolveTopologyEndpointActorRef(srcLookup, actorRefByCanonicalMatch, actorRefByIdentityKey)
 		dstRef := resolveTopologyEndpointActorRef(dstLookup, actorRefByCanonicalMatch, actorRefByIdentityKey)
 		links[i].SrcActorID = srcRef.actorID
@@ -108,10 +125,10 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []gra
 	}
 }
 
-func newTopologyMatchLookup(match graph.Match) topologyMatchLookup {
+func newTopologyMatchLookup(work *projectionWork, match graph.Match) topologyMatchLookup {
 	return topologyMatchLookup{
-		canonical:    canonicalTopologyMatchKey(match),
-		identityKeys: topologyMatchIdentityKeys(match),
+		canonical:    canonicalTopologyMatchKeyWithWork(work, match),
+		identityKeys: topologyMatchIdentityKeysWithWork(work, match),
 	}
 }
 
@@ -144,10 +161,24 @@ func resolveTopologyEndpointActorRef(lookup topologyMatchLookup, byCanonicalMatc
 	return topologyActorRef{}
 }
 
-func enrichTopologyPortDetailsWithLinkCounts(actors []projectedActor, links []graph.Link) {
+func enrichTopologyPortDetailsWithLinkCounts(
+	actors []projectedActor,
+	links []graph.Link,
+) {
+	enrichTopologyPortDetailsWithLinkCountsWithWork(nil, actors, links)
+}
+
+func enrichTopologyPortDetailsWithLinkCountsWithWork(
+	work *projectionWork,
+	actors []projectedActor,
+	links []graph.Link,
+) {
 	type actorPort struct {
 		actorHandle graph.ActorHandle
 		portName    string
+	}
+	if !work.chargeProduct(uint64(len(links)), 2) {
+		return
 	}
 	counts := make(map[actorPort]int, len(links)*2)
 
@@ -185,6 +216,13 @@ func enrichTopologyPortDetailsWithLinkCounts(actors []projectedActor, links []gr
 }
 
 func canonicalTopologyPrimaryMACKey(match graph.Match) string {
+	return canonicalTopologyPrimaryMACKeyWithWork(nil, match)
+}
+
+func canonicalTopologyPrimaryMACKeyWithWork(work *projectionWork, match graph.Match) string {
+	if !work.chargeStrings(match.MacAddresses) || !work.chargeStrings(match.ChassisIDs) {
+		return ""
+	}
 	set := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {
@@ -199,7 +237,11 @@ func canonicalTopologyPrimaryMACKey(match graph.Match) string {
 	if len(set) == 0 {
 		return ""
 	}
-	keys := sortedTopologySet(set)
+	var keys []string
+	if work == nil {
+		keys = make([]string, 0, len(set))
+	}
+	keys = sortedProjectionKeys(work, set, keys)
 	if len(keys) == 0 {
 		return ""
 	}
@@ -207,7 +249,14 @@ func canonicalTopologyPrimaryMACKey(match graph.Match) string {
 }
 
 func canonicalTopologyHardwareKey(values []string) string {
+	return canonicalTopologyHardwareKeyWithWork(nil, values)
+}
+
+func canonicalTopologyHardwareKeyWithWork(work *projectionWork, values []string) string {
 	if len(values) == 0 {
+		return ""
+	}
+	if !work.chargeStrings(values) {
 		return ""
 	}
 	out := make([]string, 0, len(values))
@@ -229,13 +278,22 @@ func canonicalTopologyHardwareKey(values []string) string {
 	if len(out) == 0 {
 		return ""
 	}
-	sort.Strings(out)
-	out = uniqueTopologyStrings(out)
+	if !sortProjectionStrings(work, out) {
+		return ""
+	}
+	out = uniqueTopologyStringsWithWork(work, out)
 	return strings.Join(out, ",")
 }
 
 func canonicalTopologyIPListKey(values []string) string {
+	return canonicalTopologyIPListKeyWithWork(nil, values)
+}
+
+func canonicalTopologyIPListKeyWithWork(work *projectionWork, values []string) string {
 	if len(values) == 0 {
+		return ""
+	}
+	if !work.chargeStrings(values) {
 		return ""
 	}
 	out := make([]string, 0, len(values))
@@ -253,13 +311,22 @@ func canonicalTopologyIPListKey(values []string) string {
 	if len(out) == 0 {
 		return ""
 	}
-	sort.Strings(out)
-	out = uniqueTopologyStrings(out)
+	if !sortProjectionStrings(work, out) {
+		return ""
+	}
+	out = uniqueTopologyStringsWithWork(work, out)
 	return strings.Join(out, ",")
 }
 
 func canonicalTopologyStringListKey(values []string) string {
+	return canonicalTopologyStringListKeyWithWork(nil, values)
+}
+
+func canonicalTopologyStringListKeyWithWork(work *projectionWork, values []string) string {
 	if len(values) == 0 {
+		return ""
+	}
+	if !work.chargeStrings(values) {
 		return ""
 	}
 	out := make([]string, 0, len(values))
@@ -273,17 +340,23 @@ func canonicalTopologyStringListKey(values []string) string {
 	if len(out) == 0 {
 		return ""
 	}
-	sort.Strings(out)
-	out = uniqueTopologyStrings(out)
+	if !sortProjectionStrings(work, out) {
+		return ""
+	}
+	out = uniqueTopologyStringsWithWork(work, out)
 	return strings.Join(out, ",")
 }
 
 func topologyLinkSortKey(link graph.Link) string {
-	return strings.Join([]string{
+	return topologyLinkSortKeyWithWork(nil, link)
+}
+
+func topologyLinkSortKeyWithWork(work *projectionWork, link graph.Link) string {
+	parts := []string{
 		link.Protocol,
 		link.Direction,
-		canonicalTopologyMatchKey(link.Src.Match),
-		canonicalTopologyMatchKey(link.Dst.Match),
+		canonicalTopologyMatchKeyWithWork(work, link.Src.Match),
+		canonicalTopologyMatchKeyWithWork(work, link.Dst.Match),
 		topologyEndpointKey(link.Src, "if_index"),
 		topologyEndpointKey(link.Src, "if_name"),
 		topologyEndpointKey(link.Src, "port_id"),
@@ -291,7 +364,11 @@ func topologyLinkSortKey(link graph.Link) string {
 		topologyEndpointKey(link.Dst, "if_name"),
 		topologyEndpointKey(link.Dst, "port_id"),
 		link.State,
-	}, keySep)
+	}
+	if !work.chargeStrings(parts) {
+		return ""
+	}
+	return strings.Join(parts, keySep)
 }
 
 func topologyEndpointKey(endpoint graph.LinkEndpoint, key string) string {
@@ -309,16 +386,31 @@ func topologyEndpointKey(endpoint graph.LinkEndpoint, key string) string {
 }
 
 func topologyActorSortKey(actor graph.Actor) string {
-	return strings.Join([]string{
+	return topologyActorSortKeyWithWork(nil, actor)
+}
+
+func topologyActorSortKeyWithWork(work *projectionWork, actor graph.Actor) string {
+	parts := []string{
 		actor.ActorType,
-		canonicalTopologyMatchKey(actor.Match),
+		canonicalTopologyMatchKeyWithWork(work, actor.Match),
 		actor.Source,
 		actor.Layer,
-	}, keySep)
+	}
+	if !work.chargeStrings(parts) {
+		return ""
+	}
+	return strings.Join(parts, keySep)
 }
 
 func sortProjectedTopologyActors(actors []projectedActor) {
+	sortProjectedTopologyActorsWithWork(nil, actors)
+}
+
+func sortProjectedTopologyActorsWithWork(work *projectionWork, actors []projectedActor) {
 	if len(actors) < 2 {
+		return
+	}
+	if !work.charge(uint64(len(actors))) {
 		return
 	}
 
@@ -326,13 +418,18 @@ func sortProjectedTopologyActors(actors []projectedActor) {
 	for i := range actors {
 		entries[i] = projectedTopologyActorSortEntry{
 			actor: actors[i],
-			key:   topologyActorSortKey(actors[i].Actor),
+			key:   topologyActorSortKeyWithWork(work, actors[i].Actor),
+		}
+		if work != nil && work.err != nil {
+			return
 		}
 	}
 
-	sort.SliceStable(entries, func(i, j int) bool {
+	if !sortProjectionSliceStable(work, entries, func(i, j int) bool {
 		return entries[i].key < entries[j].key
-	})
+	}) {
+		return
+	}
 
 	for i := range entries {
 		actors[i] = entries[i].actor
@@ -340,7 +437,14 @@ func sortProjectedTopologyActors(actors []projectedActor) {
 }
 
 func sortTopologyLinks(links []graph.Link) {
+	sortTopologyLinksWithWork(nil, links)
+}
+
+func sortTopologyLinksWithWork(work *projectionWork, links []graph.Link) {
 	if len(links) < 2 {
+		return
+	}
+	if !work.charge(uint64(len(links))) {
 		return
 	}
 
@@ -348,13 +452,18 @@ func sortTopologyLinks(links []graph.Link) {
 	for i := range links {
 		entries[i] = topologyLinkSortEntry{
 			link: links[i],
-			key:  topologyLinkSortKey(links[i]),
+			key:  topologyLinkSortKeyWithWork(work, links[i]),
+		}
+		if work != nil && work.err != nil {
+			return
 		}
 	}
 
-	sort.SliceStable(entries, func(i, j int) bool {
+	if !sortProjectionSliceStable(work, entries, func(i, j int) bool {
 		return entries[i].key < entries[j].key
-	})
+	}) {
+		return
+	}
 
 	for i := range entries {
 		links[i] = entries[i].link

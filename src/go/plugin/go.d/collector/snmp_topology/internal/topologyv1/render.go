@@ -36,23 +36,33 @@ const (
 )
 
 func Render(data topologymodel.Data, limiter worklimit.Limiter) (topologyapi.Data, error) {
-	if err := chargeRenderWork(data, limiter); err != nil {
-		return topologyapi.Data{}, err
+	var work *renderWork
+	if limiter != nil {
+		work = &renderWork{limiter: limiter}
+	}
+	if !work.charge(uint64(len(data.Actors) + len(data.Links))) {
+		return topologyapi.Data{}, work.failure()
 	}
 	if err := data.ValidateActorHandles(); err != nil {
 		return topologyapi.Data{}, err
 	}
 	stringsDict := topologyapi.NewStringDictionary("")
-	actorRows, actorIndex := buildSNMPTopologyV1Actors(data.Actors, stringsDict)
+	actorRows, actorIndex := buildSNMPTopologyV1ActorsWithWork(work, data.Actors, stringsDict)
+	if err := work.failure(); err != nil {
+		return topologyapi.Data{}, err
+	}
 
-	linkRows, evidenceSections, err := buildSNMPTopologyV1Links(data.Links, actorIndex, stringsDict)
+	linkRows, evidenceSections, err := buildSNMPTopologyV1LinksWithWork(work, data.Links, actorIndex, stringsDict)
 	if err != nil {
 		return topologyapi.Data{}, err
 	}
 
-	portNeighborSummaries := buildSNMPTopologyV1PortNeighborSummaries(data.Links, actorIndex)
-	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetails(data.Actors, actorIndex, stringsDict, portNeighborSummaries)
+	portNeighborSummaries := buildSNMPTopologyV1PortNeighborSummariesWithWork(work, data.Links, actorIndex)
+	actorDetails, tableTypes, err := buildSNMPTopologyV1ActorDetailsWithWork(work, data.Actors, actorIndex, stringsDict, portNeighborSummaries)
 	if err != nil {
+		return topologyapi.Data{}, err
+	}
+	if err := work.failure(); err != nil {
 		return topologyapi.Data{}, err
 	}
 	if tableTypes == nil {
@@ -71,8 +81,11 @@ func Render(data topologymodel.Data, limiter worklimit.Limiter) (topologyapi.Dat
 	if _, ok := tableTypes["actor_bgp_peers"]; !ok {
 		tableTypes["actor_bgp_peers"] = snmpTopologyV1BGPPeersTableType()
 	}
-	portLinksTable, err := buildSNMPTopologyV1ActorPortLinksTable(data.Links, actorIndex, stringsDict)
+	portLinksTable, err := buildSNMPTopologyV1ActorPortLinksTableWithWork(work, data.Links, actorIndex, stringsDict)
 	if err != nil {
+		return topologyapi.Data{}, err
+	}
+	if err := work.failure(); err != nil {
 		return topologyapi.Data{}, err
 	}
 	if portLinksTable.Rows > 0 {

@@ -12,6 +12,9 @@ import (
 )
 
 func (c *topologyBuilder) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
+	if !c.chargeWork(uint64(len(local.Labels))) {
+		return topologyengine.L2Observation{}
+	}
 	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
@@ -24,7 +27,7 @@ func (c *topologyBuilder) buildEngineObservation(local topologymodel.Device) top
 		DeviceID:          ensureTopologyObservationDeviceID(local, baseBridgeAddress),
 		Hostname:          strings.TrimSpace(local.SysName),
 		ManagementIP:      localManagementIP,
-		ManagementAliases: engineManagementAliases(local.ManagementAddresses),
+		ManagementAliases: c.engineManagementAliases(local.ManagementAddresses),
 		SysObjectID:       strings.TrimSpace(local.SysObjectID),
 		ChassisID:         strings.TrimSpace(local.ChassisID),
 		BaseBridgeAddress: baseBridgeAddress,
@@ -46,6 +49,13 @@ func (c *topologyBuilder) buildEngineObservation(local topologymodel.Device) top
 }
 
 func engineManagementAliases(addresses []topologymodel.ManagementAddress) []string {
+	return (&topologyBuilder{}).engineManagementAliases(addresses)
+}
+
+func (c *topologyBuilder) engineManagementAliases(addresses []topologymodel.ManagementAddress) []string {
+	if !c.chargeWork(uint64(len(addresses))) {
+		return nil
+	}
 	aliases := make([]string, 0, len(addresses))
 	for _, address := range addresses {
 		addr, ok := topologymodel.ParseManagementAddressIP(address)
@@ -56,5 +66,10 @@ func engineManagementAliases(addresses []topologymodel.ManagementAddress) []stri
 			aliases = append(aliases, ip)
 		}
 	}
-	return topologyutil.DeduplicateSortedStrings(aliases)
+	aliases, err := topologyutil.DeduplicateSortedStringsWithLimiter(c.workLimiter, aliases)
+	if err != nil {
+		c.workErr = err
+		return nil
+	}
+	return aliases
 }

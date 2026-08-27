@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -12,12 +11,19 @@ import (
 )
 
 func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (graph.Match, projectedActor) {
+	return buildBridgeSegmentActorWithWork(nil, segmentID, segment, layer, source)
+}
+
+func buildBridgeSegmentActorWithWork(work *projectionWork, segmentID string, segment *bridgeDomainSegment, layer string, source string) (graph.Match, projectedActor) {
 	parentDevices := make(map[string]struct{})
 	ifNames := make(map[string]struct{})
 	ifIndexes := make(map[string]struct{})
 	bridgePorts := make(map[string]struct{})
 	vlanIDs := make(map[string]struct{})
 	if segment != nil {
+		if !work.charge(uint64(len(segment.ports))) {
+			return graph.Match{}, projectedActor{}
+		}
 		for _, port := range segment.ports {
 			if strings.TrimSpace(port.deviceID) != "" {
 				parentDevices[port.deviceID] = struct{}{}
@@ -44,15 +50,15 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 	detail := model.ProjectionSegmentActorDetail{
 		SegmentID:     strings.TrimSpace(segmentID),
 		SegmentType:   "broadcast_domain",
-		ParentDevices: sortedTopologySet(parentDevices),
-		IfNames:       sortedTopologySet(ifNames),
-		IfIndexes:     sortedTopologySet(ifIndexes),
-		BridgePorts:   sortedTopologySet(bridgePorts),
-		VLANIDs:       sortedTopologySet(vlanIDs),
+		ParentDevices: sortedTopologySetWithWork(work, parentDevices),
+		IfNames:       sortedTopologySetWithWork(work, ifNames),
+		IfIndexes:     sortedTopologySetWithWork(work, ifIndexes),
+		BridgePorts:   sortedTopologySetWithWork(work, bridgePorts),
+		VLANIDs:       sortedTopologySetWithWork(work, vlanIDs),
 		SegmentKind:   "broadcast_domain",
 	}
 	if segment != nil {
-		detail.LearnedSources = sortedTopologySet(segment.methods)
+		detail.LearnedSources = sortedTopologySetWithWork(work, segment.methods)
 		detail.PortsTotal = model.OptionalValue[int]{Value: len(segment.ports), Has: true}
 		detail.EndpointsTotal = model.OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
 		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
@@ -103,6 +109,7 @@ func endpointMatchFromID(endpointID string) graph.Match {
 }
 
 func annotateEndpointActorsWithDirectOwners(
+	work *projectionWork,
 	actors []projectedActor,
 	endpointMatchByID map[string]graph.Match,
 	owners map[string]fdbEndpointOwner,
@@ -113,11 +120,11 @@ func annotateEndpointActorsWithDirectOwners(
 	}
 
 	ownerByMatchKey := make(map[string]fdbEndpointOwner, len(owners))
-	endpointIDs := make([]string, 0, len(owners))
-	for endpointID := range owners {
-		endpointIDs = append(endpointIDs, endpointID)
+	var endpointIDs []string
+	if work == nil {
+		endpointIDs = make([]string, 0, len(owners))
 	}
-	sort.Strings(endpointIDs)
+	endpointIDs = sortedProjectionKeys(work, owners, endpointIDs)
 
 	for _, endpointID := range endpointIDs {
 		owner := owners[endpointID]
@@ -128,7 +135,7 @@ func annotateEndpointActorsWithDirectOwners(
 		if !ok {
 			match = endpointMatchFromID(endpointID)
 		}
-		key := canonicalTopologyMatchKey(match)
+		key := canonicalTopologyMatchKeyWithWork(work, match)
 		if key == "" {
 			continue
 		}
@@ -144,7 +151,7 @@ func annotateEndpointActorsWithDirectOwners(
 		if !strings.EqualFold(strings.TrimSpace(actor.Actor.ActorType), "endpoint") {
 			continue
 		}
-		key := canonicalTopologyMatchKey(actor.Actor.Match)
+		key := canonicalTopologyMatchKeyWithWork(work, actor.Actor.Match)
 		if key == "" {
 			continue
 		}
