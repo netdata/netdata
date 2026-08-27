@@ -3,6 +3,8 @@
 #include "rrddim-backfill.h"
 #include "database/rrddim-collection.h"
 
+RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
+
 // ----------------------------------------------------------------------------
 // fill the gap of a tier
 

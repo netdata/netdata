@@ -9,6 +9,12 @@ int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 bool dbengine_use_direct_io = true;
+#ifdef ENABLE_DBENGINE
+int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+bool new_dbengine_defaults = false;
+bool legacy_multihost_db_space = false;
+#endif
 static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
 static time_t storage_tiers_retention_time_s[RRD_STORAGE_TIERS] = {14 * DAYS, 90 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS};
 

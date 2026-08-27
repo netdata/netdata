@@ -19,16 +19,10 @@ extern bool dbengine_use_all_ram_for_caches;
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_extent_cache_mb;
 extern int db_engine_journal_check;
-extern int default_rrdeng_disk_quota_mb;
-extern int default_multidb_disk_quota_mb;
-extern bool new_dbengine_defaults;
-extern bool legacy_multihost_db_space;
-extern RRD_BACKFILL default_backfill;
 
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
-extern size_t tier_quota_mb[];
 extern uint8_t tier_page_type[];
 
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
