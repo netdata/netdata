@@ -466,7 +466,7 @@ struct logical_disk_unittest_fixture {
     PERF_INSTANCE_DEFINITION instances[3];
     const char *names[3];
     const char *requested_object;
-    const char *collected[3];
+    char collected[3][128];
     size_t collected_count;
 };
 
@@ -509,7 +509,11 @@ static void logical_disk_unittest_collect_instance(
     int update_every __maybe_unused,
     usec_t now_ut __maybe_unused)
 {
-    logical_disk_unittest_fixture->collected[logical_disk_unittest_fixture->collected_count++] = name;
+    size_t index = logical_disk_unittest_fixture->collected_count++;
+    strncpyz(
+        logical_disk_unittest_fixture->collected[index],
+        name,
+        sizeof(logical_disk_unittest_fixture->collected[index]) - 1);
 }
 
 static const struct logical_disk_collection_ops logical_disk_unittest_ops = {
