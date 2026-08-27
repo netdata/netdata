@@ -1851,6 +1851,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
+        src/database/storage-engine-types.h
         src/database/ram/rrddim_mem.c
         src/database/ram/rrddim_mem.h
         src/database/sqlite/sqlite_metadata.c
