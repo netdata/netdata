@@ -704,7 +704,7 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 // --------------------------------------------------------------------------------------------------------------------
 uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
-void dbengine_shutdown();
+void dbengine_shutdown(void);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
