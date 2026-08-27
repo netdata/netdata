@@ -78,12 +78,6 @@ static inline bool rrdeng_valid_extent_disk_size(size_t size) {
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
-typedef struct dbengine_tier_stats  {
-    RRDSET *st;
-    RRDDIM *rd_space;
-    RRDDIM *rd_time;
-} DBENGINE_TIER_STATS;
-
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
     // if a page does not have one of these, it is considered unroutable
