@@ -127,28 +127,35 @@ var defaultTopologySemanticLimits = topologySemanticLimits{
 	maxLogicalBytes: 32 << 20,
 }
 
-type topologySemanticCaptureState uint8
+var defaultTopologyDiagnosticGlobalLimits = topologySemanticLimits{
+	maxRecords:      250_000,
+	maxLogicalBytes: 64 << 20,
+}
+
+type diagnosticCaptureState uint8
 
 const (
-	topologySemanticCaptureUnknown topologySemanticCaptureState = iota
-	topologySemanticCaptureAvailable
-	topologySemanticCaptureLimitExceeded
-	topologySemanticCaptureUnavailable
+	diagnosticCaptureUnknown diagnosticCaptureState = iota
+	diagnosticCaptureAvailable
+	diagnosticCaptureLimitExceeded
+	diagnosticCaptureUnavailable
 )
 
-type topologySemanticCaptureReason uint8
+type diagnosticCaptureReason uint8
 
 const (
-	topologySemanticCaptureReasonNone topologySemanticCaptureReason = iota
-	topologySemanticCaptureReasonRecordLimit
-	topologySemanticCaptureReasonByteLimit
-	topologySemanticCaptureReasonProjectionError
-	topologySemanticCaptureReasonProjectionPanic
+	diagnosticCaptureReasonNone diagnosticCaptureReason = iota
+	diagnosticCaptureReasonRecordLimit
+	diagnosticCaptureReasonByteLimit
+	diagnosticCaptureReasonProjectionError
+	diagnosticCaptureReasonProjectionPanic
+	diagnosticCaptureReasonGlobalRecordLimit
+	diagnosticCaptureReasonGlobalByteLimit
 )
 
 type topologySemanticCapture struct {
-	state        topologySemanticCaptureState
-	reason       topologySemanticCaptureReason
+	state        diagnosticCaptureState
+	reason       diagnosticCaptureReason
 	recordCount  uint64
 	logicalBytes uint64
 	evidence     *topologySemanticEvidence
@@ -217,8 +224,8 @@ type topologySemanticEventProjector func(*topologySemanticRecorder, topologySema
 
 type topologySemanticRecorder struct {
 	limits       topologySemanticLimits
-	state        topologySemanticCaptureState
-	reason       topologySemanticCaptureReason
+	state        diagnosticCaptureState
+	reason       diagnosticCaptureReason
 	recordCount  uint64
 	logicalBytes uint64
 	evidence     *topologySemanticEvidence
@@ -234,12 +241,12 @@ func newTopologySemanticRecorder(
 ) (r *topologySemanticRecorder) {
 	r = &topologySemanticRecorder{
 		limits:       limits,
-		state:        topologySemanticCaptureAvailable,
+		state:        diagnosticCaptureAvailable,
 		projectEvent: projectTopologySemanticEvent,
 	}
 	defer func() {
 		if recover() != nil {
-			r.fail(topologySemanticCaptureReasonProjectionPanic)
+			r.fail(diagnosticCaptureReasonProjectionPanic)
 		}
 	}()
 	records := uint64(1 + len(targets))
@@ -260,26 +267,26 @@ func newTopologySemanticRecorder(
 }
 
 func (r *topologySemanticRecorder) record(event topologySemanticEvent) {
-	if r == nil || r.state != topologySemanticCaptureAvailable {
+	if r == nil || r.state != diagnosticCaptureAvailable {
 		return
 	}
 	defer func() {
 		if recover() != nil {
-			r.fail(topologySemanticCaptureReasonProjectionPanic)
+			r.fail(diagnosticCaptureReasonProjectionPanic)
 		}
 	}()
 	if r.projectEvent == nil {
-		r.fail(topologySemanticCaptureReasonProjectionError)
+		r.fail(diagnosticCaptureReasonProjectionError)
 		return
 	}
 	if err := r.projectEvent(r, event); err != nil {
-		r.fail(topologySemanticCaptureReasonProjectionError)
+		r.fail(diagnosticCaptureReasonProjectionError)
 	}
 }
 
 func (r *topologySemanticRecorder) finish() topologySemanticCapture {
 	if r == nil {
-		return topologySemanticCapture{state: topologySemanticCaptureUnavailable}
+		return topologySemanticCapture{state: diagnosticCaptureUnavailable}
 	}
 	return topologySemanticCapture{
 		state:        r.state,
@@ -292,11 +299,11 @@ func (r *topologySemanticRecorder) finish() topologySemanticCapture {
 
 func (r *topologySemanticRecorder) admit(records, logicalBytes uint64) bool {
 	if records > r.limits.maxRecords-r.recordCount {
-		r.limit(topologySemanticCaptureReasonRecordLimit)
+		r.limit(diagnosticCaptureReasonRecordLimit)
 		return false
 	}
 	if logicalBytes > r.limits.maxLogicalBytes-r.logicalBytes {
-		r.limit(topologySemanticCaptureReasonByteLimit)
+		r.limit(diagnosticCaptureReasonByteLimit)
 		return false
 	}
 	r.recordCount += records
@@ -304,14 +311,14 @@ func (r *topologySemanticRecorder) admit(records, logicalBytes uint64) bool {
 	return true
 }
 
-func (r *topologySemanticRecorder) limit(reason topologySemanticCaptureReason) {
-	r.state = topologySemanticCaptureLimitExceeded
+func (r *topologySemanticRecorder) limit(reason diagnosticCaptureReason) {
+	r.state = diagnosticCaptureLimitExceeded
 	r.reason = reason
 	r.evidence = nil
 }
 
-func (r *topologySemanticRecorder) fail(reason topologySemanticCaptureReason) {
-	r.state = topologySemanticCaptureUnavailable
+func (r *topologySemanticRecorder) fail(reason diagnosticCaptureReason) {
+	r.state = diagnosticCaptureUnavailable
 	r.reason = reason
 	r.evidence = nil
 }
@@ -502,4 +509,59 @@ func topologySemanticBGPRowLogicalBytes(row ddsnmp.BGPRow) uint64 {
 		len(row.Descriptors.LocalAddress)+len(row.Descriptors.LocalAS)+len(row.Descriptors.LocalIdentifier)+
 		len(row.Descriptors.PeerIdentifier)+len(row.Descriptors.PeerType)+len(row.Descriptors.BGPVersion)+
 		len(row.Descriptors.Description)+len(row.State.State)+len(row.State.Raw)+19) + topologySemanticStringMapBytes(row.Tags)
+}
+
+func applyTopologySemanticGlobalLimits(
+	states map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
+	snapshots map[ddsnmp.DeviceRegistrationID]*topologyDeviceSnapshot,
+	limits topologySemanticLimits,
+) {
+	records := uint64(1 + len(states))
+	if len(states) == 0 {
+		records += uint64(len(snapshots))
+	} else {
+		for registrationID := range snapshots {
+			if _, ok := states[registrationID]; !ok {
+				records++
+			}
+		}
+	}
+	logicalBytes := uint64(topologyDiagnosticCutLogicalBytes) + (records-1)*topologyDiagnosticRowLogicalBytes
+	for registrationID, state := range states {
+		if _, replaced := snapshots[registrationID]; replaced || state.generation == nil {
+			continue
+		}
+		capture := state.generation.semantic
+		if capture.state == diagnosticCaptureAvailable {
+			records += capture.recordCount
+			logicalBytes += capture.logicalBytes
+		}
+	}
+
+	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(snapshots))
+	for registrationID := range snapshots {
+		registrationIDs = append(registrationIDs, registrationID)
+	}
+	slices.Sort(registrationIDs)
+	for _, registrationID := range registrationIDs {
+		snapshot := snapshots[registrationID]
+		if snapshot == nil || snapshot.semantic.state != diagnosticCaptureAvailable {
+			continue
+		}
+		capture := &snapshot.semantic
+		if records > limits.maxRecords || capture.recordCount > limits.maxRecords-records {
+			capture.state = diagnosticCaptureLimitExceeded
+			capture.reason = diagnosticCaptureReasonGlobalRecordLimit
+			capture.evidence = nil
+			continue
+		}
+		if logicalBytes > limits.maxLogicalBytes || capture.logicalBytes > limits.maxLogicalBytes-logicalBytes {
+			capture.state = diagnosticCaptureLimitExceeded
+			capture.reason = diagnosticCaptureReasonGlobalByteLimit
+			capture.evidence = nil
+			continue
+		}
+		records += capture.recordCount
+		logicalBytes += capture.logicalBytes
+	}
 }

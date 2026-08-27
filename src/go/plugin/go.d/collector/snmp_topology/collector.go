@@ -11,9 +11,11 @@ import (
 	"net"
 	"net/netip"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -75,21 +77,24 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 	}
 	metricStore := metrix.NewCollectorStore()
 	return &Collector{
-		deviceStates:     make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
-		topologyRegistry: newTopologyRegistryWithResolver(reverseDNS),
-		deviceSource:     deviceStore,
-		trapEnrichment:   trapEnrichment,
-		newSnmpClient:    gosnmp.NewHandler,
+		deviceStates:          make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
+		topologyRegistry:      newTopologyRegistryWithResolver(reverseDNS),
+		deviceSource:          deviceStore,
+		deviceLifecycleSource: deviceStore,
+		trapEnrichment:        trapEnrichment,
+		newSnmpClient:         gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
 		resolveTargetIPs: func(ctx context.Context, host string) ([]netip.Addr, error) {
 			return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 		},
-		now:            time.Now,
-		semanticLimits: defaultTopologySemanticLimits,
-		store:          metricStore,
-		metrics:        newCollectorMetrics(metricStore),
+		now:                          time.Now,
+		semanticLimits:               defaultTopologySemanticLimits,
+		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
+		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
+		store:                        metricStore,
+		metrics:                      newCollectorMetrics(metricStore),
 	}
 }
 
@@ -98,11 +103,14 @@ type (
 		collectorapi.Base `yaml:",inline"`
 		Config            `yaml:",inline"`
 
-		deviceStates       map[ddsnmp.DeviceRegistrationID]deviceRefreshState
-		generationSequence uint64
-		topologyRegistry   *topologyRegistry
-		deviceSource       deviceSource
-		trapEnrichment     *TrapEnrichmentHandle
+		deviceStates                    map[ddsnmp.DeviceRegistrationID]deviceRefreshState
+		generationSequence              uint64
+		topologyRegistry                *topologyRegistry
+		deviceSource                    deviceSource
+		deviceLifecycleSource           deviceLifecycleSource
+		trapEnrichment                  *TrapEnrichmentHandle
+		lastAbortedTopologyDiagnostic   atomic.Pointer[topologyAbortedSweepDiagnostic]
+		topologyDiagnosticAbortSequence atomic.Uint64
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -111,12 +119,14 @@ type (
 		store   metrix.CollectorStore
 		metrics *collectorMetrics
 
-		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient    func() gosnmp.Handler
-		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
-		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
-		now              func() time.Time
-		semanticLimits   topologySemanticLimits
+		topologyProfiles             func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
+		newSnmpClient                func() gosnmp.Handler
+		newDdSnmpColl                func(ddsnmpcollector.Config) ddCollector
+		resolveTargetIPs             func(context.Context, string) ([]netip.Addr, error)
+		now                          func() time.Time
+		semanticLimits               topologySemanticLimits
+		diagnosticGlobalLimits       topologySemanticLimits
+		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -231,6 +241,7 @@ func (c *Collector) Cleanup(context.Context) {
 
 	c.deviceStates = make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState)
 	c.topologyRegistry.publishGeneration(nil)
+	c.lastAbortedTopologyDiagnostic.Store(nil)
 	c.recordCleanupStats()
 }
 
@@ -240,6 +251,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	defer c.refreshMu.Unlock()
 
 	entries := c.getRegisteredDevices()
+	previousStates := c.deviceStates
 	refreshEvery := c.refreshEvery()
 	now := c.currentTime()
 	seen := make(map[ddsnmp.DeviceRegistrationID]bool, len(entries))
@@ -251,6 +263,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	successfulSnapshots := make(map[ddsnmp.DeviceRegistrationID]*topologyDeviceSnapshot)
 
 	plans := make([]topologyRefreshDevicePlan, 0, len(entries))
+	var selected map[ddsnmp.DeviceRegistrationID]bool
 	for _, entry := range entries {
 		registrationID := entry.RegistrationID
 		dev := entry.Info
@@ -259,6 +272,10 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		state, exists := nextStates[registrationID]
 		if !exists || state.nextRetry.IsZero() || !now.Before(state.nextRetry) {
 			plans = append(plans, topologyRefreshDevicePlan{registrationID: registrationID, device: dev})
+			if selected == nil {
+				selected = make(map[ddsnmp.DeviceRegistrationID]bool)
+			}
+			selected[registrationID] = true
 		}
 	}
 
@@ -308,6 +325,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	}
 
 	if ctx.Err() != nil {
+		c.publishAbortedTopologyDiagnostic(start, topologyDiagnosticAbortCanceled, len(entries), len(plans))
 		stats.cachedDevices = c.topologyRegistry.acquireGeneration().deviceCount()
 		stats.completedAt = c.currentTime()
 		stats.duration = stats.completedAt.Sub(start)
@@ -315,9 +333,16 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	}
 
 	pruneUnregisteredDeviceStates(nextStates, seen)
+	applyTopologySemanticGlobalLimits(nextStates, successfulSnapshots, c.currentTopologyDiagnosticGlobalLimits())
 	publishedAt := c.currentTime()
 	nextSequence := c.generationSequence + 1
-	for registrationID, snapshot := range successfulSnapshots {
+	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(successfulSnapshots))
+	for registrationID := range successfulSnapshots {
+		registrationIDs = append(registrationIDs, registrationID)
+	}
+	slices.Sort(registrationIDs)
+	for _, registrationID := range registrationIDs {
+		snapshot := successfulSnapshots[registrationID]
 		state := nextStates[registrationID]
 		state.generation = activateTopologyDeviceSnapshot(registrationID, nextSequence, publishedAt, snapshot)
 		nextStates[registrationID] = state
@@ -325,6 +350,17 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	c.deviceStates = nextStates
 	c.generationSequence = nextSequence
 	generation := newTopologyGeneration(c.generationSequence, publishedAt, nextStates)
+	generation.diagnostic = c.projectCommittedTopologyDiagnosticCut(topologyDiagnosticCutInput{
+		sequence:       c.generationSequence,
+		startedAt:      start,
+		publishedAt:    publishedAt,
+		entries:        entries,
+		selected:       selected,
+		seen:           seen,
+		previousStates: previousStates,
+		states:         nextStates,
+		limits:         c.currentTopologyDiagnosticGlobalLimits(),
+	})
 	c.topologyRegistry.publishGeneration(generation)
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()
@@ -343,6 +379,7 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 	start := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
+			c.publishAbortedTopologyDiagnostic(start, topologyDiagnosticAbortPanic, 0, 0)
 			c.recordRefreshStats(refreshStats{
 				errors:      1,
 				completedAt: time.Now(),
@@ -557,6 +594,13 @@ func (c *Collector) currentTopologySemanticLimits() topologySemanticLimits {
 		return defaultTopologySemanticLimits
 	}
 	return c.semanticLimits
+}
+
+func (c *Collector) currentTopologyDiagnosticGlobalLimits() topologySemanticLimits {
+	if c.diagnosticGlobalLimits.maxRecords == 0 || c.diagnosticGlobalLimits.maxLogicalBytes == 0 {
+		return defaultTopologyDiagnosticGlobalLimits
+	}
+	return c.diagnosticGlobalLimits
 }
 
 func (c *Collector) currentTime() time.Time {

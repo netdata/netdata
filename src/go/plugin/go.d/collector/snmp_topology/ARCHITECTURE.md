@@ -164,6 +164,27 @@ sweeps. A failed attempt retains the last successful device generation and its
 original freshness deadline; a canceled or panicking sweep does not publish a
 partial vector.
 
+Diagnostics preserve two intentionally independent inventory cuts:
+
+- the current `DeviceStore` lifecycle cut, which can advance when a normal SNMP
+  job initializes, checks, collects, becomes topology-ready, or exits;
+- the topology sweep cut attached to the same immutable generation as the
+  Function-visible device vector.
+
+The topology cut retains the exact start-of-sweep registration vector. Each row
+separates whether the job was selected, its committed outcome/retry state, its
+last successful evidence reference and capture state, and whether that retained
+generation is renderable or expired. Registrations removed since the preceding
+cut are recorded separately. A canceled or panicking sweep leaves both the
+published topology generation and its cut unchanged and replaces only one
+bounded last-aborted marker.
+
+Per-device semantic limits and one global latest-view record/logical-byte limit
+are checked directly. The global limit includes retained semantic evidence and
+sweep rows; lifecycle rows are admitted independently against the remaining
+budget when diagnostics are acquired. There are no reservations, sessions,
+queues, or attempt ledgers.
+
 ## Topology Profile Composition
 
 Topology profile selection uses the shared SNMP profile catalog. Matching is

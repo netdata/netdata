@@ -44,7 +44,7 @@ func BenchmarkTopologySemanticIngest(b *testing.B) {
 					consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventProfileTags, profiles: pms})
 					consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventTopologyMetrics, profiles: pms})
 					consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
-					if recorder != nil && recorder.finish().state != topologySemanticCaptureAvailable {
+					if recorder != nil && recorder.finish().state != diagnosticCaptureAvailable {
 						b.Fatal("semantic capture unavailable")
 					}
 				}

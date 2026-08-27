@@ -107,7 +107,7 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 
 	live, _ := freezeTopologyBuilder(builder)
 	capture := recorder.finish()
-	require.Equal(t, topologySemanticCaptureAvailable, capture.state)
+	require.Equal(t, diagnosticCaptureAvailable, capture.state)
 	require.NotNil(t, capture.evidence)
 	require.NotZero(t, capture.recordCount)
 	require.NotZero(t, capture.logicalBytes)
@@ -148,7 +148,7 @@ func TestTopologySemanticCaptureIgnoresRejectedBGPRows(t *testing.T) {
 
 	recorder.record(topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
 	capture := recorder.finish()
-	require.Equal(t, topologySemanticCaptureAvailable, capture.state)
+	require.Equal(t, diagnosticCaptureAvailable, capture.state)
 	require.Len(t, capture.evidence.events, 1)
 	require.True(t, capture.evidence.events[0].profiles[0].bgpFailed)
 	require.Empty(t, capture.evidence.events[0].profiles[0].bgpRows)
@@ -180,8 +180,8 @@ func TestTopologySemanticCaptureLimitFailsOpen(t *testing.T) {
 
 	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
 	capture := recorder.finish()
-	require.Equal(t, topologySemanticCaptureLimitExceeded, capture.state)
-	require.Equal(t, topologySemanticCaptureReasonRecordLimit, capture.reason)
+	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
+	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
 	require.Nil(t, capture.evidence)
 	require.EqualValues(t, 1234, builder.localDevice.SysUptime, "capture limits must not change live ingestion")
 }
@@ -202,8 +202,8 @@ func TestTopologySemanticCaptureErrorAndPanicFailOpen(t *testing.T) {
 
 		consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
 		capture := recorder.finish()
-		require.Equal(t, topologySemanticCaptureUnavailable, capture.state)
-		require.Equal(t, topologySemanticCaptureReasonProjectionError, capture.reason)
+		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
+		require.Equal(t, diagnosticCaptureReasonProjectionError, capture.reason)
 		require.Nil(t, capture.evidence)
 		require.Len(t, builder.bgpPeersByKey, 1, "projection errors must not change live ingestion")
 		require.NotContains(t, fmt.Sprintf("%+v", capture), pms[0].BGPRows[0].OriginProfileID)
@@ -220,8 +220,8 @@ func TestTopologySemanticCaptureErrorAndPanicFailOpen(t *testing.T) {
 			consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
 		})
 		capture := recorder.finish()
-		require.Equal(t, topologySemanticCaptureUnavailable, capture.state)
-		require.Equal(t, topologySemanticCaptureReasonProjectionPanic, capture.reason)
+		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
+		require.Equal(t, diagnosticCaptureReasonProjectionPanic, capture.reason)
 		require.EqualValues(t, 1234, builder.localDevice.SysUptime)
 	})
 }
@@ -240,7 +240,7 @@ func completeTestTopologySemanticEvidence(t *testing.T) *topologySemanticEvidenc
 		recorder.record(event)
 	}
 	capture := recorder.finish()
-	require.Equal(t, topologySemanticCaptureAvailable, capture.state)
+	require.Equal(t, diagnosticCaptureAvailable, capture.state)
 	return capture.evidence
 }
 

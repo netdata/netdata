@@ -47,6 +47,7 @@ type topologyGeneration struct {
 	publishedAt       time.Time
 	devices           []*topologyDeviceGeneration
 	renderableDevices []*topologyDeviceGeneration
+	diagnostic        *topologySweepDiagnosticCut
 }
 
 func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
