@@ -4,6 +4,12 @@
 #include "ram/rrddim_mem.h"
 #ifdef ENABLE_DBENGINE
 #include "engine/rrdengineapi.h"
+
+// The vtable hands over the RRDDIM because the RAM backend keeps a reference to it;
+// dbengine only ever needs the dimension's uuid.
+static STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+    return rrdeng_metric_get_or_create_by_id(si, rd->uuid);
+}
 #endif
 
 static STORAGE_ENGINE engines[] = {
@@ -60,7 +66,7 @@ static STORAGE_ENGINE engines[] = {
         .api = {
             .metric_get_by_id = rrdeng_metric_get_by_id,
             .metric_get_by_uuid = rrdeng_metric_get_by_uuid,
-            .metric_get_or_create = rrdeng_metric_get_or_create,
+            .metric_get_or_create = dbengine_metric_get_or_create,
             .metric_dup = rrdeng_metric_dup,
             .metric_release = rrdeng_metric_release,
             .metric_retention_by_id = rrdeng_metric_retention_by_id,

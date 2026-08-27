@@ -27,7 +27,7 @@ extern uint8_t tier_page_type[];
 
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh);
