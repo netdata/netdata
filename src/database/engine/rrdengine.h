@@ -407,7 +407,6 @@ typedef struct tier_config_prototype {
     uint8_t page_type;                          // default page type for this context
     uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
     time_t max_retention_s;                     // The max retention in seconds
-    uint8_t disk_percentage;                    // percentage of metadata that contribute towards tier space used
     uint8_t global_compress_alg;                // the wanted compression algorithm
     char dbfiles_path[FILENAME_MAX + 1];
 
@@ -704,7 +703,6 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 
 // --------------------------------------------------------------------------------------------------------------------
 uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
-void rrdeng_calculate_tier_disk_space_percentage(void);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 void dbengine_shutdown();
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);

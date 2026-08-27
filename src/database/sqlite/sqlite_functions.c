@@ -757,22 +757,6 @@ void sqlite_close_databases(void)
     spinlock_unlock(&sqlite_spinlock);
 }
 
-uint64_t get_total_database_space(void)
-{
-    return 0;
-
-/*
-    if (!new_dbengine_defaults)
-        return 0;
-
-    uint64_t database_space = sqlite_get_meta_space() + sqlite_get_context_space();
-#ifdef ENABLE_ML
-    database_space +=  sqlite_get_ml_space();
-#endif
-    return database_space;
-*/
-}
-
 #define SQLITE_HEAP_HARD_LIMIT (256 * 1024 * 1024)
 #define SQLITE_HEAP_SOFT_LIMIT (32 * 1024 * 1024)
 
