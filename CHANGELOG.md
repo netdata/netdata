@@ -139,6 +139,12 @@
 - Regenerate integrations docs ([#23647](https://github.com/netdata/netdata/issues/23647))
 - Document Learn checksum ownership and recovery validation ([#23652](https://github.com/netdata/netdata/issues/23652))
 - Fix streaming compression precedence and cadence-aware receiver liveness ([#23615](https://github.com/netdata/netdata/issues/23615))
+- Fix(dbengine): prevent negative tier retention reporting ([#23648](https://github.com/netdata/netdata/issues/23648))
+- Fix journalfile stale MRG metric double free ([#23560](https://github.com/netdata/netdata/issues/23560))
+- Fix(mcp): drop dead NULL check in mcp_function_get_info ([#23655](https://github.com/netdata/netdata/issues/23655))
+- Fix(go.d/jobmgr): converge accepted job activation asynchronously ([#23653](https://github.com/netdata/netdata/issues/23653))
+- Fix issues with alert (windows) ([#23559](https://github.com/netdata/netdata/issues/23559))
+- Refactor(go.d/snmp_topology): publish immutable topology generations ([#23659](https://github.com/netdata/netdata/issues/23659))
 
 ## [2.11.0] - 2026-08-12
 
