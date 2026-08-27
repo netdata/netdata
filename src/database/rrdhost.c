@@ -9,6 +9,17 @@
 RRDHOST *localhost = NULL;
 netdata_rwlock_t rrd_rwlock;
 
+// Bridge for the storage engine, which no longer sees RRDHOST: does localhost keep this tier on
+// dbengine? Answers false while localhost does not exist yet. Goes away once the engine tracks
+// its own active tiers.
+bool rrdhost_localhost_tier_is_dbengine(size_t tier) {
+    if(!localhost || tier >= RRD_STORAGE_TIERS)
+        return false;
+
+    STORAGE_ENGINE *eng = localhost->db[tier].eng;
+    return eng && eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE;
+}
+
 static void __attribute__((constructor)) init_lock(void) {
     netdata_rwlock_init(&rrd_rwlock);
 }

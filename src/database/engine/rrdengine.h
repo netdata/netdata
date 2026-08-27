@@ -3,12 +3,29 @@
 #ifndef NETDATA_RRDENGINE_H
 #define NETDATA_RRDENGINE_H
 
+// START HERE
+//
+// dbengine is netdata's tiered time-series store. Vocabulary used throughout this directory:
+//
+//   ctx (struct rrdengine_instance)   one tier of one database: a directory of datafiles and their journals;
+//                                     the daemon's tiers are multidb_ctx[]
+//   datafile / extent / page          on-disk container / a compressed group of pages / one metric's samples
+//   journalfile                       the per-datafile index of extents and metrics (v1 while writing, v2 when sealed)
+//   MRG, the metric registry          process-wide: every metric's uuid, section (its ctx) and retention (mrg.h)
+//   PGC, the page cache               process-wide caches shared by all ctxs (cache.h, pagecache.h)
+//   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
+//   the event loop (rrdeng_main)      the single libuv thread that owns datafile I/O, flushing and rotation
+//
+// The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable; the daemon
+// symbols the engine still depends on are listed, one by one, in rrdengine-daemon.h.
+
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../rrd.h"
+#include "../storage-engine-types.h"
+#include "rrdengine-daemon.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
 #include "datafile.h"
