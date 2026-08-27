@@ -87,9 +87,9 @@ order, including unsuccessful candidates before a winner. Replay injects those t
 it does not consult live DNS, embedded OUI data, the profile catalog, SNMP, configuration, the filesystem, or the clock.
 
 Graph replay uses one optional work limiter across L2 normalization, projection, policies, L3 enrichment, focus shaping,
-and v1 rendering. The same limiter covers both strict and probable projections. Each data-dependent sort or
-multiplicative stage charges before it executes; exhaustion is returned through the normal graph-build error path.
-Production passes no limiter and therefore does no accounting work.
+and v1 rendering. The same limiter covers both strict and probable projections. Before each bounded stage executes, it
+charges a checked conservative envelope for data-dependent sorts and multiplicative work. Exhaustion is returned through
+the normal graph-build error path. Production passes no limiter and therefore does no accounting work.
 
 When no recorder is installed, the collector does not construct diagnostic DTOs, copy topology rows, wrap DNS/OUI
 lookups, or run an extra graph/render pass. The production topology and Function result remain authoritative if capture

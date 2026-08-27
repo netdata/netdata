@@ -386,10 +386,10 @@ the replayed payload to equal the live payload exactly.
 Diagnostic graph replay passes one work limiter through L2 normalization,
 projection, policies, L3 enrichment, focus shaping, and v1 rendering. The
 low-confidence map charges both its strict and probable projections to that
-same budget. Data-dependent sorts and multiplicative stages charge before they
-execute, and exhaustion propagates through the ordinary graph-build error
-path. Normal production rendering supplies no limiter and performs no work
-accounting.
+same budget. Before each bounded stage executes, it charges a checked
+conservative envelope for its data-dependent sorts and multiplicative work.
+Exhaustion propagates through the ordinary graph-build error path. Normal
+production rendering supplies no limiter and performs no work accounting.
 
 Recorder admission and sealing are asynchronous:
 

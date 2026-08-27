@@ -509,11 +509,12 @@ schema and closures in that directory.
 - **Graph work bound:** Graph replay MUST pass one optional limiter through L2
   normalization, projection, policies, L3 enrichment, focus shaping, and v1
   rendering. The probable-map strict and probable projections MUST share that
-  limiter. Charge each data-dependent sort and multiplicative stage before it
-  executes, return exhaustion through the ordinary error path, and keep normal
-  production callers on the nil-limiter path. `l2topology.ToGraph` is the
-  single error-capable projection API; do not add a compatibility wrapper or a
-  second checked entry point.
+  limiter. Before a bounded stage executes, charge a checked conservative
+  envelope for its data-dependent sorts and multiplicative work. Return
+  exhaustion through the ordinary error path and keep normal production
+  callers on the nil-limiter path. `l2topology.ToGraph` is the single
+  error-capable projection API; do not add a compatibility wrapper or a second
+  checked entry point.
 - **Integrity:** Content hashes prove typed byte identity and graph
   consistency. Exact v1 members remain `restricted` and `sanitized: false`.
 - **Recorder hot path:** Disabled capture MUST perform no DTO projection or
