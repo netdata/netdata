@@ -2365,10 +2365,6 @@ uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_
     // including it in the active_space
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) - active_space;
 
-    uint64_t database_space = get_total_database_space();
-    uint64_t adjusted_database_space =  database_space * ctx->config.disk_percentage / 100 ;
-    estimated_disk_space += adjusted_database_space;
-
     return estimated_disk_space;
 }
 
@@ -2552,34 +2548,6 @@ uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx)
     OS_SYSTEM_DISK_SPACE space = os_disk_space(ctx->config.dbfiles_path);
     free_bytes = OS_SYSTEM_DISK_SPACE_OK(space) ? space.free_bytes : 0;
     return (free_bytes - (free_bytes * 5 / 100));
-}
-
-void rrdeng_calculate_tier_disk_space_percentage(void)
-{
-    uint64_t tier_space[RRD_STORAGE_TIERS];
-
-    if (!localhost)
-        return;
-
-    uint64_t total_diskspace = 0;
-    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
-        STORAGE_ENGINE *eng = localhost->db[tier].eng;
-        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE) {
-            tier_space[tier] = 0;
-            continue;
-        }
-        uint64_t tier_disk_space = multidb_ctx[tier]->config.max_disk_space ?
-                                       multidb_ctx[tier]->config.max_disk_space :
-                                       rrdeng_get_directory_free_bytes_space(multidb_ctx[tier]);
-        total_diskspace += tier_disk_space;
-        tier_space[tier] = tier_disk_space;
-    }
-
-    if (total_diskspace) {
-        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-            multidb_ctx[tier]->config.disk_percentage = (100 * tier_space[tier] / total_diskspace);
-        }
-    }
 }
 
 #define NOT_DELETING_FILES(ctx)                                                                                        \

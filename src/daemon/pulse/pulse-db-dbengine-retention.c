@@ -11,8 +11,6 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
     if (!localhost)
         return;
 
-    rrdeng_calculate_tier_disk_space_percentage();
-
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
