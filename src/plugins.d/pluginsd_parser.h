@@ -58,6 +58,7 @@ typedef struct parser_user_object {
     int trust_durations;
     RRDLABELS *new_host_labels;
     size_t clabel_count;
+    bool clabel_changed;                     // any CLABEL in this commit changed a key, value or source
     size_t data_collections_count;
     int enabled;
     bool retry;
