@@ -567,6 +567,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         };
 
         rd = dictionary_set_advanced(st->rrddim_root_index, tmp.id, -1, NULL, rrddim_size(), &tmp);
+
+        if(unlikely(!rd))
+            // The index refused the insert, which only happens once
+            // rrddim_index_destroy() has destroyed it - and that runs from
+            // rrdset_free(), i.e. this chart is already being freed. Retrying
+            // can never succeed: the loop above would spin at 100% CPU forever
+            // on a dictionary that refuses every insert. Returning NULL is not
+            // an option either - rrddim_add() callers dereference the result
+            // unconditionally (the usual idiom is rrddim_set_by_pointer() on
+            // the very next line), so this mirrors rrdset_create_custom().
+            fatal("RRDDIM: dimension '%s' of chart '%s' on host '%s' cannot be created: "
+                  "the chart's dimension index is being destroyed. "
+                  "A collector is still adding dimensions to a chart that is being freed.",
+                  id, rrdset_id(st), rrdhost_hostname(st->rrdhost));
     }
 
     return(rd);
