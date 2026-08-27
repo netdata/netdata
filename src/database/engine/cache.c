@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cache.h"
 
+// relaxed atomics for the cache statistics; the engine keeps its own names for them
+#define pgc_atomic_add_fetch(variable, value) __atomic_add_fetch(variable, value, __ATOMIC_RELAXED)
+#define pgc_atomic_sub_fetch(variable, value) __atomic_sub_fetch(variable, value, __ATOMIC_RELAXED)
+
 /* STATES AND TRANSITIONS
  *
  *   entry     |       entry
@@ -505,7 +509,7 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
 
         if(signal) {
             completion_mark_complete_a_job(&cache->evictor.completion);
-            p2_add_fetch(&cache->stats.p2_waste_evict_thread_signals, 1);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_evict_thread_signals, 1);
         }
     }
 
@@ -535,7 +539,7 @@ static ALWAYS_INLINE void evict_pages_inline(PGC *cache, bool on_release) {
     if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
         if (per1000 > cache->config.aggressive_evict_per1000 && !on_release) {
             // the threads that add pages, turn into evictors when the cache needs evictions aggressively
-            p2_add_fetch(&cache->stats.p2_waste_evictions_inline_on_add, 1);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_evictions_inline_on_add, 1);
             evict_pages(cache,
                         cache->config.max_skip_pages_per_inline_eviction,
                         cache->config.max_pages_per_inline_eviction,
@@ -543,7 +547,7 @@ static ALWAYS_INLINE void evict_pages_inline(PGC *cache, bool on_release) {
         }
         else if (per1000 > cache->config.severe_pressure_per1000 && on_release) {
             // the threads that are releasing pages, turn into evictors when the cache is critical
-            p2_add_fetch(&cache->stats.p2_waste_evictions_inline_on_release, 1);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_evictions_inline_on_release, 1);
 
             evict_pages(cache,
                         cache->config.max_skip_pages_per_inline_eviction,
@@ -564,9 +568,9 @@ static ALWAYS_INLINE void evict_on_page_release_when_permitted(PGC *cache) {
 static ALWAYS_INLINE void flush_inline(PGC *cache, bool on_release) {
     if(!(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_NO_INLINE) && flushing_critical(cache)) {
         if (on_release)
-            p2_add_fetch(&cache->stats.p2_waste_flush_on_release, 1);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_flush_on_release, 1);
         else
-            p2_add_fetch(&cache->stats.p2_waste_flush_on_add, 1);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_flush_on_add, 1);
 
         flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
     }
@@ -1274,7 +1278,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         }
 
         if(++spins > 1 && !this_loop_evicted)
-            p2_add_fetch(&cache->stats.p2_waste_evict_useless_spins, 1);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_evict_useless_spins, 1);
 
         this_loop_evicted = 0;
 
@@ -1477,7 +1481,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
 premature_exit:
     if(unlikely(total_pages_relocated))
-        p2_add_fetch(&cache->stats.p2_waste_evict_relocated, total_pages_relocated);
+        pgc_atomic_add_fetch(&cache->stats.p2_waste_evict_relocated, total_pages_relocated);
 
     __atomic_sub_fetch(&cache->stats.p0_workers_evict, 1, __ATOMIC_RELAXED);
 
@@ -1496,7 +1500,7 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     if(unlikely(entry->end_time_s < 0))
         entry->end_time_s = 0;
 
-    p2_add_fetch(&cache->stats.p2_workers_add, 1);
+    pgc_atomic_add_fetch(&cache->stats.p2_workers_add, 1);
 
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
 
@@ -1611,9 +1615,9 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     }
 
     if(spins > 1)
-        p2_add_fetch(&cache->stats.p2_waste_insert_spins, spins - 1);
+        pgc_atomic_add_fetch(&cache->stats.p2_waste_insert_spins, spins - 1);
 
-    p2_sub_fetch(&cache->stats.p2_workers_add, 1);
+    pgc_atomic_sub_fetch(&cache->stats.p2_workers_add, 1);
 
     if(!entry->hot)
         evict_on_clean_page_added(cache);
@@ -1840,7 +1844,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
         return false;
     }
 
-    p2_add_fetch(&cache->stats.p2_workers_flush, 1);
+    pgc_atomic_add_fetch(&cache->stats.p2_workers_flush, 1);
 
     bool have_dirty_lock = true;
 
@@ -1959,8 +1963,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
                 // page ptr may be invalid now
             }
 
-            p2_add_fetch(&cache->stats.p2_waste_flushes_cancelled, pages_cancelled);
-            p2_add_fetch(&cache->stats.flushes_cancelled_size, pages_cancelled_size);
+            pgc_atomic_add_fetch(&cache->stats.p2_waste_flushes_cancelled, pages_cancelled);
+            pgc_atomic_add_fetch(&cache->stats.flushes_cancelled_size, pages_cancelled_size);
 
             internal_fatal(pages_added != pages_cancelled || pages_added_size != pages_cancelled_size,
                            "DBENGINE CACHE: flushing cancel pages mismatch");
@@ -2049,7 +2053,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
         pgc_queue_unlock(cache, &cache->dirty);
     }
 
-    p2_sub_fetch(&cache->stats.p2_workers_flush, 1);
+    pgc_atomic_sub_fetch(&cache->stats.p2_workers_flush, 1);
 
     return stopped_before_finishing;
 }
@@ -2299,7 +2303,7 @@ ALWAYS_INLINE void pgc_page_release(PGC *cache, PGC_PAGE *page) {
 }
 
 ALWAYS_INLINE void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page, bool never_flush) {
-    p2_add_fetch(&cache->stats.p2_workers_hot2dirty, 1);
+    pgc_atomic_add_fetch(&cache->stats.p2_workers_hot2dirty, 1);
 
 //#ifdef NETDATA_INTERNAL_CHECKS
 //    page_transition_lock(cache, page);
@@ -2314,7 +2318,7 @@ ALWAYS_INLINE void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page,
     page_release(cache, page, true);
     // page ptr may be invalid now
 
-    p2_sub_fetch(&cache->stats.p2_workers_hot2dirty, 1);
+    pgc_atomic_sub_fetch(&cache->stats.p2_workers_hot2dirty, 1);
 
     // flush, if we have to
     if(!never_flush)
@@ -2324,7 +2328,7 @@ ALWAYS_INLINE void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page,
 bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page) {
     bool ret;
 
-    p2_add_fetch(&cache->stats.p2_workers_hot2dirty, 1);
+    pgc_atomic_add_fetch(&cache->stats.p2_workers_hot2dirty, 1);
 
     // prevent accesses from increasing the accesses counter
     page_flag_set(page, PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
@@ -2342,7 +2346,7 @@ bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page) {
         ret = false;
     }
 
-    p2_sub_fetch(&cache->stats.p2_workers_hot2dirty, 1);
+    pgc_atomic_sub_fetch(&cache->stats.p2_workers_hot2dirty, 1);
 
     return ret;
 }
@@ -2510,7 +2514,7 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
     PGC_PAGE *page = NULL;
 
-    p2_add_fetch(&cache->stats.p2_workers_search, 1);
+    pgc_atomic_add_fetch(&cache->stats.p2_workers_search, 1);
 
     size_t *stats_hit_ptr, *stats_miss_ptr;
 
@@ -2533,7 +2537,7 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
     else
         __atomic_add_fetch(stats_miss_ptr, 1, __ATOMIC_RELAXED);
 
-    p2_sub_fetch(&cache->stats.p2_workers_search, 1);
+    pgc_atomic_sub_fetch(&cache->stats.p2_workers_search, 1);
 
     return page;
 }
@@ -2627,7 +2631,7 @@ void pgc_open_cache_to_journal_v2(
     bool startup)
 {
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
-    p2_add_fetch(&cache->stats.p2_workers_jv2_flush, 1);
+    pgc_atomic_add_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
     pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
 
@@ -3022,7 +3026,7 @@ void pgc_open_cache_to_journal_v2(
     aral_by_size_release(ar_pi);
     aral_by_size_release(ar_mi);
 
-    p2_sub_fetch(&cache->stats.p2_workers_jv2_flush, 1);
+    pgc_atomic_sub_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
     // balance-parents: do not flush, there is nothing dirty
     // flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
