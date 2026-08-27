@@ -433,11 +433,23 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+            - name: exclude space metrics on paths
+              description: >-
+                Space-separated, case-insensitive Netdata simple patterns for logical-volume mount points to exclude
+                from disk space collection. Patterns support `*` wildcards and `!` negative terms. For example,
+                `*AssuredRecoveryTemp*` excludes temporary backup volumes with that path component.
+              default_value: ""
+              required: false
         examples:
           folding:
             enabled: true
-            title: ""
-          list: []
+            title: "Configuration"
+          list:
+            - name: Exclude temporary backup volumes
+              description: Exclude logical-volume disk space metrics for mount points that contain `AssuredRecoveryTemp`.
+              config: |
+                [plugin:windows:PerflibStorage]
+                  exclude space metrics on paths = *AssuredRecoveryTemp*
     troubleshooting:
       problems:
         list: []
@@ -465,12 +477,14 @@ modules:
           labels:
             - name: mount_point
               description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
-            - name: driver_type
+            - name: drive_type
               description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
             - name: filesystem
               description: "File system format used on the volume (e.g., NTFS, FAT32)."
             - name: rw_mode
               description: "Current read/write permissions status of the volume (read-only access, read and write access)."
+            - name: serial_number
+              description: "Volume serial number in hexadecimal format."
           metrics:
             - name: disk.space
               description: Disk Space Usage
