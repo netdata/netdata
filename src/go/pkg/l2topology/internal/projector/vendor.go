@@ -7,7 +7,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func inferTopologyVendorFromMatch(match graph.Match) (vendor string, prefix string) {
+func inferTopologyVendorFromMatch(
+	match graph.Match,
+	lookup func(mac string) (vendor string, prefix string),
+) (vendor string, prefix string) {
+	if lookup == nil {
+		lookup = oui.LookupVendorByMAC
+	}
 	candidates := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {
@@ -24,7 +30,7 @@ func inferTopologyVendorFromMatch(match graph.Match) (vendor string, prefix stri
 	}
 
 	for _, mac := range sortedTopologySet(candidates) {
-		if vendor, prefix := oui.LookupVendorByMAC(mac); vendor != "" {
+		if vendor, prefix := lookup(mac); vendor != "" {
 			return vendor, prefix
 		}
 	}

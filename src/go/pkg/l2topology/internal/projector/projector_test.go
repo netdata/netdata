@@ -820,6 +820,7 @@ func TestBuildDeviceActorDetail_ClassifiesDiscoveredByNormalizedDeviceID(t *test
 				topologyDeviceInterfaceSummary{},
 				graph.Match{},
 				nil,
+				nil,
 			)
 			require.Equal(t, test.want, detail.Discovered)
 		})

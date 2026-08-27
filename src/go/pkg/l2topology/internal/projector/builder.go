@@ -170,6 +170,7 @@ func (b *graphBuilder) buildDeviceActors() {
 			b.ifaceSummaryByDevice[dev.ID],
 			b.reporterAliases[dev.ID],
 			b.deviceAddressesByID[dev.ID],
+			b.opts.LookupVendorByMAC,
 		)
 		keys := topologyMatchIdentityKeys(actor.Actor.Match)
 		if len(keys) == 0 {
@@ -211,6 +212,7 @@ func (b *graphBuilder) buildEndpointTopology() {
 		b.layer,
 		b.actorIndex,
 		b.actorMACIndex,
+		b.opts.LookupVendorByMAC,
 	)
 	b.actors = append(b.actors, b.endpointActors.actors...)
 }

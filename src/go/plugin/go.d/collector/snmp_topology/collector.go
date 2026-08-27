@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/diagnostic"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -110,11 +111,12 @@ type (
 		store   metrix.CollectorStore
 		metrics *collectorMetrics
 
-		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient    func() gosnmp.Handler
-		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
-		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
-		now              func() time.Time
+		topologyProfiles   func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
+		newSnmpClient      func() gosnmp.Handler
+		newDdSnmpColl      func(ddsnmpcollector.Config) ddCollector
+		resolveTargetIPs   func(context.Context, string) ([]netip.Addr, error)
+		now                func() time.Time
+		diagnosticRecorder *diagnostic.Recorder
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -322,6 +324,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	c.deviceStates = nextStates
 	c.generationSequence++
 	generation := newTopologyGeneration(c.generationSequence, publishedAt, nextStates)
+	generation.diagnosticMember = c.captureTopologyDiagnosticGeneration(generation)
 	c.topologyRegistry.publishGeneration(generation)
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()
@@ -365,6 +368,10 @@ func (c *Collector) refreshDeviceTopology(
 ) (*topologyDeviceSnapshot, deviceRefreshOutcome) {
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
+	}
+	diagnosticCapture := c.beginTopologyDiagnosticCapture(registrationID)
+	if diagnosticCapture != nil {
+		defer diagnosticCapture.abort()
 	}
 
 	snmpClient, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
@@ -436,16 +443,25 @@ func (c *Collector) refreshDeviceTopology(
 	// seeing the previous global generation until collection is fully ingested.
 	next := c.newDeviceTopologyBuilder(dev)
 	next.targetManagementIPs = append([]netip.Addr(nil), targetManagementIPs...)
+	if diagnosticCapture != nil {
+		diagnosticCapture.setDevice(next, targetManagementIPs, sysUptime, profiles)
+	}
 
-	next.updateTopologySysUptime(sysUptime)
-	next.updateTopologyProfileTags(pms)
-	next.ingestTopologyProfileMetrics(pms)
-	next.ingestTopologyBGPPeers(pms)
-	c.collectTopologyVTPVLANContexts(ctx, next, dev)
+	var semanticObserver topologySemanticObserver
+	if diagnosticCapture != nil {
+		semanticObserver = diagnosticCapture.observe
+	}
+	applyTopologySemanticStream(next, newTopologyMainSemanticStream(sysUptime, pms), semanticObserver)
+	vlanResults := c.collectTopologyVTPVLANContexts(ctx, next.vtpVLANContexts(), dev)
+	applyTopologySemanticStream(next, newTopologyVLANSemanticStream(vlanResults), semanticObserver)
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
 	}
-	return c.freezeTopologyBuilder(next), deviceRefreshOutcomeSuccess
+	snapshot := c.freezeTopologyBuilder(next)
+	if diagnosticCapture != nil {
+		diagnosticCapture.commit(snapshot)
+	}
+	return snapshot, deviceRefreshOutcomeSuccess
 }
 
 func (c *Collector) warnTopologyRefreshFailure(registrationID ddsnmp.DeviceRegistrationID, class, format string, args ...any) {

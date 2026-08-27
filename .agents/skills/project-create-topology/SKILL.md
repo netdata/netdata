@@ -465,6 +465,53 @@ For SNMP managed device actor modals:
   Local regeneration may point the test at that checkout with
   `NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR`.
 
+### SNMP topology diagnostic and replay contract
+
+When changing the SNMP topology semantic stream, observation model, graph
+query, enrichment, shaping, vendor lookup, or renderer, inspect
+`src/go/plugin/go.d/collector/snmp_topology/diagnostic/README.md` and the v1
+schema and closures in that directory.
+
+- **Wire boundary:** Add topology evidence through explicit diagnostic DTOs.
+  MUST NOT serialize runtime collectors, profiles, device connection structs,
+  errors, requests, or graph structs directly.
+- **Credentials:** MUST NOT copy SNMP communities, v3 identity/auth/privacy
+  fields, effective context/security parameters, raw packets, request strings,
+  opaque errors, or absolute profile paths into diagnostic members.
+- **Ordered semantics:** Preserve the executed phase, VLAN context, profile,
+  row, and deterministic shard order. Do not sort semantic rows by value to
+  make them look canonical; last-writer and correlation behavior can depend on
+  production order.
+- **Profile evidence:** Treat captured profile definitions as identity evidence
+  only. MUST NOT execute captured transforms. Any raw-acquisition replay mode
+  needs a separately versioned hermetic and work-bounded transform contract.
+- **One kernel:** Live semantic ingestion and offline semantic replay MUST use
+  `applyTopologySemanticStream` and the same primitive builder operations. Do
+  not add a second topology algorithm or a marshal/unmarshal-back production
+  path.
+- **Generation closure:** A graph query MUST acquire one immutable generation
+  once. Its diagnostic generation references the exact ordered observation
+  handles for that view; unchanged devices reuse their sealed observation
+  without row re-projection.
+- **Ambient inputs:** Global replay MUST inject normalized query options,
+  three-state DNS results, every ordered OUI lookup attempt, and fixed time. It
+  MUST fail rather than read live DNS, embedded OUI data, catalog/config, SNMP,
+  filesystem, or clock state.
+- **Versioning:** Existing member schemas and capability closures are
+  immutable. Add a new member schema or capability revision when required
+  fields, semantics, or replay dependencies change.
+- **Trust:** Content hashes prove typed byte identity, not producer
+  authenticity. Keep integrity, schema validity, completeness, replayability,
+  historical-payload preservation, and authenticity as separate results.
+- **Recorder hot path:** Disabled capture MUST perform no DTO projection or
+  row-dependent work. Enabled capture MUST transfer bounded detached ownership
+  once, keep encoding/hashing off the refresh lock, and never run an artificial
+  graph/render pass or a second Function serialization.
+- **Proof:** Update schema fixtures and closure/replay tests. Run exact
+  observation-checkpoint and live/graph-replay parity, credential canaries, hostile-reader
+  limits, deterministic rendering, race tests, and focused disabled/enabled
+  allocation benchmarks for affected paths.
+
 ## Validation Checklist
 
 - JSON validates against the topology schema.

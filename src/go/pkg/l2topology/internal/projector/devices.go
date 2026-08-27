@@ -21,6 +21,7 @@ func deviceToTopologyActor(
 		ifaceSummary,
 		reporterAliases,
 		deviceAddressStrings(dev),
+		nil,
 	)
 }
 
@@ -29,6 +30,7 @@ func deviceToTopologyActorWithAddresses(
 	source, layer, localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	reporterAliases, addresses []string,
+	lookupVendorByMAC func(string) (string, string),
 ) projectedActor {
 	match := buildDeviceActorMatchWithAddresses(dev, reporterAliases, addresses)
 
@@ -41,7 +43,7 @@ func deviceToTopologyActorWithAddresses(
 			Labels:    cloneStringMap(dev.Labels),
 		},
 		Detail: model.ProjectionActorDetail{
-			Device: buildDeviceActorDetail(dev, localDeviceID, ifaceSummary, match, addresses),
+			Device: buildDeviceActorDetail(dev, localDeviceID, ifaceSummary, match, addresses, lookupVendorByMAC),
 		},
 	}
 }

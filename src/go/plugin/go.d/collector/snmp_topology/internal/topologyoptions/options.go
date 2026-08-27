@@ -36,6 +36,7 @@ type QueryOptions struct {
 	ManagedDeviceFocus     string
 	Depth                  int
 	ResolveDNSName         func(ip string) string
+	LookupVendorByMAC      func(mac string) (vendor string, prefix string)
 }
 
 type ManagedFocusTarget struct {

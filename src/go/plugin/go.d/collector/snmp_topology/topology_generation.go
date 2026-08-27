@@ -7,29 +7,32 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/diagnostic"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 // topologyDeviceSnapshot is the immutable output of one successful device
 // collection. It is not visible to readers until activated at global publish.
 type topologyDeviceSnapshot struct {
-	collectedAt    time.Time
-	freshFor       time.Duration
-	observation    topologymodel.ObservationSnapshot
-	hasObservation bool
-	trap           topologyTrapDeviceGeneration
+	collectedAt           time.Time
+	freshFor              time.Duration
+	observation           topologymodel.ObservationSnapshot
+	hasObservation        bool
+	trap                  topologyTrapDeviceGeneration
+	diagnosticObservation diagnostic.MemberHandle
 }
 
 // topologyDeviceGeneration is an immutable collected snapshot activated at a
 // global publication boundary. Builders and unactivated snapshots are never
 // published to runtime readers.
 type topologyDeviceGeneration struct {
-	registrationID ddsnmp.DeviceRegistrationID
-	collectedAt    time.Time
-	expiresAt      time.Time
-	observation    topologymodel.ObservationSnapshot
-	hasObservation bool
-	trap           topologyTrapDeviceGeneration
+	registrationID        ddsnmp.DeviceRegistrationID
+	collectedAt           time.Time
+	expiresAt             time.Time
+	observation           topologymodel.ObservationSnapshot
+	hasObservation        bool
+	trap                  topologyTrapDeviceGeneration
+	diagnosticObservation diagnostic.MemberHandle
 }
 
 // topologyGeneration is the immutable device vector published after one
@@ -39,6 +42,7 @@ type topologyGeneration struct {
 	publishedAt       time.Time
 	devices           []*topologyDeviceGeneration
 	renderableDevices []*topologyDeviceGeneration
+	diagnosticMember  diagnostic.MemberHandle
 }
 
 func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
@@ -73,12 +77,13 @@ func activateTopologyDeviceSnapshot(
 		expiresAt = publishedAt.Add(snapshot.freshFor)
 	}
 	return &topologyDeviceGeneration{
-		registrationID: registrationID,
-		collectedAt:    snapshot.collectedAt,
-		expiresAt:      expiresAt,
-		observation:    snapshot.observation,
-		hasObservation: snapshot.hasObservation,
-		trap:           snapshot.trap,
+		registrationID:        registrationID,
+		collectedAt:           snapshot.collectedAt,
+		expiresAt:             expiresAt,
+		observation:           snapshot.observation,
+		hasObservation:        snapshot.hasObservation,
+		trap:                  snapshot.trap,
+		diagnosticObservation: snapshot.diagnosticObservation,
 	}
 }
 

@@ -155,6 +155,7 @@ func projectSNMPL2TopologyData(
 		AgentID:                   agentID,
 		CollectedAt:               collectedAt,
 		ResolveDNSName:            options.ResolveDNSName,
+		LookupVendorByMAC:         options.LookupVendorByMAC,
 		CollapseActorsByIP:        options.CollapseActorsByIP,
 		EliminateNonIPInferred:    options.EliminateNonIPInferred,
 		ProbabilisticConnectivity: topologyoptions.IsMapTypeProbable(options.MapType),

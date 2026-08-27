@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"cmp"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -25,20 +26,30 @@ func topologyObservationSnapshots(generation *topologyGeneration) []topologymode
 }
 
 func sortTopologyObservationSnapshots(snapshots []topologymodel.ObservationSnapshot) {
-	sort.Slice(snapshots, func(i, j int) bool {
-		if snapshots[i].LocalDeviceID != snapshots[j].LocalDeviceID {
-			return snapshots[i].LocalDeviceID < snapshots[j].LocalDeviceID
-		}
-		leftMgmt, leftHost := topologyObservationSnapshotIdentity(snapshots[i])
-		rightMgmt, rightHost := topologyObservationSnapshotIdentity(snapshots[j])
-		if leftMgmt != rightMgmt {
-			return leftMgmt < rightMgmt
-		}
-		if leftHost != rightHost {
-			return leftHost < rightHost
-		}
-		return snapshots[i].CollectedAt.Before(snapshots[j].CollectedAt)
+	sort.SliceStable(snapshots, func(i, j int) bool {
+		return compareTopologyObservationSnapshots(snapshots[i], snapshots[j]) < 0
 	})
+}
+
+func compareTopologyObservationSnapshots(left, right topologymodel.ObservationSnapshot) int {
+	if value := cmp.Compare(left.LocalDeviceID, right.LocalDeviceID); value != 0 {
+		return value
+	}
+	leftMgmt, leftHost := topologyObservationSnapshotIdentity(left)
+	rightMgmt, rightHost := topologyObservationSnapshotIdentity(right)
+	if value := cmp.Compare(leftMgmt, rightMgmt); value != 0 {
+		return value
+	}
+	if value := cmp.Compare(leftHost, rightHost); value != 0 {
+		return value
+	}
+	if left.CollectedAt.Before(right.CollectedAt) {
+		return -1
+	}
+	if left.CollectedAt.After(right.CollectedAt) {
+		return 1
+	}
+	return 0
 }
 
 func topologyObservationSnapshotIdentity(snapshot topologymodel.ObservationSnapshot) (managementIP, hostname string) {

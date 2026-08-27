@@ -3,7 +3,9 @@
 package topologyv1
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -41,5 +43,34 @@ func TestRenderRejectsInvalidActorHandles(t *testing.T) {
 			_, err := Render(data)
 			require.Error(t, err)
 		})
+	}
+}
+
+func TestRenderIsDeterministicForProducerLabels(t *testing.T) {
+	handle := topologyV1TestActorHandle("device-a")
+	data := topologymodel.Data{
+		AgentID:     "agent-a",
+		CollectedAt: time.Date(2026, time.August, 27, 12, 0, 0, 0, time.UTC),
+		Actors: []topologymodel.Actor{{
+			ActorHandle: handle,
+			ActorID:     "device-a",
+			ActorType:   "device",
+			Labels: map[string]string{
+				"alpha": "1", "bravo": "2", "charlie": "3", "delta": "4", "echo": "5",
+				"foxtrot": "6", "golf": "7", "hotel": "8", "india": "9", "juliet": "10",
+			},
+		}},
+	}
+
+	first, err := Render(data)
+	require.NoError(t, err)
+	want, err := json.Marshal(first)
+	require.NoError(t, err)
+	for range 100 {
+		next, err := Render(data)
+		require.NoError(t, err)
+		got, err := json.Marshal(next)
+		require.NoError(t, err)
+		require.Equal(t, want, got)
 	}
 }

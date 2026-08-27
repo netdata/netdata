@@ -21,7 +21,7 @@ func TestInferTopologyVendorFromMatch(t *testing.T) {
 		},
 	}
 
-	vendor, prefix := inferTopologyVendorFromMatch(match)
+	vendor, prefix := inferTopologyVendorFromMatch(match, nil)
 
 	require.Equal(t, "Extreme Networks Headquarters", vendor)
 	require.Equal(t, "08EA44", prefix)

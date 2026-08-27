@@ -84,6 +84,7 @@ func buildDeviceActorDetail(
 	ifaceSummary topologyDeviceInterfaceSummary,
 	match graph.Match,
 	addresses []string,
+	lookupVendorByMAC func(string) (string, string),
 ) model.ProjectionDeviceActorDetail {
 	deviceID := strings.TrimSpace(dev.ID)
 	discovered := deviceID != "" && deviceID != strings.TrimSpace(localDeviceID)
@@ -107,7 +108,7 @@ func buildDeviceActorDetail(
 		TopologyRoleCounts:    cloneIntMap(ifaceSummary.roleCount),
 		Ports:                 cloneProjectionPortDetails(ifaceSummary.portStatuses),
 	}
-	derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match)
+	derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match, lookupVendorByMAC)
 	if derivedVendor != "" {
 		detail.VendorDerived = derivedVendor
 		detail.VendorDerivedSource = "mac_oui"

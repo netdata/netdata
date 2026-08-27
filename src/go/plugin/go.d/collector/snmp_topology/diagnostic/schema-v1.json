@@ -1,0 +1,849 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/netdata/netdata/snmp-topology-diagnostic-v1.schema.json",
+  "title": "Netdata SNMP topology diagnostic v1",
+  "oneOf": [
+    { "$ref": "#/$defs/manifest" },
+    { "$ref": "#/$defs/capability_root" },
+    { "$ref": "#/$defs/capture_gap" },
+    { "$ref": "#/$defs/semantic_device" },
+    { "$ref": "#/$defs/semantic_profile" },
+    { "$ref": "#/$defs/semantic_shard" },
+    { "$ref": "#/$defs/observation" },
+    { "$ref": "#/$defs/observation_checkpoint" },
+    { "$ref": "#/$defs/generation" },
+    { "$ref": "#/$defs/graph_query" },
+    { "$ref": "#/$defs/dns_trace" },
+    { "$ref": "#/$defs/oui_trace" }
+  ],
+  "$defs": {
+    "portable_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.:-]{0,127}$",
+      "not": { "pattern": "\\.\\." }
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,8}$"
+    },
+    "terminal_state": {
+      "enum": ["success", "empty", "not_applicable", "failed", "incomplete"]
+    },
+    "capability_key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "revision"],
+      "properties": {
+        "name": { "$ref": "#/$defs/portable_id" },
+        "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "content_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "kind", "schema", "canonicalization", "logical_length", "sha256"],
+      "properties": {
+        "namespace": { "const": "netdata.snmp-topology-diagnostic.member/v1" },
+        "kind": { "$ref": "#/$defs/portable_id" },
+        "schema": { "$ref": "#/$defs/revision" },
+        "canonicalization": { "const": "netdata.canonical-json/v1" },
+        "logical_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "sensitivity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "fidelity", "sanitized"],
+      "properties": {
+        "classification": { "const": "restricted" },
+        "fidelity": { "const": "exact" },
+        "sanitized": { "const": false }
+      }
+    },
+    "authenticity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "enum": ["not_provided", "unauthenticated"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "method"],
+          "properties": {
+            "state": { "const": "authenticated" },
+            "method": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "capability_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "revision", "state", "root"],
+      "properties": {
+        "name": { "$ref": "#/$defs/portable_id" },
+        "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "state": { "$ref": "#/$defs/terminal_state" },
+        "root": { "$ref": "#/$defs/content_ref" }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "canonicalization", "sensitivity", "authenticity", "roots", "members"],
+      "properties": {
+        "format": { "const": "netdata.snmp-topology-diagnostic/v1" },
+        "canonicalization": { "const": "netdata.canonical-json/v1" },
+        "sensitivity": { "$ref": "#/$defs/sensitivity" },
+        "authenticity": { "$ref": "#/$defs/authenticity" },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/capability_ref" }
+        },
+        "members": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/content_ref" }
+        }
+      }
+    },
+    "section_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "state", "expected_records", "members"],
+      "properties": {
+        "name": { "$ref": "#/$defs/portable_id" },
+        "state": { "$ref": "#/$defs/terminal_state" },
+        "expected_records": { "type": "integer", "minimum": 0 },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/content_ref" }
+        }
+      }
+    },
+    "capability_root": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "state", "sections"],
+      "properties": {
+        "capability": { "$ref": "#/$defs/capability_key" },
+        "state": { "$ref": "#/$defs/terminal_state" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/section_inventory" }
+        }
+      }
+    },
+    "string_map": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "nullable_string_map": {
+      "oneOf": [
+        { "$ref": "#/$defs/string_map" },
+        { "type": "null" }
+      ]
+    },
+    "string_array": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "nullable_string_array": {
+      "oneOf": [
+        { "$ref": "#/$defs/string_array" },
+        { "type": "null" }
+      ]
+    },
+    "capture_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first_attempt", "last_attempt", "count", "reason"],
+      "properties": {
+        "first_attempt": { "type": "integer", "minimum": 1 },
+        "last_attempt": { "type": "integer", "minimum": 1 },
+        "count": { "type": "integer", "minimum": 1 },
+        "reason": { "$ref": "#/$defs/portable_id" }
+      }
+    },
+    "semantic_management_address": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address"],
+      "properties": {
+        "address": { "type": "string" },
+        "address_type": { "type": "string" },
+        "if_subtype": { "type": "string" },
+        "if_id": { "type": "string" },
+        "oid": { "type": "string" },
+        "source": { "type": "string" }
+      }
+    },
+    "semantic_chart_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chart_id_suffix": { "type": "string" },
+        "available_metrics": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "semantic_device_dto": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chassis_id", "chassis_id_type"],
+      "properties": {
+        "chassis_id": { "type": "string" },
+        "chassis_id_type": { "type": "string" },
+        "sys_object_id": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "sys_descr": { "type": "string" },
+        "sys_contact": { "type": "string" },
+        "sys_location": { "type": "string" },
+        "sys_uptime": { "type": "integer" },
+        "serial_number": { "type": "string" },
+        "software_version": { "type": "string" },
+        "firmware_version": { "type": "string" },
+        "hardware_version": { "type": "string" },
+        "management_ip": { "type": "string" },
+        "management_addresses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/semantic_management_address" }
+        },
+        "agent_id": { "type": "string" },
+        "agent_job_id": { "type": "string" },
+        "netdata_host_id": { "type": "string" },
+        "chart_id_prefix": { "type": "string" },
+        "chart_context_prefix": { "type": "string" },
+        "device_charts": { "$ref": "#/$defs/string_map" },
+        "interface_charts": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/semantic_chart_ref" }
+        },
+        "vendor": { "type": "string" },
+        "model": { "type": "string" },
+        "ospf_router_id": { "type": "string" },
+        "capabilities": { "$ref": "#/$defs/string_array" },
+        "capabilities_supported": { "$ref": "#/$defs/string_array" },
+        "capabilities_enabled": { "$ref": "#/$defs/string_array" },
+        "labels": { "$ref": "#/$defs/string_map" },
+        "discovered": { "type": "boolean" }
+      }
+    },
+    "semantic_device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id", "registration", "collected_at", "fresh_for_nanoseconds", "agent_id",
+        "local_device", "target_management_ips", "sys_uptime"
+      ],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "registration": { "type": "integer", "minimum": 1 },
+        "collected_at": { "type": "string", "format": "date-time" },
+        "fresh_for_nanoseconds": { "type": "integer", "minimum": 1 },
+        "agent_id": { "type": "string", "minLength": 1 },
+        "local_device": { "$ref": "#/$defs/semantic_device_dto" },
+        "target_management_ips": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  { "type": "string", "format": "ipv4" },
+                  { "type": "string", "format": "ipv6" }
+                ]
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "sys_uptime": { "type": "integer" }
+      }
+    },
+    "profile_definition_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encoding", "effective_definition"],
+      "properties": {
+        "encoding": { "const": "netdata.ddsnmp-topology-profile-evidence-yaml/v1" },
+        "effective_definition": { "type": "string", "minLength": 1 },
+        "bgp_origin_profile_ids": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "semantic_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id", "registration", "role", "ordinal", "origin", "projection", "definition",
+        "definition_sha256"
+      ],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "registration": { "type": "integer", "minimum": 1 },
+        "role": { "enum": ["main", "vlan"] },
+        "vlan_id": { "type": "string" },
+        "ordinal": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "origin": { "type": "string", "minLength": 1 },
+        "projection": { "$ref": "#/$defs/portable_id" },
+        "definition": { "$ref": "#/$defs/profile_definition_evidence" },
+        "definition_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "shard_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id", "registration", "section", "phase", "context", "profile", "shard",
+        "shard_count", "first_ordinal", "record_count"
+      ],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "registration": { "type": "integer", "minimum": 1 },
+        "section": { "$ref": "#/$defs/portable_id" },
+        "phase": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "context": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "profile": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "shard": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "shard_count": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "first_ordinal": { "type": "integer", "minimum": 0 },
+        "record_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "semantic_meta_tag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "is_exact_match"],
+      "properties": {
+        "value": { "type": "string" },
+        "is_exact_match": { "type": "boolean" }
+      }
+    },
+    "optional_bool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has", "value"],
+      "properties": {
+        "has": { "type": "boolean" },
+        "value": { "type": "boolean" }
+      }
+    },
+    "optional_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has"],
+      "properties": {
+        "has": { "type": "boolean" },
+        "value": { "type": "string" },
+        "raw": { "type": "string" }
+      }
+    },
+    "optional_int64": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has", "value"],
+      "properties": {
+        "has": { "type": "boolean" },
+        "value": { "type": "integer" }
+      }
+    },
+    "semantic_bgp_peer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "admin_enabled", "state", "established_uptime", "last_received_update_age"],
+      "properties": {
+        "origin_profile_id": { "type": "string" },
+        "table": { "type": "string" },
+        "row_key": { "type": "string" },
+        "structural_id": { "type": "string" },
+        "kind": { "type": "string", "minLength": 1 },
+        "routing_instance": { "type": "string" },
+        "neighbor": { "type": "string" },
+        "remote_as": { "type": "string" },
+        "local_address": { "type": "string" },
+        "local_as": { "type": "string" },
+        "local_identifier": { "type": "string" },
+        "peer_identifier": { "type": "string" },
+        "peer_type": { "type": "string" },
+        "bgp_version": { "type": "string" },
+        "description": { "type": "string" },
+        "admin_enabled": { "$ref": "#/$defs/optional_bool" },
+        "state": { "$ref": "#/$defs/optional_text" },
+        "established_uptime": { "$ref": "#/$defs/optional_int64" },
+        "last_received_update_age": { "$ref": "#/$defs/optional_int64" },
+        "tags": { "$ref": "#/$defs/string_map" }
+      }
+    },
+    "semantic_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "kind", "profile"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "kind": { "enum": ["profile_tags", "topology_metric", "bgp_peer", "bgp_outcome", "vlan_outcome"] },
+        "profile": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/semantic_meta_tag" }
+        },
+        "tags": { "$ref": "#/$defs/string_map" },
+        "topology_kind": { "type": "string" },
+        "bgp": { "$ref": "#/$defs/semantic_bgp_peer" },
+        "vlan_id": { "type": "string" },
+        "vlan_name": { "type": "string" },
+        "state": { "$ref": "#/$defs/terminal_state" },
+        "reason": { "type": "string" }
+      }
+    },
+    "semantic_shard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["geometry", "records"],
+      "properties": {
+        "geometry": { "$ref": "#/$defs/shard_geometry" },
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/semantic_record" }
+        }
+      }
+    },
+    "observed_interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "if_index", "if_name", "if_descr", "if_alias", "mac", "speed_bps", "last_change", "duplex",
+        "interface_type", "admin_status", "oper_status"
+      ],
+      "properties": {
+        "if_index": { "type": "integer" },
+        "if_name": { "type": "string" },
+        "if_descr": { "type": "string" },
+        "if_alias": { "type": "string" },
+        "mac": { "type": "string" },
+        "speed_bps": { "type": "integer" },
+        "last_change": { "type": "integer" },
+        "duplex": { "type": "string" },
+        "interface_type": { "type": "string" },
+        "admin_status": { "type": "string" },
+        "oper_status": { "type": "string" }
+      }
+    },
+    "bridge_port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_port", "if_index"],
+      "properties": {
+        "base_port": { "type": "string" },
+        "if_index": { "type": "integer" }
+      }
+    },
+    "stp_port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port", "if_index", "if_name", "vlan_id", "vlan_name", "state", "enable", "path_cost",
+        "designated_root", "designated_bridge", "designated_port"
+      ],
+      "properties": {
+        "port": { "type": "string" },
+        "if_index": { "type": "integer" },
+        "if_name": { "type": "string" },
+        "vlan_id": { "type": "string" },
+        "vlan_name": { "type": "string" },
+        "state": { "type": "string" },
+        "enable": { "type": "string" },
+        "path_cost": { "type": "string" },
+        "designated_root": { "type": "string" },
+        "designated_bridge": { "type": "string" },
+        "designated_port": { "type": "string" }
+      }
+    },
+    "fdb_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mac", "bridge_port", "if_index", "status", "fdb_domain_id", "vlan_id", "vlan_name"],
+      "properties": {
+        "mac": { "type": "string" },
+        "bridge_port": { "type": "string" },
+        "if_index": { "type": "integer" },
+        "status": { "type": "string" },
+        "fdb_domain_id": { "type": "string" },
+        "vlan_id": { "type": "string" },
+        "vlan_name": { "type": "string" }
+      }
+    },
+    "arp_nd_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "if_index", "if_name", "ip", "mac", "state", "addr_type"],
+      "properties": {
+        "protocol": { "type": "string" },
+        "if_index": { "type": "integer" },
+        "if_name": { "type": "string" },
+        "ip": { "type": "string" },
+        "mac": { "type": "string" },
+        "state": { "type": "string" },
+        "addr_type": { "type": "string" }
+      }
+    },
+    "lldp_remote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_port_num", "remote_index", "local_port_id", "local_port_id_subtype", "local_port_desc",
+        "chassis_id", "sys_name", "port_id", "port_id_subtype", "port_desc", "management_ip"
+      ],
+      "properties": {
+        "local_port_num": { "type": "string" },
+        "remote_index": { "type": "string" },
+        "local_port_id": { "type": "string" },
+        "local_port_id_subtype": { "type": "string" },
+        "local_port_desc": { "type": "string" },
+        "chassis_id": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "port_id": { "type": "string" },
+        "port_id_subtype": { "type": "string" },
+        "port_desc": { "type": "string" },
+        "management_ip": { "type": "string" }
+      }
+    },
+    "cdp_remote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_if_index", "local_if_name", "device_index", "device_id", "sys_name", "device_port",
+        "address", "raw_address"
+      ],
+      "properties": {
+        "local_if_index": { "type": "integer" },
+        "local_if_name": { "type": "string" },
+        "device_index": { "type": "string" },
+        "device_id": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "device_port": { "type": "string" },
+        "address": { "type": "string" },
+        "raw_address": { "type": "string" }
+      }
+    },
+    "l2_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id", "inferred", "hostname", "management_ip", "management_aliases", "sys_object_id",
+        "chassis_id", "base_bridge_address", "labels", "interfaces", "bridge_ports", "stp_ports",
+        "fdb_entries", "arp_nd_entries", "lldp_remotes", "cdp_remotes"
+      ],
+      "properties": {
+        "device_id": { "type": "string" },
+        "inferred": { "type": "boolean" },
+        "hostname": { "type": "string" },
+        "management_ip": { "type": "string" },
+        "management_aliases": {
+          "oneOf": [
+            { "$ref": "#/$defs/string_array" },
+            { "type": "null" }
+          ]
+        },
+        "sys_object_id": { "type": "string" },
+        "chassis_id": { "type": "string" },
+        "base_bridge_address": { "type": "string" },
+        "labels": { "$ref": "#/$defs/nullable_string_map" },
+        "interfaces": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/observed_interface" } },
+            { "type": "null" }
+          ]
+        },
+        "bridge_ports": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/bridge_port" } },
+            { "type": "null" }
+          ]
+        },
+        "stp_ports": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/stp_port" } },
+            { "type": "null" }
+          ]
+        },
+        "fdb_entries": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/fdb_entry" } },
+            { "type": "null" }
+          ]
+        },
+        "arp_nd_entries": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/arp_nd_entry" } },
+            { "type": "null" }
+          ]
+        },
+        "lldp_remotes": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/lldp_remote" } },
+            { "type": "null" }
+          ]
+        },
+        "cdp_remotes": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/cdp_remote" } },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "l3_interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device_id", "ip", "netmask", "if_index", "if_name", "if_descr"],
+      "properties": {
+        "device_id": { "type": "string" },
+        "ip": { "type": "string" },
+        "netmask": { "type": "string" },
+        "if_index": { "type": "string" },
+        "if_name": { "type": "string" },
+        "if_descr": { "type": "string" }
+      }
+    },
+    "ospf_neighbor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id", "local_router_id", "neighbor_router_id", "neighbor_ip", "addressless_index",
+        "state", "local_ip", "network", "netmask", "subnet", "prefix"
+      ],
+      "properties": {
+        "device_id": { "type": "string" },
+        "local_router_id": { "type": "string" },
+        "neighbor_router_id": { "type": "string" },
+        "neighbor_ip": { "type": "string" },
+        "addressless_index": { "type": "string" },
+        "state": { "type": "string" },
+        "local_ip": { "type": "string" },
+        "network": { "type": "string" },
+        "netmask": { "type": "string" },
+        "subnet": { "type": "string" },
+        "prefix": { "type": "integer" }
+      }
+    },
+    "nullable_int64": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "null" }
+      ]
+    },
+    "bgp_peer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id", "routing_instance", "neighbor_ip", "remote_as", "local_ip", "local_as",
+        "local_identifier", "peer_identifier", "peer_type", "bgp_version", "description", "admin_status",
+        "state", "established_uptime", "last_received_update_age"
+      ],
+      "properties": {
+        "device_id": { "type": "string" },
+        "routing_instance": { "type": "string" },
+        "neighbor_ip": { "type": "string" },
+        "remote_as": { "type": "string" },
+        "local_ip": { "type": "string" },
+        "local_as": { "type": "string" },
+        "local_identifier": { "type": "string" },
+        "peer_identifier": { "type": "string" },
+        "peer_type": { "type": "string" },
+        "bgp_version": { "type": "string" },
+        "description": { "type": "string" },
+        "admin_status": { "type": "string" },
+        "state": { "type": "string" },
+        "established_uptime": { "$ref": "#/$defs/nullable_int64" },
+        "last_received_update_age": { "$ref": "#/$defs/nullable_int64" }
+      }
+    },
+    "observation_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["l2_observations", "l3_interfaces", "ospf_neighbors", "bgp_peers"],
+      "properties": {
+        "l2_observations": { "type": "integer", "minimum": 0 },
+        "l3_interfaces": { "type": "integer", "minimum": 0 },
+        "ospf_neighbors": { "type": "integer", "minimum": 0 },
+        "bgp_peers": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id", "registration", "l2", "l3_interfaces", "ospf_neighbors", "bgp_peers",
+        "local_device", "local_device_id", "agent_id", "collected_at", "counts"
+      ],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "registration": { "type": "integer", "minimum": 1 },
+        "l2": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/l2_observation" } },
+            { "type": "null" }
+          ]
+        },
+        "l3_interfaces": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/l3_interface" } },
+            { "type": "null" }
+          ]
+        },
+        "ospf_neighbors": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/ospf_neighbor" } },
+            { "type": "null" }
+          ]
+        },
+        "bgp_peers": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/bgp_peer" } },
+            { "type": "null" }
+          ]
+        },
+        "local_device": { "$ref": "#/$defs/semantic_device_dto" },
+        "local_device_id": { "type": "string", "minLength": 1 },
+        "agent_id": { "type": "string" },
+        "collected_at": { "type": "string", "format": "date-time" },
+        "counts": { "$ref": "#/$defs/observation_counts" }
+      }
+    },
+    "observation_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_id", "registration", "canonicalization", "logical_length", "sha256", "counts"],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "registration": { "type": "integer", "minimum": 1 },
+        "canonicalization": { "const": "netdata.snmp-topology-observation/v1" },
+        "logical_length": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "counts": { "$ref": "#/$defs/observation_counts" }
+      }
+    },
+    "graph_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "revision", "model_schema", "output_schema"],
+      "properties": {
+        "name": { "const": "snmp_topology_graph" },
+        "revision": { "const": 1 },
+        "model_schema": { "const": "2.0" },
+        "output_schema": { "const": "netdata.topology.v1" }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence", "published_at", "producer_scope_id", "kernel", "device_count",
+        "renderable_devices", "observations"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "published_at": { "type": "string", "format": "date-time" },
+        "producer_scope_id": { "type": "string" },
+        "kernel": { "$ref": "#/$defs/graph_kernel" },
+        "device_count": { "type": "integer", "minimum": 0 },
+        "renderable_devices": { "type": "integer", "minimum": 0 },
+        "observations": {
+          "oneOf": [
+            { "type": "array", "items": { "$ref": "#/$defs/content_ref" } },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "graph_query_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collapse_actors_by_ip", "eliminate_non_ip_inferred", "map_type",
+        "inference_strategy", "managed_device_focus", "depth"
+      ],
+      "properties": {
+        "collapse_actors_by_ip": { "type": "boolean" },
+        "eliminate_non_ip_inferred": { "type": "boolean" },
+        "map_type": {
+          "enum": ["managed_fabric", "lldp_cdp_managed", "high_confidence_inferred", "all_devices_low_confidence"]
+        },
+        "inference_strategy": {
+          "enum": [
+            "fdb_minimum_knowledge", "stp_parent_tree", "fdb_pairwise_minimum_knowledge",
+            "stp_fdb_correlated", "cdp_fdb_hybrid"
+          ]
+        },
+        "managed_device_focus": { "type": "string", "minLength": 1 },
+        "depth": { "type": "integer", "minimum": -1, "maximum": 10 }
+      }
+    },
+    "graph_query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_id", "generation_sequence", "generation", "options"],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "generation_sequence": { "type": "integer", "minimum": 1 },
+        "generation": { "$ref": "#/$defs/content_ref" },
+        "options": { "$ref": "#/$defs/graph_query_options" }
+      }
+    },
+    "dns_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "ip", "state"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "ip": { "type": "string" },
+        "state": { "enum": ["miss", "positive", "cached_negative"] },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dns_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_id", "records"],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/dns_record" }
+        }
+      }
+    },
+    "oui_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "mac"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "mac": { "type": "string", "pattern": "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$" },
+        "vendor": { "type": "string", "minLength": 1 },
+        "prefix": { "type": "string", "pattern": "^[0-9A-F]{6,12}$" }
+      }
+    },
+    "oui_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_id", "records"],
+      "properties": {
+        "capture_id": { "type": "integer", "minimum": 1 },
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/oui_record" }
+        }
+      }
+    }
+  }
+}

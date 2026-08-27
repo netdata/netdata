@@ -28,6 +28,7 @@ func buildEndpointActors(
 	layer string,
 	actorIndex map[string]struct{},
 	actorMACIndex map[string]struct{},
+	lookupVendorByMAC func(string) (string, string),
 ) builtEndpointActors {
 	accumulators := make(map[string]*endpointActorAccumulator)
 
@@ -139,7 +140,7 @@ func buildEndpointActors(
 			LearnedIfIndexes: sortedTopologySet(acc.ifIndexes),
 			LearnedIfNames:   sortedTopologySet(acc.ifNames),
 		}
-		derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match)
+		derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match, lookupVendorByMAC)
 		if derivedVendor != "" {
 			detail.Vendor = derivedVendor
 			detail.VendorSource = "mac_oui"

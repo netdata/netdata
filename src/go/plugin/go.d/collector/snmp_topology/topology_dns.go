@@ -68,23 +68,27 @@ func newTopologyReverseDNSCandidateCollector(resolver *reversedns.Resolver) *top
 }
 
 func (c *topologyReverseDNSCandidateCollector) lookupCached(ip string) string {
+	_, result, ok := c.lookupCachedResult(ip)
+	if ok && result.State == reversedns.StatePositive {
+		return result.Name
+	}
+	return ""
+}
+
+func (c *topologyReverseDNSCandidateCollector) lookupCachedResult(ip string) (netip.Addr, reversedns.Result, bool) {
 	if c == nil {
-		return ""
+		return netip.Addr{}, reversedns.Result{}, false
 	}
 	addr, ok := normalizeTopologyReverseDNSCandidateIP(ip)
 	if !ok {
-		return ""
+		return netip.Addr{}, reversedns.Result{}, false
 	}
 
 	c.mu.Lock()
 	c.candidates[addr] = struct{}{}
 	c.mu.Unlock()
 
-	result := c.resolver.Lookup(addr)
-	if result.State == reversedns.StatePositive {
-		return result.Name
-	}
-	return ""
+	return addr, c.resolver.Lookup(addr), true
 }
 
 func (c *topologyReverseDNSCandidateCollector) collectedCandidates() []netip.Addr {

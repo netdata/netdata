@@ -14,6 +14,7 @@ type GraphOptions struct {
 	LocalDeviceID             string
 	CollectedAt               time.Time
 	ResolveDNSName            func(ip string) string
+	LookupVendorByMAC         func(mac string) (vendor string, prefix string)
 	CollapseActorsByIP        bool
 	EliminateNonIPInferred    bool
 	ProbabilisticConnectivity bool

@@ -54,9 +54,19 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOpti
 	if r == nil {
 		return topologymodel.Data{}, false, nil
 	}
+	generation := r.acquireGeneration()
+	return r.snapshotGenerationWithOptions(generation, options)
+}
+
+func (r *topologyRegistry) snapshotGenerationWithOptions(
+	generation *topologyGeneration,
+	options topologyoptions.QueryOptions,
+) (topologymodel.Data, bool, error) {
+	if r == nil {
+		return topologymodel.Data{}, false, nil
+	}
 	options = topologyoptions.NormalizeQueryOptions(options)
 
-	generation := r.acquireGeneration()
 	aggregate, ok := aggregateTopologyObservationSnapshots(topologyObservationSnapshots(generation))
 	if !ok {
 		return topologymodel.Data{}, false, nil

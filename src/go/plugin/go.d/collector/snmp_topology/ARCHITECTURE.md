@@ -331,6 +331,79 @@ behavior of using the last successfully published device generation even after
 topology display freshness expires; unregistering the SNMP job removes it on the
 next completed sweep.
 
+## Diagnostic Capture And Replay
+
+The `diagnostic` package defines the storage-neutral
+`netdata.snmp-topology-diagnostic/v1` contract. This contract layer installs no
+production filesystem or retention policy; the collector's optional recorder
+is nil until a storage owner supplies one. This makes the normal production
+path a direct no-op at the capture boundary.
+
+When a recorder is present, capture follows the existing ownership boundaries:
+
+```text
+device refresh
+  -> borrow each ordered semantic event synchronously
+  -> detach allowlisted diagnostic DTOs
+  -> asynchronously seal typed members
+  -> retain the sealed observation handle in the immutable device generation
+
+global publication
+  -> reference each renderable device's retained observation handle
+  -> asynchronously seal one generation member
+
+Function snapshot
+  -> acquire one generation once
+  -> normalize query options
+  -> trace cache-only DNS and ordered OUI decisions
+  -> run the normal graph and render path once
+  -> asynchronously seal the query and traces
+```
+
+Live ingestion and semantic replay share `applyTopologySemanticStream`. The
+ordered stream covers system uptime, main profile tags, topology rows, BGP
+outcomes and rows, and structured VLAN-context outcomes and rows. VLAN polling
+returns data to that stream; it no longer mutates a builder as a side effect.
+Replay uses the same builder operations and must reproduce the exact captured
+observation member and checkpoint.
+
+Profile evidence is identity-only. Its digest covers an explicit effective
+topology-collection projection after profile merge and deduplication, plus the
+actual execution ordinal and portable provenance. The diagnostic reader never
+executes captured transforms, and absolute profile paths are not identities.
+A future raw-acquisition replay capability must define its own hermetic,
+work-bounded transform contract.
+
+Global graph replay is closed over one immutable generation, normalized query,
+three-state DNS trace (`miss`, `positive`, `cached_negative`), ordered OUI trace,
+and fixed publication time. It injects DNS and OUI results and must not read
+live DNS, embedded OUI data, the installed profile catalog, SNMP,
+configuration, the filesystem, or the clock. Production-shaped tests require
+the replayed payload to equal the live payload exactly. V1 deliberately stores
+no live graph-output checkpoint because producing one here would serialize the
+complete topology a second time. Historical Function-response identity and
+preservation belong to a separate capability at the one-pass encoded-response
+boundary.
+
+Recorder admission and sealing are asynchronous:
+
+- `Begin` is non-blocking and reserves terminal queue capacity.
+- Successful ownership transfer is charged by retained capacity before
+  admission.
+- `Commit` and `Abort` never wait for the worker.
+- A process-local `MemberHandle` resolves to a portable `ContentRef` or a
+  terminal failure and is never serialized.
+- Saturated attempts become coalesced capture-gap records; admitted failures
+  become explicit incomplete capabilities.
+- Capture failures never fail collection, publication, graph construction, or
+  Function rendering.
+
+The manifest can reference content sealed by earlier captures. A future sink
+therefore owns an archive-wide content-addressed store and must publish a
+manifest only after every transitive member is durable. See
+`diagnostic/README.md` and `diagnostic/schema-v1.json` for the member and
+compatibility contract.
+
 ## Graph Build Order
 
 `topology_registry_build.go` is the main graph pipeline.
