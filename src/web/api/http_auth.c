@@ -189,6 +189,10 @@ static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_
     const DICTIONARY_ITEM *item = bearer_token_set_and_acquire(
         token, user_role, access, cloud_account_id, client_name,
         created_s, expires_s, &inserted);
+    // NULL when netdata_authorized_bearers is being destroyed (shutdown)
+    if(unlikely(!item))
+        return 0;
+
     struct bearer_token *bt = dictionary_acquired_item_value(item);
 
     if(inserted && save)
@@ -222,12 +226,20 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
         *uuid, user_role, access, cloud_account_id, client_name,
         now_s, now_s + BEARER_TOKEN_EXPIRATION, true);
 
+    if(!expires_s)
+        // the token could not be registered - skip the cleanup, it needs the
+        // same dictionary
+        return 0;
+
     bearer_token_cleanup(false);
 
     return expires_s;
 }
 
-static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, BUFFER *error) {
+// Returns false when the file is invalid (the caller deletes it).
+// *stored is set to false when the token was valid but could not be registered
+// (the bearer tokens dictionary is being destroyed) - the file must be kept.
+static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, BUFFER *error, bool *stored) {
     int64_t version;
     nd_uuid_t token_in_file, cloud_account_id, host_uuid;
     CLEAN_STRING *client_name = NULL;
@@ -280,9 +292,9 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
         return false;
     }
 
-    bearer_create_token_internal(token, user_role, access,
-                                 cloud_account_id, string2str(client_name),
-                                 created_s, expires_s, false);
+    *stored = bearer_create_token_internal(token, user_role, access,
+                                           cloud_account_id, string2str(client_name),
+                                           created_s, expires_s, false) != 0;
 
     return true;
 }
@@ -302,10 +314,19 @@ static bool bearer_token_load_token(nd_uuid_t token) {
     }
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
-    bool rc = bearer_token_parse_json(token, jobj, error);
+    bool stored = false;
+    bool rc = bearer_token_parse_json(token, jobj, error, &stored);
     if(!rc) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to parse bearer token file '%s': %s", filename, buffer_tostring(error));
         unlink(filename);
+        return false;
+    }
+
+    if(!stored) {
+        // the token is valid but could not be registered - keep the file and
+        // do not run the cleanup, which needs the dictionary we just failed on
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Could not register the bearer token of file '%s' - the bearer tokens dictionary is unavailable", filename);
         return false;
     }
 
