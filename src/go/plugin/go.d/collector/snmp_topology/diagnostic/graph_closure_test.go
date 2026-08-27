@@ -8,24 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerationClosureV1_RejectsMissingObservationMember(t *testing.T) {
+func TestGenerationValidationRejectsMissingObservationMember(t *testing.T) {
 	observationRef, _, err := Seal(MemberType{Kind: KindObservation, Schema: SchemaV1}, ObservationV1{})
 	require.NoError(t, err)
 	generation := validTestGeneration()
-	generation.DeviceCount = 1
-	generation.RenderableDevices = 1
+	generation.Devices = []GenerationDeviceV1{{
+		Registration: 1, State: GenerationStateRefreshed, Renderable: true,
+		ObservationState: ObservationStateAvailable, Observation: &observationRef,
+	}}
 	generation.Observations = []ContentRef{observationRef}
-	generationRef, generationData, err := Seal(MemberType{Kind: KindGeneration, Schema: SchemaV1}, generation)
-	require.NoError(t, err)
-
-	root := CapabilityRootV1{
-		Capability: GenerationCapabilityV1(), State: StateSuccess,
-		Sections: []SectionInventoryV1{{
-			Name: GenerationSectionGeneration, State: StateSuccess, ExpectedRecords: 1,
-			Members: []ContentRef{generationRef},
-		}},
-	}
-	err = validateGenerationCapabilityGraphV1(root, MemorySource{generationRef.Key(): generationData}, testReaderLimits())
+	err = validateGenerationObservations(generation, MemorySource{}, testReaderLimits())
 	require.ErrorContains(t, err, "member not found")
 }
 
@@ -33,9 +25,13 @@ func TestGraphClosureV1_RejectsQueryGenerationMismatch(t *testing.T) {
 	generation := validTestGeneration()
 	generationRef, generationData, err := Seal(MemberType{Kind: KindGeneration, Schema: SchemaV1}, generation)
 	require.NoError(t, err)
+	otherGeneration := generation
+	otherGeneration.Sequence++
+	otherRef, _, err := Seal(MemberType{Kind: KindGeneration, Schema: SchemaV1}, otherGeneration)
+	require.NoError(t, err)
 	query := GraphQueryV1{
-		CaptureID: 1, GenerationSequence: generation.Sequence + 1, Generation: generationRef,
-		Options: validTestGraphOptions(),
+		CaptureID: 1, Generation: otherRef,
+		Kernel: validTestGraphKernel(), Options: validTestGraphOptions(),
 	}
 	queryRef, queryData, err := Seal(MemberType{Kind: KindGraphQuery, Schema: SchemaV1}, query)
 	require.NoError(t, err)
@@ -73,10 +69,13 @@ func TestGraphClosureV1_RejectsTraceBeyondReaderPolicy(t *testing.T) {
 func validTestGeneration() GenerationV1 {
 	return GenerationV1{
 		Sequence: 1, PublishedAt: "2026-08-27T12:00:00Z", ProducerScopeID: "agent-a",
-		Kernel: GraphKernelV1{
-			Name: "snmp_topology_graph", Revision: 1, ModelSchema: "2.0", OutputSchema: "netdata.topology.v1",
-		},
 		Observations: []ContentRef{},
+	}
+}
+
+func validTestGraphKernel() GraphKernelV1 {
+	return GraphKernelV1{
+		Name: "snmp_topology_graph", Revision: 1, ModelSchema: "2.0", OutputSchema: "netdata.topology.v1",
 	}
 }
 

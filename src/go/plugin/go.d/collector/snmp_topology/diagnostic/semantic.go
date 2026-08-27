@@ -17,11 +17,10 @@ import (
 const (
 	CapabilitySemanticReplay = "semantic_replay"
 
-	KindSemanticDevice        = "semantic_device"
-	KindSemanticProfile       = "semantic_profile"
-	KindSemanticShard         = "semantic_shard"
-	KindObservation           = "observation"
-	KindObservationCheckpoint = "observation_checkpoint"
+	KindSemanticDevice  = "semantic_device"
+	KindSemanticProfile = "semantic_profile"
+	KindSemanticShard   = "semantic_shard"
+	KindObservation     = "observation"
 )
 
 const (
@@ -29,7 +28,6 @@ const (
 	SemanticSectionProfiles    = "profiles"
 	SemanticSectionEvents      = "semantic_events"
 	SemanticSectionObservation = "observation"
-	SemanticSectionCheckpoint  = "observation_checkpoint"
 )
 
 const (
@@ -139,7 +137,6 @@ type SemanticProfileV1 struct {
 	VLANID           string                      `json:"vlan_id,omitempty"`
 	Ordinal          uint32                      `json:"ordinal"`
 	Origin           string                      `json:"origin"`
-	Projection       string                      `json:"projection"`
 	Definition       ProfileDefinitionEvidenceV1 `json:"definition"`
 	DefinitionSHA256 string                      `json:"definition_sha256"`
 }
@@ -158,9 +155,6 @@ func (p SemanticProfileV1) Validate() error {
 		return errors.New("main profile must not declare vlan_id")
 	}
 	if err := validatePortableOrigin(p.Origin); err != nil {
-		return err
-	}
-	if err := validateID("profile projection", p.Projection); err != nil {
 		return err
 	}
 	if err := p.Definition.Validate(); err != nil {
@@ -372,28 +366,6 @@ type ObservationCountsV1 struct {
 	L3Interfaces   uint64 `json:"l3_interfaces"`
 	OSPFNeighbors  uint64 `json:"ospf_neighbors"`
 	BGPPeers       uint64 `json:"bgp_peers"`
-}
-
-type ObservationCheckpointV1 struct {
-	CaptureID        uint64              `json:"capture_id"`
-	Registration     uint64              `json:"registration"`
-	Canonicalization string              `json:"canonicalization"`
-	LogicalLength    uint64              `json:"logical_length"`
-	SHA256           string              `json:"sha256"`
-	Counts           ObservationCountsV1 `json:"counts"`
-}
-
-func (c ObservationCheckpointV1) Validate() error {
-	if c.CaptureID == 0 || c.Registration == 0 {
-		return errors.New("observation checkpoint owner identifiers must be nonzero")
-	}
-	if c.Canonicalization != "netdata.snmp-topology-observation/v1" {
-		return fmt.Errorf("unsupported observation canonicalization %q", c.Canonicalization)
-	}
-	if c.LogicalLength == 0 || !sha256Pattern.MatchString(c.SHA256) {
-		return errors.New("observation checkpoint has invalid content identity")
-	}
-	return nil
 }
 
 func validateCanonicalTime(value string) error {

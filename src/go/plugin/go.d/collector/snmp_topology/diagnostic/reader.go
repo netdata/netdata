@@ -20,6 +20,7 @@ type Closure struct {
 	Decode        map[MemberType]DecodeMemberFunc
 	ValidateGraph func(CapabilityRootV1, MemberSource, ReaderLimits) error
 	Assess        func(CapabilityRootV1) (complete bool, replayable bool)
+	AssessGraph   func(CapabilityRootV1, MemberSource, ReaderLimits) (complete bool, replayable bool, err error)
 }
 
 type Registry struct {
@@ -206,7 +207,12 @@ func (r *Registry) ValidateCapability(
 		}
 	}
 	report.Schema = true
-	if closure.Assess != nil {
+	if closure.AssessGraph != nil {
+		report.Completeness, report.Replayable, err = closure.AssessGraph(rootDocument, source, limits)
+		if err != nil {
+			return report, fmt.Errorf("assess capability graph: %w", err)
+		}
+	} else if closure.Assess != nil {
 		report.Completeness, report.Replayable = closure.Assess(rootDocument)
 	} else {
 		report.Completeness = root.State == StateSuccess || root.State == StateEmpty || root.State == StateNotApplicable

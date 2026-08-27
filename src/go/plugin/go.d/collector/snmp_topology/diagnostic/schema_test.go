@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -64,13 +63,27 @@ func TestSchemaV1_CompilesAndValidatesKnownDocuments(t *testing.T) {
 	require.NoError(t, err)
 	generation := GenerationV1{
 		Sequence: 1, PublishedAt: timestamp, ProducerScopeID: "producer-a",
-		Kernel: GraphKernelV1{
-			Name: "snmp_topology_graph", Revision: 1, ModelSchema: "2.0", OutputSchema: "netdata.topology.v1",
-		},
-		DeviceCount: 1, RenderableDevices: 1, Observations: []ContentRef{observationRef},
+		Devices: []GenerationDeviceV1{{
+			Registration: 9, State: GenerationStateRefreshed, Renderable: true,
+			ObservationState: ObservationStateAvailable, Observation: &observationRef,
+		}},
+		Observations: []ContentRef{observationRef},
 	}
 	generationRef, _, err := Seal(MemberType{Kind: KindGeneration, Schema: SchemaV1}, generation)
 	require.NoError(t, err)
+	refreshSweep := RefreshSweepV1{
+		CaptureID: 2, StartedAt: timestamp, FinishedAt: timestamp,
+		PreviousGeneration: GenerationReferenceV1{State: GenerationReferenceNone},
+		Registrations: []RefreshRegistrationV1{{
+			Registration: 9,
+			Device:       RefreshDeviceIdentityV1{Hostname: "192.0.2.1", Port: 161, SNMPVersion: "2c"},
+			Selection:    RefreshSelectionDue, TargetResolution: TargetResolutionLiteral, Outcome: RefreshOutcomeSuccess,
+		}},
+		Publication: RefreshPublicationV1{
+			State:      RefreshPublicationPublished,
+			Generation: GenerationReferenceV1{State: GenerationReferenceAvailable, Ref: &generationRef},
+		},
+	}
 
 	documents := map[string]any{
 		"manifest":        manifest,
@@ -84,7 +97,7 @@ func TestSchemaV1_CompilesAndValidatesKnownDocuments(t *testing.T) {
 			AgentID: "agent-a", TargetManagementIPs: []string{"192.0.2.1"},
 		},
 		"semantic profile": SemanticProfileV1{
-			CaptureID: 1, Registration: 9, Role: "main", Origin: "profile.yaml", Projection: "topology_bgp",
+			CaptureID: 1, Registration: 9, Role: "main", Origin: "profile.yaml",
 			Definition: evidence, DefinitionSHA256: evidenceDigest,
 		},
 		"semantic shard": SemanticShardV1{
@@ -94,14 +107,11 @@ func TestSchemaV1_CompilesAndValidatesKnownDocuments(t *testing.T) {
 			},
 			Records: []SemanticRecordV1{{Kind: "profile_tags"}},
 		},
-		"observation": observation,
-		"observation checkpoint": ObservationCheckpointV1{
-			CaptureID: 1, Registration: 9, Canonicalization: "netdata.snmp-topology-observation/v1",
-			LogicalLength: 1, SHA256: strings.Repeat("a", 64),
-		},
-		"generation": generation,
+		"observation":   observation,
+		"refresh sweep": refreshSweep,
+		"generation":    generation,
 		"graph query": GraphQueryV1{
-			CaptureID: 2, GenerationSequence: 1, Generation: generationRef,
+			CaptureID: 2, Generation: generationRef, Kernel: validTestGraphKernel(),
 			Options: GraphQueryOptionsV1{
 				CollapseActorsByIP: true, EliminateNonIPInferred: true, MapType: "managed_fabric",
 				InferenceStrategy: "fdb_minimum_knowledge", ManagedDeviceFocus: "all_devices", Depth: -1,

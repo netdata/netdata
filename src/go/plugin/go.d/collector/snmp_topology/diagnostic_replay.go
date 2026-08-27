@@ -88,8 +88,17 @@ func replayTopologySemanticV1(
 	}
 	applyTopologySemanticStream(builder, newTopologyVLANSemanticStream(vlanResults), nil)
 	snapshot, _ := freezeTopologyBuilder(builder)
-	if snapshot == nil || !snapshot.hasObservation {
-		return nil, errors.New("semantic replay produced no observation")
+	if snapshot == nil {
+		return nil, errors.New("semantic replay produced no snapshot")
+	}
+	if root.State == diagnostic.StateEmpty {
+		if snapshot.hasObservation || observationSection.State != diagnostic.StateEmpty {
+			return nil, errors.New("empty semantic replay unexpectedly produced an observation")
+		}
+		return snapshot, nil
+	}
+	if !snapshot.hasObservation {
+		return nil, errors.New("successful semantic replay produced no observation")
 	}
 
 	actual := diagnosticObservationFromSnapshot(device.CaptureID, device.Registration, snapshot.observation)

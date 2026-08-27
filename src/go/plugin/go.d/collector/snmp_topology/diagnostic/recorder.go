@@ -360,12 +360,20 @@ type pendingMember struct {
 	value         any
 	dependencies  []MemberHandle
 	build         DerivedMemberBuilder
+	optionalBuild OptionalDerivedMemberBuilder
 	reference     MemberHandle
 	handle        MemberHandle
 	retainedBytes uint64
 }
 
 type DerivedMemberBuilder func([]ContentRef) (any, error)
+
+type MemberResolution struct {
+	Ref   ContentRef
+	State HandleState
+}
+
+type OptionalDerivedMemberBuilder func([]MemberResolution) (any, error)
 
 type captureJob struct {
 	captureID     uint64
@@ -450,7 +458,7 @@ func (t *CaptureTransaction) DefineSection(name string, state TerminalState, exp
 // AddOwned transfers value ownership on success. The caller MUST pass a fully
 // detached immutable DTO and MUST NOT mutate it after this call.
 func (t *CaptureTransaction) AddOwned(section string, memberType MemberType, value any, retainedBytes uint64) (MemberHandle, error) {
-	return t.addOwned(section, memberType, value, nil, nil, retainedBytes)
+	return t.addOwned(section, memberType, value, nil, nil, nil, retainedBytes)
 }
 
 // AddDerivedOwned transfers an immutable builder plus its process-local
@@ -473,7 +481,7 @@ func (t *CaptureTransaction) AddDerivedOwned(
 		return MemberHandle{}, errors.New("derived member builder is nil")
 	}
 	if uint64(len(dependencies)) > t.recorder.config.MaxMembers-1 {
-		return t.addOwned(section, memberType, nil, dependencies, build, retainedBytes)
+		return t.addOwned(section, memberType, nil, dependencies, build, nil, retainedBytes)
 	}
 	for i, dependency := range dependencies {
 		if dependency.id == 0 || dependency.future == nil {
@@ -483,7 +491,37 @@ func (t *CaptureTransaction) AddDerivedOwned(
 			return MemberHandle{}, fmt.Errorf("dependency %d belongs to a different recorder", i)
 		}
 	}
-	return t.addOwned(section, memberType, nil, dependencies, build, retainedBytes)
+	return t.addOwned(section, memberType, nil, dependencies, build, nil, retainedBytes)
+}
+
+// AddOptionalDerivedOwned runs after dependencies have reached their current
+// terminal state. Failed dependencies are explicit inputs instead of making
+// the derived member fail automatically.
+func (t *CaptureTransaction) AddOptionalDerivedOwned(
+	section string,
+	memberType MemberType,
+	dependencies []MemberHandle,
+	build OptionalDerivedMemberBuilder,
+	retainedBytes uint64,
+) (MemberHandle, error) {
+	if t == nil || t.recorder == nil {
+		return MemberHandle{}, ErrTransactionClosed
+	}
+	if len(dependencies) == 0 {
+		return MemberHandle{}, errors.New("optional derived member requires dependencies")
+	}
+	if build == nil {
+		return MemberHandle{}, errors.New("optional derived member builder is nil")
+	}
+	for i, dependency := range dependencies {
+		if dependency.id == 0 || dependency.future == nil {
+			return MemberHandle{}, fmt.Errorf("dependency %d is invalid", i)
+		}
+		if dependency.owner != t.recorder {
+			return MemberHandle{}, fmt.Errorf("dependency %d belongs to a different recorder", i)
+		}
+	}
+	return t.addOwned(section, memberType, nil, dependencies, nil, build, retainedBytes)
 }
 
 // AddReference attaches an earlier process-local handle to this capability
@@ -526,6 +564,7 @@ func (t *CaptureTransaction) addOwned(
 	value any,
 	dependencies []MemberHandle,
 	build DerivedMemberBuilder,
+	optionalBuild OptionalDerivedMemberBuilder,
 	retainedBytes uint64,
 ) (MemberHandle, error) {
 	if t == nil || t.recorder == nil {
@@ -534,7 +573,7 @@ func (t *CaptureTransaction) addOwned(
 	if err := memberType.Validate(); err != nil {
 		return MemberHandle{}, err
 	}
-	if value == nil && build == nil {
+	if value == nil && build == nil && optionalBuild == nil {
 		return MemberHandle{}, errors.New("owned member value is nil")
 	}
 	if retainedBytes == 0 {
@@ -573,6 +612,7 @@ func (t *CaptureTransaction) addOwned(
 		value:         value,
 		dependencies:  slices.Clone(dependencies),
 		build:         build,
+		optionalBuild: optionalBuild,
 		handle:        handle,
 		retainedBytes: retainedBytes,
 	})
@@ -764,12 +804,28 @@ func (r *Recorder) process(job captureJob) {
 		}
 		value := member.value
 		var memberInventory *boundedManifestInventory
-		if member.build != nil {
+		if member.build != nil || member.optionalBuild != nil {
 			memberInventory = newBoundedManifestInventory(r.config.MaxMembers - 1)
 			resolved := make([]ContentRef, 0, len(member.dependencies))
+			optional := make([]MemberResolution, 0, len(member.dependencies))
 			var dependencyErr error
 			for _, dependency := range member.dependencies {
 				ref, dependencyInventory, err, state := resolveMemberHandle(dependency, local)
+				if member.optionalBuild != nil {
+					resolution := MemberResolution{State: state}
+					if state == HandleSealed && err == nil {
+						resolution.Ref = ref
+						if err := memberInventory.addAll(dependencyInventory); err != nil {
+							captureErr = errors.Join(captureErr, err)
+							dependencyErr = err
+							memberLimitExceeded = true
+							optional = nil
+							break
+						}
+					}
+					optional = append(optional, resolution)
+					continue
+				}
 				if state != HandleSealed || err != nil {
 					if err == nil {
 						err = fmt.Errorf("dependency %s is %s", dependency, state)
@@ -788,12 +844,16 @@ func (r *Recorder) process(job captureJob) {
 					break
 				}
 			}
-			if resolved == nil {
+			if (member.build != nil && resolved == nil) || (member.optionalBuild != nil && optional == nil) {
 				member.handle.future.resolve(ContentRef{}, nil, errors.Join(errors.New("derived member dependency failed"), dependencyErr))
 				continue
 			}
 			var err error
-			value, err = member.build(resolved)
+			if member.optionalBuild != nil {
+				value, err = member.optionalBuild(optional)
+			} else {
+				value, err = member.build(resolved)
+			}
 			if err != nil {
 				captureErr = errors.Join(captureErr, err)
 				member.handle.future.resolve(ContentRef{}, nil, err)

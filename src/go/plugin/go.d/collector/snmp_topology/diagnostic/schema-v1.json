@@ -10,7 +10,7 @@
     { "$ref": "#/$defs/semantic_profile" },
     { "$ref": "#/$defs/semantic_shard" },
     { "$ref": "#/$defs/observation" },
-    { "$ref": "#/$defs/observation_checkpoint" },
+    { "$ref": "#/$defs/refresh_sweep" },
     { "$ref": "#/$defs/generation" },
     { "$ref": "#/$defs/graph_query" },
     { "$ref": "#/$defs/dns_trace" },
@@ -260,7 +260,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "capture_id", "registration", "role", "ordinal", "origin", "projection", "definition",
+        "capture_id", "registration", "role", "ordinal", "origin", "definition",
         "definition_sha256"
       ],
       "properties": {
@@ -270,7 +270,6 @@
         "vlan_id": { "type": "string" },
         "ordinal": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
         "origin": { "type": "string", "minLength": 1 },
-        "projection": { "$ref": "#/$defs/portable_id" },
         "definition": { "$ref": "#/$defs/profile_definition_evidence" },
         "definition_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
@@ -696,17 +695,74 @@
         "counts": { "$ref": "#/$defs/observation_counts" }
       }
     },
-    "observation_checkpoint": {
+    "generation_reference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["capture_id", "registration", "canonicalization", "logical_length", "sha256", "counts"],
+      "required": ["state"],
+      "properties": {
+        "state": { "enum": ["none", "available", "capture_unavailable"] },
+        "ref": { "$ref": "#/$defs/content_ref" }
+      }
+    },
+    "refresh_device_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostname", "port", "snmp_version"],
+      "properties": {
+        "hostname": { "type": "string" },
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "snmp_version": { "type": "string" },
+        "sys_object_id": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "vendor": { "type": "string" },
+        "model": { "type": "string" },
+        "vnode_guid": { "type": "string" },
+        "vnode_hostname": { "type": "string" }
+      }
+    },
+    "refresh_registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registration", "device", "selection", "target_resolution", "outcome"],
+      "properties": {
+        "registration": { "type": "integer", "minimum": 1 },
+        "device": { "$ref": "#/$defs/refresh_device_identity" },
+        "selection": { "enum": ["due", "skipped_not_due"] },
+        "target_resolution": { "enum": ["literal", "resolved", "failed", "timed_out", "not_attempted"] },
+        "outcome": {
+          "enum": [
+            "success", "no_profiles", "client_failed", "connect_failed", "collection_failed",
+            "canceled_in_flight", "canceled_not_started", "panic_in_flight", "panic_not_started",
+            "skipped_not_due"
+          ]
+        }
+      }
+    },
+    "refresh_publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "generation"],
+      "properties": {
+        "state": { "enum": ["published", "not_published_canceled", "not_published_panic"] },
+        "generation": { "$ref": "#/$defs/generation_reference" }
+      }
+    },
+    "refresh_sweep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id", "started_at", "finished_at", "previous_generation", "registrations", "publication"
+      ],
       "properties": {
         "capture_id": { "type": "integer", "minimum": 1 },
-        "registration": { "type": "integer", "minimum": 1 },
-        "canonicalization": { "const": "netdata.snmp-topology-observation/v1" },
-        "logical_length": { "type": "integer", "minimum": 1 },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "counts": { "$ref": "#/$defs/observation_counts" }
+        "started_at": { "type": "string", "format": "date-time" },
+        "finished_at": { "type": "string", "format": "date-time" },
+        "previous_generation": { "$ref": "#/$defs/generation_reference" },
+        "registrations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/refresh_registration" }
+        },
+        "publication": { "$ref": "#/$defs/refresh_publication" }
       }
     },
     "graph_kernel": {
@@ -723,23 +779,33 @@
     "generation": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "sequence", "published_at", "producer_scope_id", "kernel", "device_count",
-        "renderable_devices", "observations"
-      ],
+      "required": ["sequence", "published_at", "producer_scope_id", "devices", "observations"],
       "properties": {
         "sequence": { "type": "integer", "minimum": 1 },
         "published_at": { "type": "string", "format": "date-time" },
         "producer_scope_id": { "type": "string" },
-        "kernel": { "$ref": "#/$defs/graph_kernel" },
-        "device_count": { "type": "integer", "minimum": 0 },
-        "renderable_devices": { "type": "integer", "minimum": 0 },
+        "devices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/generation_device" }
+        },
         "observations": {
           "oneOf": [
             { "type": "array", "items": { "$ref": "#/$defs/content_ref" } },
             { "type": "null" }
           ]
         }
+      }
+    },
+    "generation_device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registration", "state", "renderable", "observation_state"],
+      "properties": {
+        "registration": { "type": "integer", "minimum": 1 },
+        "state": { "enum": ["refreshed", "retained", "expired", "absent"] },
+        "renderable": { "type": "boolean" },
+        "observation_state": { "enum": ["available", "capture_unavailable", "not_applicable"] },
+        "observation": { "$ref": "#/$defs/content_ref" }
       }
     },
     "graph_query_options": {
@@ -768,11 +834,11 @@
     "graph_query": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["capture_id", "generation_sequence", "generation", "options"],
+      "required": ["capture_id", "generation", "kernel", "options"],
       "properties": {
         "capture_id": { "type": "integer", "minimum": 1 },
-        "generation_sequence": { "type": "integer", "minimum": 1 },
         "generation": { "$ref": "#/$defs/content_ref" },
+        "kernel": { "$ref": "#/$defs/graph_kernel" },
         "options": { "$ref": "#/$defs/graph_query_options" }
       }
     },

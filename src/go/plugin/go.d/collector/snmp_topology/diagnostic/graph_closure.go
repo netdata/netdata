@@ -3,29 +3,14 @@
 package diagnostic
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"time"
 )
-
-func GenerationCapabilityV1() CapabilityKey {
-	return CapabilityKey{Name: CapabilityGenerationSnapshot, Revision: 1}
-}
 
 func GraphCapabilityV1() CapabilityKey {
 	return CapabilityKey{Name: CapabilityGraphReplay, Revision: 1}
-}
-
-func GenerationClosureV1() Closure {
-	capability := GenerationCapabilityV1()
-	return Closure{
-		RootType: MemberType{Kind: KindCapabilityRoot, Schema: SchemaV1},
-		Decode: map[MemberType]DecodeMemberFunc{
-			{Kind: KindCapabilityRoot, Schema: SchemaV1}: DecodeCapabilityRoot(capability),
-			{Kind: KindGeneration, Schema: SchemaV1}:     DecodeGenerationV1,
-			{Kind: KindObservation, Schema: SchemaV1}:    DecodeLeaf[ObservationV1](),
-		},
-		ValidateGraph: validateGenerationCapabilityGraphV1,
-	}
 }
 
 func GraphClosureV1() Closure {
@@ -41,7 +26,20 @@ func GraphClosureV1() Closure {
 			{Kind: KindObservation, Schema: SchemaV1}:    DecodeLeaf[ObservationV1](),
 		},
 		ValidateGraph: validateGraphCapabilityGraphV1,
+		AssessGraph:   assessGraphCapabilityV1,
 	}
+}
+
+func assessGraphCapabilityV1(root CapabilityRootV1, source MemberSource, limits ReaderLimits) (bool, bool, error) {
+	complete := root.State == StateSuccess || root.State == StateEmpty
+	if !complete {
+		return false, false, nil
+	}
+	generation, err := decodeGenerationSection(root.Sections[1], source, limits)
+	if err != nil {
+		return false, false, err
+	}
+	return true, generation.Replayable(), nil
 }
 
 func DecodeGenerationV1(data []byte, limits ReaderLimits) ([]ContentRef, error) {
@@ -64,21 +62,6 @@ func DecodeGraphQueryV1(data []byte, limits ReaderLimits) ([]ContentRef, error) 
 		return nil, err
 	}
 	return query.References(), nil
-}
-
-func validateGenerationCapabilityGraphV1(root CapabilityRootV1, source MemberSource, limits ReaderLimits) error {
-	if len(root.Sections) != 1 || root.Sections[0].Name != GenerationSectionGeneration {
-		return errors.New("generation_snapshot@1 requires exactly one generation section")
-	}
-	section := root.Sections[0]
-	if section.State != StateSuccess || section.ExpectedRecords != 1 || len(section.Members) != 1 {
-		return errors.New("generation section must contain one successful record")
-	}
-	generation, err := decodeGenerationSection(section, source, limits)
-	if err != nil {
-		return err
-	}
-	return validateGenerationObservations(generation, source, limits)
 }
 
 func validateGraphCapabilityGraphV1(root CapabilityRootV1, source MemberSource, limits ReaderLimits) error {
@@ -124,7 +107,7 @@ func validateGraphCapabilityGraphV1(root CapabilityRootV1, source MemberSource, 
 	if err := query.Validate(); err != nil {
 		return err
 	}
-	if query.Generation != generationSection.Members[0] || query.GenerationSequence != generation.Sequence {
+	if query.Generation != generationSection.Members[0] {
 		return errors.New("graph query does not identify the inventoried generation")
 	}
 
@@ -156,7 +139,7 @@ func decodeGenerationSection(section SectionInventoryV1, source MemberSource, li
 	if err := generation.Validate(); err != nil {
 		return GenerationV1{}, err
 	}
-	if generation.DeviceCount > limits.MaxDevices || generation.RenderableDevices > limits.MaxDevices {
+	if uint64(len(generation.Devices)) > limits.MaxDevices {
 		return GenerationV1{}, fmt.Errorf("generation device count exceeds limit %d", limits.MaxDevices)
 	}
 	return generation, nil
@@ -165,6 +148,13 @@ func decodeGenerationSection(section SectionInventoryV1, source MemberSource, li
 func validateGenerationObservations(generation GenerationV1, source MemberSource, limits ReaderLimits) error {
 	var rows uint64
 	var tags uint64
+	available := make(map[string]uint64)
+	for _, device := range generation.Devices {
+		if device.Observation != nil {
+			available[device.Observation.Key()] = device.Registration
+		}
+	}
+	var previous *ObservationV1
 	for i, ref := range generation.Observations {
 		var observation ObservationV1
 		if err := decodeGraphMember(source, ref, limits, &observation); err != nil {
@@ -173,6 +163,15 @@ func validateGenerationObservations(generation GenerationV1, source MemberSource
 		if err := observation.Validate(); err != nil {
 			return fmt.Errorf("generation observation %d: %w", i, err)
 		}
+		registration, ok := available[ref.Key()]
+		if !ok || observation.Registration != registration {
+			return fmt.Errorf("generation observation %d does not match its registration-owned device row", i)
+		}
+		if previous != nil && compareObservationV1(*previous, observation) >= 0 {
+			return errors.New("generation observations must be strictly semantic ordered")
+		}
+		value := observation
+		previous = &value
 		observationRows, observationTags, err := validateObservationLimits(observation, limits)
 		if err != nil {
 			return fmt.Errorf("generation observation %d: %w", i, err)
@@ -187,6 +186,36 @@ func validateGenerationObservations(generation GenerationV1, source MemberSource
 		}
 	}
 	return nil
+}
+
+func compareObservationV1(left, right ObservationV1) int {
+	if value := cmp.Compare(left.LocalDeviceID, right.LocalDeviceID); value != 0 {
+		return value
+	}
+	leftManagement, leftHostname := observationIdentityV1(left)
+	rightManagement, rightHostname := observationIdentityV1(right)
+	if value := cmp.Compare(leftManagement, rightManagement); value != 0 {
+		return value
+	}
+	if value := cmp.Compare(leftHostname, rightHostname); value != 0 {
+		return value
+	}
+	leftCollected, _ := time.Parse(time.RFC3339Nano, left.CollectedAt)
+	rightCollected, _ := time.Parse(time.RFC3339Nano, right.CollectedAt)
+	if leftCollected.Before(rightCollected) {
+		return -1
+	}
+	if leftCollected.After(rightCollected) {
+		return 1
+	}
+	return 0
+}
+
+func observationIdentityV1(observation ObservationV1) (managementIP, hostname string) {
+	if len(observation.L2) == 0 {
+		return "", ""
+	}
+	return observation.L2[0].ManagementIP, observation.L2[0].Hostname
 }
 
 func validateDNSTraceSection(section SectionInventoryV1, captureID uint64, source MemberSource, limits ReaderLimits) (uint64, error) {

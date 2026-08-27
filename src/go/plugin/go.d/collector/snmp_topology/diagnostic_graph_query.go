@@ -19,8 +19,6 @@ const (
 
 type topologyGraphDiagnosticCapture struct {
 	transaction *diagnostic.CaptureTransaction
-	generation  *topologyGeneration
-	query       diagnostic.GraphQueryOptionsV1
 	dns         []diagnostic.DNSRecordV1
 	oui         []diagnostic.OUIRecordV1
 	err         error
@@ -39,16 +37,16 @@ func beginTopologyGraphDiagnosticCapture(
 	if err != nil {
 		return nil
 	}
-	capture := &topologyGraphDiagnosticCapture{
-		transaction: transaction,
-		generation:  generation,
-		query:       diagnosticGraphQueryOptions(options),
-	}
+	capture := &topologyGraphDiagnosticCapture{transaction: transaction}
+	generationHandle := generation.diagnosticMember
+	query := diagnosticGraphQueryOptions(options)
+	kernel := topologyDiagnosticGraphKernel()
+	captureID := transaction.CaptureID()
 	if err := transaction.DefineSection(diagnostic.GraphSectionGeneration, diagnostic.StateSuccess, 1); err != nil {
 		capture.abort()
 		return nil
 	}
-	if err := transaction.AddReference(diagnostic.GraphSectionGeneration, generation.diagnosticMember); err != nil {
+	if err := transaction.AddReference(diagnostic.GraphSectionGeneration, generationHandle); err != nil {
 		capture.abort()
 		return nil
 	}
@@ -56,20 +54,20 @@ func beginTopologyGraphDiagnosticCapture(
 		capture.abort()
 		return nil
 	}
-	queryBytes := diagnosticRetainedBytes(reflect.ValueOf(capture.query)) + 512
+	queryBytes := diagnosticRetainedBytes(reflect.ValueOf(query)) + diagnosticRetainedBytes(reflect.ValueOf(kernel)) + 512
 	_, err = transaction.AddDerivedOwned(
 		diagnostic.GraphSectionQuery,
 		diagnostic.MemberType{Kind: diagnostic.KindGraphQuery, Schema: diagnostic.SchemaV1},
-		[]diagnostic.MemberHandle{generation.diagnosticMember},
+		[]diagnostic.MemberHandle{generationHandle},
 		func(refs []diagnostic.ContentRef) (any, error) {
 			if len(refs) != 1 {
 				return nil, errors.New("graph query requires one generation")
 			}
 			return diagnostic.GraphQueryV1{
-				CaptureID:          transaction.CaptureID(),
-				GenerationSequence: generation.sequence,
-				Generation:         refs[0],
-				Options:            capture.query,
+				CaptureID:  captureID,
+				Generation: refs[0],
+				Kernel:     kernel,
+				Options:    query,
 			}, nil
 		},
 		queryBytes,

@@ -22,6 +22,7 @@ import (
 const diagnosticSemanticShardRecords = 256
 
 type topologyDiagnosticCapture struct {
+	recorder     *diagnostic.Recorder
 	transaction  *diagnostic.CaptureTransaction
 	registration uint64
 	mainProfiles []*ddsnmp.Profile
@@ -48,14 +49,17 @@ func (c *Collector) beginTopologyDiagnosticCapture(registrationID ddsnmp.DeviceR
 	if c == nil || c.diagnosticRecorder == nil {
 		return nil
 	}
-	transaction, err := c.diagnosticRecorder.Begin(diagnostic.SemanticCapabilityV1())
-	if err != nil {
-		return nil
-	}
 	return &topologyDiagnosticCapture{
-		transaction: transaction, registration: uint64(registrationID),
+		recorder: c.diagnosticRecorder, registration: uint64(registrationID),
 		groupIndex: make(map[diagnosticSemanticGroupKey]int),
 	}
+}
+
+func (c *topologyDiagnosticCapture) captureID() uint64 {
+	if c == nil || c.transaction == nil {
+		return 0
+	}
+	return c.transaction.CaptureID()
 }
 
 func (c *topologyDiagnosticCapture) setDevice(
@@ -74,7 +78,7 @@ func (c *topologyDiagnosticCapture) setDevice(
 	diagnostic.SortCanonicalIPs(targets)
 	c.mainProfiles = profiles
 	c.device = &diagnostic.SemanticDeviceV1{
-		CaptureID:           c.transaction.CaptureID(),
+		CaptureID:           c.captureID(),
 		Registration:        c.registration,
 		CollectedAt:         canonicalDiagnosticTime(builder.updateTime),
 		FreshForNanoseconds: int64(builder.staleAfter),
@@ -123,7 +127,7 @@ func (c *topologyDiagnosticCapture) captureProfiles(
 			c.err = errors.Join(c.err, fmt.Errorf("effective profile evidence missing for %q", filepath.Base(pm.Source)))
 		} else {
 			evidence, err := diagnosticProfileEvidence(
-				c.transaction.CaptureID(), c.registration, role, vlanID, uint32(ordinal), profile,
+				c.captureID(), c.registration, role, vlanID, uint32(ordinal), profile,
 			)
 			if err != nil {
 				c.err = errors.Join(c.err, err)
@@ -226,11 +230,19 @@ func (c *topologyDiagnosticCapture) commit(snapshot *topologyDeviceSnapshot) {
 	if c == nil || c.finished {
 		return
 	}
-	if c.device == nil || snapshot == nil || !snapshot.hasObservation {
-		if err := c.transaction.Abort(errors.New("semantic capture has no observation")); err == nil {
-			c.finished = true
-		}
+	if c.device == nil || snapshot == nil {
+		c.finished = true
 		return
+	}
+	transaction, err := c.recorder.Begin(diagnostic.SemanticCapabilityV1())
+	if err != nil {
+		c.finished = true
+		return
+	}
+	c.transaction = transaction
+	c.device.CaptureID = transaction.CaptureID()
+	for i := range c.profiles {
+		c.profiles[i].CaptureID = transaction.CaptureID()
 	}
 
 	c.defineSection(diagnostic.SemanticSectionDevice, diagnostic.StateSuccess, 1)
@@ -258,37 +270,29 @@ func (c *topologyDiagnosticCapture) commit(snapshot *topologyDeviceSnapshot) {
 	}
 	c.defineSection(diagnostic.SemanticSectionEvents, eventState, eventRecords)
 	for _, group := range c.groups {
-		shards := semanticGroupShards(c.transaction.CaptureID(), c.registration, group)
+		shards := semanticGroupShards(transaction.CaptureID(), c.registration, group)
 		for _, shard := range shards {
 			c.addMember(diagnostic.SemanticSectionEvents, diagnostic.MemberType{Kind: diagnostic.KindSemanticShard, Schema: diagnostic.SchemaV1}, shard)
 		}
 	}
 
-	observation := diagnosticObservationFromSnapshot(c.transaction.CaptureID(), c.registration, snapshot.observation)
-	c.defineSection(diagnostic.SemanticSectionObservation, diagnostic.StateSuccess, 1)
-	observationHandle := c.addMember(diagnostic.SemanticSectionObservation, diagnostic.MemberType{Kind: diagnostic.KindObservation, Schema: diagnostic.SchemaV1}, observation)
-	c.defineSection(diagnostic.SemanticSectionCheckpoint, diagnostic.StateSuccess, 1)
-	_, err := c.transaction.AddDerivedOwned(
-		diagnostic.SemanticSectionCheckpoint,
-		diagnostic.MemberType{Kind: diagnostic.KindObservationCheckpoint, Schema: diagnostic.SchemaV1},
-		[]diagnostic.MemberHandle{observationHandle},
-		func(refs []diagnostic.ContentRef) (any, error) {
-			if len(refs) != 1 {
-				return nil, errors.New("observation checkpoint requires one observation")
-			}
-			return diagnostic.ObservationCheckpointV1{
-				CaptureID: c.transaction.CaptureID(), Registration: c.registration,
-				Canonicalization: "netdata.snmp-topology-observation/v1",
-				LogicalLength:    refs[0].LogicalLength, SHA256: refs[0].SHA256, Counts: observation.Counts,
-			}, nil
-		},
-		512,
-	)
-	if err != nil {
-		c.err = errors.Join(c.err, err)
+	var observationHandle diagnostic.MemberHandle
+	if snapshot.hasObservation {
+		observation := diagnosticObservationFromSnapshot(c.transaction.CaptureID(), c.registration, snapshot.observation)
+		c.defineSection(diagnostic.SemanticSectionObservation, diagnostic.StateSuccess, 1)
+		observationHandle = c.addMember(
+			diagnostic.SemanticSectionObservation,
+			diagnostic.MemberType{Kind: diagnostic.KindObservation, Schema: diagnostic.SchemaV1},
+			observation,
+		)
+	} else {
+		c.defineSection(diagnostic.SemanticSectionObservation, diagnostic.StateEmpty, 0)
 	}
 
 	state := diagnostic.StateSuccess
+	if !snapshot.hasObservation {
+		state = diagnostic.StateEmpty
+	}
 	if c.err != nil {
 		state = diagnostic.StateIncomplete
 		_ = c.transaction.MarkIncomplete(c.err)
@@ -302,6 +306,10 @@ func (c *topologyDiagnosticCapture) commit(snapshot *topologyDeviceSnapshot) {
 
 func (c *topologyDiagnosticCapture) abort() {
 	if c == nil || c.finished {
+		return
+	}
+	if c.transaction == nil {
+		c.finished = true
 		return
 	}
 	if err := c.transaction.Abort(errors.New("topology refresh did not produce a semantic generation")); err == nil {
@@ -388,7 +396,7 @@ func diagnosticProfileEvidence(
 	}
 	return diagnostic.SemanticProfileV1{
 		CaptureID: captureID, Registration: registration, Role: role, VLANID: vlanID, Ordinal: ordinal,
-		Origin: filepath.Base(profile.SourceFile), Projection: diagnosticProfileProjection(role),
+		Origin:     filepath.Base(profile.SourceFile),
 		Definition: evidence, DefinitionSHA256: digest,
 	}, nil
 }
@@ -402,13 +410,6 @@ type diagnosticTopologyProfileEvidence struct {
 	BGP                 []ddprofiledefinition.BGPConfig                      `yaml:"bgp,omitempty"`
 	MetricTags          []ddprofiledefinition.GlobalMetricTagConfig          `yaml:"metric_tags,omitempty"`
 	StaticTags          []ddprofiledefinition.StaticMetricTagConfig          `yaml:"static_tags,omitempty"`
-}
-
-func diagnosticProfileProjection(role string) string {
-	if role == "vlan" {
-		return "topology_vlan"
-	}
-	return "topology_bgp"
 }
 
 func diagnosticMetadata(values map[string]ddsnmp.MetaTag) map[string]diagnostic.SemanticMetaTagV1 {

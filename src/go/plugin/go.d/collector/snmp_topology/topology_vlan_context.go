@@ -32,9 +32,10 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 	ctx context.Context,
 	contexts []topologyVLANContext,
 	dev ddsnmp.DeviceConnectionInfo,
-	consume func(topologyVLANContextResult),
+	consumeSuccess func(topologyVLANContextResult),
+	observeOutcome func(topologyVLANContextResult),
 ) {
-	if ctx.Err() != nil || len(contexts) == 0 || consume == nil {
+	if ctx.Err() != nil || len(contexts) == 0 || (consumeSuccess == nil && observeOutcome == nil) {
 		return
 	}
 
@@ -42,7 +43,10 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 	if err != nil {
 		c.Warningf("device '%s': topology vlan-context polling disabled: failed to load profiles: %v", dev.Hostname, err)
 		for ordinal, context := range contexts {
-			consume(topologyVLANContextResult{
+			if observeOutcome == nil {
+				break
+			}
+			observeOutcome(topologyVLANContextResult{
 				ordinal: uint32(ordinal),
 				vlanID:  context.vlanID, vlanName: context.vlanName,
 				state: topologyVLANContextFailed, reason: "profile_load_failed",
@@ -53,37 +57,49 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 
 	for ordinal, context := range contexts {
 		if ctx.Err() != nil {
-			consume(topologyVLANContextResult{
-				ordinal: uint32(ordinal),
-				vlanID:  context.vlanID, vlanName: context.vlanName,
-				state: topologyVLANContextIncomplete, reason: "cancelled",
-			})
+			if observeOutcome != nil {
+				observeOutcome(topologyVLANContextResult{
+					ordinal: uint32(ordinal),
+					vlanID:  context.vlanID, vlanName: context.vlanName,
+					state: topologyVLANContextIncomplete, reason: "cancelled",
+				})
+			}
 			break
 		}
 
 		pms, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles)
 		if err != nil {
 			if ctx.Err() != nil {
-				consume(topologyVLANContextResult{
-					ordinal: uint32(ordinal),
-					vlanID:  context.vlanID, vlanName: context.vlanName,
-					state: topologyVLANContextIncomplete, reason: "cancelled",
-				})
+				if observeOutcome != nil {
+					observeOutcome(topologyVLANContextResult{
+						ordinal: uint32(ordinal),
+						vlanID:  context.vlanID, vlanName: context.vlanName,
+						state: topologyVLANContextIncomplete, reason: "cancelled",
+					})
+				}
 				break
 			}
 			c.Warningf("device '%s': topology vlan-context polling failed for vlan %s: %v", dev.Hostname, context.vlanID, err)
-			consume(topologyVLANContextResult{
-				ordinal: uint32(ordinal),
-				vlanID:  context.vlanID, vlanName: context.vlanName,
-				state: topologyVLANContextFailed, reason: topologyVLANFailureReason(err),
-			})
+			if observeOutcome != nil {
+				observeOutcome(topologyVLANContextResult{
+					ordinal: uint32(ordinal),
+					vlanID:  context.vlanID, vlanName: context.vlanName,
+					state: topologyVLANContextFailed, reason: topologyVLANFailureReason(err),
+				})
+			}
 			continue
 		}
-		consume(topologyVLANContextResult{
+		result := topologyVLANContextResult{
 			ordinal: uint32(ordinal),
 			vlanID:  context.vlanID, vlanName: context.vlanName,
 			state: topologyVLANContextSuccess, profiles: pms, profileDefinitions: profiles,
-		})
+		}
+		if consumeSuccess != nil {
+			consumeSuccess(result)
+		}
+		if observeOutcome != nil {
+			observeOutcome(result)
+		}
 	}
 }
 

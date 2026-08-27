@@ -16,12 +16,11 @@ func SemanticClosureV1() Closure {
 	return Closure{
 		RootType: MemberType{Kind: KindCapabilityRoot, Schema: SchemaV1},
 		Decode: map[MemberType]DecodeMemberFunc{
-			{Kind: KindCapabilityRoot, Schema: SchemaV1}:        DecodeCapabilityRoot(capability),
-			{Kind: KindSemanticDevice, Schema: SchemaV1}:        DecodeLeaf[SemanticDeviceV1](),
-			{Kind: KindSemanticProfile, Schema: SchemaV1}:       DecodeLeaf[SemanticProfileV1](),
-			{Kind: KindSemanticShard, Schema: SchemaV1}:         DecodeLeaf[SemanticShardV1](),
-			{Kind: KindObservation, Schema: SchemaV1}:           DecodeLeaf[ObservationV1](),
-			{Kind: KindObservationCheckpoint, Schema: SchemaV1}: DecodeLeaf[ObservationCheckpointV1](),
+			{Kind: KindCapabilityRoot, Schema: SchemaV1}:  DecodeCapabilityRoot(capability),
+			{Kind: KindSemanticDevice, Schema: SchemaV1}:  DecodeLeaf[SemanticDeviceV1](),
+			{Kind: KindSemanticProfile, Schema: SchemaV1}: DecodeLeaf[SemanticProfileV1](),
+			{Kind: KindSemanticShard, Schema: SchemaV1}:   DecodeLeaf[SemanticShardV1](),
+			{Kind: KindObservation, Schema: SchemaV1}:     DecodeLeaf[ObservationV1](),
 		},
 		ValidateGraph: validateSemanticGraphV1,
 	}
@@ -48,7 +47,6 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 	wantSections := []string{
 		SemanticSectionDevice,
 		SemanticSectionObservation,
-		SemanticSectionCheckpoint,
 		SemanticSectionProfiles,
 		SemanticSectionEvents,
 	}
@@ -79,48 +77,36 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 	owner = semanticOwnerV1{captureID: device.CaptureID, registration: device.Registration}
 
 	observationSection := root.Sections[1]
-	if observationSection.State != StateSuccess || observationSection.ExpectedRecords != 1 || len(observationSection.Members) != 1 {
-		return errors.New("semantic observation section must contain one successful record")
-	}
-	if observationSection.Members[0].Type() != (MemberType{Kind: KindObservation, Schema: SchemaV1}) {
-		return errors.New("semantic observation section contains the wrong member type")
-	}
-	var observation ObservationV1
-	if err := decodeGraphMember(source, observationSection.Members[0], limits, &observation); err != nil {
-		return err
-	}
-	if err := observation.Validate(); err != nil {
-		return err
-	}
-	if _, _, err := validateObservationLimits(observation, limits); err != nil {
-		return err
-	}
-	if err := requireSemanticOwner(owner, observation.CaptureID, observation.Registration); err != nil {
-		return fmt.Errorf("observation: %w", err)
-	}
-	checkpointSection := root.Sections[2]
-	if checkpointSection.State != StateSuccess || checkpointSection.ExpectedRecords != 1 || len(checkpointSection.Members) != 1 {
-		return errors.New("semantic observation checkpoint section must contain one successful record")
-	}
-	if checkpointSection.Members[0].Type() != (MemberType{Kind: KindObservationCheckpoint, Schema: SchemaV1}) {
-		return errors.New("semantic observation checkpoint section contains the wrong member type")
-	}
-	var checkpoint ObservationCheckpointV1
-	if err := decodeGraphMember(source, checkpointSection.Members[0], limits, &checkpoint); err != nil {
-		return err
-	}
-	if err := checkpoint.Validate(); err != nil {
-		return err
-	}
-	if err := requireSemanticOwner(owner, checkpoint.CaptureID, checkpoint.Registration); err != nil {
-		return fmt.Errorf("observation checkpoint: %w", err)
-	}
-	if checkpoint.LogicalLength != observationSection.Members[0].LogicalLength ||
-		checkpoint.SHA256 != observationSection.Members[0].SHA256 || checkpoint.Counts != observation.Counts {
-		return errors.New("observation checkpoint does not identify the captured observation")
+	switch root.State {
+	case StateSuccess:
+		if observationSection.State != StateSuccess || observationSection.ExpectedRecords != 1 || len(observationSection.Members) != 1 {
+			return errors.New("successful semantic observation section must contain one record")
+		}
+		if observationSection.Members[0].Type() != (MemberType{Kind: KindObservation, Schema: SchemaV1}) {
+			return errors.New("semantic observation section contains the wrong member type")
+		}
+		var observation ObservationV1
+		if err := decodeGraphMember(source, observationSection.Members[0], limits, &observation); err != nil {
+			return err
+		}
+		if err := observation.Validate(); err != nil {
+			return err
+		}
+		if _, _, err := validateObservationLimits(observation, limits); err != nil {
+			return err
+		}
+		if err := requireSemanticOwner(owner, observation.CaptureID, observation.Registration); err != nil {
+			return fmt.Errorf("observation: %w", err)
+		}
+	case StateEmpty:
+		if observationSection.State != StateEmpty || observationSection.ExpectedRecords != 0 || len(observationSection.Members) != 0 {
+			return errors.New("empty semantic observation section must contain no record")
+		}
+	default:
+		return fmt.Errorf("semantic_replay@1 has unsupported terminal state %q", root.State)
 	}
 
-	profileSection := root.Sections[3]
+	profileSection := root.Sections[2]
 	if uint64(len(profileSection.Members)) > limits.MaxProfiles || profileSection.ExpectedRecords > limits.MaxProfiles {
 		return fmt.Errorf("profile count exceeds limit %d", limits.MaxProfiles)
 	}
@@ -149,7 +135,7 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 		}
 	}
 
-	eventSection := root.Sections[4]
+	eventSection := root.Sections[3]
 	if uint64(len(eventSection.Members)) > limits.MaxMembers {
 		return fmt.Errorf("semantic shard count exceeds limit %d", limits.MaxMembers)
 	}
@@ -220,7 +206,7 @@ func validateSemanticGraphV1(root CapabilityRootV1, source MemberSource, limits 
 			return fmt.Errorf("semantic shard group %d: %w", i, err)
 		}
 	}
-	if root.State == StateSuccess {
+	if root.State == StateSuccess || root.State == StateEmpty {
 		if err := validateSemanticGroupOrderV1(groups, profiles, mainProfiles); err != nil {
 			return err
 		}

@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	CapabilityGenerationSnapshot = "generation_snapshot"
-	CapabilityGraphReplay        = "graph_replay"
+	CapabilityGraphReplay = "graph_replay"
 
 	KindGeneration = "generation"
 	KindGraphQuery = "graph_query"
@@ -22,8 +21,6 @@ const (
 )
 
 const (
-	GenerationSectionGeneration = "generation"
-
 	GraphSectionDNSTrace   = "dns_trace"
 	GraphSectionGeneration = "generation"
 	GraphSectionOUITrace   = "oui_trace"
@@ -37,13 +34,11 @@ const (
 )
 
 type GenerationV1 struct {
-	Sequence          uint64        `json:"sequence"`
-	PublishedAt       string        `json:"published_at"`
-	ProducerScopeID   string        `json:"producer_scope_id"`
-	Kernel            GraphKernelV1 `json:"kernel"`
-	DeviceCount       uint64        `json:"device_count"`
-	RenderableDevices uint64        `json:"renderable_devices"`
-	Observations      []ContentRef  `json:"observations"`
+	Sequence        uint64               `json:"sequence"`
+	PublishedAt     string               `json:"published_at"`
+	ProducerScopeID string               `json:"producer_scope_id"`
+	Devices         []GenerationDeviceV1 `json:"devices"`
+	Observations    []ContentRef         `json:"observations"`
 }
 
 func (g GenerationV1) Validate() error {
@@ -56,14 +51,19 @@ func (g GenerationV1) Validate() error {
 	if strings.ContainsRune(g.ProducerScopeID, 0) {
 		return errors.New("producer_scope_id contains NUL")
 	}
-	if err := g.Kernel.Validate(); err != nil {
-		return fmt.Errorf("kernel: %w", err)
-	}
-	if g.RenderableDevices != uint64(len(g.Observations)) {
-		return errors.New("renderable device count does not match observations")
-	}
-	if g.RenderableDevices > g.DeviceCount {
-		return errors.New("renderable device count exceeds device count")
+	available := make(map[string]uint64, len(g.Observations))
+	var previousRegistration uint64
+	for i, device := range g.Devices {
+		if err := device.Validate(); err != nil {
+			return fmt.Errorf("devices[%d]: %w", i, err)
+		}
+		if device.Registration <= previousRegistration {
+			return errors.New("generation devices must be strictly registration ordered")
+		}
+		previousRegistration = device.Registration
+		if device.Observation != nil {
+			available[device.Observation.Key()]++
+		}
 	}
 	seen := make(map[string]struct{}, len(g.Observations))
 	for i, ref := range g.Observations {
@@ -77,12 +77,28 @@ func (g GenerationV1) Validate() error {
 			return fmt.Errorf("observations[%d] duplicates an earlier observation", i)
 		}
 		seen[ref.Key()] = struct{}{}
+		if available[ref.Key()] != 1 {
+			return fmt.Errorf("observations[%d] does not identify exactly one generation device", i)
+		}
+		delete(available, ref.Key())
+	}
+	if len(available) != 0 {
+		return errors.New("generation device observation is absent from the ordered observation vector")
 	}
 	return nil
 }
 
 func (g GenerationV1) References() []ContentRef {
 	return slices.Clone(g.Observations)
+}
+
+func (g GenerationV1) Replayable() bool {
+	for _, device := range g.Devices {
+		if device.Renderable && device.ObservationState != ObservationStateAvailable {
+			return false
+		}
+	}
+	return true
 }
 
 type GraphKernelV1 struct {
@@ -106,21 +122,24 @@ func (k GraphKernelV1) Validate() error {
 }
 
 type GraphQueryV1 struct {
-	CaptureID          uint64              `json:"capture_id"`
-	GenerationSequence uint64              `json:"generation_sequence"`
-	Generation         ContentRef          `json:"generation"`
-	Options            GraphQueryOptionsV1 `json:"options"`
+	CaptureID  uint64              `json:"capture_id"`
+	Generation ContentRef          `json:"generation"`
+	Kernel     GraphKernelV1       `json:"kernel"`
+	Options    GraphQueryOptionsV1 `json:"options"`
 }
 
 func (q GraphQueryV1) Validate() error {
-	if q.CaptureID == 0 || q.GenerationSequence == 0 {
-		return errors.New("query owner identifiers must be nonzero")
+	if q.CaptureID == 0 {
+		return errors.New("query capture_id must be nonzero")
 	}
 	if err := q.Generation.Validate(); err != nil {
 		return fmt.Errorf("generation: %w", err)
 	}
 	if q.Generation.Type() != (MemberType{Kind: KindGeneration, Schema: SchemaV1}) {
 		return fmt.Errorf("query generation has type %s@%s", q.Generation.Kind, q.Generation.Schema)
+	}
+	if err := q.Kernel.Validate(); err != nil {
+		return fmt.Errorf("kernel: %w", err)
 	}
 	return q.Options.Validate()
 }

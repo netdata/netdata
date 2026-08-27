@@ -174,6 +174,51 @@ func TestRecorder_DerivedReferenceCarriesTransitivePortableInventory(t *testing.
 	require.Equal(t, []ContentRef{derivedRef}, root.Sections[0].Members)
 }
 
+func TestRecorder_OptionalDependencyPreservesResultWhenEvidenceFails(t *testing.T) {
+	t.Parallel()
+
+	sink := &MemorySink{}
+	recorder := newTestRecorder(t, sink, 2)
+	failedTxn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, failedTxn.DefineSection("leaf", StateSuccess, 1))
+	failed, err := failedTxn.AddOwned(
+		"leaf",
+		MemberType{Kind: "semantic_leaf", Schema: SchemaV1},
+		func() {},
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, failedTxn.Commit(StateSuccess))
+
+	derivedTxn, err := recorder.Begin(testSemanticCapability)
+	require.NoError(t, err)
+	require.NoError(t, derivedTxn.DefineSection("derived", StateSuccess, 1))
+	derived, err := derivedTxn.AddOptionalDerivedOwned(
+		"derived",
+		MemberType{Kind: "semantic_leaf", Schema: SchemaV1},
+		[]MemberHandle{failed},
+		func(resolved []MemberResolution) (any, error) {
+			require.Len(t, resolved, 1)
+			require.Equal(t, HandleFailed, resolved[0].State)
+			return testLeaf{ID: "capture-unavailable"}, nil
+		},
+		32,
+	)
+	require.NoError(t, err)
+	require.NoError(t, derivedTxn.Commit(StateSuccess))
+	recorder.Close()
+
+	_, handleErr, state := failed.Resolve()
+	assert.Equal(t, HandleFailed, state)
+	require.Error(t, handleErr)
+	_, handleErr, state = derived.Resolve()
+	assert.Equal(t, HandleSealed, state)
+	require.NoError(t, handleErr)
+	require.Len(t, sink.Results(), 2)
+	require.NoError(t, sink.Results()[1].Err)
+}
+
 func TestCaptureTransaction_RejectsCrossRecorderHandles(t *testing.T) {
 	t.Parallel()
 

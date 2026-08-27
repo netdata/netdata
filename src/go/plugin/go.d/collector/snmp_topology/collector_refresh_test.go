@@ -440,14 +440,14 @@ func TestCollectorDeviceRefreshWarningsAreLimitedPerRegistrationAndFailureClass(
 	}
 
 	for range 2 {
-		snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
+		snapshot, outcome, _ := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
 		require.Nil(t, snapshot)
 		require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 	}
-	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
+	snapshot, outcome, _ := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
 	require.Nil(t, snapshot)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
-	snapshot, outcome = coll.refreshDeviceTopology(context.Background(), 2, dev, nil)
+	snapshot, outcome, _ = coll.refreshDeviceTopology(context.Background(), 2, dev, nil)
 	require.Nil(t, snapshot)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 
@@ -773,7 +773,7 @@ func TestCollectorConsumesEachVLANContextBeforeCollectingNext(t *testing.T) {
 	}
 
 	var consumed []uint32
-	coll.collectTopologyVTPVLANContexts(context.Background(), contexts, dev, func(result topologyVLANContextResult) {
+	coll.collectTopologyVTPVLANContexts(context.Background(), contexts, dev, nil, func(result topologyVLANContextResult) {
 		consumed = append(consumed, result.ordinal)
 		if result.ordinal == 0 {
 			consumedFirst = true
@@ -1180,7 +1180,7 @@ func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
 		})
 	}
 
-	generation, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")})
+	generation, outcome, _ := coll.refreshDeviceTopology(context.Background(), 1, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")})
 	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
 	require.NotNil(t, generation)
 	snapshot := generation.observation
@@ -1297,7 +1297,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 
 	go func() {
 		defer close(done)
-		coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
+		_, _, _ = coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
 	}()
 
 	<-started
@@ -1341,7 +1341,7 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 		})
 	}
 
-	generation, outcome := coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
+	generation, outcome, _ := coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
 	require.Nil(t, generation)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 
