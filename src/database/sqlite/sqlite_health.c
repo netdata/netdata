@@ -390,6 +390,9 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
     // cleanups in run_metadata_cleanup() respect - an oversized WAL and a runtime budget - and
     // whatever is left is picked up by the next cleanup cycle.
     while (true) {
+        if (!sql_metadata_wal_size_acceptable())
+            break;
+
         param = 0;
         SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
         SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
@@ -404,9 +407,6 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
 
         // a short batch means the eligible set for this host is exhausted
         if (sqlite3_changes(db_meta) < HEALTH_LOG_CLEANUP_BATCH_SIZE)
-            break;
-
-        if (!sql_metadata_wal_size_acceptable())
             break;
 
         if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD)
