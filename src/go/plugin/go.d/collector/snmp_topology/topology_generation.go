@@ -18,7 +18,7 @@ type topologyDeviceSnapshot struct {
 	observation    topologymodel.ObservationSnapshot
 	hasObservation bool
 	trap           topologyTrapDeviceGeneration
-	semantic       topologySemanticCapture
+	acquisition    *topologyAcquisitionCapture
 }
 
 type topologyEvidenceRef struct {
@@ -37,7 +37,7 @@ type topologyDeviceGeneration struct {
 	observation    topologymodel.ObservationSnapshot
 	hasObservation bool
 	trap           topologyTrapDeviceGeneration
-	semantic       topologySemanticCapture
+	acquisition    *topologyAcquisitionCapture
 }
 
 // topologyGeneration is the immutable device vector published after one
@@ -93,7 +93,7 @@ func activateTopologyDeviceSnapshot(
 		observation:    snapshot.observation,
 		hasObservation: snapshot.hasObservation,
 		trap:           snapshot.trap,
-		semantic:       snapshot.semantic,
+		acquisition:    snapshot.acquisition,
 	}
 }
 

@@ -34,7 +34,8 @@ type topologySweepDeviceDiagnostic struct {
 
 	retainedSuccess    topologyEvidenceRef
 	hasRetainedSuccess bool
-	semantic           topologySemanticCapture
+	acquisition        *topologyAcquisitionCapture
+	latestAttempt      *topologyAcquisitionCapture
 	hasObservation     bool
 	expiresAt          time.Time
 	renderable         bool
@@ -104,7 +105,7 @@ type topologyDiagnosticCutInput struct {
 	seen           map[ddsnmp.DeviceRegistrationID]bool
 	previousStates map[ddsnmp.DeviceRegistrationID]deviceRefreshState
 	states         map[ddsnmp.DeviceRegistrationID]deviceRefreshState
-	limits         topologySemanticLimits
+	limits         topologyAcquisitionLimits
 }
 
 type topologyDiagnosticCutProjector func(topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error)
@@ -117,7 +118,7 @@ func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
 	}
 	if diagnostics.topology != nil {
 		if diagnostics.topology.recordCount >= limits.maxRecords || diagnostics.topology.logicalBytes >= limits.maxLogicalBytes {
-			limits = topologySemanticLimits{}
+			limits = topologyAcquisitionLimits{}
 		} else {
 			limits.maxRecords -= diagnostics.topology.recordCount
 			limits.maxLogicalBytes -= diagnostics.topology.logicalBytes
@@ -127,7 +128,7 @@ func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
 	return diagnostics
 }
 
-func acquireTopologyJobLifecycleCut(source deviceLifecycleSource, limits topologySemanticLimits) (result topologyJobLifecycleDiagnosticCut) {
+func acquireTopologyJobLifecycleCut(source deviceLifecycleSource, limits topologyAcquisitionLimits) (result topologyJobLifecycleDiagnosticCut) {
 	result.state = diagnosticCaptureAvailable
 	defer func() {
 		if recover() != nil {
@@ -224,27 +225,31 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 		cut.logicalBytes = topologyDiagnosticCutLogicalBytes
 		return cut, nil
 	}
+	countedCaptures := make(map[*topologyAcquisitionCapture]bool)
 	for _, entry := range input.entries {
-		generation := input.states[entry.RegistrationID].generation
-		if generation == nil || generation.semantic.state != diagnosticCaptureAvailable {
-			continue
+		state := input.states[entry.RegistrationID]
+		for _, capture := range stateAcquisitionCaptures(state) {
+			if capture == nil || capture.state != diagnosticCaptureAvailable || countedCaptures[capture] {
+				continue
+			}
+			countedCaptures[capture] = true
+			if capture.recordCount > input.limits.maxRecords-records {
+				cut.captureState = diagnosticCaptureLimitExceeded
+				cut.captureReason = diagnosticCaptureReasonGlobalRecordLimit
+				cut.recordCount = 1
+				cut.logicalBytes = topologyDiagnosticCutLogicalBytes
+				return cut, nil
+			}
+			if capture.logicalBytes > input.limits.maxLogicalBytes-logicalBytes {
+				cut.captureState = diagnosticCaptureLimitExceeded
+				cut.captureReason = diagnosticCaptureReasonGlobalByteLimit
+				cut.recordCount = 1
+				cut.logicalBytes = topologyDiagnosticCutLogicalBytes
+				return cut, nil
+			}
+			records += capture.recordCount
+			logicalBytes += capture.logicalBytes
 		}
-		if generation.semantic.recordCount > input.limits.maxRecords-records {
-			cut.captureState = diagnosticCaptureLimitExceeded
-			cut.captureReason = diagnosticCaptureReasonGlobalRecordLimit
-			cut.recordCount = 1
-			cut.logicalBytes = topologyDiagnosticCutLogicalBytes
-			return cut, nil
-		}
-		if generation.semantic.logicalBytes > input.limits.maxLogicalBytes-logicalBytes {
-			cut.captureState = diagnosticCaptureLimitExceeded
-			cut.captureReason = diagnosticCaptureReasonGlobalByteLimit
-			cut.recordCount = 1
-			cut.logicalBytes = topologyDiagnosticCutLogicalBytes
-			return cut, nil
-		}
-		records += generation.semantic.recordCount
-		logicalBytes += generation.semantic.logicalBytes
 	}
 	cut.recordCount = records
 	cut.logicalBytes = logicalBytes
@@ -264,12 +269,13 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 		if generation := state.generation; generation != nil {
 			row.retainedSuccess = generation.evidenceRef
 			row.hasRetainedSuccess = true
-			row.semantic = generation.semantic
+			row.acquisition = generation.acquisition
 			row.hasObservation = generation.hasObservation
 			row.expiresAt = generation.expiresAt
 			row.renderable = generation.hasObservation && generation.freshAt(input.publishedAt)
 			row.expired = !generation.expiresAt.IsZero() && input.publishedAt.After(generation.expiresAt)
 		}
+		row.latestAttempt = state.latestAttempt
 		cut.devices = append(cut.devices, row)
 	}
 
@@ -283,6 +289,20 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 		cut.removed = append(cut.removed, row)
 	}
 	return cut, nil
+}
+
+func stateAcquisitionCaptures(state deviceRefreshState) []*topologyAcquisitionCapture {
+	success := acquisitionCaptureFromGeneration(state.generation)
+	if success == nil {
+		if state.latestAttempt == nil {
+			return nil
+		}
+		return []*topologyAcquisitionCapture{state.latestAttempt}
+	}
+	if state.latestAttempt == nil || state.latestAttempt == success {
+		return []*topologyAcquisitionCapture{success}
+	}
+	return []*topologyAcquisitionCapture{success, state.latestAttempt}
 }
 
 func unavailableTopologyDiagnosticCut(input topologyDiagnosticCutInput, reason diagnosticCaptureReason) *topologySweepDiagnosticCut {
