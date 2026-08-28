@@ -57,18 +57,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
         initialize_single_ctx(multidb_ctx[i]);
 }
 
-uint64_t dbengine_out_of_memory_protection = 0;
-bool dbengine_use_all_ram_for_caches = false;
-int db_engine_journal_check = 0;
-
-#if defined(ENV32BIT)
-int default_rrdeng_page_cache_mb = 16;
-int default_rrdeng_extent_cache_mb = 0;
-#else
-int default_rrdeng_page_cache_mb = 32;
-int default_rrdeng_extent_cache_mb = 0;
-#endif
-
 // ----------------------------------------------------------------------------
 // metrics groups
 
@@ -1138,6 +1126,9 @@ int rrdeng_init(
     uint32_t max_open_files;
     bool freshly_initialized_ctx = false;
 
+    if(!dbengine_initialized())
+        fatal("DBENGINE: rrdeng_init() for tier %zu called before dbengine_init()", tier);
+
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
     /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
@@ -1442,7 +1433,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = page_type_size[ctx->config.page_type];
     stats.sizeof_page_data = tier_page_size[ctx->config.tier];
-    stats.pages_per_extent = rrdeng_pages_per_extent;
+    stats.pages_per_extent = dbengine_cfg.pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;

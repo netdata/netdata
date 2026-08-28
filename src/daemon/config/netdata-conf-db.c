@@ -10,6 +10,7 @@ bool dbengine_enabled = false; // will become true if and when dbengine is initi
 bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 bool dbengine_use_direct_io = true;
 #ifdef ENABLE_DBENGINE
+struct dbengine_config netdata_conf_dbengine = DBENGINE_CONFIG_DEFAULTS;
 int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 bool new_dbengine_defaults = false;
@@ -22,7 +23,6 @@ time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_cleanup_orphan_to_archive_time_s = 3600;
 time_t rrdhost_free_ephemeral_time_s = 0;
 
-extern time_t dbengine_journal_v2_unmount_time;
 
 size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= nd_profile.storage_tiers)) tier = nd_profile.storage_tiers - 1;
@@ -60,20 +60,24 @@ static void netdata_conf_dbengine_pre_logs(void) {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
-    default_rrdeng_extent_cache_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
-    db_engine_journal_check = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+    // read as int so that negative or too small values are visible before they become sizes
+    int page_cache_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", (int) netdata_conf_dbengine.page_cache_mb);
+    int extent_cache_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", (int) netdata_conf_dbengine.extent_cache_mb);
+    netdata_conf_dbengine.journal_integrity_check = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
-    if(default_rrdeng_extent_cache_mb < 0) {
-        default_rrdeng_extent_cache_mb = 0;
-        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+    if(extent_cache_mb < 0) {
+        extent_cache_mb = 0;
+        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", extent_cache_mb);
     }
 
-    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
+    if(page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", page_cache_mb);
     }
+
+    netdata_conf_dbengine.page_cache_mb = (size_t) page_cache_mb;
+    netdata_conf_dbengine.extent_cache_mb = (size_t) extent_cache_mb;
 
 #else
     if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
@@ -122,13 +126,19 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 }
 #endif
 
+void netdata_conf_dbengine_apply(void) {
+#ifdef ENABLE_DBENGINE
+    dbengine_init(&netdata_conf_dbengine);
+#endif
+}
+
 void netdata_conf_dbengine_init(const char *hostname) {
 #ifdef ENABLE_DBENGINE
 
     // ----------------------------------------------------------------------------------------------------------------
     // out of memory protection and use all ram for caches
 
-    dbengine_out_of_memory_protection = 0; // will be calculated below
+    netdata_conf_dbengine.out_of_memory_protection_bytes = 0; // will be calculated below
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
     if(OS_SYSTEM_MEMORY_OK(sm) && sm.ram_total_bytes > sm.ram_available_bytes) {
         // calculate the default out of memory protection size
@@ -137,27 +147,27 @@ void netdata_conf_dbengine_init(const char *hostname) {
             keep_free = 5ULL * 1024 * 1024 * 1024;
         char buf[64];
         size_snprintf(buf, sizeof(buf), keep_free, "B", false);
-        size_parse(buf, &dbengine_out_of_memory_protection, "B");
+        size_parse(buf, &netdata_conf_dbengine.out_of_memory_protection_bytes, "B");
     }
 
-    if(dbengine_out_of_memory_protection) {
-        dbengine_use_all_ram_for_caches = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use all ram for caches", dbengine_use_all_ram_for_caches);
-        dbengine_out_of_memory_protection = inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_DB, "dbengine out of memory protection", dbengine_out_of_memory_protection);
+    if(netdata_conf_dbengine.out_of_memory_protection_bytes) {
+        netdata_conf_dbengine.use_all_ram_for_caches = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use all ram for caches", netdata_conf_dbengine.use_all_ram_for_caches);
+        netdata_conf_dbengine.out_of_memory_protection_bytes = inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_DB, "dbengine out of memory protection", netdata_conf_dbengine.out_of_memory_protection_bytes);
 
         char buf_total[64], buf_avail[64], buf_oom[64];
         size_snprintf(buf_total, sizeof(buf_total), sm.ram_total_bytes, "B", false);
         size_snprintf(buf_avail, sizeof(buf_avail), sm.ram_available_bytes, "B", false);
-        size_snprintf(buf_oom, sizeof(buf_oom), dbengine_out_of_memory_protection, "B", false);
+        size_snprintf(buf_oom, sizeof(buf_oom), netdata_conf_dbengine.out_of_memory_protection_bytes, "B", false);
 
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "DBENGINE memory protection enabled. "
                "Netdata will limit DBENGINE memory usage to help keep at least %s of system RAM available when possible and reduce OOM risk. "
                "System memory total: %s, currently available: %s, use all RAM for caches: %s",
-               buf_oom, buf_total, buf_avail, dbengine_use_all_ram_for_caches ? "enabled" : "disabled");
+               buf_oom, buf_total, buf_avail, netdata_conf_dbengine.use_all_ram_for_caches ? "enabled" : "disabled");
     }
     else {
-        dbengine_out_of_memory_protection = 0;
-        dbengine_use_all_ram_for_caches = false;
+        netdata_conf_dbengine.out_of_memory_protection_bytes = 0;
+        netdata_conf_dbengine.use_all_ram_for_caches = false;
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "DBENGINE memory protection is disabled because Netdata could not detect system memory size. "
@@ -167,18 +177,21 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // ----------------------------------------------------------------------------------------------------------------
 
     dbengine_use_direct_io = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use direct io", dbengine_use_direct_io);
-    dbengine_journal_v2_unmount_time = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "dbengine journal v2 unmount time", nd_profile.dbengine_journal_v2_unmount_time);
+    netdata_conf_dbengine.journal_v2_unmount_time_s = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "dbengine journal v2 unmount time", nd_profile.dbengine_journal_v2_unmount_time);
 
     unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
-        rrdeng_pages_per_extent = read_num;
+        netdata_conf_dbengine.pages_per_extent = read_num;
     else {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Invalid dbengine pages per extent %u given. Using %u.",
-               read_num, rrdeng_pages_per_extent);
+               read_num, netdata_conf_dbengine.pages_per_extent);
 
-        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
+        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", netdata_conf_dbengine.pages_per_extent);
     }
+
+    // the process-wide configuration is complete: hand it to the engine before any tier starts
+    netdata_conf_dbengine_apply();
 
     nd_profile.storage_tiers = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     if(nd_profile.storage_tiers < 1) {

@@ -26,6 +26,12 @@
 #include <openssl/evp.h>
 #include "../storage-engine-types.h"
 #include "rrdengine-daemon.h"
+#include "dbengine-config.h"
+
+// the process-wide configuration, copied once by dbengine_init() and read-only afterwards
+extern struct dbengine_config dbengine_cfg;
+bool dbengine_initialized(void);
+
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
 #include "datafile.h"
@@ -37,8 +43,6 @@
 #include "pdc.h"
 #include "page.h"
 
-
-extern unsigned rrdeng_pages_per_extent;
 
 #define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
 #define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
@@ -70,7 +74,6 @@ struct rrdengine_instance;
 struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
-#define DEFAULT_PAGES_PER_EXTENT (109)
 
 #define MAX_EXTENT_UNCOMPRESSED_SIZE (MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE))
 

@@ -2159,8 +2159,8 @@ PGC *pgc_create(const char *name,
                                                         // otherwise, it runs by itself every 100ms
 
     // use all ram and protection from out of memory
-    cache->config.use_all_ram                       = dbengine_use_all_ram_for_caches;
-    cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_out_of_memory_protection;
+    cache->config.use_all_ram                       = dbengine_cfg.use_all_ram_for_caches;
+    cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_cfg.out_of_memory_protection_bytes;
 
     // partitions
     if(partitions == 0) partitions  = netdata_conf_cpus() * 2;

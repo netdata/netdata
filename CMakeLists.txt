@@ -1942,6 +1942,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/dbengine-stresstest.c
             src/database/engine/dbengine-compression.c
             src/database/engine/dbengine-compression.h
+            src/database/engine/dbengine-config.c
+            src/database/engine/dbengine-config.h
             src/database/engine/rrdengine-daemon.h
             src/database/engine/rrdengine-daemon-check.c
     )
@@ -1961,6 +1963,7 @@ if(ENABLE_DBENGINE)
             src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/dbengine-compression.c
+            src/database/engine/dbengine-config.c
             PROPERTIES COMPILE_OPTIONS "-Werror=implicit-function-declaration;-Werror=implicit-int")
 endif()
 
