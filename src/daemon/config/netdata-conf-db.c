@@ -75,25 +75,6 @@ static void netdata_conf_dbengine_pre_logs(void) {
         inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
     }
 
-    // ------------------------------------------------------------------------
-    // get default Database Engine disk space quota in MiB
-    //
-    //    //    if (!config_exists(CONFIG_SECTION_DB, "dbengine disk space MB") && !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"))
-    //
-    //    default_rrdeng_disk_quota_mb = (int) inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-    //    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-    //        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-    //        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-    //        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-    //    }
-    //
-    //    default_multidb_disk_quota_mb = (int) inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-    //    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-    //        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
-    //        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-    //        inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
-    //    }
-
 #else
     if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
         error_report("RRD_DB_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
