@@ -2148,19 +2148,19 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 			SOWID: "RGW-S-11", Owner: "s3check", Context: "s3check.stage_latency_status",
 			Calc: "$exceeded", Units: "status", Recipient: "silent",
 		},
-		"rgw_multisite_phase_failed": {
+		"s3check_multisite_phase_failed": {
 			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.multisite_phase_failure",
 			Calc: "$failed", Units: "status", Recipient: "sysadmin",
 		},
-		"rgw_multisite_payload_mismatch": {
+		"s3check_multisite_payload_mismatch": {
 			SOWID: "RGW-M-11", Owner: "s3check", Context: "s3check.multisite_payload_mismatch",
 			Calc: "$mismatch", Units: "status", Recipient: "sysadmin",
 		},
-		"rgw_multisite_replication_rpo_breach": {
+		"s3check_multisite_replication_rpo_breach": {
 			SOWID: "RGW-S-24", Owner: "s3check", Context: "s3check.multisite_rpo_status",
 			Calc: "$breached", Units: "status", Recipient: "silent",
 		},
-		"rgw_multisite_delete_propagation_breach": {
+		"s3check_multisite_delete_propagation_breach": {
 			SOWID: "RGW-S-25", Owner: "s3check", Context: "s3check.multisite_delete_status",
 			Calc: "$breached", Units: "status", Recipient: "silent",
 		},
@@ -2197,12 +2197,12 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 		info[alert.Name] = alert.Info
 	}
 	require.Equal(t, map[string]string{
-		"s3check_stage_failed":                    "s3check.stage_status",
-		"s3check_stage_latency":                   "s3check.stage_latency_status",
-		"rgw_multisite_phase_failed":              "s3check.multisite_phase_failure",
-		"rgw_multisite_payload_mismatch":          "s3check.multisite_payload_mismatch",
-		"rgw_multisite_replication_rpo_breach":    "s3check.multisite_rpo_status",
-		"rgw_multisite_delete_propagation_breach": "s3check.multisite_delete_status",
+		"s3check_stage_failed":                        "s3check.stage_status",
+		"s3check_stage_latency":                       "s3check.stage_latency_status",
+		"s3check_multisite_phase_failed":              "s3check.multisite_phase_failure",
+		"s3check_multisite_payload_mismatch":          "s3check.multisite_payload_mismatch",
+		"s3check_multisite_replication_rpo_breach":    "s3check.multisite_rpo_status",
+		"s3check_multisite_delete_propagation_breach": "s3check.multisite_delete_status",
 	}, actual)
 
 	templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",

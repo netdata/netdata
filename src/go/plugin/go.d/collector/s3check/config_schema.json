@@ -65,7 +65,7 @@
       },
       "path_style": {
         "title": "Path-style addressing",
-        "description": "Place the bucket in the URL path. This is the normal choice for Ceph RGW and many S3-compatible endpoints.",
+        "description": "Place the bucket in the URL path, as used by Ceph RGW and many S3-compatible services. Disable it for AWS S3 virtual-host addressing.",
         "type": "boolean",
         "default": true
       },
@@ -216,7 +216,7 @@
           },
           "path_style": {
             "title": "Destination path-style addressing",
-            "description": "Place the destination bucket in the URL path. This is the normal choice for Ceph RGW.",
+            "description": "Place the destination bucket in the URL path, as used by Ceph RGW. Disable it for virtual-host addressing.",
             "type": "boolean",
             "default": true
           },

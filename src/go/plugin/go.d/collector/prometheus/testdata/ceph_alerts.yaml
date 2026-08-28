@@ -2602,7 +2602,7 @@ netdata_extensions:
     recipient: silent
     adaptation: s3check_latency_objective
 
-  rgw_multisite_phase_failed:
+  s3check_multisite_phase_failed:
     sow_id: RGW-M-05
     reason: active multisite phase request, reconciliation, cleanup, or restart failure
     fidelity: NETDATA-ADAPTED
@@ -2616,7 +2616,7 @@ netdata_extensions:
     recipient: sysadmin
     adaptation: s3check_multisite_phase_failure
 
-  rgw_multisite_payload_mismatch:
+  s3check_multisite_payload_mismatch:
     sow_id: RGW-M-11
     reason: destination payload digest differs from the source probe payload
     fidelity: NETDATA-ADAPTED
@@ -2630,7 +2630,7 @@ netdata_extensions:
     recipient: sysadmin
     adaptation: s3check_multisite_payload_mismatch
 
-  rgw_multisite_replication_rpo_breach:
+  s3check_multisite_replication_rpo_breach:
     sow_id: RGW-S-24
     reason: source-write to destination-visibility exceeds the configured directional RPO
     fidelity: NETDATA-ADAPTED
@@ -2644,7 +2644,7 @@ netdata_extensions:
     recipient: silent
     adaptation: s3check_multisite_rpo
 
-  rgw_multisite_delete_propagation_breach:
+  s3check_multisite_delete_propagation_breach:
     sow_id: RGW-S-25
     reason: source-delete to destination-disappearance exceeds the configured objective
     fidelity: NETDATA-ADAPTED

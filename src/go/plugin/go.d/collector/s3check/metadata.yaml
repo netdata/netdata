@@ -37,6 +37,14 @@ modules:
           ownership is persisted before a write or reconciliation delete so restart and configuration changes cannot
           abandon cleanup.
 
+          Compatibility is contract-based rather than vendor-specific. The service must support SigV4 static credentials,
+          GetBucketVersioning, PutObject, GetObject, HeadObject, ListObjectsV2, and DeleteObject. An ordinary object
+          deletion must also remove the object completely without leaving hidden versions. Ceph RGW multisite is the
+          reference deployment model for directional replication checks. AWS S3 satisfies the single-site contract when it
+          is configured with virtual-host addressing and a bucket where versioning has never been enabled. AWS-native
+          cross-region or same-region replication is not a multisite source because AWS requires versioning on both
+          buckets. Other S3-compatible services can be used when they satisfy the same API and unversioned-bucket contract.
+
           Every single-site cycle generates a unique small payload and key, uploads it, reads and verifies its SHA-256
           digest, confirms LIST visibility, deletes it, and verifies that it disappeared.
 
@@ -96,6 +104,12 @@ modules:
             description: |
               Create a bucket used only by Netdata. Bucket versioning and Object Lock must be disabled; both Enabled and
               Suspended versioning states are rejected. Keep the configured prefix reserved for this collector.
+          - title: Verify S3 compatibility and addressing
+            description: |
+              Single-site checks require the documented API operations and a never-versioned dedicated bucket. AWS S3 uses
+              virtual-host addressing, so set path_style to no. Multisite checks also require replication that copies the
+              probe payload to the configured destination prefix without versioning either bucket. Ceph RGW multisite is
+              the reference deployment model for this contract.
           - title: Create restricted S3 credentials
             description: |
               Create credentials for one dedicated probe identity. The identity needs S3 read and write access to the
@@ -172,7 +186,7 @@ modules:
               required: false
               group: Base / Multisite
             - name: destination.path_style
-              description: Use destination path-style bucket addressing, normally required by Ceph RGW.
+              description: Use destination path-style bucket addressing, common for Ceph RGW; set it to no for virtual-host addressing.
               default_value: true
               required: false
               group: Base / Multisite
@@ -224,7 +238,7 @@ modules:
               required: false
               group: Base
             - name: path_style
-              description: Use path-style bucket addressing. This is normally required by Ceph RGW.
+              description: Use path-style bucket addressing, common for Ceph RGW and many S3-compatible services; set it to no for AWS S3.
               default_value: true
               required: false
               group: Base
@@ -367,6 +381,24 @@ modules:
                     timeout: 2
                     max_retries: 1
                     latency_threshold_ms: 0
+            - name: AWS S3 lifecycle check
+              description: |
+                Replace the Region endpoint, bucket, and secret references. Use a dedicated bucket where versioning has
+                never been enabled, and use virtual-host addressing by setting path_style to no.
+              config: |
+                jobs:
+                  - name: aws_s3
+                    endpoint: https://s3.us-east-1.amazonaws.com
+                    region: us-east-1
+                    bucket: netdata-s3check
+                    prefix: netdata-s3check/
+                    access_key_id: ${env:NETDATA_S3CHECK_AWS_ACCESS_KEY_ID}
+                    secret_access_key: ${env:NETDATA_S3CHECK_AWS_SECRET_ACCESS_KEY}
+                    path_style: no
+                    update_every: 120
+                    timeout: 2
+                    max_retries: 1
+                    latency_threshold_ms: 0
             - name: Ceph RGW directional multisite replication check
               description: |
                 Configure one explicit job for each replication direction that needs client-visible verification. Both
@@ -414,6 +446,12 @@ modules:
               no other writer uses the prefix. A persisted ownership journal is rejected after its mode, source, destination,
               endpoint, bucket, or prefix changes; restore the matching configuration so the pending object can be cleaned
               safely.
+          - name: AWS multisite replication is rejected
+            description: |
+              The multisite probe requires both buckets to remain never-versioned so an ordinary object deletion proves
+              complete cleanup. AWS-native replication requires versioning on both buckets and therefore does not satisfy
+              this contract. Use the AWS single-site lifecycle check, or select an S3-compatible replication implementation
+              that meets the documented unversioned-bucket contract.
     alerts:
       - name: s3check_stage_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
@@ -427,25 +465,25 @@ modules:
         info: >-
           Successful stage ${label:stage} took at least the configured latency_threshold_ms. Tune the objective to
           the client vantage and workload.
-      - name: rgw_multisite_phase_failed
+      - name: s3check_multisite_phase_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
         metric: s3check.multisite_phase_failure
         info: >-
           The active S3 probe cannot write, verify, delete, reconcile, or clean up its configured ownership namespace.
           Inspect the phase status chart for the bounded phase and reason.
-      - name: rgw_multisite_payload_mismatch
+      - name: s3check_multisite_payload_mismatch
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
         metric: s3check.multisite_payload_mismatch
         info: >-
           The destination site returned a different SHA-256 payload than the source probe wrote. The probe removes both objects
           and keeps the incident open until a later verified payload clears it.
-      - name: rgw_multisite_replication_rpo_breach
+      - name: s3check_multisite_replication_rpo_breach
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
         metric: s3check.multisite_rpo_status
         info: >-
           The current directional probe from ${label:source_site} to ${label:destination_site} has not become
           client-visible within rpo_threshold_ms. Tune the objective to the replication policy.
-      - name: rgw_multisite_delete_propagation_breach
+      - name: s3check_multisite_delete_propagation_breach
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
         metric: s3check.multisite_delete_status
         info: >-
