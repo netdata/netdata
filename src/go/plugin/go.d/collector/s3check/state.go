@@ -413,7 +413,9 @@ func (state *ownershipState) validate(
 		return errors.New("pending state has an invalid mode")
 	}
 	if state.ConfigFingerprint != fingerprint {
-		return errors.New("pending state belongs to different source, destination, or mode settings")
+		return errors.New("pending state belongs to different source, destination, or mode settings; " +
+			"the previous configuration may still own probe objects. Remove those objects from the previous owner prefixes " +
+			"before deleting this state file")
 	}
 	if state.OwnerTag != ownerTag || state.Mode != mode {
 		return errors.New("pending state belongs to a different owner or job identity")

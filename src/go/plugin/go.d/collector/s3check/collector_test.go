@@ -1038,6 +1038,72 @@ func TestCollector_SingleQuarantineBlocksRouteChangeBeforeRecheck(t *testing.T) 
 	assert.Contains(t, err.Error(), "pending state belongs")
 }
 
+func TestCollector_SingleCleanupFailureMarksSetupBlocked(t *testing.T) {
+	tests := map[string]struct {
+		keys     int
+		prepare  func(*Collector, *fakeS3Client, []ownedKey)
+		contains string
+	}{
+		"absence proof fails": {
+			keys: 1,
+			prepare: func(_ *Collector, client *fakeS3Client, _ []ownedKey) {
+				client.failures["head"] = errors.New("secret-head-failure")
+			},
+			contains: reasonRequestFailed,
+		},
+		"object remains present": {
+			keys: 1,
+			prepare: func(_ *Collector, client *fakeS3Client, keys []ownedKey) {
+				client.afterDelete = func() { client.objects[keys[0].Key] = []byte("still-present") }
+			},
+			contains: reasonStillPresent,
+		},
+		"remaining-key save fails": {
+			keys: 2,
+			prepare: func(collr *Collector, _ *fakeS3Client, _ []ownedKey) {
+				blocker := filepath.Join(t.TempDir(), "not-a-directory")
+				require.NoError(t, os.WriteFile(blocker, []byte("blocker"), 0o600))
+				collr.stateStore.path = filepath.Join(blocker, "pending.json")
+			},
+			contains: reasonInternal,
+		},
+		"journal clear fails": {
+			keys: 1,
+			prepare: func(collr *Collector, _ *fakeS3Client, _ []ownedKey) {
+				blocker := filepath.Join(t.TempDir(), "not-a-directory")
+				require.NoError(t, os.WriteFile(blocker, []byte("blocker"), 0o600))
+				collr.stateStore.path = filepath.Join(blocker, "pending.json")
+			},
+			contains: reasonInternal,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, client := newTestCollector(t)
+			keys := make([]ownedKey, test.keys)
+			for i := range keys {
+				key := staleProbeKey(90 + i)
+				keys[i] = ownedKey{Scope: ownershipSingle, Key: key}
+				client.staleKeys[key] = true
+			}
+			state := &ownershipState{
+				Phase: string(multisiteCleanup), PendingKeys: keys, CreatedAt: collr.now(),
+			}
+			require.NoError(t, collr.saveOwnership(state))
+			collr.pendingOwnershipState = state
+			test.prepare(collr, client, keys)
+
+			results := newStageResults()
+			assert.False(t, collr.cleanupOwnedKeyBatch(context.Background(), results, cleanupBatchSize))
+			assert.Equal(t, stateFailed, results[stageSetup].state)
+			assert.Equal(t, reasonOrphanCleanupPending, results[stageSetup].reason)
+			assert.Equal(t, stateFailed, results[stageCleanup].state)
+			assert.Equal(t, test.contains, results[stageCleanup].reason)
+		})
+	}
+}
+
 func TestCollector_CollectReportsRestartCleanupFailure(t *testing.T) {
 	collr, client := newTestCollector(t)
 	client.staleKeys[staleProbeKey(0)] = true

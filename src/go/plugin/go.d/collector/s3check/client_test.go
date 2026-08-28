@@ -40,7 +40,9 @@ func TestAWSS3ClientUsesSigV4AndPathStyleRequests(t *testing.T) {
 		case r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "versioning"):
 			writeXML(w, `<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></VersioningConfiguration>`)
 		case r.Method == http.MethodPut && r.URL.Path == "/probe-bucket/netdata-s3check/probe.bin":
+			mu.Lock()
 			putBody = body
+			mu.Unlock()
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/probe-bucket/netdata-s3check/probe.bin":
 			_, _ = w.Write([]byte("probe-payload"))
@@ -80,7 +82,10 @@ func TestAWSS3ClientUsesSigV4AndPathStyleRequests(t *testing.T) {
 	putAttempts, err := client.PutObject(ctx, cfg.Bucket, cfg.Prefix+"probe.bin", []byte("probe-payload"))
 	require.NoError(t, err)
 	assert.Equal(t, 1, putAttempts)
-	assert.Equal(t, []byte("probe-payload"), putBody)
+	mu.Lock()
+	capturedPutBody := putBody
+	mu.Unlock()
+	assert.Equal(t, []byte("probe-payload"), capturedPutBody)
 
 	payload, getAttempts, err := client.GetObject(ctx, cfg.Bucket, cfg.Prefix+"probe.bin", 14)
 	require.NoError(t, err)
@@ -220,9 +225,12 @@ func requestMethods(requests []capturedRequest) []string {
 }
 
 func TestAWSS3ClientUsesDestinationCredentialsAndPathStyle(t *testing.T) {
+	var mu sync.Mutex
 	var request capturedRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
+		_ = body
+		mu.Lock()
 		request = capturedRequest{
 			method:        r.Method,
 			path:          r.URL.Path,
@@ -230,7 +238,7 @@ func TestAWSS3ClientUsesDestinationCredentialsAndPathStyle(t *testing.T) {
 			date:          r.Header.Get("X-Amz-Date"),
 			contentSHA256: r.Header.Get("X-Amz-Content-Sha256"),
 		}
-		_ = body
+		mu.Unlock()
 		_, _ = w.Write([]byte("destination-payload"))
 	}))
 	defer server.Close()
@@ -244,10 +252,13 @@ func TestAWSS3ClientUsesDestinationCredentialsAndPathStyle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte("destination-payload"), payload)
 	assert.Equal(t, 1, attempts)
-	assert.Equal(t, http.MethodGet, request.method)
-	assert.True(t, strings.HasPrefix(request.path, "/"+destination.Bucket+"/"), request.path)
-	assert.Contains(t, request.authorization, "AWS4-HMAC-SHA256 Credential=test-destination-access-key-id/")
-	assert.NotContains(t, request.authorization, "test-destination-secret-access-key")
+	mu.Lock()
+	capturedRequest := request
+	mu.Unlock()
+	assert.Equal(t, http.MethodGet, capturedRequest.method)
+	assert.True(t, strings.HasPrefix(capturedRequest.path, "/"+destination.Bucket+"/"), capturedRequest.path)
+	assert.Contains(t, capturedRequest.authorization, "AWS4-HMAC-SHA256 Credential=test-destination-access-key-id/")
+	assert.NotContains(t, capturedRequest.authorization, "test-destination-secret-access-key")
 }
 
 func TestAWSS3ClientTreatsPlain404AsRequestFailure(t *testing.T) {

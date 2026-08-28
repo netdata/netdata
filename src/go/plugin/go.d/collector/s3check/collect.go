@@ -376,16 +376,19 @@ func (c *Collector) cleanupOwnedKeyBatch(ctx context.Context, results stageResul
 		cleanup.addOperations(report.operations, report.attempts)
 		if err != nil {
 			cleanup.fail(errorReason(err))
+			c.finishPendingSetup(results)
 			return false
 		}
 		if exists {
 			cleanup.fail(reasonStillPresent)
+			c.finishPendingSetup(results)
 			return false
 		}
 		state.removeOwnedKey(owned)
 		if state.hasActiveObject() || len(state.PendingKeys) > 0 {
 			if err := c.saveOwnership(state); err != nil {
 				cleanup.fail(reasonInternal)
+				c.finishPendingSetup(results)
 				return false
 			}
 			c.pendingOwnershipState = state
@@ -393,6 +396,7 @@ func (c *Collector) cleanupOwnedKeyBatch(ctx context.Context, results stageResul
 		}
 		if err := c.stateStore.clear(); err != nil {
 			cleanup.fail(reasonInternal)
+			c.finishPendingSetup(results)
 			return false
 		}
 		c.pendingOwnershipState = nil

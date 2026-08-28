@@ -134,7 +134,7 @@ func (c *Collector) Init(context.Context) error {
 	c.stateStore.now = c.now
 	_, stateErr := c.stateStore.load()
 	if stateErr != nil {
-		return fmt.Errorf("load s3check ownership state: %w", stateErr)
+		return fmt.Errorf("load s3check ownership state %q: %w", c.stateStore.path, stateErr)
 	}
 	if c.newClient == nil {
 		c.newClient = newAWSS3Client
@@ -412,6 +412,21 @@ func checkUnversionedBucket(ctx context.Context, client s3Client, bucket, label 
 	return nil
 }
 
+func (c *Collector) writeSetupFailure(reason string, cause error) {
+	if cause != nil {
+		c.Warningf("s3check setup failed: %v", cause)
+	}
+	if c.Mode == modeMultisite {
+		cycle := newMultisiteCycle()
+		cycle.phases[multisiteSetup].fail(reason)
+		c.writeMultisiteMetrics(cycle)
+		return
+	}
+	results := newStageResults()
+	results[stageSetup].fail(reason)
+	c.writeMetrics(results)
+}
+
 func (c *Collector) Collect(ctx context.Context) error {
 	if c.client == nil {
 		return errors.New("S3 client is not initialized")
@@ -422,42 +437,18 @@ func (c *Collector) Collect(ctx context.Context) error {
 
 	// The per-job reservation from Check is idempotent and remains held for
 	// this invocation; unrelated jobs use their own locks.
-	if c.reserveRuntimeJobState() != nil {
-		if c.Mode == modeMultisite {
-			cycle := newMultisiteCycle()
-			cycle.phases[multisiteSetup].fail(reasonInternal)
-			c.writeMultisiteMetrics(cycle)
-		} else {
-			results := newStageResults()
-			results[stageSetup].fail(reasonInternal)
-			c.writeMetrics(results)
-		}
+	if err := c.reserveRuntimeJobState(); err != nil {
+		c.writeSetupFailure(reasonInternal, err)
 		return ctx.Err()
 	}
 	if err := c.reserveOwnerLock(cycleCtx); err != nil {
-		if c.Mode == modeMultisite {
-			cycle := newMultisiteCycle()
-			cycle.phases[multisiteSetup].fail(reasonInternal)
-			c.writeMultisiteMetrics(cycle)
-		} else {
-			results := newStageResults()
-			results[stageSetup].fail(reasonInternal)
-			c.writeMetrics(results)
-		}
+		c.writeSetupFailure(reasonInternal, err)
 		return ctx.Err()
 	}
 	defer c.releaseJobState()
 
 	if err := c.loadOwnershipForCycle(); err != nil {
-		if c.Mode == modeMultisite {
-			cycle := newMultisiteCycle()
-			cycle.phases[multisiteSetup].fail(reasonInternal)
-			c.writeMultisiteMetrics(cycle)
-		} else {
-			results := newStageResults()
-			results[stageSetup].fail(reasonInternal)
-			c.writeMetrics(results)
-		}
+		c.writeSetupFailure(reasonInternal, err)
 		return ctx.Err()
 	}
 	if c.pendingOwnershipState == nil {
@@ -465,15 +456,10 @@ func (c *Collector) Collect(ctx context.Context) error {
 			filepath.Dir(c.stateStore.path), c.stateStore.path,
 		)
 		if unresolvedErr != nil || unresolved {
-			if c.Mode == modeMultisite {
-				cycle := newMultisiteCycle()
-				cycle.phases[multisiteSetup].fail(reasonOrphanCleanupPending)
-				c.writeMultisiteMetrics(cycle)
-			} else {
-				results := newStageResults()
-				results[stageSetup].fail(reasonOrphanCleanupPending)
-				c.writeMetrics(results)
+			if unresolvedErr == nil {
+				unresolvedErr = errUnresolvedForeignOwnership
 			}
+			c.writeSetupFailure(reasonOrphanCleanupPending, unresolvedErr)
 			return ctx.Err()
 		}
 	}

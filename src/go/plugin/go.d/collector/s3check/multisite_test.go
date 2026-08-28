@@ -1708,6 +1708,8 @@ func TestCollector_InitRejectsPendingStateForChangedRoute(t *testing.T) {
 	err := changed.Init(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "different source, destination, or mode settings")
+	assert.Contains(t, err.Error(), "previous configuration may still own probe objects")
+	assert.Contains(t, err.Error(), changed.stateStore.path)
 }
 
 func TestCollector_MultisiteSkipsDeleteMeasurementWhenDisabledButCleansDestination(t *testing.T) {
