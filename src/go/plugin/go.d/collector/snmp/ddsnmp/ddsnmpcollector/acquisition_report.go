@@ -15,8 +15,7 @@ import (
 
 // AcquisitionObserver receives one terminal report for every selected profile
 // during the initial Collect call. The report and its Routes remain valid after
-// the call; ProfileMetrics is borrowed only for the duration of the call. A
-// limit-exceeded report contains no routes or value references.
+// the call; ProfileMetrics is borrowed only for the duration of the call.
 type AcquisitionObserver interface {
 	ObserveProfile(AcquisitionProfileReport, *ddsnmp.ProfileMetrics)
 }
@@ -35,35 +34,6 @@ const (
 	AcquisitionProfileOutcomePartial
 	AcquisitionProfileOutcomeFailed
 )
-
-type AcquisitionReportState uint8
-
-const (
-	AcquisitionReportStateAvailable AcquisitionReportState = iota
-	AcquisitionReportStateLimitExceeded
-)
-
-type AcquisitionReportLimit uint8
-
-const (
-	AcquisitionReportLimitNone AcquisitionReportLimit = iota
-	AcquisitionReportLimitRecords
-	AcquisitionReportLimitLogicalBytes
-)
-
-// AcquisitionReportLimits controls admission of producer-owned diagnostic DTO
-// payload during the initial Collect call. These logical thresholds do not
-// describe exact heap, CPU, or peak process usage. The zero value selects
-// defaults; both fields must be non-zero to override them.
-type AcquisitionReportLimits struct {
-	MaxRecords      uint64
-	MaxLogicalBytes uint64
-}
-
-var defaultAcquisitionReportLimits = AcquisitionReportLimits{
-	MaxRecords:      100_000,
-	MaxLogicalBytes: 32 << 20,
-}
 
 type AcquisitionFailurePhase uint8
 
@@ -124,8 +94,6 @@ type AcquisitionProfileIdentity struct {
 
 type AcquisitionProfileReport struct {
 	Identity                AcquisitionProfileIdentity
-	State                   AcquisitionReportState
-	Limit                   AcquisitionReportLimit
 	Outcome                 AcquisitionProfileOutcome
 	FailurePhase            AcquisitionFailurePhase
 	Stats                   ddsnmp.CollectionStats
@@ -164,13 +132,8 @@ func (r AcquisitionProfileReport) String() string {
 		r.Identity.Ordinal, r.Identity.RouteDigest, r.Outcome, r.FailurePhase, len(r.Routes))
 }
 
-type acquisitionProfilePlan struct {
-	identity AcquisitionProfileIdentity
-}
-
 type acquisitionProfileCollection struct {
-	plan                    acquisitionProfilePlan
-	budget                  *acquisitionReportBudget
+	identity                AcquisitionProfileIdentity
 	routes                  []AcquisitionRouteReport
 	metricScalarRoutes      []int
 	metricTableRoutes       map[int]int
@@ -208,52 +171,16 @@ type acquisitionTableScope struct {
 }
 
 func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, count int) {
-	if o == nil || !o.retainValues || !o.collection.reportActive() {
+	if o == nil || !o.retainValues || o.collection == nil {
 		return
 	}
 	for valueOrdinal := range count {
-		if !o.collection.addTopologyValueReference(AcquisitionValueReference{
+		o.collection.addTopologyValueReference(AcquisitionValueReference{
 			RouteOrdinal: o.routeOrdinal,
 			RowOrdinal:   rowOrdinal,
 			ValueOrdinal: uint32(valueOrdinal),
-		}) {
-			return
-		}
+		})
 	}
-}
-
-type acquisitionReportBudget struct {
-	limits       AcquisitionReportLimits
-	records      uint64
-	logicalBytes uint64
-	limit        AcquisitionReportLimit
-}
-
-func newAcquisitionReportBudget(limits AcquisitionReportLimits) acquisitionReportBudget {
-	if limits.MaxRecords == 0 || limits.MaxLogicalBytes == 0 {
-		limits = defaultAcquisitionReportLimits
-	}
-	return acquisitionReportBudget{limits: limits}
-}
-
-func (b *acquisitionReportBudget) admit(records, logicalBytes uint64) bool {
-	if b == nil {
-		return true
-	}
-	if b.limit != AcquisitionReportLimitNone {
-		return false
-	}
-	if records > b.limits.MaxRecords-b.records {
-		b.limit = AcquisitionReportLimitRecords
-		return false
-	}
-	if logicalBytes > b.limits.MaxLogicalBytes-b.logicalBytes {
-		b.limit = AcquisitionReportLimitLogicalBytes
-		return false
-	}
-	b.records += records
-	b.logicalBytes += logicalBytes
-	return true
 }
 
 type acquisitionScalarObserver struct {
@@ -515,27 +442,19 @@ func acquisitionMetadataFieldOIDsMissing(
 	return found
 }
 
-func buildAcquisitionProfilePlan(profile *ddsnmp.Profile, ordinal uint32) acquisitionProfilePlan {
-	return acquisitionProfilePlan{identity: AcquisitionProfileIdentity{
+func buildAcquisitionProfileIdentity(profile *ddsnmp.Profile, ordinal uint32) AcquisitionProfileIdentity {
+	return AcquisitionProfileIdentity{
 		Ordinal:     ordinal,
 		RouteDigest: acquisitionProfileRouteDigest(profile),
-	}}
+	}
 }
 
 func newAcquisitionProfileCollection(
-	plan acquisitionProfilePlan,
+	identity AcquisitionProfileIdentity,
 	profile *ddsnmp.Profile,
 	sysObjectID string,
-	budget *acquisitionReportBudget,
 ) *acquisitionProfileCollection {
-	collection := &acquisitionProfileCollection{plan: plan, budget: budget}
-	if collection.reportLimited() {
-		return collection
-	}
-	records, logicalBytes := acquisitionProfileCollectionShape(profile, sysObjectID)
-	if !budget.admit(records, logicalBytes) {
-		return collection
-	}
+	collection := &acquisitionProfileCollection{identity: identity}
 	if profile == nil || profile.Definition == nil {
 		return collection
 	}
@@ -574,69 +493,8 @@ func newAcquisitionProfileCollection(
 	return collection
 }
 
-func acquisitionProfileCollectionShape(profile *ddsnmp.Profile, sysObjectID string) (uint64, uint64) {
-	const profileLogicalBytes = 512
-	const routeLogicalBytes = 64
-
-	records := uint64(1)
-	logicalBytes := uint64(profileLogicalBytes)
-	addRoute := func(rootOID string) {
-		records++
-		logicalBytes += uint64(routeLogicalBytes + len(rootOID))
-	}
-	addMetric := func(cfg ddprofiledefinition.MetricsConfig) {
-		switch {
-		case cfg.IsScalar():
-			addRoute(trimOID(cfg.Symbol.OID))
-		case cfg.Table.OID != "":
-			addRoute(trimOID(cfg.Table.OID))
-		}
-	}
-	addMetadata := func(fields map[string]ddprofiledefinition.MetadataField) {
-		for _, field := range fields {
-			if oid := acquisitionMetadataFieldRootOID(field); oid != "" {
-				addRoute(oid)
-			}
-		}
-	}
-
-	if profile == nil || profile.Definition == nil {
-		return records, logicalBytes
-	}
-	def := profile.Definition
-	for _, cfg := range def.Metrics {
-		addMetric(cfg)
-	}
-	for _, cfg := range def.Topology {
-		addMetric(cfg.MetricsConfig)
-	}
-	for _, cfg := range def.BGP {
-		if cfg.Table.OID == "" {
-			addRoute(firstBGPRouteOID(cfg))
-		} else {
-			addRoute(trimOID(cfg.Table.OID))
-		}
-	}
-	for _, cfg := range def.MetricTags {
-		if oid := trimOID(cfg.Symbol.OID); oid != "" {
-			addRoute(oid)
-		}
-	}
-	if sysObjectID != "" {
-		for _, entry := range def.SysobjectIDMetadata {
-			if ddprofiledefinition.SelectorOidMatches(sysObjectID, entry.SysobjectID) {
-				addMetadata(entry.Metadata)
-			}
-		}
-	}
-	if cfg, ok := def.Metadata[ddprofiledefinition.MetadataDeviceResource]; ok {
-		addMetadata(cfg.Fields)
-	}
-	return records, logicalBytes
-}
-
 func (c *acquisitionProfileCollection) prepareProfileInputRoutes(profile *ddsnmp.Profile, sysObjectID string) {
-	if !c.reportActive() || profile == nil || profile.Definition == nil {
+	if c == nil || profile == nil || profile.Definition == nil {
 		return
 	}
 	def := profile.Definition
@@ -661,7 +519,7 @@ func (c *acquisitionProfileCollection) addMetricRoutes(
 	configs []ddprofiledefinition.MetricsConfig,
 	scalarKind, tableKind AcquisitionRouteKind,
 ) (scalarRoutes []int, tableRoutes map[int]int) {
-	if !c.reportActive() {
+	if c == nil {
 		return nil, nil
 	}
 	scalarRoutes = make([]int, len(configs))
@@ -685,7 +543,7 @@ func (c *acquisitionProfileCollection) addMetricRoutes(
 }
 
 func (c *acquisitionProfileCollection) addRoute(kind AcquisitionRouteKind, rootOID string) int {
-	if !c.reportActive() {
+	if c == nil {
 		return -1
 	}
 	index := len(c.routes)
@@ -699,33 +557,24 @@ func (c *acquisitionProfileCollection) addRoute(kind AcquisitionRouteKind, rootO
 }
 
 func (c *acquisitionProfileCollection) route(index int) *AcquisitionRouteReport {
-	if c == nil || c.reportLimited() || index < 0 || index >= len(c.routes) {
+	if c == nil || index < 0 || index >= len(c.routes) {
 		return nil
 	}
 	return &c.routes[index]
 }
 
-func (c *acquisitionProfileCollection) reportLimited() bool {
-	return c != nil && c.budget != nil && c.budget.limit != AcquisitionReportLimitNone
-}
-
-func (c *acquisitionProfileCollection) reportActive() bool {
-	return c != nil && !c.reportLimited()
-}
-
 func (c *acquisitionProfileCollection) addValueReference(
 	dst *[]AcquisitionValueReference,
 	reference AcquisitionValueReference,
-) bool {
-	if c == nil || dst == nil || !c.budget.admit(1, 16) {
-		return false
+) {
+	if c == nil || dst == nil {
+		return
 	}
 	*dst = append(*dst, reference)
-	return true
 }
 
-func (c *acquisitionProfileCollection) addTopologyValueReference(reference AcquisitionValueReference) bool {
-	return c.addValueReference(&c.topologyValueReferences, reference)
+func (c *acquisitionProfileCollection) addTopologyValueReference(reference AcquisitionValueReference) {
+	c.addValueReference(&c.topologyValueReferences, reference)
 }
 
 func (c *acquisitionProfileCollection) addBGPValueReference(reference AcquisitionValueReference) {
@@ -740,14 +589,14 @@ func (c *acquisitionProfileCollection) bgpRoute(configIndex int) *AcquisitionRou
 }
 
 func (c *acquisitionProfileCollection) metricScalarObserver() *acquisitionScalarObserver {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	return &acquisitionScalarObserver{collection: c, routeIndexes: c.metricScalarRoutes}
 }
 
 func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionScalarObserver {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	return &acquisitionScalarObserver{
@@ -758,14 +607,14 @@ func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionScal
 }
 
 func (c *acquisitionProfileCollection) metricTableScope() *acquisitionTableScope {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	return &acquisitionTableScope{collection: c, routeIndexes: c.metricTableRoutes}
 }
 
 func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTableScope {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	return &acquisitionTableScope{
@@ -778,7 +627,7 @@ func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTableSco
 func (c *acquisitionProfileCollection) globalTagObserver(
 	configs []ddprofiledefinition.GlobalMetricTagConfig,
 ) *acquisitionGlobalTagObserver {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	if c.globalTags == nil {
@@ -790,7 +639,7 @@ func (c *acquisitionProfileCollection) globalTagObserver(
 func (c *acquisitionProfileCollection) newGlobalTagObserver(
 	configs []ddprofiledefinition.GlobalMetricTagConfig,
 ) *acquisitionGlobalTagObserver {
-	if !c.reportActive() || len(configs) == 0 {
+	if c == nil || len(configs) == 0 {
 		return nil
 	}
 	observer := &acquisitionGlobalTagObserver{
@@ -812,7 +661,7 @@ func (c *acquisitionProfileCollection) newGlobalTagObserver(
 func (c *acquisitionProfileCollection) metadataObserver(
 	fields map[string]ddprofiledefinition.MetadataField,
 ) *acquisitionMetadataObserver {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	if !acquisitionMetadataFieldsHaveRoute(fields) {
@@ -829,7 +678,7 @@ func (c *acquisitionProfileCollection) metadataObserver(
 func (c *acquisitionProfileCollection) newMetadataObserver(
 	fields map[string]ddprofiledefinition.MetadataField,
 ) *acquisitionMetadataObserver {
-	if !c.reportActive() {
+	if c == nil {
 		return nil
 	}
 	var observer *acquisitionMetadataObserver
@@ -884,7 +733,7 @@ func (s *acquisitionTableScope) bind(
 	configIndex int,
 	request *tableCollectionRequest,
 ) *acquisitionTableObservation {
-	if s == nil || !s.collection.reportActive() || request == nil {
+	if s == nil || s.collection == nil || request == nil {
 		return nil
 	}
 	routeIndex, ok := s.routeIndexes[configIndex]
@@ -904,7 +753,7 @@ func (s *acquisitionTableScope) bind(
 }
 
 func (c *acquisitionProfileCollection) syncTableRoutes() {
-	if !c.reportActive() {
+	if c == nil {
 		return
 	}
 	for _, binding := range c.tableBindings {
@@ -977,18 +826,12 @@ func (c *acquisitionProfileCollection) report(
 	metrics *ddsnmp.ProfileMetrics,
 ) AcquisitionProfileReport {
 	report := AcquisitionProfileReport{
-		Identity:     c.plan.identity,
+		Identity:     c.identity,
 		Outcome:      outcome,
 		FailurePhase: phase,
 	}
 	if metrics != nil {
 		report.Stats = metrics.Stats
-	}
-	if c.reportLimited() {
-		report.State = AcquisitionReportStateLimitExceeded
-		report.Limit = c.budget.limit
-		c.releaseReportStorage()
-		return report
 	}
 	report.Routes = c.routes
 	report.TopologyValueReferences = c.topologyValueReferences

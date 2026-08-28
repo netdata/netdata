@@ -505,9 +505,6 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 
 	for _, req := range scope.requests {
 		acquisition := scope.acquisition[req]
-		if acquisition != nil && acquisition.collection.reportLimited() {
-			acquisition = nil
-		}
 		if req.missing || req.route == nil {
 			continue
 		}

@@ -20,13 +20,12 @@ import (
 )
 
 type Config struct {
-	SnmpClient                     gosnmp.Handler
-	Profiles                       []*ddsnmp.Profile
-	Log                            *logger.Logger
-	SysObjectID                    string
-	DisableBulkWalk                bool
-	InitialAcquisitionObserver     AcquisitionObserver
-	InitialAcquisitionReportLimits AcquisitionReportLimits
+	SnmpClient                 gosnmp.Handler
+	Profiles                   []*ddsnmp.Profile
+	Log                        *logger.Logger
+	SysObjectID                string
+	DisableBulkWalk            bool
+	InitialAcquisitionObserver AcquisitionObserver
 }
 
 func New(cfg Config) *Collector {
@@ -44,11 +43,6 @@ func New(cfg Config) *Collector {
 	}
 	if cfg.InitialAcquisitionObserver != nil {
 		coll.initialAcquisitionObserver = cfg.InitialAcquisitionObserver
-		coll.initialAcquisitionReportLimits = cfg.InitialAcquisitionReportLimits
-		coll.initialAcquisitionPlans = make(map[string]acquisitionProfilePlan, len(coll.profiles))
-		for ordinal, state := range coll.sortedProfileStates() {
-			coll.initialAcquisitionPlans[state.profile.SourceFile] = buildAcquisitionProfilePlan(state.profile, uint32(ordinal))
-		}
 	}
 
 	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
@@ -62,16 +56,13 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
-		log                            *logger.Logger
-		profiles                       map[string]*profileState
-		missingOIDs                    map[string]bool
-		regularScalarNamesScratch      map[string]struct{}
-		tableCache                     *tableCache
-		tableIdentity                  *tableIdentity
-		initialAcquisitionObserver     AcquisitionObserver
-		initialAcquisitionReportLimits AcquisitionReportLimits
-		initialAcquisitionBudget       acquisitionReportBudget
-		initialAcquisitionPlans        map[string]acquisitionProfilePlan
+		log                        *logger.Logger
+		profiles                   map[string]*profileState
+		missingOIDs                map[string]bool
+		regularScalarNamesScratch  map[string]struct{}
+		tableCache                 *tableCache
+		tableIdentity              *tableIdentity
+		initialAcquisitionObserver AcquisitionObserver
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -119,7 +110,6 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	var prepared []*preparedProfileCollection
 	var errs []error
 	if c.initialAcquisitionObserver != nil {
-		c.initialAcquisitionBudget = newAcquisitionReportBudget(c.initialAcquisitionReportLimits)
 		defer c.releaseInitialAcquisition()
 	}
 
@@ -128,8 +118,8 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 		c.log.Debugf("Cleared %d expired table cache entries", len(expired))
 	}
 
-	for _, state := range c.sortedProfileStates() {
-		profile, err := c.prepareProfileCollection(state)
+	for ordinal, state := range c.sortedProfileStates() {
+		profile, err := c.prepareProfileCollection(state, uint32(ordinal))
 		if err != nil {
 			errs = append(errs, err)
 			c.observeAcquisitionProfile(profile, AcquisitionProfileOutcomeFailed, AcquisitionFailurePhasePrepare)
@@ -217,9 +207,6 @@ func (c *Collector) observeAcquisitionProfile(
 
 func (c *Collector) releaseInitialAcquisition() {
 	c.initialAcquisitionObserver = nil
-	c.initialAcquisitionReportLimits = AcquisitionReportLimits{}
-	c.initialAcquisitionBudget = acquisitionReportBudget{}
-	c.initialAcquisitionPlans = nil
 }
 
 func (c *Collector) sortedProfileStates() []*profileState {
@@ -280,21 +267,18 @@ func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
 	}
 }
 
-func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfileCollection, error) {
+func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (*preparedProfileCollection, error) {
 	pm := &ddsnmp.ProfileMetrics{Source: ps.profile.SourceFile}
 	prepared := &preparedProfileCollection{
 		state:   ps,
 		metrics: pm,
 	}
 	if c.initialAcquisitionObserver != nil {
-		if plan, ok := c.initialAcquisitionPlans[ps.profile.SourceFile]; ok {
-			prepared.acquisition = newAcquisitionProfileCollection(
-				plan,
-				ps.profile,
-				c.deviceMetadataCollector.sysobjectid,
-				&c.initialAcquisitionBudget,
-			)
-		}
+		prepared.acquisition = newAcquisitionProfileCollection(
+			buildAcquisitionProfileIdentity(ps.profile, ordinal),
+			ps.profile,
+			c.deviceMetadataCollector.sysobjectid,
+		)
 	}
 
 	if !ps.initialized {

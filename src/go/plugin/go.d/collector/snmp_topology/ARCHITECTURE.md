@@ -287,7 +287,8 @@ Ingestion is split by source area:
 Every completed device attempt retains a bounded acquisition envelope when projection succeeds. The envelope records its
 registration/attempt identity, target-resolution outcome and safe addresses, closed outcomes for the outer collection
 phases, and ordered main/VLAN collection contexts. Each context contains the collector's terminal per-profile route
-report and one immutable copy of the topology-consumer values needed for replay. The report's child references preserve
+report and, for replayable profiles, one immutable copy of the topology-consumer values needed for replay. The report's
+child references preserve
 the producing route and local row/value position for each retained topology or BGP value. Failed and no-profile attempts
 remain diagnostic; a successful attempt is also owned by the published device generation.
 
@@ -300,23 +301,18 @@ Retained decoded strings are exact-sized copies so a small retained substring ca
 alive outside the logical-byte limit. Stable schema/profile tag keys may remain shared because they are not decoded
 response data and their owners outlive the capture.
 
-Acquisition capture has direct per-device record and logical-byte limits. Limit exhaustion, projection errors, or
+Acquisition capture has direct per-device record and logical-byte limits. Values from failed profiles are not retained
+because replay skips those profiles. Limit exhaustion, projection errors, or
 projection panics mark the attempt unavailable and release partial evidence without changing collection, builder
 ingestion, or topology publication. Replay validates the completed shape, reconstructs the allowlisted values once,
 invokes the same event dispatcher, and ignores failed profiles and unsuccessful VLAN contexts.
 
-The optional ddsnmp producer applies fixed record and logical-content admission thresholds before it appends owned
-route/value-reference DTO payload. These thresholds are an admission policy, not a claim about exact heap, CPU, or peak
-process usage; normal profile traversal and live collection remain outside that accounting. Producer exhaustion emits
-a typed limit marker, releases report storage, and makes the topology attempt unavailable without changing collection.
-Once limited, diagnostic observers, scopes, routes, bindings, and value-reference loops become inactive for the rest of
-that call, and report construction does not make bulk copies proportional to unadmitted input. Metadata fallback OIDs
-are inspected through the already-owned profile configuration rather than copied into report helper storage.
-
-Acquisition reporting is explicitly an initial-collection facility on a fresh ddsnmp collector. The observer, report
-plans, and admission state are released when the initial `Collect` call returns; later calls continue normal collection
-and live-cache reuse without emitting acquisition reports. The topology recorder separately bounds the immutable
-evidence selected for retention and the old/new generation overlap remains governed by the topology refresh lifecycle.
+The optional ddsnmp producer creates temporary route reports and value references alongside the live initial collection.
+Their size is linear in the selected profile routes and collected topology/BGP values; they are delivered synchronously
+to the topology recorder, which owns admission of the immutable evidence selected for retention. Acquisition reporting
+is explicitly an initial-collection facility on a fresh ddsnmp collector. The observer is released when the initial
+`Collect` call returns; later calls continue normal collection and live-cache reuse without emitting acquisition reports.
+The old/new generation overlap remains governed by the topology refresh lifecycle.
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately

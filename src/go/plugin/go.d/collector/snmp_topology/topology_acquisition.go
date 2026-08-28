@@ -224,21 +224,6 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 	if o.recorder == nil || o.recorder.state != diagnosticCaptureAvailable {
 		return
 	}
-	if report.State == ddsnmpcollector.AcquisitionReportStateLimitExceeded {
-		switch report.Limit {
-		case ddsnmpcollector.AcquisitionReportLimitRecords:
-			o.recorder.limit(diagnosticCaptureReasonAcquisitionReportRecordLimit)
-		case ddsnmpcollector.AcquisitionReportLimitLogicalBytes:
-			o.recorder.limit(diagnosticCaptureReasonAcquisitionReportByteLimit)
-		default:
-			o.recorder.fail(diagnosticCaptureReasonProjectionError)
-		}
-		return
-	}
-	if report.State != ddsnmpcollector.AcquisitionReportStateAvailable {
-		o.recorder.fail(diagnosticCaptureReasonProjectionError)
-		return
-	}
 	defer func() {
 		if recover() != nil {
 			o.recorder.fail(diagnosticCaptureReasonProjectionPanic)
@@ -293,8 +278,11 @@ func topologyAcquisitionProfileShape(
 	for _, route := range report.Routes {
 		logicalBytes += uint64(64 + len(route.RootOID))
 	}
-	if profile == nil {
+	if profile == nil || report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed {
 		return records, logicalBytes, nil
+	}
+	if eventKind != topologySemanticEventVLANContext && eventKind != topologySemanticEventTopologyMetrics {
+		return 0, 0, errors.New("unsupported acquisition semantic event")
 	}
 	if len(report.TopologyValueReferences) != len(profile.TopologyMetrics) {
 		return 0, 0, errors.New("topology acquisition value-reference count mismatch")
@@ -309,17 +297,14 @@ func topologyAcquisitionProfileShape(
 			func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
 		)
 	}
+	logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+	logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
 	if eventKind == topologySemanticEventVLANContext {
 		return records, logicalBytes, nil
-	}
-	if eventKind != topologySemanticEventTopologyMetrics {
-		return 0, 0, errors.New("unsupported acquisition semantic event")
 	}
 	if len(report.BGPValueReferences) != len(profile.BGPRows) {
 		return 0, 0, errors.New("BGP acquisition value-reference count mismatch")
 	}
-	logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
-	logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
 	if profile.BGPCollectError == nil {
 		records += uint64(len(profile.BGPRows))
 		for _, row := range profile.BGPRows {
@@ -337,10 +322,12 @@ func projectTopologyAcquisitionProfileValues(
 	report ddsnmpcollector.AcquisitionProfileReport,
 	profile *ddsnmp.ProfileMetrics,
 ) topologyAcquisitionProfileValues {
-	if profile == nil {
+	if profile == nil || report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed {
 		return topologyAcquisitionProfileValues{}
 	}
 	result := topologyAcquisitionProfileValues{
+		metadata: cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed),
+		tags:     cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed),
 		metrics: projectTopologyAcquisitionMetrics(
 			eventKind,
 			profile.TopologyMetrics,
@@ -350,8 +337,6 @@ func projectTopologyAcquisitionProfileValues(
 	if eventKind == topologySemanticEventVLANContext {
 		return result
 	}
-	result.metadata = cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
-	result.tags = cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed)
 	result.bgpFailed = profile.BGPCollectError != nil
 	if !result.bgpFailed {
 		result.bgpRows = projectTopologyAcquisitionBGPRows(profile.BGPRows, report.BGPValueReferences)

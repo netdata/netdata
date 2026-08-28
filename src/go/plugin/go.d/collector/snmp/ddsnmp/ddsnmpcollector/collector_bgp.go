@@ -140,12 +140,19 @@ func (c *Collector) collectScalarBGPRows(
 			}
 		}
 		if route != nil {
-			remainingOIDs, currentMissingOIDs := c.bgpScalarOIDs(cfg)
-			route.Missing = uint64(len(currentMissingOIDs))
+			remainingOIDCount := len(oids)
+			currentMissingOIDCount := len(missingOIDs)
+			for _, oid := range oids {
+				if c.missingOIDs[oid] {
+					remainingOIDCount--
+					currentMissingOIDCount++
+				}
+			}
+			route.Missing = uint64(currentMissingOIDCount)
 			if route.Missing > 0 {
 				route.FailureClass = AcquisitionFailureClassDependency
 			}
-			if len(remainingOIDs) == 0 && len(currentMissingOIDs) > 0 {
+			if remainingOIDCount == 0 && currentMissingOIDCount > 0 {
 				route.Outcome = AcquisitionRouteOutcomeMissing
 			}
 		}
@@ -1160,13 +1167,16 @@ func bgpTableDependencies(cfg ddprofiledefinition.BGPConfig, metricsCfg ddprofil
 
 func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, []string) {
 	oids := make(map[string]struct{})
-	var missingOIDs []string
+	var missingOIDs map[string]struct{}
 	addOID := func(valueCfg ddprofiledefinition.BGPValueConfig) {
 		sym := bgpValueSymbol(valueCfg)
 		if sym.OID != "" {
 			oid := trimOID(sym.OID)
 			if c.missingOIDs[oid] {
-				missingOIDs = append(missingOIDs, sym.OID)
+				if missingOIDs == nil {
+					missingOIDs = make(map[string]struct{})
+				}
+				missingOIDs[oid] = struct{}{}
 				return
 			}
 			oids[oid] = struct{}{}
@@ -1178,7 +1188,10 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 		if tagCfg.Symbol.OID != "" {
 			oid := trimOID(tagCfg.Symbol.OID)
 			if c.missingOIDs[oid] {
-				missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
+				if missingOIDs == nil {
+					missingOIDs = make(map[string]struct{})
+				}
+				missingOIDs[oid] = struct{}{}
 				continue
 			}
 			oids[oid] = struct{}{}
@@ -1189,10 +1202,13 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 	for oid := range oids {
 		result = append(result, oid)
 	}
+	missing := make([]string, 0, len(missingOIDs))
+	for oid := range missingOIDs {
+		missing = append(missing, oid)
+	}
 	slices.Sort(result)
-	slices.Sort(missingOIDs)
-	missingOIDs = slices.Compact(missingOIDs)
-	return result, missingOIDs
+	slices.Sort(missing)
+	return result, missing
 }
 
 func forEachBGPValue(cfg ddprofiledefinition.BGPConfig, fn func(ddprofiledefinition.BGPValueConfig)) {

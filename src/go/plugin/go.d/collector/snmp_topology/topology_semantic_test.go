@@ -131,6 +131,12 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
 	vlanPMS := []*ddsnmp.ProfileMetrics{{
 		Source: "/must/not/appear/vlan-profile.yaml",
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			tagOSPFRouterID: {Value: "192.0.2.254", IsExactMatch: true},
+		},
+		Tags: map[string]string{
+			tagBridgeBaseAddress: "0011.2233.4455",
+		},
 		TopologyMetrics: []ddsnmp.Metric{
 			{
 				Name:         "/must/not/appear/vlan-metric",
@@ -200,6 +206,52 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows[0].tags, "neighbor")
+	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.metadata, tagOSPFRouterID)
+	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.tags, tagBridgeBaseAddress)
+}
+
+func TestTopologyAcquisitionFailedProfileDoesNotRetainValues(t *testing.T) {
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologySemanticDeviceInput{hostname: "192.0.2.1"},
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		defaultTopologyAcquisitionLimits,
+	)
+	observer := recorder.beginContext(0, "", "")
+	metrics := &ddsnmp.ProfileMetrics{
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			tagOSPFRouterID: {Value: "192.0.2.254", IsExactMatch: true},
+		},
+		Tags: map[string]string{
+			tagBridgeBaseAddress: "0011.2233.4455",
+		},
+		TopologyMetrics: []ddsnmp.Metric{{
+			TopologyKind: ddsnmp.KindIfName,
+			Tags: map[string]string{
+				tagTopoIfIndex: "7",
+				tagTopoIfName:  "Gi1/0/7",
+			},
+		}},
+		BGPRows: []ddsnmp.BGPRow{{
+			OriginProfileID: "_std-bgp4-mib.yaml",
+			StructuralID:    "peer-1",
+			Kind:            ddprofiledefinition.BGPRowKindPeer,
+			Identity:        ddsnmp.BGPIdentity{Neighbor: "192.0.2.2", RemoteAS: "65002"},
+		}},
+	}
+
+	observer.ObserveProfile(acquisitionReportForMetrics(
+		0, ddsnmpcollector.AcquisitionProfileOutcomeFailed, metrics,
+	), metrics)
+	capture := recorder.finish()
+
+	require.Equal(t, diagnosticCaptureAvailable, capture.state)
+	require.Len(t, capture.evidence.collectionContexts, 1)
+	require.Len(t, capture.evidence.collectionContexts[0].profiles, 1)
+	profile := capture.evidence.collectionContexts[0].profiles[0]
+	require.Equal(t, ddsnmpcollector.AcquisitionProfileOutcomeFailed, profile.outcome)
+	require.NotEmpty(t, profile.routes)
+	require.Empty(t, profile.values)
 }
 
 func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
@@ -513,27 +565,6 @@ func TestTopologyAcquisitionVnodeLabelsCountAsRecords(t *testing.T) {
 	capture := recorder.finish()
 	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
 	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
-	require.Nil(t, capture.evidence)
-}
-
-func TestTopologyAcquisitionProducerLimitFailsOpen(t *testing.T) {
-	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
-		topologySemanticDeviceInput{hostname: "192.0.2.1"},
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		defaultTopologyAcquisitionLimits,
-	)
-	observer := recorder.beginContext(0, "", "")
-	require.NotNil(t, observer)
-	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-		State: ddsnmpcollector.AcquisitionReportStateLimitExceeded,
-		Limit: ddsnmpcollector.AcquisitionReportLimitRecords,
-	}, nil)
-
-	require.Nil(t, recorder.beginContext(1, "", ""), "unavailable captures must not enable later producer reports")
-	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
-	require.Equal(t, diagnosticCaptureReasonAcquisitionReportRecordLimit, capture.reason)
 	require.Nil(t, capture.evidence)
 }
 

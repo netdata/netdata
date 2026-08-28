@@ -140,8 +140,6 @@ const (
 	diagnosticCaptureReasonNone diagnosticCaptureReason = iota
 	diagnosticCaptureReasonRecordLimit
 	diagnosticCaptureReasonByteLimit
-	diagnosticCaptureReasonAcquisitionReportRecordLimit
-	diagnosticCaptureReasonAcquisitionReportByteLimit
 	diagnosticCaptureReasonProjectionError
 	diagnosticCaptureReasonProjectionPanic
 	diagnosticCaptureReasonGlobalRecordLimit
