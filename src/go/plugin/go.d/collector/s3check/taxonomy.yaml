@@ -1,0 +1,32 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: s3check
+placements:
+  - id: s3check
+    section_id: synthetic-checks
+    title: S3 Compatible Object Storage
+    icon: synthetics
+    families: true
+    properties: {important: true, grouping: true}
+    items:
+      - type: group
+        id: lifecycle
+        title: Object Lifecycle
+        items:
+          - s3check.stage_status
+          - s3check.stage_duration
+          - s3check.stage_latency_status
+          - s3check.stage_requests
+      - type: group
+        id: multisite
+        title: Multisite Replication
+        items:
+          - s3check.multisite_phase_failure
+          - s3check.multisite_payload_mismatch
+          - s3check.multisite_replication_lag
+          - s3check.multisite_rpo_status
+          - s3check.multisite_delete_lag
+          - s3check.multisite_delete_status
+          - s3check.multisite_status
+          - s3check.multisite_phase_duration
+          - s3check.multisite_phase_requests
