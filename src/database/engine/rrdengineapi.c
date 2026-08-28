@@ -1188,10 +1188,10 @@ int rrdeng_init(
         return 0;
     }
 
-    if (unittest_running) {
+    if (ctxp) {
+        // the ctx was allocated above for this caller; hand nothing back
         freez(ctx);
-        if (ctxp)
-            *ctxp = NULL;
+        *ctxp = NULL;
     }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -1217,7 +1217,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     bool logged = false;
     size_t count = 10;
-    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count && !unittest_running) {
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count) {
         if(!logged) {
             netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", ctx->config.tier);
             logged = true;
@@ -1235,7 +1235,10 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    if(unittest_running)
+    // the static multidb contexts are never freed; anything else was allocated by
+    // rrdeng_init() for its caller (ctxp != NULL) and is released here
+    int tier = ctx->config.tier;
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS || multidb_ctx[tier] != ctx)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
