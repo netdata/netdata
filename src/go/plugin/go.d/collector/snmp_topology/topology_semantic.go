@@ -140,6 +140,8 @@ const (
 	diagnosticCaptureReasonNone diagnosticCaptureReason = iota
 	diagnosticCaptureReasonRecordLimit
 	diagnosticCaptureReasonByteLimit
+	diagnosticCaptureReasonAcquisitionReportRecordLimit
+	diagnosticCaptureReasonAcquisitionReportByteLimit
 	diagnosticCaptureReasonProjectionError
 	diagnosticCaptureReasonProjectionPanic
 	diagnosticCaptureReasonGlobalRecordLimit
@@ -248,7 +250,7 @@ func projectTopologyAcquisitionBGPRows(
 			adminHas:        row.Admin.Enabled.Has,
 			adminEnabled:    row.Admin.Enabled.Value,
 			stateHas:        row.State.Has,
-			state:           row.State.State,
+			state:           ddprofiledefinition.BGPPeerState(strings.Clone(string(row.State.State))),
 			stateRaw:        strings.Clone(row.State.Raw),
 			establishedHas:  row.Connection.EstablishedUptime.Has,
 			established:     row.Connection.EstablishedUptime.Value,

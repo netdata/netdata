@@ -212,16 +212,19 @@ only topology-consumer fields and typed `topology:` rows.
 
 `ddsnmpcollector` exposes an optional synchronous acquisition observer. When enabled, it emits one terminal report for
 each selected profile, including preparation or table failures. A stable profile ordinal and route digest identify the
-selected route structure. The report is bound to the collector's authoritative request graph, including synthetic table
-dependencies, and distinguishes processed, not-observed, empty, dependency-rejected, tag-rejected, partial, and failed
-acquisition. Compact route/row/value references join the synchronously borrowed topology and BGP results to the route
-that produced each value. Profile source paths, raw packets, copied decoded values, transform definitions, and error
-text are excluded. With no observer, report plans and report DTOs are not built.
+configured logical acquisition units and distinguishes processed, not-observed, empty, dependency-rejected,
+tag-rejected, partial, and failed acquisition. Shared canonical WALKs remain a transport optimization: each logical unit
+keeps its configured root and counts only varbinds below that root. Compact route/row/value references join the
+synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
+reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
+definitions, and error text are excluded. With no observer, report plans and report DTOs are not built.
 
-BGP evidence keeps one aggregate route per configured BGP row definition. Its digest covers every configured identity,
-descriptor, signal, tag source, and cross-table dependency; missing dependency inputs contribute to the aggregate route's
-missing count and partial/missing outcome. Synthetic table-dependency routes have no semantic rows, so they report zero
-rows and count the received dependency varbinds as values.
+BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
+every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
+OIDs already classified unavailable by collector state. Table rows without required identity/signals are rejected;
+optional absent descriptors are not missing, and cross-table lookup/processing failures use the dependency class.
+Synthetic table-dependency units have no semantic rows, so they report zero rows and count only received varbinds below
+their configured root as values.
 
 The standard capabilities have separate owners:
 
@@ -301,6 +304,12 @@ Acquisition capture has direct per-device record and logical-byte limits. Limit 
 projection panics mark the attempt unavailable and release partial evidence without changing collection, builder
 ingestion, or topology publication. Replay validates the completed shape, reconstructs the allowlisted values once,
 invokes the same event dispatcher, and ignores failed profiles and unsuccessful VLAN contexts.
+
+The optional ddsnmp producer independently caps temporary acquisition reports at 100,000 records and 32 MiB of logical
+content before it appends route/value-reference DTOs. Producer exhaustion emits a typed limit marker, releases report
+storage, and makes the topology attempt unavailable without changing live collection. The honest diagnostic peak is the
+bounded temporary producer report plus the bounded retained current attempt, alongside the separately bounded old/new
+generation overlap; no shared reservation protocol exists between the producer and recorder.
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately

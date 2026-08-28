@@ -31,6 +31,13 @@ type bgpValueContext struct {
 	crossTableCtx *crossTableContext
 }
 
+type bgpDependencyProcessingError struct {
+	err error
+}
+
+func (e *bgpDependencyProcessingError) Error() string { return e.err.Error() }
+func (e *bgpDependencyProcessingError) Unwrap() error { return e.err }
+
 func (ctx bgpValueContext) lookupPDU(oid string) (gosnmp.SnmpPDU, bool) {
 	oid = trimOID(oid)
 	if ctx.rowPDUs != nil {
@@ -156,7 +163,7 @@ func (c *Collector) collectScalarBGPRows(
 		if ok {
 			rows = append(rows, row)
 			if acquisition != nil && route != nil {
-				acquisition.bgpValueReferences = append(acquisition.bgpValueReferences, AcquisitionValueReference{
+				acquisition.addBGPValueReference(AcquisitionValueReference{
 					RouteOrdinal: route.Ordinal,
 				})
 			}
@@ -268,7 +275,7 @@ func (c *Collector) collectTableBGPRows(
 				rows = append(rows, row)
 				if route != nil {
 					route.Values++
-					acquisition.bgpValueReferences = append(acquisition.bgpValueReferences, AcquisitionValueReference{
+					acquisition.addBGPValueReference(AcquisitionValueReference{
 						RouteOrdinal: route.Ordinal,
 						RowOrdinal:   rowOrdinal,
 					})
@@ -403,6 +410,10 @@ func (c *Collector) buildTableBGPRow(
 		crossTableCtx: crossTableCtx,
 	}
 	if err := c.populateBGPRow(&row, cfg, bgpCtx); err != nil {
+		var dependencyErr *bgpDependencyProcessingError
+		if dependencyRejected != nil && errors.As(err, &dependencyErr) {
+			(*dependencyRejected)++
+		}
 		return ddsnmp.BGPRow{}, false, err
 	}
 
@@ -971,15 +982,15 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 
 	refTableOID, err := c.tableCollector.rowProcessor.crossTableResolver.findReferencedTableOID(cfg.Table, ctx.crossTableCtx.tableNameToOID)
 	if err != nil {
-		return gosnmp.SnmpPDU{}, "", false, err
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
 	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(cfg.Table, refTableOID, ctx.crossTableCtx.walkedData)
 	if err != nil {
-		return gosnmp.SnmpPDU{}, "", false, err
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
 	lookupIndex, err := c.tableCollector.rowProcessor.crossTableResolver.transformIndex(ctx.rowIndex, cfg.IndexTransform)
 	if err != nil {
-		return gosnmp.SnmpPDU{}, "", false, err
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
 	tagCfg := ddprofiledefinition.MetricTagConfig{
 		Table:        cfg.Table,
@@ -989,7 +1000,7 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 	if c.tableCollector.rowProcessor.crossTableResolver.requiresLookupByValue(tagCfg) {
 		lookupIndex, err = c.tableCollector.rowProcessor.crossTableResolver.resolveLookupIndexByValue(tagCfg, lookupIndex, refTableOID, refTablePDUs, ctx.crossTableCtx)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, "", false, err
+			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 		}
 	}
 

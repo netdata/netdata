@@ -432,6 +432,147 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 	assert.Equal(t, uint64(4), routes[dependency.Table.OID].Values)
 }
 
+func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	const oidBase = "1.3.6.1.4.1.99999.56"
+	dependency, source := crossTableDependencyTestConfigs(oidBase)
+	owner := createTestProfile("a-dependency-owner.yaml", []ddprofiledefinition.MetricsConfig{{
+		Table: dependency.Table,
+		Symbols: []ddprofiledefinition.SymbolConfig{{
+			OID:  oidBase + ".2.9",
+			Name: "unrelatedValue",
+		}},
+	}})
+	topology := &ddsnmp.Profile{
+		SourceFile: "b-topology-dependency.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind:          ddsnmp.KindArpEntry,
+			MetricsConfig: source,
+		}}},
+	}
+	ddsnmp.HandleCrossTableTagsWithoutMetrics(topology)
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.SnmpPDU{
+		createGauge32PDU(source.Symbols[0].OID+".1", 10),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependency.Table.OID, []gosnmp.SnmpPDU{
+		createGauge32PDU(oidBase+".2.9.1", 20),
+	})
+
+	var reports []AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{topology, owner},
+		Log:        logger.New(),
+		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			reports = append(reports, report)
+		}),
+	})
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 2)
+	require.Len(t, reports, 2)
+
+	logicalDependencyRoot := oidBase + ".2.1"
+	var dependencyRoute *AcquisitionRouteReport
+	for i := range reports[1].Routes {
+		if reports[1].Routes[i].RootOID == logicalDependencyRoot {
+			dependencyRoute = &reports[1].Routes[i]
+			break
+		}
+	}
+	require.NotNil(t, dependencyRoute)
+	assert.Equal(t, AcquisitionRouteOutcomeEmpty, dependencyRoute.Outcome)
+	assert.Zero(t, dependencyRoute.Rows)
+	assert.Zero(t, dependencyRoute.Values)
+}
+
+func TestCollector_AcquisitionReportLimitFailsOpen(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	const tableOID = "1.3.6.1.4.1.99999.57"
+	profile := &ddsnmp.Profile{
+		SourceFile: "acquisition-report-limit.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind: ddsnmp.KindIfName,
+			MetricsConfig: ddprofiledefinition.MetricsConfig{
+				Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: "ifNameTable"},
+				Symbols: []ddprofiledefinition.SymbolConfig{{OID: tableOID + ".1", Name: "ifName"}},
+			},
+		}}},
+	}
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+		createStringPDU(tableOID+".1.1", "eth0"),
+		createStringPDU(tableOID+".1.2", "eth1"),
+	})
+
+	var report AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
+		}),
+		AcquisitionReportLimits: AcquisitionReportLimits{
+			MaxRecords:      3,
+			MaxLogicalBytes: 1 << 20,
+		},
+	})
+
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].TopologyMetrics, 2, "diagnostic exhaustion must not change live collection")
+	assert.Equal(t, AcquisitionReportStateLimitExceeded, report.State)
+	assert.Empty(t, report.Routes)
+	assert.Empty(t, report.TopologyValueReferences)
+	assert.Equal(t, uint64(3), collector.acquisitionBudget.records)
+	assert.Equal(t, AcquisitionReportLimitRecords, collector.acquisitionBudget.limit)
+}
+
+func TestCollector_AcquisitionReportLogicalByteLimitFailsOpen(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	const scalarOID = "1.3.6.1.4.1.99999.58.0"
+	profile := &ddsnmp.Profile{
+		SourceFile: "acquisition-report-byte-limit.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind: ddsnmp.KindIfName,
+			MetricsConfig: ddprofiledefinition.MetricsConfig{
+				Symbol: ddprofiledefinition.SymbolConfig{OID: scalarOID, Name: "sysName"},
+			},
+		}}},
+	}
+	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.SnmpPDU{createIntegerPDU(scalarOID, 1)})
+
+	var report AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
+		}),
+		AcquisitionReportLimits: AcquisitionReportLimits{
+			MaxRecords:      100,
+			MaxLogicalBytes: 1,
+		},
+	})
+
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].TopologyMetrics, 1, "diagnostic exhaustion must not change live collection")
+	assert.Equal(t, AcquisitionReportStateLimitExceeded, report.State)
+	assert.Equal(t, AcquisitionReportLimitLogicalBytes, report.Limit)
+	assert.Empty(t, report.Routes)
+}
+
 func TestCollector_AcquisitionObserverDoesNotReportUnprocessedFreshTableAsEmpty(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
@@ -820,6 +961,55 @@ func TestAcquisitionProfileRouteDigestIncludesAllBGPValueSources(t *testing.T) {
 			assert.NotEqual(t, acquisitionProfileRouteDigest(baseProfile), acquisitionProfileRouteDigest(changedProfile))
 		})
 	}
+
+	base := tableBGPTestConfig()
+	changed := base.Clone()
+	changed.Table.Name += "Changed"
+	baseProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+		BGP: []ddprofiledefinition.BGPConfig{base},
+	}}
+	changedProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+		BGP: []ddprofiledefinition.BGPConfig{changed},
+	}}
+	assert.NotEqual(t, acquisitionProfileRouteDigest(baseProfile), acquisitionProfileRouteDigest(changedProfile))
+}
+
+func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependency(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	cfg := crossTableBGPTestConfig()
+	cfg.Identity.RemoteAS.IndexTransform = []ddprofiledefinition.MetricIndexTransform{{Start: 99}}
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.SnmpPDU{
+		createGauge32PDU("1.3.6.1.4.1.99999.70.1.1.4.192.0.2.1.1.1", 42),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.SnmpPDU{
+		createGauge32PDU("1.3.6.1.4.1.99999.70.2.1.4.192.0.2.1", 65001),
+		createStringPDU("1.3.6.1.4.1.99999.70.2.2.4.192.0.2.1", "blue"),
+	})
+
+	var report AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles: []*ddsnmp.Profile{{
+			SourceFile: "bgp-dependency-processing.yaml",
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{cfg},
+			},
+		}},
+		Log: logger.New(),
+		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
+		}),
+	})
+
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	require.Error(t, metrics[0].BGPCollectError)
+	require.Len(t, report.Routes, 1)
+	assert.Equal(t, AcquisitionRouteOutcomeRejected, report.Routes[0].Outcome)
+	assert.Equal(t, AcquisitionFailureClassDependency, report.Routes[0].FailureClass)
 }
 
 func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *testing.T) {
@@ -839,11 +1029,16 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 		createGauge32PDU("1.3.6.1.4.1.99999.30.1.4.42", 7200),
 	})
 
+	tableCfg := tableBGPTestConfig()
+	tableCfg.Descriptors.Description.Symbol = ddprofiledefinition.SymbolConfig{
+		OID:  "1.3.6.1.4.1.99999.30.1.5",
+		Name: "optionalDescription",
+	}
 	profile := &ddsnmp.Profile{
 		SourceFile: "bgp-value-references.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{
 			scalarBGPTestConfig(),
-			tableBGPTestConfig(),
+			tableCfg,
 		}},
 	}
 	var report AcquisitionProfileReport
@@ -864,6 +1059,8 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 		{RouteOrdinal: 0},
 		{RouteOrdinal: 1, RowOrdinal: 0},
 	}, report.BGPValueReferences)
+	assert.Equal(t, AcquisitionRouteOutcomeValues, report.Routes[1].Outcome)
+	assert.Zero(t, report.Routes[1].Missing, "optional absent BGP descriptors are not missing logical inputs")
 }
 
 func acquisitionRoutesByKind(routes []AcquisitionRouteReport) map[AcquisitionRouteKind]AcquisitionRouteReport {

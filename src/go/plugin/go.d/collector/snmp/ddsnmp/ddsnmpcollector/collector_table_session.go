@@ -61,11 +61,12 @@ type tableCollectionRequest struct {
 }
 
 type tableCollectionRoute struct {
-	oid      string
-	requests []*tableCollectionRequest
-	state    tableRouteState
-	pdus     map[string]gosnmp.SnmpPDU
-	err      error
+	oid                    string
+	requests               []*tableCollectionRequest
+	state                  tableRouteState
+	pdus                   map[string]gosnmp.SnmpPDU
+	err                    error
+	acquisitionValueCounts map[string]uint64
 }
 
 type freshRouteWork struct {
@@ -504,6 +505,9 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 
 	for _, req := range scope.requests {
 		acquisition := scope.acquisition[req]
+		if acquisition != nil && acquisition.collection.reportLimited() {
+			acquisition = nil
+		}
 		if req.missing || req.route == nil {
 			continue
 		}
@@ -525,7 +529,7 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			if len(req.config.Symbols) == 0 {
 				if acquisition != nil {
 					acquisition.processed = true
-					acquisition.values = uint64(len(req.route.pdus))
+					acquisition.values = req.route.acquisitionValuesWithin(req.config.Table.OID)
 				}
 				if req.cacheEligible && !req.sharesRouteCache {
 					s.collector.tableCache.cacheMarker(req.config)
@@ -577,4 +581,34 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
 	}
 	return metrics, nil
+}
+
+func (r *tableCollectionRoute) acquisitionValuesWithin(rootOID string) uint64 {
+	if r == nil {
+		return 0
+	}
+	if r.acquisitionValueCounts == nil {
+		r.acquisitionValueCounts = make(map[string]uint64)
+		for _, req := range r.requests {
+			if len(req.config.Symbols) != 0 || req.scope.acquisition[req] == nil {
+				continue
+			}
+			if oid := trimOID(req.config.Table.OID); oid != "" {
+				r.acquisitionValueCounts[oid] = 0
+			}
+		}
+		for oid := range r.pdus {
+			for oid = trimOID(oid); oid != ""; {
+				if _, ok := r.acquisitionValueCounts[oid]; ok {
+					r.acquisitionValueCounts[oid]++
+				}
+				pos := strings.LastIndexByte(oid, '.')
+				if pos < 0 {
+					break
+				}
+				oid = oid[:pos]
+			}
+		}
+	}
+	return r.acquisitionValueCounts[trimOID(rootOID)]
 }

@@ -138,7 +138,7 @@ func newTopologyAcquisitionRecorder(
 			recorder.fail(diagnosticCaptureReasonProjectionPanic)
 		}
 	}()
-	records := uint64(1 + len(target.addresses))
+	records := uint64(1 + len(target.addresses) + len(device.vnodeLabels))
 	logicalBytes := topologySemanticDeviceLogicalBytes(device) + 96
 	for _, address := range target.addresses {
 		logicalBytes += uint64(len(address.String()))
@@ -177,7 +177,7 @@ func failedAcquisitionPhase(class topologyAcquisitionFailureClass) topologyAcqui
 
 func (r *topologyAcquisitionRecorder) beginContext(ordinal uint32, vlanID, vlanName string) ddsnmpcollector.AcquisitionObserver {
 	if r == nil || r.state != diagnosticCaptureAvailable || r.evidence == nil {
-		return topologyAcquisitionProfileObserver{recorder: r, contextOrdinal: ordinal}
+		return nil
 	}
 	defer func() {
 		if recover() != nil {
@@ -185,12 +185,12 @@ func (r *topologyAcquisitionRecorder) beginContext(ordinal uint32, vlanID, vlanN
 		}
 	}()
 	if !r.admit(1, uint64(48+len(vlanID)+len(vlanName))) {
-		return topologyAcquisitionProfileObserver{recorder: r, contextOrdinal: ordinal}
+		return nil
 	}
 	for _, context := range r.evidence.collectionContexts {
 		if context.ordinal == ordinal {
 			r.fail(diagnosticCaptureReasonProjectionError)
-			return topologyAcquisitionProfileObserver{recorder: r, contextOrdinal: ordinal}
+			return nil
 		}
 	}
 	r.evidence.collectionContexts = append(r.evidence.collectionContexts, topologyAcquisitionContextEvidence{
@@ -209,6 +209,21 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 	metrics *ddsnmp.ProfileMetrics,
 ) {
 	if o.recorder == nil || o.recorder.state != diagnosticCaptureAvailable {
+		return
+	}
+	if report.State == ddsnmpcollector.AcquisitionReportStateLimitExceeded {
+		switch report.Limit {
+		case ddsnmpcollector.AcquisitionReportLimitRecords:
+			o.recorder.limit(diagnosticCaptureReasonAcquisitionReportRecordLimit)
+		case ddsnmpcollector.AcquisitionReportLimitLogicalBytes:
+			o.recorder.limit(diagnosticCaptureReasonAcquisitionReportByteLimit)
+		default:
+			o.recorder.fail(diagnosticCaptureReasonProjectionError)
+		}
+		return
+	}
+	if report.State != ddsnmpcollector.AcquisitionReportStateAvailable {
+		o.recorder.fail(diagnosticCaptureReasonProjectionError)
 		return
 	}
 	defer func() {

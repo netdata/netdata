@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -207,35 +208,56 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	value := func(offset int) string { return backing[offset : offset+8] }
 	input := topologySemanticDeviceInput{
 		hostname:    value(0),
-		sysName:     value(16),
-		vnodeLabels: map[string]string{value(32): value(48)},
+		sysObjectID: value(16),
+		sysName:     value(32),
+		sysDescr:    value(48),
+		sysContact:  value(64),
+		sysLocation: value(80),
+		vendor:      value(96),
+		model:       value(112),
+		vnodeGUID:   value(128),
+		vnodeLabels: map[string]string{value(144): value(160)},
 	}
 	pms := &ddsnmp.ProfileMetrics{
 		DeviceMetadata: map[string]ddsnmp.MetaTag{
-			"vendor": {Value: value(64)},
+			"vendor": {Value: value(176)},
 		},
 		Tags: map[string]string{
-			tagLldpLocSysName: value(80),
+			tagLldpLocSysName: value(192),
 		},
 		TopologyMetrics: []ddsnmp.Metric{{
 			TopologyKind: ddsnmp.KindIfName,
 			Tags: map[string]string{
-				tagTopoIfIndex: value(96),
-				tagTopoIfName:  value(112),
+				tagTopoIfIndex: value(208),
+				tagTopoIfName:  value(224),
 			},
 		}},
 		BGPRows: []ddsnmp.BGPRow{{
-			OriginProfileID: value(128),
-			Table:           value(144),
-			RowKey:          value(160),
-			StructuralID:    value(176),
+			OriginProfileID: value(240),
+			Table:           value(256),
+			RowKey:          value(272),
+			StructuralID:    value(288),
 			Kind:            ddprofiledefinition.BGPRowKindPeer,
 			Identity: ddsnmp.BGPIdentity{
-				Neighbor: value(192),
-				RemoteAS: value(208),
+				RoutingInstance: value(304),
+				Neighbor:        value(320),
+				RemoteAS:        value(336),
 			},
-			Descriptors: ddsnmp.BGPDescriptors{Description: value(224)},
-			Tags:        map[string]string{"neighbor": value(240)},
+			Descriptors: ddsnmp.BGPDescriptors{
+				LocalAddress:    value(352),
+				LocalAS:         value(368),
+				LocalIdentifier: value(384),
+				PeerIdentifier:  value(400),
+				PeerType:        value(416),
+				BGPVersion:      value(432),
+				Description:     value(448),
+			},
+			State: ddsnmp.BGPState{
+				Has:   true,
+				State: ddprofiledefinition.BGPPeerState(value(464)),
+				Raw:   value(480),
+			},
+			Tags: map[string]string{"neighbor": value(496)},
 		}},
 	}
 	report := acquisitionReportForMetrics(
@@ -243,7 +265,7 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 		ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
 		pms,
 	)
-	report.Routes[0].RootOID = value(256)
+	report.Routes[0].RootOID = value(512)
 
 	recorder := newTopologyAcquisitionRecorder(
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
@@ -251,7 +273,7 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
 		defaultTopologyAcquisitionLimits,
 	)
-	observer := recorder.beginContext(0, value(272), value(288))
+	observer := recorder.beginContext(0, value(528), value(544))
 	observer.ObserveProfile(report, pms)
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	capture := recorder.finish()
@@ -280,8 +302,46 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].neighbor)
 	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].remoteAS)
 	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].description)
+	requireStringOutsideBacking(t, backing, string(profile.values.bgpRows[0].state))
 	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].tags["neighbor"])
+	requireRetainedStringsOutsideBacking(t, backing, capture.evidence.device)
+	requireRetainedStringsOutsideBacking(t, backing, context)
 	runtime.KeepAlive(backing)
+}
+
+func requireRetainedStringsOutsideBacking(t *testing.T, backing string, retained any) {
+	t.Helper()
+	var visit func(reflect.Value)
+	visit = func(value reflect.Value) {
+		if !value.IsValid() {
+			return
+		}
+		switch value.Kind() {
+		case reflect.String:
+			if value.Len() > 0 {
+				requireStringOutsideBacking(t, backing, value.String())
+			}
+		case reflect.Pointer, reflect.Interface:
+			if !value.IsNil() {
+				visit(value.Elem())
+			}
+		case reflect.Struct:
+			for i := range value.NumField() {
+				visit(value.Field(i))
+			}
+		case reflect.Slice, reflect.Array:
+			for i := range value.Len() {
+				visit(value.Index(i))
+			}
+		case reflect.Map:
+			iter := value.MapRange()
+			for iter.Next() {
+				visit(iter.Key())
+				visit(iter.Value())
+			}
+		}
+	}
+	visit(reflect.ValueOf(retained))
 }
 
 func requireStringOutsideBacking(t *testing.T, backing, retained string) {
@@ -390,6 +450,44 @@ func TestTopologyAcquisitionCaptureLimitFailsOpen(t *testing.T) {
 	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
 	require.Nil(t, capture.evidence)
 	require.EqualValues(t, 1234, builder.localDevice.SysUptime, "capture limits must not change live ingestion")
+}
+
+func TestTopologyAcquisitionVnodeLabelsCountAsRecords(t *testing.T) {
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologySemanticDeviceInput{
+			hostname:    "192.0.2.1",
+			vnodeLabels: map[string]string{"site": "lab"},
+		},
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1024},
+	)
+
+	capture := recorder.finish()
+	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
+	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
+	require.Nil(t, capture.evidence)
+}
+
+func TestTopologyAcquisitionProducerLimitFailsOpen(t *testing.T) {
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologySemanticDeviceInput{hostname: "192.0.2.1"},
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		defaultTopologyAcquisitionLimits,
+	)
+	observer := recorder.beginContext(0, "", "")
+	require.NotNil(t, observer)
+	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+		State: ddsnmpcollector.AcquisitionReportStateLimitExceeded,
+		Limit: ddsnmpcollector.AcquisitionReportLimitRecords,
+	}, nil)
+
+	require.Nil(t, recorder.beginContext(1, "", ""), "unavailable captures must not enable later producer reports")
+	capture := recorder.finish()
+	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
+	require.Equal(t, diagnosticCaptureReasonAcquisitionReportRecordLimit, capture.reason)
+	require.Nil(t, capture.evidence)
 }
 
 func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
