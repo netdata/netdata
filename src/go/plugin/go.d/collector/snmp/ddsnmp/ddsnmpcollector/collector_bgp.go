@@ -41,7 +41,18 @@ func (ctx bgpValueContext) lookupPDU(oid string) (gosnmp.SnmpPDU, bool) {
 	return pdu, ok
 }
 
-func (c *Collector) collectBGPRows(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.BGPRow, error) {
+func (c *Collector) collectBGPRows(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.BGPRow, error) {
+	return c.collectBGPRowsObserved(prof, stats, nil)
+}
+
+func (c *Collector) collectBGPRowsObserved(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionProfileCollection,
+) ([]ddsnmp.BGPRow, error) {
 	if prof.Definition == nil || len(prof.Definition.BGP) == 0 {
 		return nil, nil
 	}
@@ -49,13 +60,13 @@ func (c *Collector) collectBGPRows(prof *ddsnmp.Profile, stats *ddsnmp.Collectio
 	var rows []ddsnmp.BGPRow
 	var errs []error
 
-	scalarRows, err := c.collectScalarBGPRows(prof.Definition.BGP, stats)
+	scalarRows, err := c.collectScalarBGPRows(prof.Definition.BGP, stats, acquisition)
 	if err != nil {
 		errs = append(errs, err)
 	}
 	rows = append(rows, scalarRows...)
 
-	tableRows, err := c.collectTableBGPRows(prof.Definition.BGP, stats)
+	tableRows, err := c.collectTableBGPRows(prof.Definition.BGP, stats, acquisition)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -72,16 +83,32 @@ func (c *Collector) collectBGPRows(prof *ddsnmp.Profile, stats *ddsnmp.Collectio
 	return rows, nil
 }
 
-func (c *Collector) collectScalarBGPRows(configs []ddprofiledefinition.BGPConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.BGPRow, error) {
+func (c *Collector) collectScalarBGPRows(
+	configs []ddprofiledefinition.BGPConfig,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionProfileCollection,
+) ([]ddsnmp.BGPRow, error) {
 	var rows []ddsnmp.BGPRow
 	var errs []error
 
-	for _, cfg := range configs {
+	for i, cfg := range configs {
 		if cfg.Table.OID != "" {
 			continue
 		}
+		var route *AcquisitionRouteReport
+		if acquisition != nil {
+			route = acquisition.bgpRoute(i)
+		}
 
 		oids, missingOIDs := c.bgpScalarOIDs(cfg)
+		if route != nil {
+			if len(oids) > 0 || len(missingOIDs) > 0 {
+				route.Source = AcquisitionRouteSourceGET
+			}
+			if len(oids) == 0 && len(missingOIDs) > 0 {
+				route.Outcome = AcquisitionRouteOutcomeMissing
+			}
+		}
 		if len(missingOIDs) > 0 {
 			c.log.Debugf("BGP scalar row %q missing OIDs: %v", bgpConfigDisplayName(cfg), missingOIDs)
 			stats.Errors.MissingOIDs += int64(len(missingOIDs))
@@ -92,20 +119,48 @@ func (c *Collector) collectScalarBGPRows(configs []ddprofiledefinition.BGPConfig
 		if len(oids) > 0 {
 			pdus, err = c.scalarCollector.getScalarValues(oids, stats)
 			if err != nil {
+				if route != nil {
+					route.Outcome = AcquisitionRouteOutcomeFailed
+					route.FailureClass = AcquisitionFailureClassTransport
+				}
 				stats.Errors.SNMP++
 				errs = append(errs, fmt.Errorf("BGP scalar row %q: %w", bgpConfigDisplayName(cfg), err))
 				continue
 			}
 		}
+		if route != nil {
+			remainingOIDs, currentMissingOIDs := c.bgpScalarOIDs(cfg)
+			if len(remainingOIDs) == 0 && len(currentMissingOIDs) > 0 {
+				route.Outcome = AcquisitionRouteOutcomeMissing
+			}
+		}
 
 		row, ok, err := c.buildScalarBGPRow(cfg, pdus)
 		if err != nil {
+			if route != nil {
+				route.Outcome = AcquisitionRouteOutcomeRejected
+				route.FailureClass = AcquisitionFailureClassProcessing
+				route.Rejected++
+			}
 			stats.Errors.Processing.BGP++
 			errs = append(errs, fmt.Errorf("BGP scalar row %q: %w", bgpConfigDisplayName(cfg), err))
 			continue
 		}
 		if ok {
 			rows = append(rows, row)
+		}
+		if route != nil && route.Outcome != AcquisitionRouteOutcomeFailed {
+			if route.Outcome == AcquisitionRouteOutcomeMissing && !ok {
+				continue
+			}
+			route.Rows = 1
+			if ok {
+				route.Values = 1
+			}
+			if !ok && len(pdus) > 0 {
+				route.Rejected++
+			}
+			setAcquisitionRouteCounts(route, route.Rows, route.Values, route.Rejected)
 		}
 	}
 
@@ -115,29 +170,51 @@ func (c *Collector) collectScalarBGPRows(configs []ddprofiledefinition.BGPConfig
 	return rows, nil
 }
 
-func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.BGPRow, error) {
+func (c *Collector) collectTableBGPRows(
+	configs []ddprofiledefinition.BGPConfig,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionProfileCollection,
+) ([]ddsnmp.BGPRow, error) {
 	var rows []ddsnmp.BGPRow
 	var errs []error
 	walkPass := newTableWalkPass()
 	tableNameToOID := bgpTableNameToOID(configs)
 
-	for _, cfg := range configs {
+	for i, cfg := range configs {
 		if cfg.Table.OID == "" {
 			continue
+		}
+		var route *AcquisitionRouteReport
+		if acquisition != nil {
+			route = acquisition.bgpRoute(i)
+		}
+		if route != nil {
+			route.Source = AcquisitionRouteSourceWalk
 		}
 		metricsCfg := bgpConfigAsMetricsConfig(cfg)
 
 		outcome := walkPass.walk(c.tableCollector, cfg.Table.OID, stats)
 		if outcome.err != nil {
+			if route != nil {
+				route.Outcome = AcquisitionRouteOutcomeFailed
+				route.FailureClass = AcquisitionFailureClassTransport
+			}
 			errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), outcome.err))
 			continue
 		}
 		pdus := outcome.pdus
 		if len(pdus) == 0 {
+			if route != nil {
+				route.Outcome = AcquisitionRouteOutcomeEmpty
+			}
 			continue
 		}
 
 		if err := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkPass, stats); err != nil {
+			if route != nil {
+				route.Outcome = AcquisitionRouteOutcomeFailed
+				route.FailureClass = AcquisitionFailureClassDependency
+			}
 			errs = append(errs, fmt.Errorf("BGP table %q dependencies: %w", bgpConfigDisplayName(cfg), err))
 			continue
 		}
@@ -153,17 +230,31 @@ func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig,
 		ctx.rows, _, _ = c.tableCollector.organizePDUsByRow(ctx)
 		crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
 		staticTags := parseStaticTags(cfg.StaticTags)
+		if route != nil {
+			route.Rows = uint64(len(ctx.rows))
+		}
 
 		for rowIndex, rowPDUs := range ctx.rows {
 			row, ok, err := c.buildTableBGPRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
+				if route != nil {
+					route.Rejected++
+				}
 				stats.Errors.Processing.BGP++
 				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
 				continue
 			}
 			if ok {
 				rows = append(rows, row)
+				if route != nil {
+					route.Values++
+				}
+			} else if route != nil {
+				route.Rejected++
 			}
+		}
+		if route != nil {
+			setAcquisitionRouteCounts(route, route.Rows, route.Values, route.Rejected)
 		}
 	}
 

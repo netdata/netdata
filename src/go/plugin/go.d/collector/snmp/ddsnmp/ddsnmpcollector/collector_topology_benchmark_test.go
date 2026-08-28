@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"fmt"
+	"maps"
 	"runtime"
 	"testing"
 
@@ -17,6 +18,50 @@ import (
 type benchmarkTopologySNMPHandler struct {
 	gosnmp.Handler
 	pdus []gosnmp.SnmpPDU
+}
+
+type benchmarkAcquisitionProjection struct {
+	report AcquisitionProfileReport
+	values []benchmarkAcquisitionTopologyValue
+}
+
+type benchmarkAcquisitionTopologyValue struct {
+	kind ddsnmp.TopologyKind
+	tags map[string]string
+}
+
+func (p *benchmarkAcquisitionProjection) ObserveProfile(
+	report AcquisitionProfileReport,
+	metrics *ddsnmp.ProfileMetrics,
+) {
+	p.report = report
+	p.values = nil
+	if metrics == nil {
+		return
+	}
+	p.values = make([]benchmarkAcquisitionTopologyValue, 0, len(metrics.TopologyMetrics))
+	for _, metric := range metrics.TopologyMetrics {
+		p.values = append(p.values, benchmarkAcquisitionTopologyValue{
+			kind: metric.TopologyKind,
+			tags: maps.Clone(metric.Tags),
+		})
+	}
+}
+
+func benchmarkAcquisitionObserverModes() []struct {
+	name string
+	new  func() AcquisitionObserver
+} {
+	return []struct {
+		name string
+		new  func() AcquisitionObserver
+	}{
+		{name: "nil", new: func() AcquisitionObserver { return nil }},
+		{name: "noop", new: func() AcquisitionObserver {
+			return AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})
+		}},
+		{name: "projection", new: func() AcquisitionObserver { return &benchmarkAcquisitionProjection{} }},
+	}
 }
 
 func (h *benchmarkTopologySNMPHandler) Version() gosnmp.SnmpVersion {
@@ -63,19 +108,21 @@ func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
 		for i := range profileCount {
 			profiles = append(profiles, benchmarkTopologyProfile(i))
 		}
-		cfg := Config{
-			SnmpClient: &benchmarkTopologySNMPHandler{},
-			Profiles:   profiles,
-			Log:        logger.New(),
+		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
+			b.Run(fmt.Sprintf("profiles=%d/observer=%s", profileCount, mode.name), func(b *testing.B) {
+				cfg := Config{
+					SnmpClient:          &benchmarkTopologySNMPHandler{},
+					Profiles:            profiles,
+					Log:                 logger.New(),
+					AcquisitionObserver: mode.new(),
+				}
+				b.ReportAllocs()
+				for b.Loop() {
+					collector := New(cfg)
+					runtime.KeepAlive(collector)
+				}
+			})
 		}
-
-		b.Run(fmt.Sprintf("profiles=%d", profileCount), func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				collector := New(cfg)
-				runtime.KeepAlive(collector)
-			}
-		})
 	}
 }
 
@@ -88,37 +135,42 @@ func BenchmarkCollector_CollectTopologyRows(b *testing.B) {
 			oid := fmt.Sprintf("%s.%d", columnOID, i+1)
 			pdus = append(pdus, createGauge32PDU(oid, uint(i+1)))
 		}
-		collector := New(Config{
-			SnmpClient: &benchmarkTopologySNMPHandler{pdus: pdus},
-			Profiles:   []*ddsnmp.Profile{benchmarkTopologyProfile(0)},
-			Log:        logger.New(),
-		})
+		for _, mode := range benchmarkAcquisitionObserverModes() {
+			b.Run(fmt.Sprintf("rows=%d/observer=%s", rowCount, mode.name), func(b *testing.B) {
+				observer := mode.new()
+				collector := New(Config{
+					SnmpClient:          &benchmarkTopologySNMPHandler{pdus: pdus},
+					Profiles:            []*ddsnmp.Profile{benchmarkTopologyProfile(0)},
+					Log:                 logger.New(),
+					AcquisitionObserver: observer,
+				})
 
-		results, err := collector.Collect()
-		topologyCount := -1
-		if len(results) == 1 {
-			topologyCount = len(results[0].TopologyMetrics)
-		}
-		if err != nil || topologyCount != rowCount {
-			b.Fatalf("warmup collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
-		}
-
-		b.Run(fmt.Sprintf("rows=%d", rowCount), func(b *testing.B) {
-			b.ReportAllocs()
-			b.ReportMetric(float64(rowCount), "rows/op")
-			b.ResetTimer()
-			for b.Loop() {
 				results, err := collector.Collect()
 				topologyCount := -1
 				if len(results) == 1 {
 					topologyCount = len(results[0].TopologyMetrics)
 				}
 				if err != nil || topologyCount != rowCount {
-					b.Fatalf("collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
+					b.Fatalf("warmup collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
 				}
-				runtime.KeepAlive(results)
-			}
-		})
+
+				b.ReportAllocs()
+				b.ReportMetric(float64(rowCount), "rows/op")
+				b.ResetTimer()
+				for b.Loop() {
+					results, err := collector.Collect()
+					topologyCount := -1
+					if len(results) == 1 {
+						topologyCount = len(results[0].TopologyMetrics)
+					}
+					if err != nil || topologyCount != rowCount {
+						b.Fatalf("collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
+					}
+					runtime.KeepAlive(results)
+					runtime.KeepAlive(observer)
+				}
+			})
+		}
 	}
 }
 

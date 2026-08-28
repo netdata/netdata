@@ -100,22 +100,24 @@ refreshTopology(ctx)
   build a plan of jobs whose next retry/refresh is due
   resolve planned DNS targets with up to eight workers under one shared 5s budget
   for each planned job, in registration-ID order:
-    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, remainingSemanticLimits)
+    assign the next per-incarnation attempt ordinal
+    refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence, perDeviceAcquisitionLimits)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
   activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, semanticLimits)
+refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence, acquisitionLimits)
+  start one bounded acquisition-attempt envelope and its main collection context
   connect to the device with gosnmp
   select topology profiles
-  collect topology ProfileMetrics with ddsnmpcollector
+  collect topology ProfileMetrics with ddsnmpcollector and receive one terminal acquisition report per selected profile
   query sysUpTime
   build a fresh mutable per-device builder with private target candidates
   ingest topology metrics into the builder
-  collect VTP VLAN contexts when needed
+  collect VTP VLAN contexts into distinct acquisition contexts when needed
   filter target and observed addresses with collected masks, select one management IP, and finalize diagnostics
-  freeze one immutable DeviceSnapshot with its exact acquisition time
+  freeze one immutable DeviceSnapshot with its exact acquisition time and successful attempt evidence
 ```
 
 The refresh loop checks devices every `update_every` seconds, but a device is
@@ -186,23 +188,20 @@ Diagnostics preserve two intentionally independent inventory cuts:
 - the topology sweep cut attached to the same immutable generation as the
   Function-visible device vector.
 
-The topology cut's ordered device rows are the exact start-of-sweep registration
-inventory. Each row separates whether the job was selected, its committed
-outcome/retry state, its last successful evidence reference and capture state,
-and whether that retained generation is renderable or expired. Registrations
-removed since the preceding cut are recorded separately. A canceled or
-panicking sweep leaves both the published topology generation and its cut
-unchanged and replaces only one bounded last-aborted marker. That marker records the sweep phase and, during
-device refresh, the active registration ID.
+The topology cut's ordered device rows are the exact start-of-sweep registration inventory. Each row separates whether
+the job was selected, its committed outcome/retry state, its retained successful acquisition, its latest completed
+attempt, and whether the retained generation is renderable or expired. The two acquisition pointers alias when the
+latest attempt succeeded; a later failure or no-profile attempt replaces only the latest-attempt pointer. Registrations
+removed since the preceding cut are recorded separately. A canceled or panicking sweep leaves both the published
+topology generation and its cut unchanged and replaces only one bounded last-aborted marker. That marker records the
+sweep phase and, during device refresh, the active registration ID.
 
-Per-device semantic limits and one global latest-view record/logical-byte limit
-are checked directly. One serial usage counter includes sweep rows, non-due
-retained evidence, and each due device's new-or-retained evidence in registration
-order. The remaining allowance reaches the recorder before it copies an event,
-so peak optional evidence is globally bounded rather than capped after all due
-devices finish. Lifecycle rows are admitted independently against the remaining
-budget when diagnostics are acquired. There are no reservations, sessions,
-queues, or attempt ledgers.
+Per-device acquisition limits are applied while an attempt is projected. One serial global latest-view
+record/logical-byte counter then admits distinct retained captures in registration order. A retained successful
+generation is admitted before a different latest failure or no-profile attempt, preserving replayable evidence when
+only one fits. Aliased captures count once. Evidence that does not fit is replaced by an explicit limit marker;
+collection and topology publication continue. Lifecycle rows are admitted independently against the remaining budget
+when diagnostics are acquired. There are no reservations, sessions, queues, or attempt ledgers.
 
 ## Topology Profile Composition
 
@@ -210,6 +209,12 @@ Topology profile selection uses the shared SNMP profile catalog. Matching is
 additive: a device receives the combined topology rows from every matching
 selector and each profile's `extends` graph. The topology projection then keeps
 only topology-consumer fields and typed `topology:` rows.
+
+`ddsnmpcollector` exposes an optional synchronous acquisition observer. When enabled, it emits one terminal report for
+each selected profile, including preparation or table failures. A stable profile ordinal and route digest identify the
+selected route structure, while compact route outcomes distinguish GET, walk, cache, missing, rejected, partial, and
+failed acquisition. Profile source paths, raw packets, decoded values, transform definitions, and error text are
+excluded. With no observer, report plans and report DTOs are not built.
 
 The standard capabilities have separate owners:
 
@@ -269,20 +274,22 @@ Ingestion is split by source area:
 - `topology_bgp_peers.go`
 - `topology_vlan_context_*.go`
 
-Every successful device refresh also retains a bounded semantic replay input.
-The live builder and the replay path share one ordered event dispatcher for
-system uptime, profile tags, topology rows, BGP rows, and successful VLAN-context
-rows. The retained projection uses positive per-event/per-topology-kind field
-allowlists. It keeps only metadata, tags, rows, and BGP fallback tags consumed by
-those builder operations; non-VLAN rows in VLAN events, credentials, profile
-source paths, metric names, values, and other collector output are not copied.
+Every completed device attempt retains a bounded acquisition envelope when projection succeeds. The envelope records its
+registration/attempt identity, target-resolution outcome and safe addresses, closed outcomes for the outer collection
+phases, and ordered main/VLAN collection contexts. Each context contains the collector's terminal per-profile route
+report and one immutable copy of the topology-consumer values needed for replay. Failed and no-profile attempts remain
+diagnostic; a successful attempt is also owned by the published device generation.
 
-Semantic capture has direct per-device record and logical-byte limits. The
-projection checks an event before copying it. Limit exhaustion, projection
-errors, or projection panics mark the generation's capture unavailable and
-release partial evidence without changing collection, builder ingestion, or
-topology publication. Replay reconstructs the allowlisted inputs and invokes
-the same event dispatcher; it rejects a missing or reordered main phase.
+The live builder and the replay path share one ordered event dispatcher for system uptime, profile tags, topology rows,
+BGP rows, and successful VLAN-context rows. The retained values use positive per-event/per-topology-kind field
+allowlists and are copied synchronously from the collector's borrowed result. They keep only metadata, tags, topology
+rows, and BGP fallback tags consumed by those builder operations. Non-VLAN rows in VLAN events, credentials, profile
+source paths, metric names, ordinary metric values, transform definitions, raw packets, and error text are not copied.
+
+Acquisition capture has direct per-device record and logical-byte limits. Limit exhaustion, projection errors, or
+projection panics mark the attempt unavailable and release partial evidence without changing collection, builder
+ingestion, or topology publication. Replay validates the completed shape, reconstructs the allowlisted values once,
+invokes the same event dispatcher, and ignores failed profiles and unsuccessful VLAN contexts.
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately
@@ -294,12 +301,13 @@ Finalization converts the builder into an immutable `topologyDeviceGeneration`:
   reverse-DNS readers;
 - immutable trap-match, interface-name, and neighbor indexes;
 - collection and expiry timestamps;
-- the typed DeviceStore registration ID.
-- a generation-local evidence reference and semantic capture state/input.
+- the typed DeviceStore registration ID;
+- a generation-local evidence reference and successful acquisition capture.
 
 The collector separately owns `deviceRefreshState` per registration ID. It
 tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,
-consecutive failures, and the last successful device generation.
+consecutive failures, the monotonic attempt ordinal, the latest completed
+attempt capture, and the last successful device generation.
 
 ## Registry And Snapshot
 

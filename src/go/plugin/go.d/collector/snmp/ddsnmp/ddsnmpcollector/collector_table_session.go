@@ -44,6 +44,7 @@ type tableCollectionScope struct {
 	stats          *ddsnmp.CollectionStats
 	requests       []*tableCollectionRequest
 	tableNameToOID map[string]string
+	acquisition    map[*tableCollectionRequest]*acquisitionTableObservation
 }
 
 type tableCollectionRequest struct {
@@ -485,6 +486,10 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 	failedSeen := make(map[string]bool)
 
 	for _, req := range scope.requests {
+		var acquisition *acquisitionTableObservation
+		if scope.acquisition != nil {
+			acquisition = scope.acquisition[req]
+		}
 		if req.missing || req.route == nil {
 			continue
 		}
@@ -514,7 +519,16 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 				symbolMode:     scope.mode,
 				cacheStructure: req.cacheEligible,
 			}
+			if acquisition != nil {
+				ctx.rejected = &acquisition.rejected
+			}
+			processingErrorsBefore := scope.stats.Errors.Processing.Table
 			tableMetrics, err := s.collector.processTableData(ctx, collectionCtx, scope.stats)
+			if acquisition != nil {
+				acquisition.rows = uint64(len(ctx.rows))
+				acquisition.values = uint64(len(tableMetrics))
+				acquisition.rejected += uint64(scope.stats.Errors.Processing.Table - processingErrorsBefore)
+			}
 			scope.stats.Metrics.Rows += int64(len(ctx.rows))
 			if err != nil {
 				scope.stats.Errors.Processing.Table++

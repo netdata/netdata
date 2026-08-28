@@ -33,6 +33,13 @@ func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bo
 
 // Collect gathers all global tags from the profile
 func (gc *globalTagsCollector) collect(prof *ddsnmp.Profile) (map[string]string, error) {
+	return gc.collectObserved(prof, nil)
+}
+
+func (gc *globalTagsCollector) collectObserved(
+	prof *ddsnmp.Profile,
+	acquisition *acquisitionProfileCollection,
+) (map[string]string, error) {
 	if len(prof.Definition.MetricTags) == 0 && len(prof.Definition.StaticTags) == 0 {
 		return nil, nil
 	}
@@ -41,7 +48,8 @@ func (gc *globalTagsCollector) collect(prof *ddsnmp.Profile) (map[string]string,
 
 	gc.processStaticTags(prof.Definition.StaticTags, tags)
 
-	if err := gc.processDynamicTags(prof.Definition.MetricTags, tags); err != nil {
+	observer := acquisition.globalTagObserver(prof.Definition.MetricTags)
+	if err := gc.processDynamicTagsObserved(prof.Definition.MetricTags, tags, observer); err != nil {
 		return ternary(len(tags) > 0, tags, nil), err
 	}
 
@@ -55,8 +63,17 @@ func (gc *globalTagsCollector) processStaticTags(staticTags []ddprofiledefinitio
 
 // processDynamicTags processes tags that require SNMP fetching
 func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.GlobalMetricTagConfig, globalTags map[string]string) error {
+	return gc.processDynamicTagsObserved(metricTags, globalTags, nil)
+}
+
+func (gc *globalTagsCollector) processDynamicTagsObserved(
+	metricTags []ddprofiledefinition.GlobalMetricTagConfig,
+	globalTags map[string]string,
+	observer *acquisitionGlobalTagObserver,
+) error {
 	// Identify OIDs to collect
 	oids, missingOIDs := gc.identifyTagOIDs(metricTags)
+	observer.start(gc.missingOIDs)
 
 	if len(missingOIDs) > 0 {
 		gc.log.Debugf("global tags missing OIDs: %v", missingOIDs)
@@ -68,12 +85,14 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 
 	pdus, err := gc.fetchTagValues(oids)
 	if err != nil {
+		observer.failUnfinished(AcquisitionFailureClassTransport)
 		return fmt.Errorf("failed to fetch global tag values: %w", err)
 	}
+	observer.start(gc.missingOIDs)
 
 	// Collect each tag configuration
 	var errs []error
-	for _, tagCfg := range metricTags {
+	for i, tagCfg := range metricTags {
 		cfg := tagCfg.MetricTagConfig
 		if cfg.Symbol.OID == "" {
 			continue
@@ -81,10 +100,23 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 
 		ta := tagAdder{tags: globalTags}
 
-		if err := gc.tagProc.processTag(cfg, pdus, ta); err != nil {
+		var observed bool
+		var err error
+		if observer == nil {
+			err = gc.tagProc.processTag(cfg, pdus, ta)
+		} else {
+			observed, err = gc.tagProc.processTagObserved(cfg, pdus, ta)
+		}
+		if err != nil {
+			observer.rejected(i)
 			errs = append(errs, fmt.Errorf("failed to process tag value for %q: %w",
 				metricTagDisplayName(cfg), err))
 			continue
+		}
+		if observed {
+			observer.value(i)
+		} else {
+			observer.empty(i)
 		}
 	}
 

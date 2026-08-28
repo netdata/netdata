@@ -37,6 +37,7 @@ type (
 		crossTableCtx *crossTableContext
 		orderedTags   []orderedTagConfig
 		symbolMode    tableSymbolMode
+		rejected      *uint64
 	}
 )
 
@@ -206,6 +207,9 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 		for _, sym := range syms {
 			metric, err := p.createMetric(sym, pdu, row, ctx.symbolMode)
 			if err != nil {
+				if ctx.rejected != nil {
+					*ctx.rejected++
+				}
 				p.log.Debugf("Error creating metric %s: %v", sym.Name, err)
 				continue
 			}

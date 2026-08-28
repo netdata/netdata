@@ -126,6 +126,7 @@ type (
 		// orderedTags contains metric tags in profile-defined order to ensure correct
 		// precedence when multiple tags share the same name (first non-empty wins)
 		orderedTags []orderedTagConfig
+		rejected    *uint64
 	}
 	orderedTagConfig struct {
 		config  ddprofiledefinition.MetricTagConfig
@@ -335,6 +336,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 			crossTableCtx: crossTableCtx,
 			orderedTags:   ctx.orderedTags,
 			symbolMode:    ctx.symbolMode,
+			rejected:      ctx.rejected,
 		}
 		rowMetrics, err := tc.rowProcessor.processRow(row, rowCtx)
 		if err != nil {

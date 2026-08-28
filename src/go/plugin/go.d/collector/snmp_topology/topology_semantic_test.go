@@ -14,16 +14,17 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
-func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
+func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	freshFor := 32 * time.Minute
 	dev := ddsnmp.DeviceConnectionInfo{
 		Hostname:       "192.0.2.1",
-		Community:      "must-not-appear-in-semantic-evidence",
-		V3AuthKey:      "must-not-appear-in-semantic-evidence",
-		V3PrivKey:      "must-not-appear-in-semantic-evidence",
+		Community:      "must-not-appear-in-acquisition-evidence",
+		V3AuthKey:      "must-not-appear-in-acquisition-evidence",
+		V3PrivKey:      "must-not-appear-in-acquisition-evidence",
 		ManualProfiles: []string{"/must/not/appear/profile.yaml"},
 		SysObjectID:    "1.3.6.1.4.1.9.1.1",
 		SysName:        "switch-a",
@@ -36,7 +37,13 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 	deviceInput := topologySemanticDeviceInputFromConnection(dev)
 	targets := []netip.Addr{netip.MustParseAddr("192.0.2.1")}
 	builder := newTopologyBuilderFromSemanticInput(deviceInput, targets, collectedAt, freshFor)
-	recorder := newTopologySemanticRecorder(deviceInput, targets, collectedAt, freshFor, defaultTopologySemanticLimits)
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		deviceInput,
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionLiteral, addresses: targets},
+		defaultTopologyAcquisitionLimits,
+	)
+	mainObserver := recorder.beginContext(0, "", "")
 
 	pms := []*ddsnmp.ProfileMetrics{{
 		Source: "/must/not/appear/profile.yaml",
@@ -110,33 +117,46 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 		}},
 	}}
 
-	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
-	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventProfileTags, profiles: pms})
-	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventTopologyMetrics, profiles: pms})
-	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
-	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{
+	mainObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+	}, pms[0])
+	recorder.completeContext(0, successfulAcquisitionPhase())
+	recorder.setCollectedShape(collectedAt, freshFor, 1234)
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventProfileTags, profiles: pms})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventTopologyMetrics, profiles: pms})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
+	vlanPMS := []*ddsnmp.ProfileMetrics{{
+		Source: "/must/not/appear/vlan-profile.yaml",
+		TopologyMetrics: []ddsnmp.Metric{
+			{
+				Name:         "/must/not/appear/vlan-metric",
+				TopologyKind: ddsnmp.KindIfName,
+				Tags: map[string]string{
+					tagTopoIfIndex: "7",
+					tagTopoIfName:  "Gi1/0/7",
+				},
+			},
+			{
+				TopologyKind: ddsnmp.KindIpIfIndex,
+				Tags: map[string]string{
+					tagTopoIPAddr: "must-not-appear-non-vlan-context-row",
+				},
+			},
+		},
+	}}
+	vlanObserver := recorder.beginContext(1, "100", "users")
+	vlanObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+	}, vlanPMS[0])
+	recorder.completeContext(1, successfulAcquisitionPhase())
+	applyTopologySemanticEvent(builder, topologySemanticEvent{
 		kind:     topologySemanticEventVLANContext,
 		vlanID:   "100",
 		vlanName: "users",
-		profiles: []*ddsnmp.ProfileMetrics{{
-			Source: "/must/not/appear/vlan-profile.yaml",
-			TopologyMetrics: []ddsnmp.Metric{
-				{
-					Name:         "/must/not/appear/vlan-metric",
-					TopologyKind: ddsnmp.KindIfName,
-					Tags: map[string]string{
-						tagTopoIfIndex: "7",
-						tagTopoIfName:  "Gi1/0/7",
-					},
-				},
-				{
-					TopologyKind: ddsnmp.KindIpIfIndex,
-					Tags: map[string]string{
-						tagTopoIPAddr: "must-not-appear-non-vlan-context-row",
-					},
-				},
-			},
-		}},
+		profiles: vlanPMS,
 	})
 
 	live, _ := freezeTopologyBuilder(builder)
@@ -152,8 +172,10 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 	pms[0].TopologyMetrics[0].Tags[tagTopoIfName] = "changed"
 	pms[0].BGPRows[0].Identity.Neighbor = "198.51.100.2"
 
-	replayed, err := replayTopologySemanticEvidence(capture.evidence)
+	beforeReplay := cloneTopologyAcquisitionEvidence(capture.evidence)
+	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
 	require.NoError(t, err)
+	require.Equal(t, beforeReplay, capture.evidence)
 	require.Equal(t, live.observation, replayed.observation)
 	require.Equal(t, live.hasObservation, replayed.hasObservation)
 	require.Equal(t, live.collectedAt, replayed.collectedAt)
@@ -173,16 +195,22 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 	require.NotContains(t, text, "must-not-appear-unused-bgp-tag")
 	require.NotContains(t, text, "must-not-appear-non-vlan-context-row")
 	require.NotContains(t, text, "must-not-appear-invalid-octet-tag")
-	require.Contains(t, capture.evidence.events[1].profiles[0].metadata, tagLldpLocChassisID)
-	require.Contains(t, capture.evidence.events[1].profiles[0].tags, tagLldpLocSysName)
-	require.Contains(t, capture.evidence.events[2].profiles[0].metrics[0].tags, tagTopoIfIndex)
-	require.Contains(t, capture.evidence.events[3].profiles[0].bgpRows[0].tags, "neighbor")
+	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metadata, tagLldpLocChassisID)
+	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
+	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
+	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows[0].tags, "neighbor")
 }
 
-func TestTopologySemanticCaptureIgnoresRejectedBGPRows(t *testing.T) {
+func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
-	recorder := newTopologySemanticRecorder(input, nil, collectedAt, time.Minute, defaultTopologySemanticLimits)
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		input,
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		defaultTopologyAcquisitionLimits,
+	)
+	observer := recorder.beginContext(0, "", "")
 	pms := []*ddsnmp.ProfileMetrics{{
 		BGPCollectError: errors.New("collection failed"),
 		BGPRows: []ddsnmp.BGPRow{{
@@ -191,39 +219,81 @@ func TestTopologySemanticCaptureIgnoresRejectedBGPRows(t *testing.T) {
 		}},
 	}}
 
-	recorder.record(topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
+	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomePartial,
+	}, pms[0])
+	recorder.completeContext(0, successfulAcquisitionPhase())
+	recorder.setCollectedShape(collectedAt, time.Minute, 0)
 	capture := recorder.finish()
 	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.Len(t, capture.evidence.events, 1)
-	require.True(t, capture.evidence.events[0].profiles[0].bgpFailed)
-	require.Empty(t, capture.evidence.events[0].profiles[0].bgpRows)
+	require.Len(t, capture.evidence.collectionContexts, 1)
+	require.True(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpFailed)
+	require.Empty(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows)
 	require.NotContains(t, fmt.Sprintf("%+v", capture), pms[0].BGPRows[0].OriginProfileID)
 }
 
-func TestTopologySemanticReplayRejectsMissingOrReorderedPhases(t *testing.T) {
-	evidence := completeTestTopologySemanticEvidence(t)
+func TestTopologyAcquisitionReplayRejectsMissingOrReorderedContexts(t *testing.T) {
+	evidence := completeTestTopologyAcquisitionEvidence(t)
 
-	missing := cloneTopologySemanticEvidence(evidence)
-	missing.events = append(missing.events[:1], missing.events[2:]...)
-	_, err := replayTopologySemanticEvidence(missing)
-	require.ErrorContains(t, err, "semantic event order")
+	missing := cloneTopologyAcquisitionEvidence(evidence)
+	missing.collectionContexts = nil
+	_, err := replayTopologyAcquisitionEvidence(missing)
+	require.ErrorContains(t, err, "main acquisition context")
 
-	reordered := cloneTopologySemanticEvidence(evidence)
-	reordered.events[1], reordered.events[2] = reordered.events[2], reordered.events[1]
-	_, err = replayTopologySemanticEvidence(reordered)
-	require.ErrorContains(t, err, "semantic event order")
+	reordered := cloneTopologyAcquisitionEvidence(evidence)
+	reordered.collectionContexts = append(reordered.collectionContexts, topologyAcquisitionContextEvidence{ordinal: 0})
+	_, err = replayTopologyAcquisitionEvidence(reordered)
+	require.ErrorContains(t, err, "acquisition context order")
 }
 
-func TestTopologySemanticCaptureLimitFailsOpen(t *testing.T) {
+func TestTopologyAcquisitionReplayIgnoresFailedVLANContextValues(t *testing.T) {
+	evidence := completeTestTopologyAcquisitionEvidence(t)
+	want, err := replayTopologyAcquisitionEvidence(evidence)
+	require.NoError(t, err)
+
+	failed := cloneTopologyAcquisitionEvidence(evidence)
+	failed.collectionContexts = append(failed.collectionContexts, topologyAcquisitionContextEvidence{
+		ordinal:    1,
+		vlanID:     "100",
+		vlanName:   "users",
+		client:     successfulAcquisitionPhase(),
+		connect:    successfulAcquisitionPhase(),
+		collection: failedAcquisitionPhase(topologyAcquisitionFailureCollection),
+		profiles: []topologyAcquisitionProfileEvidence{{
+			identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+			outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+			values: topologyAcquisitionProfileValues{metrics: []topologyAcquisitionMetricValue{{
+				kind: ddsnmp.KindFdbEntry,
+				tags: map[string]string{
+					tagFdbMac:        "00:11:22:33:44:55",
+					tagFdbBridgePort: "7",
+					tagFdbStatus:     "learned",
+				},
+			}}},
+		}},
+	})
+
+	got, err := replayTopologyAcquisitionEvidence(failed)
+	require.NoError(t, err)
+	require.Equal(t, want.observation, got.observation)
+}
+
+func TestTopologyAcquisitionCaptureLimitFailsOpen(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
 	builder := newTopologyBuilderFromSemanticInput(input, nil, collectedAt, time.Minute)
-	recorder := newTopologySemanticRecorder(input, nil, collectedAt, time.Minute, topologySemanticLimits{
-		maxRecords:      1,
-		maxLogicalBytes: 1024,
-	})
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		input,
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologyAcquisitionLimits{
+			maxRecords:      1,
+			maxLogicalBytes: 1024,
+		})
 
-	consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
+	recorder.beginContext(0, "", "")
 	capture := recorder.finish()
 	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
 	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
@@ -231,13 +301,19 @@ func TestTopologySemanticCaptureLimitFailsOpen(t *testing.T) {
 	require.EqualValues(t, 1234, builder.localDevice.SysUptime, "capture limits must not change live ingestion")
 }
 
-func TestTopologySemanticCaptureErrorAndPanicFailOpen(t *testing.T) {
+func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
 
 	t.Run("projection error", func(t *testing.T) {
 		builder := newTopologyBuilderFromSemanticInput(input, nil, collectedAt, time.Minute)
-		recorder := newTopologySemanticRecorder(input, nil, collectedAt, time.Minute, defaultTopologySemanticLimits)
+		recorder := newTopologyAcquisitionRecorder(
+			topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+			input,
+			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+			defaultTopologyAcquisitionLimits,
+		)
+		observer := recorder.beginContext(0, "", "")
 		pms := []*ddsnmp.ProfileMetrics{{BGPRows: []ddsnmp.BGPRow{{
 			OriginProfileID: "/private/profile.yaml",
 			StructuralID:    "peer-1",
@@ -245,7 +321,11 @@ func TestTopologySemanticCaptureErrorAndPanicFailOpen(t *testing.T) {
 			Identity:        ddsnmp.BGPIdentity{Neighbor: "192.0.2.2", RemoteAS: "65002"},
 		}}}}
 
-		consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
+		applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
+		observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+			Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+			Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+		}, pms[0])
 		capture := recorder.finish()
 		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
 		require.Equal(t, diagnosticCaptureReasonProjectionError, capture.reason)
@@ -256,13 +336,23 @@ func TestTopologySemanticCaptureErrorAndPanicFailOpen(t *testing.T) {
 
 	t.Run("projection panic", func(t *testing.T) {
 		builder := newTopologyBuilderFromSemanticInput(input, nil, collectedAt, time.Minute)
-		recorder := newTopologySemanticRecorder(input, nil, collectedAt, time.Minute, defaultTopologySemanticLimits)
-		recorder.projectEvent = func(*topologySemanticRecorder, topologySemanticEvent) error {
+		recorder := newTopologyAcquisitionRecorder(
+			topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+			input,
+			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+			defaultTopologyAcquisitionLimits,
+		)
+		observer := recorder.beginContext(0, "", "")
+		recorder.projectProfile = func(*ddsnmp.ProfileMetrics) topologyAcquisitionProfileValues {
 			panic("projection panic")
 		}
 
 		require.NotPanics(t, func() {
-			consumeTopologySemanticEvent(builder, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
+			applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
+			observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+				Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+				Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+			}, &ddsnmp.ProfileMetrics{})
 		})
 		capture := recorder.finish()
 		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
@@ -271,29 +361,33 @@ func TestTopologySemanticCaptureErrorAndPanicFailOpen(t *testing.T) {
 	})
 }
 
-func completeTestTopologySemanticEvidence(t *testing.T) *topologySemanticEvidence {
+func completeTestTopologyAcquisitionEvidence(t *testing.T) *topologyAcquisitionAttemptEvidence {
 	t.Helper()
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
-	recorder := newTopologySemanticRecorder(input, nil, collectedAt, time.Minute, defaultTopologySemanticLimits)
-	for _, event := range []topologySemanticEvent{
-		{kind: topologySemanticEventSysUptime, sysUptime: 1},
-		{kind: topologySemanticEventProfileTags},
-		{kind: topologySemanticEventTopologyMetrics},
-		{kind: topologySemanticEventBGPPeers},
-	} {
-		recorder.record(event)
-	}
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		input,
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		defaultTopologyAcquisitionLimits,
+	)
+	observer := recorder.beginContext(0, "", "")
+	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+	}, &ddsnmp.ProfileMetrics{})
+	recorder.completeContext(0, successfulAcquisitionPhase())
+	recorder.setCollectedShape(collectedAt, time.Minute, 1)
 	capture := recorder.finish()
 	require.Equal(t, diagnosticCaptureAvailable, capture.state)
 	return capture.evidence
 }
 
-func cloneTopologySemanticEvidence(value *topologySemanticEvidence) *topologySemanticEvidence {
+func cloneTopologyAcquisitionEvidence(value *topologyAcquisitionAttemptEvidence) *topologyAcquisitionAttemptEvidence {
 	if value == nil {
 		return nil
 	}
 	cloned := *value
-	cloned.events = slices.Clone(value.events)
+	cloned.collectionContexts = slices.Clone(value.collectionContexts)
 	return &cloned
 }
