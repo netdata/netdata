@@ -688,7 +688,7 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	if ctx.Err() == nil {
 		for _, job := range jobs {
 			if plans[job.planIndex].target.outcome == topologyTargetResolutionUnknown {
-				plans[job.planIndex].target.outcome = topologyTargetResolutionFailed
+				plans[job.planIndex].target.outcome = topologyTargetResolutionUnavailable
 			}
 		}
 	}

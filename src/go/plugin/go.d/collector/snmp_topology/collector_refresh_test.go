@@ -518,6 +518,7 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 					Rows:    1,
 					Values:  1,
 				}},
+				TopologyValueReferences: []ddsnmpcollector.AcquisitionValueReference{{RouteOrdinal: 0}},
 			}, profileMetrics)
 			return []*ddsnmp.ProfileMetrics{profileMetrics}, nil
 		})
@@ -535,6 +536,9 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 	require.Len(t, capturedProfile.routes, 1)
 	require.Equal(t, "1.3.6.1.2.1.2.2", capturedProfile.routes[0].RootOID)
 	require.Len(t, capturedProfile.values.metrics, 1)
+	require.EqualValues(t, 0, capturedProfile.values.metrics[0].routeOrdinal)
+	require.EqualValues(t, 0, capturedProfile.values.metrics[0].rowOrdinal)
+	require.EqualValues(t, 0, capturedProfile.values.metrics[0].valueOrdinal)
 	require.Equal(t, "Gi1/0/7", capturedProfile.values.metrics[0].tags[tagTopoIfName])
 	require.NotContains(t, fmt.Sprintf("%+v", capture), profileMetrics.Source)
 	require.NotContains(t, fmt.Sprintf("%+v", capture), profileMetrics.TopologyMetrics[0].Name)
@@ -1056,10 +1060,9 @@ func TestCollectorVLANContextsRecordDistinctSuccessAndFailureEvidence(t *testing
 	coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 		require.NotNil(t, cfg.AcquisitionObserver)
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-			cfg.AcquisitionObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-				Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-				Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-			}, profileMetrics)
+			cfg.AcquisitionObserver.ObserveProfile(acquisitionReportForMetrics(
+				0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, profileMetrics,
+			), profileMetrics)
 			return []*ddsnmp.ProfileMetrics{profileMetrics}, nil
 		})
 	}
@@ -1382,7 +1385,11 @@ func TestCollectorResolveTopologyTargetManagementIPsUsesStableBoundedSharedBudge
 	require.NoError(t, parent.Err())
 	for _, plan := range plans {
 		require.Empty(t, plan.target.addresses)
-		require.Equal(t, topologyTargetResolutionFailed, plan.target.outcome)
+		if plan.registrationID <= topologyTargetLookupMaxWorkers {
+			require.Equal(t, topologyTargetResolutionFailed, plan.target.outcome)
+		} else {
+			require.Equal(t, topologyTargetResolutionUnavailable, plan.target.outcome)
+		}
 	}
 }
 
@@ -1883,11 +1890,21 @@ func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
 			}
 			for _, entry := range store.Entries() {
 				registrationID := entry.RegistrationID
+				attemptID := topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1}
+				capture := benchmarkRetainedTopologyAcquisitionCapture(b, attemptID, entry.Info, now)
 				coll.deviceStates[registrationID] = deviceRefreshState{
-					generation:  &topologyDeviceGeneration{registrationID: registrationID, collectedAt: now, expiresAt: now.Add(time.Hour)},
-					lastSuccess: now,
-					nextRetry:   now.Add(time.Hour),
-					outcome:     deviceRefreshOutcomeSuccess,
+					generation: &topologyDeviceGeneration{
+						registrationID: registrationID,
+						collectedAt:    now,
+						expiresAt:      now.Add(time.Hour),
+						acquisition:    capture,
+					},
+					latestAttempt:  capture,
+					attemptOrdinal: 1,
+					lastAttempt:    now,
+					lastSuccess:    now,
+					nextRetry:      now.Add(time.Hour),
+					outcome:        deviceRefreshOutcomeSuccess,
 				}
 			}
 			coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, now, coll.deviceStates))
@@ -1898,6 +1915,121 @@ func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
 				stats := coll.refreshTopology(context.Background())
 				if stats.registeredDevices != deviceCount || stats.errors != 0 {
 					b.Fatalf("refresh stats: registered=%d errors=%d", stats.registeredDevices, stats.errors)
+				}
+			}
+		})
+	}
+}
+
+func benchmarkRetainedTopologyAcquisitionCapture(
+	b *testing.B,
+	attemptID topologyAcquisitionAttemptID,
+	device ddsnmp.DeviceConnectionInfo,
+	collectedAt time.Time,
+) *topologyAcquisitionCapture {
+	b.Helper()
+	input := topologySemanticDeviceInputFromConnection(device)
+	recorder := newTopologyAcquisitionRecorder(
+		attemptID,
+		input,
+		topologyTargetResolutionEvidence{
+			outcome:   topologyTargetResolutionLiteral,
+			addresses: []netip.Addr{netip.MustParseAddr(device.Hostname)},
+		},
+		defaultTopologyAcquisitionLimits,
+	)
+	recorder.evidence.client = successfulAcquisitionPhase()
+	recorder.evidence.connect = successfulAcquisitionPhase()
+	recorder.evidence.profiles = successfulAcquisitionPhase()
+	recorder.evidence.collection = successfulAcquisitionPhase()
+	recorder.evidence.sysUptime = successfulAcquisitionPhase()
+	observer := recorder.beginContext(0, "", "")
+	observer.ObserveProfile(acquisitionReportForMetrics(
+		0,
+		ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+		&ddsnmp.ProfileMetrics{},
+	), &ddsnmp.ProfileMetrics{})
+	recorder.completeContext(0, successfulAcquisitionPhase())
+	recorder.setCollectedShape(collectedAt, time.Hour, 1234)
+	capture := recorder.finish()
+	if capture.state != diagnosticCaptureAvailable || capture.evidence == nil {
+		b.Fatal("retained acquisition capture unavailable")
+	}
+	return capture
+}
+
+type benchmarkTopologyRefreshSNMPHandler struct {
+	gosnmp.Handler
+}
+
+func newBenchmarkTopologyRefreshSNMPHandler() *benchmarkTopologyRefreshSNMPHandler {
+	return &benchmarkTopologyRefreshSNMPHandler{Handler: gosnmp.NewHandler()}
+}
+
+func (*benchmarkTopologyRefreshSNMPHandler) Connect() error { return nil }
+func (*benchmarkTopologyRefreshSNMPHandler) Close() error   { return nil }
+
+func (*benchmarkTopologyRefreshSNMPHandler) Get([]string) (*gosnmp.SnmpPacket, error) {
+	return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+		{Name: snmputils.OidSnmpEngineTime, Type: gosnmp.Integer, Value: 1234},
+	}}, nil
+}
+
+func BenchmarkCollectorRefreshDueDeviceWithAcquisition(b *testing.B) {
+	for _, metricCount := range []int{100, 1000, 10_000} {
+		b.Run(fmt.Sprintf("metrics=%d", metricCount), func(b *testing.B) {
+			coll, store := newTestSNMPTopologyCollectorWithStore()
+			now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+			coll.now = func() time.Time { return now }
+			store.Register("benchmark-device", ddsnmp.DeviceConnectionInfo{
+				Hostname:       "192.0.2.1",
+				Port:           161,
+				SNMPVersion:    "2c",
+				ManualProfiles: []string{"benchmark-topology"},
+			})
+			coll.newSnmpClient = func() gosnmp.Handler { return newBenchmarkTopologyRefreshSNMPHandler() }
+			coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+				return []*ddsnmp.Profile{{}}
+			}
+
+			metrics := benchmarkTopologyAcquisitionMetrics(metricCount)
+			report := acquisitionReportForMetrics(
+				0,
+				ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+				metrics[0],
+			)
+			coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
+				return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+					cfg.AcquisitionObserver.ObserveProfile(report, metrics[0])
+					return metrics, nil
+				})
+			}
+
+			warmup := coll.refreshTopology(context.Background())
+			if warmup.errors != 0 || warmup.cachedDevices != 1 {
+				b.Fatalf("warmup refresh: cached=%d errors=%d", warmup.cachedDevices, warmup.errors)
+			}
+			generation := coll.topologyRegistry.acquireGeneration()
+			if generation == nil || generation.diagnostic == nil ||
+				generation.diagnostic.captureState != diagnosticCaptureAvailable ||
+				len(generation.devices) != 1 || generation.devices[0].acquisition == nil ||
+				generation.devices[0].acquisition.state != diagnosticCaptureAvailable {
+				b.Fatal("warmup refresh did not publish complete acquisition diagnostics")
+			}
+
+			b.ReportAllocs()
+			b.ReportMetric(float64(metricCount), "metrics/op")
+			b.ResetTimer()
+			for b.Loop() {
+				now = now.Add(time.Hour)
+				stats := coll.refreshTopology(context.Background())
+				if stats.registeredDevices != 1 || stats.cachedDevices != 1 || stats.errors != 0 {
+					b.Fatalf(
+						"refresh stats: registered=%d cached=%d errors=%d",
+						stats.registeredDevices,
+						stats.cachedDevices,
+						stats.errors,
+					)
 				}
 			}
 		})

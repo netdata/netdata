@@ -59,7 +59,8 @@ func (p *globalTagProcessor) processTagObserved(
 	}
 	observed := false
 	ta.observed = &observed
-	return observed, p.tp.processTag(cfg, pdu, ta)
+	err := p.tp.processTag(cfg, pdu, ta)
+	return observed, err
 }
 
 type tableTagProcessor struct{}

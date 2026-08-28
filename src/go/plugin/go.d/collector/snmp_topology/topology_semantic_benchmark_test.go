@@ -15,6 +15,7 @@ import (
 func BenchmarkTopologyAcquisitionIngest(b *testing.B) {
 	for _, metricCount := range []int{100, 1000, 10_000} {
 		pms := benchmarkTopologyAcquisitionMetrics(metricCount)
+		report := acquisitionReportForMetrics(0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, pms[0])
 		input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
 		collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
@@ -32,10 +33,7 @@ func BenchmarkTopologyAcquisitionIngest(b *testing.B) {
 							defaultTopologyAcquisitionLimits,
 						)
 						observer := recorder.beginContext(0, "", "")
-						observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-							Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-							Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-						}, pms[0])
+						observer.ObserveProfile(report, pms[0])
 						recorder.completeContext(0, successfulAcquisitionPhase())
 						recorder.setCollectedShape(collectedAt, time.Hour, 1)
 					}
@@ -94,10 +92,9 @@ func benchmarkTopologyAcquisitionEvidence(b *testing.B, pms []*ddsnmp.ProfileMet
 		defaultTopologyAcquisitionLimits,
 	)
 	observer := recorder.beginContext(0, "", "")
-	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-	}, pms[0])
+	observer.ObserveProfile(acquisitionReportForMetrics(
+		0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, pms[0],
+	), pms[0])
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC), time.Hour, 1)
 	capture := recorder.finish()

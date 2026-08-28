@@ -135,6 +135,15 @@ func (s *tableCollectionSession) addScope(
 	mode tableSymbolMode,
 	stats *ddsnmp.CollectionStats,
 ) *tableCollectionScope {
+	return s.addObservedScope(prof, mode, stats, nil)
+}
+
+func (s *tableCollectionSession) addObservedScope(
+	prof *ddsnmp.Profile,
+	mode tableSymbolMode,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionTableScope,
+) *tableCollectionScope {
 	scope := &tableCollectionScope{
 		profileSource:  prof.SourceFile,
 		mode:           mode,
@@ -146,18 +155,25 @@ func (s *tableCollectionSession) addScope(
 	if prof.Definition == nil {
 		return scope
 	}
-	for _, cfg := range prof.Definition.Metrics {
+	for configIndex, cfg := range prof.Definition.Metrics {
 		if cfg.IsScalar() || cfg.Table.OID == "" {
 			continue
 		}
 		if cfg.Table.Name != "" {
 			scope.tableNameToOID[cfg.Table.Name] = cfg.Table.OID
 		}
-		scope.requests = append(scope.requests, &tableCollectionRequest{
+		request := &tableCollectionRequest{
 			scope:         scope,
 			config:        cfg,
 			cacheEligible: mode == tableSymbolModeValue,
-		})
+		}
+		if observation := acquisition.bind(configIndex, request); observation != nil {
+			if scope.acquisition == nil {
+				scope.acquisition = make(map[*tableCollectionRequest]*acquisitionTableObservation)
+			}
+			scope.acquisition[request] = observation
+		}
+		scope.requests = append(scope.requests, request)
 	}
 	return scope
 }
@@ -350,6 +366,7 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 			req.scope.profileSource,
 			req.scope.mode,
 			&req.candidateStats,
+			req.scope.acquisition[req],
 		)
 		req.candidateStats.Timing.Table += time.Since(started)
 		if req.candidateMetrics == nil {
@@ -486,10 +503,7 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 	failedSeen := make(map[string]bool)
 
 	for _, req := range scope.requests {
-		var acquisition *acquisitionTableObservation
-		if scope.acquisition != nil {
-			acquisition = scope.acquisition[req]
-		}
+		acquisition := scope.acquisition[req]
 		if req.missing || req.route == nil {
 			continue
 		}
@@ -497,6 +511,9 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 		switch req.route.state {
 		case tableRouteCached:
 			tablesSeen[req.route.oid] = true
+			if acquisition != nil {
+				acquisition.processed = true
+			}
 			if len(req.config.Symbols) > 0 {
 				successful = true
 				metrics = append(metrics, req.candidateMetrics...)
@@ -506,6 +523,11 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			// A current WALK is successful even when it is empty or auxiliary-only.
 			successful = true
 			if len(req.config.Symbols) == 0 {
+				if acquisition != nil {
+					acquisition.processed = true
+					acquisition.rows = uint64(len(req.route.pdus))
+					acquisition.values = uint64(len(req.route.pdus))
+				}
 				if req.cacheEligible && !req.sharesRouteCache {
 					s.collector.tableCache.cacheMarker(req.config)
 				}
@@ -518,9 +540,12 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 				tableNameToOID: scope.tableNameToOID,
 				symbolMode:     scope.mode,
 				cacheStructure: req.cacheEligible,
+				acquisition:    acquisition,
 			}
 			if acquisition != nil {
+				acquisition.processed = true
 				ctx.rejected = &acquisition.rejected
+				ctx.dependencyRejected = &acquisition.dependencyRejected
 			}
 			processingErrorsBefore := scope.stats.Errors.Processing.Table
 			tableMetrics, err := s.collector.processTableData(ctx, collectionCtx, scope.stats)

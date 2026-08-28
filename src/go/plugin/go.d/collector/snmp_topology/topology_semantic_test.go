@@ -117,10 +117,9 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		}},
 	}}
 
-	mainObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-	}, pms[0])
+	mainObserver.ObserveProfile(acquisitionReportForMetrics(
+		0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, pms[0],
+	), pms[0])
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(collectedAt, freshFor, 1234)
 	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
@@ -147,10 +146,9 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		},
 	}}
 	vlanObserver := recorder.beginContext(1, "100", "users")
-	vlanObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-	}, vlanPMS[0])
+	vlanObserver.ObserveProfile(acquisitionReportForMetrics(
+		0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, vlanPMS[0],
+	), vlanPMS[0])
 	recorder.completeContext(1, successfulAcquisitionPhase())
 	applyTopologySemanticEvent(builder, topologySemanticEvent{
 		kind:     topologySemanticEventVLANContext,
@@ -219,10 +217,9 @@ func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {
 		}},
 	}}
 
-	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-		Outcome:  ddsnmpcollector.AcquisitionProfileOutcomePartial,
-	}, pms[0])
+	observer.ObserveProfile(acquisitionReportForMetrics(
+		0, ddsnmpcollector.AcquisitionProfileOutcomePartial, pms[0],
+	), pms[0])
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(collectedAt, time.Minute, 0)
 	capture := recorder.finish()
@@ -322,10 +319,9 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 		}}}}
 
 		applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
-		observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
-			Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-			Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-		}, pms[0])
+		observer.ObserveProfile(acquisitionReportForMetrics(
+			0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, pms[0],
+		), pms[0])
 		capture := recorder.finish()
 		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
 		require.Equal(t, diagnosticCaptureReasonProjectionError, capture.reason)
@@ -343,7 +339,10 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 			defaultTopologyAcquisitionLimits,
 		)
 		observer := recorder.beginContext(0, "", "")
-		recorder.projectProfile = func(*ddsnmp.ProfileMetrics) topologyAcquisitionProfileValues {
+		recorder.projectProfile = func(
+			ddsnmpcollector.AcquisitionProfileReport,
+			*ddsnmp.ProfileMetrics,
+		) topologyAcquisitionProfileValues {
 			panic("projection panic")
 		}
 
@@ -381,6 +380,55 @@ func completeTestTopologyAcquisitionEvidence(t *testing.T) *topologyAcquisitionA
 	capture := recorder.finish()
 	require.Equal(t, diagnosticCaptureAvailable, capture.state)
 	return capture.evidence
+}
+
+func acquisitionReportForMetrics(
+	ordinal uint32,
+	outcome ddsnmpcollector.AcquisitionProfileOutcome,
+	metrics *ddsnmp.ProfileMetrics,
+) ddsnmpcollector.AcquisitionProfileReport {
+	report := ddsnmpcollector.AcquisitionProfileReport{
+		Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: ordinal},
+		Outcome:  outcome,
+	}
+	if metrics == nil {
+		return report
+	}
+	if len(metrics.TopologyMetrics) > 0 {
+		routeOrdinal := uint32(len(report.Routes))
+		report.Routes = append(report.Routes, ddsnmpcollector.AcquisitionRouteReport{
+			Ordinal: routeOrdinal,
+			Kind:    ddsnmpcollector.AcquisitionRouteKindTopologyTable,
+			Outcome: ddsnmpcollector.AcquisitionRouteOutcomeValues,
+			Rows:    uint64(len(metrics.TopologyMetrics)),
+			Values:  uint64(len(metrics.TopologyMetrics)),
+		})
+		for rowOrdinal := range metrics.TopologyMetrics {
+			report.TopologyValueReferences = append(report.TopologyValueReferences,
+				ddsnmpcollector.AcquisitionValueReference{
+					RouteOrdinal: routeOrdinal,
+					RowOrdinal:   uint32(rowOrdinal),
+				})
+		}
+	}
+	if len(metrics.BGPRows) > 0 {
+		routeOrdinal := uint32(len(report.Routes))
+		report.Routes = append(report.Routes, ddsnmpcollector.AcquisitionRouteReport{
+			Ordinal: routeOrdinal,
+			Kind:    ddsnmpcollector.AcquisitionRouteKindBGPTable,
+			Outcome: ddsnmpcollector.AcquisitionRouteOutcomeValues,
+			Rows:    uint64(len(metrics.BGPRows)),
+			Values:  uint64(len(metrics.BGPRows)),
+		})
+		for rowOrdinal := range metrics.BGPRows {
+			report.BGPValueReferences = append(report.BGPValueReferences,
+				ddsnmpcollector.AcquisitionValueReference{
+					RouteOrdinal: routeOrdinal,
+					RowOrdinal:   uint32(rowOrdinal),
+				})
+		}
+	}
+	return report
 }
 
 func cloneTopologyAcquisitionEvidence(value *topologyAcquisitionAttemptEvidence) *topologyAcquisitionAttemptEvidence {

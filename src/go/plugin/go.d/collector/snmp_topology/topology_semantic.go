@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 type topologySemanticEventKind uint8
@@ -155,11 +156,18 @@ type topologyAcquisitionProfileValues struct {
 }
 
 type topologyAcquisitionMetricValue struct {
-	kind ddsnmp.TopologyKind
-	tags map[string]string
+	routeOrdinal uint32
+	rowOrdinal   uint32
+	valueOrdinal uint32
+	kind         ddsnmp.TopologyKind
+	tags         map[string]string
 }
 
 type topologyAcquisitionBGPRowValue struct {
+	routeOrdinal uint32
+	rowOrdinal   uint32
+	valueOrdinal uint32
+
 	originProfileID string
 	table           string
 	rowKey          string
@@ -192,14 +200,18 @@ type topologyAcquisitionBGPRowValue struct {
 func projectTopologyAcquisitionMetrics(
 	eventKind topologySemanticEventKind,
 	metrics []ddsnmp.Metric,
+	references []ddsnmpcollector.AcquisitionValueReference,
 ) []topologyAcquisitionMetricValue {
 	result := make([]topologyAcquisitionMetricValue, 0, len(metrics))
-	for _, metric := range metrics {
+	for i, metric := range metrics {
 		if !topologySemanticMetricConsumed(eventKind, metric.TopologyKind) {
 			continue
 		}
 		result = append(result, topologyAcquisitionMetricValue{
-			kind: metric.TopologyKind,
+			routeOrdinal: references[i].RouteOrdinal,
+			rowOrdinal:   references[i].RowOrdinal,
+			valueOrdinal: references[i].ValueOrdinal,
+			kind:         metric.TopologyKind,
 			tags: cloneTopologySemanticStringTags(
 				metric.Tags,
 				func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
@@ -209,10 +221,16 @@ func projectTopologyAcquisitionMetrics(
 	return result
 }
 
-func projectTopologyAcquisitionBGPRows(rows []ddsnmp.BGPRow) []topologyAcquisitionBGPRowValue {
+func projectTopologyAcquisitionBGPRows(
+	rows []ddsnmp.BGPRow,
+	references []ddsnmpcollector.AcquisitionValueReference,
+) []topologyAcquisitionBGPRowValue {
 	result := make([]topologyAcquisitionBGPRowValue, 0, len(rows))
-	for _, row := range rows {
+	for i, row := range rows {
 		result = append(result, topologyAcquisitionBGPRowValue{
+			routeOrdinal:    references[i].RouteOrdinal,
+			rowOrdinal:      references[i].RowOrdinal,
+			valueOrdinal:    references[i].ValueOrdinal,
 			originProfileID: row.OriginProfileID,
 			table:           row.Table,
 			rowKey:          row.RowKey,

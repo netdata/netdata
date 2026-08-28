@@ -112,7 +112,7 @@ type topologyAcquisitionRecorder struct {
 	recordCount    uint64
 	logicalBytes   uint64
 	evidence       *topologyAcquisitionAttemptEvidence
-	projectProfile func(*ddsnmp.ProfileMetrics) topologyAcquisitionProfileValues
+	projectProfile func(ddsnmpcollector.AcquisitionProfileReport, *ddsnmp.ProfileMetrics) topologyAcquisitionProfileValues
 }
 
 type topologyAcquisitionProfileObserver struct {
@@ -244,7 +244,7 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 		failurePhase: report.FailurePhase,
 		stats:        report.Stats,
 		routes:       report.Routes,
-		values:       o.recorder.projectProfile(metrics),
+		values:       o.recorder.projectProfile(report, metrics),
 	})
 }
 
@@ -262,6 +262,12 @@ func topologyAcquisitionProfileShape(
 	}
 	if profile == nil {
 		return records, logicalBytes, nil
+	}
+	if len(report.TopologyValueReferences) != len(profile.TopologyMetrics) {
+		return 0, 0, errors.New("topology acquisition value-reference count mismatch")
+	}
+	if len(report.BGPValueReferences) != len(profile.BGPRows) {
+		return 0, 0, errors.New("BGP acquisition value-reference count mismatch")
 	}
 	logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
 	logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
@@ -287,18 +293,25 @@ func topologyAcquisitionProfileShape(
 	return records, logicalBytes, nil
 }
 
-func projectTopologyAcquisitionProfileValues(profile *ddsnmp.ProfileMetrics) topologyAcquisitionProfileValues {
+func projectTopologyAcquisitionProfileValues(
+	report ddsnmpcollector.AcquisitionProfileReport,
+	profile *ddsnmp.ProfileMetrics,
+) topologyAcquisitionProfileValues {
 	if profile == nil {
 		return topologyAcquisitionProfileValues{}
 	}
 	result := topologyAcquisitionProfileValues{
-		metadata:  cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed),
-		tags:      cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed),
-		metrics:   projectTopologyAcquisitionMetrics(topologySemanticEventTopologyMetrics, profile.TopologyMetrics),
+		metadata: cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed),
+		tags:     cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed),
+		metrics: projectTopologyAcquisitionMetrics(
+			topologySemanticEventTopologyMetrics,
+			profile.TopologyMetrics,
+			report.TopologyValueReferences,
+		),
 		bgpFailed: profile.BGPCollectError != nil,
 	}
 	if !result.bgpFailed {
-		result.bgpRows = projectTopologyAcquisitionBGPRows(profile.BGPRows)
+		result.bgpRows = projectTopologyAcquisitionBGPRows(profile.BGPRows, report.BGPValueReferences)
 	}
 	return result
 }
@@ -360,7 +373,6 @@ type topologyAcquisitionUsage struct {
 	limits       topologyAcquisitionLimits
 	recordCount  uint64
 	logicalBytes uint64
-	projected    map[*topologyAcquisitionCapture]*topologyAcquisitionCapture
 }
 
 func newTopologyAcquisitionUsage(
@@ -382,7 +394,6 @@ func newTopologyAcquisitionUsage(
 		limits:       limits,
 		recordCount:  1 + rows,
 		logicalBytes: topologyDiagnosticCutLogicalBytes + rows*topologyDiagnosticRowLogicalBytes,
-		projected:    make(map[*topologyAcquisitionCapture]*topologyAcquisitionCapture),
 	}
 	for _, entry := range entries {
 		if selected[entry.RegistrationID] {
@@ -434,22 +445,14 @@ func (u *topologyAcquisitionUsage) include(capture *topologyAcquisitionCapture) 
 	if capture == nil || capture.state != diagnosticCaptureAvailable {
 		return capture
 	}
-	if projected, ok := u.projected[capture]; ok {
-		return projected
-	}
 	if u.recordCount > u.limits.maxRecords || capture.recordCount > u.limits.maxRecords-u.recordCount {
-		limited := limitTopologyAcquisitionCapture(capture, diagnosticCaptureReasonGlobalRecordLimit)
-		u.projected[capture] = limited
-		return limited
+		return limitTopologyAcquisitionCapture(capture, diagnosticCaptureReasonGlobalRecordLimit)
 	}
 	if u.logicalBytes > u.limits.maxLogicalBytes || capture.logicalBytes > u.limits.maxLogicalBytes-u.logicalBytes {
-		limited := limitTopologyAcquisitionCapture(capture, diagnosticCaptureReasonGlobalByteLimit)
-		u.projected[capture] = limited
-		return limited
+		return limitTopologyAcquisitionCapture(capture, diagnosticCaptureReasonGlobalByteLimit)
 	}
 	u.recordCount += capture.recordCount
 	u.logicalBytes += capture.logicalBytes
-	u.projected[capture] = capture
 	return capture
 }
 

@@ -212,9 +212,11 @@ only topology-consumer fields and typed `topology:` rows.
 
 `ddsnmpcollector` exposes an optional synchronous acquisition observer. When enabled, it emits one terminal report for
 each selected profile, including preparation or table failures. A stable profile ordinal and route digest identify the
-selected route structure, while compact route outcomes distinguish GET, walk, cache, missing, rejected, partial, and
-failed acquisition. Profile source paths, raw packets, decoded values, transform definitions, and error text are
-excluded. With no observer, report plans and report DTOs are not built.
+selected route structure. The report is bound to the collector's authoritative request graph, including synthetic table
+dependencies, and distinguishes processed, not-observed, empty, dependency-rejected, tag-rejected, partial, and failed
+acquisition. Compact route/row/value references join the synchronously borrowed topology and BGP results to the route
+that produced each value. Profile source paths, raw packets, copied decoded values, transform definitions, and error
+text are excluded. With no observer, report plans and report DTOs are not built.
 
 The standard capabilities have separate owners:
 
@@ -277,8 +279,9 @@ Ingestion is split by source area:
 Every completed device attempt retains a bounded acquisition envelope when projection succeeds. The envelope records its
 registration/attempt identity, target-resolution outcome and safe addresses, closed outcomes for the outer collection
 phases, and ordered main/VLAN collection contexts. Each context contains the collector's terminal per-profile route
-report and one immutable copy of the topology-consumer values needed for replay. Failed and no-profile attempts remain
-diagnostic; a successful attempt is also owned by the published device generation.
+report and one immutable copy of the topology-consumer values needed for replay. The report's child references preserve
+the producing route and local row/value position for each retained topology or BGP value. Failed and no-profile attempts
+remain diagnostic; a successful attempt is also owned by the published device generation.
 
 The live builder and the replay path share one ordered event dispatcher for system uptime, profile tags, topology rows,
 BGP rows, and successful VLAN-context rows. The retained values use positive per-event/per-topology-kind field

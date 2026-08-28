@@ -134,19 +134,19 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 	session := newTableCollectionSession(c.tableCollector, c.tableIdentity)
 	for _, profile := range prepared {
-		profile.regularScope = session.addScope(profile.state.profile, tableSymbolModeValue, &profile.metrics.Stats)
-		if profile.acquisition != nil {
-			profile.acquisition.bindTableRoutes(profile.regularScope, profile.acquisition.metricTableRoutes)
-		}
+		profile.regularScope = session.addObservedScope(
+			profile.state.profile,
+			tableSymbolModeValue,
+			&profile.metrics.Stats,
+			profile.acquisition.metricTableScope(),
+		)
 		if profile.topologyProfile != nil {
-			profile.topologyScope = session.addScope(
+			profile.topologyScope = session.addObservedScope(
 				profile.topologyProfile,
 				tableSymbolModePresence,
 				&profile.metrics.Stats,
+				profile.acquisition.topologyTableScope(),
 			)
-			if profile.acquisition != nil {
-				profile.acquisition.bindTableRoutes(profile.topologyScope, profile.acquisition.topologyTableRoutes)
-			}
 		}
 	}
 	session.resolve()

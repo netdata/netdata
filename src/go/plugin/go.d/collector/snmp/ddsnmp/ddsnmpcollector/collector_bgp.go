@@ -102,8 +102,10 @@ func (c *Collector) collectScalarBGPRows(
 
 		oids, missingOIDs := c.bgpScalarOIDs(cfg)
 		if route != nil {
-			if len(oids) > 0 || len(missingOIDs) > 0 {
+			if len(oids) > 0 {
 				route.Source = AcquisitionRouteSourceGET
+			} else if len(missingOIDs) > 0 {
+				route.Source = AcquisitionRouteSourceCache
 			}
 			if len(oids) == 0 && len(missingOIDs) > 0 {
 				route.Outcome = AcquisitionRouteOutcomeMissing
@@ -135,7 +137,7 @@ func (c *Collector) collectScalarBGPRows(
 			}
 		}
 
-		row, ok, err := c.buildScalarBGPRow(cfg, pdus)
+		row, ok, err := c.buildScalarBGPRow(cfg, pdus, route)
 		if err != nil {
 			if route != nil {
 				route.Outcome = AcquisitionRouteOutcomeRejected
@@ -148,6 +150,11 @@ func (c *Collector) collectScalarBGPRows(
 		}
 		if ok {
 			rows = append(rows, row)
+			if acquisition != nil && route != nil {
+				acquisition.bgpValueReferences = append(acquisition.bgpValueReferences, AcquisitionValueReference{
+					RouteOrdinal: route.Ordinal,
+				})
+			}
 		}
 		if route != nil && route.Outcome != AcquisitionRouteOutcomeFailed {
 			if route.Outcome == AcquisitionRouteOutcomeMissing && !ok {
@@ -234,8 +241,16 @@ func (c *Collector) collectTableBGPRows(
 			route.Rows = uint64(len(ctx.rows))
 		}
 
+		var rowOrdinal uint32
+		var dependencyRejected uint64
 		for rowIndex, rowPDUs := range ctx.rows {
-			row, ok, err := c.buildTableBGPRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
+			var rejected *uint64
+			if route != nil {
+				rejected = &route.Rejected
+			}
+			row, ok, err := c.buildTableBGPRow(
+				cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags, rejected, &dependencyRejected,
+			)
 			if err != nil {
 				if route != nil {
 					route.Rejected++
@@ -248,12 +263,20 @@ func (c *Collector) collectTableBGPRows(
 				rows = append(rows, row)
 				if route != nil {
 					route.Values++
+					acquisition.bgpValueReferences = append(acquisition.bgpValueReferences, AcquisitionValueReference{
+						RouteOrdinal: route.Ordinal,
+						RowOrdinal:   rowOrdinal,
+					})
 				}
 			} else if route != nil {
 				route.Rejected++
 			}
+			rowOrdinal++
 		}
 		if route != nil {
+			if dependencyRejected > 0 {
+				route.FailureClass = AcquisitionFailureClassDependency
+			}
 			setAcquisitionRouteCounts(route, route.Rows, route.Values, route.Rejected)
 		}
 	}
@@ -281,7 +304,11 @@ func (c *Collector) walkBGPTableDependencies(
 	return errors.Join(errs...)
 }
 
-func (c *Collector) buildScalarBGPRow(cfg ddprofiledefinition.BGPConfig, pdus map[string]gosnmp.SnmpPDU) (ddsnmp.BGPRow, bool, error) {
+func (c *Collector) buildScalarBGPRow(
+	cfg ddprofiledefinition.BGPConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	route *AcquisitionRouteReport,
+) (ddsnmp.BGPRow, bool, error) {
 	rowKey := scalarBGPRowKey(cfg)
 	row := ddsnmp.BGPRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -304,6 +331,10 @@ func (c *Collector) buildScalarBGPRow(cfg ddprofiledefinition.BGPConfig, pdus ma
 				continue
 			}
 			if err := c.scalarCollector.tagProc.processTag(tagCfg, pdus, ta); err != nil {
+				if route != nil {
+					route.Rejected++
+					route.FailureClass = AcquisitionFailureClassProcessing
+				}
 				c.log.Debugf("Error processing scalar BGP tag %s: %v", metricTagDisplayName(tagCfg), err)
 			}
 		}
@@ -327,6 +358,8 @@ func (c *Collector) buildTableBGPRow(
 	ctx *tableProcessingContext,
 	crossTableCtx *crossTableContext,
 	staticTags map[string]string,
+	rejected *uint64,
+	dependencyRejected *uint64,
 ) (ddsnmp.BGPRow, bool, error) {
 	rowTags := make(map[string]string)
 	rowData := &tableRowData{
@@ -338,14 +371,14 @@ func (c *Collector) buildTableBGPRow(
 	}
 	crossTableCtx.rowTags = rowData.tags
 	rowCtx := &tableRowProcessingContext{
-		config:        ctx.config,
-		columnOIDs:    ctx.columnOIDs,
-		crossTableCtx: crossTableCtx,
-		orderedTags:   ctx.orderedTags,
+		config:             ctx.config,
+		columnOIDs:         ctx.columnOIDs,
+		crossTableCtx:      crossTableCtx,
+		orderedTags:        ctx.orderedTags,
+		rejected:           rejected,
+		dependencyRejected: dependencyRejected,
 	}
-	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
-		c.log.Debugf("Error processing BGP row tags for %s: %v", rowIndex, err)
-	}
+	c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx)
 
 	row := ddsnmp.BGPRow{
 		OriginProfileID: cfg.OriginProfileID,

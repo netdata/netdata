@@ -157,7 +157,7 @@ func (sc *scalarCollector) processScalarMetricsObserved(
 			continue
 		}
 
-		metric, err := sc.processScalarMetric(cfg, pdus)
+		metric, err := sc.processScalarMetric(cfg, pdus, observer, i)
 		if err != nil {
 			if observer != nil {
 				observer.rejected(i)
@@ -188,7 +188,12 @@ func (sc *scalarCollector) processScalarMetricsObserved(
 }
 
 // processScalarMetric processes a single scalar metric configuration
-func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*ddsnmp.Metric, error) {
+func (sc *scalarCollector) processScalarMetric(
+	cfg ddprofiledefinition.MetricsConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	observer *acquisitionScalarObserver,
+	configIndex int,
+) (*ddsnmp.Metric, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		return nil, nil
@@ -212,6 +217,9 @@ func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsCo
 				continue
 			}
 			if err := sc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
+				if observer != nil {
+					observer.rejected(configIndex)
+				}
 				sc.log.Debugf("Error processing scalar tag '%s' for metric '%s': %v", tagCfg.Tag, cfg.Symbol.Name, err)
 			}
 		}

@@ -5,9 +5,11 @@ package snmptopology
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -228,6 +230,30 @@ func TestTopologyAcquisitionUsagePrioritizesRetainedSuccessOverLatestFailure(t *
 	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, states[1].latestAttempt.reason)
 	require.Nil(t, states[1].latestAttempt.evidence)
 	require.Equal(t, uint64(8), usage.recordCount)
+}
+
+func TestTopologyAcquisitionUsageDoesNotRetainGloballyRejectedCapture(t *testing.T) {
+	usage := topologyAcquisitionUsage{
+		limits: topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1},
+	}
+	rejected := &topologyAcquisitionCapture{
+		state:        diagnosticCaptureAvailable,
+		recordCount:  2,
+		logicalBytes: 2,
+		evidence:     &topologyAcquisitionAttemptEvidence{},
+	}
+	pointer := weak.Make(rejected)
+	limited := usage.include(rejected)
+	require.Equal(t, diagnosticCaptureLimitExceeded, limited.state)
+	require.Nil(t, limited.evidence)
+	rejected = nil
+
+	for range 3 {
+		runtime.GC()
+		runtime.Gosched()
+	}
+	require.Nil(t, pointer.Value(), "global admission retained the rejected full capture")
+	runtime.KeepAlive(usage)
 }
 
 func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T) {
