@@ -123,6 +123,7 @@ type AcquisitionRouteReport struct {
 	FailureClass AcquisitionFailureClass
 	Rows         uint64
 	Values       uint64
+	Missing      uint64
 	Rejected     uint64
 }
 
@@ -787,11 +788,18 @@ func setAcquisitionRouteCounts(route *AcquisitionRouteReport, rows, values, reje
 		if route.FailureClass == AcquisitionFailureClassNone {
 			route.FailureClass = AcquisitionFailureClassProcessing
 		}
+	case route.Missing > 0 && values > 0:
+		route.Outcome = AcquisitionRouteOutcomePartial
+		if route.FailureClass == AcquisitionFailureClassNone {
+			route.FailureClass = AcquisitionFailureClassDependency
+		}
 	case rejected > 0:
 		route.Outcome = AcquisitionRouteOutcomeRejected
 		if route.FailureClass == AcquisitionFailureClassNone {
 			route.FailureClass = AcquisitionFailureClassProcessing
 		}
+	case route.Missing > 0:
+		route.Outcome = AcquisitionRouteOutcomeMissing
 	case values > 0:
 		route.Outcome = AcquisitionRouteOutcomeValues
 	default:
@@ -878,7 +886,7 @@ func acquisitionProfileRouteDigest(profile *ddsnmp.Profile) [32]byte {
 		d.add("bgp")
 		d.add(string(row.Kind))
 		d.add(row.Table.OID)
-		ddprofiledefinition.ForEachBGPSignalValue(row, func(path string, value ddprofiledefinition.BGPValueConfig) {
+		forEachBGPValuePath(row, func(path string, value ddprofiledefinition.BGPValueConfig) {
 			d.add(path)
 			d.add(value.From)
 			d.add(value.Table)

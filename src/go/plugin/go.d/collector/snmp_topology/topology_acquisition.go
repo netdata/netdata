@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -194,8 +195,8 @@ func (r *topologyAcquisitionRecorder) beginContext(ordinal uint32, vlanID, vlanN
 	}
 	r.evidence.collectionContexts = append(r.evidence.collectionContexts, topologyAcquisitionContextEvidence{
 		ordinal:    ordinal,
-		vlanID:     vlanID,
-		vlanName:   vlanName,
+		vlanID:     strings.Clone(vlanID),
+		vlanName:   strings.Clone(vlanName),
 		client:     notObservedAcquisitionPhase(),
 		connect:    notObservedAcquisitionPhase(),
 		collection: notObservedAcquisitionPhase(),
@@ -237,6 +238,9 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 	if o.recorder.projectProfile == nil {
 		o.recorder.fail(diagnosticCaptureReasonProjectionError)
 		return
+	}
+	for i := range report.Routes {
+		report.Routes[i].RootOID = strings.Clone(report.Routes[i].RootOID)
 	}
 	context.profiles = append(context.profiles, topologyAcquisitionProfileEvidence{
 		identity:     report.Identity,

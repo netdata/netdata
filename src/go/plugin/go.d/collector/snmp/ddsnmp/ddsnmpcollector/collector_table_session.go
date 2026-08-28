@@ -525,7 +525,6 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			if len(req.config.Symbols) == 0 {
 				if acquisition != nil {
 					acquisition.processed = true
-					acquisition.rows = uint64(len(req.route.pdus))
 					acquisition.values = uint64(len(req.route.pdus))
 				}
 				if req.cacheEligible && !req.sharesRouteCache {

@@ -218,6 +218,11 @@ acquisition. Compact route/row/value references join the synchronously borrowed 
 that produced each value. Profile source paths, raw packets, copied decoded values, transform definitions, and error
 text are excluded. With no observer, report plans and report DTOs are not built.
 
+BGP evidence keeps one aggregate route per configured BGP row definition. Its digest covers every configured identity,
+descriptor, signal, tag source, and cross-table dependency; missing dependency inputs contribute to the aggregate route's
+missing count and partial/missing outcome. Synthetic table-dependency routes have no semantic rows, so they report zero
+rows and count the received dependency varbinds as values.
+
 The standard capabilities have separate owners:
 
 - `generic-device.yaml` and `generic-ups.yaml` extend
@@ -288,6 +293,9 @@ BGP rows, and successful VLAN-context rows. The retained values use positive per
 allowlists and are copied synchronously from the collector's borrowed result. They keep only metadata, tags, topology
 rows, and BGP fallback tags consumed by those builder operations. Non-VLAN rows in VLAN events, credentials, profile
 source paths, metric names, ordinary metric values, transform definitions, raw packets, and error text are not copied.
+Retained decoded strings are exact-sized copies so a small retained substring cannot keep a larger SNMP response buffer
+alive outside the logical-byte limit. Stable schema/profile tag keys may remain shared because they are not decoded
+response data and their owners outlive the capture.
 
 Acquisition capture has direct per-device record and logical-byte limits. Limit exhaustion, projection errors, or
 projection panics mark the attempt unavailable and release partial evidence without changing collection, builder

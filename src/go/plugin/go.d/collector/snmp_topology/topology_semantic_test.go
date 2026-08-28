@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
@@ -197,6 +200,97 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows[0].tags, "neighbor")
+}
+
+func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
+	backing := strings.Repeat("abcdefghijklmnopqrstuvwxyz", 1<<15)
+	value := func(offset int) string { return backing[offset : offset+8] }
+	input := topologySemanticDeviceInput{
+		hostname:    value(0),
+		sysName:     value(16),
+		vnodeLabels: map[string]string{value(32): value(48)},
+	}
+	pms := &ddsnmp.ProfileMetrics{
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			"vendor": {Value: value(64)},
+		},
+		Tags: map[string]string{
+			tagLldpLocSysName: value(80),
+		},
+		TopologyMetrics: []ddsnmp.Metric{{
+			TopologyKind: ddsnmp.KindIfName,
+			Tags: map[string]string{
+				tagTopoIfIndex: value(96),
+				tagTopoIfName:  value(112),
+			},
+		}},
+		BGPRows: []ddsnmp.BGPRow{{
+			OriginProfileID: value(128),
+			Table:           value(144),
+			RowKey:          value(160),
+			StructuralID:    value(176),
+			Kind:            ddprofiledefinition.BGPRowKindPeer,
+			Identity: ddsnmp.BGPIdentity{
+				Neighbor: value(192),
+				RemoteAS: value(208),
+			},
+			Descriptors: ddsnmp.BGPDescriptors{Description: value(224)},
+			Tags:        map[string]string{"neighbor": value(240)},
+		}},
+	}
+	report := acquisitionReportForMetrics(
+		0,
+		ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+		pms,
+	)
+	report.Routes[0].RootOID = value(256)
+
+	recorder := newTopologyAcquisitionRecorder(
+		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		input,
+		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		defaultTopologyAcquisitionLimits,
+	)
+	observer := recorder.beginContext(0, value(272), value(288))
+	observer.ObserveProfile(report, pms)
+	recorder.completeContext(0, successfulAcquisitionPhase())
+	capture := recorder.finish()
+	require.Equal(t, diagnosticCaptureAvailable, capture.state)
+	require.NotNil(t, capture.evidence)
+
+	context := capture.evidence.collectionContexts[0]
+	profile := context.profiles[0]
+	requireStringOutsideBacking(t, backing, capture.evidence.device.hostname)
+	requireStringOutsideBacking(t, backing, capture.evidence.device.sysName)
+	for key, retained := range capture.evidence.device.vnodeLabels {
+		requireStringOutsideBacking(t, backing, key)
+		requireStringOutsideBacking(t, backing, retained)
+	}
+	requireStringOutsideBacking(t, backing, context.vlanID)
+	requireStringOutsideBacking(t, backing, context.vlanName)
+	requireStringOutsideBacking(t, backing, profile.routes[0].RootOID)
+	requireStringOutsideBacking(t, backing, profile.values.metadata["vendor"].Value)
+	requireStringOutsideBacking(t, backing, profile.values.tags[tagLldpLocSysName])
+	requireStringOutsideBacking(t, backing, profile.values.metrics[0].tags[tagTopoIfIndex])
+	requireStringOutsideBacking(t, backing, profile.values.metrics[0].tags[tagTopoIfName])
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].originProfileID)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].table)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].rowKey)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].structuralID)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].neighbor)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].remoteAS)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].description)
+	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].tags["neighbor"])
+	runtime.KeepAlive(backing)
+}
+
+func requireStringOutsideBacking(t *testing.T, backing, retained string) {
+	t.Helper()
+	require.NotEmpty(t, retained)
+	start := uintptr(unsafe.Pointer(unsafe.StringData(backing)))
+	end := start + uintptr(len(backing))
+	pointer := uintptr(unsafe.Pointer(unsafe.StringData(retained)))
+	require.False(t, pointer >= start && pointer < end, "retained string aliases the source backing allocation")
 }
 
 func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {

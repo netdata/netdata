@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"maps"
 	"net/netip"
 	"path"
 	"slices"
@@ -231,26 +230,26 @@ func projectTopologyAcquisitionBGPRows(
 			routeOrdinal:    references[i].RouteOrdinal,
 			rowOrdinal:      references[i].RowOrdinal,
 			valueOrdinal:    references[i].ValueOrdinal,
-			originProfileID: row.OriginProfileID,
-			table:           row.Table,
-			rowKey:          row.RowKey,
-			structuralID:    row.StructuralID,
+			originProfileID: strings.Clone(row.OriginProfileID),
+			table:           strings.Clone(row.Table),
+			rowKey:          strings.Clone(row.RowKey),
+			structuralID:    strings.Clone(row.StructuralID),
 			kind:            row.Kind,
-			routingInstance: row.Identity.RoutingInstance,
-			neighbor:        row.Identity.Neighbor,
-			remoteAS:        row.Identity.RemoteAS,
-			localAddress:    row.Descriptors.LocalAddress,
-			localAS:         row.Descriptors.LocalAS,
-			localIdentifier: row.Descriptors.LocalIdentifier,
-			peerIdentifier:  row.Descriptors.PeerIdentifier,
-			peerType:        row.Descriptors.PeerType,
-			bgpVersion:      row.Descriptors.BGPVersion,
-			description:     row.Descriptors.Description,
+			routingInstance: strings.Clone(row.Identity.RoutingInstance),
+			neighbor:        strings.Clone(row.Identity.Neighbor),
+			remoteAS:        strings.Clone(row.Identity.RemoteAS),
+			localAddress:    strings.Clone(row.Descriptors.LocalAddress),
+			localAS:         strings.Clone(row.Descriptors.LocalAS),
+			localIdentifier: strings.Clone(row.Descriptors.LocalIdentifier),
+			peerIdentifier:  strings.Clone(row.Descriptors.PeerIdentifier),
+			peerType:        strings.Clone(row.Descriptors.PeerType),
+			bgpVersion:      strings.Clone(row.Descriptors.BGPVersion),
+			description:     strings.Clone(row.Descriptors.Description),
 			adminHas:        row.Admin.Enabled.Has,
 			adminEnabled:    row.Admin.Enabled.Value,
 			stateHas:        row.State.Has,
 			state:           row.State.State,
-			stateRaw:        row.State.Raw,
+			stateRaw:        strings.Clone(row.State.Raw),
 			establishedHas:  row.Connection.EstablishedUptime.Has,
 			established:     row.Connection.EstablishedUptime.Value,
 			updateAgeHas:    row.Connection.LastReceivedUpdateAge.Has,
@@ -277,7 +276,16 @@ func portableTopologySemanticOrigin(value string) bool {
 }
 
 func cloneTopologySemanticDeviceInput(value topologySemanticDeviceInput) topologySemanticDeviceInput {
-	value.vnodeLabels = maps.Clone(value.vnodeLabels)
+	value.hostname = strings.Clone(value.hostname)
+	value.sysObjectID = strings.Clone(value.sysObjectID)
+	value.sysName = strings.Clone(value.sysName)
+	value.sysDescr = strings.Clone(value.sysDescr)
+	value.sysContact = strings.Clone(value.sysContact)
+	value.sysLocation = strings.Clone(value.sysLocation)
+	value.vendor = strings.Clone(value.vendor)
+	value.model = strings.Clone(value.model)
+	value.vnodeGUID = strings.Clone(value.vnodeGUID)
+	value.vnodeLabels = cloneTopologySemanticStringMap(value.vnodeLabels)
 	return value
 }
 
@@ -333,7 +341,18 @@ func cloneTopologySemanticStringTags(values map[string]string, allowed func(stri
 		if result == nil {
 			result = make(map[string]string)
 		}
-		result[key] = value
+		result[key] = strings.Clone(value)
+	}
+	return result
+}
+
+func cloneTopologySemanticStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	result := make(map[string]string, len(values))
+	for key, value := range values {
+		result[strings.Clone(key)] = strings.Clone(value)
 	}
 	return result
 }
@@ -347,6 +366,7 @@ func cloneTopologySemanticMetaTags(values map[string]ddsnmp.MetaTag, allowed fun
 		if result == nil {
 			result = make(map[string]ddsnmp.MetaTag)
 		}
+		value.Value = strings.Clone(value.Value)
 		result[key] = value
 	}
 	return result

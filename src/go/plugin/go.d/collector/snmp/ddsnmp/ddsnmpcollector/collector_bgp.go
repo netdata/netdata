@@ -102,6 +102,7 @@ func (c *Collector) collectScalarBGPRows(
 
 		oids, missingOIDs := c.bgpScalarOIDs(cfg)
 		if route != nil {
+			route.Missing = uint64(len(missingOIDs))
 			if len(oids) > 0 {
 				route.Source = AcquisitionRouteSourceGET
 			} else if len(missingOIDs) > 0 {
@@ -132,6 +133,10 @@ func (c *Collector) collectScalarBGPRows(
 		}
 		if route != nil {
 			remainingOIDs, currentMissingOIDs := c.bgpScalarOIDs(cfg)
+			route.Missing = uint64(len(currentMissingOIDs))
+			if route.Missing > 0 {
+				route.FailureClass = AcquisitionFailureClassDependency
+			}
 			if len(remainingOIDs) == 0 && len(currentMissingOIDs) > 0 {
 				route.Outcome = AcquisitionRouteOutcomeMissing
 			}
@@ -1173,21 +1178,31 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 }
 
 func forEachBGPValue(cfg ddprofiledefinition.BGPConfig, fn func(ddprofiledefinition.BGPValueConfig)) {
-	fn(cfg.Identity.RoutingInstance)
-	fn(cfg.Identity.Neighbor)
-	fn(cfg.Identity.RemoteAS)
-	fn(cfg.Identity.AddressFamily.BGPValueConfig)
-	fn(cfg.Identity.SubsequentAddressFamily.BGPValueConfig)
-	fn(cfg.Descriptors.LocalAddress)
-	fn(cfg.Descriptors.LocalAS)
-	fn(cfg.Descriptors.LocalIdentifier)
-	fn(cfg.Descriptors.PeerIdentifier)
-	fn(cfg.Descriptors.PeerType)
-	fn(cfg.Descriptors.BGPVersion)
-	fn(cfg.Descriptors.Description)
-	ddprofiledefinition.ForEachBGPSignalValue(cfg, func(_ string, value ddprofiledefinition.BGPValueConfig) {
-		fn(value)
-	})
+	forEachBGPValuePath(cfg, func(_ string, value ddprofiledefinition.BGPValueConfig) { fn(value) })
+}
+
+func forEachBGPValuePath(
+	cfg ddprofiledefinition.BGPConfig,
+	fn func(string, ddprofiledefinition.BGPValueConfig),
+) {
+	add := func(path string, value ddprofiledefinition.BGPValueConfig) {
+		if value.IsSet() {
+			fn(path, value)
+		}
+	}
+	add("identity.routing_instance", cfg.Identity.RoutingInstance)
+	add("identity.neighbor", cfg.Identity.Neighbor)
+	add("identity.remote_as", cfg.Identity.RemoteAS)
+	add("identity.address_family", cfg.Identity.AddressFamily.BGPValueConfig)
+	add("identity.subsequent_address_family", cfg.Identity.SubsequentAddressFamily.BGPValueConfig)
+	add("descriptors.local_address", cfg.Descriptors.LocalAddress)
+	add("descriptors.local_as", cfg.Descriptors.LocalAS)
+	add("descriptors.local_identifier", cfg.Descriptors.LocalIdentifier)
+	add("descriptors.peer_identifier", cfg.Descriptors.PeerIdentifier)
+	add("descriptors.peer_type", cfg.Descriptors.PeerType)
+	add("descriptors.bgp_version", cfg.Descriptors.BGPVersion)
+	add("descriptors.description", cfg.Descriptors.Description)
+	ddprofiledefinition.ForEachBGPSignalValue(cfg, add)
 }
 
 func bgpValueSymbol(cfg ddprofiledefinition.BGPValueConfig) ddprofiledefinition.SymbolConfig {

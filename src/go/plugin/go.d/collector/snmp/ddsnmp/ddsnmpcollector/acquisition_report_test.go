@@ -377,6 +377,61 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 	assert.Equal(t, AcquisitionFailureClassTransport, routes[dependencyRouteOID].FailureClass)
 }
 
+func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	const oidBase = "1.3.6.1.4.1.99999.55"
+	dependency, source := crossTableDependencyTestConfigs(oidBase)
+	source.MetricTags = append(source.MetricTags, ddprofiledefinition.MetricTagConfig{
+		Tag:   "second_dependency_value",
+		Table: dependency.Table.Name,
+		Symbol: ddprofiledefinition.SymbolConfigCompat{
+			OID:  oidBase + ".2.2",
+			Name: "secondDependencyValue",
+		},
+	})
+	profile := &ddsnmp.Profile{
+		SourceFile: "topology-dependency-counts.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind:          ddsnmp.KindArpEntry,
+			MetricsConfig: source,
+		}}},
+	}
+	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.SnmpPDU{
+		createGauge32PDU(source.Symbols[0].OID+".1", 10),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependency.Table.OID, []gosnmp.SnmpPDU{
+		createGauge32PDU(oidBase+".2.1.1", 20),
+		createGauge32PDU(oidBase+".2.2.1", 30),
+		createGauge32PDU(oidBase+".2.1.2", 40),
+		createGauge32PDU(oidBase+".2.2.2", 50),
+	})
+
+	var report AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
+		}),
+	})
+	_, err := collector.Collect()
+	require.NoError(t, err)
+
+	require.Len(t, report.Routes, 2)
+	routes := make(map[string]AcquisitionRouteReport, len(report.Routes))
+	for _, route := range report.Routes {
+		routes[route.RootOID] = route
+	}
+	assert.Equal(t, AcquisitionRouteOutcomeValues, routes[dependency.Table.OID].Outcome)
+	assert.Zero(t, routes[dependency.Table.OID].Rows)
+	assert.Equal(t, uint64(4), routes[dependency.Table.OID].Values)
+}
+
 func TestCollector_AcquisitionObserverDoesNotReportUnprocessedFreshTableAsEmpty(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
@@ -691,6 +746,80 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 	assert.Equal(t, AcquisitionRouteOutcomeFailed, report.Routes[1].Outcome)
 	assert.Equal(t, AcquisitionFailureClassTransport, report.Routes[1].FailureClass)
 	assert.NotContains(t, report.String(), "private BGP timeout")
+}
+
+func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	const (
+		stateOID  = "1.3.6.1.4.1.99999.20.1.0"
+		uptimeOID = "1.3.6.1.4.1.99999.20.2.0"
+	)
+	expectSNMPGet(mockHandler, []string{stateOID, uptimeOID}, []gosnmp.SnmpPDU{
+		createNoSuchObjectPDU(stateOID),
+		createGauge32PDU(uptimeOID, 3600),
+	})
+	expectSNMPGet(mockHandler, []string{uptimeOID}, []gosnmp.SnmpPDU{
+		createGauge32PDU(uptimeOID, 3600),
+	})
+
+	profile := &ddsnmp.Profile{
+		SourceFile: "bgp-mixed-missing.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{
+			scalarBGPTestConfig(),
+		}},
+	}
+	var reports []AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			reports = append(reports, value)
+		}),
+	})
+	for range 2 {
+		metrics, err := collector.Collect()
+		require.NoError(t, err)
+		require.Len(t, metrics, 1)
+		require.Len(t, metrics[0].BGPRows, 1)
+	}
+
+	require.Len(t, reports, 2)
+	for _, report := range reports {
+		require.Len(t, report.Routes, 1)
+		assert.Equal(t, AcquisitionRouteSourceGET, report.Routes[0].Source)
+		assert.Equal(t, AcquisitionRouteOutcomePartial, report.Routes[0].Outcome)
+		assert.Equal(t, AcquisitionFailureClassDependency, report.Routes[0].FailureClass)
+		assert.Equal(t, uint64(1), report.Routes[0].Missing)
+		assert.Equal(t, uint64(1), report.Routes[0].Values)
+	}
+}
+
+func TestAcquisitionProfileRouteDigestIncludesAllBGPValueSources(t *testing.T) {
+	tests := map[string]func(*ddprofiledefinition.BGPConfig){
+		"identity": func(cfg *ddprofiledefinition.BGPConfig) {
+			cfg.Identity.RemoteAS.Symbol.OID = "1.3.6.1.4.1.99999.90.1"
+		},
+		"descriptor": func(cfg *ddprofiledefinition.BGPConfig) {
+			cfg.Descriptors.Description.Symbol.OID = "1.3.6.1.4.1.99999.90.2"
+		},
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			base := scalarBGPTestConfig()
+			changed := base.Clone()
+			mutate(&changed)
+			baseProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{base},
+			}}
+			changedProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{changed},
+			}}
+			assert.NotEqual(t, acquisitionProfileRouteDigest(baseProfile), acquisitionProfileRouteDigest(changedProfile))
+		})
+	}
 }
 
 func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *testing.T) {
