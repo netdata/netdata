@@ -226,6 +226,37 @@ adaptation_contracts:
       - the threshold is explicit deployment policy rather than a universal source threshold
       - failed or skipped requests do not raise a second latency incident
       - the alert is silent until the operator enables and tunes the objective
+  s3check_multisite_phase_failure:
+    preserved:
+      - categorical inability to write, verify, reconcile, delete, or clean an explicitly configured route
+      - explicit source-site and destination-site identity
+      - dedicated payload-mismatch alert remains separate and non-duplicated
+    differences:
+      - endpoint, credential, reconciliation, cleanup, and restart failures notify by default
+      - RPO and delete-policy outcomes use their separate silent objectives
+      - raw provider errors, credentials, endpoints, request IDs, and payloads are never labels
+  s3check_multisite_payload_mismatch:
+    preserved:
+      - categorical correctness failure when a configured destination returns a different object
+      - explicit source-site and destination-site identity
+      - cleanup of both probe objects before a new directional probe starts
+    differences:
+      - client-visible payload digest is used instead of daemon replication success counters
+      - raw provider errors, credentials, endpoints, request IDs, and payloads are never labels
+  s3check_multisite_rpo:
+    preserved:
+      - source-write to destination-visibility objective for one explicit replication direction
+      - operator-selected RPO policy and silent default routing
+    differences:
+      - visibility is measured by an authenticated destination GET rather than sync telemetry
+      - polling spans bounded collection cycles and is abandoned at replication_timeout_ms
+  s3check_multisite_delete_propagation:
+    preserved:
+      - source-delete to destination-disappearance objective
+      - operator-selected policy and silent default routing
+    differences:
+      - the destination copy is explicitly removed after delete_timeout_ms so a probe cannot leak
+      - disabling verify_delete skips propagation measurement but never skips cleanup
 
 alerts:
   ceph_health_error:
@@ -2570,6 +2601,62 @@ netdata_extensions:
     condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
     recipient: silent
     adaptation: s3check_latency_objective
+
+  rgw_multisite_phase_failed:
+    sow_id: RGW-M-05
+    reason: active multisite phase request, reconciliation, cleanup, or restart failure
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_phase_failure
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $failed
+    units: status
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: sysadmin
+    adaptation: s3check_multisite_phase_failure
+
+  rgw_multisite_payload_mismatch:
+    sow_id: RGW-M-11
+    reason: destination payload digest differs from the source probe payload
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_payload_mismatch
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $mismatch
+    units: status
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: sysadmin
+    adaptation: s3check_multisite_payload_mismatch
+
+  rgw_multisite_replication_rpo_breach:
+    sow_id: RGW-S-24
+    reason: source-write to destination-visibility exceeds the configured directional RPO
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_rpo_status
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $breached
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: silent
+    adaptation: s3check_multisite_rpo
+
+  rgw_multisite_delete_propagation_breach:
+    sow_id: RGW-S-25
+    reason: source-delete to destination-disappearance exceeds the configured objective
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_delete_status
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $breached
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: silent
+    adaptation: s3check_multisite_delete_propagation
 
   rgw_tls_certificate_expiring:
     sow_id: RGW-S-01

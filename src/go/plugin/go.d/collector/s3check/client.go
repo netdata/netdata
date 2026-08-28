@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -16,9 +17,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
+	"github.com/aws/smithy-go"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
+
+type s3OperationReport struct {
+	operations int
+	attempts   int
+}
 
 type s3Client interface {
 	GetBucketVersioning(ctx context.Context, bucket string) (string, int, error)
@@ -26,16 +32,33 @@ type s3Client interface {
 	GetObject(ctx context.Context, bucket, key string, maxBytes int64) ([]byte, int, error)
 	ListObjects(ctx context.Context, bucket, prefix string, maxKeys int32) ([]string, bool, int, error)
 	DeleteObject(ctx context.Context, bucket, key string) (int, error)
-	ObjectExists(ctx context.Context, bucket, key string) (bool, int, error)
+	ObjectExists(ctx context.Context, bucket, key string) (bool, s3OperationReport, error)
 }
 
 func newAWSS3Client(cfg Config) (*http.Client, s3Client, error) {
+	endpoint := endpointConfig{
+		Endpoint:        cfg.Endpoint,
+		Region:          cfg.Region,
+		Bucket:          cfg.Bucket,
+		Prefix:          cfg.Prefix,
+		AccessKeyID:     cfg.AccessKeyID,
+		SecretAccessKey: cfg.SecretAccessKey,
+		SessionToken:    cfg.SessionToken,
+		PathStyle:       cfg.PathStyle,
+		ClientConfig:    cfg.ClientConfig,
+	}
+	return newAWSS3ClientForEndpoint(endpoint, cfg.MaxRetries)
+}
+
+func newAWSS3ClientForEndpoint(cfg endpointConfig, maxRetries int) (*http.Client, s3Client, error) {
 	httpClient, err := web.NewHTTPClient(cfg.ClientConfig)
 	if err != nil {
-		return nil, nil, err
+		// The shared helper can echo a malformed proxy URL, including inline proxy
+		// credentials. Return a bounded generic error instead.
+		return nil, nil, errors.New("invalid S3 HTTP transport configuration")
 	}
 
-	retryer := newCountingBoundedRetryer(cfg.MaxRetries + 1)
+	retryer := newCountingBoundedRetryer(maxRetries + 1)
 	awsConfig := aws.Config{
 		Region:      cfg.Region,
 		Credentials: credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, cfg.SessionToken),
@@ -50,7 +73,10 @@ func newAWSS3Client(cfg Config) (*http.Client, s3Client, error) {
 		options.BaseEndpoint = aws.String(endpoint)
 		options.UsePathStyle = cfg.PathStyle
 	})
-	return httpClient, &awsS3Client{client: client, retryer: retryer}, nil
+	return httpClient, &awsS3Client{
+		client:  client,
+		retryer: retryer,
+	}, nil
 }
 
 func newCountingBoundedRetryer(maxAttempts int) *countingRetryer {
@@ -58,7 +84,9 @@ func newCountingBoundedRetryer(maxAttempts int) *countingRetryer {
 		options.MaxAttempts = maxAttempts
 		options.MaxBackoff = maxRetryBackoff
 	})
-	return &countingRetryer{RetryerV2: standard}
+	return &countingRetryer{
+		RetryerV2: standard,
+	}
 }
 
 type countingRetryer struct {
@@ -106,7 +134,9 @@ type awsS3Client struct {
 
 func (c *awsS3Client) GetBucketVersioning(ctx context.Context, bucket string) (string, int, error) {
 	c.retryer.reset()
-	out, err := c.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: aws.String(bucket)})
+	out, err := c.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
+		Bucket: aws.String(bucket),
+	})
 	if err != nil {
 		return "", c.attemptCount(), err
 	}
@@ -173,9 +203,9 @@ func (c *awsS3Client) DeleteObject(ctx context.Context, bucket, key string) (int
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		if isNotFoundError(err) {
+		if isNoSuchKeyError(err) {
 			// An already-absent object is the desired cleanup state. Some S3-compatible
-			// services report 404 where Amazon S3 returns a successful idempotent delete.
+			// services report NoSuchKey where Amazon S3 returns a successful idempotent delete.
 			return c.attemptCount(), nil
 		}
 		return c.attemptCount(), err
@@ -183,19 +213,30 @@ func (c *awsS3Client) DeleteObject(ctx context.Context, bucket, key string) (int
 	return c.attemptCount(), nil
 }
 
-func (c *awsS3Client) ObjectExists(ctx context.Context, bucket, key string) (bool, int, error) {
+func (c *awsS3Client) ObjectExists(ctx context.Context, bucket, key string) (bool, s3OperationReport, error) {
 	c.retryer.reset()
 	_, err := c.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
 	if err == nil {
-		return true, c.attemptCount(), nil
+		return true, s3OperationReport{operations: 1, attempts: c.attemptCount()}, nil
 	}
-	if isNotFoundError(err) {
-		return false, c.attemptCount(), nil
+	headAttempts := c.attemptCount()
+	if !isObjectAbsentError(err) {
+		return false, s3OperationReport{operations: 1, attempts: headAttempts}, err
 	}
-	return false, c.attemptCount(), err
+	// A HEAD 404 can also mean the bucket or route disappeared. Verify the bucket
+	// before treating it as proof that this object is absent.
+	status, bucketAttempts, bucketErr := c.GetBucketVersioning(ctx, bucket)
+	report := s3OperationReport{operations: 2, attempts: headAttempts + bucketAttempts}
+	if bucketErr != nil {
+		return false, report, bucketErr
+	}
+	if status != "" {
+		return false, report, fmt.Errorf("bucket versioning status %q is unsupported during cleanup", status)
+	}
+	return false, report, nil
 }
 
 func (c *awsS3Client) attemptCount() int {
@@ -205,18 +246,23 @@ func (c *awsS3Client) attemptCount() int {
 	return 1
 }
 
-func isNotFoundError(err error) bool {
+func isNoSuchKeyError(err error) bool {
 	var noSuchKey *types.NoSuchKey
 	if errors.As(err, &noSuchKey) {
 		return true
 	}
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchKey"
+}
+
+func isObjectAbsentError(err error) bool {
+	if isNoSuchKeyError(err) {
+		return true
+	}
 	var notFound *types.NotFound
-	if errors.As(err, &notFound) {
-		return true
-	}
-	var responseErr *smithyhttp.ResponseError
-	if errors.As(err, &responseErr) && responseErr.HTTPStatusCode() == http.StatusNotFound {
-		return true
-	}
-	return false
+	return errors.As(err, &notFound)
+}
+
+func newAWSS3ClientFromDestination(cfg DestinationConfig, maxRetries int) (*http.Client, s3Client, error) {
+	return newAWSS3ClientForEndpoint(destinationEndpointConfig(cfg), maxRetries)
 }

@@ -97,10 +97,10 @@ func TestAWSS3ClientUsesSigV4AndPathStyleRequests(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, deleteAttempts)
 
-	exists, headAttempts, err := client.ObjectExists(ctx, cfg.Bucket, cfg.Prefix+"probe.bin")
+	exists, headReport, err := client.ObjectExists(ctx, cfg.Bucket, cfg.Prefix+"probe.bin")
 	require.NoError(t, err)
 	assert.True(t, exists)
-	assert.Equal(t, 1, headAttempts)
+	assert.Equal(t, s3OperationReport{operations: 1, attempts: 1}, headReport)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -177,7 +177,11 @@ func TestAWSS3ClientAccountsAttemptCancelledDuringRetryBackoff(t *testing.T) {
 }
 
 func TestAWSS3ClientTreatsHead404AsMissingObject(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "versioning") {
+			writeXML(w, `<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></VersioningConfiguration>`)
+			return
+		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
@@ -187,10 +191,10 @@ func TestAWSS3ClientTreatsHead404AsMissingObject(t *testing.T) {
 	_, client, err := newAWSS3Client(cfg)
 	require.NoError(t, err)
 
-	exists, attempts, err := client.ObjectExists(context.Background(), cfg.Bucket, cfg.Prefix+"probe.bin")
+	exists, report, err := client.ObjectExists(context.Background(), cfg.Bucket, cfg.Prefix+"probe.bin")
 	require.NoError(t, err)
 	assert.False(t, exists)
-	assert.Equal(t, 1, attempts)
+	assert.Equal(t, s3OperationReport{operations: 2, attempts: 2}, report)
 }
 
 type capturedRequest struct {
@@ -213,4 +217,73 @@ func requestMethods(requests []capturedRequest) []string {
 		out[i] = request.method
 	}
 	return out
+}
+
+func TestAWSS3ClientUsesDestinationCredentialsAndPathStyle(t *testing.T) {
+	var request capturedRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		request = capturedRequest{
+			method:        r.Method,
+			path:          r.URL.Path,
+			authorization: r.Header.Get("Authorization"),
+			date:          r.Header.Get("X-Amz-Date"),
+			contentSHA256: r.Header.Get("X-Amz-Content-Sha256"),
+		}
+		_ = body
+		_, _ = w.Write([]byte("destination-payload"))
+	}))
+	defer server.Close()
+
+	destination := validMultisiteTestConfig().Destination
+	destination.Endpoint = server.URL
+	_, client, err := newAWSS3ClientFromDestination(*destination, defaultMaxRetries)
+	require.NoError(t, err)
+
+	payload, attempts, err := client.GetObject(context.Background(), destination.Bucket, destination.Prefix+"probe.bin", 20)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("destination-payload"), payload)
+	assert.Equal(t, 1, attempts)
+	assert.Equal(t, http.MethodGet, request.method)
+	assert.True(t, strings.HasPrefix(request.path, "/"+destination.Bucket+"/"), request.path)
+	assert.Contains(t, request.authorization, "AWS4-HMAC-SHA256 Credential=test-destination-access-key-id/")
+	assert.NotContains(t, request.authorization, "test-destination-secret-access-key")
+}
+
+func TestAWSS3ClientTreatsPlain404AsRequestFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	cfg := validTestConfig()
+	cfg.Endpoint = server.URL
+	_, client, err := newAWSS3Client(cfg)
+	require.NoError(t, err)
+
+	_, _, err = client.GetObject(context.Background(), cfg.Bucket, cfg.Prefix+"probe.bin", 2)
+	require.Error(t, err)
+	assert.False(t, isNoSuchKeyError(err))
+}
+
+func TestAWSS3ClientRejectsVersionedBucketDuringAbsenceProof(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.RawQuery, "versioning") {
+			writeXML(w, `<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	cfg := validTestConfig()
+	cfg.Endpoint = server.URL
+	_, client, err := newAWSS3Client(cfg)
+	require.NoError(t, err)
+
+	exists, report, err := client.ObjectExists(context.Background(), cfg.Bucket, cfg.Prefix+"probe.bin")
+	require.Error(t, err)
+	assert.False(t, exists)
+	assert.Equal(t, s3OperationReport{operations: 2, attempts: 2}, report)
+	assert.Contains(t, err.Error(), "versioning status")
 }

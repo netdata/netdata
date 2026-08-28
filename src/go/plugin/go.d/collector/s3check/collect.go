@@ -28,6 +28,7 @@ const (
 	stageCleanup stageID = "cleanup"
 
 	stateOK      stageState = "ok"
+	stateWaiting stageState = "waiting"
 	stateFailed  stageState = "failed"
 	stateSkipped stageState = "skipped"
 
@@ -39,6 +40,7 @@ const (
 	reasonPayloadMismatch      = "payload_mismatch"
 	reasonNotVisible           = "not_visible"
 	reasonStillPresent         = "still_present"
+	reasonQuarantinePending    = "quarantine_pending"
 	reasonOrphanCleanupPending = "orphan_cleanup_pending"
 )
 
@@ -91,13 +93,17 @@ func (r *stageResult) fail(reason string) {
 }
 
 func (r *stageResult) addOperation(attempts int) {
-	if attempts <= 0 {
+	r.addOperations(1, attempts)
+}
+
+func (r *stageResult) addOperations(operations, attempts int) {
+	if operations <= 0 || attempts <= 0 {
 		return
 	}
+	r.operations += operations
 	r.attempts += attempts
-	r.operations++
-	if attempts > 1 {
-		r.retries += attempts - 1
+	if attempts > operations {
+		r.retries += attempts - operations
 	}
 }
 
@@ -119,10 +125,43 @@ func readRandomBytes(size int) ([]byte, error) {
 }
 
 func (c *Collector) collect(ctx context.Context, results stageResults) {
-	if !c.cleanupInterruptedObject(ctx, results) {
+	cycleStartedAt := c.now()
+	if c.stateStore == nil {
+		results[stageSetup].fail(reasonInternal)
 		return
 	}
-	if !c.prepareCollection(ctx, results) {
+	if c.pendingOwnershipState == nil {
+		state, stateErr := c.stateStore.load()
+		if stateErr != nil {
+			results[stageSetup].fail(reasonInternal)
+			return
+		}
+		c.pendingOwnershipState = state
+	}
+	reconciliationResumed := false
+	if c.pendingOwnershipState != nil {
+		if err := c.touchOwnership(); err != nil {
+			results[stageSetup].fail(reasonInternal)
+			return
+		}
+		if c.pendingOwnershipState.ReconciliationPending {
+			if !c.resumeSingleReconciliation(ctx, results) {
+				return
+			}
+			reconciliationResumed = true
+			if c.pendingOwnershipState != nil && !c.cleanupOwnedSingleState(ctx, results) {
+				return
+			}
+		} else if !c.cleanupOwnedSingleState(ctx, results) {
+			return
+		}
+	}
+	if c.pendingOwnershipState == nil && !reconciliationResumed {
+		if !c.prepareCollection(ctx, results) {
+			return
+		}
+	}
+	if !c.verifySingleBucketUnversioned(ctx, results[stageSetup]) {
 		return
 	}
 
@@ -132,9 +171,23 @@ func (c *Collector) collect(ctx context.Context, results stageResults) {
 	}
 	payloadHash := sha256.Sum256(payload)
 
-	c.currentKey = key
-	c.objectMayExist = true
-	c.cleanupCompleted = false
+	state := &ownershipState{
+		Phase:              string(multisiteSourcePut),
+		SourceKey:          key,
+		CreatedAt:          cycleStartedAt,
+		SourcePutAttempted: true,
+	}
+	if err := c.reserveOwnershipPublication(); err != nil {
+		results[stageSetup].fail(publicationFailureReason(err))
+		return
+	}
+	saveErr := c.saveOwnership(state)
+	c.releaseOwnershipHandoff()
+	if saveErr != nil {
+		results[stageSetup].fail(reasonInternal)
+		return
+	}
+	c.pendingOwnershipState = state
 
 	if !c.putProbe(ctx, key, payload, results) {
 		c.deleteAndVerify(ctx, key, results)
@@ -151,27 +204,19 @@ func (c *Collector) collect(ctx context.Context, results stageResults) {
 	c.deleteAndVerify(ctx, key, results)
 }
 
-func (c *Collector) cleanupInterruptedObject(ctx context.Context, results stageResults) bool {
-	if c.currentKey == "" || !c.objectMayExist {
-		return true
-	}
-
-	ok := c.cleanupStage(ctx, c.currentKey, results)
-	c.finishPendingSetup(results)
-	if ok {
-		c.currentKey = ""
-		c.objectMayExist = false
-		c.cleanupCompleted = true
-	}
-	return false
-}
-
 func (c *Collector) prepareCollection(ctx context.Context, results stageResults) bool {
-	// Reconcile the dedicated prefix before every new write. A timed-out PUT can
-	// commit after an immediate cleanup check; the next cycle's LIST therefore has
-	// to remain eligible instead of relying on a once-per-process orphan scan.
+	// As with multisite, a keyless blocker is durable before the first LIST. A
+	// request failure or crash cannot expose the old owner namespace to a route
+	// replacement before reconciliation proves it safe.
+	if !c.rememberSingleReconciliationBlocker(results) {
+		return false
+	}
+
+	// Reconciliation is owner-scoped. Another Agent or job may intentionally
+	// probe the same namespace without surrendering its active objects.
+	probePrefix := c.stateStore.sourceProbePrefix
 	start := c.now()
-	keys, truncated, attempts, err := c.client.ListObjects(ctx, c.Bucket, c.Prefix, maxCleanupListKeys)
+	keys, truncated, attempts, err := c.client.ListObjects(ctx, c.Bucket, probePrefix, maxOwnedKeys+1)
 	elapsed := c.now().Sub(start)
 	setup := results[stageSetup]
 	setup.duration += elapsed
@@ -183,24 +228,150 @@ func (c *Collector) prepareCollection(ctx context.Context, results stageResults)
 
 	probeKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
-		if isProbeKey(c.Prefix, key) {
+		if isProbeKey(probePrefix, key) {
 			probeKeys = append(probeKeys, key)
 		}
 	}
-	if len(probeKeys) == 0 && !truncated {
+	if truncated || len(probeKeys) > maxOwnedKeys {
+		setup.fail(reasonInternal)
+		return false
+	}
+	if !c.publishSingleReconciliation(c.pendingOwnershipState, probeKeys, results) {
+		return false
+	}
+	if c.pendingOwnershipState == nil {
 		setup.succeed()
 		return true
 	}
 
-	batch := probeKeys
-	if len(batch) > cleanupBatchSize {
-		batch = batch[:cleanupBatchSize]
+	if !c.cleanupOwnedKeyBatch(ctx, results, cleanupBatchSize) {
+		return false
 	}
-	for _, key := range batch {
-		start = c.now()
-		attempts, err = c.client.DeleteObject(ctx, c.Bucket, key)
-		elapsed = c.now().Sub(start)
-		cleanup := results[stageCleanup]
+	results[stageCleanup].succeed()
+	c.finishPendingSetup(results)
+	return false
+}
+
+func (c *Collector) resumeSingleReconciliation(ctx context.Context, results stageResults) bool {
+	probePrefix := c.stateStore.sourceProbePrefix
+	start := c.now()
+	keys, truncated, attempts, err := c.client.ListObjects(ctx, c.Bucket, probePrefix, maxOwnedKeys+1)
+	elapsed := c.now().Sub(start)
+	setup := results[stageSetup]
+	setup.duration += elapsed
+	setup.addOperation(attempts)
+	if err != nil {
+		setup.fail(errorReason(err))
+		return false
+	}
+
+	probeKeys := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if isProbeKey(probePrefix, key) {
+			probeKeys = append(probeKeys, key)
+		}
+	}
+	if truncated || len(probeKeys) > maxOwnedKeys {
+		setup.fail(reasonInternal)
+		return false
+	}
+	return c.publishSingleReconciliation(c.pendingOwnershipState, probeKeys, results)
+}
+
+func (c *Collector) rememberSingleReconciliationBlocker(results stageResults) bool {
+	if err := c.reserveOwnershipPublication(); err != nil {
+		results[stageSetup].fail(publicationFailureReason(err))
+		return false
+	}
+	defer c.releaseOwnershipHandoff()
+
+	state := &ownershipState{
+		Phase: string(multisiteCleanup), CreatedAt: c.now(), ReconciliationPending: true,
+	}
+	if err := c.saveOwnership(state); err != nil {
+		results[stageSetup].fail(reasonInternal)
+		return false
+	}
+	c.pendingOwnershipState = state
+	return true
+}
+
+func (c *Collector) publishSingleReconciliation(
+	existing *ownershipState, keys []string, results stageResults,
+) bool {
+	if err := c.reserveOwnershipPublication(); err != nil {
+		results[stageSetup].fail(publicationFailureReason(err))
+		return false
+	}
+	defer c.releaseOwnershipHandoff()
+
+	state := &ownershipState{
+		Phase: string(multisiteCleanup), CreatedAt: c.now(), TerminalReason: reasonOrphanCleanupPending,
+	}
+	if existing != nil {
+		state = existing.clone()
+		state.ReconciliationPending = false
+		state.RetiredAt = nil
+		state.TerminalReason = reasonOrphanCleanupPending
+	}
+	exactKeysFit := true
+	for _, key := range keys {
+		owned := ownedKey{Scope: ownershipSingle, Key: key}
+		if state.ownsKey(owned) {
+			continue
+		}
+		if len(state.PendingKeys) >= maxOwnedKeys {
+			exactKeysFit = false
+			break
+		}
+		state.PendingKeys = append(state.PendingKeys, owned)
+	}
+	if !exactKeysFit {
+		results[stageSetup].fail(reasonInternal)
+		return false
+	}
+
+	if len(state.PendingKeys) == 0 {
+		if existing == nil {
+			return true
+		}
+		if err := c.stateStore.clear(); err != nil {
+			results[stageSetup].fail(reasonInternal)
+			return false
+		}
+		c.pendingOwnershipState = nil
+		results[stageSetup].succeed()
+		return true
+	}
+
+	if err := c.saveOwnership(state); err != nil {
+		results[stageSetup].fail(reasonInternal)
+		return false
+	}
+	c.pendingOwnershipState = state
+	return true
+}
+
+func (c *Collector) cleanupOwnedKeyBatch(ctx context.Context, results stageResults, limit int) bool {
+	original := c.pendingOwnershipState
+	cleanup := results[stageCleanup]
+	if original == nil || len(original.PendingKeys) == 0 {
+		return true
+	}
+
+	count := min(limit, len(original.PendingKeys))
+	for range count {
+		// Each durable transition starts from the last persisted key set. Never
+		// mutate the live clone across multiple keys before another save/clear.
+		state := c.pendingOwnershipState.clone()
+		owned := state.PendingKeys[0]
+		if !c.verifySingleBucketUnversioned(ctx, results[stageCleanup]) {
+			c.finishPendingSetup(results)
+			return false
+		}
+		start := c.now()
+		attempts, err := c.client.DeleteObject(ctx, c.Bucket, owned.Key)
+		elapsed := c.now().Sub(start)
 		cleanup.duration += elapsed
 		cleanup.addOperation(attempts)
 		if err != nil {
@@ -208,10 +379,175 @@ func (c *Collector) prepareCollection(ctx context.Context, results stageResults)
 			c.finishPendingSetup(results)
 			return false
 		}
+
+		start = c.now()
+		exists, report, err := c.client.ObjectExists(ctx, c.Bucket, owned.Key)
+		elapsed = c.now().Sub(start)
+		cleanup.duration += elapsed
+		cleanup.addOperations(report.operations, report.attempts)
+		if err != nil {
+			cleanup.fail(errorReason(err))
+			return false
+		}
+		if exists {
+			cleanup.fail(reasonStillPresent)
+			return false
+		}
+		state.removeOwnedKey(owned)
+		if state.hasActiveObject() || len(state.PendingKeys) > 0 {
+			if err := c.saveOwnership(state); err != nil {
+				cleanup.fail(reasonInternal)
+				return false
+			}
+			c.pendingOwnershipState = state
+			continue
+		}
+		if err := c.stateStore.clear(); err != nil {
+			cleanup.fail(reasonInternal)
+			return false
+		}
+		c.pendingOwnershipState = nil
+		break
 	}
-	results[stageCleanup].succeed()
+	cleanup.succeed()
+	return true
+}
+
+func (c *Collector) cleanupOwnedSingleState(ctx context.Context, results stageResults) bool {
+	original := c.pendingOwnershipState
+	if original == nil {
+		return true
+	}
+	if original.ReconciliationPending {
+		results[stageCleanup].state = stateWaiting
+		results[stageCleanup].reason = reasonReconciliationPending
+		return false
+	}
+	state := original.clone()
+
+	if state.SourceKey != "" {
+		if !c.cleanupStage(ctx, state.SourceKey, results) {
+			c.finishPendingSetup(results)
+			return false
+		}
+
+		// The journal may be the only witness of a DELETE that completed just
+		// before a restart. Retain its exact key through one quarantine interval so
+		// a delayed PUT commit cannot bypass the owner-prefix recheck.
+		owned := ownedKey{Scope: ownershipSingle, Key: state.SourceKey}
+		if !state.ownsKey(owned) {
+			if len(state.PendingKeys) >= maxOwnedKeys {
+				results[stageCleanup].fail(reasonInternal)
+				return false
+			}
+			state.PendingKeys = append(state.PendingKeys, owned)
+		}
+		if state.QuarantinedAt == nil {
+			quarantinedAt := state.CreatedAt
+			state.QuarantinedAt = &quarantinedAt
+		}
+		state.SourceKey = ""
+		state.PayloadDigest = ""
+		if err := c.saveOwnership(state); err != nil {
+			results[stageCleanup].fail(reasonInternal)
+			return false
+		}
+		c.pendingOwnershipState = state
+		c.finishPendingSetup(results)
+		return false
+	}
+
+	if len(state.PendingKeys) > 0 {
+		if state.QuarantinedAt != nil {
+			if c.now().Sub(*state.QuarantinedAt) < time.Duration(c.UpdateEvery)*time.Second {
+				setup := results[stageSetup]
+				setup.state = stateSkipped
+				setup.reason = reasonQuarantinePending
+				return false
+			}
+			if !c.refreshSinglePendingKeys(ctx, results) {
+				return false
+			}
+			if c.pendingOwnershipState == nil {
+				return true
+			}
+			c.finishPendingSetup(results)
+		}
+		if !c.cleanupOwnedKeyBatch(ctx, results, cleanupBatchSize) {
+			return false
+		}
+	}
+
+	if c.pendingOwnershipState == nil {
+		return false
+	}
 	c.finishPendingSetup(results)
 	return false
+}
+
+func (c *Collector) refreshSinglePendingKeys(ctx context.Context, results stageResults) bool {
+	original := c.pendingOwnershipState
+	if original == nil {
+		return true
+	}
+	start := c.now()
+	keys, truncated, attempts, err := c.client.ListObjects(ctx, c.Bucket, c.stateStore.sourceProbePrefix, maxOwnedKeys+1)
+	elapsed := c.now().Sub(start)
+	setup := results[stageSetup]
+	setup.duration += elapsed
+	setup.addOperation(attempts)
+	if err != nil {
+		setup.fail(errorReason(err))
+		return false
+	}
+
+	if truncated {
+		setup.fail(reasonInternal)
+		return false
+	}
+
+	state := original.clone()
+	state.PendingKeys = nil
+	for _, key := range keys {
+		if isProbeKey(c.stateStore.sourceProbePrefix, key) {
+			state.PendingKeys = append(state.PendingKeys, ownedKey{Scope: ownershipSingle, Key: key})
+		}
+	}
+	if len(state.PendingKeys) == 0 && !truncated {
+		if err := c.stateStore.clear(); err != nil {
+			results[stageCleanup].fail(reasonInternal)
+			return false
+		}
+		c.pendingOwnershipState = nil
+		return true
+	}
+	if len(state.PendingKeys) > maxOwnedKeys {
+		results[stageSetup].fail(reasonInternal)
+		return false
+	}
+	if err := c.saveOwnership(state); err != nil {
+		results[stageSetup].fail(reasonInternal)
+		return false
+	}
+	c.pendingOwnershipState = state
+	return true
+}
+
+func (c *Collector) verifySingleBucketUnversioned(ctx context.Context, result *stageResult) bool {
+	start := c.now()
+	status, attempts, err := c.client.GetBucketVersioning(ctx, c.Bucket)
+	elapsed := c.now().Sub(start)
+	result.duration += elapsed
+	result.addOperation(attempts)
+	if err != nil {
+		result.fail(errorReason(err))
+		return false
+	}
+	if status != "" {
+		result.fail(reasonRequestFailed)
+		return false
+	}
+	return true
 }
 
 func (c *Collector) finishPendingSetup(results stageResults) {
@@ -243,11 +579,14 @@ func (c *Collector) newProbeKey() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%sprobe-%d-%s.bin", c.Prefix, c.now().UnixNano(), hex.EncodeToString(suffix)), nil
+	ownerTag := c.stateStore.ownerTag
+	name := fmt.Sprintf("probe-%d-%s-%s.bin", c.now().UnixNano(), hex.EncodeToString(suffix), ownerTag)
+	return c.stateStore.sourceProbePrefix + name, nil
 }
 
 func isProbeKey(prefix, key string) bool {
-	return strings.HasPrefix(key, prefix) && probeKeyRE.MatchString(strings.TrimPrefix(key, prefix))
+	base, valid := strings.CutPrefix(key, prefix)
+	return valid && multisiteProbeKeyRE.MatchString(base)
 }
 
 func (c *Collector) putProbe(ctx context.Context, key string, payload []byte, results stageResults) bool {
@@ -286,7 +625,7 @@ func (c *Collector) getProbe(ctx context.Context, key string, payload []byte, pa
 
 func (c *Collector) listProbe(ctx context.Context, key string, results stageResults) bool {
 	start := c.now()
-	keys, _, attempts, err := c.client.ListObjects(ctx, c.Bucket, c.Prefix, 100)
+	keys, _, attempts, err := c.client.ListObjects(ctx, c.Bucket, c.stateStore.sourceProbePrefix, 100)
 	result := results[stageList]
 	result.duration += c.now().Sub(start)
 	result.addOperation(attempts)
@@ -305,9 +644,13 @@ func (c *Collector) listProbe(ctx context.Context, key string, results stageResu
 }
 
 func (c *Collector) deleteAndVerify(ctx context.Context, key string, results stageResults) {
+	result := results[stageDelete]
+	if !c.verifySingleBucketUnversioned(ctx, result) {
+		return
+	}
+
 	start := c.now()
 	attempts, err := c.client.DeleteObject(ctx, c.Bucket, key)
-	result := results[stageDelete]
 	result.duration += c.now().Sub(start)
 	result.addOperation(attempts)
 	if err != nil {
@@ -316,21 +659,53 @@ func (c *Collector) deleteAndVerify(ctx context.Context, key string, results sta
 		result.succeed()
 	}
 
-	if !c.cleanupStage(ctx, key, results) {
+	if !c.verifyObjectGone(ctx, key, results) {
 		return
 	}
-	c.currentKey = ""
-	c.objectMayExist = false
-	c.cleanupCompleted = true
+	if state := c.pendingOwnershipState; state != nil && state.SourceKey == key {
+		updated := state.clone()
+		updated.SourceKey = ""
+		updated.PayloadDigest = ""
+		owned := ownedKey{Scope: ownershipSingle, Key: key}
+		if !updated.ownsKey(owned) {
+			updated.PendingKeys = append(updated.PendingKeys, owned)
+		}
+		updated.QuarantinedAt = &updated.CreatedAt
+		if err := c.saveOwnership(updated); err != nil {
+			results[stageCleanup].fail(reasonInternal)
+			return
+		}
+		c.pendingOwnershipState = updated
+	}
+}
+
+func (c *Collector) verifyObjectGone(ctx context.Context, key string, results stageResults) bool {
+	result := results[stageCleanup]
+	start := c.now()
+	exists, report, err := c.client.ObjectExists(ctx, c.Bucket, key)
+	result.duration += c.now().Sub(start)
+	result.addOperations(report.operations, report.attempts)
+	if err != nil {
+		result.fail(errorReason(err))
+		return false
+	}
+	if exists {
+		// A still-present object is retried on a later collection cycle, keeping
+		// the destructive operation budget bounded.
+		result.fail(reasonStillPresent)
+		return false
+	}
+	result.succeed()
+	return true
 }
 
 func (c *Collector) cleanupStage(ctx context.Context, key string, results stageResults) bool {
 	result := results[stageCleanup]
 
 	start := c.now()
-	exists, attempts, err := c.client.ObjectExists(ctx, c.Bucket, key)
+	exists, report, err := c.client.ObjectExists(ctx, c.Bucket, key)
 	result.duration += c.now().Sub(start)
-	result.addOperation(attempts)
+	result.addOperations(report.operations, report.attempts)
 	if err != nil {
 		result.fail(errorReason(err))
 		return false
@@ -341,7 +716,20 @@ func (c *Collector) cleanupStage(ctx context.Context, key string, results stageR
 	}
 
 	start = c.now()
-	attempts, err = c.client.DeleteObject(ctx, c.Bucket, key)
+	status, versionAttempts, versionErr := c.client.GetBucketVersioning(ctx, c.Bucket)
+	result.duration += c.now().Sub(start)
+	result.addOperation(versionAttempts)
+	if versionErr != nil {
+		result.fail(errorReason(versionErr))
+		return false
+	}
+	if status != "" {
+		result.fail(reasonRequestFailed)
+		return false
+	}
+
+	start = c.now()
+	attempts, err := c.client.DeleteObject(ctx, c.Bucket, key)
 	result.duration += c.now().Sub(start)
 	result.addOperation(attempts)
 	if err != nil {
@@ -350,37 +738,21 @@ func (c *Collector) cleanupStage(ctx context.Context, key string, results stageR
 	}
 
 	start = c.now()
-	exists, attempts, err = c.client.ObjectExists(ctx, c.Bucket, key)
+	exists, report, err = c.client.ObjectExists(ctx, c.Bucket, key)
 	result.duration += c.now().Sub(start)
-	result.addOperation(attempts)
+	result.addOperations(report.operations, report.attempts)
 	if err != nil {
 		result.fail(errorReason(err))
 		return false
 	}
 	if exists {
+		// Retry on the next collection cycle. A same-cycle retry would double the
+		// destructive budget and cannot distinguish slow DELETE propagation yet.
 		result.fail(reasonStillPresent)
 		return false
 	}
 	result.succeed()
 	return true
-}
-
-func (c *Collector) ensureObjectGone(ctx context.Context, key string) error {
-	exists, _, err := c.client.ObjectExists(ctx, c.Bucket, key)
-	if err != nil || !exists {
-		return err
-	}
-	if _, err = c.client.DeleteObject(ctx, c.Bucket, key); err != nil {
-		return err
-	}
-	exists, _, err = c.client.ObjectExists(ctx, c.Bucket, key)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return errors.New("probe object still exists")
-	}
-	return nil
 }
 
 func errorReason(err error) string {
