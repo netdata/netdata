@@ -10,8 +10,117 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
+
+type benchmarkTopologySNMPHandler struct {
+	gosnmp.Handler
+	pdus []gosnmp.SnmpPDU
+}
+
+func (h *benchmarkTopologySNMPHandler) Version() gosnmp.SnmpVersion {
+	return gosnmp.Version2c
+}
+
+func (h *benchmarkTopologySNMPHandler) BulkWalkAll(string) ([]gosnmp.SnmpPDU, error) {
+	return h.pdus, nil
+}
+
+func (h *benchmarkTopologySNMPHandler) MaxOids() int {
+	return 4096
+}
+
+func benchmarkTopologyProfile(ordinal int) *ddsnmp.Profile {
+	tableOID := fmt.Sprintf("1.3.6.1.4.1.99999.%d", ordinal+1)
+	return &ddsnmp.Profile{
+		SourceFile: fmt.Sprintf("benchmark-topology-%d.yaml", ordinal+1),
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{
+				{
+					Kind: ddsnmp.KindIfName,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  tableOID,
+							Name: fmt.Sprintf("benchmarkTable%d", ordinal+1),
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{
+								OID:  tableOID + ".1",
+								Name: fmt.Sprintf("benchmark_value_%d", ordinal+1),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
+	for _, profileCount := range []int{1, 4} {
+		profiles := make([]*ddsnmp.Profile, 0, profileCount)
+		for i := range profileCount {
+			profiles = append(profiles, benchmarkTopologyProfile(i))
+		}
+		cfg := Config{
+			SnmpClient: &benchmarkTopologySNMPHandler{},
+			Profiles:   profiles,
+			Log:        logger.New(),
+		}
+
+		b.Run(fmt.Sprintf("profiles=%d", profileCount), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				collector := New(cfg)
+				runtime.KeepAlive(collector)
+			}
+		})
+	}
+}
+
+func BenchmarkCollector_CollectTopologyRows(b *testing.B) {
+	const columnOID = "1.3.6.1.4.1.99999.1.1"
+
+	for _, rowCount := range []int{0, 256, 4096} {
+		pdus := make([]gosnmp.SnmpPDU, 0, rowCount)
+		for i := range rowCount {
+			oid := fmt.Sprintf("%s.%d", columnOID, i+1)
+			pdus = append(pdus, createGauge32PDU(oid, uint(i+1)))
+		}
+		collector := New(Config{
+			SnmpClient: &benchmarkTopologySNMPHandler{pdus: pdus},
+			Profiles:   []*ddsnmp.Profile{benchmarkTopologyProfile(0)},
+			Log:        logger.New(),
+		})
+
+		results, err := collector.Collect()
+		topologyCount := -1
+		if len(results) == 1 {
+			topologyCount = len(results[0].TopologyMetrics)
+		}
+		if err != nil || topologyCount != rowCount {
+			b.Fatalf("warmup collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
+		}
+
+		b.Run(fmt.Sprintf("rows=%d", rowCount), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ReportMetric(float64(rowCount), "rows/op")
+			b.ResetTimer()
+			for b.Loop() {
+				results, err := collector.Collect()
+				topologyCount := -1
+				if len(results) == 1 {
+					topologyCount = len(results[0].TopologyMetrics)
+				}
+				if err != nil || topologyCount != rowCount {
+					b.Fatalf("collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
+				}
+				runtime.KeepAlive(results)
+			}
+		})
+	}
+}
 
 func BenchmarkTableCollector_OrganizeRowsByCacheEligibility(b *testing.B) {
 	const (
