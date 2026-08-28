@@ -143,7 +143,7 @@ func (s *tableCollectionSession) addObservedScope(
 	prof *ddsnmp.Profile,
 	mode tableSymbolMode,
 	stats *ddsnmp.CollectionStats,
-	acquisition *acquisitionTableScope,
+	acquisition *acquisitionTopologyTableScope,
 ) *tableCollectionScope {
 	scope := &tableCollectionScope{
 		profileSource:  prof.SourceFile,

@@ -283,35 +283,22 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 	assert.NotEqual(t, digestA, digestChangedRoute)
 }
 
-func TestCollector_AcquisitionObserverReportsPartialTableCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
-	defer ctrl.Finish()
+func TestAcquisitionProfileRouteDigestIgnoresOrdinaryMetrics(t *testing.T) {
+	profile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+		Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind: ddsnmp.KindArpEntry,
+			MetricsConfig: ddprofiledefinition.MetricsConfig{
+				Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3", Name: "topologyValue"},
+			},
+		}},
+	}}
 
-	profile := profileWithTwoTableMetrics()
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.2.2", nil)
-	expectSNMPWalkError(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", errors.New("private transport detail"))
+	want := acquisitionProfileRouteDigest(profile)
+	profile.Definition.Metrics = []ddprofiledefinition.MetricsConfig{{
+		Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.4", Name: "ordinaryValue"},
+	}}
 
-	var reports []AcquisitionProfileReport
-	collector := New(Config{
-		SnmpClient: mockHandler,
-		Profiles:   []*ddsnmp.Profile{profile},
-		Log:        logger.New(),
-		InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-			reports = append(reports, report)
-		}),
-	})
-
-	metrics, err := collector.Collect()
-	require.NoError(t, err)
-	require.Len(t, metrics, 1)
-	require.Len(t, reports, 1)
-	require.Len(t, reports[0].Routes, 2)
-	assert.Equal(t, AcquisitionProfileOutcomePartial, reports[0].Outcome)
-	assert.Equal(t, AcquisitionRouteOutcomeEmpty, reports[0].Routes[0].Outcome)
-	assert.Equal(t, AcquisitionRouteSourceWalk, reports[0].Routes[0].Source)
-	assert.Equal(t, AcquisitionRouteOutcomeFailed, reports[0].Routes[1].Outcome)
-	assert.Equal(t, AcquisitionFailureClassTransport, reports[0].Routes[1].FailureClass)
-	assert.NotContains(t, reports[0].String(), "private transport detail")
+	assert.Equal(t, want, acquisitionProfileRouteDigest(profile))
 }
 
 func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t *testing.T) {
@@ -480,7 +467,7 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 	assert.Zero(t, dependencyRoute.Values)
 }
 
-func TestCollector_AcquisitionObserverDoesNotReportUnprocessedFreshTableAsEmpty(t *testing.T) {
+func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTableFails(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
@@ -521,10 +508,12 @@ func TestCollector_AcquisitionObserverDoesNotReportUnprocessedFreshTableAsEmpty(
 	_, err := collector.Collect()
 	require.Error(t, err)
 
-	require.Len(t, report.Routes, 2)
-	assert.Equal(t, AcquisitionRouteOutcomeFailed, report.Routes[0].Outcome)
-	assert.Equal(t, AcquisitionRouteSourceWalk, report.Routes[1].Source)
-	assert.Equal(t, AcquisitionRouteOutcomeNotObserved, report.Routes[1].Outcome)
+	assert.Equal(t, AcquisitionProfileOutcomeFailed, report.Outcome)
+	assert.Equal(t, AcquisitionFailurePhaseTables, report.FailurePhase)
+	require.Len(t, report.Routes, 1)
+	assert.Equal(t, topologyTableOID, report.Routes[0].RootOID)
+	assert.Equal(t, AcquisitionRouteSourceWalk, report.Routes[0].Source)
+	assert.Equal(t, AcquisitionRouteOutcomeNotObserved, report.Routes[0].Outcome)
 }
 
 func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *testing.T) {
@@ -586,12 +575,12 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 	defer ctrl.Finish()
 
 	const oid = "1.3.6.1.4.1.99999.80.0"
-	first := createTestProfile("a-current.yaml", []ddprofiledefinition.MetricsConfig{{
+	first := acquisitionTopologyTestProfile("a-current.yaml", ddprofiledefinition.MetricsConfig{
 		Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "currentMissing"},
-	}})
-	second := createTestProfile("b-inherited.yaml", []ddprofiledefinition.MetricsConfig{{
+	})
+	second := acquisitionTopologyTestProfile("b-inherited.yaml", ddprofiledefinition.MetricsConfig{
 		Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "inheritedMissing"},
-	}})
+	})
 	expectSNMPGet(mockHandler, []string{oid}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(oid)})
 
 	var reports []AcquisitionProfileReport
@@ -614,14 +603,14 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 }
 
 func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGET(t *testing.T) {
-	t.Run("metric scalar", func(t *testing.T) {
+	t.Run("topology scalar", func(t *testing.T) {
 		ctrl, mockHandler := setupMockHandler(t)
 		defer ctrl.Finish()
 
 		const oid = "1.3.6.1.4.1.99999.40.1.0"
-		profile := createTestProfile("metric-scalar.yaml", []ddprofiledefinition.MetricsConfig{{
+		profile := acquisitionTopologyTestProfile("topology-scalar.yaml", ddprofiledefinition.MetricsConfig{
 			Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "missingMetric"},
-		}})
+		})
 		expectSNMPGet(mockHandler, []string{oid}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(oid)})
 
 		var report AcquisitionProfileReport
@@ -674,69 +663,6 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 		assert.Equal(t, AcquisitionRouteOutcomeMissing, report.Routes[0].Outcome)
 		assert.Zero(t, report.Routes[0].Rejected)
 		assert.Equal(t, AcquisitionRouteSourceGET, report.Routes[0].Source)
-	})
-}
-
-func TestCollector_AcquisitionObserverReportsWalkedAndRejectedTables(t *testing.T) {
-	const (
-		tableOID  = "1.3.6.1.4.1.99999.3"
-		columnOID = tableOID + ".1.1"
-		rowOID    = columnOID + ".7"
-	)
-
-	t.Run("walked", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
-		defer ctrl.Finish()
-		profile := createTestProfile("cached.yaml", []ddprofiledefinition.MetricsConfig{{
-			Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: "cacheTable"},
-			Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
-		}})
-		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{createGauge32PDU(rowOID, 1)})
-
-		var report AcquisitionProfileReport
-		collector := New(Config{
-			SnmpClient: mockHandler,
-			Profiles:   []*ddsnmp.Profile{profile},
-			Log:        logger.New(),
-			InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				report = value
-			}),
-		})
-		_, err := collector.Collect()
-		require.NoError(t, err)
-
-		require.Len(t, report.Routes, 1)
-		assert.Equal(t, AcquisitionRouteSourceWalk, report.Routes[0].Source)
-		assert.Equal(t, AcquisitionRouteOutcomeValues, report.Routes[0].Outcome)
-		assert.Equal(t, uint64(1), report.Routes[0].Rows)
-	})
-
-	t.Run("rejected", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
-		defer ctrl.Finish()
-		profile := createTestProfile("rejected.yaml", []ddprofiledefinition.MetricsConfig{{
-			Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: "rejectedTable"},
-			Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
-		}})
-		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{createStringPDU(rowOID, "not-a-number")})
-
-		var report AcquisitionProfileReport
-		collector := New(Config{
-			SnmpClient: mockHandler,
-			Profiles:   []*ddsnmp.Profile{profile},
-			Log:        logger.New(),
-			InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				report = value
-			}),
-		})
-		_, err := collector.Collect()
-		require.NoError(t, err)
-
-		require.Len(t, report.Routes, 1)
-		assert.Equal(t, AcquisitionProfileOutcomePartial, report.Outcome)
-		assert.Equal(t, AcquisitionRouteOutcomeRejected, report.Routes[0].Outcome)
-		assert.Equal(t, uint64(1), report.Routes[0].Rows)
-		assert.Equal(t, uint64(1), report.Routes[0].Rejected)
 	})
 }
 
@@ -1067,4 +993,14 @@ func acquisitionRoutesByKind(routes []AcquisitionRouteReport) map[AcquisitionRou
 		result[route.Kind] = route
 	}
 	return result
+}
+
+func acquisitionTopologyTestProfile(source string, config ddprofiledefinition.MetricsConfig) *ddsnmp.Profile {
+	return &ddsnmp.Profile{
+		SourceFile: source,
+		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind:          ddsnmp.KindArpEntry,
+			MetricsConfig: config,
+		}}},
+	}
 }

@@ -41,7 +41,7 @@ func (sc *scalarCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.Collectio
 func (sc *scalarCollector) collectObserved(
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
-	observer *acquisitionScalarObserver,
+	observer *acquisitionTopologyScalarObserver,
 ) ([]ddsnmp.Metric, error) {
 	oids, missingOIDs := sc.identifyScalarOIDs(prof.Definition.Metrics)
 	if observer != nil {
@@ -147,7 +147,7 @@ func (sc *scalarCollector) processScalarMetricsObserved(
 	configs []ddprofiledefinition.MetricsConfig,
 	pdus map[string]gosnmp.SnmpPDU,
 	stats *ddsnmp.CollectionStats,
-	observer *acquisitionScalarObserver,
+	observer *acquisitionTopologyScalarObserver,
 ) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 	var errs []error
@@ -191,7 +191,7 @@ func (sc *scalarCollector) processScalarMetricsObserved(
 func (sc *scalarCollector) processScalarMetric(
 	cfg ddprofiledefinition.MetricsConfig,
 	pdus map[string]gosnmp.SnmpPDU,
-	observer *acquisitionScalarObserver,
+	observer *acquisitionTopologyScalarObserver,
 	configIndex int,
 ) (*ddsnmp.Metric, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]

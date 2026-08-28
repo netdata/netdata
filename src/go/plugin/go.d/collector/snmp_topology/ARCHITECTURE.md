@@ -212,9 +212,11 @@ only topology-consumer fields and typed `topology:` rows.
 
 `ddsnmpcollector` exposes an optional synchronous acquisition observer. When enabled, it emits one terminal report for
 each selected profile, including preparation or table failures. A stable profile ordinal and route digest identify the
-configured logical acquisition units and distinguishes processed, not-observed, empty, dependency-rejected,
-tag-rejected, partial, and failed acquisition. Shared canonical WALKs remain a transport optimization: each logical unit
-keeps its configured root and counts only varbinds below that root. Compact route/row/value references join the
+configured logical acquisition units and distinguish processed, not-observed, empty, dependency-rejected,
+tag-rejected, partial, and failed acquisition. Reports cover topology rows, BGP rows, profile tags, and metadata used by
+the topology consumer; ordinary metric rows remain live collector inputs but are not diagnostic routes. Shared canonical
+WALKs remain a transport optimization: each logical unit keeps its configured root and counts only varbinds below that
+root. Compact route/row/value references join the
 synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
 reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
 definitions, and error text are excluded. With no observer, profile digests, route reports, and value references are not

@@ -49,8 +49,6 @@ const (
 	AcquisitionRouteKindUnknown AcquisitionRouteKind = iota
 	AcquisitionRouteKindProfileTagScalar
 	AcquisitionRouteKindMetadataScalar
-	AcquisitionRouteKindMetricScalar
-	AcquisitionRouteKindMetricTable
 	AcquisitionRouteKindTopologyScalar
 	AcquisitionRouteKindTopologyTable
 	AcquisitionRouteKindBGPScalar
@@ -135,8 +133,6 @@ func (r AcquisitionProfileReport) String() string {
 type acquisitionProfileCollection struct {
 	identity                AcquisitionProfileIdentity
 	routes                  []AcquisitionRouteReport
-	metricScalarRoutes      []int
-	metricTableRoutes       map[int]int
 	topologyScalarRoutes    []int
 	topologyTableRoutes     map[int]int
 	bgpRoutes               []int
@@ -156,7 +152,6 @@ type acquisitionTableBinding struct {
 type acquisitionTableObservation struct {
 	collection         *acquisitionProfileCollection
 	routeOrdinal       uint32
-	retainValues       bool
 	processed          bool
 	rows               uint64
 	values             uint64
@@ -164,14 +159,13 @@ type acquisitionTableObservation struct {
 	dependencyRejected uint64
 }
 
-type acquisitionTableScope struct {
+type acquisitionTopologyTableScope struct {
 	collection   *acquisitionProfileCollection
 	routeIndexes map[int]int
-	retainValues bool
 }
 
 func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, count int) {
-	if o == nil || !o.retainValues || o.collection == nil {
+	if o == nil || o.collection == nil {
 		return
 	}
 	for valueOrdinal := range count {
@@ -183,10 +177,9 @@ func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, coun
 	}
 }
 
-type acquisitionScalarObserver struct {
+type acquisitionTopologyScalarObserver struct {
 	collection   *acquisitionProfileCollection
 	routeIndexes []int
-	valueRefs    *[]AcquisitionValueReference
 }
 
 type acquisitionGlobalTagObserver struct {
@@ -205,7 +198,7 @@ type acquisitionMetadataRoute struct {
 	field      ddprofiledefinition.MetadataField
 }
 
-func (o *acquisitionScalarObserver) start(
+func (o *acquisitionTopologyScalarObserver) start(
 	configs []ddprofiledefinition.MetricsConfig,
 	missingOIDs map[string]bool,
 ) {
@@ -231,7 +224,7 @@ func (o *acquisitionScalarObserver) start(
 	}
 }
 
-func (o *acquisitionScalarObserver) failUnfinished(class AcquisitionFailureClass) {
+func (o *acquisitionTopologyScalarObserver) failUnfinished(class AcquisitionFailureClass) {
 	if o == nil {
 		return
 	}
@@ -245,30 +238,26 @@ func (o *acquisitionScalarObserver) failUnfinished(class AcquisitionFailureClass
 	}
 }
 
-func (o *acquisitionScalarObserver) rejected(index int) {
+func (o *acquisitionTopologyScalarObserver) rejected(index int) {
 	if route := o.route(index); route != nil {
 		setAcquisitionScalarRouteRejected(route)
 	}
 }
 
-func (o *acquisitionScalarObserver) value(index int) {
+func (o *acquisitionTopologyScalarObserver) value(index int) {
 	if route := o.route(index); route != nil {
 		setAcquisitionScalarRouteValue(route)
-		if o.valueRefs != nil {
-			o.collection.addValueReference(o.valueRefs, AcquisitionValueReference{
-				RouteOrdinal: route.Ordinal,
-			})
-		}
+		o.collection.addTopologyValueReference(AcquisitionValueReference{RouteOrdinal: route.Ordinal})
 	}
 }
 
-func (o *acquisitionScalarObserver) empty(index int) {
+func (o *acquisitionTopologyScalarObserver) empty(index int) {
 	if route := o.route(index); route != nil && route.Outcome == AcquisitionRouteOutcomeNotObserved {
 		route.Outcome = AcquisitionRouteOutcomeEmpty
 	}
 }
 
-func (o *acquisitionScalarObserver) route(configIndex int) *AcquisitionRouteReport {
+func (o *acquisitionTopologyScalarObserver) route(configIndex int) *AcquisitionRouteReport {
 	if o == nil || configIndex < 0 || configIndex >= len(o.routeIndexes) {
 		return nil
 	}
@@ -459,21 +448,11 @@ func newAcquisitionProfileCollection(
 		return collection
 	}
 	def := profile.Definition
-	collection.metricScalarRoutes, collection.metricTableRoutes = collection.addMetricRoutes(
-		def.Metrics,
-		AcquisitionRouteKindMetricScalar,
-		AcquisitionRouteKindMetricTable,
-	)
-
 	topologyMetrics := make([]ddprofiledefinition.MetricsConfig, 0, len(def.Topology))
 	for _, cfg := range def.Topology {
 		topologyMetrics = append(topologyMetrics, cfg.MetricsConfig)
 	}
-	collection.topologyScalarRoutes, collection.topologyTableRoutes = collection.addMetricRoutes(
-		topologyMetrics,
-		AcquisitionRouteKindTopologyScalar,
-		AcquisitionRouteKindTopologyTable,
-	)
+	collection.topologyScalarRoutes, collection.topologyTableRoutes = collection.addTopologyRoutes(topologyMetrics)
 
 	collection.bgpRoutes = make([]int, len(def.BGP))
 	for i := range collection.bgpRoutes {
@@ -515,9 +494,8 @@ func (c *acquisitionProfileCollection) prepareProfileInputRoutes(profile *ddsnmp
 	}
 }
 
-func (c *acquisitionProfileCollection) addMetricRoutes(
+func (c *acquisitionProfileCollection) addTopologyRoutes(
 	configs []ddprofiledefinition.MetricsConfig,
-	scalarKind, tableKind AcquisitionRouteKind,
 ) (scalarRoutes []int, tableRoutes map[int]int) {
 	if c == nil {
 		return nil, nil
@@ -528,7 +506,7 @@ func (c *acquisitionProfileCollection) addMetricRoutes(
 	}
 	for i, cfg := range configs {
 		if cfg.IsScalar() {
-			scalarRoutes[i] = c.addRoute(scalarKind, trimOID(cfg.Symbol.OID))
+			scalarRoutes[i] = c.addRoute(AcquisitionRouteKindTopologyScalar, trimOID(cfg.Symbol.OID))
 		}
 	}
 	for i, cfg := range configs {
@@ -536,7 +514,7 @@ func (c *acquisitionProfileCollection) addMetricRoutes(
 			if tableRoutes == nil {
 				tableRoutes = make(map[int]int)
 			}
-			tableRoutes[i] = c.addRoute(tableKind, trimOID(cfg.Table.OID))
+			tableRoutes[i] = c.addRoute(AcquisitionRouteKindTopologyTable, trimOID(cfg.Table.OID))
 		}
 	}
 	return scalarRoutes, tableRoutes
@@ -588,39 +566,23 @@ func (c *acquisitionProfileCollection) bgpRoute(configIndex int) *AcquisitionRou
 	return c.route(c.bgpRoutes[configIndex])
 }
 
-func (c *acquisitionProfileCollection) metricScalarObserver() *acquisitionScalarObserver {
+func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionTopologyScalarObserver {
 	if c == nil {
 		return nil
 	}
-	return &acquisitionScalarObserver{collection: c, routeIndexes: c.metricScalarRoutes}
-}
-
-func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionScalarObserver {
-	if c == nil {
-		return nil
-	}
-	return &acquisitionScalarObserver{
+	return &acquisitionTopologyScalarObserver{
 		collection:   c,
 		routeIndexes: c.topologyScalarRoutes,
-		valueRefs:    &c.topologyValueReferences,
 	}
 }
 
-func (c *acquisitionProfileCollection) metricTableScope() *acquisitionTableScope {
+func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTopologyTableScope {
 	if c == nil {
 		return nil
 	}
-	return &acquisitionTableScope{collection: c, routeIndexes: c.metricTableRoutes}
-}
-
-func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTableScope {
-	if c == nil {
-		return nil
-	}
-	return &acquisitionTableScope{
+	return &acquisitionTopologyTableScope{
 		collection:   c,
 		routeIndexes: c.topologyTableRoutes,
-		retainValues: true,
 	}
 }
 
@@ -729,7 +691,7 @@ func acquisitionMetadataFieldRootOID(field ddprofiledefinition.MetadataField) st
 	return ""
 }
 
-func (s *acquisitionTableScope) bind(
+func (s *acquisitionTopologyTableScope) bind(
 	configIndex int,
 	request *tableCollectionRequest,
 ) *acquisitionTableObservation {
@@ -743,7 +705,6 @@ func (s *acquisitionTableScope) bind(
 	observation := &acquisitionTableObservation{
 		collection:   s.collection,
 		routeOrdinal: uint32(routeIndex),
-		retainValues: s.retainValues,
 	}
 	s.collection.tableBindings = append(s.collection.tableBindings, acquisitionTableBinding{
 		request:     request,
@@ -848,8 +809,6 @@ func (c *acquisitionProfileCollection) releaseReportStorage() {
 		return
 	}
 	c.routes = nil
-	c.metricScalarRoutes = nil
-	c.metricTableRoutes = nil
 	c.topologyScalarRoutes = nil
 	c.topologyTableRoutes = nil
 	c.bgpRoutes = nil
@@ -894,9 +853,6 @@ func acquisitionProfileRouteDigest(profile *ddsnmp.Profile) [32]byte {
 	}
 	def := profile.Definition
 
-	for _, cfg := range def.Metrics {
-		d.addMetric("metric", cfg)
-	}
 	for _, cfg := range def.Topology {
 		d.addMetric("topology:"+string(cfg.Kind), cfg.MetricsConfig)
 	}

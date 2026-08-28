@@ -130,11 +130,10 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 	session := newTableCollectionSession(c.tableCollector, c.tableIdentity)
 	for _, profile := range prepared {
-		profile.regularScope = session.addObservedScope(
+		profile.regularScope = session.addScope(
 			profile.state.profile,
 			tableSymbolModeValue,
 			&profile.metrics.Stats,
-			profile.acquisition.metricTableScope(),
 		)
 		if profile.topologyProfile != nil {
 			profile.topologyScope = session.addObservedScope(
@@ -300,17 +299,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 	pm.DeviceMetadata = maps.Clone(ps.cache.deviceMetadata)
 
 	now := time.Now()
-	var scalarMetrics []ddsnmp.Metric
-	var err error
-	if prepared.acquisition == nil {
-		scalarMetrics, err = c.scalarCollector.collect(ps.profile, &pm.Stats)
-	} else {
-		scalarMetrics, err = c.scalarCollector.collectObserved(
-			ps.profile,
-			&pm.Stats,
-			prepared.acquisition.metricScalarObserver(),
-		)
-	}
+	scalarMetrics, err := c.scalarCollector.collect(ps.profile, &pm.Stats)
 	if err != nil {
 		return prepared, err
 	}
