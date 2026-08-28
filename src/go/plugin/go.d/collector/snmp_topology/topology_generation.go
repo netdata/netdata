@@ -18,6 +18,12 @@ type topologyDeviceSnapshot struct {
 	observation    topologymodel.ObservationSnapshot
 	hasObservation bool
 	trap           topologyTrapDeviceGeneration
+	semantic       topologySemanticCapture
+}
+
+type topologyEvidenceRef struct {
+	registrationID ddsnmp.DeviceRegistrationID
+	generation     uint64
 }
 
 // topologyDeviceGeneration is an immutable collected snapshot activated at a
@@ -25,11 +31,13 @@ type topologyDeviceSnapshot struct {
 // published to runtime readers.
 type topologyDeviceGeneration struct {
 	registrationID ddsnmp.DeviceRegistrationID
+	evidenceRef    topologyEvidenceRef
 	collectedAt    time.Time
 	expiresAt      time.Time
 	observation    topologymodel.ObservationSnapshot
 	hasObservation bool
 	trap           topologyTrapDeviceGeneration
+	semantic       topologySemanticCapture
 }
 
 // topologyGeneration is the immutable device vector published after one
@@ -39,6 +47,7 @@ type topologyGeneration struct {
 	publishedAt       time.Time
 	devices           []*topologyDeviceGeneration
 	renderableDevices []*topologyDeviceGeneration
+	diagnostic        *topologySweepDiagnosticCut
 }
 
 func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
@@ -62,6 +71,7 @@ func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, t
 
 func activateTopologyDeviceSnapshot(
 	registrationID ddsnmp.DeviceRegistrationID,
+	generation uint64,
 	publishedAt time.Time,
 	snapshot *topologyDeviceSnapshot,
 ) *topologyDeviceGeneration {
@@ -74,11 +84,16 @@ func activateTopologyDeviceSnapshot(
 	}
 	return &topologyDeviceGeneration{
 		registrationID: registrationID,
+		evidenceRef: topologyEvidenceRef{
+			registrationID: registrationID,
+			generation:     generation,
+		},
 		collectedAt:    snapshot.collectedAt,
 		expiresAt:      expiresAt,
 		observation:    snapshot.observation,
 		hasObservation: snapshot.hasObservation,
 		trap:           snapshot.trap,
+		semantic:       snapshot.semantic,
 	}
 }
 

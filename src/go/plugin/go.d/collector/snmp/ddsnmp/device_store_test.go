@@ -4,9 +4,144 @@ package ddsnmp
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestDeviceStoreLifecyclePrecedesTopologyRegistration(t *testing.T) {
+	store := NewDeviceStore()
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: "2c",
+	})
+
+	beforeCut := time.Now()
+	cut := store.LifecycleCut()
+	afterCut := time.Now()
+	require.NotZero(t, cut.Sequence)
+	require.False(t, cut.CapturedAt.Before(beforeCut))
+	require.False(t, cut.CapturedAt.After(afterCut))
+	require.Len(t, cut.Entries, 1)
+	entry := cut.Entries[0]
+	require.NotZero(t, entry.RegistrationID)
+	require.Equal(t, "192.0.2.10", entry.Info.Hostname)
+	require.Equal(t, 161, entry.Info.Port)
+	require.Equal(t, "2c", entry.Info.SNMPVersion)
+	require.Equal(t, DeviceLifecyclePhaseUnknown, entry.LastCompleted.Phase)
+	require.Equal(t, DeviceLifecycleOutcomeUnknown, entry.LastCompleted.Outcome)
+	require.False(t, entry.TopologyReady)
+
+	completedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	store.RecordJobLifecycle("switch-a", DeviceLifecycleStatus{
+		Phase:       DeviceLifecyclePhaseInit,
+		Outcome:     DeviceLifecycleOutcomeFailed,
+		CompletedAt: completedAt,
+	})
+
+	cut = store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, entry.RegistrationID, cut.Entries[0].RegistrationID)
+	require.Equal(t, DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	require.Equal(t, completedAt, cut.Entries[0].LastCompleted.CompletedAt)
+	require.False(t, cut.Entries[0].TopologyReady)
+
+	store.Register("switch-a", DeviceConnectionInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: "2c",
+		Community:   "must-not-appear-in-lifecycle",
+		V3AuthKey:   "must-not-appear-in-lifecycle",
+		V3PrivKey:   "must-not-appear-in-lifecycle",
+	})
+
+	require.Len(t, store.Entries(), 1)
+	require.Equal(t, entry.RegistrationID, store.Entries()[0].RegistrationID)
+	cut = store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, entry.RegistrationID, cut.Entries[0].RegistrationID)
+	require.True(t, cut.Entries[0].TopologyReady)
+	require.Equal(t, DeviceLifecycleInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: "2c",
+	}, cut.Entries[0].Info)
+}
+
+func TestDeviceStoreReplaceJobCommitsOneIncarnationTransition(t *testing.T) {
+	store := NewDeviceStore()
+	store.RegisterJob("old-config", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.Register("old-config", DeviceConnectionInfo{Hostname: "192.0.2.10"})
+	oldCut := store.LifecycleCut()
+	status := DeviceLifecycleStatus{
+		Phase:       DeviceLifecyclePhaseInit,
+		Outcome:     DeviceLifecycleOutcomeFailed,
+		CompletedAt: time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC),
+	}
+
+	store.ReplaceJob("old-config", "new-config", DeviceLifecycleInfo{
+		Hostname:    "192.0.2.20",
+		Port:        1161,
+		SNMPVersion: "3",
+	}, status, nil)
+
+	newCut := store.LifecycleCut()
+	require.Equal(t, oldCut.Sequence+1, newCut.Sequence)
+	require.Len(t, newCut.Entries, 1)
+	require.Greater(t, newCut.Entries[0].RegistrationID, oldCut.Entries[0].RegistrationID)
+	require.Equal(t, "192.0.2.20", newCut.Entries[0].Info.Hostname)
+	require.Equal(t, status, newCut.Entries[0].LastCompleted)
+	require.False(t, newCut.Entries[0].TopologyReady)
+	require.Empty(t, store.Entries())
+}
+
+func TestDeviceStoreLifecycleCleanupAndReincarnation(t *testing.T) {
+	store := NewDeviceStore()
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	first := store.LifecycleCut()
+	require.Len(t, first.Entries, 1)
+
+	store.Unregister("switch-a")
+	require.Empty(t, store.LifecycleCut().Entries)
+	require.Empty(t, store.Entries())
+
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	second := store.LifecycleCut()
+	require.Len(t, second.Entries, 1)
+	require.Greater(t, second.Entries[0].RegistrationID, first.Entries[0].RegistrationID)
+}
+
+func TestDeviceStoreLifecycleCutIsSortedAndIndependent(t *testing.T) {
+	store := NewDeviceStore()
+	store.RegisterJob("switch-b", DeviceLifecycleInfo{Hostname: "switch-b"})
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "switch-a"})
+
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 2)
+	require.Less(t, cut.Entries[0].RegistrationID, cut.Entries[1].RegistrationID)
+
+	cut.Entries[0].Info.Hostname = "changed"
+	again := store.LifecycleCut()
+	require.Equal(t, "switch-b", again.Entries[0].Info.Hostname)
+}
+
+func BenchmarkDeviceStoreRecordJobLifecycle(b *testing.B) {
+	store := NewDeviceStore()
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	status := DeviceLifecycleStatus{
+		Phase:       DeviceLifecyclePhaseCollect,
+		Outcome:     DeviceLifecycleOutcomeSuccess,
+		CompletedAt: time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC),
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		store.RecordJobLifecycle("switch-a", status)
+	}
+}
 
 func TestDeviceStoreDevicesByHostname(t *testing.T) {
 	store := NewDeviceStore()

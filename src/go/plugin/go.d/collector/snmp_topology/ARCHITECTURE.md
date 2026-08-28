@@ -38,7 +38,7 @@ flowchart LR
     Init --> Traps
     ReverseDNS --> Topology
     ReverseDNS --> Traps
-    SNMP -->|"registers devices"| Store
+    SNMP -->|"committed lifecycle and device state"| Store
     Store -->|"device connection state"| Topology
     Topology -->|"trap topology enrichment"| TrapHandle
     TrapHandle -->|"interface/device context"| Traps
@@ -100,13 +100,13 @@ refreshTopology(ctx)
   build a plan of jobs whose next retry/refresh is due
   resolve planned DNS targets with up to eight workers under one shared 5s budget
   for each planned job, in registration-ID order:
-    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
+    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, remainingSemanticLimits)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
   activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
+refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, semanticLimits)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
@@ -135,6 +135,30 @@ rebuilt `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore
 keep independent refresh state and device generations, and a replacement job
 cannot inherit the removed job's retry or warning-limiter state.
 
+Job Manager projects a credential-free normal-SNMP baseline from each committed
+running/failed configuration. The baseline has an unknown phase when vnode,
+secret, or configuration application fails before a runtime collector exists.
+When construction succeeds, the collector records lifecycle phase/outcome
+locally from `Init`, before system information or profile selection can succeed,
+and Job Manager uses that detached value instead. Publication occurs only after
+the matching DynCfg graph row commits, or after a successful transaction confirms
+that its fallback row already matches. Failed candidate cleanup therefore cannot
+erase the incumbent or publish the candidate. Graph reconciliation owns
+connection demotion, incarnation replacement, and full removal; managed
+collector cleanup does not mutate the shared `DeviceStore`.
+
+`LifecycleCut` provides a separately sequenced and timestamped snapshot of every
+committed job's credential-free configured identity, last completed lifecycle
+phase/outcome, and topology-readiness state. Connection state collected before
+graph commit is held once by the collector. A successfully accepted runtime is
+consulted transiently during graph reconciliation so that state is flushed
+atomically with the lifecycle row; the detached snapshot never retains the
+collector, its configuration, or its SNMP client. Later updates retain the same
+registration ID. `Entries` remains limited to topology-ready jobs. Lifecycle
+reporting is diagnostic-only: failures or panics are rate-limited and cannot
+change collector or graph results, while a panic in `Init` or `Check` is recorded
+as a failed phase before the framework recovers it.
+
 Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh
 context, and use a lookup-only child context, so expiry of the shared lookup
@@ -154,6 +178,31 @@ readers each acquire one generation and cannot combine devices from different
 sweeps. A failed attempt retains the last successful device generation and its
 original freshness deadline; a canceled or panicking sweep does not publish a
 partial vector.
+
+Diagnostics preserve two intentionally independent inventory cuts:
+
+- the current `DeviceStore` lifecycle cut, which can advance when a normal SNMP
+  job initializes, checks, collects, becomes topology-ready, or exits;
+- the topology sweep cut attached to the same immutable generation as the
+  Function-visible device vector.
+
+The topology cut's ordered device rows are the exact start-of-sweep registration
+inventory. Each row separates whether the job was selected, its committed
+outcome/retry state, its last successful evidence reference and capture state,
+and whether that retained generation is renderable or expired. Registrations
+removed since the preceding cut are recorded separately. A canceled or
+panicking sweep leaves both the published topology generation and its cut
+unchanged and replaces only one bounded last-aborted marker. That marker records the sweep phase and, during
+device refresh, the active registration ID.
+
+Per-device semantic limits and one global latest-view record/logical-byte limit
+are checked directly. One serial usage counter includes sweep rows, non-due
+retained evidence, and each due device's new-or-retained evidence in registration
+order. The remaining allowance reaches the recorder before it copies an event,
+so peak optional evidence is globally bounded rather than capped after all due
+devices finish. Lifecycle rows are admitted independently against the remaining
+budget when diagnostics are acquired. There are no reservations, sessions,
+queues, or attempt ledgers.
 
 ## Topology Profile Composition
 
@@ -220,6 +269,21 @@ Ingestion is split by source area:
 - `topology_bgp_peers.go`
 - `topology_vlan_context_*.go`
 
+Every successful device refresh also retains a bounded semantic replay input.
+The live builder and the replay path share one ordered event dispatcher for
+system uptime, profile tags, topology rows, BGP rows, and successful VLAN-context
+rows. The retained projection uses positive per-event/per-topology-kind field
+allowlists. It keeps only metadata, tags, rows, and BGP fallback tags consumed by
+those builder operations; non-VLAN rows in VLAN events, credentials, profile
+source paths, metric names, values, and other collector output are not copied.
+
+Semantic capture has direct per-device record and logical-byte limits. The
+projection checks an event before copying it. Limit exhaustion, projection
+errors, or projection panics mark the generation's capture unavailable and
+release partial evidence without changing collection, builder ingestion, or
+topology publication. Replay reconstructs the allowlisted inputs and invokes
+the same event dispatcher; it rejects a missing or reordered main phase.
+
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately
 because they describe the device itself rather than one topology row.
@@ -231,6 +295,7 @@ Finalization converts the builder into an immutable `topologyDeviceGeneration`:
 - immutable trap-match, interface-name, and neighbor indexes;
 - collection and expiry timestamps;
 - the typed DeviceStore registration ID.
+- a generation-local evidence reference and semantic capture state/input.
 
 The collector separately owns `deviceRefreshState` per registration ID. It
 tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,

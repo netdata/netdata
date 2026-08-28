@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
@@ -21,11 +22,12 @@ var (
 )
 
 type autoDetectionFailure struct {
-	cause      error
-	retry      bool
-	retryAfter int
-	coded      bool
-	code       int
+	cause              error
+	retry              bool
+	retryAfter         int
+	coded              bool
+	code               int
+	jobConfigLifecycle collectorapi.JobConfigLifecycleSnapshot
 }
 
 func (adf *autoDetectionFailure) Error() string {
@@ -113,6 +115,9 @@ type ConstructedJob struct {
 	outputGate         *generationOutputGate
 	storeSnapshot      secretresolver.AtomicScopeSnapshot
 	processOwner       *stagedJobOwner
+	jobConfigIdentity  collectorapi.JobConfigIdentity
+	jobConfigLifecycle collectorapi.JobConfigLifecycle
+	jobConfigSnapshot  collectorapi.JobConfigLifecycleSnapshot
 }
 
 // constructedJobAttachment reports whether process ownership transferred even
@@ -199,6 +204,22 @@ func (pj PreparedJob) Identity() lifecycle.ResourceIdentity {
 	return lifecycle.ResourceIdentity{
 		ID:         pj.state.id,
 		Generation: pj.state.generation,
+	}
+}
+
+func (pj PreparedJob) jobConfigLifecycleState() preparedJobConfigLifecycle {
+	if pj.state == nil {
+		return preparedJobConfigLifecycle{}
+	}
+	pj.state.mu.Lock()
+	defer pj.state.mu.Unlock()
+	if pj.state.consumed {
+		return preparedJobConfigLifecycle{}
+	}
+	return preparedJobConfigLifecycle{
+		identity: pj.state.constructed.jobConfigIdentity,
+		snapshot: pj.state.constructed.jobConfigSnapshot,
+		runtime:  pj.state.constructed.candidateJob,
 	}
 }
 

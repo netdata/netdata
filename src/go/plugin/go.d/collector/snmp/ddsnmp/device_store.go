@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // DeviceConnectionInfo holds SNMP connection parameters for a device.
@@ -60,11 +61,67 @@ type DeviceEntry struct {
 	Info           DeviceConnectionInfo
 }
 
+// DeviceLifecycleInfo is the credential-free configured identity of an SNMP
+// job. It is available before the job has enough device state for topology.
+type DeviceLifecycleInfo struct {
+	Hostname    string
+	Port        int
+	SNMPVersion string
+}
+
+// DeviceLifecyclePhase identifies the last completed collector lifecycle call.
+type DeviceLifecyclePhase uint8
+
+const (
+	DeviceLifecyclePhaseUnknown DeviceLifecyclePhase = iota
+	DeviceLifecyclePhaseInit
+	DeviceLifecyclePhaseCheck
+	DeviceLifecyclePhaseCollect
+)
+
+// DeviceLifecycleOutcome identifies the result of a completed lifecycle call.
+type DeviceLifecycleOutcome uint8
+
+const (
+	DeviceLifecycleOutcomeUnknown DeviceLifecycleOutcome = iota
+	DeviceLifecycleOutcomeSuccess
+	DeviceLifecycleOutcomeFailed
+)
+
+// DeviceLifecycleStatus describes the last completed lifecycle call.
+type DeviceLifecycleStatus struct {
+	Phase       DeviceLifecyclePhase
+	Outcome     DeviceLifecycleOutcome
+	CompletedAt time.Time
+}
+
+// DeviceLifecycleEntry is one current normal-SNMP job incarnation.
+type DeviceLifecycleEntry struct {
+	RegistrationID DeviceRegistrationID
+	Info           DeviceLifecycleInfo
+	LastCompleted  DeviceLifecycleStatus
+	TopologyReady  bool
+}
+
+// DeviceLifecycleCut is an immutable, independently sequenced snapshot of all
+// current normal-SNMP job incarnations.
+type DeviceLifecycleCut struct {
+	Sequence   uint64
+	CapturedAt time.Time
+	Entries    []DeviceLifecycleEntry
+}
+
+type deviceLifecycleRecord struct {
+	info          DeviceLifecycleInfo
+	lastCompleted DeviceLifecycleStatus
+}
+
 // NewDeviceStore returns an empty SNMP device connection-state store.
 func NewDeviceStore() *DeviceStore {
 	return &DeviceStore{
 		ownerRegistrations: make(map[string]DeviceRegistrationID),
 		devices:            make(map[DeviceRegistrationID]DeviceConnectionInfo),
+		lifecycles:         make(map[DeviceRegistrationID]deviceLifecycleRecord),
 		byHostname:         make(map[string]map[string]struct{}),
 	}
 }
@@ -74,8 +131,110 @@ type DeviceStore struct {
 	mu                 sync.RWMutex
 	ownerRegistrations map[string]DeviceRegistrationID
 	devices            map[DeviceRegistrationID]DeviceConnectionInfo
+	lifecycles         map[DeviceRegistrationID]deviceLifecycleRecord
 	byHostname         map[string]map[string]struct{}
 	lastRegistrationID DeviceRegistrationID
+	lifecycleSequence  uint64
+}
+
+// RegisterJob starts or updates the credential-free lifecycle row for a
+// normal-SNMP job. Its registration ID is retained if connection state is
+// registered later.
+func (s *DeviceStore) RegisterJob(ownerKey string, info DeviceLifecycleInfo) {
+	s.mu.Lock()
+	s.ensureMapsLocked()
+	registrationID, exists := s.ownerRegistrations[ownerKey]
+	if !exists {
+		registrationID = s.nextRegistrationIDLocked()
+		s.ownerRegistrations[ownerKey] = registrationID
+	}
+	record := s.lifecycles[registrationID]
+	record.info = info
+	s.lifecycles[registrationID] = record
+	s.lifecycleSequence++
+	s.mu.Unlock()
+}
+
+// RecordJobLifecycle updates the last completed lifecycle call for a current
+// normal-SNMP job. Unknown owner keys are ignored so diagnostics cannot create
+// a second, incomplete incarnation.
+func (s *DeviceStore) RecordJobLifecycle(ownerKey string, status DeviceLifecycleStatus) {
+	s.mu.Lock()
+	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
+		record := s.lifecycles[registrationID]
+		record.lastCompleted = status
+		s.lifecycles[registrationID] = record
+		s.lifecycleSequence++
+	}
+	s.mu.Unlock()
+}
+
+// LifecycleCut returns a deterministic snapshot of all current normal-SNMP
+// jobs, including jobs that are not yet topology-ready.
+func (s *DeviceStore) LifecycleCut() DeviceLifecycleCut {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	registrationIDs := make([]DeviceRegistrationID, 0, len(s.ownerRegistrations))
+	for _, registrationID := range s.ownerRegistrations {
+		registrationIDs = append(registrationIDs, registrationID)
+	}
+	slices.Sort(registrationIDs)
+
+	cut := DeviceLifecycleCut{
+		Sequence:   s.lifecycleSequence,
+		CapturedAt: time.Now(),
+		Entries:    make([]DeviceLifecycleEntry, 0, len(registrationIDs)),
+	}
+	for _, registrationID := range registrationIDs {
+		record := s.lifecycles[registrationID]
+		_, topologyReady := s.devices[registrationID]
+		cut.Entries = append(cut.Entries, DeviceLifecycleEntry{
+			RegistrationID: registrationID,
+			Info:           record.info,
+			LastCompleted:  record.lastCompleted,
+			TopologyReady:  topologyReady,
+		})
+	}
+	return cut
+}
+
+// ReplaceJob atomically removes a prior configuration incarnation, when
+// different, and publishes the current lifecycle plus any topology-ready state.
+func (s *DeviceStore) ReplaceJob(
+	previousOwnerKey string,
+	ownerKey string,
+	info DeviceLifecycleInfo,
+	status DeviceLifecycleStatus,
+	device *DeviceConnectionInfo,
+) {
+	if ownerKey == "" {
+		return
+	}
+	s.mu.Lock()
+	s.ensureMapsLocked()
+	if previousOwnerKey != "" && previousOwnerKey != ownerKey {
+		s.removeRegistrationLocked(previousOwnerKey)
+	}
+	registrationID, exists := s.ownerRegistrations[ownerKey]
+	if !exists {
+		registrationID = s.nextRegistrationIDLocked()
+		s.ownerRegistrations[ownerKey] = registrationID
+	} else if device, ok := s.devices[registrationID]; ok {
+		s.removeHostnameIndexLocked(ownerKey, device.Hostname)
+		delete(s.devices, registrationID)
+	}
+	s.lifecycles[registrationID] = deviceLifecycleRecord{
+		info:          info,
+		lastCompleted: status,
+	}
+	if device != nil {
+		cloned := cloneDeviceConnectionInfo(*device)
+		s.devices[registrationID] = cloned
+		s.addHostnameIndexLocked(ownerKey, cloned.Hostname)
+	}
+	s.lifecycleSequence++
+	s.mu.Unlock()
 }
 
 // Register adds or updates a device by its caller-owned lookup key. An update
@@ -92,19 +251,35 @@ func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 		s.ownerRegistrations[ownerKey] = registrationID
 	}
 	s.devices[registrationID] = cloneDeviceConnectionInfo(info)
+	record := s.lifecycles[registrationID]
+	record.info = lifecycleInfoFromDeviceConnection(info)
+	s.lifecycles[registrationID] = record
 	s.addHostnameIndexLocked(ownerKey, info.Hostname)
+	s.lifecycleSequence++
 	s.mu.Unlock()
 }
 
-// Unregister removes a device from the store.
+// Unregister removes a complete job incarnation from the store.
 func (s *DeviceStore) Unregister(ownerKey string) {
 	s.mu.Lock()
-	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
-		s.removeHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
-		delete(s.devices, registrationID)
-		delete(s.ownerRegistrations, ownerKey)
+	if _, ok := s.ownerRegistrations[ownerKey]; ok {
+		s.removeRegistrationLocked(ownerKey)
+		s.lifecycleSequence++
 	}
 	s.mu.Unlock()
+}
+
+func (s *DeviceStore) removeRegistrationLocked(ownerKey string) {
+	registrationID, ok := s.ownerRegistrations[ownerKey]
+	if !ok {
+		return
+	}
+	if info, exists := s.devices[registrationID]; exists {
+		s.removeHostnameIndexLocked(ownerKey, info.Hostname)
+	}
+	delete(s.devices, registrationID)
+	delete(s.lifecycles, registrationID)
+	delete(s.ownerRegistrations, ownerKey)
 }
 
 // Entries returns a deterministic, deep-copied snapshot of all registered jobs.
@@ -183,6 +358,14 @@ func cloneDeviceConnectionInfo(info DeviceConnectionInfo) DeviceConnectionInfo {
 	return dev
 }
 
+func lifecycleInfoFromDeviceConnection(info DeviceConnectionInfo) DeviceLifecycleInfo {
+	return DeviceLifecycleInfo{
+		Hostname:    info.Hostname,
+		Port:        info.Port,
+		SNMPVersion: info.SNMPVersion,
+	}
+}
+
 func (s *DeviceStore) ensureMapsLocked() {
 	if s.ownerRegistrations == nil {
 		s.ownerRegistrations = make(map[string]DeviceRegistrationID)
@@ -190,10 +373,20 @@ func (s *DeviceStore) ensureMapsLocked() {
 	if s.devices == nil {
 		s.devices = make(map[DeviceRegistrationID]DeviceConnectionInfo)
 	}
+	if s.lifecycles == nil {
+		s.lifecycles = make(map[DeviceRegistrationID]deviceLifecycleRecord)
+		for _, registrationID := range s.ownerRegistrations {
+			if info, ok := s.devices[registrationID]; ok {
+				s.lifecycles[registrationID] = deviceLifecycleRecord{info: lifecycleInfoFromDeviceConnection(info)}
+			}
+		}
+	}
 	if s.byHostname == nil {
 		s.byHostname = make(map[string]map[string]struct{})
 		for ownerKey, registrationID := range s.ownerRegistrations {
-			s.addHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
+			if info, ok := s.devices[registrationID]; ok {
+				s.addHostnameIndexLocked(ownerKey, info.Hostname)
+			}
 		}
 	}
 }
