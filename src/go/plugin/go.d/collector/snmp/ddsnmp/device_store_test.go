@@ -17,8 +17,12 @@ func TestDeviceStoreLifecyclePrecedesTopologyRegistration(t *testing.T) {
 		SNMPVersion: "2c",
 	})
 
+	beforeCut := time.Now()
 	cut := store.LifecycleCut()
+	afterCut := time.Now()
 	require.NotZero(t, cut.Sequence)
+	require.False(t, cut.CapturedAt.Before(beforeCut))
+	require.False(t, cut.CapturedAt.After(afterCut))
 	require.Len(t, cut.Entries, 1)
 	entry := cut.Entries[0]
 	require.NotZero(t, entry.RegistrationID)
@@ -64,6 +68,50 @@ func TestDeviceStoreLifecyclePrecedesTopologyRegistration(t *testing.T) {
 		Port:        161,
 		SNMPVersion: "2c",
 	}, cut.Entries[0].Info)
+}
+
+func TestDeviceStoreConnectionCleanupRetainsLifecycle(t *testing.T) {
+	store := NewDeviceStore()
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.Register("switch-a", DeviceConnectionInfo{Hostname: "192.0.2.10"})
+
+	before := store.LifecycleCut()
+	require.True(t, before.Entries[0].TopologyReady)
+
+	store.UnregisterDevice("switch-a")
+
+	after := store.LifecycleCut()
+	require.Len(t, after.Entries, 1)
+	require.Equal(t, before.Entries[0].RegistrationID, after.Entries[0].RegistrationID)
+	require.False(t, after.Entries[0].TopologyReady)
+	require.Empty(t, store.Entries())
+}
+
+func TestDeviceStoreReplaceJobCommitsOneIncarnationTransition(t *testing.T) {
+	store := NewDeviceStore()
+	store.RegisterJob("old-config", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.Register("old-config", DeviceConnectionInfo{Hostname: "192.0.2.10"})
+	oldCut := store.LifecycleCut()
+	status := DeviceLifecycleStatus{
+		Phase:       DeviceLifecyclePhaseInit,
+		Outcome:     DeviceLifecycleOutcomeFailed,
+		CompletedAt: time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC),
+	}
+
+	store.ReplaceJob("old-config", "new-config", DeviceLifecycleInfo{
+		Hostname:    "192.0.2.20",
+		Port:        1161,
+		SNMPVersion: "3",
+	}, status, nil)
+
+	newCut := store.LifecycleCut()
+	require.Equal(t, oldCut.Sequence+1, newCut.Sequence)
+	require.Len(t, newCut.Entries, 1)
+	require.Greater(t, newCut.Entries[0].RegistrationID, oldCut.Entries[0].RegistrationID)
+	require.Equal(t, "192.0.2.20", newCut.Entries[0].Info.Hostname)
+	require.Equal(t, status, newCut.Entries[0].LastCompleted)
+	require.False(t, newCut.Entries[0].TopologyReady)
+	require.Empty(t, store.Entries())
 }
 
 func TestDeviceStoreLifecycleCleanupAndReincarnation(t *testing.T) {

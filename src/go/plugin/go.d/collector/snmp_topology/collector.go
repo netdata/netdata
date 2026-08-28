@@ -246,11 +246,30 @@ func (c *Collector) Cleanup(context.Context) {
 }
 
 func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
-	start := c.currentTime()
+	start := safeTopologyDiagnosticTime(c)
+	phase := topologyDiagnosticSweepPhaseRegistrationCut
+	var activeRegistrationID ddsnmp.DeviceRegistrationID
+	var hasActiveRegistration bool
+	var registrationCount, selectedCount int
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			c.publishAbortedTopologyDiagnostic(
+				start,
+				topologyDiagnosticAbortPanic,
+				phase,
+				activeRegistrationID,
+				hasActiveRegistration,
+				registrationCount,
+				selectedCount,
+			)
+			panic(recovered)
+		}
+	}()
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
 	entries := c.getRegisteredDevices()
+	registrationCount = len(entries)
 	previousStates := c.deviceStates
 	refreshEvery := c.refreshEvery()
 	now := c.currentTime()
@@ -278,7 +297,17 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 			selected[registrationID] = true
 		}
 	}
+	selectedCount = len(plans)
+	semanticUsage := newTopologySemanticUsage(
+		entries,
+		seen,
+		selected,
+		previousStates,
+		nextStates,
+		c.currentTopologyDiagnosticGlobalLimits(),
+	)
 
+	phase = topologyDiagnosticSweepPhaseTargetResolution
 	c.resolveTopologyTargetManagementIPs(
 		ctx,
 		plans,
@@ -291,9 +320,21 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 			break
 		}
 		attemptedAt := c.currentTime()
+		phase = topologyDiagnosticSweepPhaseDeviceRefresh
+		activeRegistrationID = plan.registrationID
+		hasActiveRegistration = true
 		state := nextStates[plan.registrationID]
 		state.lastAttempt = attemptedAt
-		snapshot, outcome := c.refreshDeviceTopology(ctx, plan.registrationID, plan.device, plan.targetManagementIPs)
+		perDeviceLimits := c.currentTopologySemanticLimits()
+		effectiveLimits := semanticUsage.availableLimits(perDeviceLimits)
+		snapshot, outcome := c.refreshDeviceTopology(
+			ctx,
+			plan.registrationID,
+			plan.device,
+			plan.targetManagementIPs,
+			effectiveLimits,
+		)
+		hasActiveRegistration = false
 		if ctx.Err() != nil {
 			break
 		}
@@ -302,14 +343,18 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		state.outcome = outcome
 		switch outcome {
 		case deviceRefreshOutcomeSuccess:
+			snapshot.semantic = classifyTopologySemanticCaptureLimit(snapshot.semantic, effectiveLimits, perDeviceLimits)
+			snapshot.semantic = semanticUsage.include(snapshot.semantic)
 			successfulSnapshots[plan.registrationID] = snapshot
 			state.lastSuccess = completedAt
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
 		case deviceRefreshOutcomeNoProfiles:
+			state = semanticUsage.includeRetained(state)
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
 		default:
+			state = semanticUsage.includeRetained(state)
 			if ctx.Err() != nil {
 				break
 			}
@@ -325,15 +370,24 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	}
 
 	if ctx.Err() != nil {
-		c.publishAbortedTopologyDiagnostic(start, topologyDiagnosticAbortCanceled, len(entries), len(plans))
+		c.publishAbortedTopologyDiagnostic(
+			start,
+			topologyDiagnosticAbortCanceled,
+			phase,
+			activeRegistrationID,
+			hasActiveRegistration,
+			registrationCount,
+			selectedCount,
+		)
 		stats.cachedDevices = c.topologyRegistry.acquireGeneration().deviceCount()
 		stats.completedAt = c.currentTime()
 		stats.duration = stats.completedAt.Sub(start)
 		return stats
 	}
 
+	phase = topologyDiagnosticSweepPhaseCommit
+	hasActiveRegistration = false
 	pruneUnregisteredDeviceStates(nextStates, seen)
-	applyTopologySemanticGlobalLimits(nextStates, successfulSnapshots, c.currentTopologyDiagnosticGlobalLimits())
 	publishedAt := c.currentTime()
 	nextSequence := c.generationSequence + 1
 	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(successfulSnapshots))
@@ -379,7 +433,6 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 	start := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
-			c.publishAbortedTopologyDiagnostic(start, topologyDiagnosticAbortPanic, 0, 0)
 			c.recordRefreshStats(refreshStats{
 				errors:      1,
 				completedAt: time.Now(),
@@ -402,6 +455,7 @@ func (c *Collector) refreshDeviceTopology(
 	registrationID ddsnmp.DeviceRegistrationID,
 	dev ddsnmp.DeviceConnectionInfo,
 	targetManagementIPs []netip.Addr,
+	semanticLimits topologySemanticLimits,
 ) (*topologyDeviceSnapshot, deviceRefreshOutcome) {
 	if ctx.Err() != nil {
 		return nil, deviceRefreshOutcomeFailed
@@ -486,7 +540,7 @@ func (c *Collector) refreshDeviceTopology(
 		targetManagementIPs,
 		next.updateTime,
 		next.staleAfter,
-		c.currentTopologySemanticLimits(),
+		semanticLimits,
 	)
 
 	consumeTopologySemanticEvent(next, recorder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: sysUptime})

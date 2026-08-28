@@ -100,6 +100,26 @@ func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
 	require.Same(t, previousCut, diagnostics.topology)
 	require.NotNil(t, diagnostics.lastAborted)
 	require.Equal(t, topologyDiagnosticAbortCanceled, diagnostics.lastAborted.reason)
+	require.Equal(t, topologyDiagnosticSweepPhaseTargetResolution, diagnostics.lastAborted.phase)
+	require.False(t, diagnostics.lastAborted.hasActiveRegistration)
+}
+
+func TestCollectorPanicDiagnosticIdentifiesActiveDeviceRefresh(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10"})
+	registrationID := store.Entries()[0].RegistrationID
+	coll.newSnmpClient = func() gosnmp.Handler { panic("device refresh panic") }
+
+	require.NotPanics(t, func() { coll.refreshTopologyRecovering(context.Background()) })
+
+	diagnostics := coll.acquireTopologyDiagnostics()
+	require.NotNil(t, diagnostics.lastAborted)
+	require.Equal(t, topologyDiagnosticAbortPanic, diagnostics.lastAborted.reason)
+	require.Equal(t, topologyDiagnosticSweepPhaseDeviceRefresh, diagnostics.lastAborted.phase)
+	require.True(t, diagnostics.lastAborted.hasActiveRegistration)
+	require.Equal(t, registrationID, diagnostics.lastAborted.activeRegistrationID)
+	require.Equal(t, 1, diagnostics.lastAborted.registrationCount)
+	require.Equal(t, 1, diagnostics.lastAborted.selectedCount)
 }
 
 func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *testing.T) {
@@ -153,20 +173,32 @@ func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *test
 	}
 }
 
-func TestApplyTopologySemanticGlobalLimitsIsDeterministic(t *testing.T) {
-	first := &topologyDeviceSnapshot{semantic: topologySemanticCapture{
+func TestTopologySemanticUsageBoundsRetainedEvidenceDeterministically(t *testing.T) {
+	first := &topologyDeviceGeneration{semantic: topologySemanticCapture{
 		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologySemanticEvidence{},
 	}}
-	second := &topologyDeviceSnapshot{semantic: topologySemanticCapture{
+	second := &topologyDeviceGeneration{semantic: topologySemanticCapture{
 		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologySemanticEvidence{},
 	}}
-	snapshots := map[ddsnmp.DeviceRegistrationID]*topologyDeviceSnapshot{2: second, 1: first}
+	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
+		2: {generation: second},
+		1: {generation: first},
+	}
+	entries := []ddsnmp.DeviceEntry{{RegistrationID: 1}, {RegistrationID: 2}}
+	seen := map[ddsnmp.DeviceRegistrationID]bool{1: true, 2: true}
 
-	applyTopologySemanticGlobalLimits(nil, snapshots, topologySemanticLimits{maxRecords: 10, maxLogicalBytes: 1000})
-	require.Equal(t, diagnosticCaptureAvailable, first.semantic.state)
-	require.Equal(t, diagnosticCaptureLimitExceeded, second.semantic.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, second.semantic.reason)
-	require.Nil(t, second.semantic.evidence)
+	usage := newTopologySemanticUsage(entries, seen, nil, states, states, topologySemanticLimits{
+		maxRecords:      10,
+		maxLogicalBytes: 1000,
+	})
+	require.Equal(t, diagnosticCaptureAvailable, states[1].generation.semantic.state)
+	require.Equal(t, diagnosticCaptureLimitExceeded, states[2].generation.semantic.state)
+	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, states[2].generation.semantic.reason)
+	require.Nil(t, states[2].generation.semantic.evidence)
+	require.NotSame(t, second, states[2].generation)
+
+	require.Equal(t, topologySemanticLimits{maxRecords: 1, maxLogicalBytes: 652},
+		usage.availableLimits(defaultTopologySemanticLimits))
 }
 
 func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T) {

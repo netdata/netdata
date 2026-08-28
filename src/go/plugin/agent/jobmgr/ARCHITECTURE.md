@@ -564,6 +564,11 @@ flowchart TD
    - **One bad collector cannot dirty Job Manager.** A normal `Init`, `Check`, validation, or Function-staging failure
      is isolated to that candidate once rejection cleanup completes. Only a *failed or unprovable* cleanup retains
      process ownership and fails the run closed.
+   - A collector creator may expose one diagnostic configuration-lifecycle hook. Job Manager binds an opaque exact-config
+     identity before `Init`, captures one detached typed snapshot after probing and before rejection cleanup, and
+     reconciles it only after the matching running/failed graph transition commits. Replacement/removal reconciles the
+     prior incarnation from the graph preimage. Hook panic is fail-open and cannot change candidate, graph, or cleanup
+     behavior. This is a latest-state projection, not an event bus or retry history.
 4. **Reserve and retire** — only a timely successful candidate is wrapped in an inactive run permit. Replacement then
    fences the incumbent's ordinary output and detaches its run projections immediately; its physical managed loop,
    `Stop`, Function drain, and collector cleanup remain process-owned until they return.

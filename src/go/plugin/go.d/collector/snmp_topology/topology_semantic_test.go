@@ -43,16 +43,22 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 		DeviceMetadata: map[string]ddsnmp.MetaTag{
 			tagLldpLocChassisID:        {Value: "001122334455", IsExactMatch: true},
 			tagLldpLocChassisIDSubtype: {Value: "4", IsExactMatch: true},
+			"unused_metadata":          {Value: "must-not-appear-unused-metadata"},
 		},
-		Tags: map[string]string{tagLldpLocSysName: "switch-a"},
+		Tags: map[string]string{
+			tagLldpLocSysName: "switch-a",
+			"vendor":          "must-not-appear-profile-tag-vendor",
+			"unused_profile":  "must-not-appear-unused-profile-tag",
+		},
 		TopologyMetrics: []ddsnmp.Metric{
 			{
 				Name:         "/must/not/appear/metric",
 				TopologyKind: ddsnmp.KindIfName,
 				Tags: map[string]string{
-					tagTopoIfIndex: "7",
-					tagTopoIfName:  "Gi1/0/7",
-					tagTopoIfOper:  "up",
+					tagTopoIfIndex:  "7",
+					tagTopoIfName:   "Gi1/0/7",
+					tagTopoIfOper:   "up",
+					"unused_metric": "must-not-appear-unused-metric-tag",
 				},
 			},
 			{
@@ -61,6 +67,20 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 					tagLldpLocPortNum:       "7",
 					tagLldpLocPortID:        "Gi1/0/7",
 					tagLldpLocPortIDSubtype: "5",
+				},
+			},
+			{
+				TopologyKind: ddsnmp.KindLldpRemManAddr,
+				Tags: map[string]string{
+					tagLldpLocPortNum:                      "7",
+					tagLldpRemIndex:                        "1",
+					tagLldpRemMgmtAddrSubtype:              "1",
+					tagLldpRemMgmtAddrLen:                  "4",
+					tagLldpRemMgmtAddrOctetPref + "1":      "192",
+					tagLldpRemMgmtAddrOctetPref + "2":      "0",
+					tagLldpRemMgmtAddrOctetPref + "3":      "2",
+					tagLldpRemMgmtAddrOctetPref + "4":      "2",
+					tagLldpRemMgmtAddrOctetPref + "unused": "must-not-appear-invalid-octet-tag",
 				},
 			},
 		},
@@ -81,6 +101,12 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 			},
 			Admin: ddsnmp.BGPAdmin{Enabled: ddsnmp.BGPBool{Has: true, Value: true}},
 			State: ddsnmp.BGPState{Has: true, State: ddprofiledefinition.BGPPeerStateEstablished},
+			Tags: map[string]string{
+				"neighbor":         "192.0.2.2",
+				"remote_as":        "65002",
+				"routing_instance": "default",
+				"unused_bgp":       "must-not-appear-unused-bgp-tag",
+			},
 		}},
 	}}
 
@@ -94,14 +120,22 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 		vlanName: "users",
 		profiles: []*ddsnmp.ProfileMetrics{{
 			Source: "/must/not/appear/vlan-profile.yaml",
-			TopologyMetrics: []ddsnmp.Metric{{
-				Name:         "/must/not/appear/vlan-metric",
-				TopologyKind: ddsnmp.KindIfName,
-				Tags: map[string]string{
-					tagTopoIfIndex: "7",
-					tagTopoIfName:  "Gi1/0/7",
+			TopologyMetrics: []ddsnmp.Metric{
+				{
+					Name:         "/must/not/appear/vlan-metric",
+					TopologyKind: ddsnmp.KindIfName,
+					Tags: map[string]string{
+						tagTopoIfIndex: "7",
+						tagTopoIfName:  "Gi1/0/7",
+					},
 				},
-			}},
+				{
+					TopologyKind: ddsnmp.KindIpIfIndex,
+					Tags: map[string]string{
+						tagTopoIPAddr: "must-not-appear-non-vlan-context-row",
+					},
+				},
+			},
 		}},
 	})
 
@@ -132,6 +166,17 @@ func TestTopologySemanticReplayMatchesLiveBuilder(t *testing.T) {
 	require.NotContains(t, text, dev.ManualProfiles[0])
 	require.NotContains(t, text, pms[0].Source)
 	require.NotContains(t, text, pms[0].TopologyMetrics[0].Name)
+	require.NotContains(t, text, "must-not-appear-unused-metadata")
+	require.NotContains(t, text, "must-not-appear-unused-profile-tag")
+	require.NotContains(t, text, "must-not-appear-profile-tag-vendor")
+	require.NotContains(t, text, "must-not-appear-unused-metric-tag")
+	require.NotContains(t, text, "must-not-appear-unused-bgp-tag")
+	require.NotContains(t, text, "must-not-appear-non-vlan-context-row")
+	require.NotContains(t, text, "must-not-appear-invalid-octet-tag")
+	require.Contains(t, capture.evidence.events[1].profiles[0].metadata, tagLldpLocChassisID)
+	require.Contains(t, capture.evidence.events[1].profiles[0].tags, tagLldpLocSysName)
+	require.Contains(t, capture.evidence.events[2].profiles[0].metrics[0].tags, tagTopoIfIndex)
+	require.Contains(t, capture.evidence.events[3].profiles[0].bgpRows[0].tags, "neighbor")
 }
 
 func TestTopologySemanticCaptureIgnoresRejectedBGPRows(t *testing.T) {

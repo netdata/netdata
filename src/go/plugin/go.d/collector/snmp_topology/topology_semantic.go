@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -365,16 +366,22 @@ func topologySemanticEventShape(event topologySemanticEvent) (uint64, uint64, er
 		}
 		switch event.kind {
 		case topologySemanticEventProfileTags:
-			logicalBytes += topologySemanticMetaTagMapBytes(profile.DeviceMetadata)
-			logicalBytes += topologySemanticStringMapBytes(profile.Tags)
+			logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+			logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
 		case topologySemanticEventTopologyMetrics, topologySemanticEventVLANContext:
 			if event.kind == topologySemanticEventVLANContext {
-				logicalBytes += topologySemanticMetaTagMapBytes(profile.DeviceMetadata)
-				logicalBytes += topologySemanticStringMapBytes(profile.Tags)
+				logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+				logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
 			}
-			records += uint64(len(profile.TopologyMetrics))
 			for _, metric := range profile.TopologyMetrics {
-				logicalBytes += uint64(len(metric.TopologyKind)) + topologySemanticStringMapBytes(metric.Tags)
+				if !topologySemanticMetricConsumed(event.kind, metric.TopologyKind) {
+					continue
+				}
+				records++
+				logicalBytes += uint64(len(metric.TopologyKind)) + topologySemanticFilteredStringMapBytes(
+					metric.Tags,
+					func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
+				)
 			}
 		case topologySemanticEventBGPPeers:
 			if profile.BGPCollectError != nil {
@@ -399,29 +406,38 @@ func projectTopologySemanticProfile(kind topologySemanticEventKind, profile *dds
 	result := topologySemanticProfileEvidence{}
 	switch kind {
 	case topologySemanticEventProfileTags:
-		result.metadata = maps.Clone(profile.DeviceMetadata)
-		result.tags = maps.Clone(profile.Tags)
+		result.metadata = cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+		result.tags = cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed)
 	case topologySemanticEventTopologyMetrics:
-		result.metrics = projectTopologySemanticMetrics(profile.TopologyMetrics)
+		result.metrics = projectTopologySemanticMetrics(kind, profile.TopologyMetrics)
 	case topologySemanticEventBGPPeers:
 		result.bgpFailed = profile.BGPCollectError != nil
 		if !result.bgpFailed {
 			result.bgpRows = projectTopologySemanticBGPRows(profile.BGPRows)
 		}
 	case topologySemanticEventVLANContext:
-		result.metadata = maps.Clone(profile.DeviceMetadata)
-		result.tags = maps.Clone(profile.Tags)
-		result.metrics = projectTopologySemanticMetrics(profile.TopologyMetrics)
+		result.metadata = cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+		result.tags = cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed)
+		result.metrics = projectTopologySemanticMetrics(kind, profile.TopologyMetrics)
 	}
 	return result
 }
 
-func projectTopologySemanticMetrics(metrics []ddsnmp.Metric) []topologySemanticMetricEvidence {
+func projectTopologySemanticMetrics(
+	eventKind topologySemanticEventKind,
+	metrics []ddsnmp.Metric,
+) []topologySemanticMetricEvidence {
 	result := make([]topologySemanticMetricEvidence, 0, len(metrics))
 	for _, metric := range metrics {
+		if !topologySemanticMetricConsumed(eventKind, metric.TopologyKind) {
+			continue
+		}
 		result = append(result, topologySemanticMetricEvidence{
 			kind: metric.TopologyKind,
-			tags: maps.Clone(metric.Tags),
+			tags: cloneTopologySemanticStringTags(
+				metric.Tags,
+				func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
+			),
 		})
 	}
 	return result
@@ -455,7 +471,7 @@ func projectTopologySemanticBGPRows(rows []ddsnmp.BGPRow) []topologySemanticBGPR
 			established:     row.Connection.EstablishedUptime.Value,
 			updateAgeHas:    row.Connection.LastReceivedUpdateAge.Has,
 			updateAge:       row.Connection.LastReceivedUpdateAge.Value,
-			tags:            maps.Clone(row.Tags),
+			tags:            cloneTopologySemanticStringTags(row.Tags, topologySemanticBGPTagAllowed),
 		})
 	}
 	return result
@@ -495,10 +511,22 @@ func topologySemanticStringMapBytes(values map[string]string) uint64 {
 	return total
 }
 
-func topologySemanticMetaTagMapBytes(values map[string]ddsnmp.MetaTag) uint64 {
+func topologySemanticFilteredStringMapBytes(values map[string]string, allowed func(string) bool) uint64 {
 	var total uint64
 	for key, value := range values {
-		total += uint64(len(key) + len(value.Value) + 1)
+		if allowed(key) {
+			total += uint64(len(key) + len(value))
+		}
+	}
+	return total
+}
+
+func topologySemanticFilteredMetaTagMapBytes(values map[string]ddsnmp.MetaTag, allowed func(string) bool) uint64 {
+	var total uint64
+	for key, value := range values {
+		if allowed(key) {
+			total += uint64(len(key) + len(value.Value) + 1)
+		}
 	}
 	return total
 }
@@ -508,60 +536,284 @@ func topologySemanticBGPRowLogicalBytes(row ddsnmp.BGPRow) uint64 {
 		len(row.Identity.RoutingInstance)+len(row.Identity.Neighbor)+len(row.Identity.RemoteAS)+
 		len(row.Descriptors.LocalAddress)+len(row.Descriptors.LocalAS)+len(row.Descriptors.LocalIdentifier)+
 		len(row.Descriptors.PeerIdentifier)+len(row.Descriptors.PeerType)+len(row.Descriptors.BGPVersion)+
-		len(row.Descriptors.Description)+len(row.State.State)+len(row.State.Raw)+19) + topologySemanticStringMapBytes(row.Tags)
+		len(row.Descriptors.Description)+len(row.State.State)+len(row.State.Raw)+19) +
+		topologySemanticFilteredStringMapBytes(row.Tags, topologySemanticBGPTagAllowed)
 }
 
-func applyTopologySemanticGlobalLimits(
-	states map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
-	snapshots map[ddsnmp.DeviceRegistrationID]*topologyDeviceSnapshot,
-	limits topologySemanticLimits,
-) {
-	records := uint64(1 + len(states))
-	if len(states) == 0 {
-		records += uint64(len(snapshots))
-	} else {
-		for registrationID := range snapshots {
-			if _, ok := states[registrationID]; !ok {
-				records++
-			}
-		}
-	}
-	logicalBytes := uint64(topologyDiagnosticCutLogicalBytes) + (records-1)*topologyDiagnosticRowLogicalBytes
-	for registrationID, state := range states {
-		if _, replaced := snapshots[registrationID]; replaced || state.generation == nil {
+func cloneTopologySemanticStringTags(values map[string]string, allowed func(string) bool) map[string]string {
+	var result map[string]string
+	for key, value := range values {
+		if !allowed(key) {
 			continue
 		}
-		capture := state.generation.semantic
-		if capture.state == diagnosticCaptureAvailable {
-			records += capture.recordCount
-			logicalBytes += capture.logicalBytes
+		if result == nil {
+			result = make(map[string]string)
 		}
+		result[key] = value
+	}
+	return result
+}
+
+func cloneTopologySemanticMetaTags(values map[string]ddsnmp.MetaTag, allowed func(string) bool) map[string]ddsnmp.MetaTag {
+	var result map[string]ddsnmp.MetaTag
+	for key, value := range values {
+		if !allowed(key) {
+			continue
+		}
+		if result == nil {
+			result = make(map[string]ddsnmp.MetaTag)
+		}
+		result[key] = value
+	}
+	return result
+}
+
+func topologySemanticProfileMetadataAllowed(key string) bool {
+	if key == "vendor" || key == "model" {
+		return true
+	}
+	return topologySemanticProfileTagAllowed(key)
+}
+
+func topologySemanticProfileTagAllowed(key string) bool {
+	switch key {
+	case tagLldpLocChassisID, tagLldpLocChassisIDSubtype,
+		tagLldpLocSysName, tagLldpLocSysDesc,
+		tagLldpLocSysCapSupported, tagLldpLocSysCapEnabled,
+		tagBridgeBaseAddress, tagOSPFRouterID:
+		return true
+	default:
+		return false
+	}
+}
+
+func topologySemanticMetricConsumed(eventKind topologySemanticEventKind, kind ddsnmp.TopologyKind) bool {
+	if eventKind == topologySemanticEventVLANContext {
+		return isTopologyVLANContextMetric(kind)
+	}
+	return eventKind == topologySemanticEventTopologyMetrics
+}
+
+func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool {
+	switch kind {
+	case ddsnmp.KindIfName, ddsnmp.KindIfStatus, ddsnmp.KindIfDuplex:
+		switch key {
+		case
+			tagTopoIfIndex, tagTopoIfName, tagTopoIfType, tagTopoIfAdmin, tagTopoIfOper,
+			tagTopoIfPhys, tagTopoIfDescr, tagTopoIfAlias, tagTopoIfSpeed, tagTopoIfHigh,
+			tagTopoIfLast, tagTopoIfDuplex:
+			return true
+		}
+	case ddsnmp.KindIpIfIndex:
+		switch key {
+		case tagTopoIfIndex, tagTopoIPAddr, tagTopoIPMask:
+			return true
+		}
+	case ddsnmp.KindBridgePortIfIndex:
+		switch key {
+		case tagBridgeBasePort, tagBridgeIfIndex:
+			return true
+		}
+	case ddsnmp.KindLldpLocPort:
+		switch key {
+		case tagLldpLocPortNum, tagLldpLocPortID, tagLldpLocPortIDSubtype, tagLldpLocPortDesc:
+			return true
+		}
+	case ddsnmp.KindLldpLocManAddr:
+		switch key {
+		case tagLldpLocMgmtAddr, tagLldpLocMgmtAddrSubtype,
+			tagLldpLocMgmtAddrIfSubtype, tagLldpLocMgmtAddrIfID, tagLldpLocMgmtAddrOID:
+			return true
+		}
+	case ddsnmp.KindLldpRem:
+		switch key {
+		case
+			tagLldpLocPortNum, tagLldpRemIndex, tagLldpRemChassisID, tagLldpRemChassisIDSubtype,
+			tagLldpRemPortID, tagLldpRemPortIDSubtype, tagLldpRemPortDesc, tagLldpRemSysName,
+			tagLldpRemSysDesc, tagLldpRemSysCapSupported, tagLldpRemSysCapEnabled,
+			tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype:
+			return true
+		}
+	case ddsnmp.KindLldpRemManAddr, ddsnmp.KindLldpRemManAddrCompat:
+		switch key {
+		case
+			tagLldpLocPortNum, tagLldpRemIndex, tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype,
+			tagLldpRemMgmtAddrLen, tagLldpRemMgmtAddrIfSubtype, tagLldpRemMgmtAddrIfID,
+			tagLldpRemMgmtAddrOID:
+			return true
+		}
+		return topologySemanticLldpRemOctetTagAllowed(key)
+	case ddsnmp.KindCdpCache:
+		switch key {
+		case
+			tagCdpIfIndex, tagCdpIfName, tagCdpDeviceIndex, tagCdpDeviceID, tagCdpAddressType,
+			tagCdpDevicePort, tagCdpVersion, tagCdpPlatform, tagCdpCaps, tagCdpAddress,
+			tagCdpVTPDomain, tagCdpNativeVLAN, tagCdpDuplex, tagCdpPower, tagCdpMTU,
+			tagCdpSysName, tagCdpSysObjectID, tagCdpPrimaryMgmtAddrType, tagCdpPrimaryMgmtAddr,
+			tagCdpSecondaryMgmtAddrType, tagCdpSecondaryMgmtAddr, tagCdpPhysicalLocation,
+			tagCdpLastChange:
+			return true
+		}
+	case ddsnmp.KindFdbEntry, ddsnmp.KindQbridgeFdbEntry:
+		switch key {
+		case
+			tagFdbMac, tagFdbBridgePort, tagFdbStatus, tagDot1qFdbID, tagDot1qFdbMac,
+			tagDot1qFdbPort, tagDot1qFdbStatus, tagTopologyContextVLANID, tagTopologyContextVLANName:
+			return true
+		}
+	case ddsnmp.KindQbridgeVlanEntry:
+		switch key {
+		case tagDot1qVlanID, tagDot1qVlanID1, tagDot1qVlanFdbID:
+			return true
+		}
+	case ddsnmp.KindStpPort:
+		switch key {
+		case
+			tagStpPort, tagStpPortPriority, tagStpPortState, tagStpPortEnable,
+			tagStpPortPathCost, tagStpPortDesignatedRoot, tagStpPortDesignatedCost,
+			tagStpPortDesignatedBridge, tagStpPortDesignatedPort,
+			tagTopologyContextVLANID, tagTopologyContextVLANName:
+			return true
+		}
+	case ddsnmp.KindVtpVlan:
+		switch key {
+		case tagVtpVlanIndex, tagVtpVlanState, tagVtpVlanType, tagVtpVlanName:
+			return true
+		}
+	case ddsnmp.KindArpEntry, ddsnmp.KindArpLegacyEntry:
+		switch key {
+		case tagArpIfIndex, tagArpIfName, tagArpIP, tagArpMac, tagArpType, tagArpState, tagArpAddrType:
+			return true
+		}
+	case ddsnmp.KindOSPFNeighbor:
+		switch key {
+		case tagOSPFNeighborIP, tagOSPFNeighborAddresslessIndex, tagOSPFNeighborRouterID, tagOSPFNeighborState:
+			return true
+		}
+	}
+	return false
+}
+
+func topologySemanticBGPTagAllowed(key string) bool {
+	switch key {
+	case "neighbor", "remote_as", "routing_instance":
+		return true
+	default:
+		return false
+	}
+}
+
+func topologySemanticLldpRemOctetTagAllowed(key string) bool {
+	suffix := strings.TrimPrefix(key, tagLldpRemMgmtAddrOctetPref)
+	index, err := strconv.Atoi(suffix)
+	return err == nil && index >= 1 && index <= 16 && strconv.Itoa(index) == suffix
+}
+
+type topologySemanticUsage struct {
+	limits       topologySemanticLimits
+	recordCount  uint64
+	logicalBytes uint64
+}
+
+func newTopologySemanticUsage(
+	entries []ddsnmp.DeviceEntry,
+	seen map[ddsnmp.DeviceRegistrationID]bool,
+	selected map[ddsnmp.DeviceRegistrationID]bool,
+	previousStates map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
+	states map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
+	limits topologySemanticLimits,
+) topologySemanticUsage {
+	removed := 0
+	for registrationID := range previousStates {
+		if !seen[registrationID] {
+			removed++
+		}
+	}
+	rows := uint64(len(entries) + removed)
+	usage := topologySemanticUsage{
+		limits:       limits,
+		recordCount:  1 + rows,
+		logicalBytes: topologyDiagnosticCutLogicalBytes + rows*topologyDiagnosticRowLogicalBytes,
 	}
 
-	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(snapshots))
-	for registrationID := range snapshots {
-		registrationIDs = append(registrationIDs, registrationID)
-	}
-	slices.Sort(registrationIDs)
-	for _, registrationID := range registrationIDs {
-		snapshot := snapshots[registrationID]
-		if snapshot == nil || snapshot.semantic.state != diagnosticCaptureAvailable {
+	for _, entry := range entries {
+		registrationID := entry.RegistrationID
+		if selected[registrationID] {
 			continue
 		}
-		capture := &snapshot.semantic
-		if records > limits.maxRecords || capture.recordCount > limits.maxRecords-records {
-			capture.state = diagnosticCaptureLimitExceeded
+		state := states[registrationID]
+		states[registrationID] = usage.includeRetained(state)
+	}
+	return usage
+}
+
+func (u *topologySemanticUsage) availableLimits(perDevice topologySemanticLimits) topologySemanticLimits {
+	return topologySemanticLimits{
+		maxRecords:      min(perDevice.maxRecords, topologySemanticRemaining(u.limits.maxRecords, u.recordCount)),
+		maxLogicalBytes: min(perDevice.maxLogicalBytes, topologySemanticRemaining(u.limits.maxLogicalBytes, u.logicalBytes)),
+	}
+}
+
+func (u *topologySemanticUsage) include(capture topologySemanticCapture) topologySemanticCapture {
+	if capture.state != diagnosticCaptureAvailable {
+		return capture
+	}
+	if u.recordCount > u.limits.maxRecords || capture.recordCount > u.limits.maxRecords-u.recordCount {
+		return limitTopologySemanticCapture(capture, diagnosticCaptureReasonGlobalRecordLimit)
+	}
+	if u.logicalBytes > u.limits.maxLogicalBytes || capture.logicalBytes > u.limits.maxLogicalBytes-u.logicalBytes {
+		return limitTopologySemanticCapture(capture, diagnosticCaptureReasonGlobalByteLimit)
+	}
+	u.recordCount += capture.recordCount
+	u.logicalBytes += capture.logicalBytes
+	return capture
+}
+
+func (u *topologySemanticUsage) includeRetained(state deviceRefreshState) deviceRefreshState {
+	if state.generation == nil || state.generation.semantic.state != diagnosticCaptureAvailable {
+		return state
+	}
+	capture := u.include(state.generation.semantic)
+	if capture.state == diagnosticCaptureAvailable {
+		return state
+	}
+	generation := *state.generation
+	generation.semantic = capture
+	state.generation = &generation
+	return state
+}
+
+func topologySemanticRemaining(limit, used uint64) uint64 {
+	if used >= limit {
+		return 0
+	}
+	return limit - used
+}
+
+func classifyTopologySemanticCaptureLimit(
+	capture topologySemanticCapture,
+	effective topologySemanticLimits,
+	perDevice topologySemanticLimits,
+) topologySemanticCapture {
+	if capture.state != diagnosticCaptureLimitExceeded {
+		return capture
+	}
+	switch capture.reason {
+	case diagnosticCaptureReasonRecordLimit:
+		if effective.maxRecords < perDevice.maxRecords {
 			capture.reason = diagnosticCaptureReasonGlobalRecordLimit
-			capture.evidence = nil
-			continue
 		}
-		if logicalBytes > limits.maxLogicalBytes || capture.logicalBytes > limits.maxLogicalBytes-logicalBytes {
-			capture.state = diagnosticCaptureLimitExceeded
+	case diagnosticCaptureReasonByteLimit:
+		if effective.maxLogicalBytes < perDevice.maxLogicalBytes {
 			capture.reason = diagnosticCaptureReasonGlobalByteLimit
-			capture.evidence = nil
-			continue
 		}
-		records += capture.recordCount
-		logicalBytes += capture.logicalBytes
 	}
+	return capture
+}
+
+func limitTopologySemanticCapture(capture topologySemanticCapture, reason diagnosticCaptureReason) topologySemanticCapture {
+	capture.state = diagnosticCaptureLimitExceeded
+	capture.reason = reason
+	capture.evidence = nil
+	return capture
 }

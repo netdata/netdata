@@ -54,10 +54,11 @@ type (
 	// modules that set these fields can expose data functions to the UI.
 	Creator struct {
 		Defaults
-		Create          func() CollectorV1
-		CreateV2        func() CollectorV2
-		JobConfigSchema string
-		Config          func() any
+		Create             func() CollectorV1
+		CreateV2           func() CollectorV2
+		JobConfigSchema    string
+		Config             func() any
+		JobConfigLifecycle JobConfigLifecycle
 
 		// InstancePolicy defaults to InstancePolicyPerJob when omitted.
 		InstancePolicy InstancePolicy

@@ -68,13 +68,26 @@ const (
 	topologyDiagnosticAbortPanic
 )
 
+type topologyDiagnosticSweepPhase uint8
+
+const (
+	topologyDiagnosticSweepPhaseUnknown topologyDiagnosticSweepPhase = iota
+	topologyDiagnosticSweepPhaseRegistrationCut
+	topologyDiagnosticSweepPhaseTargetResolution
+	topologyDiagnosticSweepPhaseDeviceRefresh
+	topologyDiagnosticSweepPhaseCommit
+)
+
 type topologyAbortedSweepDiagnostic struct {
-	sequence          uint64
-	startedAt         time.Time
-	abortedAt         time.Time
-	reason            topologyDiagnosticAbortReason
-	registrationCount int
-	selectedCount     int
+	sequence              uint64
+	startedAt             time.Time
+	abortedAt             time.Time
+	reason                topologyDiagnosticAbortReason
+	phase                 topologyDiagnosticSweepPhase
+	activeRegistrationID  ddsnmp.DeviceRegistrationID
+	hasActiveRegistration bool
+	registrationCount     int
+	selectedCount         int
 }
 
 type topologyDiagnostics struct {
@@ -290,6 +303,9 @@ func unavailableTopologyDiagnosticCut(input topologyDiagnosticCutInput, reason d
 func (c *Collector) publishAbortedTopologyDiagnostic(
 	startedAt time.Time,
 	reason topologyDiagnosticAbortReason,
+	phase topologyDiagnosticSweepPhase,
+	activeRegistrationID ddsnmp.DeviceRegistrationID,
+	hasActiveRegistration bool,
 	registrationCount int,
 	selectedCount int,
 ) {
@@ -297,12 +313,15 @@ func (c *Collector) publishAbortedTopologyDiagnostic(
 		return
 	}
 	c.lastAbortedTopologyDiagnostic.Store(&topologyAbortedSweepDiagnostic{
-		sequence:          c.topologyDiagnosticAbortSequence.Add(1),
-		startedAt:         startedAt,
-		abortedAt:         safeTopologyDiagnosticTime(c),
-		reason:            reason,
-		registrationCount: registrationCount,
-		selectedCount:     selectedCount,
+		sequence:              c.topologyDiagnosticAbortSequence.Add(1),
+		startedAt:             startedAt,
+		abortedAt:             safeTopologyDiagnosticTime(c),
+		reason:                reason,
+		phase:                 phase,
+		activeRegistrationID:  activeRegistrationID,
+		hasActiveRegistration: hasActiveRegistration,
+		registrationCount:     registrationCount,
+		selectedCount:         selectedCount,
 	})
 }
 

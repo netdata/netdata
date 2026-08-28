@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -37,10 +38,11 @@ func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:          func() collectorapi.CollectorV1 { return New(store) },
-		Config:          func() any { return &Config{} },
-		SharedFunctions: snmpMethods,
-		MethodHandler:   snmpFunctionHandler,
+		Create:             func() collectorapi.CollectorV1 { return New(store) },
+		Config:             func() any { return &Config{} },
+		JobConfigLifecycle: newSNMPJobConfigLifecycle(store),
+		SharedFunctions:    snmpMethods,
+		MethodHandler:      snmpFunctionHandler,
 	}
 }
 
@@ -108,12 +110,19 @@ type (
 
 		vnode *vnodes.VirtualNode
 
-		charts               *collectorapi.Charts
-		seenScalarMetrics    map[string]bool
-		seenTableMetrics     map[string]bool
-		seenProfiles         map[string]bool
-		deviceStore          *ddsnmp.DeviceStore
-		deviceLifecycleStore deviceLifecycleStore
+		charts                   *collectorapi.Charts
+		seenScalarMetrics        map[string]bool
+		seenTableMetrics         map[string]bool
+		seenProfiles             map[string]bool
+		deviceStore              *ddsnmp.DeviceStore
+		deviceLifecycleStore     deviceLifecycleStore
+		deviceLifecycleMu        sync.Mutex
+		deviceLifecycleOwner     string
+		deviceLifecycleInfo      ddsnmp.DeviceLifecycleInfo
+		deviceLifecycleStatus    ddsnmp.DeviceLifecycleStatus
+		deviceLifecyclePending   *ddsnmp.DeviceConnectionInfo
+		deviceLifecycleManaged   bool
+		deviceLifecycleCommitted bool
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		licensing  *licensingIntegration
@@ -217,7 +226,12 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.funcRouter.Cleanup(ctx)
 	}
 	if c.deviceStore != nil {
-		c.deviceStore.Unregister(c.deviceStoreOwnerKey())
+		ownerKey, managed := c.deviceStoreCleanupKey()
+		if managed {
+			c.deviceStore.UnregisterDevice(ownerKey)
+		} else {
+			c.deviceStore.Unregister(ownerKey)
+		}
 	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()

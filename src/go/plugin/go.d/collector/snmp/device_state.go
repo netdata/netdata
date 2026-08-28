@@ -5,6 +5,7 @@ package snmp
 import (
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -43,7 +44,21 @@ func (c *Collector) vnodeLabels() map[string]string {
 }
 
 func (c *Collector) deviceStoreOwnerKey() string {
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	if c.deviceLifecycleOwner != "" {
+		return c.deviceLifecycleOwner
+	}
 	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
+}
+
+func (c *Collector) deviceStoreCleanupKey() (string, bool) {
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	if c.deviceLifecycleOwner != "" {
+		return c.deviceLifecycleOwner, c.deviceLifecycleManaged
+	}
+	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port), false
 }
 
 // registerDeviceState exposes the already-configured SNMP job to SNMP-family
@@ -60,7 +75,7 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		vnodeLabels,
 	)
 
-	c.deviceStore.Register(c.deviceStoreOwnerKey(), ddsnmp.DeviceConnectionInfo{
+	c.publishDeviceState(ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
 		Port:            c.Options.Port,
 		SNMPVersion:     c.Options.Version,
@@ -85,11 +100,29 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		Model:           model,
 
 		DisableBulkWalk: c.disableBulkWalk,
-		ManualProfiles:  c.ManualProfiles,
+		ManualProfiles:  slices.Clone(c.ManualProfiles),
 		VnodeGUID:       c.vnodeGUID(),
 		VnodeHostname:   c.vnodeHostname(),
 		VnodeLabels:     vnodeLabels,
 	})
+}
+
+func (c *Collector) publishDeviceState(info ddsnmp.DeviceConnectionInfo) {
+	c.deviceLifecycleMu.Lock()
+	if c.deviceLifecycleManaged && !c.deviceLifecycleCommitted {
+		pending := info
+		pending.ManualProfiles = slices.Clone(info.ManualProfiles)
+		pending.VnodeLabels = maps.Clone(info.VnodeLabels)
+		c.deviceLifecyclePending = &pending
+		c.deviceLifecycleMu.Unlock()
+		return
+	}
+	ownerKey := c.deviceLifecycleOwner
+	if ownerKey == "" {
+		ownerKey = fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
+	}
+	c.deviceLifecycleMu.Unlock()
+	c.deviceStore.Register(ownerKey, info)
 }
 
 func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {

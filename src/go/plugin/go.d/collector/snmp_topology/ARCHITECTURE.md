@@ -38,7 +38,7 @@ flowchart LR
     Init --> Traps
     ReverseDNS --> Topology
     ReverseDNS --> Traps
-    SNMP -->|"registers devices"| Store
+    SNMP -->|"committed lifecycle and device state"| Store
     Store -->|"device connection state"| Topology
     Topology -->|"trap topology enrichment"| TrapHandle
     TrapHandle -->|"interface/device context"| Traps
@@ -100,13 +100,13 @@ refreshTopology(ctx)
   build a plan of jobs whose next retry/refresh is due
   resolve planned DNS targets with up to eight workers under one shared 5s budget
   for each planned job, in registration-ID order:
-    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
+    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, remainingSemanticLimits)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
   activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs)
+refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, semanticLimits)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
@@ -135,14 +135,22 @@ rebuilt `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore
 keep independent refresh state and device generations, and a replacement job
 cannot inherit the removed job's retry or warning-limiter state.
 
-The registration lifetime now begins when the normal SNMP job enters `Init`,
-before system information, profile selection, or vnode setup can succeed.
-`LifecycleCut` provides a separately sequenced snapshot of every current job's
-credential-free configured identity, last completed lifecycle phase/outcome,
-and topology-readiness state. Later connection-state registration reuses the
-same registration ID, while `Entries` remains limited to topology-ready jobs.
-Lifecycle reporting is diagnostic-only: failures or panics are rate-limited and
-cannot change collector lifecycle results. Cleanup removes both views together.
+The normal SNMP collector records lifecycle phase/outcome locally from `Init`,
+before system information, profile selection, or vnode setup can succeed. Job
+Manager publishes that snapshot only after the matching running/failed DynCfg
+graph row commits. Failed candidate cleanup therefore cannot erase the job, and
+an uncommitted candidate cannot appear in topology. Configuration replacement
+atomically replaces the prior lifecycle incarnation; configuration removal owns
+full deletion. Normal collector cleanup removes only topology-ready connection
+state.
+
+`LifecycleCut` provides a separately sequenced and timestamped snapshot of every
+committed job's credential-free configured identity, last completed lifecycle
+phase/outcome, and topology-readiness state. Connection state collected before
+graph commit is held once by the collector and flushed atomically with the
+lifecycle row; later updates retain the same registration ID. `Entries` remains
+limited to topology-ready jobs. Lifecycle reporting is diagnostic-only:
+failures or panics are rate-limited and cannot change collector or graph results.
 
 Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh
@@ -177,11 +185,15 @@ last successful evidence reference and capture state, and whether that retained
 generation is renderable or expired. Registrations removed since the preceding
 cut are recorded separately. A canceled or panicking sweep leaves both the
 published topology generation and its cut unchanged and replaces only one
-bounded last-aborted marker.
+bounded last-aborted marker. That marker records the sweep phase and, during
+device refresh, the active registration ID.
 
 Per-device semantic limits and one global latest-view record/logical-byte limit
-are checked directly. The global limit includes retained semantic evidence and
-sweep rows; lifecycle rows are admitted independently against the remaining
+are checked directly. One serial usage counter includes sweep rows, non-due
+retained evidence, and each due device's new-or-retained evidence in registration
+order. The remaining allowance reaches the recorder before it copies an event,
+so peak optional evidence is globally bounded rather than capped after all due
+devices finish. Lifecycle rows are admitted independently against the remaining
 budget when diagnostics are acquired. There are no reservations, sessions,
 queues, or attempt ledgers.
 
@@ -253,9 +265,10 @@ Ingestion is split by source area:
 Every successful device refresh also retains a bounded semantic replay input.
 The live builder and the replay path share one ordered event dispatcher for
 system uptime, profile tags, topology rows, BGP rows, and successful VLAN-context
-rows. The retained projection keeps only fields consumed by those builder
-operations; credentials, profile source paths, metric names, values, and other
-collector output are not copied.
+rows. The retained projection uses positive per-event/per-topology-kind field
+allowlists. It keeps only metadata, tags, rows, and BGP fallback tags consumed by
+those builder operations; non-VLAN rows in VLAN events, credentials, profile
+source paths, metric names, values, and other collector output are not copied.
 
 Semantic capture has direct per-device record and logical-byte limits. The
 projection checks an event before copying it. Limit exhaustion, projection

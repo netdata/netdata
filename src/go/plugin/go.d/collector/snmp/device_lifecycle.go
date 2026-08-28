@@ -16,12 +16,20 @@ type deviceLifecycleStore interface {
 }
 
 func (c *Collector) beginDeviceLifecycle() {
+	info := ddsnmp.DeviceLifecycleInfo{
+		Hostname:    c.Hostname,
+		Port:        c.Options.Port,
+		SNMPVersion: c.Options.Version,
+	}
+	c.deviceLifecycleMu.Lock()
+	c.deviceLifecycleInfo = info
+	publish := !c.deviceLifecycleManaged || c.deviceLifecycleCommitted
+	c.deviceLifecycleMu.Unlock()
+	if !publish {
+		return
+	}
 	c.reportDeviceLifecycle(func(store deviceLifecycleStore) {
-		store.RegisterJob(c.deviceStoreOwnerKey(), ddsnmp.DeviceLifecycleInfo{
-			Hostname:    c.Hostname,
-			Port:        c.Options.Port,
-			SNMPVersion: c.Options.Version,
-		})
+		store.RegisterJob(c.deviceStoreOwnerKey(), info)
 	})
 }
 
@@ -30,13 +38,67 @@ func (c *Collector) completeDeviceLifecycle(phase ddsnmp.DeviceLifecyclePhase, e
 	if err != nil {
 		outcome = ddsnmp.DeviceLifecycleOutcomeFailed
 	}
+	status := ddsnmp.DeviceLifecycleStatus{
+		Phase:       phase,
+		Outcome:     outcome,
+		CompletedAt: time.Now(),
+	}
+	c.deviceLifecycleMu.Lock()
+	c.deviceLifecycleStatus = status
+	publish := !c.deviceLifecycleManaged || c.deviceLifecycleCommitted
+	c.deviceLifecycleMu.Unlock()
+	if !publish {
+		return
+	}
 	c.reportDeviceLifecycle(func(store deviceLifecycleStore) {
-		store.RecordJobLifecycle(c.deviceStoreOwnerKey(), ddsnmp.DeviceLifecycleStatus{
-			Phase:       phase,
-			Outcome:     outcome,
-			CompletedAt: time.Now(),
-		})
+		store.RecordJobLifecycle(c.deviceStoreOwnerKey(), status)
 	})
+}
+
+func (c *Collector) bindDeviceLifecycle(owner string) {
+	if c == nil || owner == "" {
+		return
+	}
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	if c.deviceLifecycleOwner != "" && c.deviceLifecycleOwner != owner {
+		return
+	}
+	c.deviceLifecycleOwner = owner
+	c.deviceLifecycleManaged = true
+	c.deviceLifecycleCommitted = false
+}
+
+func (c *Collector) commitDeviceLifecycle(previousOwner string) {
+	if c == nil || c.deviceStore == nil {
+		return
+	}
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	defer func() {
+		if recover() != nil {
+			c.Limit("snmp:device-lifecycle", 1, deviceLifecycleWarningEvery).
+				Warningf("failed to update SNMP job lifecycle diagnostics")
+		}
+	}()
+	c.deviceStore.ReplaceJob(
+		previousOwner,
+		c.deviceLifecycleOwner,
+		c.deviceLifecycleInfo,
+		c.deviceLifecycleStatus,
+		c.deviceLifecyclePending,
+	)
+	c.deviceLifecyclePending = nil
+	c.deviceLifecycleCommitted = true
+}
+
+func (c *Collector) deviceLifecycleBoundTo(owner string) bool {
+	if c == nil || owner == "" {
+		return false
+	}
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	return c.deviceLifecycleManaged && c.deviceLifecycleOwner == owner
 }
 
 func (c *Collector) reportDeviceLifecycle(report func(deviceLifecycleStore)) {

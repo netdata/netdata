@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -260,6 +261,68 @@ func TestCollector_InitFailurePublishesSafeLifecycle(t *testing.T) {
 	require.NotContains(t, serialized, collr.User.PrivKey)
 	require.NotContains(t, serialized, collr.ManualProfiles[0])
 }
+
+func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilCommit(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	collr := New(store)
+	collr.Hostname = ""
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+
+	hook.Bind(identity, job)
+	require.Error(t, collr.Init(context.Background()))
+	snapshot := hook.Capture(identity, job)
+	collr.Cleanup(context.Background())
+	require.Empty(t, store.LifecycleCut().Entries)
+
+	snapshot.Commit(collectorapi.JobConfigIdentity{})
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	require.False(t, cut.Entries[0].TopologyReady)
+}
+
+func TestCollectorManagedConnectionCollectedBeforeCommitIsPublishedAtCommit(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	collr := New(store)
+	collr.Config = prepareV2Config()
+	collr.ManualProfiles = []string{"profile-a"}
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+
+	hook.Bind(identity, job)
+	collr.beginDeviceLifecycle()
+	collr.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseInit, nil)
+	collr.registerDeviceState(&snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+		Name:        "switch-a",
+	}, nil)
+	collr.ManualProfiles[0] = "changed"
+	require.Empty(t, store.Entries())
+	require.Empty(t, store.LifecycleCut().Entries)
+
+	snapshot := hook.Capture(identity, job)
+	require.NotNil(t, snapshot)
+	snapshot.Commit(collectorapi.JobConfigIdentity{})
+	require.Len(t, store.Entries(), 1)
+	require.Equal(t, []string{"profile-a"}, store.Entries()[0].Info.ManualProfiles)
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.True(t, cut.Entries[0].TopologyReady)
+}
+
+type snmpLifecycleTestRuntimeJob struct {
+	collector *Collector
+}
+
+func (snmpLifecycleTestRuntimeJob) FullName() string   { return "snmp_test" }
+func (snmpLifecycleTestRuntimeJob) ModuleName() string { return "snmp" }
+func (snmpLifecycleTestRuntimeJob) Name() string       { return "test" }
+func (snmpLifecycleTestRuntimeJob) IsRunning() bool    { return false }
+func (j snmpLifecycleTestRuntimeJob) Collector() any   { return j.collector }
 
 func TestCollector_CheckFailureUpdatesLifecycleWithoutTopologyRegistration(t *testing.T) {
 	ctrl := gomock.NewController(t)

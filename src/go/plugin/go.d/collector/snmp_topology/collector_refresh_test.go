@@ -446,14 +446,14 @@ func TestCollectorDeviceRefreshWarningsAreLimitedPerRegistrationAndFailureClass(
 	}
 
 	for range 2 {
-		snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
+		snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil, coll.currentTopologySemanticLimits())
 		require.Nil(t, snapshot)
 		require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 	}
-	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
+	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil, coll.currentTopologySemanticLimits())
 	require.Nil(t, snapshot)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
-	snapshot, outcome = coll.refreshDeviceTopology(context.Background(), 2, dev, nil)
+	snapshot, outcome = coll.refreshDeviceTopology(context.Background(), 2, dev, nil, coll.currentTopologySemanticLimits())
 	require.Nil(t, snapshot)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 
@@ -586,7 +586,7 @@ func TestCollectorSuccessfulRefreshSurvivesSemanticCaptureLimit(t *testing.T) {
 		})
 	}
 
-	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil)
+	snapshot, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, nil, coll.currentTopologySemanticLimits())
 	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
 	require.NotNil(t, snapshot)
 	require.True(t, snapshot.hasObservation)
@@ -1223,7 +1223,7 @@ func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
 		})
 	}
 
-	generation, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")})
+	generation, outcome := coll.refreshDeviceTopology(context.Background(), 1, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")}, coll.currentTopologySemanticLimits())
 	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
 	require.NotNil(t, generation)
 	snapshot := generation.observation
@@ -1340,7 +1340,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 
 	go func() {
 		defer close(done)
-		coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
+		coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")}, coll.currentTopologySemanticLimits())
 	}()
 
 	<-started
@@ -1384,7 +1384,7 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 		})
 	}
 
-	generation, outcome := coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
+	generation, outcome := coll.refreshDeviceTopology(context.Background(), registrationID, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")}, coll.currentTopologySemanticLimits())
 	require.Nil(t, generation)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 

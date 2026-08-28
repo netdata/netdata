@@ -106,8 +106,9 @@ type DeviceLifecycleEntry struct {
 // DeviceLifecycleCut is an immutable, independently sequenced snapshot of all
 // current normal-SNMP job incarnations.
 type DeviceLifecycleCut struct {
-	Sequence uint64
-	Entries  []DeviceLifecycleEntry
+	Sequence   uint64
+	CapturedAt time.Time
+	Entries    []DeviceLifecycleEntry
 }
 
 type deviceLifecycleRecord struct {
@@ -181,8 +182,9 @@ func (s *DeviceStore) LifecycleCut() DeviceLifecycleCut {
 	slices.Sort(registrationIDs)
 
 	cut := DeviceLifecycleCut{
-		Sequence: s.lifecycleSequence,
-		Entries:  make([]DeviceLifecycleEntry, 0, len(registrationIDs)),
+		Sequence:   s.lifecycleSequence,
+		CapturedAt: time.Now(),
+		Entries:    make([]DeviceLifecycleEntry, 0, len(registrationIDs)),
 	}
 	for _, registrationID := range registrationIDs {
 		record := s.lifecycles[registrationID]
@@ -195,6 +197,44 @@ func (s *DeviceStore) LifecycleCut() DeviceLifecycleCut {
 		})
 	}
 	return cut
+}
+
+// ReplaceJob atomically removes a prior configuration incarnation, when
+// different, and publishes the current lifecycle plus any topology-ready state.
+func (s *DeviceStore) ReplaceJob(
+	previousOwnerKey string,
+	ownerKey string,
+	info DeviceLifecycleInfo,
+	status DeviceLifecycleStatus,
+	device *DeviceConnectionInfo,
+) {
+	if ownerKey == "" {
+		return
+	}
+	s.mu.Lock()
+	s.ensureMapsLocked()
+	if previousOwnerKey != "" && previousOwnerKey != ownerKey {
+		s.removeRegistrationLocked(previousOwnerKey)
+	}
+	registrationID, exists := s.ownerRegistrations[ownerKey]
+	if !exists {
+		registrationID = s.nextRegistrationIDLocked()
+		s.ownerRegistrations[ownerKey] = registrationID
+	} else if device, ok := s.devices[registrationID]; ok {
+		s.removeHostnameIndexLocked(ownerKey, device.Hostname)
+		delete(s.devices, registrationID)
+	}
+	s.lifecycles[registrationID] = deviceLifecycleRecord{
+		info:          info,
+		lastCompleted: status,
+	}
+	if device != nil {
+		cloned := cloneDeviceConnectionInfo(*device)
+		s.devices[registrationID] = cloned
+		s.addHostnameIndexLocked(ownerKey, cloned.Hostname)
+	}
+	s.lifecycleSequence++
+	s.mu.Unlock()
 }
 
 // Register adds or updates a device by its caller-owned lookup key. An update
@@ -219,19 +259,41 @@ func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	s.mu.Unlock()
 }
 
-// Unregister removes a device from the store.
-func (s *DeviceStore) Unregister(ownerKey string) {
+// UnregisterDevice removes topology-ready connection state while retaining the
+// configuration-owned lifecycle incarnation.
+func (s *DeviceStore) UnregisterDevice(ownerKey string) {
 	s.mu.Lock()
 	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
 		if info, exists := s.devices[registrationID]; exists {
 			s.removeHostnameIndexLocked(ownerKey, info.Hostname)
+			delete(s.devices, registrationID)
+			s.lifecycleSequence++
 		}
-		delete(s.devices, registrationID)
-		delete(s.lifecycles, registrationID)
-		delete(s.ownerRegistrations, ownerKey)
+	}
+	s.mu.Unlock()
+}
+
+// Unregister removes a complete job incarnation from the store.
+func (s *DeviceStore) Unregister(ownerKey string) {
+	s.mu.Lock()
+	if _, ok := s.ownerRegistrations[ownerKey]; ok {
+		s.removeRegistrationLocked(ownerKey)
 		s.lifecycleSequence++
 	}
 	s.mu.Unlock()
+}
+
+func (s *DeviceStore) removeRegistrationLocked(ownerKey string) {
+	registrationID, ok := s.ownerRegistrations[ownerKey]
+	if !ok {
+		return
+	}
+	if info, exists := s.devices[registrationID]; exists {
+		s.removeHostnameIndexLocked(ownerKey, info.Hostname)
+	}
+	delete(s.devices, registrationID)
+	delete(s.lifecycles, registrationID)
+	delete(s.ownerRegistrations, ownerKey)
 }
 
 // Entries returns a deterministic, deep-copied snapshot of all registered jobs.
