@@ -7,7 +7,6 @@
 
 extern bool dbengine_enabled;
 extern bool dbengine_datafiles_present; // dbengine datafiles exist on disk, even if the agent is not currently running dbengine
-extern bool dbengine_use_direct_io;
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/dbengine-config.h"
