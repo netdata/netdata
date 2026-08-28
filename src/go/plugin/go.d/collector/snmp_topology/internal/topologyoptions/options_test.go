@@ -3,10 +3,22 @@
 package topologyoptions
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestQueryOptionsContainsOnlyComparableScalarValues(t *testing.T) {
+	typeOfOptions := reflect.TypeFor[QueryOptions]()
+	for field := range typeOfOptions.Fields() {
+		switch field.Type.Kind() {
+		case reflect.Bool, reflect.Int, reflect.String:
+		default:
+			t.Errorf("QueryOptions.%s has non-scalar type %s", field.Name, field.Type)
+		}
+	}
+}
 
 func TestParseDepth(t *testing.T) {
 	tests := map[string]struct {

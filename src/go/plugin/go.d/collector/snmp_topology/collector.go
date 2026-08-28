@@ -409,7 +409,12 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	}
 	c.deviceStates = nextStates
 	c.generationSequence = nextSequence
-	generation := newTopologyGeneration(c.generationSequence, publishedAt, nextStates)
+	generation := newTopologyGeneration(
+		c.generationSequence,
+		publishedAt,
+		c.topologyRegistry.producerScope(),
+		nextStates,
+	)
 	generation.diagnostic = c.projectCommittedTopologyDiagnosticCut(topologyDiagnosticCutInput{
 		sequence:       c.generationSequence,
 		startedAt:      start,

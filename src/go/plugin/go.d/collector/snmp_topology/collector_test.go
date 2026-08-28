@@ -95,7 +95,7 @@ func TestSNMPTopologyFunctionAvailabilityChangesOnlyWithPublishedGeneration(t *t
 	const registrationID ddsnmp.DeviceRegistrationID = 1
 	device := freezeTestTopologyBuilderAt(registrationID, publishedAt, builder)
 	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, publishedAt, states))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, publishedAt, coll.topologyRegistry.producerScope(), states))
 
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 	require.True(t, device.freshAt(publishedAt.Add(10*time.Millisecond)))
@@ -103,7 +103,12 @@ func TestSNMPTopologyFunctionAvailabilityChangesOnlyWithPublishedGeneration(t *t
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID),
 		"one published generation must not decay between completed sweeps")
 
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(2, publishedAt.Add(21*time.Millisecond), states))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		2,
+		publishedAt.Add(21*time.Millisecond),
+		coll.topologyRegistry.producerScope(),
+		states,
+	))
 	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID),
 		"the next completed sweep must remove an expired retained generation from renderable membership")
 }

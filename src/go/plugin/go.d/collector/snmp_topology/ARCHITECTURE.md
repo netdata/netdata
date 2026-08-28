@@ -335,17 +335,21 @@ tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,
 consecutive failures, the monotonic attempt ordinal, the latest completed
 attempt capture, and the last successful device generation.
 
+The published `topologyGeneration` also owns the producer scope captured at the
+same commit boundary. Graph readers therefore cannot combine an observation
+vector from one sweep with a later registry scope.
+
 ## Registry And Snapshot
 
 `topology_registry.go` owns one atomic pointer to the latest immutable
 `topologyGeneration`. The generation contains the complete, registration-ID
-ordered vector produced by one refresh sweep.
+ordered vector and producer scope produced by one refresh sweep.
 
 ```text
-topologyRegistry.snapshotWithOptions(options)
+topologyRegistry.snapshotWithEnvironment(options, environment)
   normalize query options
   acquire one topology generation
-  read the generation's fixed renderable device membership
+  read the generation's fixed renderable device membership and producer scope
   aggregate per-device observations
   build a topology graph
 ```
@@ -413,11 +417,12 @@ instead of copying or hashing those IDs per link:
 - the renderer validates unique actors and resolved link handles, then maps
   handles to final actor rows without serializing the handles.
 
-The aggregate also carries the producer scope id read from the parent Agent
-registry id. L3 subnet segment actor ids use that scope so identical private
-subnets observed by different Agents do not collide after Cloud aggregation.
-If the registry id is unavailable, L3 subnet segment actors are omitted; direct
-L3 subnet links, OSPF, and BGP enrichment still run.
+The aggregate also carries the producer scope id captured in its immutable
+generation from the parent Agent registry id. L3 subnet segment actor ids use
+that scope so identical private subnets observed by different Agents do not
+collide after Cloud aggregation. If the registry id is unavailable, L3 subnet
+segment actors are omitted; direct L3 subnet links, OSPF, and BGP enrichment
+still run.
 
 Renderable membership is fixed when a complete topology generation publishes;
 Function, focus, availability, and reverse-DNS readers therefore see one stable
@@ -504,8 +509,8 @@ and adapters to shared SNMP-family state.
 The internal packages are deliberately narrower:
 
 - `internal/topologymodel`: typed internal graph model used by SNMP topology.
-- `internal/topologyoptions`: Function/query option constants and
-  normalization.
+- `internal/topologyoptions`: comparable scalar Function/query option constants
+  and normalization.
 - `internal/topologyshape`: graph shaping and policy passes, such as collapse,
   map type filtering, probable-link marking, and depth/focus filtering.
 - `internal/topologyenrich`: pure graph enrichment for L3 subnet, OSPF, and BGP
@@ -560,7 +565,7 @@ flowchart TD
     Request["snmp:topology:snmp request"]
     Handler["snmptopologyfunc.Handle"]
     Options["resolve QueryOptions"]
-    Registry["topologyRegistry.snapshotWithOptions"]
+    Registry["topologyRegistry.snapshotWithEnvironment"]
     Snapshot["fresh device-generation snapshots"]
     Aggregate["aggregate observations"]
     L2["l2topology BuildL2Result -> ToGraph"]
@@ -577,7 +582,7 @@ flowchart TD
 snmp:topology:snmp request
   -> snmptopologyfunc.Handle
   -> funcDepsAdapter.Snapshot(options)
-  -> topologyRegistry.snapshotWithOptions(options)
+  -> topologyRegistry.snapshotWithEnvironment(options, cache-only DNS)
   -> topologyv1.Render(data)
   -> Function response with type "topology"
 ```
@@ -596,6 +601,42 @@ Reverse DNS is cache-backed and non-blocking on the Function path:
   sysName, hostname, IP, and MAC display-name order.
 
 Function requests must not perform live DNS I/O while serving a response.
+
+## Offline Graph Replay
+
+`topology_graph_replay.go` rebuilds a typed `netdata.topology.v1` payload from
+the committed diagnostic cut without retaining Function requests or rendered
+payloads:
+
+```text
+committed topology diagnostic cut
+  -> replay each renderable device's acquisition evidence
+  -> sort and aggregate observation snapshots
+  -> apply caller-supplied scalar query options
+  -> run the shared graph, enrichment, shaping, and topology-v1 renderer
+```
+
+The replay contract is hermetic:
+
+- query options contain only comparable scalar selectors; replay callers supply
+  the desired option set instead of selecting retained query history;
+- collection time comes from acquisition evidence, and replay rejects missing
+  collection timestamps instead of allowing the renderer's current-time
+  fallback;
+- producer scope comes from the same immutable generation as the diagnostic
+  cut;
+- the offline build environment has no reverse-DNS resolver, so PTR-derived DNS
+  names and display choices deterministically fall back to collected identity;
+- OUI enrichment uses the compiled-in lookup table and needs no captured
+  environment revision;
+- a renderable device without available acquisition evidence makes complete
+  replay fail rather than silently emitting a partial graph.
+
+Live Function and offline replay use the same graph and renderer. Their typed
+topology structure is identical for the same scalar options; only PTR-derived
+presentation fields may differ. This replay entry point consumes trusted,
+already-bounded in-memory diagnostics. Validation and structural limits for
+untrusted archive input belong to the later archive reader boundary.
 
 ## Trap Enrichment
 
@@ -626,8 +667,8 @@ and retained device-generation state; they are not the topology payload.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.
-- Function, focus, availability, reverse-DNS, and trap readers each load that
-  pointer once and never block on collection or builder locks.
+- Function, focus, availability, reverse-DNS, diagnostics, and trap readers each
+  load that pointer once and never block on collection or builder locks.
 - The registry mutex only protects producer-scope discovery and the reverse-DNS
   warmer context; it does not protect topology generations.
 

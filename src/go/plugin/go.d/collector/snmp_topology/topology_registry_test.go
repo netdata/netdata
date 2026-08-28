@@ -98,7 +98,7 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 func TestBuildSNMPTopologySnapshotPreservesL2BuildError(t *testing.T) {
 	_, ok, err := buildSNMPTopologySnapshot(topologymodel.ObservationAggregate{
 		L2Observations: []topologyengine.L2Observation{{}},
-	}, topologyoptions.DefaultQueryOptions())
+	}, topologyoptions.DefaultQueryOptions(), topologyGraphBuildEnvironment{})
 	require.ErrorContains(t, err, "empty device id")
 	require.False(t, ok)
 }
@@ -175,7 +175,7 @@ func TestBuildProbableTopologySnapshotMatchesIndependentLegacyPath(t *testing.T)
 	options := topologyoptions.DefaultQueryOptions()
 	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 
-	got, ok, err := buildProbableTopologySnapshot(aggregate, options)
+	got, ok, err := buildProbableTopologySnapshot(aggregate, options, topologyGraphBuildEnvironment{})
 	require.NoError(t, err)
 	require.True(t, ok)
 
@@ -203,7 +203,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 	strictOptions := options
 	strictOptions.MapType = topologyoptions.MapTypeHighConfidenceInferred
 	strictData, err := projectSNMPL2TopologyData(
-		strictResult, aggregate.AgentID, aggregate.CollectedAt, strictOptions,
+		strictResult, aggregate.AgentID, aggregate.CollectedAt, strictOptions, topologyGraphBuildEnvironment{},
 	)
 	require.NoError(t, err)
 	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
@@ -215,7 +215,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 	probableOptions := options
 	probableOptions.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	probableData, err := projectSNMPL2TopologyData(
-		probableResult, aggregate.AgentID, aggregate.CollectedAt, probableOptions,
+		probableResult, aggregate.AgentID, aggregate.CollectedAt, probableOptions, topologyGraphBuildEnvironment{},
 	)
 	require.NoError(t, err)
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
@@ -286,8 +286,10 @@ func TestTopologyRegistry_ReverseDNSCandidatesExcludeDeviceAliases(t *testing.T)
 
 	candidates := registry.reverseDNSCandidateCollector()
 	options := defaultTopologyQueryOptionsForTest()
-	options.ResolveDNSName = candidates.lookupCached
-	data, ok, err := registry.snapshotWithOptions(options)
+	data, ok, err := registry.snapshotWithEnvironment(
+		options,
+		topologyGraphBuildEnvironment{resolveDNSName: candidates.lookupCached},
+	)
 	require.NoError(t, err)
 
 	require.True(t, ok)
@@ -344,7 +346,7 @@ func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
 				const registrationID ddsnmp.DeviceRegistrationID = 1
 				device := freezeTestTopologyBuilderAt(registrationID, publishedAt, cache)
 				states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
-				registry.publishGeneration(newTopologyGeneration(2, time.Now(), states))
+				registry.publishGeneration(newTopologyGeneration(2, time.Now(), registry.producerScope(), states))
 			},
 			want: false,
 		},
