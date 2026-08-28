@@ -42,7 +42,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
     struct gorilla_statistics gs;
     global_statistics_copy(&gs);
 
-    if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
+    if (netdata_conf_dbengine_page_type(0) == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {
         static RRDSET *st_tier0_gorilla_pages = NULL;
         static RRDDIM *rd_num_gorilla_pages = NULL;
@@ -71,7 +71,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
         rrdset_done(st_tier0_gorilla_pages);
     }
 
-    if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
+    if (netdata_conf_dbengine_page_type(0) == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {
         static RRDSET *st_tier0_compression_info = NULL;
 

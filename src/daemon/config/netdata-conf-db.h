@@ -13,6 +13,10 @@ extern bool dbengine_datafiles_present; // dbengine datafiles exist on disk, eve
 // the engine's process-wide configuration as the daemon resolved it from netdata.conf; the
 // daemon reads its own copy, the engine gets it through netdata_conf_dbengine_apply()
 extern struct dbengine_config netdata_conf_dbengine;
+
+// per-tier configuration for rrdeng_init(): tier, page type and grouping; the caller adds path, quota and retention
+void netdata_conf_dbengine_tier_config(size_t tier, struct rrdeng_tier_config *out);
+uint8_t netdata_conf_dbengine_page_type(size_t tier);
 #endif
 
 // dbengine tier sizing knobs, consumed by the daemon (tier setup, /api/v1/info, analytics, tests) - not by the engine

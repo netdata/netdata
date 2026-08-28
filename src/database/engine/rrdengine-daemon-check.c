@@ -6,7 +6,6 @@
 
 #include "rrdengine-daemon.h"
 
-#include "daemon/config/netdata-conf-db.h"
 #include "daemon/pulse/pulse-aral.h"
 #include "daemon/pulse/pulse-gorilla.h"
 #include "web/api/queries/weights.h"
