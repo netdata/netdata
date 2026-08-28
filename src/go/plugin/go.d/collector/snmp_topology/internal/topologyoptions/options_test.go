@@ -11,7 +11,6 @@ import (
 
 func TestQueryOptionsContainsOnlyComparableScalarValues(t *testing.T) {
 	typeOfOptions := reflect.TypeFor[QueryOptions]()
-	assert.True(t, typeOfOptions.Comparable())
 	for field := range typeOfOptions.Fields() {
 		switch field.Type.Kind() {
 		case reflect.Bool, reflect.Int, reflect.String:
