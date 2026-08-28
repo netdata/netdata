@@ -15,16 +15,13 @@
 #include "libnetdata/libnetdata.h"
 
 // leaf daemon headers (they include nothing of the daemon themselves)
-#include "daemon/config/netdata-conf-profile.h"   // nd_profile, netdata_conf_is_parent()            -> config struct
+#include "daemon/config/netdata-conf-profile.h"   // nd_profile.storage_tiers                          -> active tiers
 #include "daemon/libuv_workers.h"                 // UV_EVENT_* job ids, register_libuv_worker_jobs(),
-                                                  // libuv_worker_threads                              -> config struct / hooks
+                                                  // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
 #include "daemon/daemon-service.h"                // service_register()                                -> hooks
 
 // configuration the engine reads inline                                                              -> config struct
-size_t netdata_conf_cpus(void);                                                 // daemon/config/netdata-conf-global.h
 size_t get_tier_grouping(size_t tier);                                          // daemon/config/netdata-conf-db.h
-extern bool dbengine_use_direct_io;                                             // daemon/config/netdata-conf-db.h
-extern bool pulse_enabled;                                                      // daemon/pulse/pulse.h
 bool rrdhost_localhost_tier_is_dbengine(size_t tier);                           // database/rrdhost.c, a bridge until the
                                                                                 // engine tracks its own active tiers
 

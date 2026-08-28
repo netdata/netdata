@@ -746,8 +746,8 @@ ALWAYS_INLINE_HOT void rrdeng_load_metric_init(
 
         handle->dt_s = db_update_every_s;
         if (!handle->dt_s) {
-            handle->dt_s = nd_profile.update_every;
-            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, nd_profile.update_every);
+            handle->dt_s = dbengine_cfg.default_update_every_s;
+            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, dbengine_cfg.default_update_every_s);
         }
 
         seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
@@ -1081,9 +1081,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
 {
     size_t datafiles = datafile_count(ctx, false);
 
-    ssize_t cpus = (ssize_t)netdata_conf_cpus();
-    if(cpus < 1)
-        cpus = 1;
+    ssize_t cpus = (ssize_t)dbengine_cfg.cpus;
 
     netdata_log_info("DBENGINE: tier %d: populating retention to MRG from %zu journal files, using a shared pool of %zd threads...", ctx->config.tier, datafiles, cpus);
 
@@ -1344,7 +1342,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
                 if(likely(points > 1))
                     update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
                 else {
-                    update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
+                    update_every_s = (time_t) (dbengine_cfg.default_update_every_s * get_tier_grouping(datafile_ctx(datafile)->config.tier));
                     stats->single_point_pages++;
                 }
 
@@ -1438,7 +1436,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t)nd_profile.update_every * get_tier_grouping(ctx->config.tier);
+    stats.default_granularity_secs = (size_t)dbengine_cfg.default_update_every_s * get_tier_grouping(ctx->config.tier);
 
     return stats;
 }

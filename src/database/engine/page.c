@@ -241,7 +241,7 @@ int aral_size_sort_compare(const void *a, const void *b) {
 }
 
 void pgd_init_arals(void) {
-    size_t partitions = netdata_conf_cpus();
+    size_t partitions = dbengine_cfg.cpus;
     if(partitions < 4) partitions = 4;
     if(partitions > PGD_ARAL_PARTITIONS_MAX) partitions = PGD_ARAL_PARTITIONS_MAX;
     pgd_alloc_globals.partitions = partitions;
@@ -251,8 +251,7 @@ void pgd_init_arals(void) {
     for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
         aral_sizes[i] = tier_page_size[i];
 
-    if(!netdata_conf_is_parent()) {
-        // this agent is not a parent
+    if(!dbengine_cfg.arals_for_large_pages) {
         // do not use ARAL for sizes above 4KiB
         for(size_t i = RRD_STORAGE_TIERS ; i < _countof(aral_sizes) ;i++) {
             if(aral_sizes[i] > 4096)

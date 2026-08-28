@@ -193,10 +193,10 @@ enum LIBUV_WORKERS_STATUS {
 static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     size_t dispatched = __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED);
 
-    if(dispatched >= (size_t)(libuv_worker_threads))
+    if(dispatched >= (size_t)(dbengine_cfg.libuv_worker_threads))
         return LIBUV_WORKERS_CRITICAL;
 
-    else if(dispatched >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
+    else if(dispatched >= (size_t)(dbengine_cfg.libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
         return LIBUV_WORKERS_STRESSED;
 
     return LIBUV_WORKERS_RELAXED;
@@ -2610,7 +2610,7 @@ void dbengine_event_loop(void* arg) {
     fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
-    size_t cpus = netdata_conf_cpus();
+    size_t cpus = dbengine_cfg.cpus;
     uv_sem_t sem;
     uv_sem_init(&sem, (unsigned int) cpus);
     struct mrg_load_thread *mlt = callocz(cpus, sizeof(*mlt));

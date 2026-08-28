@@ -2137,7 +2137,7 @@ PGC *pgc_create(const char *name,
 
     cache->config.options = options;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
-    cache->config.stats = pulse_enabled;
+    cache->config.stats = dbengine_cfg.cache_statistics;
 
     // flushing
     cache->config.max_flushes_inline            = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
@@ -2163,7 +2163,7 @@ PGC *pgc_create(const char *name,
     cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_cfg.out_of_memory_protection_bytes;
 
     // partitions
-    if(partitions == 0) partitions  = netdata_conf_cpus() * 2;
+    if(partitions == 0) partitions  = dbengine_cfg.cpus * 2;
     if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
     cache->config.partitions        = partitions;
