@@ -91,9 +91,10 @@ type topologyAbortedSweepDiagnostic struct {
 }
 
 type topologyDiagnostics struct {
-	lifecycle   topologyJobLifecycleDiagnosticCut
-	topology    *topologySweepDiagnosticCut
-	lastAborted *topologyAbortedSweepDiagnostic
+	lifecycle       topologyJobLifecycleDiagnosticCut
+	producerScopeID string
+	topology        *topologySweepDiagnosticCut
+	lastAborted     *topologyAbortedSweepDiagnostic
 }
 
 type topologyDiagnosticCutInput struct {
@@ -114,6 +115,7 @@ func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
 	limits := c.currentTopologyDiagnosticGlobalLimits()
 	diagnostics := topologyDiagnostics{lastAborted: c.lastAbortedTopologyDiagnostic.Load()}
 	if generation := c.topologyRegistry.acquireGeneration(); generation != nil {
+		diagnostics.producerScopeID = generation.producerScopeID
 		diagnostics.topology = generation.diagnostic
 	}
 	if diagnostics.topology != nil {

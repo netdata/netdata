@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -45,6 +46,7 @@ type topologyDeviceGeneration struct {
 type topologyGeneration struct {
 	sequence          uint64
 	publishedAt       time.Time
+	producerScopeID   string
 	devices           []*topologyDeviceGeneration
 	renderableDevices []*topologyDeviceGeneration
 	diagnostic        *topologySweepDiagnosticCut
@@ -97,7 +99,12 @@ func activateTopologyDeviceSnapshot(
 	}
 }
 
-func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[ddsnmp.DeviceRegistrationID]deviceRefreshState) *topologyGeneration {
+func newTopologyGeneration(
+	sequence uint64,
+	publishedAt time.Time,
+	producerScopeID string,
+	states map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
+) *topologyGeneration {
 	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(states))
 	for registrationID, state := range states {
 		if state.generation != nil {
@@ -118,6 +125,7 @@ func newTopologyGeneration(sequence uint64, publishedAt time.Time, states map[dd
 	return &topologyGeneration{
 		sequence:          sequence,
 		publishedAt:       publishedAt,
+		producerScopeID:   strings.TrimSpace(producerScopeID),
 		devices:           devices,
 		renderableDevices: renderableDevices,
 	}

@@ -48,7 +48,7 @@ func publishTestTopologyBuilder(r *topologyRegistry, cache *topologyBuilder) {
 	registrationID := ddsnmp.DeviceRegistrationID(sequence)
 	publishedAt := time.Now()
 	states[registrationID] = deviceRefreshState{generation: freezeTestTopologyBuilderAt(registrationID, publishedAt, cache)}
-	r.publishGeneration(newTopologyGeneration(sequence, publishedAt, states))
+	r.publishGeneration(newTopologyGeneration(sequence, publishedAt, r.producerScope(), states))
 }
 
 func snapshotTestTopologyBuilder(c *topologyBuilder) (topologymodel.ObservationSnapshot, bool) {

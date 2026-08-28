@@ -199,9 +199,10 @@ func BenchmarkSNMPTopologyFDBSnapshotMapTypeScaling(b *testing.B) {
 			options.MapType = mapType
 			snapshot := func() (topologymodel.Data, bool, error) {
 				candidates := registry.reverseDNSCandidateCollector()
-				current := options
-				current.ResolveDNSName = candidates.lookupCached
-				data, ok, err := registry.snapshotWithOptions(current)
+				data, ok, err := registry.snapshotWithEnvironment(
+					options,
+					topologyGraphBuildEnvironment{resolveDNSName: candidates.lookupCached},
+				)
 				runtime.KeepAlive(candidates.collectedCandidates())
 				return data, ok, err
 			}
@@ -565,8 +566,10 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricMixedReadPublish(b *testin
 	replacement := &topologyGeneration{
 		sequence:          published.sequence + 1,
 		publishedAt:       published.publishedAt.Add(time.Second),
+		producerScopeID:   published.producerScopeID,
 		devices:           append([]*topologyDeviceGeneration(nil), published.devices...),
 		renderableDevices: append([]*topologyDeviceGeneration(nil), published.renderableDevices...),
+		diagnostic:        published.diagnostic,
 	}
 
 	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {

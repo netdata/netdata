@@ -51,19 +51,42 @@ func (r *topologyRegistry) acquireGeneration() *topologyGeneration {
 }
 
 func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+	return r.snapshotWithEnvironment(options, topologyGraphBuildEnvironment{})
+}
+
+func (r *topologyRegistry) snapshotWithEnvironment(
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
 	if r == nil {
 		return topologymodel.Data{}, false, nil
 	}
-	options = topologyoptions.NormalizeQueryOptions(options)
-
 	generation := r.acquireGeneration()
-	aggregate, ok := aggregateTopologyObservationSnapshots(topologyObservationSnapshots(generation))
+	producerScopeID := ""
+	if generation != nil {
+		producerScopeID = generation.producerScopeID
+	}
+	return buildTopologyObservationSnapshot(
+		topologyObservationSnapshots(generation),
+		producerScopeID,
+		options,
+		environment,
+	)
+}
+
+func buildTopologyObservationSnapshot(
+	snapshots []topologymodel.ObservationSnapshot,
+	producerScopeID string,
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
+	options = topologyoptions.NormalizeQueryOptions(options)
+	aggregate, ok := aggregateTopologyObservationSnapshots(snapshots)
 	if !ok {
 		return topologymodel.Data{}, false, nil
 	}
-	aggregate.ProducerScopeID = r.producerScope()
-
-	return buildSNMPTopologySnapshot(aggregate, options)
+	aggregate.ProducerScopeID = strings.TrimSpace(producerScopeID)
+	return buildSNMPTopologySnapshot(aggregate, options, environment)
 }
 
 func (r *topologyRegistry) hasRenderableObservations() bool {
@@ -160,9 +183,10 @@ func (r *topologyRegistry) enqueueReverseDNSWarmFromDefaultSnapshot() bool {
 		if collector == nil {
 			return
 		}
-		options := topologyoptions.DefaultQueryOptions()
-		options.ResolveDNSName = collector.lookupCached
-		if _, ok, err := r.snapshotWithOptions(options); err != nil || !ok {
+		if _, ok, err := r.snapshotWithEnvironment(
+			topologyoptions.DefaultQueryOptions(),
+			topologyGraphBuildEnvironment{resolveDNSName: collector.lookupCached},
+		); err != nil || !ok {
 			return
 		}
 		r.reverseDNSWarmer.warm(ctx, collector.collectedCandidates())

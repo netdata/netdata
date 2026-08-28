@@ -157,7 +157,9 @@ func TestCollectorRefreshPrunesUnregisteredDeviceStateFromPublishedGeneration(t 
 	const registrationID ddsnmp.DeviceRegistrationID = 1
 	generation := freezeTestTopologyBuilder(registrationID, cache)
 	coll.deviceStates[registrationID] = deviceRefreshState{generation: generation}
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		1, time.Now(), coll.topologyRegistry.producerScope(), coll.deviceStates,
+	))
 
 	coll.refreshTopology(context.Background())
 
@@ -245,7 +247,9 @@ func TestCollectorRefreshTreatsReregisteredOwnerAsNewDevice(t *testing.T) {
 		nextRetry:  base.Add(time.Hour),
 		outcome:    deviceRefreshOutcomeSuccess,
 	}
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, base, coll.deviceStates))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		1, base, coll.topologyRegistry.producerScope(), coll.deviceStates,
+	))
 
 	store.Unregister("owner-a")
 	store.Register("owner-a", dev)
@@ -804,7 +808,9 @@ func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(
 		lastSuccess:         previousSuccess,
 		consecutiveFailures: 3,
 	}
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, base, coll.deviceStates))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		1, base, coll.topologyRegistry.producerScope(), coll.deviceStates,
+	))
 	coll.now = func() time.Time { return base }
 
 	stats := coll.refreshTopology(context.Background())
@@ -853,7 +859,7 @@ func TestCollectorRefreshTopologyRecoveringHandlesPanic(t *testing.T) {
 	registrationID := store.Entries()[0].RegistrationID
 	previousDevice := freezeTestTopologyBuilder(registrationID, builder)
 	coll.deviceStates[previousDevice.registrationID] = deviceRefreshState{generation: previousDevice}
-	previous := newTopologyGeneration(1, time.Now(), coll.deviceStates)
+	previous := newTopologyGeneration(1, time.Now(), coll.topologyRegistry.producerScope(), coll.deviceStates)
 	coll.generationSequence = previous.sequence
 	coll.topologyRegistry.publishGeneration(previous)
 
@@ -1650,7 +1656,9 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 	coll := newTestSNMPTopologyCollector()
 	publishedGeneration := freezeTestTopologyBuilder(registrationID, published)
 	coll.deviceStates[registrationID] = deviceRefreshState{generation: publishedGeneration}
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		1, time.Now(), coll.topologyRegistry.producerScope(), coll.deviceStates,
+	))
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return &blockingTopologyCollector{
@@ -1704,7 +1712,9 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
 	publishedGeneration := freezeTestTopologyBuilder(registrationID, published)
 	coll.deviceStates[registrationID] = deviceRefreshState{generation: publishedGeneration}
-	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, time.Now(), coll.deviceStates))
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		1, time.Now(), coll.topologyRegistry.producerScope(), coll.deviceStates,
+	))
 	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
@@ -1907,7 +1917,9 @@ func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
 					outcome:        deviceRefreshOutcomeSuccess,
 				}
 			}
-			coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, now, coll.deviceStates))
+			coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+				1, now, coll.topologyRegistry.producerScope(), coll.deviceStates,
+			))
 
 			b.ReportAllocs()
 			b.ResetTimer()
