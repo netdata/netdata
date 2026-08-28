@@ -419,6 +419,7 @@ extern struct rrdeng_global_stats global_stats;
 typedef struct tier_config_prototype {
     int tier;                                   // the tier of this ctx
     uint8_t page_type;                          // default page type for this context
+    size_t grouping;                            // points of tier 0 per point of this tier
     uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
     time_t max_retention_s;                     // The max retention in seconds
     uint8_t global_compress_alg;                // the wanted compression algorithm

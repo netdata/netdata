@@ -17,12 +17,6 @@ struct rrdengine_instance multidb_ctx_storage_tier4 = { 0 };
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS] = { 0 };
-uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
-    RRDENG_PAGE_TYPE_GORILLA_32BIT,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1};
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
@@ -1113,19 +1107,36 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(
-    struct rrdengine_instance **ctxp,
-    const char *dbfiles_path,
-    unsigned disk_space_mb,
-    size_t tier,
-    time_t max_retention_s)
+static void rrdeng_tier_config_validate(const struct rrdeng_tier_config *tc) {
+    if(tc->tier >= RRD_STORAGE_TIERS)
+        fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
+
+    if(!tc->dbfiles_path || !*tc->dbfiles_path)
+        fatal("DBENGINE: tier %zu has no datafiles path", tc->tier);
+
+    // tier 0 stores samples; the tiers above it store aggregates, which only one page type can hold
+    bool valid_page_type = tc->tier == 0 ?
+        (tc->page_type == RRDENG_PAGE_TYPE_GORILLA_32BIT || tc->page_type == RRDENG_PAGE_TYPE_ARRAY_32BIT) :
+        (tc->page_type == RRDENG_PAGE_TYPE_ARRAY_TIER1);
+    if(!valid_page_type)
+        fatal("DBENGINE: page type %u is not valid for tier %zu", (unsigned)tc->page_type, tc->tier);
+
+    if(!tc->grouping)
+        fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
+}
+
+int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_config *tc)
 {
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
     bool freshly_initialized_ctx = false;
 
     if(!dbengine_initialized())
-        fatal("DBENGINE: rrdeng_init() for tier %zu called before dbengine_init()", tier);
+        fatal("DBENGINE: rrdeng_init() for tier %zu called before dbengine_init()", tc->tier);
+
+    rrdeng_tier_config_validate(tc);
+    size_t tier = tc->tier;
+    unsigned disk_space_mb = tc->disk_space_mb;
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
@@ -1151,10 +1162,11 @@ int rrdeng_init(
         ctx = multidb_ctx[tier];
 
     ctx->config.tier = (int)tier;
-    ctx->config.page_type = tier_page_type[tier];
+    ctx->config.page_type = tc->page_type;
+    ctx->config.grouping = tc->grouping;
     ctx->config.global_compress_alg = dbengine_default_compression();
 
-    strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
+    strncpyz(ctx->config.dbfiles_path, tc->dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
     ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
 
     if (disk_space_mb && disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
@@ -1162,7 +1174,7 @@ int rrdeng_init(
 
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
 
-    ctx->config.max_retention_s = max_retention_s;
+    ctx->config.max_retention_s = tc->max_retention_s;
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
@@ -1342,7 +1354,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
                 if(likely(points > 1))
                     update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
                 else {
-                    update_every_s = (time_t) (dbengine_cfg.default_update_every_s * get_tier_grouping(datafile_ctx(datafile)->config.tier));
+                    update_every_s = (time_t) (dbengine_cfg.default_update_every_s * datafile_ctx(datafile)->config.grouping);
                     stats->single_point_pages++;
                 }
 
@@ -1436,7 +1448,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t)dbengine_cfg.default_update_every_s * get_tier_grouping(ctx->config.tier);
+    stats.default_granularity_secs = (size_t)dbengine_cfg.default_update_every_s * ctx->config.grouping;
 
     return stats;
 }

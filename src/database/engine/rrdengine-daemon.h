@@ -20,8 +20,7 @@
                                                   // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
 #include "daemon/daemon-service.h"                // service_register()                                -> hooks
 
-// configuration the engine reads inline                                                              -> config struct
-size_t get_tier_grouping(size_t tier);                                          // daemon/config/netdata-conf-db.h
+// daemon state the engine still reads inline                                                         -> active tiers
 bool rrdhost_localhost_tier_is_dbengine(size_t tier);                           // database/rrdhost.c, a bridge until the
                                                                                 // engine tracks its own active tiers
 

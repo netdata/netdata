@@ -10,6 +10,7 @@ bool dbengine_enabled = false; // will become true if and when dbengine is initi
 bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 #ifdef ENABLE_DBENGINE
 struct dbengine_config netdata_conf_dbengine = DBENGINE_CONFIG_DEFAULTS;
+static uint8_t dbengine_tier0_page_type = RRDENG_PAGE_TYPE_GORILLA_32BIT;
 int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 bool new_dbengine_defaults = false;
@@ -48,11 +49,11 @@ static void netdata_conf_dbengine_pre_logs(void) {
 
     const char *page_type = inicfg_get(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
     if (strcmp(page_type, "gorilla") == 0)
-        tier_page_type[0] = RRDENG_PAGE_TYPE_GORILLA_32BIT;
+        dbengine_tier0_page_type = RRDENG_PAGE_TYPE_GORILLA_32BIT;
     else if (strcmp(page_type, "raw") == 0)
-        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
+        dbengine_tier0_page_type = RRDENG_PAGE_TYPE_ARRAY_32BIT;
     else {
-        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
+        dbengine_tier0_page_type = RRDENG_PAGE_TYPE_ARRAY_32BIT;
         netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
     }
 
@@ -87,18 +88,28 @@ static void netdata_conf_dbengine_pre_logs(void) {
 }
 
 #ifdef ENABLE_DBENGINE
+uint8_t netdata_conf_dbengine_page_type(size_t tier) {
+    // only tier 0 is configurable; the higher tiers hold aggregates, which one page type stores
+    return tier ? RRDENG_PAGE_TYPE_ARRAY_TIER1 : dbengine_tier0_page_type;
+}
+
+void netdata_conf_dbengine_tier_config(size_t tier, struct rrdeng_tier_config *out) {
+    memset(out, 0, sizeof(*out));
+    out->tier = tier;
+    out->page_type = netdata_conf_dbengine_page_type(tier);
+    out->grouping = get_tier_grouping(tier);
+}
+
 struct dbengine_initialization {
     ND_THREAD *thread;
     char path[FILENAME_MAX + 1];
-    int disk_space_mb;
-    size_t retention_seconds;
-    size_t tier;
+    struct rrdeng_tier_config config;
     int ret;
 };
 
 void dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier, dbi->retention_seconds);
+    dbi->ret = rrdeng_init(NULL, &dbi->config);
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
@@ -230,11 +241,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
     default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
 
-    size_t grouping_iterations = nd_profile.update_every;
-    storage_tiers_grouping_iterations[0] = nd_profile.update_every;
-
     for (size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
-        grouping_iterations = storage_tiers_grouping_iterations[tier];
+        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
         grouping_iterations = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
         if(grouping_iterations < 2) {
@@ -289,10 +297,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
             &netdata_config, CONFIG_SECTION_DB,
             dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_time_s[tier] : 0);
 
-        tiers_init[tier].disk_space_mb = (int) disk_space_mb;
-        tiers_init[tier].tier = tier;
-        tiers_init[tier].retention_seconds = (size_t) storage_tiers_retention_time_s[tier];
         strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
+        netdata_conf_dbengine_tier_config(tier, &tiers_init[tier].config);
+        tiers_init[tier].config.dbfiles_path = tiers_init[tier].path;
+        tiers_init[tier].config.disk_space_mb = (unsigned) disk_space_mb;
+        tiers_init[tier].config.max_retention_s = storage_tiers_retention_time_s[tier];
         tiers_init[tier].ret = 0;
 
         if(parallel_initialization) {
@@ -311,7 +320,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
         if(tiers_init[tier].ret != 0) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
-                   hostname, tiers_init[tier].tier, tiers_init[tier].path);
+                   hostname, tiers_init[tier].config.tier, tiers_init[tier].path);
         }
         else if(created_tiers == tier)
             created_tiers++;

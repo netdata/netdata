@@ -62,6 +62,17 @@ struct dbengine_config {
     .libuv_worker_threads = 0,                                  \
 }
 
+// One tier's configuration, handed to rrdeng_init(); the engine copies what it needs.
+struct rrdeng_tier_config {
+    size_t tier;                                // 0 is the tier collectors write to; higher tiers aggregate the one below
+    const char *dbfiles_path;                   // directory of this tier's datafiles and journals
+    unsigned disk_space_mb;                     // 0 = no disk quota
+    time_t max_retention_s;                     // 0 = no time limit
+    uint8_t page_type;                          // tier 0: RRDENG_PAGE_TYPE_GORILLA_32BIT or RRDENG_PAGE_TYPE_ARRAY_32BIT;
+                                                // higher tiers hold aggregates and must use RRDENG_PAGE_TYPE_ARRAY_TIER1
+    size_t grouping;                            // points of tier 0 that make one point of this tier (1 for tier 0)
+};
+
 void dbengine_config_defaults(struct dbengine_config *cfg);
 
 // Copy cfg into the engine, resolving the 0-means-default fields. Call it once, from one
