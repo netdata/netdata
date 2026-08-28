@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 	"time"
 )
@@ -212,35 +213,15 @@ func (c *Collector) prepareCollection(ctx context.Context, results stageResults)
 		return false
 	}
 
-	// Reconciliation is owner-scoped. Another Agent or job may intentionally
-	// probe the same namespace without surrendering its active objects.
-	probePrefix := c.stateStore.sourceProbePrefix
-	start := c.now()
-	keys, truncated, attempts, err := c.client.ListObjects(ctx, c.Bucket, probePrefix, maxOwnedKeys+1)
-	elapsed := c.now().Sub(start)
-	setup := results[stageSetup]
-	setup.duration += elapsed
-	setup.addOperation(attempts)
-	if err != nil {
-		setup.fail(errorReason(err))
-		return false
-	}
-
-	probeKeys := make([]string, 0, len(keys))
-	for _, key := range keys {
-		if isProbeKey(probePrefix, key) {
-			probeKeys = append(probeKeys, key)
-		}
-	}
-	if truncated || len(probeKeys) > maxOwnedKeys {
-		setup.fail(reasonInternal)
+	probeKeys, ok := c.listSingleProbeKeys(ctx, results)
+	if !ok {
 		return false
 	}
 	if !c.publishSingleReconciliation(c.pendingOwnershipState, probeKeys, results) {
 		return false
 	}
 	if c.pendingOwnershipState == nil {
-		setup.succeed()
+		results[stageSetup].succeed()
 		return true
 	}
 
@@ -253,6 +234,14 @@ func (c *Collector) prepareCollection(ctx context.Context, results stageResults)
 }
 
 func (c *Collector) resumeSingleReconciliation(ctx context.Context, results stageResults) bool {
+	probeKeys, ok := c.listSingleProbeKeys(ctx, results)
+	if !ok {
+		return false
+	}
+	return c.publishSingleReconciliation(c.pendingOwnershipState, probeKeys, results)
+}
+
+func (c *Collector) listSingleProbeKeys(ctx context.Context, results stageResults) ([]string, bool) {
 	probePrefix := c.stateStore.sourceProbePrefix
 	start := c.now()
 	keys, truncated, attempts, err := c.client.ListObjects(ctx, c.Bucket, probePrefix, maxOwnedKeys+1)
@@ -262,7 +251,7 @@ func (c *Collector) resumeSingleReconciliation(ctx context.Context, results stag
 	setup.addOperation(attempts)
 	if err != nil {
 		setup.fail(errorReason(err))
-		return false
+		return nil, false
 	}
 
 	probeKeys := make([]string, 0, len(keys))
@@ -273,9 +262,9 @@ func (c *Collector) resumeSingleReconciliation(ctx context.Context, results stag
 	}
 	if truncated || len(probeKeys) > maxOwnedKeys {
 		setup.fail(reasonInternal)
-		return false
+		return nil, false
 	}
-	return c.publishSingleReconciliation(c.pendingOwnershipState, probeKeys, results)
+	return probeKeys, true
 }
 
 func (c *Collector) rememberSingleReconciliationBlocker(results stageResults) bool {
@@ -544,7 +533,7 @@ func (c *Collector) verifySingleBucketUnversioned(ctx context.Context, result *s
 		return false
 	}
 	if status != "" {
-		result.fail(reasonRequestFailed)
+		result.fail(reasonBucketVersioned)
 		return false
 	}
 	return true
@@ -633,11 +622,9 @@ func (c *Collector) listProbe(ctx context.Context, key string, results stageResu
 		result.fail(errorReason(err))
 		return false
 	}
-	for _, listedKey := range keys {
-		if listedKey == key {
-			result.succeed()
-			return true
-		}
+	if slices.Contains(keys, key) {
+		result.succeed()
+		return true
 	}
 	result.fail(reasonNotVisible)
 	return false
@@ -724,7 +711,7 @@ func (c *Collector) cleanupStage(ctx context.Context, key string, results stageR
 		return false
 	}
 	if status != "" {
-		result.fail(reasonRequestFailed)
+		result.fail(reasonBucketVersioned)
 		return false
 	}
 

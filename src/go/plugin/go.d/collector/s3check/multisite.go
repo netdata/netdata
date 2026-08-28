@@ -20,6 +20,7 @@ const (
 	reasonDeleteTimeout              = "delete_timeout"
 	reasonShutdownCleanup            = "shutdown_cleanup"
 	reasonReconciliationPending      = "reconciliation_pending"
+	reasonBucketVersioned            = "bucket_versioned"
 )
 
 func (c *Collector) collectMultisite(ctx context.Context, cycle *multisiteCycle) {
@@ -863,7 +864,7 @@ func (c *Collector) verifyMultisiteBucketUnversioned(
 		return false
 	}
 	if status != "" {
-		result.fail(reasonRequestFailed)
+		result.fail(reasonBucketVersioned)
 		return false
 	}
 	return true

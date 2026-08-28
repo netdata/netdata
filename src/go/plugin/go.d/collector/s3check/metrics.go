@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-var stageStates = []string{string(stateOK), string(stateFailed), string(stateSkipped)}
+var stageStates = []string{string(stateOK), string(stateWaiting), string(stateFailed), string(stateSkipped)}
 
 func (c *Collector) writeMetrics(results stageResults) {
 	meter := c.store.Write().SnapshotMeter("")

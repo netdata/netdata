@@ -265,6 +265,23 @@ func cleanupBatchCount(keys []ownedKey) int {
 	return len(bases)
 }
 
+func requireChangedMultisiteRouteBlocked(t *testing.T, collr *Collector) *ownershipStateStore {
+	t.Helper()
+
+	changed := collr.Config
+	changed.Destination = &DestinationConfig{}
+	*changed.Destination = *collr.Destination
+	changed.Destination.Prefix = "changed-route/"
+	changedCollector := &Collector{Config: changed}
+	changedStore := newOwnershipStateStore(
+		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
+		changed.Prefix, changed.Destination.Prefix,
+	)
+	_, err := changedStore.load()
+	require.Error(t, err)
+	return changedStore
+}
+
 func finishMultisiteCleanup(t *testing.T, collr *Collector) map[string]metrix.SampleValue {
 	t.Helper()
 
@@ -574,17 +591,7 @@ func TestCollector_MultisiteOneSidedSourceOwnsDestinationCounterpart(t *testing.
 	require.Contains(t, state.PendingKeys, ownedKey{Scope: ownershipDestination, Key: destinationKey})
 	require.NotNil(t, state.CleanupQuarantinedAt)
 
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	requireChangedMultisiteRouteBlocked(t, collr)
 
 	destination.objects[destinationKey] = []byte("delayed-replica")
 	finishMultisiteCleanup(t, collr)
@@ -608,17 +615,7 @@ func TestCollector_MultisiteReconcilesBothPrefixesBeforeNewWrite(t *testing.T) {
 	require.NoError(t, loadErr)
 	require.Len(t, state.PendingKeys, 2)
 	require.NotNil(t, state.CleanupQuarantinedAt)
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	requireChangedMultisiteRouteBlocked(t, collr)
 
 	finishMultisiteCleanup(t, collr)
 	_, err = collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
@@ -669,17 +666,7 @@ func TestCollector_MultisiteCleanupBatchesCounterpartPairsTogether(t *testing.T)
 	require.Nil(t, remaining.CleanupConfirmedAt)
 	require.NotNil(t, remaining.CleanupQuarantinedAt)
 
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	requireChangedMultisiteRouteBlocked(t, collr)
 
 	finishMultisiteCleanup(t, collr)
 	assert.Empty(t, source.staleKeys)
@@ -711,17 +698,7 @@ func TestCollector_MultisiteReconciliationOwnsFullSupportedKeySet(t *testing.T) 
 	require.NoError(t, loadErr)
 	require.Len(t, state.PendingKeys, maxOwnedKeys)
 
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	requireChangedMultisiteRouteBlocked(t, collr)
 
 	finishMultisiteCleanup(t, collr)
 	assert.Empty(t, source.staleKeys)
@@ -776,17 +753,7 @@ func TestCollector_MultisitePartialReconciliationDurablyBlocksRoute(t *testing.T
 			assert.NotContains(t, source.operations(), "delete")
 			assert.NotContains(t, destination.operations(), "delete")
 
-			changed := collr.Config
-			changed.Destination = &DestinationConfig{}
-			*changed.Destination = *collr.Destination
-			changed.Destination.Prefix = "changed-route/"
-			changedCollector := &Collector{Config: changed}
-			changedStore := newOwnershipStateStore(
-				collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-				changed.Prefix, changed.Destination.Prefix,
-			)
-			_, loadErr = changedStore.load()
-			require.Error(t, loadErr)
+			requireChangedMultisiteRouteBlocked(t, collr)
 
 			if test.failingEndpoint == "source" {
 				delete(source.failures, "list")
@@ -857,17 +824,7 @@ func TestCollector_MultisiteResumedPartialDiscoverySurvivesObjectRemoval(t *test
 			require.True(t, retained.ReconciliationPending)
 			require.Len(t, retained.PendingKeys, 2)
 
-			changed := collr.Config
-			changed.Destination = &DestinationConfig{}
-			*changed.Destination = *collr.Destination
-			changed.Destination.Prefix = "changed-route/"
-			changedCollector := &Collector{Config: changed}
-			changedStore := newOwnershipStateStore(
-				collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-				changed.Prefix, changed.Destination.Prefix,
-			)
-			_, loadErr = changedStore.load()
-			require.Error(t, loadErr)
+			requireChangedMultisiteRouteBlocked(t, collr)
 
 			delete(source.failures, "list")
 			delete(destination.failures, "list")
@@ -898,17 +855,7 @@ func TestCollector_MultisiteKeylessPartialReconciliationBlocksAndClears(t *testi
 	assert.True(t, blocker.ReconciliationPending)
 	assert.Empty(t, blocker.PendingKeys)
 
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	requireChangedMultisiteRouteBlocked(t, collr)
 
 	delete(destination.failures, "list")
 	_, err = collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
@@ -960,17 +907,7 @@ func TestCollector_MultisiteReconciliationFailsClosedAboveOwnedKeyLimit(t *testi
 	assert.Empty(t, blocker.PendingKeys)
 	assert.Nil(t, blocker.CleanupQuarantinedAt)
 
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	requireChangedMultisiteRouteBlocked(t, collr)
 }
 
 func TestCollector_MultisiteCleanupRefreshFailsClosedAboveOwnedKeyLimit(t *testing.T) {
@@ -1056,10 +993,14 @@ func TestCollector_MultisiteCleanupStopsBeforeDeleteWhenVersioningDrifts(t *test
 				}
 			}
 
+			wantReason := reasonRequestFailed
+			if test.status != "" {
+				wantReason = reasonBucketVersioned
+			}
 			metrics, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 			require.NoError(t, err)
 			assert.Equal(t, metrix.SampleValue(1), metrics[stateMetricKey(
-				"multisite_status", "failed", multisitePhaseLabels(multisiteCleanup, reasonRequestFailed),
+				"multisite_status", "failed", multisitePhaseLabels(multisiteCleanup, wantReason),
 			)])
 			assert.Equal(t, metrix.SampleValue(1), metrics[metricKey("multisite_phase_failure", multisiteSiteLabels())])
 			assert.NotContains(t, source.operations(), "delete")
@@ -1381,17 +1322,7 @@ func TestCollector_MultisiteCleanupQuarantineCatchesLateArrivalBeforeRouteChange
 	require.Len(t, quarantined.PendingKeys, 2)
 	assert.True(t, quarantined.CleanupQuarantinedAt.After(destinationProofAt))
 
-	changed := collr.Config
-	changed.Destination = &DestinationConfig{}
-	*changed.Destination = *collr.Destination
-	changed.Destination.Prefix = "changed-route/"
-	changedCollector := &Collector{Config: changed}
-	changedStore := newOwnershipStateStore(
-		collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-		changed.Prefix, changed.Destination.Prefix,
-	)
-	_, loadErr = changedStore.load()
-	require.Error(t, loadErr)
+	changedStore := requireChangedMultisiteRouteBlocked(t, collr)
 
 	for _, owned := range quarantined.PendingKeys {
 		if owned.Scope == ownershipSource {
@@ -1543,7 +1474,7 @@ func TestCollector_MultisiteDoesNotWriteWhenBucketVersioningDrifts(t *testing.T)
 			metrics, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 			require.NoError(t, err)
 			assert.Equal(t, metrix.SampleValue(1), metrics[stateMetricKey(
-				"multisite_status", "failed", multisitePhaseLabels(multisiteSetup, reasonRequestFailed),
+				"multisite_status", "failed", multisitePhaseLabels(multisiteSetup, reasonBucketVersioned),
 			)])
 			assert.Equal(t, metrix.SampleValue(1), metrics[metricKey("multisite_phase_failure", multisiteSiteLabels())])
 			assert.NotContains(t, source.operations(), "put")
@@ -1602,10 +1533,14 @@ func TestCollector_MultisiteSourceDeleteStopsWhenVersioningDrifts(t *testing.T) 
 				source.failures["versioning"] = test.failure
 			}
 
+			wantReason := reasonRequestFailed
+			if test.status != "" {
+				wantReason = reasonBucketVersioned
+			}
 			metrics, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 			require.NoError(t, err)
 			assert.Equal(t, metrix.SampleValue(1), metrics[stateMetricKey(
-				"multisite_status", "failed", multisitePhaseLabels(multisiteSourceDelete, reasonRequestFailed),
+				"multisite_status", "failed", multisitePhaseLabels(multisiteSourceDelete, wantReason),
 			)])
 			assert.Equal(t, metrix.SampleValue(1), metrics[metricKey("multisite_phase_failure", multisiteSiteLabels())])
 			assert.NotContains(t, source.operations(), "delete")
@@ -1658,10 +1593,14 @@ func TestCollector_MultisitePrefixReconciliationStopsWhenVersioningDrifts(t *tes
 				}
 			}
 
+			wantReason := reasonRequestFailed
+			if test.status != "" {
+				wantReason = reasonBucketVersioned
+			}
 			metrics, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 			require.NoError(t, err)
 			assert.Equal(t, metrix.SampleValue(1), metrics[stateMetricKey(
-				"multisite_status", "failed", multisitePhaseLabels(multisiteCleanup, reasonRequestFailed),
+				"multisite_status", "failed", multisitePhaseLabels(multisiteCleanup, wantReason),
 			)])
 			assert.Equal(t, metrix.SampleValue(1), metrics[metricKey("multisite_phase_failure", multisiteSiteLabels())])
 
@@ -1670,17 +1609,7 @@ func TestCollector_MultisitePrefixReconciliationStopsWhenVersioningDrifts(t *tes
 			require.Len(t, state.PendingKeys, 2)
 			require.NotNil(t, state.CleanupQuarantinedAt)
 
-			changed := collr.Config
-			changed.Destination = &DestinationConfig{}
-			*changed.Destination = *collr.Destination
-			changed.Destination.Prefix = "changed-route/"
-			changedCollector := &Collector{Config: changed}
-			changedStore := newOwnershipStateStore(
-				collr.stateStore.path, changedCollector.ownershipFingerprint(), collr.stateStore.ownerTag, modeMultisite,
-				changed.Prefix, changed.Destination.Prefix,
-			)
-			_, loadErr = changedStore.load()
-			require.Error(t, loadErr)
+			requireChangedMultisiteRouteBlocked(t, collr)
 
 			source.versioningStatus = ""
 			destination.versioningStatus = ""

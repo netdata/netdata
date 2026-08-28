@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -373,12 +374,7 @@ func (state *ownershipState) clone() *ownershipState {
 }
 
 func (state *ownershipState) ownsKey(owned ownedKey) bool {
-	for _, existing := range state.PendingKeys {
-		if existing == owned {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(state.PendingKeys, owned)
 }
 
 func (state *ownershipState) ownsOrAddsKey(owned ownedKey) bool {

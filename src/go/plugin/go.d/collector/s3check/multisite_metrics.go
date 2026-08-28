@@ -110,7 +110,7 @@ func (s *multisiteCounters) add(result *multisiteResult) {
 
 func isCategoricalMultisiteFailure(reason string) bool {
 	switch reason {
-	case reasonRequestFailed, reasonInternal, reasonOrphanCleanupPending, reasonRestartAbandoned, reasonStillPresent, reasonTimeout:
+	case reasonRequestFailed, reasonBucketVersioned, reasonInternal, reasonOrphanCleanupPending, reasonRestartAbandoned, reasonStillPresent, reasonTimeout:
 		return true
 	default:
 		return false

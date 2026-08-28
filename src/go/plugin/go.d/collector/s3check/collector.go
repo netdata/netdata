@@ -422,7 +422,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 
 	// The per-job reservation from Check is idempotent and remains held for
 	// this invocation; unrelated jobs use their own locks.
-	if lockErr := c.reserveRuntimeJobState(); lockErr != nil {
+	if c.reserveRuntimeJobState() != nil {
 		if c.Mode == modeMultisite {
 			cycle := newMultisiteCycle()
 			cycle.phases[multisiteSetup].fail(reasonInternal)

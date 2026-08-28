@@ -240,7 +240,7 @@ func validateEndpointConfig(endpoint *endpointConfig, label string) error {
 		strings.Contains(endpoint.Prefix, "//") {
 		return fmt.Errorf("%s prefix must end with '/', must not start with '/', and must not contain an empty segment", label)
 	}
-	for _, part := range strings.Split(strings.Trim(endpoint.Prefix, "/"), "/") {
+	for part := range strings.SplitSeq(strings.Trim(endpoint.Prefix, "/"), "/") {
 		if part == "" || part == "." || part == ".." {
 			return fmt.Errorf("%s prefix must not contain '.', '..', or empty segments", label)
 		}

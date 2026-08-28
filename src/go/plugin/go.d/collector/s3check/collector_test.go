@@ -219,7 +219,7 @@ func TestCollector_InitValidatesMultisiteConfiguration(t *testing.T) {
 			}, "must not use the same endpoint and bucket",
 		},
 		"destination HTTP2 proxy bypass": {
-			func(c *Config) { c.Destination.ForceHTTP2 = ptrTo(true) }, "destination force_http2 is not supported",
+			func(c *Config) { c.Destination.ForceHTTP2 = new(true) }, "destination force_http2 is not supported",
 		},
 		"malformed destination proxy redaction": {
 			func(c *Config) { c.Destination.ProxyURL = "http://user:pa%zz@example.net" }, "proxy_url is not a valid absolute URL",
@@ -242,7 +242,7 @@ func TestCollector_InitValidatesMultisiteConfiguration(t *testing.T) {
 				c.Endpoint = "https://s3.example.net"
 				c.Destination.Endpoint = "https://s3.example.net:0443"
 				c.Destination.Bucket = c.Bucket
-				c.Destination.PathStyle = ptrTo(true)
+				c.Destination.PathStyle = new(true)
 			}, "must not use the same endpoint and bucket",
 		},
 		"same bucket through virtual-host addressing": {
@@ -251,7 +251,7 @@ func TestCollector_InitValidatesMultisiteConfiguration(t *testing.T) {
 				c.PathStyle = false
 				c.Destination.Endpoint = "https://" + c.Bucket + ".s3.example.net"
 				c.Destination.Bucket = c.Bucket
-				c.Destination.PathStyle = ptrTo(false)
+				c.Destination.PathStyle = new(false)
 			}, "must not use the same endpoint and bucket",
 		},
 		"same bucket through different scheme": {
@@ -809,6 +809,15 @@ func TestCollector_SingleShutdownRetainsKeylessReconciliationBlocker(t *testing.
 	require.NoError(t, err)
 	operations := len(client.operations())
 
+	results := newStageResults()
+	assert.False(t, collr.cleanupOwnedSingleState(context.Background(), results))
+	managed, ok := metrix.AsCycleManagedStore(collr.MetricStore())
+	require.True(t, ok)
+	cycle := managed.CycleController()
+	cycle.BeginCycle()
+	require.NotPanics(t, func() { collr.writeMetrics(results) })
+	require.NoError(t, cycle.CommitCycleSuccess())
+
 	collr.Cleanup(context.Background())
 	require.FileExists(t, collr.stateStore.path)
 	blocker, loadErr := collr.stateStore.load()
@@ -874,7 +883,7 @@ func TestCollector_SingleQuarantineRefreshFailsClosedAboveOwnedKeyLimit(t *testi
 
 func TestCollector_CollectPerformsBoundedRestartCleanup(t *testing.T) {
 	collr, client := newTestCollector(t)
-	for i := 0; i < cleanupBatchSize; i++ {
+	for i := range cleanupBatchSize {
 		key := staleProbeKey(i)
 		client.staleKeys[key] = true
 	}
@@ -1005,7 +1014,7 @@ func TestCollector_SingleNormalDeleteStopsWhenVersioningDrifts(t *testing.T) {
 	metrics, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 	require.NoError(t, err)
 	assert.Equal(t, metrix.SampleValue(1), metrics[stateMetricKey(
-		"stage_status", "failed", stageLabels(stageDelete, reasonRequestFailed),
+		"stage_status", "failed", stageLabels(stageDelete, reasonBucketVersioned),
 	)])
 	assert.NotContains(t, client.operations(), "delete")
 	require.FileExists(t, collr.stateStore.path)
@@ -1216,7 +1225,7 @@ func TestCollector_SingleFunctionalListUsesOwnerNamespace(t *testing.T) {
 	collr, client := newTestCollector(t)
 	foreignOwner := multisiteOwnerTag("foreign-agent-machine-guid", "foreign-s3check-job")
 	foreignPrefix := multisiteProbePrefix(defaultPrefix, foreignOwner)
-	for i := 0; i < 120; i++ {
+	for i := range 120 {
 		key := fmt.Sprintf("%sprobe-%d-%016x-%s.bin", foreignPrefix, 1_700_000_000+i, i, foreignOwner)
 		client.staleKeys[key] = true
 	}
@@ -1247,7 +1256,8 @@ func TestCollector_SameIdentityCheckWaitsForBoundedJobLockContention(t *testing.
 	candidate.Cleanup(context.Background())
 }
 
-func ptrTo[T any](value T) *T { return &value }
+//go:fix inline
+func ptrTo[T any](value T) *T { return new(value) }
 
 func validTestConfig() Config {
 	return Config{
@@ -1537,9 +1547,7 @@ func stageLabels(stage stageID, reason string) metrix.Labels {
 
 func stateLabels(name, state string, labels metrix.Labels) metrix.Labels {
 	out := make(metrix.Labels, len(labels)+1)
-	for key, value := range labels {
-		out[key] = value
-	}
+	maps.Copy(out, labels)
 	out[name] = state
 	return out
 }
@@ -1554,14 +1562,15 @@ func metricKey(name string, labels metrix.Labels) string {
 	}
 	sort.Strings(keys)
 
-	out := name + "{"
+	var out strings.Builder
+	out.WriteString(name + "{")
 	for i, key := range keys {
 		if i > 0 {
-			out += ","
+			out.WriteString(",")
 		}
-		out += key + `="` + labels[key] + `"`
+		out.WriteString(key + `="` + labels[key] + `"`)
 	}
-	return out + "}"
+	return out.String() + "}"
 }
 
 func stateMetricKey(name, state string, labels metrix.Labels) string {
