@@ -272,7 +272,7 @@ type acquisitionMetadataObserver struct {
 
 type acquisitionMetadataRoute struct {
 	routeIndex int
-	oids       []string
+	field      ddprofiledefinition.MetadataField
 }
 
 func (o *acquisitionScalarObserver) start(
@@ -407,7 +407,7 @@ func (o *acquisitionMetadataObserver) start(missingOIDs map[string]bool) {
 		if route == nil {
 			continue
 		}
-		if allAcquisitionOIDsMissing(binding.oids, missingOIDs) {
+		if acquisitionMetadataFieldOIDsMissing(binding.field, missingOIDs) {
 			if route.Source == AcquisitionRouteSourceNone {
 				route.Source = AcquisitionRouteSourceCache
 			}
@@ -488,16 +488,28 @@ func setAcquisitionScalarRouteRejected(route *AcquisitionRouteReport) {
 	route.FailureClass = AcquisitionFailureClassProcessing
 }
 
-func allAcquisitionOIDsMissing(oids []string, missingOIDs map[string]bool) bool {
-	if len(oids) == 0 {
+func acquisitionMetadataFieldOIDsMissing(
+	field ddprofiledefinition.MetadataField,
+	missingOIDs map[string]bool,
+) bool {
+	if field.Value != "" {
 		return false
 	}
-	for _, oid := range oids {
+	if oid := trimOID(field.Symbol.OID); oid != "" {
+		return missingOIDs[oid]
+	}
+	var found bool
+	for _, symbol := range field.Symbols {
+		oid := trimOID(symbol.OID)
+		if oid == "" {
+			continue
+		}
+		found = true
 		if !missingOIDs[oid] {
 			return false
 		}
 	}
-	return true
+	return found
 }
 
 func buildAcquisitionProfilePlan(profile *ddsnmp.Profile, ordinal uint32) acquisitionProfilePlan {
@@ -621,7 +633,7 @@ func acquisitionProfileCollectionShape(profile *ddsnmp.Profile, sysObjectID stri
 }
 
 func (c *acquisitionProfileCollection) prepareProfileInputRoutes(profile *ddsnmp.Profile, sysObjectID string) {
-	if c == nil || profile == nil || profile.Definition == nil {
+	if !c.reportActive() || profile == nil || profile.Definition == nil {
 		return
 	}
 	def := profile.Definition
@@ -629,12 +641,16 @@ func (c *acquisitionProfileCollection) prepareProfileInputRoutes(profile *ddsnmp
 	if sysObjectID != "" {
 		for _, entry := range def.SysobjectIDMetadata {
 			if ddprofiledefinition.SelectorOidMatches(sysObjectID, entry.SysobjectID) {
-				c.metadata = append(c.metadata, c.newMetadataObserver(entry.Metadata))
+				if observer := c.newMetadataObserver(entry.Metadata); observer != nil {
+					c.metadata = append(c.metadata, observer)
+				}
 			}
 		}
 	}
 	if cfg, ok := def.Metadata[ddprofiledefinition.MetadataDeviceResource]; ok {
-		c.metadata = append(c.metadata, c.newMetadataObserver(cfg.Fields))
+		if observer := c.newMetadataObserver(cfg.Fields); observer != nil {
+			c.metadata = append(c.metadata, observer)
+		}
 	}
 }
 
@@ -642,6 +658,9 @@ func (c *acquisitionProfileCollection) addMetricRoutes(
 	configs []ddprofiledefinition.MetricsConfig,
 	scalarKind, tableKind AcquisitionRouteKind,
 ) (scalarRoutes []int, tableRoutes map[int]int) {
+	if !c.reportActive() {
+		return nil, nil
+	}
 	scalarRoutes = make([]int, len(configs))
 	for i := range scalarRoutes {
 		scalarRoutes[i] = -1
@@ -663,6 +682,9 @@ func (c *acquisitionProfileCollection) addMetricRoutes(
 }
 
 func (c *acquisitionProfileCollection) addRoute(kind AcquisitionRouteKind, rootOID string) int {
+	if !c.reportActive() {
+		return -1
+	}
 	index := len(c.routes)
 	c.routes = append(c.routes, AcquisitionRouteReport{
 		Ordinal: uint32(index),
@@ -682,6 +704,10 @@ func (c *acquisitionProfileCollection) route(index int) *AcquisitionRouteReport 
 
 func (c *acquisitionProfileCollection) reportLimited() bool {
 	return c != nil && c.budget != nil && c.budget.limit != AcquisitionReportLimitNone
+}
+
+func (c *acquisitionProfileCollection) reportActive() bool {
+	return c != nil && !c.reportLimited()
 }
 
 func (c *acquisitionProfileCollection) addValueReference(
@@ -710,14 +736,14 @@ func (c *acquisitionProfileCollection) bgpRoute(configIndex int) *AcquisitionRou
 }
 
 func (c *acquisitionProfileCollection) metricScalarObserver() *acquisitionScalarObserver {
-	if c == nil {
+	if !c.reportActive() {
 		return nil
 	}
 	return &acquisitionScalarObserver{collection: c, routeIndexes: c.metricScalarRoutes}
 }
 
 func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionScalarObserver {
-	if c == nil {
+	if !c.reportActive() {
 		return nil
 	}
 	return &acquisitionScalarObserver{
@@ -728,14 +754,14 @@ func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionScal
 }
 
 func (c *acquisitionProfileCollection) metricTableScope() *acquisitionTableScope {
-	if c == nil {
+	if !c.reportActive() {
 		return nil
 	}
 	return &acquisitionTableScope{collection: c, routeIndexes: c.metricTableRoutes}
 }
 
 func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTableScope {
-	if c == nil {
+	if !c.reportActive() {
 		return nil
 	}
 	return &acquisitionTableScope{
@@ -748,7 +774,7 @@ func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTableSco
 func (c *acquisitionProfileCollection) globalTagObserver(
 	configs []ddprofiledefinition.GlobalMetricTagConfig,
 ) *acquisitionGlobalTagObserver {
-	if c == nil {
+	if !c.reportActive() {
 		return nil
 	}
 	if c.globalTags == nil {
@@ -760,7 +786,7 @@ func (c *acquisitionProfileCollection) globalTagObserver(
 func (c *acquisitionProfileCollection) newGlobalTagObserver(
 	configs []ddprofiledefinition.GlobalMetricTagConfig,
 ) *acquisitionGlobalTagObserver {
-	if len(configs) == 0 {
+	if !c.reportActive() || len(configs) == 0 {
 		return nil
 	}
 	observer := &acquisitionGlobalTagObserver{
@@ -782,7 +808,10 @@ func (c *acquisitionProfileCollection) newGlobalTagObserver(
 func (c *acquisitionProfileCollection) metadataObserver(
 	fields map[string]ddprofiledefinition.MetadataField,
 ) *acquisitionMetadataObserver {
-	if c == nil {
+	if !c.reportActive() {
+		return nil
+	}
+	if !acquisitionMetadataFieldsHaveRoute(fields) {
 		return nil
 	}
 	if c.metadataCursor < len(c.metadata) {
@@ -796,17 +825,19 @@ func (c *acquisitionProfileCollection) metadataObserver(
 func (c *acquisitionProfileCollection) newMetadataObserver(
 	fields map[string]ddprofiledefinition.MetadataField,
 ) *acquisitionMetadataObserver {
+	if !c.reportActive() {
+		return nil
+	}
 	var observer *acquisitionMetadataObserver
-	names := make([]string, 0, len(fields))
-	for name := range fields {
-		names = append(names, name)
+	var names []string
+	for name, field := range fields {
+		if acquisitionMetadataFieldRootOID(field) != "" {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		oids := acquisitionMetadataFieldOIDs(fields[name])
-		if len(oids) == 0 {
-			continue
-		}
+		field := fields[name]
 		if observer == nil {
 			observer = &acquisitionMetadataObserver{
 				collection: c,
@@ -814,27 +845,20 @@ func (c *acquisitionProfileCollection) newMetadataObserver(
 			}
 		}
 		observer.routes[name] = acquisitionMetadataRoute{
-			routeIndex: c.addRoute(AcquisitionRouteKindMetadataScalar, oids[0]),
-			oids:       oids,
+			routeIndex: c.addRoute(AcquisitionRouteKindMetadataScalar, acquisitionMetadataFieldRootOID(field)),
+			field:      field,
 		}
 	}
 	return observer
 }
 
-func acquisitionMetadataFieldOIDs(field ddprofiledefinition.MetadataField) []string {
-	if field.Value != "" {
-		return nil
-	}
-	if oid := trimOID(field.Symbol.OID); oid != "" {
-		return []string{oid}
-	}
-	oids := make([]string, 0, len(field.Symbols))
-	for _, symbol := range field.Symbols {
-		if oid := trimOID(symbol.OID); oid != "" {
-			oids = append(oids, oid)
+func acquisitionMetadataFieldsHaveRoute(fields map[string]ddprofiledefinition.MetadataField) bool {
+	for _, field := range fields {
+		if acquisitionMetadataFieldRootOID(field) != "" {
+			return true
 		}
 	}
-	return oids
+	return false
 }
 
 func acquisitionMetadataFieldRootOID(field ddprofiledefinition.MetadataField) string {
@@ -912,7 +936,7 @@ func (s *acquisitionTableScope) bind(
 	configIndex int,
 	request *tableCollectionRequest,
 ) *acquisitionTableObservation {
-	if s == nil || s.collection == nil || request == nil {
+	if s == nil || !s.collection.reportActive() || request == nil {
 		return nil
 	}
 	routeIndex, ok := s.routeIndexes[configIndex]

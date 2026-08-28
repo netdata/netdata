@@ -63,20 +63,20 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
-		log                        *logger.Logger
-		profiles                   map[string]*profileState
-		missingOIDs                map[string]bool
-		regularScalarNamesScratch  map[string]struct{}
-		tableCache                 *tableCache
-		tableIdentity              *tableIdentity
-		acquisitionObserver        AcquisitionObserver
-		acquisitionReportLimits    AcquisitionReportLimits
-		acquisitionBudget          acquisitionReportBudget
-		acquisitionCachedRecords   uint64
-		acquisitionCachedBytes     uint64
-		acquisitionPersistentLimit AcquisitionReportLimit
-		acquisitionPlans           map[string]acquisitionProfilePlan
-		acquisitionInputCache      map[string][]AcquisitionRouteReport
+		log                       *logger.Logger
+		profiles                  map[string]*profileState
+		missingOIDs               map[string]bool
+		regularScalarNamesScratch map[string]struct{}
+		tableCache                *tableCache
+		tableIdentity             *tableIdentity
+		acquisitionObserver       AcquisitionObserver
+		acquisitionReportLimits   AcquisitionReportLimits
+		acquisitionBudget         acquisitionReportBudget
+		acquisitionCachedRecords  uint64
+		acquisitionCachedBytes    uint64
+		acquisitionCacheLimit     AcquisitionReportLimit
+		acquisitionPlans          map[string]acquisitionProfilePlan
+		acquisitionInputCache     map[string][]AcquisitionRouteReport
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -125,10 +125,10 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	var errs []error
 	if c.acquisitionObserver != nil {
 		c.acquisitionBudget = newAcquisitionReportBudget(c.acquisitionReportLimits)
-		if c.acquisitionPersistentLimit != AcquisitionReportLimitNone {
-			c.acquisitionBudget.limit = c.acquisitionPersistentLimit
+		if c.acquisitionCacheLimit != AcquisitionReportLimitNone {
+			c.acquisitionBudget.limit = c.acquisitionCacheLimit
 		} else if !c.acquisitionBudget.admit(c.acquisitionCachedRecords, c.acquisitionCachedBytes) {
-			c.acquisitionPersistentLimit = c.acquisitionBudget.limit
+			c.acquisitionCacheLimit = c.acquisitionBudget.limit
 		}
 	}
 
@@ -296,9 +296,6 @@ func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfile
 				c.deviceMetadataCollector.sysobjectid,
 				&c.acquisitionBudget,
 			)
-			if prepared.acquisition.reportLimited() {
-				c.acquisitionPersistentLimit = c.acquisitionBudget.limit
-			}
 		}
 	}
 
@@ -318,7 +315,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfile
 		if prepared.acquisition != nil {
 			cached := prepared.acquisition.profileInputRoutes()
 			if prepared.acquisition.reportLimited() {
-				c.acquisitionPersistentLimit = c.acquisitionBudget.limit
+				c.acquisitionCacheLimit = c.acquisitionBudget.limit
 			} else {
 				c.acquisitionInputCache[ps.profile.SourceFile] = cached
 				records, logicalBytes := acquisitionRouteReportsShape(cached)

@@ -307,7 +307,11 @@ invokes the same event dispatcher, and ignores failed profiles and unsuccessful 
 
 The optional ddsnmp producer independently caps temporary acquisition reports at 100,000 records and 32 MiB of logical
 content before it appends route/value-reference DTOs. Producer exhaustion emits a typed limit marker, releases report
-storage, and makes the topology attempt unavailable without changing live collection. The honest diagnostic peak is the
+storage, and makes the topology attempt unavailable without changing live collection. Once limited, the report marker
+remains available but every diagnostic observer, scope, route, and binding construction boundary becomes inactive for
+that Collect call. A transient limit is not retained across calls; only an unreconstructible profile-input cache or a
+cached-input footprint that cannot fit keeps evidence unavailable. Metadata fallback OIDs are inspected through the
+already-owned profile configuration rather than copied into report helper storage. The honest diagnostic peak is the
 bounded temporary producer report plus the bounded retained current attempt, alongside the separately bounded old/new
 generation overlap; no shared reservation protocol exists between the producer and recorder.
 

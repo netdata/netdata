@@ -24,11 +24,12 @@ const (
 )
 
 type bgpValueContext struct {
-	pdus          map[string]gosnmp.SnmpPDU
-	rowIndex      string
-	rowPDUs       map[string]gosnmp.SnmpPDU
-	tableName     string
-	crossTableCtx *crossTableContext
+	pdus                      map[string]gosnmp.SnmpPDU
+	rowIndex                  string
+	rowPDUs                   map[string]gosnmp.SnmpPDU
+	tableName                 string
+	crossTableCtx             *crossTableContext
+	requiredDependencyMissing *bool
 }
 
 type bgpDependencyProcessingError struct {
@@ -403,11 +404,13 @@ func (c *Collector) buildTableBGPRow(
 	}
 	mergeStringMaps(row.Tags, rowData.tags)
 
+	var requiredDependencyMissing bool
 	bgpCtx := bgpValueContext{
-		rowIndex:      rowIndex,
-		rowPDUs:       rowPDUs,
-		tableName:     cfg.Table.Name,
-		crossTableCtx: crossTableCtx,
+		rowIndex:                  rowIndex,
+		rowPDUs:                   rowPDUs,
+		tableName:                 cfg.Table.Name,
+		crossTableCtx:             crossTableCtx,
+		requiredDependencyMissing: &requiredDependencyMissing,
 	}
 	if err := c.populateBGPRow(&row, cfg, bgpCtx); err != nil {
 		var dependencyErr *bgpDependencyProcessingError
@@ -417,10 +420,10 @@ func (c *Collector) buildTableBGPRow(
 		return ddsnmp.BGPRow{}, false, err
 	}
 
-	if !bgpRowHasSignals(row) {
-		return ddsnmp.BGPRow{}, false, nil
-	}
-	if !bgpRowIdentityComplete(row) {
+	if !bgpRowHasSignals(row) || !bgpRowIdentityComplete(row) {
+		if requiredDependencyMissing && dependencyRejected != nil {
+			(*dependencyRejected)++
+		}
 		return ddsnmp.BGPRow{}, false, nil
 	}
 
@@ -858,6 +861,7 @@ func (c *Collector) bgpTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgp
 }
 
 func (c *Collector) bgpOptionalTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) string {
+	ctx.requiredDependencyMissing = nil
 	value, err := c.bgpTextValue(cfg, ctx)
 	if err != nil {
 		sym := bgpValueSymbol(cfg)
@@ -1007,6 +1011,9 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 	fullOID := sourceOID + "." + lookupIndex
 	pdu, ok := refTablePDUs[fullOID]
 	if !ok {
+		if ctx.requiredDependencyMissing != nil {
+			*ctx.requiredDependencyMissing = true
+		}
 		return gosnmp.SnmpPDU{}, sourceOID, false, nil
 	}
 	return pdu, sourceOID, true, nil
