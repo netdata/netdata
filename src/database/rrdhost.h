@@ -415,7 +415,6 @@ struct rrdhost {
 };
 
 extern RRDHOST *localhost;
-bool rrdhost_localhost_tier_is_dbengine(size_t tier);
 
 // receiver_lock protects host->receiver and the host->stream.rcv.status fields.
 //
