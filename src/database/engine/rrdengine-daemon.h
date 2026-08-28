@@ -15,7 +15,6 @@
 #include "libnetdata/libnetdata.h"
 
 // leaf daemon headers (they include nothing of the daemon themselves)
-#include "daemon/config/netdata-conf-profile.h"   // nd_profile.storage_tiers                          -> active tiers
 #include "daemon/libuv_workers.h"                 // UV_EVENT_* job ids, register_libuv_worker_jobs(),
                                                   // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
 #include "daemon/daemon-service.h"                // service_register()                                -> hooks
