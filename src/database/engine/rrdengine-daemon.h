@@ -19,10 +19,6 @@
                                                   // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
 #include "daemon/daemon-service.h"                // service_register()                                -> hooks
 
-// daemon state the engine still reads inline                                                         -> active tiers
-bool rrdhost_localhost_tier_is_dbengine(size_t tier);                           // database/rrdhost.c, a bridge until the
-                                                                                // engine tracks its own active tiers
-
 // telemetry the engine pushes into daemon/pulse                                                      -> published stats
 void pulse_aral_register(ARAL *ar, const char *name);                           // daemon/pulse/pulse-aral.h
 void pulse_aral_register_statistics(struct aral_statistics *stats, const char *name);

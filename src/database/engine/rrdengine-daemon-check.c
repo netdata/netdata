@@ -11,6 +11,5 @@
 #include "web/api/queries/weights.h"
 #include "database/contexts/rrdcontext.h"
 #include "database/sqlite/sqlite_metadata.h"
-#include "database/rrdhost.h"
 
 typedef int rrdengine_daemon_check_is_not_an_empty_translation_unit;

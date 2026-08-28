@@ -2415,7 +2415,7 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
 
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
-        if (!rrdeng_ctx_is_active(ctx) || !rrdhost_localhost_tier_is_dbengine(tier))
+        if (!rrdeng_ctx_is_active(ctx))
             continue;
         check_and_schedule_db_rotation(ctx);
     }
