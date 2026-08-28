@@ -84,7 +84,7 @@ func topologySemanticDeviceInputFromConnection(dev ddsnmp.DeviceConnectionInfo) 
 		vendor:      dev.Vendor,
 		model:       dev.Model,
 		vnodeGUID:   dev.VnodeGUID,
-		vnodeLabels: maps.Clone(dev.VnodeLabels),
+		vnodeLabels: dev.VnodeLabels,
 	}
 }
 
@@ -99,7 +99,7 @@ func (d topologySemanticDeviceInput) connectionInfo() ddsnmp.DeviceConnectionInf
 		Vendor:      d.vendor,
 		Model:       d.model,
 		VnodeGUID:   d.vnodeGUID,
-		VnodeLabels: maps.Clone(d.vnodeLabels),
+		VnodeLabels: d.vnodeLabels,
 	}
 }
 

@@ -66,7 +66,6 @@ func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
 	diagnostics := coll.acquireTopologyDiagnostics()
 	require.NotNil(t, diagnostics.topology)
 	require.Equal(t, diagnosticCaptureAvailable, diagnostics.topology.captureState)
-	require.Equal(t, []ddsnmp.DeviceRegistrationID{registrationID}, diagnostics.topology.registrationVector)
 	require.Len(t, diagnostics.topology.devices, 1)
 	row := diagnostics.topology.devices[0]
 	require.Equal(t, registrationID, row.registrationID)

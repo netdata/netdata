@@ -48,16 +48,15 @@ type topologyRemovedDeviceDiagnostic struct {
 }
 
 type topologySweepDiagnosticCut struct {
-	sequence           uint64
-	startedAt          time.Time
-	publishedAt        time.Time
-	captureState       diagnosticCaptureState
-	captureReason      diagnosticCaptureReason
-	recordCount        uint64
-	logicalBytes       uint64
-	registrationVector []ddsnmp.DeviceRegistrationID
-	devices            []topologySweepDeviceDiagnostic
-	removed            []topologyRemovedDeviceDiagnostic
+	sequence      uint64
+	startedAt     time.Time
+	publishedAt   time.Time
+	captureState  diagnosticCaptureState
+	captureReason diagnosticCaptureReason
+	recordCount   uint64
+	logicalBytes  uint64
+	devices       []topologySweepDeviceDiagnostic
+	removed       []topologyRemovedDeviceDiagnostic
 }
 
 type topologyDiagnosticAbortReason uint8
@@ -250,7 +249,6 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 	cut.recordCount = records
 	cut.logicalBytes = logicalBytes
 
-	cut.registrationVector = make([]ddsnmp.DeviceRegistrationID, 0, len(input.entries))
 	cut.devices = make([]topologySweepDeviceDiagnostic, 0, len(input.entries))
 	for _, entry := range input.entries {
 		registrationID := entry.RegistrationID
@@ -272,7 +270,6 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 			row.renderable = generation.hasObservation && generation.freshAt(input.publishedAt)
 			row.expired = !generation.expiresAt.IsZero() && input.publishedAt.After(generation.expiresAt)
 		}
-		cut.registrationVector = append(cut.registrationVector, registrationID)
 		cut.devices = append(cut.devices, row)
 	}
 

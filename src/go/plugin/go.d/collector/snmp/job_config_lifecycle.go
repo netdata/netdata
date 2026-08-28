@@ -59,7 +59,7 @@ func (*snmpJobConfigLifecycle) Capture(
 	return snapshot
 }
 
-func (l *snmpJobConfigLifecycle) Commit(
+func (l *snmpJobConfigLifecycle) Reconcile(
 	previous collectorapi.JobConfigIdentity,
 	snapshot collectorapi.JobConfigLifecycleSnapshot,
 	job collectorapi.RuntimeJob,

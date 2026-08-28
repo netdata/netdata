@@ -22,13 +22,14 @@ func (id JobConfigIdentity) String() string {
 // JobConfigLifecycle projects a small diagnostic lifecycle snapshot at the
 // authoritative Job Manager configuration-commit boundary. Implementations
 // must be fail-open. Project must not retain config, and snapshots must contain
-// no configuration or runtime objects. Commit receives a runtime only for a
-// successfully accepted job; failed or pre-construction states receive nil.
+// no configuration or runtime objects. Reconcile receives the prior graph
+// incarnation plus a runtime only for a successfully accepted job; failed or
+// pre-construction states receive nil.
 type JobConfigLifecycle interface {
 	Project(JobConfigIdentity, map[string]any) JobConfigLifecycleSnapshot
 	Bind(JobConfigIdentity, RuntimeJob)
 	Capture(JobConfigIdentity, RuntimeJob) JobConfigLifecycleSnapshot
-	Commit(JobConfigIdentity, JobConfigLifecycleSnapshot, RuntimeJob)
+	Reconcile(JobConfigIdentity, JobConfigLifecycleSnapshot, RuntimeJob)
 	Remove(JobConfigIdentity)
 }
 

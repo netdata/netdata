@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/netip"
 	"runtime/debug"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -390,16 +389,14 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	pruneUnregisteredDeviceStates(nextStates, seen)
 	publishedAt := c.currentTime()
 	nextSequence := c.generationSequence + 1
-	registrationIDs := make([]ddsnmp.DeviceRegistrationID, 0, len(successfulSnapshots))
-	for registrationID := range successfulSnapshots {
-		registrationIDs = append(registrationIDs, registrationID)
-	}
-	slices.Sort(registrationIDs)
-	for _, registrationID := range registrationIDs {
-		snapshot := successfulSnapshots[registrationID]
-		state := nextStates[registrationID]
-		state.generation = activateTopologyDeviceSnapshot(registrationID, nextSequence, publishedAt, snapshot)
-		nextStates[registrationID] = state
+	for _, plan := range plans {
+		snapshot, ok := successfulSnapshots[plan.registrationID]
+		if !ok {
+			continue
+		}
+		state := nextStates[plan.registrationID]
+		state.generation = activateTopologyDeviceSnapshot(plan.registrationID, nextSequence, publishedAt, snapshot)
+		nextStates[plan.registrationID] = state
 	}
 	c.deviceStates = nextStates
 	c.generationSequence = nextSequence
@@ -632,15 +629,6 @@ func closeSNMPClientOnContextCancel(ctx context.Context, client gosnmp.Handler) 
 		}
 	}()
 	return func() { close(done) }
-}
-
-func (c *Collector) newDeviceTopologyBuilder(dev ddsnmp.DeviceConnectionInfo) *topologyBuilder {
-	return newTopologyBuilderFromSemanticInput(
-		topologySemanticDeviceInputFromConnection(dev),
-		nil,
-		c.currentTime(),
-		c.refreshEvery()+2*c.deviceCheckEvery(),
-	)
 }
 
 func (c *Collector) currentTopologySemanticLimits() topologySemanticLimits {

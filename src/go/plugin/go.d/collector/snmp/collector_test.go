@@ -262,7 +262,7 @@ func TestCollector_InitFailurePublishesSafeLifecycle(t *testing.T) {
 	require.NotContains(t, serialized, collr.ManualProfiles[0])
 }
 
-func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilCommit(t *testing.T) {
+func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
 	collr := New(store)
 	collr.Hostname = ""
@@ -276,7 +276,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilCommit(t *testing.
 	collr.Cleanup(context.Background())
 	require.Empty(t, store.LifecycleCut().Entries)
 
-	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, nil)
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, nil)
 	cut := store.LifecycleCut()
 	require.Len(t, cut.Entries, 1)
 	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
@@ -303,7 +303,7 @@ func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
 
 	snapshot := hook.Project(identity, config)
 	config["hostname"] = "changed-after-projection.example"
-	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, nil)
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, nil)
 
 	cut := store.LifecycleCut()
 	require.Len(t, cut.Entries, 1)
@@ -353,7 +353,7 @@ func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
 	}
 	collr.deviceLifecycleMu.Unlock()
 
-	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, nil)
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, nil)
 	cut := store.LifecycleCut()
 	require.Len(t, cut.Entries, 1)
 	require.Equal(t, prepareV2Config().Hostname, cut.Entries[0].Info.Hostname)
@@ -397,7 +397,7 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 	})
 }
 
-func TestCollectorManagedConnectionCollectedBeforeCommitIsPublishedAtCommit(t *testing.T) {
+func TestCollectorManagedConnectionCollectedBeforeReconcileIsPublishedAtReconcile(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
 	collr := New(store)
 	collr.Config = prepareV2Config()
@@ -419,7 +419,7 @@ func TestCollectorManagedConnectionCollectedBeforeCommitIsPublishedAtCommit(t *t
 
 	snapshot := hook.Capture(identity, job)
 	require.NotNil(t, snapshot)
-	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, job)
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, job)
 	require.Len(t, store.Entries(), 1)
 	require.Equal(t, []string{"profile-a"}, store.Entries()[0].Info.ManualProfiles)
 	cut := store.LifecycleCut()

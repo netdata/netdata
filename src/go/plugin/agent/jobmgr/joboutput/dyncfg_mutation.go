@@ -105,7 +105,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	busyFallback *ResourceActivationFallback,
 	quarantinedFallback *ResourceActivationFallback,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	jobConfigCommit := dcjc.prepareJobConfigLifecycleCommit(scope.ID, postimage, jobConfig)
+	jobConfigReconcile := dcjc.prepareJobConfigLifecycleReconcile(scope.ID, postimage, jobConfig)
 	afterApply = composeAfterApply(dcjc.retrySettlement(scope.ID, retry), afterApply)
 	acceptedAfterApply, err := dcjc.acceptedActivationAfterApply(scope.ID, postimage)
 	if err != nil {
@@ -126,10 +126,10 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 			return nil, err
 		}
 	}
-	dependencyCommit = composeAfterApply(dependencyCommit, jobConfigCommit)
+	dependencyCommit = composeAfterApply(dependencyCommit, jobConfigReconcile)
 	mutation, err := dcjc.graph.PrepareMutation([]dyncfg.GraphChange{{ID: scope.ID, Config: postimage}})
 	if errors.Is(err, dyncfg.ErrGraphNoChange) {
-		afterApply = composeAfterApply(afterApply, jobConfigCommit)
+		afterApply = composeAfterApply(afterApply, jobConfigReconcile)
 		if successor != nil {
 			return dcjc.prepareResourceTransaction(
 				ResourceTransactionSpec{
@@ -208,7 +208,7 @@ func (dcjc *DynCfgJobController) newActivationFallback(
 	}
 	dependencyCommit = composeAfterApply(
 		dependencyCommit,
-		dcjc.prepareJobConfigLifecycleCommit(id, postimage, preparedJobConfigLifecycle{snapshot: jobConfigSnapshot}),
+		dcjc.prepareJobConfigLifecycleReconcile(id, postimage, preparedJobConfigLifecycle{snapshot: jobConfigSnapshot}),
 	)
 	return &ResourceActivationFallback{
 		Change: dyncfg.GraphChange{

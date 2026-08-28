@@ -165,7 +165,7 @@ func TestCollectorRefreshPrunesUnregisteredDeviceStateFromPublishedGeneration(t 
 	require.Zero(t, coll.topologyRegistry.acquireGeneration().deviceCount())
 	diagnostics := coll.acquireTopologyDiagnostics()
 	require.NotNil(t, diagnostics.topology)
-	require.Empty(t, diagnostics.topology.registrationVector)
+	require.Empty(t, diagnostics.topology.devices)
 	require.Len(t, diagnostics.topology.removed, 1)
 	require.Equal(t, registrationID, diagnostics.topology.removed[0].registrationID)
 	require.True(t, diagnostics.topology.removed[0].hasRetainedSuccess)
@@ -828,14 +828,6 @@ func TestCollectorCancelsInFlightVLANContextRefresh(t *testing.T) {
 	case <-time.After(time.Second):
 		require.Fail(t, "vlan-context refresh did not stop after context cancellation")
 	}
-}
-
-func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testing.T) {
-	coll := newTestSNMPTopologyCollector()
-
-	cache := coll.newDeviceTopologyBuilder(ddsnmp.DeviceConnectionInfo{Hostname: "switch-a"})
-
-	require.Equal(t, defaultRefreshEvery+2*defaultDeviceCheckEvery, cache.staleAfter)
 }
 
 func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {

@@ -1909,17 +1909,17 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 	)
 	require.NoError(t, err)
 	require.Equal(t, []string{"bind", "check", "capture", "cleanup"}, events)
-	require.Empty(t, lifecycleHook.commits, "candidate cleanup must not publish before graph commit")
+	require.Empty(t, lifecycleHook.reconciliations, "candidate cleanup must not publish before graph commit")
 
 	_, err = transaction.Apply(context.Background())
 	require.NoError(t, err)
 	record, ok := graph.Lookup(config.FullName())
 	require.True(t, ok)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.Len(t, lifecycleHook.commits, 1)
-	require.Equal(t, lifecycleHook.bound, lifecycleHook.commits[0].current)
-	require.Equal(t, lifecycleHook.bound, lifecycleHook.commits[0].previous)
-	require.Equal(t, "commit", events[len(events)-1])
+	require.Len(t, lifecycleHook.reconciliations, 1)
+	require.Equal(t, lifecycleHook.bound, lifecycleHook.reconciliations[0].current)
+	require.Equal(t, lifecycleHook.bound, lifecycleHook.reconciliations[0].previous)
+	require.Equal(t, "reconcile", events[len(events)-1])
 
 	removeScope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
 	removeTransaction, err := controller.prepareMutation(
@@ -1975,26 +1975,26 @@ func TestTransientPreConstructionFailurePublishesConfigLifecycleAfterGraphCommit
 		permit,
 	)
 	require.NoError(t, err)
-	require.Empty(t, lifecycleHook.commits)
+	require.Empty(t, lifecycleHook.reconciliations)
 
 	_, err = transaction.Apply(context.Background())
 	require.NoError(t, err)
 	record, ok := graph.Lookup(config.FullName())
 	require.True(t, ok)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.Len(t, lifecycleHook.commits, 1)
-	require.Equal(t, jobConfigIdentity(config), lifecycleHook.commits[0].current)
-	require.Equal(t, jobConfigIdentity(config), lifecycleHook.commits[0].previous)
+	require.Len(t, lifecycleHook.reconciliations, 1)
+	require.Equal(t, jobConfigIdentity(config), lifecycleHook.reconciliations[0].current)
+	require.Equal(t, jobConfigIdentity(config), lifecycleHook.reconciliations[0].previous)
 }
 
 type recordingJobConfigLifecycle struct {
-	events  *[]string
-	bound   collectorapi.JobConfigIdentity
-	commits []recordingJobConfigLifecycleCommit
-	removed []collectorapi.JobConfigIdentity
+	events          *[]string
+	bound           collectorapi.JobConfigIdentity
+	reconciliations []recordingJobConfigLifecycleReconciliation
+	removed         []collectorapi.JobConfigIdentity
 }
 
-type recordingJobConfigLifecycleCommit struct {
+type recordingJobConfigLifecycleReconciliation struct {
 	current  collectorapi.JobConfigIdentity
 	previous collectorapi.JobConfigIdentity
 }
@@ -2020,12 +2020,12 @@ func (r *recordingJobConfigLifecycle) Capture(
 	return &recordingJobConfigLifecycleSnapshot{identity: identity}
 }
 
-func (r *recordingJobConfigLifecycle) Commit(
+func (r *recordingJobConfigLifecycle) Reconcile(
 	previous collectorapi.JobConfigIdentity,
 	snapshot collectorapi.JobConfigLifecycleSnapshot,
 	_ collectorapi.RuntimeJob,
 ) {
-	r.recordCommit(previous, snapshot)
+	r.recordReconciliation(previous, snapshot)
 }
 
 func (r *recordingJobConfigLifecycle) Remove(identity collectorapi.JobConfigIdentity) {
@@ -2041,7 +2041,7 @@ func (r *recordingJobConfigLifecycleSnapshot) Identity() collectorapi.JobConfigI
 	return r.identity
 }
 
-func (r *recordingJobConfigLifecycle) recordCommit(
+func (r *recordingJobConfigLifecycle) recordReconciliation(
 	previous collectorapi.JobConfigIdentity,
 	snapshot collectorapi.JobConfigLifecycleSnapshot,
 ) {
@@ -2049,11 +2049,11 @@ func (r *recordingJobConfigLifecycle) recordCommit(
 	if current == nil {
 		return
 	}
-	r.commits = append(r.commits, recordingJobConfigLifecycleCommit{
+	r.reconciliations = append(r.reconciliations, recordingJobConfigLifecycleReconciliation{
 		current:  current.identity,
 		previous: previous,
 	})
-	*r.events = append(*r.events, "commit")
+	*r.events = append(*r.events, "reconcile")
 }
 
 type jobDependencyIndexFunc func(string, *dyncfg.GraphConfig) (func(), error)

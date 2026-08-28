@@ -36,9 +36,7 @@ func (c *Collector) vnodeHostname() string {
 
 func (c *Collector) vnodeLabels() map[string]string {
 	if c.vnode != nil && len(c.vnode.Labels) > 0 {
-		cp := make(map[string]string, len(c.vnode.Labels))
-		maps.Copy(cp, c.vnode.Labels)
-		return cp
+		return c.vnode.Labels
 	}
 	return nil
 }
@@ -100,7 +98,7 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		Model:           model,
 
 		DisableBulkWalk: c.disableBulkWalk,
-		ManualProfiles:  slices.Clone(c.ManualProfiles),
+		ManualProfiles:  c.ManualProfiles,
 		VnodeGUID:       c.vnodeGUID(),
 		VnodeHostname:   c.vnodeHostname(),
 		VnodeLabels:     vnodeLabels,

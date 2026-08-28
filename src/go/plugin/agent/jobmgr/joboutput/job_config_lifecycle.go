@@ -102,7 +102,7 @@ type jobConfigLifecycleGraphState struct {
 	valid    bool
 }
 
-func (dcjc *DynCfgJobController) prepareJobConfigLifecycleCommit(
+func (dcjc *DynCfgJobController) prepareJobConfigLifecycleReconcile(
 	id string,
 	postimage *dyncfg.GraphConfig,
 	prepared preparedJobConfigLifecycle,
@@ -133,7 +133,7 @@ func (dcjc *DynCfgJobController) prepareJobConfigLifecycleCommit(
 			if prepared.identity == next.identity && prepared.runtime != nil {
 				runtime = prepared.runtime
 			}
-			callJobConfigLifecycle(func() { next.hook.Commit(previous.identity, snapshot, runtime) })
+			callJobConfigLifecycle(func() { next.hook.Reconcile(previous.identity, snapshot, runtime) })
 		}
 	}
 	if previous.valid && (!next.valid || next.identity != previous.identity) && previous.hook != nil {
