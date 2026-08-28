@@ -424,13 +424,6 @@ typedef struct tier_config_prototype {
     time_t max_retention_s;                     // The max retention in seconds
     uint8_t global_compress_alg;                // the wanted compression algorithm
     char dbfiles_path[FILENAME_MAX + 1];
-
-    struct {
-        uint32_t uses;
-        bool enabled;
-        bool is_on_disk;
-        SPINLOCK spinlock;
-    } _internal;
 } TIER_CONFIG_PROTOTYPE;
 
 struct rrdengine_instance {
@@ -460,6 +453,7 @@ struct rrdengine_instance {
 
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
+        PAD64(bool) active;                                // set when rrdeng_init() succeeded, cleared by rrdeng_exit()
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
         PAD64(bool) needs_indexing;
@@ -482,6 +476,13 @@ struct rrdengine_instance {
 
     struct rrdengine_statistics stats;
 };
+
+// a tier that came up and has not been shut down; the event loop's periodic work covers exactly these
+static inline bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
+    return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
+}
+
+size_t rrdeng_active_tiers(void);
 
 #define ctx_current_disk_space_get(ctx) __atomic_load_n(&(ctx)->atomic.current_disk_space, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)

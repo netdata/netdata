@@ -416,7 +416,7 @@ static void wal_cleanup1(void) {
     if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
-    if(wal_globals.protected.available_items && wal_globals.protected.available > nd_profile.storage_tiers) {
+    if(wal_globals.protected.available_items && wal_globals.protected.available > rrdeng_active_tiers()) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -2413,10 +2413,11 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
 {
     worker_is_busy(RRDENG_RETENTION_TIMER_CB);
 
-    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        if (!rrdhost_localhost_tier_is_dbengine(tier))
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        struct rrdengine_instance *ctx = multidb_ctx[tier];
+        if (!rrdeng_ctx_is_active(ctx) || !rrdhost_localhost_tier_is_dbengine(tier))
             continue;
-        check_and_schedule_db_rotation(multidb_ctx[tier]);
+        check_and_schedule_db_rotation(ctx);
     }
 
     worker_is_idle();

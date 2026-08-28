@@ -1185,6 +1185,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
+        __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);
         rrdeng_populate_mrg(ctx);
         return 0;
     }
@@ -1199,6 +1200,14 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     return UV_EIO;
 }
 
+size_t rrdeng_active_tiers(void) {
+    size_t active = 0;
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
+            active++;
+    return active;
+}
+
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
@@ -1209,6 +1218,9 @@ size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
 int rrdeng_exit(struct rrdengine_instance *ctx) {
     if (NULL == ctx)
         return 1;
+
+    // no more periodic work for this tier from here on
+    __atomic_store_n(&ctx->atomic.active, false, __ATOMIC_RELEASE);
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
