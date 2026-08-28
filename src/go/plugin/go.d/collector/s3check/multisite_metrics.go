@@ -149,47 +149,19 @@ func (c *Collector) writeMultisiteMetrics(cycle *multisiteCycle) {
 		result := cycle.phases[phase]
 		c.multisiteStats[phase].add(result)
 		counters := c.multisiteStats[phase]
-		labels := meter.LabelSet(
-			metrix.Label{
-				Key:   "source_site",
-				Value: c.SourceSite,
-			},
-			metrix.Label{
-				Key:   "destination_site",
-				Value: c.Destination.Site,
-			},
-			metrix.Label{
-				Key:   "phase",
-				Value: string(phase),
-			},
-			metrix.Label{
-				Key:   "reason",
-				Value: result.reason,
-			},
-		)
-		meter.WithLabels(
-			metrix.Label{
-				Key:   "source_site",
-				Value: c.SourceSite,
-			},
-			metrix.Label{
-				Key:   "destination_site",
-				Value: c.Destination.Site,
-			},
-			metrix.Label{
-				Key:   "phase",
-				Value: string(phase),
-			},
-			metrix.Label{
-				Key:   "reason",
-				Value: result.reason,
-			},
-		).StateSet(
+		labels := []metrix.Label{
+			{Key: "source_site", Value: c.SourceSite},
+			{Key: "destination_site", Value: c.Destination.Site},
+			{Key: "phase", Value: string(phase)},
+			{Key: "reason", Value: result.reason},
+		}
+		labelSet := meter.LabelSet(labels...)
+		meter.WithLabels(labels...).StateSet(
 			"multisite_status",
 			metrix.WithStateSetMode(metrix.ModeEnum),
 			metrix.WithStateSetStates(ownershipStates...),
 		).Enable(string(result.state))
-		duration.Observe(metrix.SampleValue(float64(result.duration.Nanoseconds())/1e6), labels)
+		duration.Observe(metrix.SampleValue(float64(result.duration.Nanoseconds())/1e6), labelSet)
 
 		phaseOnly := meter.LabelSet(
 			metrix.Label{
