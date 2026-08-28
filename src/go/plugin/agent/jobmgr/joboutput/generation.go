@@ -207,16 +207,20 @@ func (pj PreparedJob) Identity() lifecycle.ResourceIdentity {
 	}
 }
 
-func (pj PreparedJob) jobConfigLifecycleSnapshot() collectorapi.JobConfigLifecycleSnapshot {
+func (pj PreparedJob) jobConfigLifecycleState() preparedJobConfigLifecycle {
 	if pj.state == nil {
-		return nil
+		return preparedJobConfigLifecycle{}
 	}
 	pj.state.mu.Lock()
 	defer pj.state.mu.Unlock()
 	if pj.state.consumed {
-		return nil
+		return preparedJobConfigLifecycle{}
 	}
-	return pj.state.constructed.jobConfigSnapshot
+	return preparedJobConfigLifecycle{
+		identity: pj.state.constructed.jobConfigIdentity,
+		snapshot: pj.state.constructed.jobConfigSnapshot,
+		runtime:  pj.state.constructed.candidateJob,
+	}
 }
 
 func (pj PreparedJob) AcceptStart(ctx context.Context, expected uint64) (lifecycle.ReadyResource, error) {

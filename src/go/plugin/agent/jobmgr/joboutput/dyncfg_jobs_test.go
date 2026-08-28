@@ -1941,6 +1941,52 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 	require.Equal(t, []collectorapi.JobConfigIdentity{lifecycleHook.bound}, lifecycleHook.removed)
 }
 
+func TestTransientPreConstructionFailurePublishesConfigLifecycleAfterGraphCommit(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	events := []string{}
+	lifecycleHook := &recordingJobConfigLifecycle{events: &events}
+	creator := controller.modules["module"]
+	creator.JobConfigLifecycle = lifecycleHook
+	controller.modules["module"] = creator
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider("test")
+	config.Set("vnode", "missing-vnode")
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
+	permit, _ := issueTestJobPermit(t, config.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:      config.FullName(),
+		Current: currentIdentity,
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 2,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true},
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	require.Empty(t, lifecycleHook.commits)
+
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+	record, ok := graph.Lookup(config.FullName())
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Len(t, lifecycleHook.commits, 1)
+	require.Equal(t, jobConfigIdentity(config), lifecycleHook.commits[0].current)
+	require.Equal(t, jobConfigIdentity(config), lifecycleHook.commits[0].previous)
+}
+
 type recordingJobConfigLifecycle struct {
 	events  *[]string
 	bound   collectorapi.JobConfigIdentity
@@ -1953,6 +1999,14 @@ type recordingJobConfigLifecycleCommit struct {
 	previous collectorapi.JobConfigIdentity
 }
 
+func (r *recordingJobConfigLifecycle) Project(
+	identity collectorapi.JobConfigIdentity,
+	_ map[string]any,
+) collectorapi.JobConfigLifecycleSnapshot {
+	*r.events = append(*r.events, "project")
+	return &recordingJobConfigLifecycleSnapshot{identity: identity}
+}
+
 func (r *recordingJobConfigLifecycle) Bind(identity collectorapi.JobConfigIdentity, _ collectorapi.RuntimeJob) {
 	r.bound = identity
 	*r.events = append(*r.events, "bind")
@@ -1963,7 +2017,15 @@ func (r *recordingJobConfigLifecycle) Capture(
 	_ collectorapi.RuntimeJob,
 ) collectorapi.JobConfigLifecycleSnapshot {
 	*r.events = append(*r.events, "capture")
-	return &recordingJobConfigLifecycleSnapshot{owner: r, identity: identity}
+	return &recordingJobConfigLifecycleSnapshot{identity: identity}
+}
+
+func (r *recordingJobConfigLifecycle) Commit(
+	previous collectorapi.JobConfigIdentity,
+	snapshot collectorapi.JobConfigLifecycleSnapshot,
+	_ collectorapi.RuntimeJob,
+) {
+	r.recordCommit(previous, snapshot)
 }
 
 func (r *recordingJobConfigLifecycle) Remove(identity collectorapi.JobConfigIdentity) {
@@ -1972,7 +2034,6 @@ func (r *recordingJobConfigLifecycle) Remove(identity collectorapi.JobConfigIden
 }
 
 type recordingJobConfigLifecycleSnapshot struct {
-	owner    *recordingJobConfigLifecycle
 	identity collectorapi.JobConfigIdentity
 }
 
@@ -1980,12 +2041,19 @@ func (r *recordingJobConfigLifecycleSnapshot) Identity() collectorapi.JobConfigI
 	return r.identity
 }
 
-func (r *recordingJobConfigLifecycleSnapshot) Commit(previous collectorapi.JobConfigIdentity) {
-	r.owner.commits = append(r.owner.commits, recordingJobConfigLifecycleCommit{
-		current:  r.identity,
+func (r *recordingJobConfigLifecycle) recordCommit(
+	previous collectorapi.JobConfigIdentity,
+	snapshot collectorapi.JobConfigLifecycleSnapshot,
+) {
+	current, _ := snapshot.(*recordingJobConfigLifecycleSnapshot)
+	if current == nil {
+		return
+	}
+	r.commits = append(r.commits, recordingJobConfigLifecycleCommit{
+		current:  current.identity,
 		previous: previous,
 	})
-	*r.owner.events = append(*r.owner.events, "commit")
+	*r.events = append(*r.events, "commit")
 }
 
 type jobDependencyIndexFunc func(string, *dyncfg.GraphConfig) (func(), error)

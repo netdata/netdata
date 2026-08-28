@@ -135,22 +135,29 @@ rebuilt `hostname:port` key. Two SNMP jobs targeting the same endpoint therefore
 keep independent refresh state and device generations, and a replacement job
 cannot inherit the removed job's retry or warning-limiter state.
 
-The normal SNMP collector records lifecycle phase/outcome locally from `Init`,
-before system information, profile selection, or vnode setup can succeed. Job
-Manager publishes that snapshot only after the matching running/failed DynCfg
-graph row commits. Failed candidate cleanup therefore cannot erase the job, and
-an uncommitted candidate cannot appear in topology. Configuration replacement
-atomically replaces the prior lifecycle incarnation; configuration removal owns
-full deletion. Normal collector cleanup removes only topology-ready connection
-state.
+Job Manager projects a credential-free normal-SNMP baseline from each committed
+running/failed configuration. The baseline has an unknown phase when vnode,
+secret, or configuration application fails before a runtime collector exists.
+When construction succeeds, the collector records lifecycle phase/outcome
+locally from `Init`, before system information or profile selection can succeed,
+and Job Manager uses that detached value instead. Publication occurs only after
+the matching DynCfg graph row commits, or after a successful transaction confirms
+that its fallback row already matches. Failed candidate cleanup therefore cannot
+erase the incumbent or publish the candidate. Graph reconciliation owns
+connection demotion, incarnation replacement, and full removal; managed
+collector cleanup does not mutate the shared `DeviceStore`.
 
 `LifecycleCut` provides a separately sequenced and timestamped snapshot of every
 committed job's credential-free configured identity, last completed lifecycle
 phase/outcome, and topology-readiness state. Connection state collected before
-graph commit is held once by the collector and flushed atomically with the
-lifecycle row; later updates retain the same registration ID. `Entries` remains
-limited to topology-ready jobs. Lifecycle reporting is diagnostic-only:
-failures or panics are rate-limited and cannot change collector or graph results.
+graph commit is held once by the collector. A successfully accepted runtime is
+consulted transiently during graph reconciliation so that state is flushed
+atomically with the lifecycle row; the detached snapshot never retains the
+collector, its configuration, or its SNMP client. Later updates retain the same
+registration ID. `Entries` remains limited to topology-ready jobs. Lifecycle
+reporting is diagnostic-only: failures or panics are rate-limited and cannot
+change collector or graph results, while a panic in `Init` or `Check` is recorded
+as a failed phase before the framework recovers it.
 
 Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh

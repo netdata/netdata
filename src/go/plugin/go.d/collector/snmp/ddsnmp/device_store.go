@@ -259,20 +259,6 @@ func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	s.mu.Unlock()
 }
 
-// UnregisterDevice removes topology-ready connection state while retaining the
-// configuration-owned lifecycle incarnation.
-func (s *DeviceStore) UnregisterDevice(ownerKey string) {
-	s.mu.Lock()
-	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
-		if info, exists := s.devices[registrationID]; exists {
-			s.removeHostnameIndexLocked(ownerKey, info.Hostname)
-			delete(s.devices, registrationID)
-			s.lifecycleSequence++
-		}
-	}
-	s.mu.Unlock()
-}
-
 // Unregister removes a complete job incarnation from the store.
 func (s *DeviceStore) Unregister(ownerKey string) {
 	s.mu.Lock()

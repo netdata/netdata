@@ -760,6 +760,9 @@ func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
 	require.Nil(t, diagnostics.topology)
 	require.NotNil(t, diagnostics.lastAborted)
 	require.Equal(t, topologyDiagnosticAbortCanceled, diagnostics.lastAborted.reason)
+	require.Equal(t, topologyDiagnosticSweepPhaseDeviceRefresh, diagnostics.lastAborted.phase)
+	require.True(t, diagnostics.lastAborted.hasActiveRegistration)
+	require.Equal(t, store.Entries()[0].RegistrationID, diagnostics.lastAborted.activeRegistrationID)
 	require.Equal(t, 1, diagnostics.lastAborted.registrationCount)
 	require.Equal(t, 1, diagnostics.lastAborted.selectedCount)
 }

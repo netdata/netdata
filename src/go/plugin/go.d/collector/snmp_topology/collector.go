@@ -334,10 +334,10 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 			plan.targetManagementIPs,
 			effectiveLimits,
 		)
-		hasActiveRegistration = false
 		if ctx.Err() != nil {
 			break
 		}
+		hasActiveRegistration = false
 		completedAt := c.currentTime()
 
 		state.outcome = outcome

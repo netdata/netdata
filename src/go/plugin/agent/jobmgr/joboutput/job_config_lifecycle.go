@@ -64,45 +64,76 @@ func jobConfigLifecycleSnapshotIdentity(
 	return identity, ok && identity.Valid()
 }
 
-func preparedJobConfigLifecycleSnapshot(
-	successor lifecycle.PreparedResource,
-) collectorapi.JobConfigLifecycleSnapshot {
+type preparedJobConfigLifecycle struct {
+	identity collectorapi.JobConfigIdentity
+	snapshot collectorapi.JobConfigLifecycleSnapshot
+	runtime  collectorapi.RuntimeJob
+}
+
+func preparedJobConfigLifecycleState(successor lifecycle.PreparedResource) preparedJobConfigLifecycle {
 	if successor == nil {
-		return nil
+		return preparedJobConfigLifecycle{}
 	}
 	provider, ok := successor.(interface {
-		jobConfigLifecycleSnapshot() collectorapi.JobConfigLifecycleSnapshot
+		jobConfigLifecycleState() preparedJobConfigLifecycle
 	})
 	if !ok {
-		return nil
+		return preparedJobConfigLifecycle{}
 	}
-	snapshot := provider.jobConfigLifecycleSnapshot()
-	if nilInterfaceValue(snapshot) {
-		return nil
+	state := provider.jobConfigLifecycleState()
+	if !state.identity.Valid() || state.runtime == nil {
+		return preparedJobConfigLifecycle{}
 	}
-	return snapshot
+	if nilInterfaceValue(state.snapshot) {
+		state.snapshot = nil
+		return state
+	}
+	snapshotIdentity, ok := jobConfigLifecycleSnapshotIdentity(state.snapshot)
+	if !ok || snapshotIdentity != state.identity {
+		state.snapshot = nil
+	}
+	return state
 }
 
 type jobConfigLifecycleGraphState struct {
 	identity collectorapi.JobConfigIdentity
 	hook     collectorapi.JobConfigLifecycle
+	config   confgroup.Config
 	valid    bool
 }
 
 func (dcjc *DynCfgJobController) prepareJobConfigLifecycleCommit(
 	id string,
 	postimage *dyncfg.GraphConfig,
-	snapshot collectorapi.JobConfigLifecycleSnapshot,
+	prepared preparedJobConfigLifecycle,
 ) func() {
 	if dcjc == nil || dcjc.graph == nil || id == "" {
 		return nil
 	}
 	previous := dcjc.currentJobConfigLifecycleGraphState(id)
 	next := dcjc.postimageJobConfigLifecycleGraphState(postimage)
+	snapshot := prepared.snapshot
+	if snapshotIdentity, ok := jobConfigLifecycleSnapshotIdentity(snapshot); !ok ||
+		!next.valid || snapshotIdentity != next.identity {
+		snapshot = nil
+	}
+	if next.valid && snapshot == nil {
+		callJobConfigLifecycle(func() {
+			snapshot = next.hook.Project(next.identity, map[string]any(next.config))
+		})
+		if snapshotIdentity, ok := jobConfigLifecycleSnapshotIdentity(snapshot); !ok ||
+			snapshotIdentity != next.identity {
+			snapshot = nil
+		}
+	}
 	if snapshotIdentity, ok := jobConfigLifecycleSnapshotIdentity(snapshot); ok &&
 		next.valid && snapshotIdentity == next.identity {
 		return func() {
-			callJobConfigLifecycle(func() { snapshot.Commit(previous.identity) })
+			var runtime collectorapi.RuntimeJob
+			if prepared.identity == next.identity && prepared.runtime != nil {
+				runtime = prepared.runtime
+			}
+			callJobConfigLifecycle(func() { next.hook.Commit(previous.identity, snapshot, runtime) })
 		}
 	}
 	if previous.valid && (!next.valid || next.identity != previous.identity) && previous.hook != nil {
@@ -118,11 +149,15 @@ func (dcjc *DynCfgJobController) currentJobConfigLifecycleGraphState(id string) 
 	if !ok {
 		return jobConfigLifecycleGraphState{}
 	}
+	hook := dcjc.jobConfigLifecycleHook(record.Module, record.Status)
+	if hook == nil {
+		return jobConfigLifecycleGraphState{}
+	}
 	config, err := graphRecordConfig(record)
 	if err != nil {
 		return jobConfigLifecycleGraphState{}
 	}
-	return dcjc.jobConfigLifecycleGraphState(record.Module, record.Name, record.Status, config)
+	return dcjc.jobConfigLifecycleGraphState(record.Module, record.Name, config, hook)
 }
 
 func (dcjc *DynCfgJobController) postimageJobConfigLifecycleGraphState(
@@ -131,34 +166,46 @@ func (dcjc *DynCfgJobController) postimageJobConfigLifecycleGraphState(
 	if postimage == nil {
 		return jobConfigLifecycleGraphState{}
 	}
+	hook := dcjc.jobConfigLifecycleHook(postimage.Module, postimage.Status)
+	if hook == nil {
+		return jobConfigLifecycleGraphState{}
+	}
 	var config confgroup.Config
 	if err := yaml.Unmarshal(postimage.Payload, &config); err != nil || config == nil ||
 		config.Module() != postimage.Module || config.Name() != postimage.Name {
 		return jobConfigLifecycleGraphState{}
 	}
-	return dcjc.jobConfigLifecycleGraphState(postimage.Module, postimage.Name, postimage.Status, config)
+	return dcjc.jobConfigLifecycleGraphState(postimage.Module, postimage.Name, config, hook)
 }
 
 func (dcjc *DynCfgJobController) jobConfigLifecycleGraphState(
 	module string,
 	name string,
-	status string,
 	config confgroup.Config,
+	hook collectorapi.JobConfigLifecycle,
 ) jobConfigLifecycleGraphState {
 	if config == nil || config.Module() != module || config.Name() != name {
-		return jobConfigLifecycleGraphState{}
-	}
-	if status != dyncfg.StatusRunning.String() && status != dyncfg.StatusFailed.String() {
-		return jobConfigLifecycleGraphState{}
-	}
-	creator, ok := dcjc.modules.Lookup(module)
-	if !ok || creator.JobConfigLifecycle == nil {
 		return jobConfigLifecycleGraphState{}
 	}
 	identity := jobConfigIdentity(config)
 	return jobConfigLifecycleGraphState{
 		identity: identity,
-		hook:     creator.JobConfigLifecycle,
+		hook:     hook,
+		config:   config,
 		valid:    identity.Valid(),
 	}
+}
+
+func (dcjc *DynCfgJobController) jobConfigLifecycleHook(
+	module string,
+	status string,
+) collectorapi.JobConfigLifecycle {
+	if status != dyncfg.StatusRunning.String() && status != dyncfg.StatusFailed.String() {
+		return nil
+	}
+	creator, ok := dcjc.modules.Lookup(module)
+	if !ok || nilInterfaceValue(creator.JobConfigLifecycle) {
+		return nil
+	}
+	return creator.JobConfigLifecycle
 }

@@ -70,23 +70,6 @@ func TestDeviceStoreLifecyclePrecedesTopologyRegistration(t *testing.T) {
 	}, cut.Entries[0].Info)
 }
 
-func TestDeviceStoreConnectionCleanupRetainsLifecycle(t *testing.T) {
-	store := NewDeviceStore()
-	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
-	store.Register("switch-a", DeviceConnectionInfo{Hostname: "192.0.2.10"})
-
-	before := store.LifecycleCut()
-	require.True(t, before.Entries[0].TopologyReady)
-
-	store.UnregisterDevice("switch-a")
-
-	after := store.LifecycleCut()
-	require.Len(t, after.Entries, 1)
-	require.Equal(t, before.Entries[0].RegistrationID, after.Entries[0].RegistrationID)
-	require.False(t, after.Entries[0].TopologyReady)
-	require.Empty(t, store.Entries())
-}
-
 func TestDeviceStoreReplaceJobCommitsOneIncarnationTransition(t *testing.T) {
 	store := NewDeviceStore()
 	store.RegisterJob("old-config", DeviceLifecycleInfo{Hostname: "192.0.2.10"})

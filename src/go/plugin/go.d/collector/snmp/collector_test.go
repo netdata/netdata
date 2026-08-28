@@ -276,12 +276,125 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilCommit(t *testing.
 	collr.Cleanup(context.Background())
 	require.Empty(t, store.LifecycleCut().Entries)
 
-	snapshot.Commit(collectorapi.JobConfigIdentity{})
+	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, nil)
 	cut := store.LifecycleCut()
 	require.Len(t, cut.Entries, 1)
 	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
 	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
 	require.False(t, cut.Entries[0].TopologyReady)
+}
+
+func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+	config := map[string]any{
+		"hostname":  "switch-a.example",
+		"community": "must-not-appear",
+		"user": map[any]any{
+			"auth_key": "must-not-appear",
+			"priv_key": "must-not-appear",
+		},
+		"options": map[any]any{
+			"port":    1161,
+			"version": "3",
+		},
+	}
+
+	snapshot := hook.Project(identity, config)
+	config["hostname"] = "changed-after-projection.example"
+	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, nil)
+
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, ddsnmp.DeviceLifecycleInfo{
+		Hostname:    "switch-a.example",
+		Port:        1161,
+		SNMPVersion: "3",
+	}, cut.Entries[0].Info)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseUnknown, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeUnknown, cut.Entries[0].LastCompleted.Outcome)
+	require.NotContains(t, fmt.Sprintf("%+v", snapshot), "must-not-appear")
+}
+
+func TestCollectorRejectedManagedCandidateDoesNotRemoveIncumbentConnection(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	identity := collectorapi.JobConfigIdentity{1}
+	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{Hostname: "incumbent.example"})
+	collr := New(store)
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+
+	hook.Bind(identity, job)
+	collr.Cleanup(context.Background())
+
+	require.Len(t, store.Entries(), 1)
+	require.Equal(t, "incumbent.example", store.Entries()[0].Info.Hostname)
+}
+
+func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	collr := New(store)
+	collr.Config = prepareV2Config()
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+
+	hook.Bind(identity, job)
+	collr.beginDeviceLifecycle()
+	collr.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseInit, errors.New("initial failure"))
+	snapshot := hook.Capture(identity, job)
+
+	collr.deviceLifecycleMu.Lock()
+	collr.deviceLifecycleInfo.Hostname = "changed-after-capture.example"
+	collr.deviceLifecycleStatus = ddsnmp.DeviceLifecycleStatus{
+		Phase:   ddsnmp.DeviceLifecyclePhaseCollect,
+		Outcome: ddsnmp.DeviceLifecycleOutcomeSuccess,
+	}
+	collr.deviceLifecycleMu.Unlock()
+
+	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, nil)
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, prepareV2Config().Hostname, cut.Entries[0].Info.Hostname)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+}
+
+func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
+	t.Run("init", func(t *testing.T) {
+		store := ddsnmp.NewDeviceStore()
+		collr := New(store)
+		collr.Config = prepareV2Config()
+		collr.newSnmpClient = func() gosnmp.Handler { panic("init panic") }
+
+		require.Panics(t, func() { _ = collr.Init(context.Background()) })
+		cut := store.LifecycleCut()
+		require.Len(t, cut.Entries, 1)
+		require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+		require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	})
+
+	t.Run("check", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		store := ddsnmp.NewDeviceStore()
+		collr := New(store)
+		collr.Config = prepareV2Config()
+		mockSNMP := snmpmock.NewMockHandler(ctrl)
+		mockSNMP.EXPECT().WalkAll(gomock.Any()).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+			panic("check panic")
+		})
+		collr.snmpClient = mockSNMP
+		collr.beginDeviceLifecycle()
+
+		require.Panics(t, func() { _ = collr.Check(context.Background()) })
+		cut := store.LifecycleCut()
+		require.Len(t, cut.Entries, 1)
+		require.Equal(t, ddsnmp.DeviceLifecyclePhaseCheck, cut.Entries[0].LastCompleted.Phase)
+		require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	})
 }
 
 func TestCollectorManagedConnectionCollectedBeforeCommitIsPublishedAtCommit(t *testing.T) {
@@ -306,7 +419,7 @@ func TestCollectorManagedConnectionCollectedBeforeCommitIsPublishedAtCommit(t *t
 
 	snapshot := hook.Capture(identity, job)
 	require.NotNil(t, snapshot)
-	snapshot.Commit(collectorapi.JobConfigIdentity{})
+	hook.Commit(collectorapi.JobConfigIdentity{}, snapshot, job)
 	require.Len(t, store.Entries(), 1)
 	require.Equal(t, []string{"profile-a"}, store.Entries()[0].Info.ManualProfiles)
 	cut := store.LifecycleCut()

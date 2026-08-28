@@ -484,7 +484,7 @@ func portableTopologySemanticOrigin(value string) bool {
 	if strings.ContainsAny(value, `\:`) || path.IsAbs(value) || path.Clean(value) != value {
 		return false
 	}
-	for _, component := range strings.Split(value, "/") {
+	for component := range strings.SplitSeq(value, "/") {
 		if component == "" || component == "." || component == ".." {
 			return false
 		}

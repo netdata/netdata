@@ -38,6 +38,13 @@ func (c *Collector) completeDeviceLifecycle(phase ddsnmp.DeviceLifecyclePhase, e
 	if err != nil {
 		outcome = ddsnmp.DeviceLifecycleOutcomeFailed
 	}
+	c.recordDeviceLifecycle(phase, outcome)
+}
+
+func (c *Collector) recordDeviceLifecycle(
+	phase ddsnmp.DeviceLifecyclePhase,
+	outcome ddsnmp.DeviceLifecycleOutcome,
+) {
 	status := ddsnmp.DeviceLifecycleStatus{
 		Phase:       phase,
 		Outcome:     outcome,

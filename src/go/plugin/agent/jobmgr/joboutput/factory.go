@@ -296,7 +296,9 @@ func (f *Factory) build(
 	}
 	jobConfigIdentity := jobConfigIdentity(config)
 	jobConfigLifecycle := creator.JobConfigLifecycle
-	if jobConfigLifecycle != nil && !callJobConfigLifecycle(func() {
+	if nilInterfaceValue(jobConfigLifecycle) {
+		jobConfigLifecycle = nil
+	} else if !callJobConfigLifecycle(func() {
 		jobConfigLifecycle.Bind(jobConfigIdentity, job)
 	}) {
 		jobConfigLifecycle = nil
