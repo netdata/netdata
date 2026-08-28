@@ -994,12 +994,18 @@ func TestCollector_ConcurrentSingleJobsShareOnlyOwnershipDirectory(t *testing.T)
 
 	// The first job retains a durable quarantine journal, but its live owner
 	// lock must not suppress an unrelated owner during the same interval.
+	if !first.ownerLockHeld {
+		require.NoError(t, first.reserveOwnerLock(context.Background()))
+	}
 	first.now = time.Now
 	first.stateStore.now = first.now
 	require.NoError(t, first.saveOwnership(first.pendingOwnershipState))
-	_, err = collecttest.CollectScalarSeries(second, metrix.ReadFlatten())
+	metrics, err := collecttest.CollectScalarSeries(second, metrix.ReadFlatten())
 	require.NoError(t, err)
 	require.FileExists(t, second.stateStore.path)
+	assert.Equal(t, metrix.SampleValue(1), metrics[stateMetricKey(
+		"stage_status", "ok", stageLabels(stageSetup, reasonOK),
+	)])
 	assert.Empty(t, secondClient.objects)
 }
 
