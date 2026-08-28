@@ -13,10 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// AcquisitionObserver receives one terminal report for every selected profile.
-// The report and its Routes remain valid after the call; ProfileMetrics is
-// borrowed only for the duration of the call. A limit-exceeded report contains
-// no routes or value references.
+// AcquisitionObserver receives one terminal report for every selected profile
+// during the initial Collect call. The report and its Routes remain valid after
+// the call; ProfileMetrics is borrowed only for the duration of the call. A
+// limit-exceeded report contains no routes or value references.
 type AcquisitionObserver interface {
 	ObserveProfile(AcquisitionProfileReport, *ddsnmp.ProfileMetrics)
 }
@@ -51,9 +51,10 @@ const (
 	AcquisitionReportLimitLogicalBytes
 )
 
-// AcquisitionReportLimits bounds producer-owned diagnostic DTOs for one
-// Collect call. The zero value selects defaults; both fields must be non-zero
-// to override them.
+// AcquisitionReportLimits controls admission of producer-owned diagnostic DTO
+// payload during the initial Collect call. These logical thresholds do not
+// describe exact heap, CPU, or peak process usage. The zero value selects
+// defaults; both fields must be non-zero to override them.
 type AcquisitionReportLimits struct {
 	MaxRecords      uint64
 	MaxLogicalBytes uint64
@@ -207,15 +208,17 @@ type acquisitionTableScope struct {
 }
 
 func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, count int) {
-	if o == nil || !o.retainValues {
+	if o == nil || !o.retainValues || !o.collection.reportActive() {
 		return
 	}
 	for valueOrdinal := range count {
-		o.collection.addTopologyValueReference(AcquisitionValueReference{
+		if !o.collection.addTopologyValueReference(AcquisitionValueReference{
 			RouteOrdinal: o.routeOrdinal,
 			RowOrdinal:   rowOrdinal,
 			ValueOrdinal: uint32(valueOrdinal),
-		})
+		}) {
+			return
+		}
 	}
 }
 
@@ -713,15 +716,16 @@ func (c *acquisitionProfileCollection) reportActive() bool {
 func (c *acquisitionProfileCollection) addValueReference(
 	dst *[]AcquisitionValueReference,
 	reference AcquisitionValueReference,
-) {
+) bool {
 	if c == nil || dst == nil || !c.budget.admit(1, 16) {
-		return
+		return false
 	}
 	*dst = append(*dst, reference)
+	return true
 }
 
-func (c *acquisitionProfileCollection) addTopologyValueReference(reference AcquisitionValueReference) {
-	c.addValueReference(&c.topologyValueReferences, reference)
+func (c *acquisitionProfileCollection) addTopologyValueReference(reference AcquisitionValueReference) bool {
+	return c.addValueReference(&c.topologyValueReferences, reference)
 }
 
 func (c *acquisitionProfileCollection) addBGPValueReference(reference AcquisitionValueReference) {
@@ -876,62 +880,6 @@ func acquisitionMetadataFieldRootOID(field ddprofiledefinition.MetadataField) st
 	return ""
 }
 
-func (c *acquisitionProfileCollection) profileInputRoutes() []AcquisitionRouteReport {
-	if c == nil || c.reportLimited() {
-		return nil
-	}
-	var count int
-	var logicalBytes uint64
-	for _, route := range c.routes {
-		if isAcquisitionProfileInputRoute(route.Kind) {
-			count++
-			logicalBytes += uint64(64 + len(route.RootOID))
-		}
-	}
-	if count == 0 {
-		return nil
-	}
-	if !c.budget.admit(uint64(count), logicalBytes) {
-		return nil
-	}
-	routes := make([]AcquisitionRouteReport, 0, count)
-	for _, route := range c.routes {
-		if isAcquisitionProfileInputRoute(route.Kind) {
-			routes = append(routes, route)
-		}
-	}
-	return routes
-}
-
-func acquisitionRouteReportsShape(routes []AcquisitionRouteReport) (uint64, uint64) {
-	var logicalBytes uint64
-	for _, route := range routes {
-		logicalBytes += uint64(64 + len(route.RootOID))
-	}
-	return uint64(len(routes)), logicalBytes
-}
-
-func (c *acquisitionProfileCollection) restoreProfileInputRoutes(cached []AcquisitionRouteReport) {
-	if c == nil {
-		return
-	}
-	for _, route := range cached {
-		current := c.route(int(route.Ordinal))
-		if current == nil || current.Kind != route.Kind || current.RootOID != route.RootOID ||
-			!isAcquisitionProfileInputRoute(route.Kind) {
-			continue
-		}
-		*current = route
-		if current.Outcome != AcquisitionRouteOutcomeNotObserved {
-			current.Source = AcquisitionRouteSourceCache
-		}
-	}
-}
-
-func isAcquisitionProfileInputRoute(kind AcquisitionRouteKind) bool {
-	return kind == AcquisitionRouteKindProfileTagScalar || kind == AcquisitionRouteKindMetadataScalar
-}
-
 func (s *acquisitionTableScope) bind(
 	configIndex int,
 	request *tableCollectionRequest,
@@ -956,7 +904,7 @@ func (s *acquisitionTableScope) bind(
 }
 
 func (c *acquisitionProfileCollection) syncTableRoutes() {
-	if c == nil {
+	if !c.reportActive() {
 		return
 	}
 	for _, binding := range c.tableBindings {
@@ -1080,22 +1028,19 @@ func routesHaveFailures(routes []AcquisitionRouteReport) bool {
 }
 
 func firstBGPRouteOID(cfg ddprofiledefinition.BGPConfig) string {
-	var oids []string
-	forEachBGPValue(cfg, func(value ddprofiledefinition.BGPValueConfig) {
-		if oid := trimOID(bgpValueSymbol(value).OID); oid != "" {
-			oids = append(oids, oid)
+	var first string
+	add := func(oid string) {
+		if oid = trimOID(oid); oid != "" && (first == "" || oid < first) {
+			first = oid
 		}
+	}
+	forEachBGPValue(cfg, func(value ddprofiledefinition.BGPValueConfig) {
+		add(bgpValueSymbol(value).OID)
 	})
 	for _, tag := range cfg.MetricTags {
-		if oid := trimOID(tag.Symbol.OID); oid != "" {
-			oids = append(oids, oid)
-		}
+		add(tag.Symbol.OID)
 	}
-	if len(oids) == 0 {
-		return ""
-	}
-	sort.Strings(oids)
-	return oids[0]
+	return first
 }
 
 func acquisitionProfileRouteDigest(profile *ddsnmp.Profile) [32]byte {

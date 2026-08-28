@@ -20,13 +20,13 @@ import (
 )
 
 type Config struct {
-	SnmpClient              gosnmp.Handler
-	Profiles                []*ddsnmp.Profile
-	Log                     *logger.Logger
-	SysObjectID             string
-	DisableBulkWalk         bool
-	AcquisitionObserver     AcquisitionObserver
-	AcquisitionReportLimits AcquisitionReportLimits
+	SnmpClient                     gosnmp.Handler
+	Profiles                       []*ddsnmp.Profile
+	Log                            *logger.Logger
+	SysObjectID                    string
+	DisableBulkWalk                bool
+	InitialAcquisitionObserver     AcquisitionObserver
+	InitialAcquisitionReportLimits AcquisitionReportLimits
 }
 
 func New(cfg Config) *Collector {
@@ -42,13 +42,12 @@ func New(cfg Config) *Collector {
 	for _, prof := range cfg.Profiles {
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
-	if cfg.AcquisitionObserver != nil {
-		coll.acquisitionObserver = cfg.AcquisitionObserver
-		coll.acquisitionReportLimits = cfg.AcquisitionReportLimits
-		coll.acquisitionPlans = make(map[string]acquisitionProfilePlan, len(coll.profiles))
-		coll.acquisitionInputCache = make(map[string][]AcquisitionRouteReport, len(coll.profiles))
+	if cfg.InitialAcquisitionObserver != nil {
+		coll.initialAcquisitionObserver = cfg.InitialAcquisitionObserver
+		coll.initialAcquisitionReportLimits = cfg.InitialAcquisitionReportLimits
+		coll.initialAcquisitionPlans = make(map[string]acquisitionProfilePlan, len(coll.profiles))
 		for ordinal, state := range coll.sortedProfileStates() {
-			coll.acquisitionPlans[state.profile.SourceFile] = buildAcquisitionProfilePlan(state.profile, uint32(ordinal))
+			coll.initialAcquisitionPlans[state.profile.SourceFile] = buildAcquisitionProfilePlan(state.profile, uint32(ordinal))
 		}
 	}
 
@@ -63,20 +62,16 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
-		log                       *logger.Logger
-		profiles                  map[string]*profileState
-		missingOIDs               map[string]bool
-		regularScalarNamesScratch map[string]struct{}
-		tableCache                *tableCache
-		tableIdentity             *tableIdentity
-		acquisitionObserver       AcquisitionObserver
-		acquisitionReportLimits   AcquisitionReportLimits
-		acquisitionBudget         acquisitionReportBudget
-		acquisitionCachedRecords  uint64
-		acquisitionCachedBytes    uint64
-		acquisitionCacheLimit     AcquisitionReportLimit
-		acquisitionPlans          map[string]acquisitionProfilePlan
-		acquisitionInputCache     map[string][]AcquisitionRouteReport
+		log                            *logger.Logger
+		profiles                       map[string]*profileState
+		missingOIDs                    map[string]bool
+		regularScalarNamesScratch      map[string]struct{}
+		tableCache                     *tableCache
+		tableIdentity                  *tableIdentity
+		initialAcquisitionObserver     AcquisitionObserver
+		initialAcquisitionReportLimits AcquisitionReportLimits
+		initialAcquisitionBudget       acquisitionReportBudget
+		initialAcquisitionPlans        map[string]acquisitionProfilePlan
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -123,13 +118,9 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	var prepared []*preparedProfileCollection
 	var errs []error
-	if c.acquisitionObserver != nil {
-		c.acquisitionBudget = newAcquisitionReportBudget(c.acquisitionReportLimits)
-		if c.acquisitionCacheLimit != AcquisitionReportLimitNone {
-			c.acquisitionBudget.limit = c.acquisitionCacheLimit
-		} else if !c.acquisitionBudget.admit(c.acquisitionCachedRecords, c.acquisitionCachedBytes) {
-			c.acquisitionCacheLimit = c.acquisitionBudget.limit
-		}
+	if c.initialAcquisitionObserver != nil {
+		c.initialAcquisitionBudget = newAcquisitionReportBudget(c.initialAcquisitionReportLimits)
+		defer c.releaseInitialAcquisition()
 	}
 
 	expired := c.tableCache.clearExpired()
@@ -213,7 +204,7 @@ func (c *Collector) observeAcquisitionProfile(
 	outcome AcquisitionProfileOutcome,
 	phase AcquisitionFailurePhase,
 ) {
-	if c.acquisitionObserver == nil || profile == nil || profile.acquisition == nil {
+	if c.initialAcquisitionObserver == nil || profile == nil || profile.acquisition == nil {
 		return
 	}
 	profile.acquisition.syncTableRoutes()
@@ -221,7 +212,14 @@ func (c *Collector) observeAcquisitionProfile(
 	defer func() {
 		_ = recover()
 	}()
-	c.acquisitionObserver.ObserveProfile(report, profile.metrics)
+	c.initialAcquisitionObserver.ObserveProfile(report, profile.metrics)
+}
+
+func (c *Collector) releaseInitialAcquisition() {
+	c.initialAcquisitionObserver = nil
+	c.initialAcquisitionReportLimits = AcquisitionReportLimits{}
+	c.initialAcquisitionBudget = acquisitionReportBudget{}
+	c.initialAcquisitionPlans = nil
 }
 
 func (c *Collector) sortedProfileStates() []*profileState {
@@ -288,13 +286,13 @@ func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfile
 		state:   ps,
 		metrics: pm,
 	}
-	if c.acquisitionObserver != nil {
-		if plan, ok := c.acquisitionPlans[ps.profile.SourceFile]; ok {
+	if c.initialAcquisitionObserver != nil {
+		if plan, ok := c.initialAcquisitionPlans[ps.profile.SourceFile]; ok {
 			prepared.acquisition = newAcquisitionProfileCollection(
 				plan,
 				ps.profile,
 				c.deviceMetadataCollector.sysobjectid,
-				&c.acquisitionBudget,
+				&c.initialAcquisitionBudget,
 			)
 		}
 	}
@@ -312,19 +310,6 @@ func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfile
 		}
 		ps.cache.deviceMetadata = deviceMeta
 		ps.initialized = true
-		if prepared.acquisition != nil {
-			cached := prepared.acquisition.profileInputRoutes()
-			if prepared.acquisition.reportLimited() {
-				c.acquisitionCacheLimit = c.acquisitionBudget.limit
-			} else {
-				c.acquisitionInputCache[ps.profile.SourceFile] = cached
-				records, logicalBytes := acquisitionRouteReportsShape(cached)
-				c.acquisitionCachedRecords += records
-				c.acquisitionCachedBytes += logicalBytes
-			}
-		}
-	} else if prepared.acquisition != nil {
-		prepared.acquisition.restoreProfileInputRoutes(c.acquisitionInputCache[ps.profile.SourceFile])
 	}
 
 	pm.Tags = maps.Clone(ps.cache.globalTags)

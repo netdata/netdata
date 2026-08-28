@@ -504,9 +504,9 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 		return []*ddsnmp.Profile{{}}
 	}
 	coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
-		require.NotNil(t, cfg.AcquisitionObserver)
+		require.NotNil(t, cfg.InitialAcquisitionObserver)
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-			cfg.AcquisitionObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+			cfg.InitialAcquisitionObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
 				Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
 				Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
 				Routes: []ddsnmpcollector.AcquisitionRouteReport{{
@@ -540,8 +540,8 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 	require.EqualValues(t, 0, capturedProfile.values.metrics[0].rowOrdinal)
 	require.EqualValues(t, 0, capturedProfile.values.metrics[0].valueOrdinal)
 	require.Equal(t, "Gi1/0/7", capturedProfile.values.metrics[0].tags[tagTopoIfName])
-	require.NotContains(t, fmt.Sprintf("%+v", capture), profileMetrics.Source)
-	require.NotContains(t, fmt.Sprintf("%+v", capture), profileMetrics.TopologyMetrics[0].Name)
+	requireRetainedStringsExclude(t, capture.evidence.collectionContexts,
+		profileMetrics.Source, profileMetrics.TopologyMetrics[0].Name)
 
 	profileMetrics.TopologyMetrics[0].Tags[tagTopoIfName] = "mutated-after-observer"
 	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
@@ -583,7 +583,7 @@ func TestCollectorRefreshRecordsSysUptimeFailureWithoutFailingTopology(t *testin
 	require.NotNil(t, snapshot)
 	require.Equal(t, successfulAcquisitionPhase(), capture.evidence.collection)
 	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureSysUptime), capture.evidence.sysUptime)
-	require.NotContains(t, fmt.Sprintf("%+v", capture), "private sysUptime failure")
+	requireRetainedStringsExclude(t, capture.evidence.collectionContexts, "private sysUptime failure")
 	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
 	require.NoError(t, err)
 	require.Equal(t, snapshot.observation, replayed.observation)
@@ -1058,9 +1058,9 @@ func TestCollectorVLANContextsRecordDistinctSuccessAndFailureEvidence(t *testing
 		return client
 	}
 	coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
-		require.NotNil(t, cfg.AcquisitionObserver)
+		require.NotNil(t, cfg.InitialAcquisitionObserver)
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-			cfg.AcquisitionObserver.ObserveProfile(acquisitionReportForMetrics(
+			cfg.InitialAcquisitionObserver.ObserveProfile(acquisitionReportForMetrics(
 				0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, profileMetrics,
 			), profileMetrics)
 			return []*ddsnmp.ProfileMetrics{profileMetrics}, nil
@@ -2000,7 +2000,7 @@ func BenchmarkCollectorRefreshDueDeviceWithAcquisition(b *testing.B) {
 			)
 			coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 				return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-					cfg.AcquisitionObserver.ObserveProfile(report, metrics[0])
+					cfg.InitialAcquisitionObserver.ObserveProfile(report, metrics[0])
 					return metrics, nil
 				})
 			}

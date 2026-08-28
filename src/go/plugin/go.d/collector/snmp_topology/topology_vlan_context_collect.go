@@ -55,12 +55,12 @@ func collectTopologyVLANContext(
 	}
 
 	vlanCollector := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient:          snmpClient,
-		Profiles:            profiles,
-		Log:                 c.Logger,
-		SysObjectID:         dev.SysObjectID,
-		DisableBulkWalk:     dev.DisableBulkWalk,
-		AcquisitionObserver: observer,
+		SnmpClient:                 snmpClient,
+		Profiles:                   profiles,
+		Log:                        c.Logger,
+		SysObjectID:                dev.SysObjectID,
+		DisableBulkWalk:            dev.DisableBulkWalk,
+		InitialAcquisitionObserver: observer,
 	})
 
 	pms, err := vlanCollector.Collect()

@@ -111,10 +111,10 @@ func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
 		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
 			b.Run(fmt.Sprintf("profiles=%d/observer=%s", profileCount, mode.name), func(b *testing.B) {
 				cfg := Config{
-					SnmpClient:          &benchmarkTopologySNMPHandler{},
-					Profiles:            profiles,
-					Log:                 logger.New(),
-					AcquisitionObserver: mode.new(),
+					SnmpClient:                 &benchmarkTopologySNMPHandler{},
+					Profiles:                   profiles,
+					Log:                        logger.New(),
+					InitialAcquisitionObserver: mode.new(),
 				}
 				b.ReportAllocs()
 				for b.Loop() {
@@ -126,7 +126,7 @@ func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
 	}
 }
 
-func BenchmarkCollector_CollectTopologyRows(b *testing.B) {
+func BenchmarkCollector_InitialCollectTopologyRows(b *testing.B) {
 	const columnOID = "1.3.6.1.4.1.99999.1.1"
 
 	for _, rowCount := range []int{0, 256, 4096} {
@@ -135,29 +135,20 @@ func BenchmarkCollector_CollectTopologyRows(b *testing.B) {
 			oid := fmt.Sprintf("%s.%d", columnOID, i+1)
 			pdus = append(pdus, createGauge32PDU(oid, uint(i+1)))
 		}
+		profile := benchmarkTopologyProfile(0)
 		for _, mode := range benchmarkAcquisitionObserverModes() {
 			b.Run(fmt.Sprintf("rows=%d/observer=%s", rowCount, mode.name), func(b *testing.B) {
-				observer := mode.new()
-				collector := New(Config{
-					SnmpClient:          &benchmarkTopologySNMPHandler{pdus: pdus},
-					Profiles:            []*ddsnmp.Profile{benchmarkTopologyProfile(0)},
-					Log:                 logger.New(),
-					AcquisitionObserver: observer,
-				})
-
-				results, err := collector.Collect()
-				topologyCount := -1
-				if len(results) == 1 {
-					topologyCount = len(results[0].TopologyMetrics)
-				}
-				if err != nil || topologyCount != rowCount {
-					b.Fatalf("warmup collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
-				}
-
+				log := logger.New()
 				b.ReportAllocs()
 				b.ReportMetric(float64(rowCount), "rows/op")
-				b.ResetTimer()
 				for b.Loop() {
+					observer := mode.new()
+					collector := New(Config{
+						SnmpClient:                 &benchmarkTopologySNMPHandler{pdus: pdus},
+						Profiles:                   []*ddsnmp.Profile{profile},
+						Log:                        log,
+						InitialAcquisitionObserver: observer,
+					})
 					results, err := collector.Collect()
 					topologyCount := -1
 					if len(results) == 1 {

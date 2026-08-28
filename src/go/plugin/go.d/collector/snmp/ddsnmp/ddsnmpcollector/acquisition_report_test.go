@@ -43,7 +43,7 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{succeeded, failed},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, metrics *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, metrics *ddsnmp.ProfileMetrics) {
 			got = append(got, observation{report: report, hasMetrics: metrics != nil})
 		}),
 	})
@@ -74,7 +74,7 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 	}
 }
 
-func TestCollector_AcquisitionObserverReportsProfileTagAndMetadataRoutesFromGETAndCache(t *testing.T) {
+func TestCollector_InitialAcquisitionObserverReportsProfileInputsOnce(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
@@ -108,18 +108,16 @@ func TestCollector_AcquisitionObserverReportsProfileTagAndMetadataRoutesFromGETA
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			reports = append(reports, report)
 		}),
 	})
-	for range 2 {
-		metrics, err := collector.Collect()
-		require.NoError(t, err)
-		require.Len(t, metrics, 1)
-		assert.Equal(t, "lab", metrics[0].Tags["site"])
-		assert.NotContains(t, metrics[0].DeviceMetadata, "serial_number")
-	}
-	require.Len(t, reports, 2)
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	assert.Equal(t, "lab", metrics[0].Tags["site"])
+	assert.NotContains(t, metrics[0].DeviceMetadata, "serial_number")
+	require.Len(t, reports, 1)
 
 	first := acquisitionRoutesByKind(reports[0].Routes)
 	require.Contains(t, first, AcquisitionRouteKindProfileTagScalar)
@@ -129,13 +127,12 @@ func TestCollector_AcquisitionObserverReportsProfileTagAndMetadataRoutesFromGETA
 	assert.Equal(t, AcquisitionRouteSourceGET, first[AcquisitionRouteKindMetadataScalar].Source)
 	assert.Equal(t, AcquisitionRouteOutcomeMissing, first[AcquisitionRouteKindMetadataScalar].Outcome)
 
-	second := acquisitionRoutesByKind(reports[1].Routes)
-	require.Contains(t, second, AcquisitionRouteKindProfileTagScalar)
-	require.Contains(t, second, AcquisitionRouteKindMetadataScalar)
-	assert.Equal(t, AcquisitionRouteSourceCache, second[AcquisitionRouteKindProfileTagScalar].Source)
-	assert.Equal(t, AcquisitionRouteOutcomeValues, second[AcquisitionRouteKindProfileTagScalar].Outcome)
-	assert.Equal(t, AcquisitionRouteSourceCache, second[AcquisitionRouteKindMetadataScalar].Source)
-	assert.Equal(t, AcquisitionRouteOutcomeMissing, second[AcquisitionRouteKindMetadataScalar].Outcome)
+	metrics, err = collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	assert.Equal(t, "lab", metrics[0].Tags["site"], "normal collection must continue to reuse its live cache")
+	assert.NotContains(t, metrics[0].DeviceMetadata, "serial_number")
+	assert.Len(t, reports, 1, "acquisition evidence is produced only by the initial Collect call")
 }
 
 func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepareFailure(t *testing.T) {
@@ -171,7 +168,7 @@ func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepar
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -203,29 +200,23 @@ func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
 	}
 	expectSNMPGet(mockHandler, []string{tagOID}, []gosnmp.SnmpPDU{createStringPDU(tagOID, "lab-core")})
 
-	var reports []AcquisitionProfileReport
+	var report AcquisitionProfileReport
 	collector := New(Config{
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-			reports = append(reports, value)
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
 		}),
 	})
-	for range 2 {
-		metrics, err := collector.Collect()
-		require.NoError(t, err)
-		require.Len(t, metrics, 1)
-		assert.Equal(t, "lab", metrics[0].Tags["site"])
-		assert.Equal(t, "core", metrics[0].Tags["role"])
-	}
-	require.Len(t, reports, 2)
-	for _, report := range reports {
-		require.Len(t, report.Routes, 1)
-		assert.Equal(t, AcquisitionRouteOutcomeValues, report.Routes[0].Outcome)
-	}
-	assert.Equal(t, AcquisitionRouteSourceGET, reports[0].Routes[0].Source)
-	assert.Equal(t, AcquisitionRouteSourceCache, reports[1].Routes[0].Source)
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	assert.Equal(t, "lab", metrics[0].Tags["site"])
+	assert.Equal(t, "core", metrics[0].Tags["role"])
+	require.Len(t, report.Routes, 1)
+	assert.Equal(t, AcquisitionRouteOutcomeValues, report.Routes[0].Outcome)
+	assert.Equal(t, AcquisitionRouteSourceGET, report.Routes[0].Source)
 }
 
 func TestCollector_AcquisitionObserverPanicDoesNotChangeCollection(t *testing.T) {
@@ -236,7 +227,7 @@ func TestCollector_AcquisitionObserverPanicDoesNotChangeCollection(t *testing.T)
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{createTestProfile("profile.yaml", nil)},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {
 			panic("observer failure")
 		}),
 	})
@@ -274,7 +265,7 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 				reports = append(reports, report)
 			}),
 		})
@@ -305,7 +296,7 @@ func TestCollector_AcquisitionObserverReportsPartialTableCollection(t *testing.T
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			reports = append(reports, report)
 		}),
 	})
@@ -355,7 +346,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -415,7 +406,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -466,7 +457,7 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{topology, owner},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			reports = append(reports, report)
 		}),
 	})
@@ -514,10 +505,10 @@ func TestCollector_AcquisitionReportLimitFailsOpen(t *testing.T) {
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
-		AcquisitionReportLimits: AcquisitionReportLimits{
+		InitialAcquisitionReportLimits: AcquisitionReportLimits{
 			MaxRecords:      3,
 			MaxLogicalBytes: 1 << 20,
 		},
@@ -530,8 +521,7 @@ func TestCollector_AcquisitionReportLimitFailsOpen(t *testing.T) {
 	assert.Equal(t, AcquisitionReportStateLimitExceeded, report.State)
 	assert.Empty(t, report.Routes)
 	assert.Empty(t, report.TopologyValueReferences)
-	assert.Equal(t, uint64(3), collector.acquisitionBudget.records)
-	assert.Equal(t, AcquisitionReportLimitRecords, collector.acquisitionBudget.limit)
+	assert.Equal(t, AcquisitionReportLimitRecords, report.Limit)
 }
 
 func TestCollector_AcquisitionReportLogicalByteLimitFailsOpen(t *testing.T) {
@@ -555,10 +545,10 @@ func TestCollector_AcquisitionReportLogicalByteLimitFailsOpen(t *testing.T) {
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
-		AcquisitionReportLimits: AcquisitionReportLimits{
+		InitialAcquisitionReportLimits: AcquisitionReportLimits{
 			MaxRecords:      100,
 			MaxLogicalBytes: 1,
 		},
@@ -669,70 +659,6 @@ func TestAcquisitionProfileCollectionLimitStopsDiagnosticConstruction(t *testing
 	})
 }
 
-func TestCollector_AcquisitionReportLimitRecoversAfterTransientCollectExhaustion(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
-	defer ctrl.Finish()
-
-	const (
-		topologyOID = "1.3.6.1.4.1.99999.59.10.0"
-		metricOID   = "1.3.6.1.4.1.99999.59.11.0"
-	)
-	topologyProfile := &ddsnmp.Profile{
-		SourceFile: "a-transient-topology.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind: ddsnmp.KindIfName,
-			MetricsConfig: ddprofiledefinition.MetricsConfig{
-				Symbol: ddprofiledefinition.SymbolConfig{OID: topologyOID, Name: "sysName"},
-			},
-		}}},
-	}
-	metricProfile := createTestProfile("b-regular-metric.yaml", []ddprofiledefinition.MetricsConfig{{
-		Symbol: ddprofiledefinition.SymbolConfig{OID: metricOID, Name: "sysUpTime"},
-	}})
-
-	for range 2 {
-		expectSNMPGet(mockHandler, []string{topologyOID}, []gosnmp.SnmpPDU{createIntegerPDU(topologyOID, 1)})
-		expectSNMPGet(mockHandler, []string{metricOID}, []gosnmp.SnmpPDU{createIntegerPDU(metricOID, 2)})
-	}
-	expectSNMPGet(mockHandler, []string{topologyOID}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(topologyOID)})
-	expectSNMPGet(mockHandler, []string{metricOID}, []gosnmp.SnmpPDU{createIntegerPDU(metricOID, 2)})
-
-	var reports []AcquisitionProfileReport
-	collector := New(Config{
-		SnmpClient: mockHandler,
-		Profiles:   []*ddsnmp.Profile{topologyProfile, metricProfile},
-		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-			reports = append(reports, report)
-		}),
-		AcquisitionReportLimits: AcquisitionReportLimits{MaxRecords: 100, MaxLogicalBytes: 1 << 20},
-	})
-
-	metrics, err := collector.Collect()
-	require.NoError(t, err)
-	require.Len(t, metrics, 2)
-	require.Len(t, reports, 2)
-	assert.Equal(t, AcquisitionReportStateAvailable, reports[0].State)
-	assert.Equal(t, AcquisitionReportStateAvailable, reports[1].State)
-
-	collector.acquisitionReportLimits.MaxRecords = 4
-	metrics, err = collector.Collect()
-	require.NoError(t, err)
-	require.Len(t, metrics, 2)
-	require.Len(t, reports, 4)
-	assert.Equal(t, AcquisitionReportStateLimitExceeded, reports[2].State)
-	assert.Equal(t, AcquisitionReportStateLimitExceeded, reports[3].State)
-
-	metrics, err = collector.Collect()
-	require.NoError(t, err)
-	require.Len(t, metrics, 2)
-	require.Len(t, reports, 6)
-	assert.Empty(t, metrics[0].TopologyMetrics)
-	assert.Equal(t, AcquisitionReportStateAvailable, reports[4].State)
-	assert.Equal(t, AcquisitionReportStateAvailable, reports[5].State)
-	assert.Equal(t, AcquisitionReportLimitNone, collector.acquisitionCacheLimit)
-}
-
 func TestCollector_AcquisitionObserverDoesNotReportUnprocessedFreshTableAsEmpty(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
@@ -767,7 +693,7 @@ func TestCollector_AcquisitionObserverDoesNotReportUnprocessedFreshTableAsEmpty(
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -819,7 +745,7 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -852,7 +778,7 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{second, first},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			reports = append(reports, value)
 		}),
 	})
@@ -882,7 +808,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 				report = value
 			}),
 		})
@@ -912,38 +838,32 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 			}},
 		}
 
-		var reports []AcquisitionProfileReport
+		var report AcquisitionProfileReport
 		collector := New(Config{
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				reports = append(reports, value)
+			InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+				report = value
 			}),
 		})
-		for range 2 {
-			_, err := collector.Collect()
-			require.NoError(t, err)
-		}
-		require.Len(t, reports, 2)
-		for _, report := range reports {
-			require.Len(t, report.Routes, 1)
-			assert.Equal(t, AcquisitionRouteOutcomeMissing, report.Routes[0].Outcome)
-			assert.Zero(t, report.Routes[0].Rejected)
-		}
-		assert.Equal(t, AcquisitionRouteSourceGET, reports[0].Routes[0].Source)
-		assert.Equal(t, AcquisitionRouteSourceCache, reports[1].Routes[0].Source)
+		_, err := collector.Collect()
+		require.NoError(t, err)
+		require.Len(t, report.Routes, 1)
+		assert.Equal(t, AcquisitionRouteOutcomeMissing, report.Routes[0].Outcome)
+		assert.Zero(t, report.Routes[0].Rejected)
+		assert.Equal(t, AcquisitionRouteSourceGET, report.Routes[0].Source)
 	})
 }
 
-func TestCollector_AcquisitionObserverReportsCachedAndRejectedTables(t *testing.T) {
+func TestCollector_AcquisitionObserverReportsWalkedAndRejectedTables(t *testing.T) {
 	const (
 		tableOID  = "1.3.6.1.4.1.99999.3"
 		columnOID = tableOID + ".1.1"
 		rowOID    = columnOID + ".7"
 	)
 
-	t.Run("cached", func(t *testing.T) {
+	t.Run("walked", func(t *testing.T) {
 		ctrl, mockHandler := setupMockHandler(t)
 		defer ctrl.Finish()
 		profile := createTestProfile("cached.yaml", []ddprofiledefinition.MetricsConfig{{
@@ -951,28 +871,23 @@ func TestCollector_AcquisitionObserverReportsCachedAndRejectedTables(t *testing.
 			Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
 		}})
 		expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{createGauge32PDU(rowOID, 1)})
-		expectSNMPGet(mockHandler, []string{rowOID}, []gosnmp.SnmpPDU{createGauge32PDU(rowOID, 2)})
 
-		var reports []AcquisitionProfileReport
+		var report AcquisitionProfileReport
 		collector := New(Config{
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				reports = append(reports, report)
+			InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+				report = value
 			}),
 		})
-		for range 2 {
-			_, err := collector.Collect()
-			require.NoError(t, err)
-		}
+		_, err := collector.Collect()
+		require.NoError(t, err)
 
-		require.Len(t, reports, 2)
-		assert.Equal(t, AcquisitionRouteSourceWalk, reports[0].Routes[0].Source)
-		assert.Equal(t, AcquisitionRouteOutcomeValues, reports[0].Routes[0].Outcome)
-		assert.Equal(t, AcquisitionRouteSourceCache, reports[1].Routes[0].Source)
-		assert.Equal(t, AcquisitionRouteOutcomeValues, reports[1].Routes[0].Outcome)
-		assert.Equal(t, uint64(1), reports[1].Routes[0].Rows)
+		require.Len(t, report.Routes, 1)
+		assert.Equal(t, AcquisitionRouteSourceWalk, report.Routes[0].Source)
+		assert.Equal(t, AcquisitionRouteOutcomeValues, report.Routes[0].Outcome)
+		assert.Equal(t, uint64(1), report.Routes[0].Rows)
 	})
 
 	t.Run("rejected", func(t *testing.T) {
@@ -989,7 +904,7 @@ func TestCollector_AcquisitionObserverReportsCachedAndRejectedTables(t *testing.
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 				report = value
 			}),
 		})
@@ -1029,7 +944,7 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -1061,9 +976,6 @@ func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *test
 		createNoSuchObjectPDU(stateOID),
 		createGauge32PDU(uptimeOID, 3600),
 	})
-	expectSNMPGet(mockHandler, []string{uptimeOID}, []gosnmp.SnmpPDU{
-		createGauge32PDU(uptimeOID, 3600),
-	})
 
 	profile := &ddsnmp.Profile{
 		SourceFile: "bgp-mixed-missing.yaml",
@@ -1071,31 +983,26 @@ func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *test
 			scalarBGPTestConfig(),
 		}},
 	}
-	var reports []AcquisitionProfileReport
+	var report AcquisitionProfileReport
 	collector := New(Config{
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-			reports = append(reports, value)
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
 		}),
 	})
-	for range 2 {
-		metrics, err := collector.Collect()
-		require.NoError(t, err)
-		require.Len(t, metrics, 1)
-		require.Len(t, metrics[0].BGPRows, 1)
-	}
+	metrics, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+	require.Len(t, metrics[0].BGPRows, 1)
 
-	require.Len(t, reports, 2)
-	for _, report := range reports {
-		require.Len(t, report.Routes, 1)
-		assert.Equal(t, AcquisitionRouteSourceGET, report.Routes[0].Source)
-		assert.Equal(t, AcquisitionRouteOutcomePartial, report.Routes[0].Outcome)
-		assert.Equal(t, AcquisitionFailureClassDependency, report.Routes[0].FailureClass)
-		assert.Equal(t, uint64(1), report.Routes[0].Missing)
-		assert.Equal(t, uint64(1), report.Routes[0].Values)
-	}
+	require.Len(t, report.Routes, 1)
+	assert.Equal(t, AcquisitionRouteSourceGET, report.Routes[0].Source)
+	assert.Equal(t, AcquisitionRouteOutcomePartial, report.Routes[0].Outcome)
+	assert.Equal(t, AcquisitionFailureClassDependency, report.Routes[0].FailureClass)
+	assert.Equal(t, uint64(1), report.Routes[0].Missing)
+	assert.Equal(t, uint64(1), report.Routes[0].Values)
 }
 
 func TestAcquisitionProfileRouteDigestIncludesAllBGPValueSources(t *testing.T) {
@@ -1134,6 +1041,33 @@ func TestAcquisitionProfileRouteDigestIncludesAllBGPValueSources(t *testing.T) {
 	assert.NotEqual(t, acquisitionProfileRouteDigest(baseProfile), acquisitionProfileRouteDigest(changedProfile))
 }
 
+func TestFirstBGPRouteOIDDoesNotBulkAllocateBySourceCount(t *testing.T) {
+	const smallestOID = "1.3.6.1.2.1.1"
+	cfg := scalarBGPTestConfig()
+	cfg.MetricTags = make(ddprofiledefinition.MetricTagConfigList, 10_000)
+	for i := range cfg.MetricTags {
+		cfg.MetricTags[i].Symbol = ddprofiledefinition.SymbolConfigCompat{
+			OID:  "1.3.6.1.4.1.99999.100",
+			Name: "tagSource",
+		}
+	}
+	cfg.MetricTags[0].Symbol.OID = smallestOID
+
+	allocationCount := func(cfg ddprofiledefinition.BGPConfig) float64 {
+		var got string
+		allocations := testing.AllocsPerRun(10, func() {
+			got = firstBGPRouteOID(cfg)
+		})
+		require.Equal(t, smallestOID, got)
+		return allocations
+	}
+	small := cfg
+	small.MetricTags = cfg.MetricTags[:1]
+
+	assert.LessOrEqual(t, allocationCount(cfg), allocationCount(small)+1,
+		"representative-root selection must not copy configured source OIDs")
+}
+
 func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependency(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
@@ -1158,7 +1092,7 @@ func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependenc
 			},
 		}},
 		Log: logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -1194,7 +1128,7 @@ func TestCollector_AcquisitionObserverClassifiesMissingRequiredBGPTableCellAsDep
 			},
 		}},
 		Log: logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -1240,7 +1174,7 @@ func TestCollector_AcquisitionObserverIgnoresMissingOptionalBGPTableDescriptor(t
 			},
 		}},
 		Log: logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})
@@ -1289,7 +1223,7 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = value
 		}),
 	})

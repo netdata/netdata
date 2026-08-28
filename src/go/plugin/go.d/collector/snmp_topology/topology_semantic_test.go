@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"errors"
-	"fmt"
 	"net/netip"
 	"reflect"
 	"runtime"
@@ -183,20 +182,20 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	require.Equal(t, live.collectedAt, replayed.collectedAt)
 	require.Equal(t, live.freshFor, replayed.freshFor)
 
-	text := fmt.Sprintf("%+v", capture)
-	require.NotContains(t, text, dev.Community)
-	require.NotContains(t, text, dev.V3AuthKey)
-	require.NotContains(t, text, dev.V3PrivKey)
-	require.NotContains(t, text, dev.ManualProfiles[0])
-	require.NotContains(t, text, pms[0].Source)
-	require.NotContains(t, text, pms[0].TopologyMetrics[0].Name)
-	require.NotContains(t, text, "must-not-appear-unused-metadata")
-	require.NotContains(t, text, "must-not-appear-unused-profile-tag")
-	require.NotContains(t, text, "must-not-appear-profile-tag-vendor")
-	require.NotContains(t, text, "must-not-appear-unused-metric-tag")
-	require.NotContains(t, text, "must-not-appear-unused-bgp-tag")
-	require.NotContains(t, text, "must-not-appear-non-vlan-context-row")
-	require.NotContains(t, text, "must-not-appear-invalid-octet-tag")
+	requireRetainedStringsExclude(t, capture.evidence.device, dev.Community, dev.V3AuthKey, dev.V3PrivKey,
+		dev.ManualProfiles[0])
+	requireRetainedStringsExclude(t, capture.evidence.collectionContexts,
+		pms[0].Source,
+		pms[0].TopologyMetrics[0].Name,
+		"must-not-appear-unused-metadata",
+		"must-not-appear-unused-profile-tag",
+		"must-not-appear-profile-tag-vendor",
+		"must-not-appear-unused-metric-tag",
+		"must-not-appear-unused-bgp-tag",
+		"must-not-appear-non-vlan-context-row",
+		"must-not-appear-invalid-octet-tag",
+	)
+	requireRetainedStringsContain(t, capture.evidence.collectionContexts, "Gi1/0/7")
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metadata, tagLldpLocChassisID)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
@@ -344,6 +343,54 @@ func requireRetainedStringsOutsideBacking(t *testing.T, backing string, retained
 	visit(reflect.ValueOf(retained))
 }
 
+func requireRetainedStringsExclude(t *testing.T, retained any, excluded ...string) {
+	t.Helper()
+	visitRetainedStrings(reflect.ValueOf(retained), func(value string) {
+		for _, forbidden := range excluded {
+			if forbidden != "" {
+				require.NotContains(t, value, forbidden)
+			}
+		}
+	})
+}
+
+func requireRetainedStringsContain(t *testing.T, retained any, expected string) {
+	t.Helper()
+	var found bool
+	visitRetainedStrings(reflect.ValueOf(retained), func(value string) {
+		found = found || value == expected
+	})
+	require.True(t, found, "retained values do not contain %q", expected)
+}
+
+func visitRetainedStrings(value reflect.Value, visit func(string)) {
+	if !value.IsValid() {
+		return
+	}
+	switch value.Kind() {
+	case reflect.String:
+		visit(value.String())
+	case reflect.Pointer, reflect.Interface:
+		if !value.IsNil() {
+			visitRetainedStrings(value.Elem(), visit)
+		}
+	case reflect.Struct:
+		for i := range value.NumField() {
+			visitRetainedStrings(value.Field(i), visit)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range value.Len() {
+			visitRetainedStrings(value.Index(i), visit)
+		}
+	case reflect.Map:
+		iter := value.MapRange()
+		for iter.Next() {
+			visitRetainedStrings(iter.Key(), visit)
+			visitRetainedStrings(iter.Value(), visit)
+		}
+	}
+}
+
 func requireStringOutsideBacking(t *testing.T, backing, retained string) {
 	t.Helper()
 	require.NotEmpty(t, retained)
@@ -381,7 +428,7 @@ func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {
 	require.Len(t, capture.evidence.collectionContexts, 1)
 	require.True(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpFailed)
 	require.Empty(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows)
-	require.NotContains(t, fmt.Sprintf("%+v", capture), pms[0].BGPRows[0].OriginProfileID)
+	requireRetainedStringsExclude(t, capture.evidence.collectionContexts, pms[0].BGPRows[0].OriginProfileID)
 }
 
 func TestTopologyAcquisitionReplayRejectsMissingOrReorderedContexts(t *testing.T) {
@@ -519,7 +566,6 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 		require.Equal(t, diagnosticCaptureReasonProjectionError, capture.reason)
 		require.Nil(t, capture.evidence)
 		require.Len(t, builder.bgpPeersByKey, 1, "projection errors must not change live ingestion")
-		require.NotContains(t, fmt.Sprintf("%+v", capture), pms[0].BGPRows[0].OriginProfileID)
 	})
 
 	t.Run("projection panic", func(t *testing.T) {
@@ -532,6 +578,7 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 		)
 		observer := recorder.beginContext(0, "", "")
 		recorder.projectProfile = func(
+			topologySemanticEventKind,
 			ddsnmpcollector.AcquisitionProfileReport,
 			*ddsnmp.ProfileMetrics,
 		) topologyAcquisitionProfileValues {

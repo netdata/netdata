@@ -113,12 +113,17 @@ type topologyAcquisitionRecorder struct {
 	recordCount    uint64
 	logicalBytes   uint64
 	evidence       *topologyAcquisitionAttemptEvidence
-	projectProfile func(ddsnmpcollector.AcquisitionProfileReport, *ddsnmp.ProfileMetrics) topologyAcquisitionProfileValues
+	projectProfile func(
+		topologySemanticEventKind,
+		ddsnmpcollector.AcquisitionProfileReport,
+		*ddsnmp.ProfileMetrics,
+	) topologyAcquisitionProfileValues
 }
 
 type topologyAcquisitionProfileObserver struct {
 	recorder       *topologyAcquisitionRecorder
 	contextOrdinal uint32
+	eventKind      topologySemanticEventKind
 }
 
 func newTopologyAcquisitionRecorder(
@@ -201,7 +206,15 @@ func (r *topologyAcquisitionRecorder) beginContext(ordinal uint32, vlanID, vlanN
 		connect:    notObservedAcquisitionPhase(),
 		collection: notObservedAcquisitionPhase(),
 	})
-	return topologyAcquisitionProfileObserver{recorder: r, contextOrdinal: ordinal}
+	eventKind := topologySemanticEventTopologyMetrics
+	if ordinal != 0 {
+		eventKind = topologySemanticEventVLANContext
+	}
+	return topologyAcquisitionProfileObserver{
+		recorder:       r,
+		contextOrdinal: ordinal,
+		eventKind:      eventKind,
+	}
 }
 
 func (o topologyAcquisitionProfileObserver) ObserveProfile(
@@ -242,7 +255,7 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 			return
 		}
 	}
-	records, logicalBytes, err := topologyAcquisitionProfileShape(report, metrics)
+	records, logicalBytes, err := topologyAcquisitionProfileShape(o.eventKind, report, metrics)
 	if err != nil {
 		o.recorder.fail(diagnosticCaptureReasonProjectionError)
 		return
@@ -263,11 +276,12 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 		failurePhase: report.FailurePhase,
 		stats:        report.Stats,
 		routes:       report.Routes,
-		values:       o.recorder.projectProfile(report, metrics),
+		values:       o.recorder.projectProfile(o.eventKind, report, metrics),
 	})
 }
 
 func topologyAcquisitionProfileShape(
+	eventKind topologySemanticEventKind,
 	report ddsnmpcollector.AcquisitionProfileReport,
 	profile *ddsnmp.ProfileMetrics,
 ) (uint64, uint64, error) {
@@ -285,13 +299,8 @@ func topologyAcquisitionProfileShape(
 	if len(report.TopologyValueReferences) != len(profile.TopologyMetrics) {
 		return 0, 0, errors.New("topology acquisition value-reference count mismatch")
 	}
-	if len(report.BGPValueReferences) != len(profile.BGPRows) {
-		return 0, 0, errors.New("BGP acquisition value-reference count mismatch")
-	}
-	logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
-	logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
 	for _, metric := range profile.TopologyMetrics {
-		if !topologySemanticMetricConsumed(topologySemanticEventTopologyMetrics, metric.TopologyKind) {
+		if !topologySemanticMetricConsumed(eventKind, metric.TopologyKind) {
 			continue
 		}
 		records++
@@ -300,6 +309,17 @@ func topologyAcquisitionProfileShape(
 			func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
 		)
 	}
+	if eventKind == topologySemanticEventVLANContext {
+		return records, logicalBytes, nil
+	}
+	if eventKind != topologySemanticEventTopologyMetrics {
+		return 0, 0, errors.New("unsupported acquisition semantic event")
+	}
+	if len(report.BGPValueReferences) != len(profile.BGPRows) {
+		return 0, 0, errors.New("BGP acquisition value-reference count mismatch")
+	}
+	logicalBytes += topologySemanticFilteredMetaTagMapBytes(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+	logicalBytes += topologySemanticFilteredStringMapBytes(profile.Tags, topologySemanticProfileTagAllowed)
 	if profile.BGPCollectError == nil {
 		records += uint64(len(profile.BGPRows))
 		for _, row := range profile.BGPRows {
@@ -313,6 +333,7 @@ func topologyAcquisitionProfileShape(
 }
 
 func projectTopologyAcquisitionProfileValues(
+	eventKind topologySemanticEventKind,
 	report ddsnmpcollector.AcquisitionProfileReport,
 	profile *ddsnmp.ProfileMetrics,
 ) topologyAcquisitionProfileValues {
@@ -320,15 +341,18 @@ func projectTopologyAcquisitionProfileValues(
 		return topologyAcquisitionProfileValues{}
 	}
 	result := topologyAcquisitionProfileValues{
-		metadata: cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed),
-		tags:     cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed),
 		metrics: projectTopologyAcquisitionMetrics(
-			topologySemanticEventTopologyMetrics,
+			eventKind,
 			profile.TopologyMetrics,
 			report.TopologyValueReferences,
 		),
-		bgpFailed: profile.BGPCollectError != nil,
 	}
+	if eventKind == topologySemanticEventVLANContext {
+		return result
+	}
+	result.metadata = cloneTopologySemanticMetaTags(profile.DeviceMetadata, topologySemanticProfileMetadataAllowed)
+	result.tags = cloneTopologySemanticStringTags(profile.Tags, topologySemanticProfileTagAllowed)
+	result.bgpFailed = profile.BGPCollectError != nil
 	if !result.bgpFailed {
 		result.bgpRows = projectTopologyAcquisitionBGPRows(profile.BGPRows, report.BGPValueReferences)
 	}

@@ -305,15 +305,18 @@ projection panics mark the attempt unavailable and release partial evidence with
 ingestion, or topology publication. Replay validates the completed shape, reconstructs the allowlisted values once,
 invokes the same event dispatcher, and ignores failed profiles and unsuccessful VLAN contexts.
 
-The optional ddsnmp producer independently caps temporary acquisition reports at 100,000 records and 32 MiB of logical
-content before it appends route/value-reference DTOs. Producer exhaustion emits a typed limit marker, releases report
-storage, and makes the topology attempt unavailable without changing live collection. Once limited, the report marker
-remains available but every diagnostic observer, scope, route, and binding construction boundary becomes inactive for
-that Collect call. A transient limit is not retained across calls; only an unreconstructible profile-input cache or a
-cached-input footprint that cannot fit keeps evidence unavailable. Metadata fallback OIDs are inspected through the
-already-owned profile configuration rather than copied into report helper storage. The honest diagnostic peak is the
-bounded temporary producer report plus the bounded retained current attempt, alongside the separately bounded old/new
-generation overlap; no shared reservation protocol exists between the producer and recorder.
+The optional ddsnmp producer applies fixed record and logical-content admission thresholds before it appends owned
+route/value-reference DTO payload. These thresholds are an admission policy, not a claim about exact heap, CPU, or peak
+process usage; normal profile traversal and live collection remain outside that accounting. Producer exhaustion emits
+a typed limit marker, releases report storage, and makes the topology attempt unavailable without changing collection.
+Once limited, diagnostic observers, scopes, routes, bindings, and value-reference loops become inactive for the rest of
+that call, and report construction does not make bulk copies proportional to unadmitted input. Metadata fallback OIDs
+are inspected through the already-owned profile configuration rather than copied into report helper storage.
+
+Acquisition reporting is explicitly an initial-collection facility on a fresh ddsnmp collector. The observer, report
+plans, and admission state are released when the initial `Collect` call returns; later calls continue normal collection
+and live-cache reuse without emitting acquisition reports. The topology recorder separately bounds the immutable
+evidence selected for retention and the old/new generation overlap remains governed by the topology refresh lifecycle.
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately
