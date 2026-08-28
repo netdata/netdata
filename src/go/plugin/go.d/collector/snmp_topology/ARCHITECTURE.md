@@ -217,12 +217,13 @@ tag-rejected, partial, and failed acquisition. Shared canonical WALKs remain a t
 keeps its configured root and counts only varbinds below that root. Compact route/row/value references join the
 synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
 reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
-definitions, and error text are excluded. With no observer, report plans and report DTOs are not built.
+definitions, and error text are excluded. With no observer, profile digests, route reports, and value references are not
+built.
 
 BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
 every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
-OIDs already classified unavailable by collector state. Table rows without required identity/signals are rejected;
-optional absent descriptors are not missing, and cross-table lookup/processing failures use the dependency class.
+OIDs already classified unavailable by collector state. Table rows without required identity/signals are rejected.
+Optional absent descriptors are not missing; cross-table failures that reject a row or tag use the dependency class.
 Synthetic table-dependency units have no semantic rows, so they report zero rows and count only received varbinds below
 their configured root as values.
 

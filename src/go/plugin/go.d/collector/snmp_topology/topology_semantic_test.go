@@ -377,8 +377,8 @@ func requireRetainedStringsOutsideBacking(t *testing.T, backing string, retained
 				visit(value.Elem())
 			}
 		case reflect.Struct:
-			for i := range value.NumField() {
-				visit(value.Field(i))
+			for _, field := range value.Fields() {
+				visit(field)
 			}
 		case reflect.Slice, reflect.Array:
 			for i := range value.Len() {
@@ -427,8 +427,8 @@ func visitRetainedStrings(value reflect.Value, visit func(string)) {
 			visitRetainedStrings(value.Elem(), visit)
 		}
 	case reflect.Struct:
-		for i := range value.NumField() {
-			visitRetainedStrings(value.Field(i), visit)
+		for _, field := range value.Fields() {
+			visitRetainedStrings(field, visit)
 		}
 	case reflect.Slice, reflect.Array:
 		for i := range value.Len() {

@@ -1167,16 +1167,13 @@ func bgpTableDependencies(cfg ddprofiledefinition.BGPConfig, metricsCfg ddprofil
 
 func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, []string) {
 	oids := make(map[string]struct{})
-	var missingOIDs map[string]struct{}
+	var missingOIDs []string
 	addOID := func(valueCfg ddprofiledefinition.BGPValueConfig) {
 		sym := bgpValueSymbol(valueCfg)
 		if sym.OID != "" {
 			oid := trimOID(sym.OID)
 			if c.missingOIDs[oid] {
-				if missingOIDs == nil {
-					missingOIDs = make(map[string]struct{})
-				}
-				missingOIDs[oid] = struct{}{}
+				missingOIDs = append(missingOIDs, oid)
 				return
 			}
 			oids[oid] = struct{}{}
@@ -1188,10 +1185,7 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 		if tagCfg.Symbol.OID != "" {
 			oid := trimOID(tagCfg.Symbol.OID)
 			if c.missingOIDs[oid] {
-				if missingOIDs == nil {
-					missingOIDs = make(map[string]struct{})
-				}
-				missingOIDs[oid] = struct{}{}
+				missingOIDs = append(missingOIDs, oid)
 				continue
 			}
 			oids[oid] = struct{}{}
@@ -1202,13 +1196,10 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 	for oid := range oids {
 		result = append(result, oid)
 	}
-	missing := make([]string, 0, len(missingOIDs))
-	for oid := range missingOIDs {
-		missing = append(missing, oid)
-	}
 	slices.Sort(result)
-	slices.Sort(missing)
-	return result, missing
+	slices.Sort(missingOIDs)
+	missingOIDs = slices.Compact(missingOIDs)
+	return result, missingOIDs
 }
 
 func forEachBGPValue(cfg ddprofiledefinition.BGPConfig, fn func(ddprofiledefinition.BGPValueConfig)) {
