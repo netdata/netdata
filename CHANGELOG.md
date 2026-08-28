@@ -145,6 +145,13 @@
 - Fix(go.d/jobmgr): converge accepted job activation asynchronously ([#23653](https://github.com/netdata/netdata/issues/23653))
 - Fix issues with alert (windows) ([#23559](https://github.com/netdata/netdata/issues/23559))
 - Refactor(go.d/snmp_topology): publish immutable topology generations ([#23659](https://github.com/netdata/netdata/issues/23659))
+- Fix text buffer cleanup and dyncfg tree sizing race ([#23657](https://github.com/netdata/netdata/issues/23657))
+- Fix(dictionary): defer destruction while dictionary APIs are active ([#23634](https://github.com/netdata/netdata/issues/23634))
+- Fix(pulse): prevent redundant chart metadata version bumps ([#23650](https://github.com/netdata/netdata/issues/23650))
+- Docs: document Netdata Cloud outbound IP addresses endpoint ([#23656](https://github.com/netdata/netdata/issues/23656))
+- Regenerate integrations docs ([#23661](https://github.com/netdata/netdata/issues/23661))
+- Drop retries on artifact downloads. ([#23649](https://github.com/netdata/netdata/issues/23649))
+- Filter disk (Windows) ([#23660](https://github.com/netdata/netdata/issues/23660))
 
 ## [2.11.0] - 2026-08-12
 
