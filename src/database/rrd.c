@@ -110,6 +110,8 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     }
 
     if (unlikely(unittest)) {
+        // the unit tests bring their tiers up themselves; give the engine its configuration first
+        netdata_conf_dbengine_apply();
         dbengine_enabled = true;
     }
     else {

@@ -6,8 +6,6 @@
 
 struct rrdeng_global_stats global_stats = { 0 };
 
-unsigned rrdeng_pages_per_extent = DEFAULT_PAGES_PER_EXTENT;
-
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
@@ -933,7 +931,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     uLong crc;
 
     for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
-        descr && count != rrdeng_pages_per_extent;
+        descr && count != dbengine_cfg.pages_per_extent;
         descr = descr->link.next, Index++) {
 
         uncompressed_payload_length += descr->page_length;
