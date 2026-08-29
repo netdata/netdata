@@ -18,7 +18,8 @@ go run ./tools/snmp-topology-diagnostics inspect-device --archive /path/to/archi
 go run ./tools/snmp-topology-diagnostics inspect-link --archive /path/to/archive.zst \
   --source-identity ip:192.0.2.10 \
   --destination-identity ip:192.0.2.20 \
-  --family lldp
+  --family lldp \
+  --direction bidirectional
 ```
 
 Every successful operation writes one JSON document to standard output. `validate` verifies the complete archive and
@@ -28,7 +29,8 @@ graph, and rendered topology stages.
 
 Use `summary` to find a device registration ID. A device inspection reports its graph identity keys; one of those keys can
 be supplied as a link endpoint identity. Link families are `lldp`, `cdp`, `bridge`, `fdb`, `stp`, `arp`, `l3_subnet`,
-`l3_subnet_membership`, `ospf_adjacency`, and `bgp_adjacency`.
+`l3_subnet_membership`, `ospf_adjacency`, and `bgp_adjacency`. Link direction is required and accepts `observed`,
+`unidirectional`, or `bidirectional`.
 
 Replay and inspection accept the production scalar query options:
 

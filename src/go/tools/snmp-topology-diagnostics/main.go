@@ -147,7 +147,7 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		flags.StringVar(&options.link.DestinationIdentity, "destination-identity", "", "destination actor identity key")
 		flags.StringVar(&options.link.Family, "family", "", "link family")
 		flags.StringVar(&options.link.Protocol, "protocol", "", "link protocol (defaults to the family)")
-		flags.StringVar(&options.link.Direction, "direction", "", "link direction (defaults to observed)")
+		flags.StringVar(&options.link.Direction, "direction", "", "link direction")
 	}
 	if err := flags.Parse(arguments); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -168,8 +168,12 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		return commandOptions{}, 2
 	}
 	if operation == "inspect-link" &&
-		(options.link.SourceIdentity == "" || options.link.DestinationIdentity == "" || options.link.Family == "") {
-		fmt.Fprintln(stderr, "error: --source-identity, --destination-identity, and --family are required")
+		(options.link.SourceIdentity == "" || options.link.DestinationIdentity == "" ||
+			options.link.Family == "" || options.link.Direction == "") {
+		fmt.Fprintln(
+			stderr,
+			"error: --source-identity, --destination-identity, --family, and --direction are required",
+		)
 		return commandOptions{}, 2
 	}
 	return options, -1

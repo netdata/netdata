@@ -226,12 +226,18 @@ func diagnosticLinkSubjectToInternal(
 	default:
 		return topologyInspectionLinkSubject{}, fmt.Errorf("unknown topology link family %q", subject.Family)
 	}
+	direction := normalizeTopologyInspectionToken(subject.Direction)
+	switch direction {
+	case "observed", "unidirectional", "bidirectional":
+	default:
+		return topologyInspectionLinkSubject{}, fmt.Errorf("unknown topology link direction %q", subject.Direction)
+	}
 	return normalizeTopologyInspectionLinkSubject(topologyInspectionLinkSubject{
 		srcIdentity: subject.SourceIdentity,
 		dstIdentity: subject.DestinationIdentity,
 		family:      family,
 		protocol:    subject.Protocol,
-		direction:   subject.Direction,
+		direction:   direction,
 	}), nil
 }
 

@@ -46,6 +46,11 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 
 	device, err := archive.InspectDevice(query, 1)
 	require.NoError(t, err)
+	directDeviceReport, err := inspectTopologyDevice(diagnostics, scenario.opts, 1)
+	require.NoError(t, err)
+	directDevice, err := newDiagnosticDeviceInspection(directDeviceReport)
+	require.NoError(t, err)
+	require.Equal(t, directDevice, device)
 	require.Equal(t, uint64(1), device.RegistrationID)
 	require.Equal(t, snmptopologydiagnostics.StatePresent, device.Sweep.Membership.State)
 	require.Equal(t, snmptopologydiagnostics.StatePresent, device.Observation.State)
@@ -64,6 +69,11 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 		Direction:           subject.direction,
 	})
 	require.NoError(t, err)
+	directLinkReport, err := inspectTopologyLink(diagnostics, scenario.opts, subject)
+	require.NoError(t, err)
+	directLink, err := newDiagnosticLinkInspection(directLinkReport)
+	require.NoError(t, err)
+	require.Equal(t, directLink, link)
 	require.Equal(t, snmptopologydiagnostics.StatePresent, link.GraphLink.Membership.State)
 	require.NotEmpty(t, link.GraphLink.Candidates)
 	require.NotEmpty(t, link.Source.Contexts)
@@ -114,6 +124,17 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 			},
 			link: true,
 			want: "link family",
+		},
+		"link direction": {
+			query: diagnosticQueryOptionsFromInternal(newLLDPDirectScenario().opts),
+			subject: snmptopologydiagnostics.LinkSubject{
+				SourceIdentity:      "actor:a",
+				DestinationIdentity: "actor:b",
+				Family:              "lldp",
+				Direction:           "",
+			},
+			link: true,
+			want: "link direction",
 		},
 	}
 

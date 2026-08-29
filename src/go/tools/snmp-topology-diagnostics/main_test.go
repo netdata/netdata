@@ -4,6 +4,9 @@ package main
 
 import (
 	"bytes"
+	jsonv1 "encoding/json"
+	jsonv2 "encoding/json/v2"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +16,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/internal/snmptopologydiagnostics"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
 func TestRunValidatesAndSummarizesArchive(t *testing.T) {
@@ -61,6 +65,16 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 		operation string
 		want      string
 	}{
+		"validate": {
+			args:      []string{"validate", "--archive", path},
+			operation: "validate",
+			want:      `"valid": true`,
+		},
+		"summary": {
+			args:      []string{"summary", "--archive", path},
+			operation: "summary",
+			want:      `"producer_agent_version": ""`,
+		},
 		"replay": {
 			args: []string{
 				"replay", "--archive", path, "--map-type", "lldp_cdp_managed", "--depth", "2",
@@ -79,6 +93,7 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 			args: []string{
 				"inspect-link", "--archive", path,
 				"--source-identity", "actor:a", "--destination-identity", "actor:b", "--family", "lldp",
+				"--direction", "bidirectional",
 			},
 			operation: "inspect-link",
 			want:      `"family": "lldp"`,
@@ -100,6 +115,9 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 			}
 			if openCalls != 1 {
 				t.Fatalf("archive decode calls=%d, want 1", openCalls)
+			}
+			if fake.operationCalls != 1 {
+				t.Fatalf("archive operation calls=%d, want 1", fake.operationCalls)
 			}
 			if fake.operation != tc.operation {
 				t.Fatalf("operation=%q, want %q", fake.operation, tc.operation)
@@ -126,6 +144,105 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunRealArchiveMatchesDirectOperations(t *testing.T) {
+	archivePath := replayableDiagnosticArchivePath()
+	query := snmptopology.DefaultDiagnosticQueryOptions()
+	link := snmptopologydiagnostics.LinkSubject{
+		SourceIdentity:      "ip:192.0.2.71",
+		DestinationIdentity: "ip:192.0.2.72",
+		Family:              "lldp",
+		Direction:           "bidirectional",
+	}
+	tests := map[string]struct {
+		args   []string
+		direct func(*snmptopology.DiagnosticArchive) (any, error)
+	}{
+		"validate": {
+			args: []string{"validate", "--archive", archivePath},
+			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
+				return snmptopologydiagnostics.Validation{Valid: true, Archive: archive.Identity()}, nil
+			},
+		},
+		"summary": {
+			args:   []string{"summary", "--archive", archivePath},
+			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) { return archive.Summary() },
+		},
+		"replay": {
+			args:   []string{"replay", "--archive", archivePath},
+			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) { return archive.Replay(query) },
+		},
+		"inspect device": {
+			args: []string{"inspect-device", "--archive", archivePath, "--registration-id", "1"},
+			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
+				return archive.InspectDevice(query, 1)
+			},
+		},
+		"inspect link": {
+			args: []string{
+				"inspect-link", "--archive", archivePath,
+				"--source-identity", link.SourceIdentity,
+				"--destination-identity", link.DestinationIdentity,
+				"--family", link.Family,
+				"--direction", link.Direction,
+			},
+			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
+				return archive.InspectLink(query, link)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			archive := readReplayableDiagnosticArchive(t)
+			want, err := tc.direct(archive)
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := jsonv2.Marshal(want, outputJSONOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded = append(encoded, '\n')
+
+			var stdout, stderr bytes.Buffer
+			if exitCode := run(tc.args, &stdout, &stderr); exitCode != 0 {
+				t.Fatalf("exit code=%d stderr=%s stdout=%s", exitCode, stderr.String(), stdout.String())
+			}
+			if !jsonv1.Valid(stdout.Bytes()) {
+				t.Fatalf("stdout is not valid JSON: %s", stdout.String())
+			}
+			if !bytes.Equal(encoded, stdout.Bytes()) {
+				t.Fatalf(
+					"command output differs from direct operation: %s",
+					firstByteDifference(encoded, stdout.Bytes()),
+				)
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("unexpected stderr: %s", stderr.String())
+			}
+		})
+	}
+}
+
+func firstByteDifference(want, got []byte) string {
+	limit := min(len(want), len(got))
+	index := 0
+	for index < limit && want[index] == got[index] {
+		index++
+	}
+	start := max(0, index-40)
+	wantEnd := min(len(want), index+80)
+	gotEnd := min(len(got), index+80)
+	return fmt.Sprintf(
+		"offset=%d want_len=%d got_len=%d want=%q got=%q",
+		index,
+		len(want),
+		len(got),
+		want[start:wantEnd],
+		got[start:gotEnd],
+	)
 }
 
 func BenchmarkRunSummary(b *testing.B) {
@@ -180,6 +297,23 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 			code: 1,
 			want: "map type",
 		},
+		"missing link direction": {
+			args: []string{
+				"inspect-link", "--archive", validArchive,
+				"--source-identity", "actor:a", "--destination-identity", "actor:b", "--family", "lldp",
+			},
+			code: 2,
+			want: "--direction",
+		},
+		"invalid link direction": {
+			args: []string{
+				"inspect-link", "--archive", validArchive,
+				"--source-identity", "actor:a", "--destination-identity", "actor:b", "--family", "lldp",
+				"--direction", "sideways",
+			},
+			code: 1,
+			want: "link direction",
+		},
 	}
 
 	for name, tc := range tests {
@@ -196,22 +330,27 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 }
 
 type fakeDiagnosticArchive struct {
-	operation string
-	limits    snmptopologydiagnostics.ReadLimits
-	query     snmptopologydiagnostics.QueryOptions
+	operation      string
+	operationCalls int
+	limits         snmptopologydiagnostics.ReadLimits
+	query          snmptopologydiagnostics.QueryOptions
 }
 
 func (a *fakeDiagnosticArchive) Identity() snmptopologydiagnostics.ArchiveIdentity {
+	a.operation = "validate"
+	a.operationCalls++
 	return snmptopologydiagnostics.ArchiveIdentity{}
 }
 
 func (a *fakeDiagnosticArchive) Summary() (snmptopologydiagnostics.Summary, error) {
 	a.operation = "summary"
+	a.operationCalls++
 	return snmptopologydiagnostics.Summary{}, nil
 }
 
 func (a *fakeDiagnosticArchive) Replay(options snmptopologydiagnostics.QueryOptions) (topologyv1.Data, error) {
 	a.operation = "replay"
+	a.operationCalls++
 	a.query = options
 	return topologyv1.Data{SchemaVersion: "1"}, nil
 }
@@ -221,6 +360,7 @@ func (a *fakeDiagnosticArchive) InspectDevice(
 	registrationID uint64,
 ) (snmptopologydiagnostics.DeviceInspection, error) {
 	a.operation = "inspect-device"
+	a.operationCalls++
 	a.query = options
 	return snmptopologydiagnostics.DeviceInspection{RegistrationID: registrationID}, nil
 }
@@ -230,6 +370,7 @@ func (a *fakeDiagnosticArchive) InspectLink(
 	subject snmptopologydiagnostics.LinkSubject,
 ) (snmptopologydiagnostics.LinkInspection, error) {
 	a.operation = "inspect-link"
+	a.operationCalls++
 	a.query = options
 	return snmptopologydiagnostics.LinkInspection{Subject: subject}, nil
 }
@@ -265,4 +406,27 @@ func writeGoldenDiagnosticArchive(t testing.TB) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func replayableDiagnosticArchivePath() string {
+	return filepath.Join(
+		"..", "..", "plugin", "go.d", "collector", "snmp_topology", "testdata",
+		"topology-diagnostic-archive-replay-v1.zst",
+	)
+}
+
+func readReplayableDiagnosticArchive(t testing.TB) *snmptopology.DiagnosticArchive {
+	t.Helper()
+	fixture, err := os.ReadFile(replayableDiagnosticArchivePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive, err := snmptopology.ReadDiagnosticArchive(
+		bytes.NewReader(fixture),
+		snmptopology.DefaultDiagnosticArchiveReadLimits(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return archive
 }
