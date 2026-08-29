@@ -1635,11 +1635,25 @@ static struct cleanup_cycle label_cleanup_cycle = {
 static void cleanup_health_log(struct meta_config_s *config)
 {
     static time_t next_execution_t = 0;
+    static time_t next_orphan_sweep_t = 0;
+
+    // The host a previous pass stopped at, so the hosts at the end of the index are not starved
+    // by a large backlog on the hosts before them. The cursor is the host id and not its
+    // position: hosts are removed at runtime, which shifts every host after them and would
+    // silently skip one.
+    static nd_uuid_t resume_host_id;
+    static bool have_resume_host = false;
+
+    // A host left with rows behind has to keep the fast cadence even when the passes that follow
+    // find nothing to do, or its backlog waits for a full interval.
+    static bool cycle_incomplete = false;
 
     time_t now = now_realtime_sec();
 
-    if (!next_execution_t)
+    if (!next_execution_t) {
         next_execution_t = nd_time_t_add_saturating(now, METADATA_MAINTENANCE_FIRST_CHECK);
+        next_orphan_sweep_t = next_execution_t;
+    }
 
     if (next_execution_t && next_execution_t > now)
         return;
@@ -1650,41 +1664,78 @@ static void cleanup_health_log(struct meta_config_s *config)
     // One runtime budget for the whole pass, not one per host: otherwise a parent with many
     // children could hold the metadata event loop for hosts x METADATA_RUNTIME_THRESHOLD seconds.
     time_t started = now_monotonic_sec();
-    bool more_work = false;
+    bool resumed = have_resume_host;
+    bool seeking = resumed;
+    bool stopped_early = false;
+    bool pass_incomplete = false;
+
+    have_resume_host = false;
 
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
-            more_work = true;
+        // fast forward to the host the previous pass stopped at
+        if (seeking) {
+            if (!nd_uuid_eq(host->host_id.uuid, resume_host_id))
+                continue;
+            seeking = false;
+        }
+
+        // Stop the pass on the same conditions the rest of run_metadata_cleanup() honors.
+        // Continuing would only prepare, stat and finalize once per remaining host for no work,
+        // and walk every host's in-memory alarm list under its health log lock.
+        if (!sql_metadata_wal_size_acceptable() ||
+            now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
+            uuid_copy(resume_host_id, host->host_id.uuid);
+            have_resume_host = true;
+            stopped_early = true;
             break;
         }
 
         if (sql_health_alarm_log_cleanup(host, started))
-            more_work = true;
+            pass_incomplete = true;
 
         if (unlikely(SHUTDOWN_REQUESTED(config)))
             break;
     }
     dfe_done(host);
 
-    // A pass that stopped on the WAL gate or the runtime budget left rows behind. Retry soon
-    // instead of deferring them for a full interval - the WAL can stay over its limit for hours
-    // on a busy parent, and health_log_detail would grow unbounded in the meantime.
-    next_execution_t = nd_time_t_add_saturating(
-        now, more_work ? METADATA_HEALTH_LOG_REPEAT : METADATA_HEALTH_LOG_INTERVAL);
+    // Only a pass that started at the top of the index and walked all of it knows the whole
+    // truth. One that resumed at a cursor, stopped early, or never found its cursor host
+    // because it was removed, has not seen every host, so it can only add to what we knew.
+    if (stopped_early || seeking || resumed)
+        cycle_incomplete = cycle_incomplete || pass_incomplete;
+    else
+        cycle_incomplete = pass_incomplete;
 
+    bool more_work = stopped_early || seeking || cycle_incomplete;
+
+    // no rescheduling on the way out: the metadata event loop is stopping and these statics
+    // die with the process
     if (unlikely(SHUTDOWN_REQUESTED(config))) {
         worker_is_idle();
         return;
     }
 
-    // The orphan sweeps are unbounded deletes, so run them only on a pass that completed - a
-    // retry pass is already fighting for the same disk.
-    if (!more_work) {
-        (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
-        (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
-        (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
+    // The orphan sweeps are unbounded deletes that have nothing to do with the retention drain
+    // above, so they keep their own hourly cadence: tying them to the pass would either repeat
+    // them on every retry, or never run them while a drain persists.
+    if (next_orphan_sweep_t <= now) {
+        if (sql_metadata_wal_size_acceptable()) {
+            (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
+            (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
+            (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
+            next_orphan_sweep_t = nd_time_t_add_saturating(now_realtime_sec(), METADATA_HEALTH_LOG_INTERVAL);
+        }
+        else
+            // due, but the WAL is over its limit - come back for it soon rather than leaving it
+            // to the next interval
+            more_work = true;
     }
+
+    // the deletes above are unbounded, so schedule from the clock after the work, not before it
+    next_execution_t = nd_time_t_add_saturating(
+        now_realtime_sec(), more_work ? METADATA_HEALTH_LOG_REPEAT : METADATA_HEALTH_LOG_INTERVAL);
+
     worker_is_idle();
 }
 

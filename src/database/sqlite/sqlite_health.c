@@ -364,7 +364,7 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 // The rowid-IN form is used rather than "DELETE ... LIMIT": both produce an identical query
 // plan, but DELETE-with-LIMIT needs SQLITE_ENABLE_UPDATE_DELETE_LIMIT, which is not enabled
 // in every SQLite build netdata may link against.
-#define HEALTH_LOG_CLEANUP_BATCH_SIZE (5000)
+#define HEALTH_LOG_CLEANUP_BATCH_SIZE (2000)
 
 #define SQL_CLEANUP_HEALTH_LOG_DETAIL                                                                                  \
     "DELETE FROM health_log_detail WHERE rowid IN ("                                                                   \
@@ -372,54 +372,74 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
     "   (SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND d.when_key < UNIXEPOCH() - @history "      \
     "   AND d.updated_by_id <> 0 AND d.transition_id NOT IN "                                                          \
     "   (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"                                    \
-    "  LIMIT @batch)"
+    "  LIMIT @batch) RETURNING 1"
 
-// Returns true when rows may still be eligible for this host - the caller's runtime budget
-// expired or the WAL grew too large - so the caller can retry sooner than its normal interval.
-// "started" is the caller's pass start, so the budget bounds the whole pass, not each host.
+// Returns true when this host still has eligible rows and the caller should come back sooner
+// than its normal interval. Only the two throttles set it - an oversized WAL and the runtime
+// budget - because only they stop with work that is known to be drainable. A failed statement
+// is reported and left for the next normal pass: retrying it once a minute for every host
+// would only repeat a permanent failure.
+//
+// "started" is the caller's pass start, so the runtime budget bounds the whole pass rather
+// than each host.
 bool sql_health_alarm_log_cleanup(RRDHOST *host, time_t started)
 {
     sqlite3_stmt *res = NULL;
     int rc;
     int param = 0;
-    bool more_work = false;
+    bool retry_soon = false;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res)) {
+        health_alarm_log_cleanup(host);
         return false;
+    }
 
     // Each iteration is its own transaction, so the WAL can be checkpointed and other writers
     // can make progress between batches. We stop early on the same two conditions the other
     // cleanups in run_metadata_cleanup() respect - an oversized WAL and a runtime budget - and
     // whatever is left is picked up by the next cleanup cycle.
     while (true) {
-        if (!sql_metadata_wal_size_acceptable()) {
-            more_work = true;
-            break;
-        }
-
         param = 0;
         SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
         SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
         SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)HEALTH_LOG_CLEANUP_BATCH_SIZE));
 
         param = 0;
-        rc = sqlite3_step_monitored(res);
+
+        // The statement RETURNs one row per deleted row: counting them is statement local.
+        // sqlite3_changes() cannot be used here - it reports the last statement completed on
+        // the connection, and db_meta is shared with the health and ACLK threads, which makes
+        // its value unpredictable rather than merely stale.
+        //
+        // Never leave this drain on a SQLITE_ROW: finalizing or resetting a half drained
+        // RETURNING statement commits the rows it already deleted instead of rolling them
+        // back, so we would lose exactly the count we came here for.
+        //
+        // The delete itself completes inside the first step and the rows are replayed from an
+        // ephemeral table, so the implicit commit lands on the step that returns SQLITE_DONE.
+        // A busy there makes sqlite3_step() reset, and the retry inside sqlite3_step_monitored()
+        // restarts the delete rather than resuming it, counting the same rows twice. That can
+        // only inflate the count, so it costs one extra batch and can never fake an exhausted
+        // set.
+        int deleted = 0;
+        while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW)
+            deleted++;
+
         if (unlikely(rc != SQLITE_DONE)) {
             error_report("Failed to cleanup health log detail table, rc = %d", rc);
             break;
         }
 
-        // sqlite3_changes() counts the last statement completed on the connection, not on our
-        // statement, and db_meta is shared with the health and ACLK threads. A concurrent write
-        // landing between the step above and this read can only clobber the count downwards to
-        // something below the batch size, so only a zero proves the eligible set is exhausted.
-        // Any other value keeps us looping, bounded by the WAL gate and the budget below, at
-        // the cost of one delete that matches nothing per host per pass.
-        if (sqlite3_changes(db_meta) == 0)
+        // a short batch means the eligible set for this host is exhausted
+        if (deleted < HEALTH_LOG_CLEANUP_BATCH_SIZE)
             break;
 
-        if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
-            more_work = true;
+        // Both throttles are checked after a batch, never before the first one: the caller
+        // gates on the WAL immediately before calling us, so checking it here again would only
+        // repeat that stat once per host.
+        if (!sql_metadata_wal_size_acceptable() ||
+            now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
+            retry_soon = true;
             break;
         }
 
@@ -433,7 +453,7 @@ done:
     // After cleaning up SQLite entries, also clean up in-memory entries
     health_alarm_log_cleanup(host);
 
-    return more_work;
+    return retry_soon;
 }
 
 #define SQL_UPDATE_TRANSITION_IN_HEALTH_LOG                                                                            \
