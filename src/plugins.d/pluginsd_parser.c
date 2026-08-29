@@ -1723,6 +1723,115 @@ static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
     return 0;
 }
 
+static int pluginsd_timestamps_unittest_replay(void) {
+    // Child values arrive as unsigned 64-bit strings cast to time_t:
+    // 18446744073709551614ULL / 18446744073709551615ULL wrap to -2 / -1 and
+    // used to pass the "non-zero && < wall_clock" checks.
+    time_t wrapped_start = (time_t) 18446744073709551614ULL; // -2
+    time_t wrapped_end = (time_t) 18446744073709551615ULL;   // -1
+
+    time_t now = now_realtime_sec();
+    time_t tolerance = 6;
+
+    struct {
+        time_t start, end, wall_clock, tolerance;
+        bool valid;
+    } cases[] = {
+        // the wrap-around values accepted before the fix
+        { wrapped_start, wrapped_end, now, tolerance, false, },
+        { wrapped_start, wrapped_end, wrapped_end, tolerance, false, },
+        // zero / negative
+        { 0, now, now, tolerance, false, },
+        { now, 0, now, tolerance, false, },
+        { -1, -1, now, tolerance, false, },
+        // future beyond tolerance
+        { now + 3600, now + 3601, now, tolerance, false, },
+        // boundary: end == wall_clock + tolerance is rejected (strict <)
+        { now - tolerance, now + tolerance, now, tolerance, false, },
+        // start >= end
+        { now, now, now + tolerance, tolerance, false, },
+        { now, now - 1, now + tolerance, tolerance, false, },
+        // valid replay pair
+        { now - 1, now, now, tolerance, true, },
+        { now - tolerance, now, now, tolerance, true, },
+    };
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        bool valid = pluginsd_replay_timestamps_valid(cases[i].start, cases[i].end, cases[i].wall_clock, cases[i].tolerance);
+        if(valid != cases[i].valid) {
+            netdata_log_error("PLUGINSD: replay timestamps unittest failed for case %zu "
+                              "(start=%ld, end=%ld, wall_clock=%ld, tolerance=%ld): expected %s, got %s",
+                              i, (long)cases[i].start, (long)cases[i].end, (long)cases[i].wall_clock,
+                              (long)cases[i].tolerance,
+                              cases[i].valid ? "valid" : "invalid", valid ? "valid" : "invalid");
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int pluginsd_timestamps_unittest_begin_v2(void) {
+    time_t wrapped_end = (time_t) 18446744073709551615ULL; // -1, accepted before the fix
+    time_t now = now_realtime_sec();
+
+    // invalid end_time values
+    struct {
+        time_t end_time, wall_clock;
+    } invalid[] = {
+        { wrapped_end, now, },         // the wrap-around input
+        { wrapped_end, wrapped_end, }, // '#' shorthand: wall_clock == end_time
+        { 0, now, },
+        { -1, now, },
+    };
+
+    for(size_t i = 0; i < _countof(invalid); i++) {
+        time_t wall_clock = invalid[i].wall_clock;
+        if(pluginsd_begin_v2_times_valid(invalid[i].end_time, wall_clock, &wall_clock)) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: end_time %ld unexpectedly accepted",
+                              (long)invalid[i].end_time);
+            return 1;
+        }
+    }
+
+    // valid end_time: wall_clock is kept when positive, falls back to end_time otherwise
+    struct {
+        time_t end_time, wall_clock_in, wall_clock_expected;
+    } valid[] = {
+        { now, now, now, },           // positive wall_clock kept
+        { now, now - 10, now - 10, }, // positive wall_clock kept (may differ from end_time)
+        { now, wrapped_end, now, },   // wrapped wall_clock falls back to end_time
+        { now, 0, now, },             // unset wall_clock falls back to end_time
+    };
+
+    for(size_t i = 0; i < _countof(valid); i++) {
+        time_t wall_clock = valid[i].wall_clock_in;
+        if(!pluginsd_begin_v2_times_valid(valid[i].end_time, wall_clock, &wall_clock)) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: end_time %ld unexpectedly rejected",
+                              (long)valid[i].end_time);
+            return 1;
+        }
+        if(wall_clock != valid[i].wall_clock_expected) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: expected wall_clock %ld, got %ld",
+                              (long)valid[i].wall_clock_expected, (long)wall_clock);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int pluginsd_timestamps_unittest(void) {
+    if(pluginsd_timestamps_unittest_replay())
+        return 1;
+
+    if(pluginsd_timestamps_unittest_begin_v2())
+        return 1;
+
+    netdata_log_info("PLUGINSD: timestamps unittest passed");
+    return 0;
+}
+
 int pluginsd_parser_unittest(void) {
     if(pluginsd_parser_unittest_slot_bounds(PLUGINSD_DIMENSION_SLOT_MAX))
         return 1;
