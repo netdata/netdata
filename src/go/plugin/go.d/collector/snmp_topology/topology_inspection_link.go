@@ -92,10 +92,25 @@ func topologyInspectionLinkMatches(
 	if link.SrcActorHandle == srcHandle && link.DstActorHandle == dstHandle {
 		return actual == subject.discriminator
 	}
-	if link.SrcActorHandle == dstHandle && link.DstActorHandle == srcHandle {
+	if topologyInspectionLinkSubjectUnordered(subject) &&
+		link.SrcActorHandle == dstHandle && link.DstActorHandle == srcHandle {
 		return topologyInspectionSwapLinkDiscriminator(actual) == subject.discriminator
 	}
 	return false
+}
+
+func topologyInspectionLinkSubjectUnordered(subject topologyInspectionLinkSubject) bool {
+	if subject.direction == "bidirectional" {
+		return true
+	}
+	switch subject.family {
+	case topologymodel.L3SubnetLinkType,
+		topologymodel.OSPFAdjacencyLinkType,
+		topologymodel.BGPAdjacencyLinkType:
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeTopologyInspectionLinkSubject(subject topologyInspectionLinkSubject) topologyInspectionLinkSubject {

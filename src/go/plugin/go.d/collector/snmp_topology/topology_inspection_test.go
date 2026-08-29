@@ -209,6 +209,14 @@ func TestInspectTopologyLinkUsesStructuralSubjectAndSingleRenderedRow(t *testing
 	require.Equal(t, report.graphLink.index, report.typedLink.row)
 	sourceContext := report.source
 
+	reversed := subject
+	reversed.srcIdentity, reversed.dstIdentity = reversed.dstIdentity, reversed.srcIdentity
+	reversed.discriminator = topologyInspectionSwapLinkDiscriminator(reversed.discriminator)
+	report, err = inspectTopologyLink(diagnostics, scenario.opts, reversed)
+	require.NoError(t, err)
+	require.Equal(t, topologyInspectionPresent, report.graphLink.membership.state)
+	require.Equal(t, topologyInspectionPresent, report.typedLink.state)
+
 	subject.discriminator.srcPortID = "missing-port"
 	report, err = inspectTopologyLink(diagnostics, scenario.opts, subject)
 	require.NoError(t, err)
@@ -246,6 +254,48 @@ func TestInspectTopologyLinkAmbiguousIdentityIsUndetermined(t *testing.T) {
 	got := inspectTopologyGraphLink(data, subject)
 	require.Equal(t, topologyInspectionUndetermined, got.membership.state)
 	require.Equal(t, 2, got.srcActors.membership.candidates)
+}
+
+func TestInspectTopologyGraphLinkPreservesOrderedEndpointRoles(t *testing.T) {
+	tests := map[string]struct {
+		scenario func() *topologyScenario
+		family   string
+	}{
+		"stp": {
+			scenario: newSTPInferredScenario,
+			family:   "stp",
+		},
+		"l3 subnet membership": {
+			scenario: newMixedL2L3ControlScenario,
+			family:   topologymodel.L3SubnetMembershipLinkType,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			scenario := tc.scenario()
+			_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
+			replay := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
+			require.Equal(t, topologyInspectionPresent, replay.graph.state)
+
+			var subject topologyInspectionLinkSubject
+			for i, link := range replay.data.Links {
+				if topologyInspectionLinkFamily(link) != tc.family {
+					continue
+				}
+				var ok bool
+				subject, ok = topologyInspectionSubjectFromLink(replay.data, i)
+				require.True(t, ok)
+				break
+			}
+			require.NotEmpty(t, subject.family)
+
+			subject.srcIdentity, subject.dstIdentity = subject.dstIdentity, subject.srcIdentity
+			subject.discriminator = topologyInspectionSwapLinkDiscriminator(subject.discriminator)
+			match := inspectTopologyGraphLink(replay.data, subject)
+			require.Equal(t, topologyInspectionAbsent, match.membership.state)
+		})
+	}
 }
 
 func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability(t *testing.T) {
@@ -317,6 +367,20 @@ func TestTopologyInspectionSubjectsDistinguishEveryRenderedLink(t *testing.T) {
 		require.Equalf(t, topologyInspectionPresent, match.membership.state, "link=%d family=%s", i, subject.family)
 		require.Equalf(t, 1, match.membership.candidates, "link=%d family=%s", i, subject.family)
 		require.Equal(t, i, match.index)
+		if topologyInspectionLinkSubjectUnordered(subject) {
+			subject.srcIdentity, subject.dstIdentity = subject.dstIdentity, subject.srcIdentity
+			subject.discriminator = topologyInspectionSwapLinkDiscriminator(subject.discriminator)
+			reversed := inspectTopologyGraphLink(replay.data, subject)
+			require.Equalf(
+				t,
+				topologyInspectionPresent,
+				reversed.membership.state,
+				"reversed link=%d family=%s",
+				i,
+				subject.family,
+			)
+			require.Equal(t, i, reversed.index)
+		}
 		families[subject.family] = true
 	}
 	require.True(t, families["lldp"])

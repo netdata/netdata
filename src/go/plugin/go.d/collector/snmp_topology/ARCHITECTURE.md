@@ -661,9 +661,11 @@ collapsed actor.
 
 Link inspection resolves both endpoints through exact normalized actor identity
 keys, then matches the existing link family, protocol, direction, and
-family-specific structural fields. Zero matches is `absent` only after the
-relevant stage completed, one is `present`, and multiple actor or link matches
-is `undetermined`. Retained acquisition rows are reported only as candidate
+family-specific structural fields. Endpoint reversal is accepted for
+bidirectional links and unordered direct L3/OSPF/BGP adjacencies; ordered STP
+and subnet-membership roles remain exact. Zero matches is `absent` only after
+the relevant stage completed, one is `present`, and multiple actor or link
+matches is `undetermined`. Retained acquisition rows are reported only as candidate
 family context across registrations, with each retained capture's availability
 kept explicit. They are not matched to the exact structural subject, do not
 produce a source membership result, and are not causal provenance.
