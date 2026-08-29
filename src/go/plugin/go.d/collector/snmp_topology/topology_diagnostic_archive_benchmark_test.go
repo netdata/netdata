@@ -116,7 +116,7 @@ func BenchmarkSNMPTopologyDiagnosticArchiveEncoderLevel(b *testing.B) {
 					if err != nil {
 						b.Fatal(err)
 					}
-					if err := jsonv2.MarshalWrite(encoder, document, topologyDiagnosticArchiveJSONOptions); err != nil {
+					if err := jsonv2.MarshalWrite(encoder, document, topologyDiagnosticArchiveWriterJSONOptions); err != nil {
 						b.Fatal(err)
 					}
 					if err := encoder.Close(); err != nil {

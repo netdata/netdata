@@ -359,11 +359,17 @@ func TestTopologyDiagnosticArchiveUsesStandardJSONFieldSemantics(t *testing.T) {
 
 	_, err = readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, raw)))
 	require.NoError(t, err)
+}
+
+func TestTopologyDiagnosticArchiveRejectsInvalidWireUTF8(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+	raw := archiveDocumentJSON(t, document)
 
 	invalidUTF8 := strings.Replace(raw, `"v-test"`, `"`+string([]byte{0xff})+`"`, 1)
-	archive, err := readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, invalidUTF8)))
-	require.NoError(t, err)
-	require.Equal(t, "\ufffd", archive.producerVersion)
+	_, err = readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, invalidUTF8)))
+	require.ErrorContains(t, err, "invalid UTF-8")
 }
 
 func TestTopologyDiagnosticArchiveWriterPreservesV1StringSemantics(t *testing.T) {
@@ -437,7 +443,7 @@ func TestTopologyDiagnosticArchivePreflightCountsAllocationClassesTogether(t *te
 	const raw = `{"entries":[{},{}],"tags":{"site":"lab","zone":"a"}}`
 	limits := defaultTopologyDiagnosticArchiveLimits
 	counts, err := preflightTopologyDiagnosticArchiveJSON(
-		jsontext.NewDecoder(strings.NewReader(raw), topologyDiagnosticArchiveJSONOptions),
+		jsontext.NewDecoder(strings.NewReader(raw), topologyDiagnosticArchiveReaderJSONOptions),
 		limits,
 	)
 	require.NoError(t, err)

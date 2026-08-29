@@ -719,7 +719,8 @@ Writing and reading are invocation-local `io.Writer`/`io.Reader` operations.
 Both use one zstd worker. The writer streams JSON through zstd without retaining
 encoded Function output or imposing another byte ceiling on the already-bounded
 live snapshot. Stable JSON v2 is used with explicit JSON v1 compatibility
-options and HTML escaping disabled, preserving archive-v1 field behavior.
+options and HTML escaping disabled. Invalid in-memory strings receive the JSON
+v1 replacement behavior, so the writer always emits valid UTF-8.
 
 The reader buffers only bounded compressed input and opens two bounded zstd
 streams over it. The first JSON token pass totals estimated slice backing across
@@ -732,6 +733,13 @@ reconstruction. Unknown members remain accepted; a member whose name matches an
 allowlisted dynamic field is conservatively counted. There are no per-field
 limits, JSON-path schema, custom unmarshalers, or generic token, string, depth,
 record, logical-byte, canonical-order, or replay-work policy.
+
+Raw invalid UTF-8 is rejected during the preflight pass rather than expanded by
+replacement during typed decoding. The reader bounds are independent and their
+worst cases are additive; they do not claim one exact process heap or RSS
+ceiling. Extreme supported or crafted archives can therefore remain expensive
+to inspect, but each input, decompression, slice, and map allocation class has
+an explicit finite envelope.
 
 Reconstruction validates only the root format/version and the typed enum,
 capture-role/reference/generation, unique attempt-ordinal, registration,

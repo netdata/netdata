@@ -55,9 +55,14 @@ var defaultTopologyDiagnosticArchiveLimits = topologyDiagnosticArchiveLimits{
 	maxMapEntries:           topologyDiagnosticArchiveMaxMapEntries,
 }
 
-var topologyDiagnosticArchiveJSONOptions = jsonv2.JoinOptions(
+var topologyDiagnosticArchiveWriterJSONOptions = jsonv2.JoinOptions(
 	jsonv1.DefaultOptionsV1(),
 	jsontext.EscapeForHTML(false),
+)
+
+var topologyDiagnosticArchiveReaderJSONOptions = jsonv2.JoinOptions(
+	jsonv1.DefaultOptionsV1(),
+	jsontext.AllowInvalidUTF8(false),
 )
 
 type topologyDiagnosticArchive struct {
@@ -199,7 +204,7 @@ func writeTopologyDiagnosticArchiveWithProducerVersion(
 	if err != nil {
 		return fmt.Errorf("write SNMP topology diagnostic archive: create zstd encoder: %w", err)
 	}
-	encodeErr := jsonv2.MarshalWrite(encoder, document, topologyDiagnosticArchiveJSONOptions)
+	encodeErr := jsonv2.MarshalWrite(encoder, document, topologyDiagnosticArchiveWriterJSONOptions)
 	closeErr := encoder.Close()
 	if encodeErr != nil {
 		return fmt.Errorf("write SNMP topology diagnostic archive: encode JSON: %w", encodeErr)
@@ -239,7 +244,7 @@ func readTopologyDiagnosticArchiveWithLimits(
 
 	var document topologyDiagnosticArchiveDocumentV1
 	err = consumeTopologyDiagnosticArchiveJSON(compressed, limits, func(decoder *jsontext.Decoder) error {
-		if err := jsonv2.UnmarshalDecode(decoder, &document, topologyDiagnosticArchiveJSONOptions); err != nil {
+		if err := jsonv2.UnmarshalDecode(decoder, &document, topologyDiagnosticArchiveReaderJSONOptions); err != nil {
 			return err
 		}
 		if _, err := decoder.ReadToken(); !errors.Is(err, io.EOF) {
@@ -279,7 +284,7 @@ func consumeTopologyDiagnosticArchiveJSON(
 	defer decoder.Close()
 
 	decoded := &io.LimitedReader{R: decoder, N: limits.maxDecodedBytes + 1}
-	err = consume(jsontext.NewDecoder(decoded, topologyDiagnosticArchiveJSONOptions))
+	err = consume(jsontext.NewDecoder(decoded, topologyDiagnosticArchiveReaderJSONOptions))
 	if decoded.N == 0 {
 		return errTopologyDiagnosticArchiveDecodedLimit
 	}
