@@ -119,9 +119,14 @@ type topologyInspectionSourceFact struct {
 	bgp            *topologyAcquisitionBGPRowValue
 }
 
+type topologyInspectionSourceContext struct {
+	registrationID ddsnmp.DeviceRegistrationID
+	capture        topologyInspectionCaptureResult
+	facts          []topologyInspectionSourceFact
+}
+
 type topologyInspectionSourceResult struct {
-	membership topologyInspectionStage
-	facts      []topologyInspectionSourceFact
+	contexts []topologyInspectionSourceContext
 }
 
 type topologyInspectionGraphLinkResult struct {
@@ -227,7 +232,7 @@ func inspectTopologyLink(
 	}
 
 	replay := replayTopologyDiagnosticStages(diagnostics, options)
-	report.source = inspectTopologyLinkSources(replay.devices, subject)
+	report.source = inspectTopologyLinkSourceContext(replay.devices, subject.family)
 	if replay.graph.state != topologyInspectionPresent {
 		return report, nil
 	}

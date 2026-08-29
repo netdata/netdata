@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
@@ -176,16 +175,18 @@ func TestInspectTopologyLinkUsesStructuralSubjectAndSingleRenderedRow(t *testing
 
 	report, err := inspectTopologyLink(diagnostics, scenario.opts, subject)
 	require.NoError(t, err)
-	require.Equal(t, topologyInspectionPresent, report.source.membership.state)
-	require.NotEmpty(t, report.source.facts)
+	require.Len(t, report.source.contexts, len(diagnostics.topology.devices))
+	require.NotZero(t, topologyInspectionSourceFactCount(report.source))
 	require.Equal(t, topologyInspectionPresent, report.graphLink.membership.state)
 	require.Equal(t, 1, report.graphLink.membership.candidates)
 	require.Equal(t, topologyInspectionPresent, report.typedLink.state)
 	require.Equal(t, report.graphLink.index, report.typedLink.row)
+	sourceContext := report.source
 
 	subject.discriminator.srcPortID = "missing-port"
 	report, err = inspectTopologyLink(diagnostics, scenario.opts, subject)
 	require.NoError(t, err)
+	require.Equal(t, sourceContext, report.source)
 	require.Equal(t, topologyInspectionAbsent, report.graphLink.membership.state)
 	require.Equal(t, topologyInspectionAbsent, report.typedLink.state)
 }
@@ -221,31 +222,58 @@ func TestInspectTopologyLinkAmbiguousIdentityIsUndetermined(t *testing.T) {
 	require.Equal(t, 2, got.srcActors.membership.candidates)
 }
 
-func TestInspectTopologyLinkSourceAbsenceRequiresCompleteRoutes(t *testing.T) {
-	scenario := newLLDPDirectScenario()
+func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability(t *testing.T) {
+	scenario := newTopologyScenario("inspection-family-source-context")
+	left := scenario.Switch("switch-left", "192.0.2.51", "02:00:00:00:51:01")
+	right := scenario.Switch("switch-right", "192.0.2.52", "02:00:00:00:52:01")
+	otherLeft := scenario.Switch("switch-other-left", "192.0.2.53", "02:00:00:00:53:01")
+	otherRight := scenario.Switch("switch-other-right", "192.0.2.54", "02:00:00:00:54:01")
+	scenario.LLDP(left.Port("left-right", 1), right.Port("right-left", 1))
+	scenario.LLDP(otherLeft.Port("other-left-right", 1), otherRight.Port("other-right-left", 1))
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
 	replay := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
 	require.NotEmpty(t, replay.data.Links)
 	subject, ok := topologyInspectionSubjectFromLink(replay.data, 0)
 	require.True(t, ok)
 
-	setTopologyInspectionSourceRoutes(t, diagnostics, ddsnmpcollector.AcquisitionRouteOutcomePartial)
+	var unrelatedRegistrationID ddsnmp.DeviceRegistrationID
+	for _, device := range replay.devices {
+		if device.snapshot == nil {
+			continue
+		}
+		actor, ok := topologyLocalActorFromCache(
+			device.snapshot.observation.LocalDeviceID,
+			device.snapshot.observation.LocalDevice,
+		)
+		if ok && !topologyInspectionActorHasIdentity(actor, subject.srcIdentity) &&
+			!topologyInspectionActorHasIdentity(actor, subject.dstIdentity) {
+			unrelatedRegistrationID = device.registrationID
+			break
+		}
+	}
+	require.NotZero(t, unrelatedRegistrationID)
+
+	diagnostics.topology.devices = append(diagnostics.topology.devices, topologySweepDeviceDiagnostic{
+		registrationID: 99,
+		acquisition: &topologyAcquisitionCapture{
+			state:  diagnosticCaptureUnavailable,
+			reason: diagnosticCaptureReasonProjectionError,
+		},
+	})
 	report, err := inspectTopologyLink(diagnostics, scenario.opts, subject)
 	require.NoError(t, err)
-	require.Equal(t, topologyInspectionUndetermined, report.source.membership.state)
-	require.Empty(t, report.source.facts)
+	require.Len(t, report.source.contexts, len(diagnostics.topology.devices))
 
-	setTopologyInspectionSourceRoutes(t, diagnostics, ddsnmpcollector.AcquisitionRouteOutcomeEmpty)
-	report, err = inspectTopologyLink(diagnostics, scenario.opts, subject)
-	require.NoError(t, err)
-	require.Equal(t, topologyInspectionAbsent, report.source.membership.state)
-	require.Empty(t, report.source.facts)
+	unrelated := topologyInspectionSourceContextByRegistration(report.source, unrelatedRegistrationID)
+	require.NotNil(t, unrelated)
+	require.NotEmpty(t, unrelated.facts)
 
-	clearTopologyInspectionSourceRoutes(t, diagnostics)
-	report, err = inspectTopologyLink(diagnostics, scenario.opts, subject)
-	require.NoError(t, err)
-	require.Equal(t, topologyInspectionUndetermined, report.source.membership.state)
-	require.Empty(t, report.source.facts)
+	unavailable := topologyInspectionSourceContextByRegistration(report.source, 99)
+	require.NotNil(t, unavailable)
+	require.Equal(t, topologyInspectionPresent, unavailable.capture.membership.state)
+	require.Equal(t, topologyInspectionUndetermined, unavailable.capture.evidence.state)
+	require.Equal(t, diagnosticCaptureUnavailable, unavailable.capture.capture.state)
+	require.Empty(t, unavailable.facts)
 }
 
 func TestTopologyInspectionSubjectsDistinguishEveryRenderedLink(t *testing.T) {
@@ -331,47 +359,22 @@ func setTopologyInspectionLifecycleCut(diagnostics *topologyDiagnostics, registr
 	}
 }
 
-func setTopologyInspectionSourceRoutes(
-	t *testing.T,
-	diagnostics topologyDiagnostics,
-	outcome ddsnmpcollector.AcquisitionRouteOutcome,
-) {
-	t.Helper()
-	for deviceIndex := range diagnostics.topology.devices {
-		capture := diagnostics.topology.devices[deviceIndex].acquisition
-		require.NotNil(t, capture)
-		require.NotNil(t, capture.evidence)
-		for contextIndex := range capture.evidence.collectionContexts {
-			context := &capture.evidence.collectionContexts[contextIndex]
-			for profileIndex := range context.profiles {
-				profile := &context.profiles[profileIndex]
-				profile.values.metrics = nil
-				for routeIndex := range profile.routes {
-					route := &profile.routes[routeIndex]
-					if route.Kind == ddsnmpcollector.AcquisitionRouteKindTopologyScalar ||
-						route.Kind == ddsnmpcollector.AcquisitionRouteKindTopologyTable {
-						route.Outcome = outcome
-					}
-				}
-			}
+func topologyInspectionSourceContextByRegistration(
+	result topologyInspectionSourceResult,
+	registrationID ddsnmp.DeviceRegistrationID,
+) *topologyInspectionSourceContext {
+	for i := range result.contexts {
+		if result.contexts[i].registrationID == registrationID {
+			return &result.contexts[i]
 		}
 	}
+	return nil
 }
 
-func clearTopologyInspectionSourceRoutes(t *testing.T, diagnostics topologyDiagnostics) {
-	t.Helper()
-	for deviceIndex := range diagnostics.topology.devices {
-		capture := diagnostics.topology.devices[deviceIndex].acquisition
-		require.NotNil(t, capture)
-		require.NotNil(t, capture.evidence)
-		for contextIndex := range capture.evidence.collectionContexts {
-			context := &capture.evidence.collectionContexts[contextIndex]
-			for profileIndex := range context.profiles {
-				profile := &context.profiles[profileIndex]
-				profile.values.metrics = nil
-				profile.values.bgpRows = nil
-				profile.routes = nil
-			}
-		}
+func topologyInspectionSourceFactCount(result topologyInspectionSourceResult) int {
+	var count int
+	for _, context := range result.contexts {
+		count += len(context.facts)
 	}
+	return count
 }

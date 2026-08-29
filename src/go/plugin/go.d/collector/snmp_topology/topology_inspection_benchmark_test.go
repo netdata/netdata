@@ -18,6 +18,7 @@ func BenchmarkSNMPTopologyOfflineInspectionScaling(b *testing.B) {
 		sharedEndpoints     bool
 	}{
 		{devices: 8, fdbEntriesPerDevice: 128},
+		{devices: 40, fdbEntriesPerDevice: 1600},
 		{devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
 	}
 

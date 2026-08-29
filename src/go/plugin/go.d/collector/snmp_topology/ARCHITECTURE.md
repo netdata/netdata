@@ -664,9 +664,9 @@ keys, then matches the existing link family, protocol, direction, and
 family-specific structural fields. Zero matches is `absent` only after the
 relevant stage completed, one is `present`, and multiple actor or link matches
 is `undetermined`. Retained acquisition rows are reported only as candidate
-source facts from endpoint registrations. They are not causal provenance.
-Failed, partial, rejected, or not-observed candidate routes prevent a negative
-source conclusion.
+family context across registrations, with each retained capture's availability
+kept explicit. They are not matched to the exact structural subject, do not
+produce a source membership result, and are not causal provenance.
 
 One inspection invocation replays each selected retained capture at most once,
 builds one graph, and renders once. Existing graph counters are returned as

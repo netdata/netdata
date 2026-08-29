@@ -4,41 +4,23 @@ package snmptopology
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func inspectTopologyLinkSources(
+func inspectTopologyLinkSourceContext(
 	devices []topologyDiagnosticReplayedDevice,
-	subject topologyInspectionLinkSubject,
+	family string,
 ) topologyInspectionSourceResult {
-	var result topologyInspectionSourceResult
-	complete := true
-	matchedDevices := 0
+	result := topologyInspectionSourceResult{
+		contexts: make([]topologyInspectionSourceContext, 0, len(devices)),
+	}
 	for i := range devices {
 		device := &devices[i]
-		if device.observation != topologyInspectionPresent || device.snapshot == nil {
-			continue
-		}
-		actor, ok := topologyLocalActorFromCache(
-			device.snapshot.observation.LocalDeviceID,
-			device.snapshot.observation.LocalDevice,
-		)
-		if !ok || (!topologyInspectionActorHasIdentity(actor, subject.srcIdentity) &&
-			!topologyInspectionActorHasIdentity(actor, subject.dstIdentity)) {
-			continue
-		}
-		matchedDevices++
-		if !topologyInspectionCaptureCompleteForFamily(device.capture, subject.family) {
-			complete = false
-		}
-		result.facts = append(result.facts, topologyInspectionCaptureFacts(device.registrationID, device.capture, subject.family)...)
-	}
-	result.membership.candidates = len(result.facts)
-	if len(result.facts) > 0 {
-		result.membership.state = topologyInspectionPresent
-	} else if matchedDevices > 0 && complete {
-		result.membership.state = topologyInspectionAbsent
+		result.contexts = append(result.contexts, topologyInspectionSourceContext{
+			registrationID: device.registrationID,
+			capture:        inspectTopologyCapture(device.capture),
+			facts:          topologyInspectionCaptureFacts(device.registrationID, device.capture, family),
+		})
 	}
 	return result
 }
@@ -107,47 +89,4 @@ func topologyInspectionMetricMatchesFamily(kind ddsnmp.TopologyKind, family stri
 	default:
 		return true
 	}
-}
-
-func topologyInspectionCaptureCompleteForFamily(capture *topologyAcquisitionCapture, family string) bool {
-	if capture == nil || capture.state != diagnosticCaptureAvailable || capture.evidence == nil {
-		return false
-	}
-	observedRelevantRoute := false
-	for _, context := range capture.evidence.collectionContexts {
-		if context.collection.outcome != topologyAcquisitionPhaseSuccess {
-			return false
-		}
-		for _, profile := range context.profiles {
-			if profile.outcome != ddsnmpcollector.AcquisitionProfileOutcomeSuccess {
-				return false
-			}
-			if family == topologymodel.BGPAdjacencyLinkType && profile.values.bgpFailed {
-				return false
-			}
-			for _, route := range profile.routes {
-				if !topologyInspectionRouteMatchesFamily(route.Kind, family) {
-					continue
-				}
-				observedRelevantRoute = true
-				switch route.Outcome {
-				case ddsnmpcollector.AcquisitionRouteOutcomeMissing,
-					ddsnmpcollector.AcquisitionRouteOutcomeEmpty,
-					ddsnmpcollector.AcquisitionRouteOutcomeValues:
-				default:
-					return false
-				}
-			}
-		}
-	}
-	return observedRelevantRoute
-}
-
-func topologyInspectionRouteMatchesFamily(kind ddsnmpcollector.AcquisitionRouteKind, family string) bool {
-	if family == topologymodel.BGPAdjacencyLinkType {
-		return kind == ddsnmpcollector.AcquisitionRouteKindBGPScalar ||
-			kind == ddsnmpcollector.AcquisitionRouteKindBGPTable
-	}
-	return kind == ddsnmpcollector.AcquisitionRouteKindTopologyScalar ||
-		kind == ddsnmpcollector.AcquisitionRouteKindTopologyTable
 }
