@@ -634,9 +634,10 @@ The replay contract is hermetic:
 
 Live Function and offline replay use the same graph and renderer. Their typed
 topology structure is identical for the same scalar options; only PTR-derived
-presentation fields may differ. This replay entry point consumes trusted,
-already-bounded in-memory diagnostics. Validation and structural limits for
-untrusted archive input belong to the later archive reader boundary.
+presentation fields may differ. The live replay entry point consumes trusted,
+already-bounded in-memory diagnostics. The portable archive reader below owns
+the external byte, format, enum, role, and reference boundary before it exposes
+the same immutable diagnostic snapshot to replay or inspection.
 
 ## Offline Diagnostic Inspection
 
@@ -686,6 +687,51 @@ builds one graph, and renders once. Existing graph counters are returned as
 graph-wide context and never determine a subject's state. Any renderable-device
 replay failure makes graph and typed-output membership `undetermined` globally,
 while an independently replayable device observation remains available.
+
+## Portable Diagnostic Archive
+
+`topology_diagnostic_archive*.go` defines one portable representation of the
+complete diagnostic snapshot. It is one root-versioned JSON document inside a
+zstd stream, not a member container:
+
+```text
+topologyDiagnostics
+  -> positive-allowlist archive-v1 DTO
+  -> one JSON value
+  -> one checksummed zstd stream
+```
+
+The DTO mirrors only credential-free diagnostic state. It has no manifest,
+member paths, per-section revisions, checksums outside the zstd frame, captured
+profile programs, packet material, error text, or credential-bearing connection
+state. Producer Agent version is informational. The one archive version covers
+both the DTO and the replay kernel; changes to replay-affecting semantic, graph,
+enrichment, shaping, rendering, or compiled OUI behavior require a new archive
+version.
+
+Each device owns a capture list. A capture entry has `latest_attempt`,
+`retained_success`, or both roles. One entry with both roles reconstructs one
+shared pointer; separate entries reconstruct distinct captures. This preserves
+the runtime lineage without a global object table or cross-device reference
+graph.
+
+Writing and reading are invocation-local `io.Writer`/`io.Reader` operations.
+Both use one zstd worker. The writer streams JSON through zstd without retaining
+encoded Function output. The reader bounds compressed input, decoded JSON, and
+the zstd window, decodes once into one owned DTO, checks one complete JSON value,
+and reconstructs one immutable diagnostic snapshot. It validates only the root
+format/version and typed enum, capture-role, registration, address, and value-to-
+route references needed for safe replay and honest inspection. Standard Go JSON
+unknown-field and duplicate-key behavior is intentional; there is no token,
+string, depth, record, logical-byte, canonical-order, or generic replay-work
+policy at this boundary.
+
+Archives are sensitive, untrusted support attachments even though the Agent is
+the only supported producer. The byte/window limits protect the maintainer
+reader from oversized input and compressed amplification. Zstd frame integrity
+detects accidental corruption; it does not authenticate an archive. Arbitrary
+semantic JSON editing, signing, sanitization, filesystem publication, retention,
+and command-line behavior are separate contracts.
 
 ## Trap Enrichment
 

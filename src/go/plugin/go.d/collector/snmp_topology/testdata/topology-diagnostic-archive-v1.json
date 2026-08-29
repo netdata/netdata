@@ -1,0 +1,77 @@
+{
+  "format": "netdata.snmp_topology.diagnostics",
+  "version": 1,
+  "producer": {
+    "agent_version": "v1.2.3"
+  },
+  "snapshot": {
+    "job_lifecycle_cut": {
+      "capture_state": "available",
+      "capture_reason": "none",
+      "cut": {
+        "sequence": 11,
+        "captured_at": "2026-08-29T12:00:03Z",
+        "entries": [
+          {
+            "registration_id": 7,
+            "hostname": "192.0.2.7",
+            "port": 161,
+            "snmp_version": "2c",
+            "last_completed": {
+              "phase": "collect",
+              "outcome": "success",
+              "completed_at": "2026-08-29T12:00:02Z"
+            },
+            "topology_ready": true
+          }
+        ]
+      }
+    },
+    "producer_scope_id": "scope-a",
+    "topology_sweep_cut": {
+      "sequence": 5,
+      "started_at": "2026-08-29T11:59:00Z",
+      "published_at": "2026-08-29T12:00:00Z",
+      "capture_state": "available",
+      "capture_reason": "none",
+      "record_count": 2,
+      "logical_bytes": 160,
+      "devices": [
+        {
+          "registration_id": 7,
+          "selected": true,
+          "outcome": "failed",
+          "last_attempt": "2026-08-29T11:59:30Z",
+          "last_success": "0001-01-01T00:00:00Z",
+          "next_retry": "2026-08-29T12:00:30Z",
+          "captures": [
+            {
+              "roles": [
+                "latest_attempt"
+              ],
+              "attempt_ordinal": 2,
+              "capture_state": "unavailable",
+              "capture_reason": "projection_error",
+              "record_count": 0,
+              "logical_bytes": 0
+            }
+          ],
+          "has_observation": false,
+          "expires_at": "0001-01-01T00:00:00Z",
+          "renderable": false,
+          "expired": false
+        }
+      ]
+    },
+    "last_aborted_sweep": {
+      "sequence": 3,
+      "started_at": "2026-08-29T12:01:00Z",
+      "aborted_at": "2026-08-29T12:01:01Z",
+      "reason": "canceled",
+      "phase": "target_resolution",
+      "has_active_registration": false,
+      "registration_count": 1,
+      "selected_count": 1
+    }
+  }
+}
