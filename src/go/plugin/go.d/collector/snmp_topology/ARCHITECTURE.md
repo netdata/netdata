@@ -638,6 +638,55 @@ presentation fields may differ. This replay entry point consumes trusted,
 already-bounded in-memory diagnostics. Validation and structural limits for
 untrusted archive input belong to the later archive reader boundary.
 
+## Offline Diagnostic Inspection
+
+The `topology_inspection*.go` files add read-only, invocation-local inspection over the
+same committed diagnostic cut. It does not add live observers, retained
+reports, query history, or a second graph algorithm.
+
+Device inspection starts with one exact `DeviceRegistrationID`. Lifecycle and
+committed-sweep membership use that ID directly. The report carries both cut
+sequence/timestamp identities, any matching removed-registration row, and the
+existing last-aborted-sweep marker before keeping two independent branches:
+
+- `latestAttempt` describes the last completed attempt, including an unavailable
+  evidence marker;
+- `retainedSuccess` identifies the older successful capture, when any, that can
+  continue through semantic replay, graph construction, and typed rendering.
+
+The branches explicitly record when they alias. A graph actor is reported as an
+identity representation of the retained observation after shaping; it is not
+claimed to be the registration itself or proof that one registration caused a
+collapsed actor.
+
+Link inspection resolves both endpoints through exact normalized actor identity
+keys, then matches the existing link family, protocol, and direction. These
+fields define a candidate subject rather than a unique link identity; the full
+matching graph rows retain interface, subnet, adjacency, routing-instance, and
+other parallel-link details. Endpoint reversal is accepted for bidirectional
+links and unordered direct L3/OSPF/BGP adjacencies; ordered STP and
+subnet-membership roles remain exact. Zero matches is `absent` only after the
+relevant stage completed, one is `present`, and multiple actor or link matches
+is `undetermined` with every candidate returned.
+
+Every link report also carries the committed diagnostic cut's capture state,
+reason, sequence, and timestamps. A cut rejected by projection or diagnostic
+limits therefore remains distinguishable from a successfully captured empty
+cut before graph or source inspection begins.
+
+Source facts are reported only as family-wide context across registrations.
+Each registration exposes independent `latestAttempt` and `retainedSuccess`
+branches and records whether they alias. Facts are attached once per distinct
+capture, so an aliased capture is not duplicated. Capture availability remains
+explicit. Source facts are not matched to the exact candidate subject, do not
+produce a source membership result, and are not causal provenance.
+
+One inspection invocation replays each selected retained capture at most once,
+builds one graph, and renders once. Existing graph counters are returned as
+graph-wide context and never determine a subject's state. Any renderable-device
+replay failure makes graph and typed-output membership `undetermined` globally,
+while an independently replayable device observation remains available.
+
 ## Trap Enrichment
 
 `topology_trap_enrich.go` publishes a separate handle used by `snmp_traps`.
