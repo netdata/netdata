@@ -398,6 +398,54 @@ func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability
 	require.Empty(t, unavailable.captures[0].facts)
 }
 
+func TestInspectTopologyLinkPreservesDiagnosticCutFailure(t *testing.T) {
+	scenario := newLLDPDirectScenario()
+	limitedCut, err := projectTopologyDiagnosticCut(topologyDiagnosticCutInput{
+		sequence:    7,
+		startedAt:   topologyScenarioCollectedAt,
+		publishedAt: topologyScenarioCollectedAt,
+		entries: []ddsnmp.DeviceEntry{
+			{RegistrationID: 1},
+		},
+		limits: topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1024},
+	})
+	require.NoError(t, err)
+	require.Equal(t, diagnosticCaptureLimitExceeded, limitedCut.captureState)
+
+	subject := topologyInspectionLinkSubject{
+		srcIdentity: "ip:192.0.2.1",
+		dstIdentity: "ip:192.0.2.2",
+		family:      "lldp",
+		protocol:    "lldp",
+		direction:   "bidirectional",
+	}
+	report, err := inspectTopologyLink(topologyDiagnostics{topology: limitedCut}, scenario.opts, subject)
+	require.NoError(t, err)
+	require.Equal(t, diagnosticCaptureLimitExceeded, report.diagnosticCut.captureState)
+	require.Equal(t, diagnosticCaptureReasonRecordLimit, report.diagnosticCut.captureReason)
+	require.Equal(t, uint64(7), report.diagnosticCut.sequence)
+	require.Equal(t, limitedCut.startedAt, report.diagnosticCut.startedAt)
+	require.Equal(t, limitedCut.publishedAt, report.diagnosticCut.publishedAt)
+	require.Empty(t, report.source.contexts)
+	require.Equal(t, topologyInspectionUndetermined, report.graphLink.membership.state)
+	require.Equal(t, topologyInspectionUndetermined, report.typedLink.state)
+
+	availableCut, err := projectTopologyDiagnosticCut(topologyDiagnosticCutInput{
+		sequence:    8,
+		startedAt:   topologyScenarioCollectedAt,
+		publishedAt: topologyScenarioCollectedAt,
+		limits:      topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1024},
+	})
+	require.NoError(t, err)
+	report, err = inspectTopologyLink(topologyDiagnostics{topology: availableCut}, scenario.opts, subject)
+	require.NoError(t, err)
+	require.Equal(t, diagnosticCaptureAvailable, report.diagnosticCut.captureState)
+	require.Equal(t, diagnosticCaptureReasonNone, report.diagnosticCut.captureReason)
+	require.Empty(t, report.source.contexts)
+	require.Equal(t, topologyInspectionUndetermined, report.graphLink.membership.state)
+	require.Equal(t, topologyInspectionUndetermined, report.typedLink.state)
+}
+
 func TestTopologyInspectionSubjectsReturnEveryRenderedLinkAsCandidate(t *testing.T) {
 	scenario := newMixedL2L3ControlScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)

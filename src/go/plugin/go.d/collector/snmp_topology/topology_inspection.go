@@ -33,14 +33,18 @@ type topologyInspectionLifecycleResult struct {
 	entry         *ddsnmp.DeviceLifecycleEntry
 }
 
-type topologyInspectionSweepResult struct {
-	membership    topologyInspectionStage
+type topologyInspectionDiagnosticCutResult struct {
 	captureState  diagnosticCaptureState
 	captureReason diagnosticCaptureReason
 	sequence      uint64
 	startedAt     time.Time
 	publishedAt   time.Time
-	device        *topologySweepDeviceDiagnostic
+}
+
+type topologyInspectionSweepResult struct {
+	topologyInspectionDiagnosticCutResult
+	membership topologyInspectionStage
+	device     *topologySweepDeviceDiagnostic
 }
 
 type topologyInspectionRemovedResult struct {
@@ -127,14 +131,15 @@ type topologyInspectionGraphLinkResult struct {
 }
 
 type topologyLinkInspection struct {
-	subject     topologyInspectionLinkSubject
-	options     topologyoptions.QueryOptions
-	source      topologyInspectionSourceResult
-	graphLink   topologyInspectionGraphLinkResult
-	typedLink   topologyInspectionRowResult
-	graphStats  topologyInspectionStage
-	stats       topologymodel.Stats
-	lastAborted *topologyAbortedSweepDiagnostic
+	subject       topologyInspectionLinkSubject
+	options       topologyoptions.QueryOptions
+	diagnosticCut topologyInspectionDiagnosticCutResult
+	source        topologyInspectionSourceResult
+	graphLink     topologyInspectionGraphLinkResult
+	typedLink     topologyInspectionRowResult
+	graphStats    topologyInspectionStage
+	stats         topologymodel.Stats
+	lastAborted   *topologyAbortedSweepDiagnostic
 }
 
 func inspectTopologyDevice(
@@ -214,11 +219,12 @@ func inspectTopologyLink(
 ) (topologyLinkInspection, error) {
 	subject = normalizeTopologyInspectionLinkSubject(subject)
 	report := topologyLinkInspection{
-		subject:     subject,
-		options:     topologyoptions.NormalizeQueryOptions(options),
-		graphLink:   topologyInspectionGraphLinkResult{index: -1},
-		typedLink:   topologyInspectionRowResult{row: -1},
-		lastAborted: diagnostics.lastAborted,
+		subject:       subject,
+		options:       topologyoptions.NormalizeQueryOptions(options),
+		diagnosticCut: inspectTopologyDiagnosticCut(diagnostics.topology),
+		graphLink:     topologyInspectionGraphLinkResult{index: -1},
+		typedLink:     topologyInspectionRowResult{row: -1},
+		lastAborted:   diagnostics.lastAborted,
 	}
 	if subject.srcIdentity == "" || subject.dstIdentity == "" || subject.family == "" {
 		return report, fmt.Errorf("topology inspection link subject is incomplete")

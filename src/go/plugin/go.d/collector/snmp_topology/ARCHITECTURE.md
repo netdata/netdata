@@ -669,6 +669,11 @@ subnet-membership roles remain exact. Zero matches is `absent` only after the
 relevant stage completed, one is `present`, and multiple actor or link matches
 is `undetermined` with every candidate returned.
 
+Every link report also carries the committed diagnostic cut's capture state,
+reason, sequence, and timestamps. A cut rejected by projection or diagnostic
+limits therefore remains distinguishable from a successfully captured empty
+cut before graph or source inspection begins.
+
 Source facts are reported only as family-wide context across registrations.
 Each registration exposes independent `latestAttempt` and `retainedSuccess`
 branches and records whether they alias. Facts are attached once per distinct

@@ -7,6 +7,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
+func inspectTopologyDiagnosticCut(cut *topologySweepDiagnosticCut) topologyInspectionDiagnosticCutResult {
+	if cut == nil {
+		return topologyInspectionDiagnosticCutResult{}
+	}
+	return topologyInspectionDiagnosticCutResult{
+		captureState:  cut.captureState,
+		captureReason: cut.captureReason,
+		sequence:      cut.sequence,
+		startedAt:     cut.startedAt,
+		publishedAt:   cut.publishedAt,
+	}
+}
+
 func inspectTopologyLinkSourceContext(
 	devices []topologyDiagnosticReplayedDevice,
 	family string,

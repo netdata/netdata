@@ -39,14 +39,10 @@ func inspectTopologySweepRegistration(
 	if cut == nil {
 		return result
 	}
-	result.captureState = cut.captureState
-	result.captureReason = cut.captureReason
+	result.topologyInspectionDiagnosticCutResult = inspectTopologyDiagnosticCut(cut)
 	if cut.captureState != diagnosticCaptureAvailable {
 		return result
 	}
-	result.sequence = cut.sequence
-	result.startedAt = cut.startedAt
-	result.publishedAt = cut.publishedAt
 	for i := range cut.devices {
 		if cut.devices[i].registrationID == registrationID {
 			result.membership = topologyInspectionStage{state: topologyInspectionPresent, candidates: 1}
