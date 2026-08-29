@@ -609,6 +609,10 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/troubleshooting.md
               description: Timeouts, missing metrics, SNMPv3 auth, gaps, and phantom spikes.
           - meta:
+              label: Collect Troubleshooting Data
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md
+              description: Collect raw SNMP data without credentials for Netdata Support to investigate metrics and topology issues.
+          - meta:
               label: Anti-patterns
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/anti-patterns.md
               description: The common SNMP polling mistakes and how to avoid them.

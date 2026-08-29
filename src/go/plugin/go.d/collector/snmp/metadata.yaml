@@ -1242,6 +1242,9 @@ modules:
     troubleshooting:
       problems:
         list:
+          - name: Collect Live Data for Netdata Support
+            description: |
+              For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.
           - name: Debugging Gaps on Charts
             description: |
               If your SNMP charts show gaps, it means the collector could not finish metric collection before the next scheduled run. This usually happens when SNMP tables take longer to collect than your configured `update_every`.
