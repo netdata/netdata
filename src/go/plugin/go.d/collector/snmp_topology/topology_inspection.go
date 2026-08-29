@@ -204,7 +204,11 @@ func inspectTopologyDevice(
 
 	report.graphStats = replay.data.Stats
 	report.hasGraphStats = true
-	report.graphIdentity = inspectTopologyLocalDeviceIdentity(replay.data, replayed.snapshot.observation.LocalDevice)
+	report.graphIdentity = inspectTopologyLocalDeviceIdentity(
+		replay.data,
+		replayed.snapshot.observation.LocalDeviceID,
+		replayed.snapshot.observation.LocalDevice,
+	)
 	report.typedIdentity = topologyInspectionRenderedRow(
 		replay.typed.state,
 		report.graphIdentity.membership.state,

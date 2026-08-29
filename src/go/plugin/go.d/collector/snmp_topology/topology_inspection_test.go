@@ -151,6 +151,32 @@ func TestInspectTopologyDeviceUsesOneCollapsedIdentityRepresentation(t *testing.
 	require.Equal(t, leftReport.graphIdentity.index, rightReport.graphIdentity.index)
 }
 
+func TestInspectTopologyDeviceUsesLocalDeviceIDFallbackRepresentation(t *testing.T) {
+	scenario := newTopologyScenario("inspection-local-device-id-fallback")
+	scenario.Switch("switch-fallback", "192.0.2.55", "02:00:00:00:55:01")
+	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
+	setTopologyInspectionLifecycleCut(&diagnostics, 1)
+
+	capture := diagnostics.topology.devices[0].acquisition
+	require.NotNil(t, capture)
+	require.NotNil(t, capture.evidence)
+	capture.evidence.device = topologySemanticDeviceInput{}
+	for contextIndex := range capture.evidence.collectionContexts {
+		context := &capture.evidence.collectionContexts[contextIndex]
+		for profileIndex := range context.profiles {
+			profile := &context.profiles[profileIndex]
+			profile.values = topologyAcquisitionProfileValues{}
+		}
+	}
+
+	report, err := inspectTopologyDevice(diagnostics, scenario.opts, 1)
+	require.NoError(t, err)
+	require.Equal(t, topologyInspectionPresent, report.observation.state)
+	require.Equal(t, topologyInspectionPresent, report.graphIdentity.membership.state)
+	require.Equal(t, topologyInspectionPresent, report.typedIdentity.state)
+	require.Equal(t, "local-device", report.graphIdentity.actors[0].ActorID)
+}
+
 func TestInspectTopologyActorIdentityRequiresOneMatch(t *testing.T) {
 	data := topologymodel.Data{Actors: []topologymodel.Actor{
 		{ActorID: "actor-a", Match: topologymodel.Match{IPAddresses: []string{"192.0.2.1"}}},

@@ -112,6 +112,7 @@ func findTopologyDiagnosticReplayedDevice(
 
 func inspectTopologyLocalDeviceIdentity(
 	data topologymodel.Data,
+	localDeviceID string,
 	device topologymodel.Device,
 ) topologyInspectionActorResult {
 	index := topologymodel.NewLocalActorMatchIndex()
@@ -120,7 +121,14 @@ func inspectTopologyLocalDeviceIdentity(
 			index.AddMatch(i, data.Actors[i].Match)
 		}
 	}
-	return topologyInspectionActorsAt(data, index.MatchIndexes(nil, device))
+	if indexes := index.MatchIndexes(nil, device); len(indexes) > 0 {
+		return topologyInspectionActorsAt(data, indexes)
+	}
+	actor, ok := topologyLocalActorFromCache(localDeviceID, device)
+	if !ok {
+		return topologyInspectionActorsAt(data, nil)
+	}
+	return inspectTopologyActorIdentity(data, "actor:"+actor.ActorID)
 }
 
 func inspectTopologyActorIdentity(data topologymodel.Data, identityKey string) topologyInspectionActorResult {
