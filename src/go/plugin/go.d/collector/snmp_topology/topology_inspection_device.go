@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"slices"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -165,15 +166,10 @@ func topologyInspectionActorHasIdentity(actor topologymodel.Actor, identityKey s
 	if identityKey == "" {
 		return false
 	}
-	if strings.HasPrefix(identityKey, "actor:") {
-		return strings.TrimSpace(actor.ActorID) == strings.TrimPrefix(identityKey, "actor:")
+	if after, ok := strings.CutPrefix(identityKey, "actor:"); ok {
+		return strings.TrimSpace(actor.ActorID) == after
 	}
-	for _, key := range topologymodel.MatchIdentityKeys(actor.Match) {
-		if key == identityKey {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(topologymodel.MatchIdentityKeys(actor.Match), identityKey)
 }
 
 func topologyInspectionPreferredActorIdentity(actor topologymodel.Actor) string {
