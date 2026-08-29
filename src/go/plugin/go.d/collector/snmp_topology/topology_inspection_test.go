@@ -236,12 +236,20 @@ func TestInspectTopologyLinkAmbiguousIdentityIsUndetermined(t *testing.T) {
 	for i := range data.Actors {
 		data.Actors[i].ActorHandle = allocator.Next()
 	}
-	data.Links = []topologymodel.Link{{
-		Protocol:       "lldp",
-		Direction:      "bidirectional",
-		SrcActorHandle: data.Actors[0].ActorHandle,
-		DstActorHandle: data.Actors[2].ActorHandle,
-	}}
+	data.Links = []topologymodel.Link{
+		{
+			Protocol:       "lldp",
+			Direction:      "bidirectional",
+			SrcActorHandle: data.Actors[0].ActorHandle,
+			DstActorHandle: data.Actors[2].ActorHandle,
+		},
+		{
+			Protocol:       "lldp",
+			Direction:      "bidirectional",
+			SrcActorHandle: data.Actors[1].ActorHandle,
+			DstActorHandle: data.Actors[2].ActorHandle,
+		},
+	}
 	subject := topologyInspectionLinkSubject{
 		srcIdentity: "ip:192.0.2.1",
 		dstIdentity: "ip:192.0.2.2",
@@ -253,6 +261,9 @@ func TestInspectTopologyLinkAmbiguousIdentityIsUndetermined(t *testing.T) {
 	got := inspectTopologyGraphLink(data, subject)
 	require.Equal(t, topologyInspectionUndetermined, got.membership.state)
 	require.Equal(t, 2, got.srcActors.membership.candidates)
+	require.Equal(t, 2, got.membership.candidates)
+	require.Equal(t, data.Links, got.links)
+	require.Equal(t, -1, got.index)
 }
 
 func TestInspectTopologyGraphLinkPreservesOrderedEndpointRoles(t *testing.T) {

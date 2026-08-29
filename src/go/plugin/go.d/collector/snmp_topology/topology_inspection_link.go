@@ -42,20 +42,22 @@ func inspectTopologyGraphLink(
 		dstActors: inspectTopologyActorIdentity(data, subject.dstIdentity),
 		index:     -1,
 	}
-	if result.srcActors.membership.state == topologyInspectionUndetermined ||
-		result.dstActors.membership.state == topologyInspectionUndetermined {
-		return result
-	}
 	if result.srcActors.membership.state == topologyInspectionAbsent ||
 		result.dstActors.membership.state == topologyInspectionAbsent {
 		result.membership.state = topologyInspectionAbsent
 		return result
 	}
 
-	srcHandle := result.srcActors.actors[0].ActorHandle
-	dstHandle := result.dstActors.actors[0].ActorHandle
+	srcHandles := make(map[topologymodel.ActorHandle]struct{}, len(result.srcActors.actors))
+	for _, actor := range result.srcActors.actors {
+		srcHandles[actor.ActorHandle] = struct{}{}
+	}
+	dstHandles := make(map[topologymodel.ActorHandle]struct{}, len(result.dstActors.actors))
+	for _, actor := range result.dstActors.actors {
+		dstHandles[actor.ActorHandle] = struct{}{}
+	}
 	for i := range data.Links {
-		if topologyInspectionLinkMatches(data.Links[i], srcHandle, dstHandle, subject) {
+		if topologyInspectionLinkMatches(data.Links[i], srcHandles, dstHandles, subject) {
 			result.links = append(result.links, data.Links[i])
 			if result.index == -1 {
 				result.index = i
@@ -63,6 +65,12 @@ func inspectTopologyGraphLink(
 		}
 	}
 	result.membership.candidates = len(result.links)
+	if result.srcActors.membership.state == topologyInspectionUndetermined ||
+		result.dstActors.membership.state == topologyInspectionUndetermined {
+		result.membership.state = topologyInspectionUndetermined
+		result.index = -1
+		return result
+	}
 	switch len(result.links) {
 	case 0:
 		result.membership.state = topologyInspectionAbsent
@@ -77,8 +85,8 @@ func inspectTopologyGraphLink(
 
 func topologyInspectionLinkMatches(
 	link topologymodel.Link,
-	srcHandle topologymodel.ActorHandle,
-	dstHandle topologymodel.ActorHandle,
+	srcHandles map[topologymodel.ActorHandle]struct{},
+	dstHandles map[topologymodel.ActorHandle]struct{},
 	subject topologyInspectionLinkSubject,
 ) bool {
 	if topologyInspectionLinkFamily(link) != subject.family ||
@@ -86,14 +94,17 @@ func topologyInspectionLinkMatches(
 		normalizeTopologyInspectionDirection(link.Direction) != subject.direction {
 		return false
 	}
-	if link.SrcActorHandle == srcHandle && link.DstActorHandle == dstHandle {
+	_, srcMatchesSrc := srcHandles[link.SrcActorHandle]
+	_, dstMatchesDst := dstHandles[link.DstActorHandle]
+	if srcMatchesSrc && dstMatchesDst {
 		return true
 	}
-	if topologyInspectionLinkSubjectUnordered(subject) &&
-		link.SrcActorHandle == dstHandle && link.DstActorHandle == srcHandle {
-		return true
+	if !topologyInspectionLinkSubjectUnordered(subject) {
+		return false
 	}
-	return false
+	_, srcMatchesDst := dstHandles[link.SrcActorHandle]
+	_, dstMatchesSrc := srcHandles[link.DstActorHandle]
+	return srcMatchesDst && dstMatchesSrc
 }
 
 func topologyInspectionLinkSubjectUnordered(subject topologyInspectionLinkSubject) bool {
