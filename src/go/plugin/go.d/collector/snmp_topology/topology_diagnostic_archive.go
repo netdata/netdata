@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 
@@ -24,34 +25,34 @@ const (
 
 	// The reader bounds admit the measured maximum live shapes while containing
 	// independent attachment, decompression, and typed-allocation risks.
-	topologyDiagnosticArchiveMaxCompressedBytes = 128 << 20
-	topologyDiagnosticArchiveMaxDecodedBytes    = 512 << 20
-	topologyDiagnosticArchiveMaxDecoderMemory   = 8 << 20
-	topologyDiagnosticArchiveMaxArrayElements   = 2 << 20
-	topologyDiagnosticArchiveMaxMapEntries      = 6 << 20
+	topologyDiagnosticArchiveMaxCompressedBytes      = 128 << 20
+	topologyDiagnosticArchiveMaxDecodedBytes         = 512 << 20
+	topologyDiagnosticArchiveMaxDecoderMemory        = 8 << 20
+	topologyDiagnosticArchiveMaxArrayAllocationBytes = 128 << 20
+	topologyDiagnosticArchiveMaxMapEntries           = 6 << 20
 )
 
 var (
-	errTopologyDiagnosticArchiveCompressedLimit = errors.New("SNMP topology diagnostic archive compressed-byte limit exceeded")
-	errTopologyDiagnosticArchiveDecodedLimit    = errors.New("SNMP topology diagnostic archive decoded-byte limit exceeded")
-	errTopologyDiagnosticArchiveArrayLimit      = errors.New("SNMP topology diagnostic archive array-element limit exceeded")
-	errTopologyDiagnosticArchiveMapLimit        = errors.New("SNMP topology diagnostic archive map-entry limit exceeded")
+	errTopologyDiagnosticArchiveCompressedLimit      = errors.New("SNMP topology diagnostic archive compressed-byte limit exceeded")
+	errTopologyDiagnosticArchiveDecodedLimit         = errors.New("SNMP topology diagnostic archive decoded-byte limit exceeded")
+	errTopologyDiagnosticArchiveArrayAllocationLimit = errors.New("SNMP topology diagnostic archive array-allocation limit exceeded")
+	errTopologyDiagnosticArchiveMapLimit             = errors.New("SNMP topology diagnostic archive map-entry limit exceeded")
 )
 
 type topologyDiagnosticArchiveLimits struct {
-	maxCompressedBytes int64
-	maxDecodedBytes    int64
-	maxDecoderMemory   uint64
-	maxArrayElements   uint64
-	maxMapEntries      uint64
+	maxCompressedBytes      int64
+	maxDecodedBytes         int64
+	maxDecoderMemory        uint64
+	maxArrayAllocationBytes uint64
+	maxMapEntries           uint64
 }
 
 var defaultTopologyDiagnosticArchiveLimits = topologyDiagnosticArchiveLimits{
-	maxCompressedBytes: topologyDiagnosticArchiveMaxCompressedBytes,
-	maxDecodedBytes:    topologyDiagnosticArchiveMaxDecodedBytes,
-	maxDecoderMemory:   topologyDiagnosticArchiveMaxDecoderMemory,
-	maxArrayElements:   topologyDiagnosticArchiveMaxArrayElements,
-	maxMapEntries:      topologyDiagnosticArchiveMaxMapEntries,
+	maxCompressedBytes:      topologyDiagnosticArchiveMaxCompressedBytes,
+	maxDecodedBytes:         topologyDiagnosticArchiveMaxDecodedBytes,
+	maxDecoderMemory:        topologyDiagnosticArchiveMaxDecoderMemory,
+	maxArrayAllocationBytes: topologyDiagnosticArchiveMaxArrayAllocationBytes,
+	maxMapEntries:           topologyDiagnosticArchiveMaxMapEntries,
 }
 
 var topologyDiagnosticArchiveJSONOptions = jsonv2.JoinOptions(
@@ -286,8 +287,8 @@ func consumeTopologyDiagnosticArchiveJSON(
 }
 
 type topologyDiagnosticArchiveCollectionCounts struct {
-	arrayElements uint64
-	mapEntries    uint64
+	arrayAllocationBytes uint64
+	mapEntries           uint64
 }
 
 type topologyDiagnosticArchiveContainerClass uint8
@@ -298,26 +299,38 @@ const (
 	topologyDiagnosticArchiveContainerMap
 )
 
-var topologyDiagnosticArchiveCollectionFields = map[string]topologyDiagnosticArchiveContainerClass{
-	"entries":             topologyDiagnosticArchiveContainerArray,
-	"devices":             topologyDiagnosticArchiveContainerArray,
-	"removed_devices":     topologyDiagnosticArchiveContainerArray,
-	"captures":            topologyDiagnosticArchiveContainerArray,
-	"roles":               topologyDiagnosticArchiveContainerArray,
-	"collection_contexts": topologyDiagnosticArchiveContainerArray,
-	"addresses":           topologyDiagnosticArchiveContainerArray,
-	"profiles":            topologyDiagnosticArchiveContainerArray,
-	"routes":              topologyDiagnosticArchiveContainerArray,
-	"metrics":             topologyDiagnosticArchiveContainerArray,
-	"bgp_rows":            topologyDiagnosticArchiveContainerArray,
-	"vnode_labels":        topologyDiagnosticArchiveContainerMap,
-	"metadata":            topologyDiagnosticArchiveContainerMap,
-	"tags":                topologyDiagnosticArchiveContainerMap,
+type topologyDiagnosticArchiveCollectionField struct {
+	class             topologyDiagnosticArchiveContainerClass
+	arrayElementBytes uint64
+}
+
+func topologyDiagnosticArchiveArrayField[T any]() topologyDiagnosticArchiveCollectionField {
+	return topologyDiagnosticArchiveCollectionField{
+		class:             topologyDiagnosticArchiveContainerArray,
+		arrayElementBytes: uint64(reflect.TypeFor[T]().Size()),
+	}
+}
+
+var topologyDiagnosticArchiveCollectionFields = map[string]topologyDiagnosticArchiveCollectionField{
+	"entries":             topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveLifecycleEntryV1](),
+	"devices":             topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveDeviceV1](),
+	"removed_devices":     topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveRemovedV1](),
+	"captures":            topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveCaptureV1](),
+	"roles":               topologyDiagnosticArchiveArrayField[string](),
+	"collection_contexts": topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveContextEvidenceV1](),
+	"addresses":           topologyDiagnosticArchiveArrayField[string](),
+	"profiles":            topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveProfileEvidenceV1](),
+	"routes":              topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveRouteV1](),
+	"metrics":             topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveMetricValueV1](),
+	"bgp_rows":            topologyDiagnosticArchiveArrayField[topologyDiagnosticArchiveBGPRowValueV1](),
+	"vnode_labels":        {class: topologyDiagnosticArchiveContainerMap},
+	"metadata":            {class: topologyDiagnosticArchiveContainerMap},
+	"tags":                {class: topologyDiagnosticArchiveContainerMap},
 }
 
 type topologyDiagnosticArchivePreflightFrame struct {
-	class        topologyDiagnosticArchiveContainerClass
-	pendingClass topologyDiagnosticArchiveContainerClass
+	field        topologyDiagnosticArchiveCollectionField
+	pendingField topologyDiagnosticArchiveCollectionField
 }
 
 func preflightTopologyDiagnosticArchiveJSON(
@@ -340,13 +353,14 @@ func preflightTopologyDiagnosticArchiveJSON(
 		} else if depth > 0 {
 			parent, index = decoder.StackIndex(depth)
 			frame := &frames[depth-1]
-			if frame.class == topologyDiagnosticArchiveContainerArray && next != jsontext.KindEndArray {
-				if counts.arrayElements >= limits.maxArrayElements {
-					return counts, errTopologyDiagnosticArchiveArrayLimit
+			if frame.field.class == topologyDiagnosticArchiveContainerArray && next != jsontext.KindEndArray {
+				if counts.arrayAllocationBytes > limits.maxArrayAllocationBytes ||
+					frame.field.arrayElementBytes > limits.maxArrayAllocationBytes-counts.arrayAllocationBytes {
+					return counts, errTopologyDiagnosticArchiveArrayAllocationLimit
 				}
-				counts.arrayElements++
+				counts.arrayAllocationBytes += frame.field.arrayElementBytes
 			}
-			if frame.class == topologyDiagnosticArchiveContainerMap && index%2 == 0 && next != jsontext.KindEndObject {
+			if frame.field.class == topologyDiagnosticArchiveContainerMap && index%2 == 0 && next != jsontext.KindEndObject {
 				if counts.mapEntries >= limits.maxMapEntries {
 					return counts, errTopologyDiagnosticArchiveMapLimit
 				}
@@ -364,35 +378,35 @@ func preflightTopologyDiagnosticArchiveJSON(
 
 		switch token.Kind() {
 		case jsontext.KindBeginArray, jsontext.KindBeginObject:
-			class := topologyDiagnosticArchiveContainerNone
+			field := topologyDiagnosticArchiveCollectionField{}
 			if depth > 0 && parent == jsontext.KindBeginObject && index%2 == 1 {
-				expected := frames[depth-1].pendingClass
-				if (token.Kind() == jsontext.KindBeginArray && expected == topologyDiagnosticArchiveContainerArray) ||
-					(token.Kind() == jsontext.KindBeginObject && expected == topologyDiagnosticArchiveContainerMap) {
-					class = expected
+				expected := frames[depth-1].pendingField
+				if (token.Kind() == jsontext.KindBeginArray && expected.class == topologyDiagnosticArchiveContainerArray) ||
+					(token.Kind() == jsontext.KindBeginObject && expected.class == topologyDiagnosticArchiveContainerMap) {
+					field = expected
 				}
 			}
-			frames = append(frames, topologyDiagnosticArchivePreflightFrame{class: class})
+			frames = append(frames, topologyDiagnosticArchivePreflightFrame{field: field})
 		case jsontext.KindEndArray, jsontext.KindEndObject:
 			frames = frames[:len(frames)-1]
 		case jsontext.KindString:
 			if depth > 0 && parent == jsontext.KindBeginObject && index%2 == 0 {
-				frames[depth-1].pendingClass = topologyDiagnosticArchiveCollectionFieldClass(token.String())
+				frames[depth-1].pendingField = topologyDiagnosticArchiveCollectionFieldDefinition(token.String())
 			}
 		}
 	}
 }
 
-func topologyDiagnosticArchiveCollectionFieldClass(name string) topologyDiagnosticArchiveContainerClass {
-	if class, ok := topologyDiagnosticArchiveCollectionFields[name]; ok {
-		return class
+func topologyDiagnosticArchiveCollectionFieldDefinition(fieldName string) topologyDiagnosticArchiveCollectionField {
+	if field, ok := topologyDiagnosticArchiveCollectionFields[fieldName]; ok {
+		return field
 	}
-	for field, class := range topologyDiagnosticArchiveCollectionFields {
-		if strings.EqualFold(name, field) {
-			return class
+	for candidate, field := range topologyDiagnosticArchiveCollectionFields {
+		if strings.EqualFold(fieldName, candidate) {
+			return field
 		}
 	}
-	return topologyDiagnosticArchiveContainerNone
+	return topologyDiagnosticArchiveCollectionField{}
 }
 
 func newTopologyDiagnosticArchiveDocumentV1(

@@ -722,14 +722,16 @@ live snapshot. Stable JSON v2 is used with explicit JSON v1 compatibility
 options and HTML escaping disabled, preserving archive-v1 field behavior.
 
 The reader buffers only bounded compressed input and opens two bounded zstd
-streams over it. The first JSON token pass totals elements across the DTO's
-array-valued fields and entries across its map-valued fields without constructing
-them. The second pass decodes one owned DTO. Compressed bytes, decoded bytes,
-zstd decoder memory/window, array elements, and map entries cover four resource
-classes before reconstruction. Unknown members remain accepted; a member whose
-name matches an allowlisted dynamic field is conservatively counted. There are
-no per-field limits, JSON-path schema, custom unmarshalers, or generic token,
-string, depth, record, logical-byte, canonical-order, or replay-work policy.
+streams over it. The first JSON token pass totals estimated slice backing across
+the DTO's array-valued fields and entries across its map-valued fields without
+constructing them. Array weights use the actual DTO element sizes, so compact
+wide elements cannot bypass the typed-allocation bound. The second pass decodes
+one owned DTO. Compressed bytes, decoded bytes, zstd decoder memory/window,
+estimated slice backing, and map entries cover four resource classes before
+reconstruction. Unknown members remain accepted; a member whose name matches an
+allowlisted dynamic field is conservatively counted. There are no per-field
+limits, JSON-path schema, custom unmarshalers, or generic token, string, depth,
+record, logical-byte, canonical-order, or replay-work policy.
 
 Reconstruction validates only the root format/version and the typed enum,
 capture-role/reference/generation, unique attempt-ordinal, registration,

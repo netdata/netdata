@@ -5,7 +5,9 @@ package snmptopology
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -241,10 +243,33 @@ func TestTopologyDiagnosticArchiveRejectsCompactArrayBeforeTypedDecode(t *testin
 		}
 	}`
 	limits := defaultTopologyDiagnosticArchiveLimits
-	limits.maxArrayElements = 64
+	limits.maxArrayAllocationBytes = 64 * uint64(reflect.TypeFor[topologyDiagnosticArchiveLifecycleEntryV1]().Size())
 
 	_, err := readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(compressArchiveJSON(t, raw)), limits)
-	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayLimit)
+	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayAllocationLimit)
+}
+
+func TestTopologyDiagnosticArchiveRejectsCompactWideArrayBeforeTypedDecode(t *testing.T) {
+	rowBytes := topologyDiagnosticArchiveCollectionFields["bgp_rows"].arrayElementBytes
+	require.NotZero(t, rowBytes)
+	rowCount := int(defaultTopologyDiagnosticArchiveLimits.maxArrayAllocationBytes/rowBytes) + 1
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newMixedL2L3ControlScenario())
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+	row := firstTopologyDiagnosticArchiveBGPRow(t, &document)
+	entry := fmt.Sprintf(`{"route_ordinal":%d,"kind":%q}`, row.RouteOrdinal, row.Kind)
+	raw := archiveDocumentJSON(t, document)
+	marker := `"bgp_rows":[`
+	start := strings.Index(raw, marker)
+	require.NotEqual(t, -1, start)
+	start += len(marker)
+	endOffset := strings.IndexByte(raw[start:], ']')
+	require.NotEqual(t, -1, endOffset)
+	rows := strings.Repeat(entry+",", rowCount)
+	raw = raw[:start] + rows[:len(rows)-1] + raw[start+endOffset:]
+
+	_, err = readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, raw)))
+	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayAllocationLimit)
 }
 
 func TestTopologyDiagnosticArchiveRejectsTrailingAndTruncatedContent(t *testing.T) {
@@ -292,9 +317,9 @@ func TestTopologyDiagnosticArchiveEnforcesOnlyTheFourReaderResourceBounds(t *tes
 	require.Contains(t, strings.ToLower(err.Error()), "window")
 
 	limits = defaultTopologyDiagnosticArchiveLimits
-	limits.maxArrayElements = 1
+	limits.maxArrayAllocationBytes = 1
 	_, err = readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(encoded), limits)
-	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayLimit)
+	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayAllocationLimit)
 
 	require.NotNil(t, document.Snapshot.Topology)
 	require.NotEmpty(t, document.Snapshot.Topology.Devices)
@@ -359,7 +384,7 @@ func TestTopologyDiagnosticArchiveWriterPreservesV1StringSemantics(t *testing.T)
 
 func TestTopologyDiagnosticArchiveCollectionClassifierCoversDTO(t *testing.T) {
 	root := reflect.TypeFor[topologyDiagnosticArchiveDocumentV1]()
-	discovered := make(map[string]topologyDiagnosticArchiveContainerClass)
+	discovered := make(map[string]topologyDiagnosticArchiveCollectionField)
 	visited := make(map[reflect.Type]bool)
 	var arrays int
 	var maps int
@@ -379,15 +404,20 @@ func TestTopologyDiagnosticArchiveCollectionClassifierCoversDTO(t *testing.T) {
 			switch field.Type.Kind() {
 			case reflect.Slice:
 				arrays++
-				require.Equal(t, topologyDiagnosticArchiveContainerArray,
-					topologyDiagnosticArchiveCollectionFieldClass(name), "%s.%s", value, field.Name)
-				discovered[name] = topologyDiagnosticArchiveContainerArray
+				expected := topologyDiagnosticArchiveCollectionField{
+					class:             topologyDiagnosticArchiveContainerArray,
+					arrayElementBytes: uint64(field.Type.Elem().Size()),
+				}
+				require.Equal(t, expected,
+					topologyDiagnosticArchiveCollectionFieldDefinition(name), "%s.%s", value, field.Name)
+				discovered[name] = expected
 				visit(field.Type.Elem())
 			case reflect.Map:
 				maps++
-				require.Equal(t, topologyDiagnosticArchiveContainerMap,
-					topologyDiagnosticArchiveCollectionFieldClass(name), "%s.%s", value, field.Name)
-				discovered[name] = topologyDiagnosticArchiveContainerMap
+				expected := topologyDiagnosticArchiveCollectionField{class: topologyDiagnosticArchiveContainerMap}
+				require.Equal(t, expected,
+					topologyDiagnosticArchiveCollectionFieldDefinition(name), "%s.%s", value, field.Name)
+				discovered[name] = expected
 				visit(field.Type.Elem())
 			default:
 				visit(field.Type)
@@ -399,8 +429,23 @@ func TestTopologyDiagnosticArchiveCollectionClassifierCoversDTO(t *testing.T) {
 	require.Equal(t, 11, arrays)
 	require.Equal(t, 5, maps)
 	require.Equal(t, topologyDiagnosticArchiveCollectionFields, discovered)
-	require.Equal(t, topologyDiagnosticArchiveContainerArray,
-		topologyDiagnosticArchiveCollectionFieldClass("EnTrIeS"))
+	require.Equal(t, topologyDiagnosticArchiveCollectionFields["entries"],
+		topologyDiagnosticArchiveCollectionFieldDefinition("EnTrIeS"))
+}
+
+func TestTopologyDiagnosticArchivePreflightCountsAllocationClassesTogether(t *testing.T) {
+	const raw = `{"entries":[{},{}],"tags":{"site":"lab","zone":"a"}}`
+	limits := defaultTopologyDiagnosticArchiveLimits
+	counts, err := preflightTopologyDiagnosticArchiveJSON(
+		jsontext.NewDecoder(strings.NewReader(raw), topologyDiagnosticArchiveJSONOptions),
+		limits,
+	)
+	require.NoError(t, err)
+	require.Equal(t,
+		2*uint64(reflect.TypeFor[topologyDiagnosticArchiveLifecycleEntryV1]().Size()),
+		counts.arrayAllocationBytes,
+	)
+	require.Equal(t, uint64(2), counts.mapEntries)
 }
 
 func TestTopologyDiagnosticArchiveEnumTablesAreCompleteAndRoundTrip(t *testing.T) {
@@ -459,11 +504,11 @@ func FuzzReadTopologyDiagnosticArchive(f *testing.F) {
 	f.Add(seed)
 	f.Fuzz(func(t *testing.T, input []byte) {
 		limits := topologyDiagnosticArchiveLimits{
-			maxCompressedBytes: 1 << 20,
-			maxDecodedBytes:    4 << 20,
-			maxDecoderMemory:   1 << 20,
-			maxArrayElements:   1 << 20,
-			maxMapEntries:      1 << 20,
+			maxCompressedBytes:      1 << 20,
+			maxDecodedBytes:         4 << 20,
+			maxDecoderMemory:        1 << 20,
+			maxArrayAllocationBytes: 1 << 20,
+			maxMapEntries:           1 << 20,
 		}
 		_, _ = readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(input), limits)
 	})

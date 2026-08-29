@@ -29,8 +29,8 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 		"maximum_records": func(tb testing.TB) topologyDiagnostics {
 			return benchmarkTopologyArchiveDiagnostics(tb, 3, 83_000, 8)
 		},
-		"maximum_array_elements": func(tb testing.TB) topologyDiagnostics {
-			return benchmarkTopologyArchiveArrayCardinality(tb, 249_999)
+		"maximum_array_allocation": func(tb testing.TB) topologyDiagnostics {
+			return benchmarkTopologyArchiveArrayAllocation(tb, 249_999)
 		},
 		"maximum_combined": func(tb testing.TB) topologyDiagnostics {
 			return benchmarkTopologyArchiveDiagnostics(tb, 3, 83_000, 215)
@@ -151,7 +151,7 @@ func topologyDiagnosticArchiveCollectionCountsForBenchmark(
 	tb.Helper()
 	var counts topologyDiagnosticArchiveCollectionCounts
 	limits := defaultTopologyDiagnosticArchiveLimits
-	limits.maxArrayElements = math.MaxUint64
+	limits.maxArrayAllocationBytes = math.MaxUint64
 	limits.maxMapEntries = math.MaxUint64
 	err := consumeTopologyDiagnosticArchiveJSON(encoded, limits, func(decoder *jsontext.Decoder) error {
 		var err error
@@ -173,7 +173,7 @@ func reportTopologyDiagnosticArchiveSize(
 	b.ReportMetric(float64(decodedBytes), "decoded_B")
 	b.ReportMetric(float64(compressedBytes), "compressed_B")
 	b.ReportMetric(float64(decodedBytes)/float64(compressedBytes), "compression_ratio")
-	b.ReportMetric(float64(counts.arrayElements), "array_elements")
+	b.ReportMetric(float64(counts.arrayAllocationBytes), "array_allocation_B")
 	b.ReportMetric(float64(counts.mapEntries), "map_entries")
 }
 
@@ -360,7 +360,7 @@ func benchmarkTopologyArchiveMapCardinality(tb testing.TB) topologyDiagnostics {
 	)
 }
 
-func benchmarkTopologyArchiveArrayCardinality(tb testing.TB, deviceCount int) topologyDiagnostics {
+func benchmarkTopologyArchiveArrayAllocation(tb testing.TB, deviceCount int) topologyDiagnostics {
 	tb.Helper()
 	const sequence = uint64(1)
 	devices := make([]topologySweepDeviceDiagnostic, 0, deviceCount)
