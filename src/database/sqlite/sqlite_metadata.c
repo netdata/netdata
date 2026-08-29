@@ -75,7 +75,20 @@ const char *database_config[] = {
     "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
     "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
     "info text, exec_code int, new_status real, old_status real, delay int, "
-    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text, "
+    "info_id int, summary_id int)",
+
+    // info and summary are a function of (alert config, chart labels) only - they are never
+    // interpolated with metric values - so every transition of the same alert on the same chart
+    // repeats the same two strings. On an 808-node parent that was 2.62 GB of literal repetition
+    // across 25.6M rows drawn from 3612 distinct values. health_log_detail now stores ids into
+    // this table instead, and the readers resolve them with COALESCE(t.text, hld.<col>) so rows
+    // written before the v19->v20 migration keep rendering from their inline text.
+    //
+    // Rows here are never deleted. The population is bounded by the distinct alert text ever
+    // observed (~3600 entries / ~360 KB on that parent), while finding orphans would mean
+    // scanning health_log_detail - far more expensive than the space it could reclaim.
+    SQL_CREATE_HEALTH_LOG_TEXT,
 
     "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
     "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",

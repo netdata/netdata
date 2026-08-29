@@ -248,13 +248,95 @@ done:
         SQLITE_FINALIZE(res);
 }
 
+// Interned alert text (health_log_text). info and summary depend only on the alert config and
+// the chart labels, so the same two strings repeat on every transition of an alert. Store an id
+// instead. The hit path is a single indexed lookup on a table small enough to stay resident
+// (~3600 rows on an 808-node parent); only a newly observed string writes.
+#define SQL_SELECT_HEALTH_LOG_TEXT_ID "SELECT id FROM health_log_text WHERE text = @text"
+
+#define SQL_INSERT_HEALTH_LOG_TEXT "INSERT OR IGNORE INTO health_log_text (text) VALUES (@text)"
+
+// Returns the interned id for txt, or 0 when there is nothing to intern (txt is NULL) or the
+// lookup/insert failed. On 0 the caller stores the text inline, exactly as before this change,
+// so a row is never left without its text - the readers COALESCE over both representations.
+static int64_t sql_health_text_id(STRING *txt)
+{
+    if (!txt)
+        return 0;
+
+    static __thread sqlite3_stmt *compiled_select = NULL;
+    static __thread sqlite3_stmt *compiled_insert = NULL;
+
+    sqlite3_stmt *select_res = NULL;
+    sqlite3_stmt *insert_res = NULL;
+
+    if (is_health_thread) {
+        if (!compiled_select && !PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_HEALTH_LOG_TEXT_ID, &compiled_select))
+            return 0;
+        select_res = compiled_select;
+    } else {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HEALTH_LOG_TEXT_ID, &select_res))
+            return 0;
+    }
+
+    int64_t id = 0;
+    int param = 0;
+
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(select_res, ++param, txt));
+
+    param = 0;
+    if (sqlite3_step_monitored(select_res) == SQLITE_ROW)
+        id = sqlite3_column_int64(select_res, 0);
+
+    if (id)
+        goto done;
+
+    // first time we see this string on this agent
+    if (is_health_thread) {
+        if (!compiled_insert && !PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_TEXT, &compiled_insert))
+            goto done;
+        insert_res = compiled_insert;
+    } else {
+        if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_TEXT, &insert_res))
+            goto done;
+    }
+
+    // OR IGNORE: another thread may have inserted the same text between the select and here
+    if (SQLITE3_BIND_STRING_OR_NULL(insert_res, 1, txt) == SQLITE_OK) {
+        if (sqlite3_step_monitored(insert_res) != SQLITE_DONE)
+            error_report("HEALTH: Failed to execute SQL_INSERT_HEALTH_LOG_TEXT");
+    } else
+        error_report("HEALTH: Failed to bind text for SQL_INSERT_HEALTH_LOG_TEXT");
+
+    if (is_health_thread)
+        SQLITE_RESET(insert_res);
+    else
+        SQLITE_FINALIZE(insert_res);
+
+    // re-read: covers both our own insert and a concurrent one that OR IGNORE skipped
+    SQLITE_RESET(select_res);
+    if (SQLITE3_BIND_STRING_OR_NULL(select_res, 1, txt) == SQLITE_OK &&
+        sqlite3_step_monitored(select_res) == SQLITE_ROW)
+        id = sqlite3_column_int64(select_res, 0);
+
+done:
+    REPORT_BIND_FAIL(select_res, param);
+    if (is_health_thread)
+        SQLITE_RESET(select_res);
+    else
+        SQLITE_FINALIZE(select_res);
+
+    return id;
+}
+
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                         \
     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, "                                    \
     "updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, "  \
-    "info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, summary) " \
+    "info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, summary, " \
+    "info_id, summary_id) "                                                                                                 \
     " VALUES (@health_log_id,@unique_id,@alarm_id,@alarm_event_id,@updated_by_id,@updates_id,@when_key,@duration,"           \
     "@non_clear_duration,@flags,@exec_run_timestamp,@delay_up_to_timestamp, @info,@exec_code,@new_status,@old_status,"       \
-    "@delay,@new_value,@old_value,@last_repeat,@transition_id,@global_id,@summary)"
+    "@delay,@new_value,@old_value,@last_repeat,@transition_id,@global_id,@summary,@info_id,@summary_id)"
 
 static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
 {
@@ -275,6 +357,10 @@ static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     int rc = SQLITE_ERROR;
     struct health_ae_mutable_fields f = health_ae_mutable_fields_get(ae);
 
+    // resolve the interned ids before binding; on failure (id 0) fall back to inline text
+    int64_t info_id = sql_health_text_id(ae->info);
+    int64_t summary_id = sql_health_text_id(ae->summary);
+
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->unique_id));
@@ -288,7 +374,7 @@ static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)f.flags));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)f.exec_run_timestamp));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->delay_up_to_timestamp));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->info));
+    SQLITE_BIND_FAIL(done, info_id ? sqlite3_bind_null(res, ++param) : SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->info));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, f.exec_code));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->new_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->old_status));
@@ -298,7 +384,9 @@ static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->last_repeat));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->global_id));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->summary));
+    SQLITE_BIND_FAIL(done, summary_id ? sqlite3_bind_null(res, ++param) : SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->summary));
+    SQLITE_BIND_FAIL(done, info_id ? sqlite3_bind_int64(res, ++param, info_id) : sqlite3_bind_null(res, ++param));
+    SQLITE_BIND_FAIL(done, summary_id ? sqlite3_bind_int64(res, ++param, summary_id) : sqlite3_bind_null(res, ++param));
 
     param = 0;
     rc = sqlite3_step_monitored(res);
@@ -555,13 +643,17 @@ done:
     return (param == 0 && rc == SQLITE_DONE);
 }
 
+// info/summary are copied from the row being closed, in whichever representation it used:
+// pre-v20 rows carry inline text, newer rows carry ids. Copy both columns verbatim rather than
+// re-resolving, so a removal event always renders exactly like the transition it closes.
 #define SQL_INJECT_REMOVED                                                                                                      \
     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, "  \
     "duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, " \
-    "delay, new_value, old_value, last_repeat, transition_id, global_id, summary) "                                             \
+    "delay, new_value, old_value, last_repeat, transition_id, global_id, summary, info_id, summary_id) "                        \
     "SELECT health_log_id, @max_unique_id, @alarm_id, @alarm_event_id, 0, @unique_id, UNIXEPOCH(), 0, 0, flags, "               \
     " exec_run_timestamp, UNIXEPOCH(), info, exec_code, -2, "                                                                   \
-    " new_status, delay, NULL, new_value, 0, @transition_id, NOW_USEC(0), summary FROM health_log_detail "                      \
+    " new_status, delay, NULL, new_value, 0, @transition_id, NOW_USEC(0), summary, info_id, summary_id "                        \
+    " FROM health_log_detail "                                                                                                 \
     " WHERE unique_id = @unique_id AND transition_id = @last_transition_id RETURNING health_log_id, old_status"
 
 static void sql_inject_removed_status(
@@ -810,9 +902,11 @@ void sql_alert_cleanup(bool cli)
     "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, "                   \
     "hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, "          \
     "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.exec, hl.recipient, ah.source, hl.units, "                       \
-    "hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, "               \
+    "COALESCE(ti.text, hld.info), hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, " \
     "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, "           \
-    "hl.chart_name, hld.summary FROM health_log hl, alert_hash ah, health_log_detail hld "                             \
+    "hl.chart_name, COALESCE(ts.text, hld.summary) FROM health_log hl, alert_hash ah, health_log_detail hld "          \
+    "LEFT JOIN health_log_text ti ON ti.id = hld.info_id "                                                             \
+    "LEFT JOIN health_log_text ts ON ts.id = hld.summary_id "                                                          \
     "WHERE hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id"
 
 void sql_health_alarm_log_load(RRDHOST *host)
@@ -1169,9 +1263,13 @@ done:
      "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, hld.updates_id, "  \
      "hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, "                         \
      "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.exec, hl.recipient, ah.source, "                                \
-     "hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, "    \
-     "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.summary "             \
-     "FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and "              \
+     "hl.units, COALESCE(ti.text, hld.info), hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, " \
+     "hld.old_value, hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, "          \
+     "COALESCE(ts.text, hld.summary) "                                                                                 \
+     "FROM health_log hl, alert_hash ah, health_log_detail hld "                                                       \
+     "LEFT JOIN health_log_text ti ON ti.id = hld.info_id "                                                            \
+     "LEFT JOIN health_log_text ts ON ts.id = hld.summary_id "                                                          \
+     "WHERE hl.config_hash_id = ah.hash_id and "                                                                       \
      "hl.health_log_id = hld.health_log_id and hl.host_id = @host_id AND hld.unique_id > @after "
 
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const char *chart)
@@ -1566,19 +1664,25 @@ done:
 #define SQL_SEARCH_ALERT_TRANSITION_SELECT                                                                                    \
     "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.chart_name, h.family, h.recipient, h.units, h.exec, " \
     "h.chart_context,  d.when_key, d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, "                      \
-    "d.info, d.exec_code, d.new_status, d.old_status, d.delay, d.new_value, d.old_value, d.last_repeat, "                     \
-    "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp, d.summary"
+    "COALESCE(ti.text, d.info), d.exec_code, d.new_status, d.old_status, d.delay, d.new_value, d.old_value, d.last_repeat, " \
+    "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp, COALESCE(ts.text, d.summary)"
 
 #define SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE "h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id"
+
+#define SQL_SEARCH_ALERT_TRANSITION_TEXT_JOIN                                                                          \
+    " LEFT JOIN health_log_text ti ON ti.id = d.info_id "                                                              \
+    " LEFT JOIN health_log_text ts ON ts.id = d.summary_id "
 
 #define SQL_SEARCH_ALERT_TRANSITION                                                                                    \
     SQL_SEARCH_ALERT_TRANSITION_SELECT                                                                                 \
         " FROM health_log h, health_log_detail d, v_%p t, alert_hash ah "                                              \
+        SQL_SEARCH_ALERT_TRANSITION_TEXT_JOIN                                                                          \
         " WHERE h.host_id = t.host_id AND " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE                                   \
         " AND ( d.new_status > 2 OR d.old_status > 2 ) AND d.global_id BETWEEN @after AND @before "
 
 #define SQL_SEARCH_ALERT_TRANSITION_DIRECT                                                                             \
     SQL_SEARCH_ALERT_TRANSITION_SELECT " FROM health_log h, health_log_detail d, alert_hash ah "                       \
+                                       SQL_SEARCH_ALERT_TRANSITION_TEXT_JOIN                                           \
                                        " WHERE " SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE                              \
                                        " AND transition_id = @transition "
 
@@ -2126,5 +2230,250 @@ cleanup:
 
     sql_close_database(db_meta, "META-UNITTEST");
     db_meta = saved_db_meta;
+    return failed;
+}
+
+// health_log and health_log_detail as created before info/summary were interned
+#define SQL_CREATE_HEALTH_LOG_V19                                                                                      \
+    "CREATE TABLE health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "                         \
+    "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "                 \
+    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))"
+
+#define SQL_CREATE_HEALTH_LOG_DETAIL_V19                                                                               \
+    "CREATE TABLE health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "             \
+    "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "                          \
+    "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "                                                   \
+    "info text, exec_code int, new_status real, old_status real, delay int, "                                          \
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)"
+
+// blob literals: every byte of the host id is 0x11, of the config hash 0x22, of the pre-upgrade transition 0x33
+#define UT_HEX16(b) "x'" b b b b b b b b b b b b b b b b "'"
+
+#define SQL_HEALTH_TEXT_FIXTURE                                                                                        \
+    "INSERT INTO alert_hash (hash_id, source) VALUES (" UT_HEX16("22") ", 'unittest');"                                \
+    "INSERT INTO health_log (health_log_id, host_id, alarm_id, config_hash_id, name, chart, last_transition_id) "     \
+    " VALUES (1, " UT_HEX16("11") ", 7, " UT_HEX16("22") ", 'unittest', 'chart', " UT_HEX16("33") ");"                 \
+    "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, when_key, info, new_status, "  \
+    " old_status, transition_id, global_id, summary) "                                                                 \
+    " VALUES (1, 100, 7, 1, 1000, 'old info', 3, 0, " UT_HEX16("33") ", 1, 'old summary');"
+
+static void health_text_unittest_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+    (void)argc;
+    (void)argv;
+    sqlite3_result_int64(context, (sqlite3_int64)now_realtime_usec());
+}
+
+static int64_t health_text_unittest_count(const char *sql)
+{
+    sqlite3_stmt *res = NULL;
+    int64_t value = -1;
+
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
+        return -1;
+
+    if (sqlite3_step_monitored(res) == SQLITE_ROW)
+        value = sqlite3_column_int64(res, 0);
+
+    SQLITE_FINALIZE(res);
+    return value;
+}
+
+static bool health_text_unittest_inject_removed(uint32_t unique_id, uint32_t max_unique_id, uint8_t last, uint8_t next)
+{
+    sqlite3_stmt *res = NULL;
+    nd_uuid_t last_transition, transition;
+    memset(last_transition, last, sizeof(last_transition));
+    memset(transition, next, sizeof(transition));
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_INJECT_REMOVED, &res))
+        return false;
+
+    int rows = 0;
+    if (sqlite3_bind_int64(res, 1, max_unique_id) == SQLITE_OK && sqlite3_bind_int64(res, 2, 7) == SQLITE_OK &&
+        sqlite3_bind_int64(res, 3, 9) == SQLITE_OK && sqlite3_bind_int64(res, 4, unique_id) == SQLITE_OK &&
+        sqlite3_bind_blob(res, 5, &transition, sizeof(transition), SQLITE_STATIC) == SQLITE_OK &&
+        sqlite3_bind_blob(res, 6, &last_transition, sizeof(last_transition), SQLITE_STATIC) == SQLITE_OK) {
+        while (sqlite3_step_monitored(res) == SQLITE_ROW)
+            rows++;
+    }
+
+    SQLITE_FINALIZE(res);
+    return rows == 1;
+}
+
+static bool health_text_unittest_same(const char *expected, const unsigned char *actual)
+{
+    if (!expected || !actual)
+        return !expected && !actual;
+    return strcmp(expected, (const char *)actual) == 0;
+}
+
+int sql_health_text_unittest(void)
+{
+    sqlite3 *saved_db_meta = db_meta;
+    int failed = 0;
+    RRDHOST *host = callocz(1, sizeof(*host));
+    STRING *text_a = string_strdupz("interned info");
+    STRING *text_b = string_strdupz("interned summary");
+    sqlite3_stmt *res = NULL;
+
+    db_meta = NULL;
+    if (sqlite3_open(":memory:", &db_meta) != SQLITE_OK) {
+        fprintf(stderr, "FAILED [health log text interning]: cannot open an in-memory database\n");
+        if (db_meta)
+            sqlite3_close(db_meta);
+        db_meta = saved_db_meta;
+        failed = 1;
+        goto release;
+    }
+
+    fprintf(stderr, "\nStarting health log text interning unit tests\n");
+    fprintf(stderr, "===================================================\n\n");
+
+    // an agent upgraded from before interning, holding one transition with its text inline
+    if (db_execute(db_meta, SQL_CREATE_ALERT_HASH_V18, NULL) || db_execute(db_meta, SQL_CREATE_HEALTH_LOG_V19, NULL) ||
+        db_execute(db_meta, SQL_CREATE_HEALTH_LOG_DETAIL_V19, NULL) ||
+        db_execute(db_meta, SQL_HEALTH_TEXT_FIXTURE, NULL) || db_execute(db_meta, "PRAGMA user_version = 18", NULL) ||
+        sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, health_text_unittest_now_usec, 0, 0) != SQLITE_OK) {
+        fprintf(stderr, "FAILED [health log text interning]: cannot build the pre-upgrade schema\n");
+        failed++;
+        goto cleanup;
+    }
+
+    if (perform_database_migration(db_meta, DB_METADATA_VERSION) != DB_METADATA_VERSION ||
+        health_text_unittest_count("SELECT COUNT(*) FROM pragma_table_info('health_log_detail')"
+                                   " WHERE name IN ('info_id', 'summary_id')") != 2) {
+        fprintf(stderr, "FAILED [upgrade adds the interned text columns]\n");
+        failed++;
+        goto cleanup;
+    }
+
+    // created by database_config[], which runs after the migrations
+    if (db_execute(db_meta, SQL_CREATE_HEALTH_LOG_TEXT, NULL)) {
+        fprintf(stderr, "FAILED [health log text interning]: cannot create health_log_text\n");
+        failed++;
+        goto cleanup;
+    }
+
+    int64_t id_a = sql_health_text_id(text_a);
+    int64_t id_a_again = sql_health_text_id(text_a);
+    int64_t id_b = sql_health_text_id(text_b);
+    if (id_a <= 0 || id_a_again != id_a || id_b <= 0 || id_b == id_a || sql_health_text_id(NULL) != 0 ||
+        health_text_unittest_count("SELECT COUNT(*) FROM health_log_text") != 2) {
+        fprintf(stderr, "FAILED [each distinct text is stored once]: ids %"PRId64", %"PRId64", %"PRId64"\n",
+                id_a, id_a_again, id_b);
+        failed++;
+    }
+
+    // two transitions saved after the upgrade: one with both texts, one without a summary
+    ALARM_ENTRY ae = { 0 };
+    ae.alarm_id = 7;
+    ae.info = text_a;
+    ae.new_status = RRDCALC_STATUS_WARNING;
+
+    ae.unique_id = 101;
+    ae.alarm_event_id = 2;
+    ae.summary = text_b;
+    memset(ae.transition_id, 0x44, sizeof(ae.transition_id));
+    bool saved = sql_health_alarm_log_insert_detail(host, 1, &ae);
+
+    ae.unique_id = 102;
+    ae.alarm_event_id = 3;
+    ae.summary = NULL;
+    memset(ae.transition_id, 0x55, sizeof(ae.transition_id));
+    saved = sql_health_alarm_log_insert_detail(host, 1, &ae) && saved;
+
+    if (!saved ||
+        health_text_unittest_count(
+            "SELECT COUNT(*) FROM health_log_detail WHERE unique_id IN (101, 102) AND info IS NULL AND summary IS NULL"
+            " AND info_id IS NOT NULL AND (summary_id IS NOT NULL) = (unique_id = 101)") != 2) {
+        fprintf(stderr, "FAILED [new transitions store ids, not text]\n");
+        failed++;
+    }
+
+    // removal events copy the text of the transition they close, in either representation
+    if (!health_text_unittest_inject_removed(100, 200, 0x33, 0x66) ||
+        !health_text_unittest_inject_removed(101, 201, 0x44, 0x77)) {
+        fprintf(stderr, "FAILED [a removal event is injected for each transition]\n");
+        failed++;
+    }
+
+    static const struct {
+        int64_t unique_id;
+        const char *info;
+        const char *summary;
+    } expected[] = {
+        { 100, "old info", "old summary" },
+        { 101, "interned info", "interned summary" },
+        { 102, "interned info", NULL },
+        { 200, "old info", "old summary" },
+        { 201, "interned info", "interned summary" },
+    };
+    size_t expected_rows = sizeof(expected) / sizeof(expected[0]);
+
+    // the health log the way sql_health_alarm_log2json() reads it
+    nd_uuid_t host_id;
+    memset(host_id, 0x11, sizeof(host_id));
+    size_t rows = 0;
+    if (PREPARE_STATEMENT(db_meta, SQL_SELECT_HEALTH_LOG " ORDER BY hld.unique_id", &res) &&
+        sqlite3_bind_blob(res, 1, &host_id, sizeof(host_id), SQLITE_STATIC) == SQLITE_OK &&
+        sqlite3_bind_int64(res, 2, 0) == SQLITE_OK) {
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+            int64_t unique_id = sqlite3_column_int64(res, 0);
+            const unsigned char *info = sqlite3_column_text(res, 18);
+            const unsigned char *summary = sqlite3_column_text(res, 31);
+            if (rows >= expected_rows || unique_id != expected[rows].unique_id ||
+                !health_text_unittest_same(expected[rows].info, info) ||
+                !health_text_unittest_same(expected[rows].summary, summary)) {
+                fprintf(stderr, "FAILED [health log renders the text]: row %zu unique_id %"PRId64" info '%s' summary '%s'\n",
+                        rows, unique_id, info ? (const char *)info : "(null)", summary ? (const char *)summary : "(null)");
+                failed++;
+            }
+            rows++;
+        }
+    }
+    SQLITE_FINALIZE(res);
+    if (rows != expected_rows) {
+        fprintf(stderr, "FAILED [health log renders every transition]: %zu rows, want %zu\n", rows, expected_rows);
+        failed++;
+    }
+
+    // and one transition the way the alert_transitions Function looks it up
+    static const struct {
+        uint8_t transition;
+        const char *info;
+        const char *summary;
+    } direct[] = {
+        { 0x33, "old info", "old summary" },
+        { 0x44, "interned info", "interned summary" },
+    };
+    for (size_t i = 0; i < sizeof(direct) / sizeof(direct[0]); i++) {
+        nd_uuid_t transition;
+        memset(transition, direct[i].transition, sizeof(transition));
+        bool found = false;
+        if (PREPARE_STATEMENT(db_meta, SQL_SEARCH_ALERT_TRANSITION_DIRECT, &res) &&
+            sqlite3_bind_blob(res, 1, &transition, sizeof(transition), SQLITE_STATIC) == SQLITE_OK &&
+            sqlite3_step_monitored(res) == SQLITE_ROW)
+            found = health_text_unittest_same(direct[i].info, sqlite3_column_text(res, 16)) &&
+                    health_text_unittest_same(direct[i].summary, sqlite3_column_text(res, 30));
+        SQLITE_FINALIZE(res);
+        if (!found) {
+            fprintf(stderr, "FAILED [alert transition renders the text]: transition 0x%02x\n", direct[i].transition);
+            failed++;
+        }
+    }
+
+cleanup:
+    fprintf(stderr, "\n===================================================\n");
+    fprintf(stderr, "Health log text interning tests: %s\n\n", failed ? "FAILED" : "passed");
+
+    sql_close_database(db_meta, "META-UNITTEST");
+    db_meta = saved_db_meta;
+
+release:
+    string_freez(text_a);
+    string_freez(text_b);
+    freez(host);
     return failed;
 }

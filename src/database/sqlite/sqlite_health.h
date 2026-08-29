@@ -42,4 +42,5 @@ bool sql_find_alert_transition(const char *transition, void (*cb)(const char *ma
 void sql_alert_cleanup(bool cli);
 
 int sql_alert_config_unittest(void);
+int sql_health_text_unittest(void);
 #endif //NETDATA_SQLITE_HEALTH_H

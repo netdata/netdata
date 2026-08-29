@@ -186,6 +186,11 @@ const char *database_migrate_v18_v19[] = {
     NULL
 };
 
+const char *database_migrate_v19_v20[] = {
+    "ALTER TABLE health_log_detail ADD info_id INT",
+    "ALTER TABLE health_log_detail ADD summary_id INT",
+    NULL
+};
 
 static int do_migration_v1_v2(sqlite3 *database)
 {
@@ -462,6 +467,20 @@ static int do_migration_v18_v19(sqlite3 *database)
     return 0;
 }
 
+// health_log_detail.info / .summary move to ids into health_log_text (created by
+// database_config[], which runs after the migrations). Only the columns are added here:
+// ALTER TABLE ADD COLUMN is metadata-only, so this stays O(1) even on the 25M-row tables
+// seen on large parents. Existing rows keep their inline text and are resolved by the
+// readers with COALESCE(t.text, hld.<col>) until retention removes them.
+static int do_migration_v19_v20(sqlite3 *database)
+{
+    if (table_exists_in_database(database, "health_log_detail") &&
+        !column_exists_in_table(database, "health_log_detail", "info_id"))
+        return init_database_batch(database, &database_migrate_v19_v20[0], "meta_migrate");
+
+    return 0;
+}
+
 
 static int do_migration_v12_v13(sqlite3 *database)
 {
@@ -564,6 +583,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v16 to v17",  .func = do_migration_v16_v17},
     {.name = "v17 to v18",  .func = do_migration_v17_v18},
     {.name = "v18 to v19",  .func = do_migration_v18_v19},
+    {.name = "v19 to v20",  .func = do_migration_v19_v20},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

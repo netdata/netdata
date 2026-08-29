@@ -7,7 +7,10 @@
 #include "sqlite_functions.h"
 
 // the schema version an agent migrates its metadata database to on startup
-#define DB_METADATA_VERSION 19
+#define DB_METADATA_VERSION 20
+
+// interned health_log_detail info/summary text (see database_config[])
+#define SQL_CREATE_HEALTH_LOG_TEXT "CREATE TABLE IF NOT EXISTS health_log_text (id INTEGER PRIMARY KEY, text TEXT NOT NULL UNIQUE)"
 
 typedef enum event_log_type {
     EVENT_AGENT_START_TIME  = 1,
