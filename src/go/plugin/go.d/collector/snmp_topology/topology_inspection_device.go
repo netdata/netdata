@@ -14,12 +14,15 @@ func inspectTopologyLifecycleRegistration(
 	cut topologyJobLifecycleDiagnosticCut,
 	registrationID ddsnmp.DeviceRegistrationID,
 ) topologyInspectionLifecycleResult {
-	result := topologyInspectionLifecycleResult{captureState: cut.state, captureReason: cut.reason}
+	result := topologyInspectionLifecycleResult{
+		captureState:  cut.state,
+		captureReason: cut.reason,
+		sequence:      cut.cut.Sequence,
+		capturedAt:    cut.cut.CapturedAt,
+	}
 	if cut.state != diagnosticCaptureAvailable {
 		return result
 	}
-	result.sequence = cut.cut.Sequence
-	result.capturedAt = cut.cut.CapturedAt
 	for i := range cut.cut.Entries {
 		if cut.cut.Entries[i].RegistrationID == registrationID {
 			result.membership = topologyInspectionStage{state: topologyInspectionPresent, candidates: 1}

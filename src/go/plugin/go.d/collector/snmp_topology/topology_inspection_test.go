@@ -74,6 +74,26 @@ func TestInspectTopologyDeviceKeepsIncompleteCutsUndetermined(t *testing.T) {
 	require.Equal(t, topologyInspectionUndetermined, report.typedIdentity.state)
 }
 
+func TestInspectTopologyDevicePreservesLimitedLifecycleCutIdentity(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.RegisterJob("job-b", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.20"})
+	registrationID := store.LifecycleCut().Entries[0].RegistrationID
+	coll.diagnosticGlobalLimits = topologyAcquisitionLimits{maxRecords: 2, maxLogicalBytes: 1 << 20}
+	diagnostics := coll.acquireTopologyDiagnostics()
+	require.Equal(t, diagnosticCaptureLimitExceeded, diagnostics.lifecycle.state)
+	require.NotZero(t, diagnostics.lifecycle.cut.Sequence)
+	require.False(t, diagnostics.lifecycle.cut.CapturedAt.IsZero())
+
+	report, err := inspectTopologyDevice(diagnostics, newLLDPDirectScenario().opts, registrationID)
+	require.NoError(t, err)
+	require.Equal(t, topologyInspectionUndetermined, report.lifecycle.membership.state)
+	require.Equal(t, diagnosticCaptureLimitExceeded, report.lifecycle.captureState)
+	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, report.lifecycle.captureReason)
+	require.Equal(t, diagnostics.lifecycle.cut.Sequence, report.lifecycle.sequence)
+	require.Equal(t, diagnostics.lifecycle.cut.CapturedAt, report.lifecycle.capturedAt)
+}
+
 func TestInspectTopologyDeviceDoesNotFlattenWholeGraphReplayFailure(t *testing.T) {
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
