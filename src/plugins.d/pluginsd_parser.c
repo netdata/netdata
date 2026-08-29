@@ -948,6 +948,9 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     else
         wall_clock_time = (time_t) str2ull_encoded(wall_clock_time_str);
 
+    if (unlikely(!pluginsd_begin_v2_times_valid(end_time, wall_clock_time, &wall_clock_time)))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_BEGIN_V2, "invalid end_time");
+
     if (unlikely(update_every != st->update_every)) {
         rrdset_set_update_every_s(st, update_every);
         update_every = st->update_every;
