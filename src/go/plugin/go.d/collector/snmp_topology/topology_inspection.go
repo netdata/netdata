@@ -83,32 +83,12 @@ type topologyDeviceInspection struct {
 	lastAborted     *topologyAbortedSweepDiagnostic
 }
 
-type topologyInspectionLinkDiscriminator struct {
-	srcIfIndex int
-	srcIfName  string
-	srcPortID  string
-	dstIfIndex int
-	dstIfName  string
-	dstPortID  string
-
-	bridgeDomain string
-	subnet       string
-	prefix       int
-
-	ospfRouterA   string
-	ospfRouterB   string
-	ospfAdjacency string
-
-	bgpRoutingInstance string
-}
-
 type topologyInspectionLinkSubject struct {
-	srcIdentity   string
-	dstIdentity   string
-	family        string
-	protocol      string
-	direction     string
-	discriminator topologyInspectionLinkDiscriminator
+	srcIdentity string
+	dstIdentity string
+	family      string
+	protocol    string
+	direction   string
 }
 
 type topologyInspectionSourceFact struct {
@@ -119,10 +99,19 @@ type topologyInspectionSourceFact struct {
 	bgp            *topologyAcquisitionBGPRowValue
 }
 
+type topologyInspectionSourceCaptureContext struct {
+	latestAttempt   bool
+	retainedSuccess bool
+	capture         topologyInspectionCaptureResult
+	facts           []topologyInspectionSourceFact
+}
+
 type topologyInspectionSourceContext struct {
-	registrationID ddsnmp.DeviceRegistrationID
-	capture        topologyInspectionCaptureResult
-	facts          []topologyInspectionSourceFact
+	registrationID  ddsnmp.DeviceRegistrationID
+	latestAttempt   topologyInspectionCaptureResult
+	retainedSuccess topologyInspectionCaptureResult
+	sameAttempt     bool
+	captures        []topologyInspectionSourceCaptureContext
 }
 
 type topologyInspectionSourceResult struct {

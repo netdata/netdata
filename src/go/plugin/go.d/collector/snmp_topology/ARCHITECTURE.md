@@ -660,14 +660,20 @@ claimed to be the registration itself or proof that one registration caused a
 collapsed actor.
 
 Link inspection resolves both endpoints through exact normalized actor identity
-keys, then matches the existing link family, protocol, direction, and
-family-specific structural fields. Endpoint reversal is accepted for
-bidirectional links and unordered direct L3/OSPF/BGP adjacencies; ordered STP
-and subnet-membership roles remain exact. Zero matches is `absent` only after
-the relevant stage completed, one is `present`, and multiple actor or link
-matches is `undetermined`. Retained acquisition rows are reported only as candidate
-family context across registrations, with each retained capture's availability
-kept explicit. They are not matched to the exact structural subject, do not
+keys, then matches the existing link family, protocol, and direction. These
+fields define a candidate subject rather than a unique link identity; the full
+matching graph rows retain interface, subnet, adjacency, routing-instance, and
+other parallel-link details. Endpoint reversal is accepted for bidirectional
+links and unordered direct L3/OSPF/BGP adjacencies; ordered STP and
+subnet-membership roles remain exact. Zero matches is `absent` only after the
+relevant stage completed, one is `present`, and multiple actor or link matches
+is `undetermined` with every candidate returned.
+
+Source facts are reported only as family-wide context across registrations.
+Each registration exposes independent `latestAttempt` and `retainedSuccess`
+branches and records whether they alias. Facts are attached once per distinct
+capture, so an aliased capture is not duplicated. Capture availability remains
+explicit. Source facts are not matched to the exact candidate subject, do not
 produce a source membership result, and are not causal provenance.
 
 One inspection invocation replays each selected retained capture at most once,

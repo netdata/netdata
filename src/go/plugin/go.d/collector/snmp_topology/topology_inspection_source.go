@@ -16,11 +16,36 @@ func inspectTopologyLinkSourceContext(
 	}
 	for i := range devices {
 		device := &devices[i]
-		result.contexts = append(result.contexts, topologyInspectionSourceContext{
-			registrationID: device.registrationID,
-			capture:        inspectTopologyCapture(device.capture),
-			facts:          topologyInspectionCaptureFacts(device.registrationID, device.capture, family),
-		})
+		context := topologyInspectionSourceContext{
+			registrationID:  device.registrationID,
+			latestAttempt:   inspectTopologyCapture(device.latestAttempt),
+			retainedSuccess: inspectTopologyCapture(device.retainedSuccess),
+			sameAttempt:     device.latestAttempt != nil && device.latestAttempt == device.retainedSuccess,
+		}
+		if device.latestAttempt != nil {
+			context.captures = append(context.captures, topologyInspectionSourceCaptureContext{
+				latestAttempt:   true,
+				retainedSuccess: context.sameAttempt,
+				capture:         context.latestAttempt,
+				facts: topologyInspectionCaptureFacts(
+					device.registrationID,
+					device.latestAttempt,
+					family,
+				),
+			})
+		}
+		if device.retainedSuccess != nil && !context.sameAttempt {
+			context.captures = append(context.captures, topologyInspectionSourceCaptureContext{
+				retainedSuccess: true,
+				capture:         context.retainedSuccess,
+				facts: topologyInspectionCaptureFacts(
+					device.registrationID,
+					device.retainedSuccess,
+					family,
+				),
+			})
+		}
+		result.contexts = append(result.contexts, context)
 	}
 	return result
 }

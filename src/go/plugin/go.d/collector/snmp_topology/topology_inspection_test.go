@@ -189,7 +189,7 @@ func TestInspectTopologyActorIdentityRequiresOneMatch(t *testing.T) {
 	require.Len(t, got.actors, 2)
 }
 
-func TestInspectTopologyLinkUsesStructuralSubjectAndSingleRenderedRow(t *testing.T) {
+func TestInspectTopologyLinkUsesCandidateSubjectAndSingleRenderedRow(t *testing.T) {
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
 
@@ -211,13 +211,12 @@ func TestInspectTopologyLinkUsesStructuralSubjectAndSingleRenderedRow(t *testing
 
 	reversed := subject
 	reversed.srcIdentity, reversed.dstIdentity = reversed.dstIdentity, reversed.srcIdentity
-	reversed.discriminator = topologyInspectionSwapLinkDiscriminator(reversed.discriminator)
 	report, err = inspectTopologyLink(diagnostics, scenario.opts, reversed)
 	require.NoError(t, err)
 	require.Equal(t, topologyInspectionPresent, report.graphLink.membership.state)
 	require.Equal(t, topologyInspectionPresent, report.typedLink.state)
 
-	subject.discriminator.srcPortID = "missing-port"
+	subject.dstIdentity = "ip:192.0.2.254"
 	report, err = inspectTopologyLink(diagnostics, scenario.opts, subject)
 	require.NoError(t, err)
 	require.Equal(t, sourceContext, report.source)
@@ -291,7 +290,6 @@ func TestInspectTopologyGraphLinkPreservesOrderedEndpointRoles(t *testing.T) {
 			require.NotEmpty(t, subject.family)
 
 			subject.srcIdentity, subject.dstIdentity = subject.dstIdentity, subject.srcIdentity
-			subject.discriminator = topologyInspectionSwapLinkDiscriminator(subject.discriminator)
 			match := inspectTopologyGraphLink(replay.data, subject)
 			require.Equal(t, topologyInspectionAbsent, match.membership.state)
 		})
@@ -328,13 +326,33 @@ func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability
 		}
 	}
 	require.NotZero(t, unrelatedRegistrationID)
+	var retained *topologyAcquisitionCapture
+	var latest *topologyAcquisitionCapture
+	for i := range diagnostics.topology.devices {
+		device := &diagnostics.topology.devices[i]
+		if device.registrationID != unrelatedRegistrationID {
+			continue
+		}
+		retained = device.acquisition
+		latest = &topologyAcquisitionCapture{
+			attemptID: topologyAcquisitionAttemptID{registrationID: unrelatedRegistrationID, ordinal: 2},
+			state:     diagnosticCaptureUnavailable,
+			reason:    diagnosticCaptureReasonProjectionError,
+		}
+		device.latestAttempt = latest
+		break
+	}
+	require.NotNil(t, retained)
+	require.NotNil(t, latest)
 
+	unavailableCapture := &topologyAcquisitionCapture{
+		state:  diagnosticCaptureUnavailable,
+		reason: diagnosticCaptureReasonProjectionError,
+	}
 	diagnostics.topology.devices = append(diagnostics.topology.devices, topologySweepDeviceDiagnostic{
 		registrationID: 99,
-		acquisition: &topologyAcquisitionCapture{
-			state:  diagnosticCaptureUnavailable,
-			reason: diagnosticCaptureReasonProjectionError,
-		},
+		acquisition:    unavailableCapture,
+		latestAttempt:  unavailableCapture,
 	})
 	report, err := inspectTopologyLink(diagnostics, scenario.opts, subject)
 	require.NoError(t, err)
@@ -342,17 +360,34 @@ func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability
 
 	unrelated := topologyInspectionSourceContextByRegistration(report.source, unrelatedRegistrationID)
 	require.NotNil(t, unrelated)
-	require.NotEmpty(t, unrelated.facts)
+	require.False(t, unrelated.sameAttempt)
+	require.Same(t, latest, unrelated.latestAttempt.capture)
+	require.Equal(t, topologyInspectionUndetermined, unrelated.latestAttempt.evidence.state)
+	require.Same(t, retained, unrelated.retainedSuccess.capture)
+	require.Equal(t, topologyInspectionPresent, unrelated.retainedSuccess.evidence.state)
+	require.Len(t, unrelated.captures, 2)
+	require.True(t, unrelated.captures[0].latestAttempt)
+	require.False(t, unrelated.captures[0].retainedSuccess)
+	require.Empty(t, unrelated.captures[0].facts)
+	require.False(t, unrelated.captures[1].latestAttempt)
+	require.True(t, unrelated.captures[1].retainedSuccess)
+	require.NotEmpty(t, unrelated.captures[1].facts)
 
 	unavailable := topologyInspectionSourceContextByRegistration(report.source, 99)
 	require.NotNil(t, unavailable)
-	require.Equal(t, topologyInspectionPresent, unavailable.capture.membership.state)
-	require.Equal(t, topologyInspectionUndetermined, unavailable.capture.evidence.state)
-	require.Equal(t, diagnosticCaptureUnavailable, unavailable.capture.capture.state)
-	require.Empty(t, unavailable.facts)
+	require.True(t, unavailable.sameAttempt)
+	require.Equal(t, topologyInspectionPresent, unavailable.latestAttempt.membership.state)
+	require.Equal(t, topologyInspectionUndetermined, unavailable.latestAttempt.evidence.state)
+	require.Same(t, unavailableCapture, unavailable.latestAttempt.capture)
+	require.Equal(t, unavailable.latestAttempt, unavailable.retainedSuccess)
+	require.Len(t, unavailable.captures, 1)
+	require.True(t, unavailable.captures[0].latestAttempt)
+	require.True(t, unavailable.captures[0].retainedSuccess)
+	require.Same(t, unavailableCapture, unavailable.captures[0].capture.capture)
+	require.Empty(t, unavailable.captures[0].facts)
 }
 
-func TestTopologyInspectionSubjectsDistinguishEveryRenderedLink(t *testing.T) {
+func TestTopologyInspectionSubjectsReturnEveryRenderedLinkAsCandidate(t *testing.T) {
 	scenario := newMixedL2L3ControlScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
 	replay := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
@@ -364,22 +399,21 @@ func TestTopologyInspectionSubjectsDistinguishEveryRenderedLink(t *testing.T) {
 		subject, ok := topologyInspectionSubjectFromLink(replay.data, i)
 		require.Truef(t, ok, "link=%d", i)
 		match := inspectTopologyGraphLink(replay.data, subject)
-		require.Equalf(t, topologyInspectionPresent, match.membership.state, "link=%d family=%s", i, subject.family)
-		require.Equalf(t, 1, match.membership.candidates, "link=%d family=%s", i, subject.family)
-		require.Equal(t, i, match.index)
+		require.Containsf(t, match.links, replay.data.Links[i], "link=%d family=%s", i, subject.family)
+		require.Equal(t, len(match.links), match.membership.candidates)
+		if len(match.links) == 1 {
+			require.Equal(t, topologyInspectionPresent, match.membership.state)
+			require.Equal(t, i, match.index)
+		} else {
+			require.Equal(t, topologyInspectionUndetermined, match.membership.state)
+			require.Equal(t, -1, match.index)
+		}
 		if topologyInspectionLinkSubjectUnordered(subject) {
 			subject.srcIdentity, subject.dstIdentity = subject.dstIdentity, subject.srcIdentity
-			subject.discriminator = topologyInspectionSwapLinkDiscriminator(subject.discriminator)
 			reversed := inspectTopologyGraphLink(replay.data, subject)
-			require.Equalf(
-				t,
-				topologyInspectionPresent,
-				reversed.membership.state,
-				"reversed link=%d family=%s",
-				i,
-				subject.family,
-			)
-			require.Equal(t, i, reversed.index)
+			require.Containsf(t, reversed.links, replay.data.Links[i], "reversed link=%d family=%s", i, subject.family)
+			require.Equal(t, match.membership, reversed.membership)
+			require.Equal(t, match.index, reversed.index)
 		}
 		families[subject.family] = true
 	}
@@ -389,7 +423,7 @@ func TestTopologyInspectionSubjectsDistinguishEveryRenderedLink(t *testing.T) {
 	require.True(t, families[topologymodel.BGPAdjacencyLinkType])
 }
 
-func TestInspectTopologyGraphLinkRejectsDuplicateStructuralMatches(t *testing.T) {
+func TestInspectTopologyGraphLinkReturnsDuplicateCandidates(t *testing.T) {
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
 	replay := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
@@ -404,7 +438,7 @@ func TestInspectTopologyGraphLinkRejectsDuplicateStructuralMatches(t *testing.T)
 	require.Equal(t, -1, match.index)
 }
 
-func TestTopologyInspectionLinkSubjectSeparatesParallelBGPRoutingInstances(t *testing.T) {
+func TestTopologyInspectionLinkSubjectReturnsParallelBGPRoutingInstancesAsCandidates(t *testing.T) {
 	scenario := newTopologyScenario("inspection-parallel-bgp")
 	left := scenario.Router("router-left", "192.0.2.61", "02:00:00:00:61:01", "192.0.2.61", "65001")
 	right := scenario.Router("router-right", "192.0.2.62", "02:00:00:00:62:01", "192.0.2.62", "65002")
@@ -425,12 +459,17 @@ func TestTopologyInspectionLinkSubjectSeparatesParallelBGPRoutingInstances(t *te
 		subjects = append(subjects, subject)
 	}
 	require.Len(t, subjects, 2)
-	require.NotEqual(t, subjects[0].discriminator.bgpRoutingInstance, subjects[1].discriminator.bgpRoutingInstance)
-	for _, subject := range subjects {
-		match := inspectTopologyGraphLink(replay.data, subject)
-		require.Equal(t, topologyInspectionPresent, match.membership.state)
-		require.Equal(t, 1, match.membership.candidates)
+	require.Equal(t, subjects[0], subjects[1])
+	match := inspectTopologyGraphLink(replay.data, subjects[0])
+	require.Equal(t, topologyInspectionUndetermined, match.membership.state)
+	require.Equal(t, 2, match.membership.candidates)
+	require.Len(t, match.links, 2)
+	routingInstances := make(map[string]bool)
+	for _, link := range match.links {
+		require.NotNil(t, link.Detail.BGP)
+		routingInstances[link.Detail.BGP.RoutingInstance] = true
 	}
+	require.Equal(t, map[string]bool{"blue": true, "red": true}, routingInstances)
 }
 
 func setTopologyInspectionLifecycleCut(diagnostics *topologyDiagnostics, registrationIDs ...ddsnmp.DeviceRegistrationID) {
@@ -464,7 +503,9 @@ func topologyInspectionSourceContextByRegistration(
 func topologyInspectionSourceFactCount(result topologyInspectionSourceResult) int {
 	var count int
 	for _, context := range result.contexts {
-		count += len(context.facts)
+		for _, capture := range context.captures {
+			count += len(capture.facts)
+		}
 	}
 	return count
 }

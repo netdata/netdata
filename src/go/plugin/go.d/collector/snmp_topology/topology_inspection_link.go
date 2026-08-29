@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -25,12 +24,11 @@ func topologyInspectionSubjectFromLink(data topologymodel.Data, index int) (topo
 		return topologyInspectionLinkSubject{}, false
 	}
 	return normalizeTopologyInspectionLinkSubject(topologyInspectionLinkSubject{
-		srcIdentity:   srcIdentity,
-		dstIdentity:   dstIdentity,
-		family:        topologyInspectionLinkFamily(link),
-		protocol:      link.Protocol,
-		direction:     link.Direction,
-		discriminator: topologyInspectionLinkDiscriminatorForLink(link),
+		srcIdentity: srcIdentity,
+		dstIdentity: dstIdentity,
+		family:      topologyInspectionLinkFamily(link),
+		protocol:    link.Protocol,
+		direction:   link.Direction,
 	}), true
 }
 
@@ -88,13 +86,12 @@ func topologyInspectionLinkMatches(
 		normalizeTopologyInspectionDirection(link.Direction) != subject.direction {
 		return false
 	}
-	actual := topologyInspectionLinkDiscriminatorForLink(link)
 	if link.SrcActorHandle == srcHandle && link.DstActorHandle == dstHandle {
-		return actual == subject.discriminator
+		return true
 	}
 	if topologyInspectionLinkSubjectUnordered(subject) &&
 		link.SrcActorHandle == dstHandle && link.DstActorHandle == srcHandle {
-		return topologyInspectionSwapLinkDiscriminator(actual) == subject.discriminator
+		return true
 	}
 	return false
 }
@@ -122,91 +119,7 @@ func normalizeTopologyInspectionLinkSubject(subject topologyInspectionLinkSubjec
 		subject.protocol = subject.family
 	}
 	subject.direction = normalizeTopologyInspectionDirection(subject.direction)
-	subject.discriminator = normalizeTopologyInspectionLinkDiscriminator(subject.discriminator)
 	return subject
-}
-
-func normalizeTopologyInspectionLinkDiscriminator(value topologyInspectionLinkDiscriminator) topologyInspectionLinkDiscriminator {
-	value.srcIfIndex = max(value.srcIfIndex, 0)
-	value.dstIfIndex = max(value.dstIfIndex, 0)
-	value.srcIfName = strings.TrimSpace(value.srcIfName)
-	value.dstIfName = strings.TrimSpace(value.dstIfName)
-	value.srcPortID = strings.TrimSpace(value.srcPortID)
-	value.dstPortID = strings.TrimSpace(value.dstPortID)
-	value.bridgeDomain = strings.TrimSpace(value.bridgeDomain)
-	value.subnet = strings.TrimSpace(value.subnet)
-	value.ospfRouterA = topologyutil.NormalizeTopologyRouterID(value.ospfRouterA)
-	value.ospfRouterB = topologyutil.NormalizeTopologyRouterID(value.ospfRouterB)
-	if value.ospfRouterA > value.ospfRouterB {
-		value.ospfRouterA, value.ospfRouterB = value.ospfRouterB, value.ospfRouterA
-	}
-	value.ospfAdjacency = strings.TrimSpace(value.ospfAdjacency)
-	value.bgpRoutingInstance = strings.TrimSpace(value.bgpRoutingInstance)
-	return value
-}
-
-func topologyInspectionLinkDiscriminatorForLink(link topologymodel.Link) topologyInspectionLinkDiscriminator {
-	var result topologyInspectionLinkDiscriminator
-	switch topologyInspectionLinkFamily(link) {
-	case topologymodel.L3SubnetLinkType:
-		if link.Detail.L3Subnet != nil {
-			result.subnet = link.Detail.L3Subnet.Subnet
-			result.prefix = link.Detail.L3Subnet.Prefix
-		}
-	case topologymodel.L3SubnetMembershipLinkType:
-		if link.Detail.L3SubnetMembership != nil {
-			result.subnet = link.Detail.L3SubnetMembership.Subnet
-			result.prefix = link.Detail.L3SubnetMembership.Prefix
-		}
-	case topologymodel.OSPFAdjacencyLinkType:
-		if detail := link.Detail.OSPF; detail != nil {
-			result.ospfRouterA = detail.LocalRouterID
-			result.ospfRouterB = detail.NeighborRouterID
-			result.ospfAdjacency = topologyInspectionOSPFAdjacency(
-				detail.Subnet,
-				detail.Prefix,
-				detail.LocalIP,
-				detail.NeighborIP,
-			)
-		}
-	case topologymodel.BGPAdjacencyLinkType:
-		if detail := link.Detail.BGP; detail != nil {
-			result.bgpRoutingInstance = topologyutil.FirstNonEmptyString(detail.RoutingInstance, "default")
-		}
-	default:
-		result.srcIfIndex = max(link.Src.IfIndex, 0)
-		result.srcIfName = topologymodel.EndpointKey(link.Src, "if_name")
-		result.srcPortID = topologymodel.EndpointKey(link.Src, "port_id")
-		result.dstIfIndex = max(link.Dst.IfIndex, 0)
-		result.dstIfName = topologymodel.EndpointKey(link.Dst, "if_name")
-		result.dstPortID = topologymodel.EndpointKey(link.Dst, "port_id")
-		if link.L2 != nil {
-			result.bridgeDomain = link.L2.BridgeDomain
-		}
-	}
-	return normalizeTopologyInspectionLinkDiscriminator(result)
-}
-
-func topologyInspectionSwapLinkDiscriminator(value topologyInspectionLinkDiscriminator) topologyInspectionLinkDiscriminator {
-	value.srcIfIndex, value.dstIfIndex = value.dstIfIndex, value.srcIfIndex
-	value.srcIfName, value.dstIfName = value.dstIfName, value.srcIfName
-	value.srcPortID, value.dstPortID = value.dstPortID, value.srcPortID
-	return value
-}
-
-func topologyInspectionOSPFAdjacency(subnet string, prefix int, localIP, neighborIP string) string {
-	if subnet = strings.TrimSpace(subnet); subnet != "" && prefix > 0 {
-		return topologyutil.JoinKeyParts("subnet", subnet, strconv.Itoa(prefix))
-	}
-	localIP = topologyutil.NormalizeNonUnspecifiedIPAddress(localIP)
-	neighborIP = topologyutil.NormalizeNonUnspecifiedIPAddress(neighborIP)
-	if localIP != "" && neighborIP != "" {
-		if localIP > neighborIP {
-			localIP, neighborIP = neighborIP, localIP
-		}
-		return topologyutil.JoinKeyParts("ip_pair", localIP, neighborIP)
-	}
-	return "router_id"
 }
 
 func topologyInspectionLinkFamily(link topologymodel.Link) string {

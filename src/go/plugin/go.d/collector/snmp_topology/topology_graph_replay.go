@@ -24,11 +24,12 @@ func replayTopologyDiagnostics(
 }
 
 type topologyDiagnosticReplayedDevice struct {
-	registrationID ddsnmp.DeviceRegistrationID
-	capture        *topologyAcquisitionCapture
-	renderable     bool
-	observation    topologyInspectionState
-	snapshot       *topologyDeviceSnapshot
+	registrationID  ddsnmp.DeviceRegistrationID
+	latestAttempt   *topologyAcquisitionCapture
+	retainedSuccess *topologyAcquisitionCapture
+	renderable      bool
+	observation     topologyInspectionState
+	snapshot        *topologyDeviceSnapshot
 }
 
 type topologyDiagnosticReplayStages struct {
@@ -61,9 +62,10 @@ func replayTopologyDiagnosticStagesWithObservationScope(
 	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(cut.devices))
 	for _, device := range cut.devices {
 		replayed := topologyDiagnosticReplayedDevice{
-			registrationID: device.registrationID,
-			capture:        device.acquisition,
-			renderable:     device.renderable,
+			registrationID:  device.registrationID,
+			latestAttempt:   device.latestAttempt,
+			retainedSuccess: device.acquisition,
+			renderable:      device.renderable,
 		}
 		if !device.renderable && !includeNonRenderable {
 			replay.devices = append(replay.devices, replayed)
