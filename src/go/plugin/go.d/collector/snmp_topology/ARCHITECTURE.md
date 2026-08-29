@@ -717,18 +717,31 @@ graph.
 
 Writing and reading are invocation-local `io.Writer`/`io.Reader` operations.
 Both use one zstd worker. The writer streams JSON through zstd without retaining
-encoded Function output. The reader bounds compressed input, decoded JSON, and
-the zstd window, decodes once into one owned DTO, checks one complete JSON value,
-and reconstructs one immutable diagnostic snapshot. It validates only the root
-format/version and typed enum, capture-role, registration, address, and value-to-
-route references needed for safe replay and honest inspection. Standard Go JSON
-unknown-field and duplicate-key behavior is intentional; there is no token,
-string, depth, record, logical-byte, canonical-order, or generic replay-work
-policy at this boundary.
+encoded Function output or imposing another byte ceiling on the already-bounded
+live snapshot. Stable JSON v2 is used with explicit JSON v1 compatibility
+options and HTML escaping disabled, preserving archive-v1 field behavior.
+
+The reader buffers only bounded compressed input and opens two bounded zstd
+streams over it. The first JSON token pass totals elements across the DTO's
+array-valued fields and entries across its map-valued fields without constructing
+them. The second pass decodes one owned DTO. Compressed bytes, decoded bytes,
+zstd decoder memory/window, array elements, and map entries cover four resource
+classes before reconstruction. Unknown members remain accepted; a member whose
+name matches an allowlisted dynamic field is conservatively counted. There are
+no per-field limits, JSON-path schema, custom unmarshalers, or generic token,
+string, depth, record, logical-byte, canonical-order, or replay-work policy.
+
+Reconstruction validates only the root format/version and the typed enum,
+capture-role/reference/generation, unique attempt-ordinal, registration,
+address, and value-to-route invariants needed for safe replay and honest
+inspection. BGP peer state remains an open scalar, matching live evidence rather
+than inventing a closed archive enum. Standard Go JSON unknown-field and
+duplicate-key behavior is intentional.
 
 Archives are sensitive, untrusted support attachments even though the Agent is
-the only supported producer. The byte/window limits protect the maintainer
-reader from oversized input and compressed amplification. Zstd frame integrity
+the only supported producer. The reader limits protect the maintainer from
+oversized input, compressed amplification, and compact collection-cardinality
+amplification during typed decoding. Zstd frame integrity
 detects accidental corruption; it does not authenticate an archive. Arbitrary
 semantic JSON editing, signing, sanitization, filesystem publication, retention,
 and command-line behavior are separate contracts.

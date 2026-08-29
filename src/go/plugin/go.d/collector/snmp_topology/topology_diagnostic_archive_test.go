@@ -5,8 +5,10 @@ package snmptopology
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -24,11 +26,10 @@ func TestTopologyDiagnosticArchiveRoundTripPreservesReplayAndInspection(t *testi
 	completeTopologyDiagnosticArchiveFixture(&diagnostics)
 
 	var encoded bytes.Buffer
-	require.NoError(t, writeTopologyDiagnosticArchiveWithLimits(
+	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(
 		&encoded,
 		diagnostics,
 		"v-test",
-		defaultTopologyDiagnosticArchiveLimits,
 	))
 	archive, err := readTopologyDiagnosticArchive(bytes.NewReader(encoded.Bytes()))
 	require.NoError(t, err)
@@ -146,6 +147,106 @@ func TestTopologyDiagnosticArchiveRejectsMalformedAndUnsupportedInput(t *testing
 	}
 }
 
+func TestTopologyDiagnosticArchivePreservesOpenBGPPeerState(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newMixedL2L3ControlScenario())
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+
+	const state = "vendor-specific"
+	row := firstTopologyDiagnosticArchiveBGPRow(t, &document)
+	row.StateHas = true
+	row.State = state
+
+	archive, err := readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, document))))
+	require.NoError(t, err)
+	restored, err := newTopologyDiagnosticArchiveDocumentV1(archive.diagnostics, archive.producerVersion)
+	require.NoError(t, err)
+	require.Equal(t, state, firstTopologyDiagnosticArchiveBGPRow(t, &restored).State)
+}
+
+func TestTopologyDiagnosticArchiveRejectsRetainedReferenceCaptureMismatch(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newMixedL2L3ControlScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(document.Snapshot.Topology.Devices), 2)
+
+	tests := map[string]struct {
+		mutate func(*topologyDiagnosticArchiveDeviceV1, uint64)
+		want   string
+	}{
+		"reference without role": {
+			mutate: func(device *topologyDiagnosticArchiveDeviceV1, _ uint64) {
+				require.NotNil(t, device.RetainedSuccess)
+				require.Len(t, device.Captures, 1)
+				device.Captures[0].Roles = []string{topologyDiagnosticArchiveCaptureRoleLatestAttempt}
+			},
+			want: "retained-success reference and capture role disagree",
+		},
+		"role without reference": {
+			mutate: func(device *topologyDiagnosticArchiveDeviceV1, _ uint64) {
+				require.NotNil(t, device.RetainedSuccess)
+				device.RetainedSuccess = nil
+			},
+			want: "retained-success reference and capture role disagree",
+		},
+		"generation newer than sweep": {
+			mutate: func(device *topologyDiagnosticArchiveDeviceV1, sequence uint64) {
+				require.NotNil(t, device.RetainedSuccess)
+				device.RetainedSuccess.Generation = sequence + 1
+			},
+			want: "retained-success generation",
+		},
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			mutated := document
+			mutated.Snapshot.Topology = cloneTopologyDiagnosticArchiveSweepV1(t, document.Snapshot.Topology)
+			device := &mutated.Snapshot.Topology.Devices[1]
+			mutate.mutate(device, mutated.Snapshot.Topology.Sequence)
+
+			_, err := readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, mutated))))
+			require.ErrorContains(t, err, mutate.want)
+		})
+	}
+}
+
+func TestTopologyDiagnosticArchiveRejectsDuplicateCaptureAttemptOrdinal(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newMixedL2L3ControlScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+	device := &document.Snapshot.Topology.Devices[0]
+	require.Len(t, device.Captures, 2)
+	device.Captures[1].AttemptOrdinal = device.Captures[0].AttemptOrdinal
+
+	_, err = readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, document))))
+	require.ErrorContains(t, err, "duplicate capture attempt ordinal")
+}
+
+func TestTopologyDiagnosticArchiveRejectsCompactArrayBeforeTypedDecode(t *testing.T) {
+	const entryCount = 129
+	raw := `{
+		"format":"netdata.snmp_topology.diagnostics",
+		"version":1,
+		"producer":{"agent_version":"v-test"},
+		"snapshot":{
+			"job_lifecycle_cut":{
+				"capture_state":"available",
+				"capture_reason":"none",
+				"cut":{"sequence":1,"captured_at":"2026-08-29T00:00:00Z","entries":[` +
+		strings.Repeat("{},", entryCount-1) + `{}` + `]}
+			},
+			"producer_scope_id":"scope"
+		}
+	}`
+	limits := defaultTopologyDiagnosticArchiveLimits
+	limits.maxArrayElements = 64
+
+	_, err := readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(compressArchiveJSON(t, raw)), limits)
+	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayLimit)
+}
+
 func TestTopologyDiagnosticArchiveRejectsTrailingAndTruncatedContent(t *testing.T) {
 	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
 	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
@@ -166,8 +267,9 @@ func TestTopologyDiagnosticArchiveRejectsTrailingAndTruncatedContent(t *testing.
 	require.Error(t, err)
 }
 
-func TestTopologyDiagnosticArchiveEnforcesOnlyTheThreeResourceBounds(t *testing.T) {
+func TestTopologyDiagnosticArchiveEnforcesOnlyTheFourReaderResourceBounds(t *testing.T) {
 	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
 	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
 	require.NoError(t, err)
 	encoded := compressArchiveJSON(t, archiveDocumentJSON(t, document))
@@ -184,24 +286,41 @@ func TestTopologyDiagnosticArchiveEnforcesOnlyTheThreeResourceBounds(t *testing.
 
 	windowed := compressArchiveJSONWithWindow(t, strings.Repeat(" ", 8<<10)+archiveDocumentJSON(t, document), 8<<10)
 	limits = defaultTopologyDiagnosticArchiveLimits
-	limits.maxWindowBytes = 1 << 10
+	limits.maxDecoderMemory = 1 << 10
 	_, err = readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(windowed), limits)
 	require.Error(t, err)
 	require.Contains(t, strings.ToLower(err.Error()), "window")
-}
-
-func TestTopologyDiagnosticArchiveWriterEnforcesEncodedAndDecodedBounds(t *testing.T) {
-	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
-
-	limits := defaultTopologyDiagnosticArchiveLimits
-	limits.maxDecodedBytes = 64
-	err := writeTopologyDiagnosticArchiveWithLimits(io.Discard, diagnostics, "v-test", limits)
-	require.ErrorIs(t, err, errTopologyDiagnosticArchiveDecodedLimit)
 
 	limits = defaultTopologyDiagnosticArchiveLimits
-	limits.maxCompressedBytes = 16
-	err = writeTopologyDiagnosticArchiveWithLimits(io.Discard, diagnostics, "v-test", limits)
-	require.ErrorIs(t, err, errTopologyDiagnosticArchiveCompressedLimit)
+	limits.maxArrayElements = 1
+	_, err = readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(encoded), limits)
+	require.ErrorIs(t, err, errTopologyDiagnosticArchiveArrayLimit)
+
+	require.NotNil(t, document.Snapshot.Topology)
+	require.NotEmpty(t, document.Snapshot.Topology.Devices)
+	require.NotEmpty(t, document.Snapshot.Topology.Devices[0].Captures)
+	require.NotNil(t, document.Snapshot.Topology.Devices[0].Captures[0].Evidence)
+	document.Snapshot.Topology.Devices[0].Captures[0].Evidence.Device.VnodeLabels = map[string]string{
+		"site": "lab",
+		"zone": "a",
+	}
+	mapEncoded := compressArchiveJSON(t, archiveDocumentJSON(t, document))
+	limits = defaultTopologyDiagnosticArchiveLimits
+	limits.maxMapEntries = 1
+	_, err = readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(mapEncoded), limits)
+	require.ErrorIs(t, err, errTopologyDiagnosticArchiveMapLimit)
+}
+
+func TestTopologyDiagnosticArchiveWriterPropagatesDestinationFailure(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	destinationErr := errors.New("destination failure")
+
+	err := writeTopologyDiagnosticArchiveWithProducerVersion(
+		topologyDiagnosticArchiveErrorWriter{err: destinationErr},
+		diagnostics,
+		"v-test",
+	)
+	require.ErrorIs(t, err, destinationErr)
 }
 
 func TestTopologyDiagnosticArchiveUsesStandardJSONFieldSemantics(t *testing.T) {
@@ -211,9 +330,77 @@ func TestTopologyDiagnosticArchiveUsesStandardJSONFieldSemantics(t *testing.T) {
 	raw := archiveDocumentJSON(t, document)
 	raw = strings.Replace(raw, `"version":1`, `"ignored":true,"version":1`, 1)
 	raw = strings.Replace(raw, `"version":1`, `"version":99,"version":1`, 1)
+	raw = strings.Replace(raw, `"format":`, `"FoRmAt":`, 1)
 
 	_, err = readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, raw)))
 	require.NoError(t, err)
+
+	invalidUTF8 := strings.Replace(raw, `"v-test"`, `"`+string([]byte{0xff})+`"`, 1)
+	archive, err := readTopologyDiagnosticArchive(bytes.NewReader(compressArchiveJSON(t, invalidUTF8)))
+	require.NoError(t, err)
+	require.Equal(t, "\ufffd", archive.producerVersion)
+}
+
+func TestTopologyDiagnosticArchiveWriterPreservesV1StringSemantics(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	producerVersion := "v<&>" + string([]byte{0xff})
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, producerVersion))
+
+	raw := decompressArchiveJSON(t, encoded.Bytes())
+	require.Contains(t, raw, `"agent_version":"v<&>`)
+	require.NotContains(t, raw, `\u003c`)
+	require.NotContains(t, raw, `\u003e`)
+	require.NotContains(t, raw, `\u0026`)
+	archive, err := readTopologyDiagnosticArchive(bytes.NewReader(encoded.Bytes()))
+	require.NoError(t, err)
+	require.Equal(t, "v<&>\ufffd", archive.producerVersion)
+}
+
+func TestTopologyDiagnosticArchiveCollectionClassifierCoversDTO(t *testing.T) {
+	root := reflect.TypeFor[topologyDiagnosticArchiveDocumentV1]()
+	discovered := make(map[string]topologyDiagnosticArchiveContainerClass)
+	visited := make(map[reflect.Type]bool)
+	var arrays int
+	var maps int
+
+	var visit func(reflect.Type)
+	visit = func(value reflect.Type) {
+		for value.Kind() == reflect.Pointer {
+			value = value.Elem()
+		}
+		if value.Kind() != reflect.Struct || value.PkgPath() != root.PkgPath() || visited[value] {
+			return
+		}
+		visited[value] = true
+		for index := range value.NumField() {
+			field := value.Field(index)
+			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+			switch field.Type.Kind() {
+			case reflect.Slice:
+				arrays++
+				require.Equal(t, topologyDiagnosticArchiveContainerArray,
+					topologyDiagnosticArchiveCollectionFieldClass(name), "%s.%s", value, field.Name)
+				discovered[name] = topologyDiagnosticArchiveContainerArray
+				visit(field.Type.Elem())
+			case reflect.Map:
+				maps++
+				require.Equal(t, topologyDiagnosticArchiveContainerMap,
+					topologyDiagnosticArchiveCollectionFieldClass(name), "%s.%s", value, field.Name)
+				discovered[name] = topologyDiagnosticArchiveContainerMap
+				visit(field.Type.Elem())
+			default:
+				visit(field.Type)
+			}
+		}
+	}
+	visit(root)
+
+	require.Equal(t, 11, arrays)
+	require.Equal(t, 5, maps)
+	require.Equal(t, topologyDiagnosticArchiveCollectionFields, discovered)
+	require.Equal(t, topologyDiagnosticArchiveContainerArray,
+		topologyDiagnosticArchiveCollectionFieldClass("EnTrIeS"))
 }
 
 func TestTopologyDiagnosticArchiveEnumTablesAreCompleteAndRoundTrip(t *testing.T) {
@@ -274,7 +461,9 @@ func FuzzReadTopologyDiagnosticArchive(f *testing.F) {
 		limits := topologyDiagnosticArchiveLimits{
 			maxCompressedBytes: 1 << 20,
 			maxDecodedBytes:    4 << 20,
-			maxWindowBytes:     1 << 20,
+			maxDecoderMemory:   1 << 20,
+			maxArrayElements:   1 << 20,
+			maxMapEntries:      1 << 20,
 		}
 		_, _ = readTopologyDiagnosticArchiveWithLimits(bytes.NewReader(input), limits)
 	})
@@ -360,4 +549,64 @@ func compressArchiveJSONWithWindow(t testing.TB, value string, window int) []byt
 	require.NoError(t, err)
 	require.NoError(t, encoder.Close())
 	return encoded.Bytes()
+}
+
+func decompressArchiveJSON(t testing.TB, encoded []byte) string {
+	t.Helper()
+	decoder, err := zstd.NewReader(bytes.NewReader(encoded), zstd.WithDecoderConcurrency(1))
+	require.NoError(t, err)
+	decompressed, err := io.ReadAll(decoder)
+	decoder.Close()
+	require.NoError(t, err)
+	return string(decompressed)
+}
+
+func firstTopologyDiagnosticArchiveBGPRow(
+	t testing.TB,
+	document *topologyDiagnosticArchiveDocumentV1,
+) *topologyDiagnosticArchiveBGPRowValueV1 {
+	t.Helper()
+	require.NotNil(t, document)
+	require.NotNil(t, document.Snapshot.Topology)
+	for deviceIndex := range document.Snapshot.Topology.Devices {
+		device := &document.Snapshot.Topology.Devices[deviceIndex]
+		for captureIndex := range device.Captures {
+			capture := &device.Captures[captureIndex]
+			if capture.Evidence == nil {
+				continue
+			}
+			for contextIndex := range capture.Evidence.CollectionContexts {
+				context := &capture.Evidence.CollectionContexts[contextIndex]
+				for profileIndex := range context.Profiles {
+					profile := &context.Profiles[profileIndex]
+					if len(profile.Values.BGPRows) > 0 {
+						return &profile.Values.BGPRows[0]
+					}
+				}
+			}
+		}
+	}
+	t.Fatal("archive fixture has no BGP row")
+	return nil
+}
+
+func cloneTopologyDiagnosticArchiveSweepV1(
+	t testing.TB,
+	sweep *topologyDiagnosticArchiveSweepV1,
+) *topologyDiagnosticArchiveSweepV1 {
+	t.Helper()
+	require.NotNil(t, sweep)
+	raw, err := json.Marshal(sweep)
+	require.NoError(t, err)
+	var cloned topologyDiagnosticArchiveSweepV1
+	require.NoError(t, json.Unmarshal(raw, &cloned))
+	return &cloned
+}
+
+type topologyDiagnosticArchiveErrorWriter struct {
+	err error
+}
+
+func (w topologyDiagnosticArchiveErrorWriter) Write([]byte) (int, error) {
+	return 0, w.err
 }

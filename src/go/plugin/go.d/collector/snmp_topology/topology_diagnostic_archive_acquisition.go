@@ -698,9 +698,6 @@ func (v topologyDiagnosticArchiveProfileValuesV1) values(
 			return topologyAcquisitionProfileValues{}, fmt.Errorf("unknown BGP row kind %q", row.Kind)
 		}
 		state := ddprofiledefinition.BGPPeerState(row.State)
-		if !ddprofiledefinition.IsValidBGPPeerState(state) {
-			return topologyAcquisitionProfileValues{}, fmt.Errorf("unknown BGP peer state %q", row.State)
-		}
 		result.bgpRows = append(result.bgpRows, topologyAcquisitionBGPRowValue{
 			routeOrdinal:    row.RouteOrdinal,
 			rowOrdinal:      row.RowOrdinal,

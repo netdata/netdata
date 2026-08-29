@@ -3,10 +3,14 @@
 package snmptopology
 
 import (
-	"encoding/json"
+	"bytes"
+	jsonv1 "encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -18,29 +22,42 @@ const (
 	topologyDiagnosticArchiveFormat  = "netdata.snmp_topology.diagnostics"
 	topologyDiagnosticArchiveVersion = 1
 
-	// The byte bounds include the measured JSON overhead above the live
-	// diagnostic evidence limits without creating another shape policy.
+	// The reader bounds admit the measured maximum live shapes while containing
+	// independent attachment, decompression, and typed-allocation risks.
 	topologyDiagnosticArchiveMaxCompressedBytes = 128 << 20
-	topologyDiagnosticArchiveMaxDecodedBytes    = 128 << 20
-	topologyDiagnosticArchiveMaxWindowBytes     = 8 << 20
+	topologyDiagnosticArchiveMaxDecodedBytes    = 512 << 20
+	topologyDiagnosticArchiveMaxDecoderMemory   = 8 << 20
+	topologyDiagnosticArchiveMaxArrayElements   = 2 << 20
+	topologyDiagnosticArchiveMaxMapEntries      = 6 << 20
 )
 
 var (
 	errTopologyDiagnosticArchiveCompressedLimit = errors.New("SNMP topology diagnostic archive compressed-byte limit exceeded")
 	errTopologyDiagnosticArchiveDecodedLimit    = errors.New("SNMP topology diagnostic archive decoded-byte limit exceeded")
+	errTopologyDiagnosticArchiveArrayLimit      = errors.New("SNMP topology diagnostic archive array-element limit exceeded")
+	errTopologyDiagnosticArchiveMapLimit        = errors.New("SNMP topology diagnostic archive map-entry limit exceeded")
 )
 
 type topologyDiagnosticArchiveLimits struct {
 	maxCompressedBytes int64
 	maxDecodedBytes    int64
-	maxWindowBytes     uint64
+	maxDecoderMemory   uint64
+	maxArrayElements   uint64
+	maxMapEntries      uint64
 }
 
 var defaultTopologyDiagnosticArchiveLimits = topologyDiagnosticArchiveLimits{
 	maxCompressedBytes: topologyDiagnosticArchiveMaxCompressedBytes,
 	maxDecodedBytes:    topologyDiagnosticArchiveMaxDecodedBytes,
-	maxWindowBytes:     topologyDiagnosticArchiveMaxWindowBytes,
+	maxDecoderMemory:   topologyDiagnosticArchiveMaxDecoderMemory,
+	maxArrayElements:   topologyDiagnosticArchiveMaxArrayElements,
+	maxMapEntries:      topologyDiagnosticArchiveMaxMapEntries,
 }
+
+var topologyDiagnosticArchiveJSONOptions = jsonv2.JoinOptions(
+	jsonv1.DefaultOptionsV1(),
+	jsontext.EscapeForHTML(false),
+)
 
 type topologyDiagnosticArchive struct {
 	producerVersion string
@@ -157,14 +174,13 @@ const (
 )
 
 func writeTopologyDiagnosticArchive(w io.Writer, diagnostics topologyDiagnostics) error {
-	return writeTopologyDiagnosticArchiveWithLimits(w, diagnostics, buildinfo.Version, defaultTopologyDiagnosticArchiveLimits)
+	return writeTopologyDiagnosticArchiveWithProducerVersion(w, diagnostics, buildinfo.Version)
 }
 
-func writeTopologyDiagnosticArchiveWithLimits(
+func writeTopologyDiagnosticArchiveWithProducerVersion(
 	w io.Writer,
 	diagnostics topologyDiagnostics,
 	producerVersion string,
-	limits topologyDiagnosticArchiveLimits,
 ) error {
 	if w == nil {
 		return errors.New("write SNMP topology diagnostic archive: nil writer")
@@ -173,13 +189,8 @@ func writeTopologyDiagnosticArchiveWithLimits(
 	if err != nil {
 		return fmt.Errorf("write SNMP topology diagnostic archive: %w", err)
 	}
-	compressed := &topologyDiagnosticArchiveLimitWriter{
-		writer: w,
-		limit:  limits.maxCompressedBytes,
-		err:    errTopologyDiagnosticArchiveCompressedLimit,
-	}
 	encoder, err := zstd.NewWriter(
-		compressed,
+		w,
 		zstd.WithEncoderLevel(zstd.SpeedDefault),
 		zstd.WithEncoderConcurrency(1),
 		zstd.WithEncoderCRC(true),
@@ -187,14 +198,7 @@ func writeTopologyDiagnosticArchiveWithLimits(
 	if err != nil {
 		return fmt.Errorf("write SNMP topology diagnostic archive: create zstd encoder: %w", err)
 	}
-	decoded := &topologyDiagnosticArchiveLimitWriter{
-		writer: encoder,
-		limit:  limits.maxDecodedBytes,
-		err:    errTopologyDiagnosticArchiveDecodedLimit,
-	}
-	jsonEncoder := json.NewEncoder(decoded)
-	jsonEncoder.SetEscapeHTML(false)
-	encodeErr := jsonEncoder.Encode(document)
+	encodeErr := jsonv2.MarshalWrite(encoder, document, topologyDiagnosticArchiveJSONOptions)
 	closeErr := encoder.Close()
 	if encodeErr != nil {
 		return fmt.Errorf("write SNMP topology diagnostic archive: encode JSON: %w", encodeErr)
@@ -216,45 +220,37 @@ func readTopologyDiagnosticArchiveWithLimits(
 	if r == nil {
 		return topologyDiagnosticArchive{}, errors.New("read SNMP topology diagnostic archive: nil reader")
 	}
-	compressed := &io.LimitedReader{R: r, N: limits.maxCompressedBytes + 1}
-	decoder, err := zstd.NewReader(
-		compressed,
-		zstd.WithDecoderConcurrency(1),
-		zstd.WithDecoderMaxMemory(limits.maxWindowBytes),
-		zstd.WithDecoderMaxWindow(limits.maxWindowBytes),
-	)
+	compressed, err := io.ReadAll(io.LimitReader(r, limits.maxCompressedBytes+1))
 	if err != nil {
-		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: create zstd decoder: %w", err)
+		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: read compressed input: %w", err)
 	}
-
-	decoded := &io.LimitedReader{R: decoder, N: limits.maxDecodedBytes + 1}
-	jsonDecoder := json.NewDecoder(decoded)
-	var document topologyDiagnosticArchiveDocumentV1
-	decodeErr := jsonDecoder.Decode(&document)
-	var trailing json.RawMessage
-	if decodeErr == nil {
-		if err := jsonDecoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-			if err == nil {
-				decodeErr = errors.New("trailing JSON value")
-			} else {
-				decodeErr = fmt.Errorf("trailing JSON content: %w", err)
-			}
-		}
-	}
-	decoder.Close()
-	_, drainErr := io.Copy(io.Discard, compressed)
-
-	if compressed.N == 0 {
+	if int64(len(compressed)) > limits.maxCompressedBytes {
 		return topologyDiagnosticArchive{}, errTopologyDiagnosticArchiveCompressedLimit
 	}
-	if decoded.N == 0 {
-		return topologyDiagnosticArchive{}, errTopologyDiagnosticArchiveDecodedLimit
+
+	err = consumeTopologyDiagnosticArchiveJSON(compressed, limits, func(decoder *jsontext.Decoder) error {
+		_, err := preflightTopologyDiagnosticArchiveJSON(decoder, limits)
+		return err
+	})
+	if err != nil {
+		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: preflight JSON: %w", err)
 	}
-	if drainErr != nil {
-		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: drain compressed input: %w", drainErr)
-	}
-	if decodeErr != nil {
-		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: decode JSON: %w", decodeErr)
+
+	var document topologyDiagnosticArchiveDocumentV1
+	err = consumeTopologyDiagnosticArchiveJSON(compressed, limits, func(decoder *jsontext.Decoder) error {
+		if err := jsonv2.UnmarshalDecode(decoder, &document, topologyDiagnosticArchiveJSONOptions); err != nil {
+			return err
+		}
+		if _, err := decoder.ReadToken(); !errors.Is(err, io.EOF) {
+			if err == nil {
+				return errors.New("trailing JSON value")
+			}
+			return fmt.Errorf("trailing JSON content: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: decode JSON: %w", err)
 	}
 	diagnostics, err := document.diagnostics()
 	if err != nil {
@@ -266,23 +262,137 @@ func readTopologyDiagnosticArchiveWithLimits(
 	}, nil
 }
 
-type topologyDiagnosticArchiveLimitWriter struct {
-	writer  io.Writer
-	limit   int64
-	written int64
-	err     error
+func consumeTopologyDiagnosticArchiveJSON(
+	compressed []byte,
+	limits topologyDiagnosticArchiveLimits,
+	consume func(*jsontext.Decoder) error,
+) error {
+	decoder, err := zstd.NewReader(
+		bytes.NewReader(compressed),
+		zstd.WithDecoderConcurrency(1),
+		zstd.WithDecoderMaxMemory(limits.maxDecoderMemory),
+	)
+	if err != nil {
+		return fmt.Errorf("create zstd decoder: %w", err)
+	}
+	defer decoder.Close()
+
+	decoded := &io.LimitedReader{R: decoder, N: limits.maxDecodedBytes + 1}
+	err = consume(jsontext.NewDecoder(decoded, topologyDiagnosticArchiveJSONOptions))
+	if decoded.N == 0 {
+		return errTopologyDiagnosticArchiveDecodedLimit
+	}
+	return err
 }
 
-func (w *topologyDiagnosticArchiveLimitWriter) Write(p []byte) (int, error) {
-	if w == nil || w.writer == nil {
-		return 0, io.ErrClosedPipe
+type topologyDiagnosticArchiveCollectionCounts struct {
+	arrayElements uint64
+	mapEntries    uint64
+}
+
+type topologyDiagnosticArchiveContainerClass uint8
+
+const (
+	topologyDiagnosticArchiveContainerNone topologyDiagnosticArchiveContainerClass = iota
+	topologyDiagnosticArchiveContainerArray
+	topologyDiagnosticArchiveContainerMap
+)
+
+var topologyDiagnosticArchiveCollectionFields = map[string]topologyDiagnosticArchiveContainerClass{
+	"entries":             topologyDiagnosticArchiveContainerArray,
+	"devices":             topologyDiagnosticArchiveContainerArray,
+	"removed_devices":     topologyDiagnosticArchiveContainerArray,
+	"captures":            topologyDiagnosticArchiveContainerArray,
+	"roles":               topologyDiagnosticArchiveContainerArray,
+	"collection_contexts": topologyDiagnosticArchiveContainerArray,
+	"addresses":           topologyDiagnosticArchiveContainerArray,
+	"profiles":            topologyDiagnosticArchiveContainerArray,
+	"routes":              topologyDiagnosticArchiveContainerArray,
+	"metrics":             topologyDiagnosticArchiveContainerArray,
+	"bgp_rows":            topologyDiagnosticArchiveContainerArray,
+	"vnode_labels":        topologyDiagnosticArchiveContainerMap,
+	"metadata":            topologyDiagnosticArchiveContainerMap,
+	"tags":                topologyDiagnosticArchiveContainerMap,
+}
+
+type topologyDiagnosticArchivePreflightFrame struct {
+	class        topologyDiagnosticArchiveContainerClass
+	pendingClass topologyDiagnosticArchiveContainerClass
+}
+
+func preflightTopologyDiagnosticArchiveJSON(
+	decoder *jsontext.Decoder,
+	limits topologyDiagnosticArchiveLimits,
+) (topologyDiagnosticArchiveCollectionCounts, error) {
+	var counts topologyDiagnosticArchiveCollectionCounts
+	var roots uint64
+	var frames []topologyDiagnosticArchivePreflightFrame
+	for {
+		depth := decoder.StackDepth()
+		next := decoder.PeekKind()
+		var parent jsontext.Kind
+		var index int64
+		if depth == 0 && next != jsontext.KindInvalid {
+			roots++
+			if roots > 1 {
+				return counts, errors.New("trailing JSON value")
+			}
+		} else if depth > 0 {
+			parent, index = decoder.StackIndex(depth)
+			frame := &frames[depth-1]
+			if frame.class == topologyDiagnosticArchiveContainerArray && next != jsontext.KindEndArray {
+				if counts.arrayElements >= limits.maxArrayElements {
+					return counts, errTopologyDiagnosticArchiveArrayLimit
+				}
+				counts.arrayElements++
+			}
+			if frame.class == topologyDiagnosticArchiveContainerMap && index%2 == 0 && next != jsontext.KindEndObject {
+				if counts.mapEntries >= limits.maxMapEntries {
+					return counts, errTopologyDiagnosticArchiveMapLimit
+				}
+				counts.mapEntries++
+			}
+		}
+
+		token, err := decoder.ReadToken()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return counts, nil
+			}
+			return counts, err
+		}
+
+		switch token.Kind() {
+		case jsontext.KindBeginArray, jsontext.KindBeginObject:
+			class := topologyDiagnosticArchiveContainerNone
+			if depth > 0 && parent == jsontext.KindBeginObject && index%2 == 1 {
+				expected := frames[depth-1].pendingClass
+				if (token.Kind() == jsontext.KindBeginArray && expected == topologyDiagnosticArchiveContainerArray) ||
+					(token.Kind() == jsontext.KindBeginObject && expected == topologyDiagnosticArchiveContainerMap) {
+					class = expected
+				}
+			}
+			frames = append(frames, topologyDiagnosticArchivePreflightFrame{class: class})
+		case jsontext.KindEndArray, jsontext.KindEndObject:
+			frames = frames[:len(frames)-1]
+		case jsontext.KindString:
+			if depth > 0 && parent == jsontext.KindBeginObject && index%2 == 0 {
+				frames[depth-1].pendingClass = topologyDiagnosticArchiveCollectionFieldClass(token.String())
+			}
+		}
 	}
-	if int64(len(p)) > w.limit-w.written {
-		return 0, w.err
+}
+
+func topologyDiagnosticArchiveCollectionFieldClass(name string) topologyDiagnosticArchiveContainerClass {
+	if class, ok := topologyDiagnosticArchiveCollectionFields[name]; ok {
+		return class
 	}
-	n, err := w.writer.Write(p)
-	w.written += int64(n)
-	return n, err
+	for field, class := range topologyDiagnosticArchiveCollectionFields {
+		if strings.EqualFold(name, field) {
+			return class
+		}
+	}
+	return topologyDiagnosticArchiveContainerNone
 }
 
 func newTopologyDiagnosticArchiveDocumentV1(
@@ -663,7 +773,7 @@ func (s topologyDiagnosticArchiveSweepV1) sweep() (*topologySweepDiagnosticCut, 
 	}
 	seen := make(map[ddsnmp.DeviceRegistrationID]struct{}, len(s.Devices)+len(s.Removed))
 	for _, device := range s.Devices {
-		row, err := device.device()
+		row, err := device.device(s.Sequence)
 		if err != nil {
 			return nil, err
 		}
@@ -686,6 +796,14 @@ func (s topologyDiagnosticArchiveSweepV1) sweep() (*topologySweepDiagnosticCut, 
 		if err != nil {
 			return nil, fmt.Errorf("removed topology registration %d: %w", registrationID, err)
 		}
+		if hasRef && ref.generation > s.Sequence {
+			return nil, fmt.Errorf(
+				"removed topology registration %d retained-success generation %d exceeds sweep generation %d",
+				registrationID,
+				ref.generation,
+				s.Sequence,
+			)
+		}
 		result.removed = append(result.removed, topologyRemovedDeviceDiagnostic{
 			registrationID:     registrationID,
 			retainedSuccess:    ref,
@@ -695,7 +813,7 @@ func (s topologyDiagnosticArchiveSweepV1) sweep() (*topologySweepDiagnosticCut, 
 	return result, nil
 }
 
-func (d topologyDiagnosticArchiveDeviceV1) device() (topologySweepDeviceDiagnostic, error) {
+func (d topologyDiagnosticArchiveDeviceV1) device(sweepGeneration uint64) (topologySweepDeviceDiagnostic, error) {
 	registrationID := ddsnmp.DeviceRegistrationID(d.RegistrationID)
 	if registrationID == 0 {
 		return topologySweepDeviceDiagnostic{}, errors.New("topology sweep registration ID is zero")
@@ -723,11 +841,20 @@ func (d topologyDiagnosticArchiveDeviceV1) device() (topologySweepDeviceDiagnost
 		expired:            d.Expired,
 	}
 	seenRoles := make(map[string]struct{}, 2)
+	seenAttemptOrdinals := make(map[uint64]struct{}, len(d.Captures))
 	for _, archivedCapture := range d.Captures {
 		capture, err := archivedCapture.capture(registrationID)
 		if err != nil {
 			return topologySweepDeviceDiagnostic{}, err
 		}
+		if _, ok := seenAttemptOrdinals[capture.attemptID.ordinal]; ok {
+			return topologySweepDeviceDiagnostic{}, fmt.Errorf(
+				"topology sweep registration %d duplicate capture attempt ordinal %d",
+				registrationID,
+				capture.attemptID.ordinal,
+			)
+		}
+		seenAttemptOrdinals[capture.attemptID.ordinal] = struct{}{}
 		if len(archivedCapture.Roles) == 0 {
 			return topologySweepDeviceDiagnostic{}, fmt.Errorf("topology sweep registration %d capture has no role", registrationID)
 		}
@@ -745,6 +872,20 @@ func (d topologyDiagnosticArchiveDeviceV1) device() (topologySweepDeviceDiagnost
 				return topologySweepDeviceDiagnostic{}, fmt.Errorf("topology sweep registration %d unknown capture role %q", registrationID, role)
 			}
 		}
+	}
+	if hasRef != (result.acquisition != nil) {
+		return topologySweepDeviceDiagnostic{}, fmt.Errorf(
+			"topology sweep registration %d retained-success reference and capture role disagree",
+			registrationID,
+		)
+	}
+	if hasRef && ref.generation > sweepGeneration {
+		return topologySweepDeviceDiagnostic{}, fmt.Errorf(
+			"topology sweep registration %d retained-success generation %d exceeds sweep generation %d",
+			registrationID,
+			ref.generation,
+			sweepGeneration,
+		)
 	}
 	if result.acquisition != nil && result.acquisition.state == diagnosticCaptureAvailable {
 		if err := validateTopologyAcquisitionEvidence(result.acquisition.evidence); err != nil {
