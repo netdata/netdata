@@ -4,11 +4,9 @@ package snmptopology
 
 import (
 	"bytes"
-	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
-	"math"
 	"runtime"
 	"strings"
 	"testing"
@@ -29,14 +27,8 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 		"maximum_records": func(tb testing.TB) topologyDiagnostics {
 			return benchmarkTopologyArchiveDiagnostics(tb, 3, 83_000, 8)
 		},
-		"maximum_array_allocation": func(tb testing.TB) topologyDiagnostics {
-			return benchmarkTopologyArchiveArrayAllocation(tb, 249_999)
-		},
 		"maximum_combined": func(tb testing.TB) topologyDiagnostics {
 			return benchmarkTopologyArchiveDiagnostics(tb, 3, 83_000, 215)
-		},
-		"maximum_map_entries": func(tb testing.TB) topologyDiagnostics {
-			return benchmarkTopologyArchiveMapCardinality(tb)
 		},
 		"maximum_logical_bytes": func(tb testing.TB) topologyDiagnostics {
 			return benchmarkTopologyArchiveDiagnostics(tb, 2, 7_500, 4_000)
@@ -58,7 +50,6 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 			}
 			compressedBytes := encoded.Len()
 			decodedBytes := decodedTopologyDiagnosticArchiveSize(b, encoded.Bytes())
-			collectionCounts := topologyDiagnosticArchiveCollectionCountsForBenchmark(b, encoded.Bytes())
 			runtime.GC()
 			b.Run("write", func(b *testing.B) {
 				b.ReportAllocs()
@@ -72,16 +63,19 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 						b.Fatal(err)
 					}
 				}
-				reportTopologyDiagnosticArchiveSize(b, decodedBytes, compressedBytes, collectionCounts)
+				reportTopologyDiagnosticArchiveSize(b, decodedBytes, compressedBytes)
 			})
 			b.Run("read", func(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
-					if _, err := readTopologyDiagnosticArchive(bytes.NewReader(encoded.Bytes())); err != nil {
+					if _, err := readTopologyDiagnosticArchive(
+						bytes.NewReader(encoded.Bytes()),
+						defaultTopologyDiagnosticArchiveReadLimits(),
+					); err != nil {
 						b.Fatal(err)
 					}
 				}
-				reportTopologyDiagnosticArchiveSize(b, decodedBytes, compressedBytes, collectionCounts)
+				reportTopologyDiagnosticArchiveSize(b, decodedBytes, compressedBytes)
 			})
 		})
 	}
@@ -144,37 +138,14 @@ func decodedTopologyDiagnosticArchiveSize(tb testing.TB, encoded []byte) int {
 	return int(n)
 }
 
-func topologyDiagnosticArchiveCollectionCountsForBenchmark(
-	tb testing.TB,
-	encoded []byte,
-) topologyDiagnosticArchiveCollectionCounts {
-	tb.Helper()
-	var counts topologyDiagnosticArchiveCollectionCounts
-	limits := defaultTopologyDiagnosticArchiveLimits
-	limits.maxArrayAllocationBytes = math.MaxUint64
-	limits.maxMapEntries = math.MaxUint64
-	err := consumeTopologyDiagnosticArchiveJSON(encoded, limits, func(decoder *jsontext.Decoder) error {
-		var err error
-		counts, err = preflightTopologyDiagnosticArchiveJSON(decoder, limits)
-		return err
-	})
-	if err != nil {
-		tb.Fatal(err)
-	}
-	return counts
-}
-
 func reportTopologyDiagnosticArchiveSize(
 	b *testing.B,
 	decodedBytes int,
 	compressedBytes int,
-	counts topologyDiagnosticArchiveCollectionCounts,
 ) {
 	b.ReportMetric(float64(decodedBytes), "decoded_B")
 	b.ReportMetric(float64(compressedBytes), "compressed_B")
 	b.ReportMetric(float64(decodedBytes)/float64(compressedBytes), "compression_ratio")
-	b.ReportMetric(float64(counts.arrayAllocationBytes), "array_allocation_B")
-	b.ReportMetric(float64(counts.mapEntries), "map_entries")
 }
 
 func benchmarkTopologyArchiveDiagnostics(
@@ -311,96 +282,5 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 		},
 		producerScopeID: "benchmark-scope",
 		topology:        cut,
-	}
-}
-
-func benchmarkTopologyArchiveMapCardinality(tb testing.TB) topologyDiagnostics {
-	tb.Helper()
-	tags := map[string]string{
-		tagCdpIfIndex:               "",
-		tagCdpIfName:                "",
-		tagCdpDeviceIndex:           "",
-		tagCdpDeviceID:              "",
-		tagCdpAddressType:           "",
-		tagCdpDevicePort:            "",
-		tagCdpVersion:               "",
-		tagCdpPlatform:              "",
-		tagCdpCaps:                  "",
-		tagCdpAddress:               "",
-		tagCdpVTPDomain:             "",
-		tagCdpNativeVLAN:            "",
-		tagCdpDuplex:                "",
-		tagCdpPower:                 "",
-		tagCdpMTU:                   "",
-		tagCdpSysName:               "",
-		tagCdpSysObjectID:           "",
-		tagCdpPrimaryMgmtAddrType:   "",
-		tagCdpPrimaryMgmtAddr:       "",
-		tagCdpSecondaryMgmtAddrType: "",
-		tagCdpSecondaryMgmtAddr:     "",
-		tagCdpPhysicalLocation:      "",
-		tagCdpLastChange:            "",
-	}
-	logicalBytesPerMetric := uint64(len(ddsnmp.KindCdpCache)) + topologySemanticFilteredStringMapBytes(
-		tags,
-		func(key string) bool { return topologySemanticMetricTagAllowed(ddsnmp.KindCdpCache, key) },
-	)
-	perDeviceBudget := (defaultTopologyDiagnosticGlobalLimits.maxLogicalBytes-topologyDiagnosticCutLogicalBytes-
-		2*topologyDiagnosticRowLogicalBytes)/2 - 1_024
-	metricsPerDevice := min(
-		int(perDeviceBudget/logicalBytesPerMetric),
-		int(defaultTopologyAcquisitionLimits.maxRecords-4),
-	)
-	return benchmarkTopologyArchiveDiagnosticsWithMetric(
-		tb,
-		2,
-		metricsPerDevice,
-		ddsnmp.KindCdpCache,
-		func(int) map[string]string { return tags },
-	)
-}
-
-func benchmarkTopologyArchiveArrayAllocation(tb testing.TB, deviceCount int) topologyDiagnostics {
-	tb.Helper()
-	const sequence = uint64(1)
-	devices := make([]topologySweepDeviceDiagnostic, 0, deviceCount)
-	for index := range deviceCount {
-		registrationID := ddsnmp.DeviceRegistrationID(index + 1)
-		retained := &topologyAcquisitionCapture{
-			attemptID: topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1},
-			state:     diagnosticCaptureUnavailable,
-			reason:    diagnosticCaptureReasonProjectionError,
-		}
-		latest := &topologyAcquisitionCapture{
-			attemptID: topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 2},
-			state:     diagnosticCaptureUnavailable,
-			reason:    diagnosticCaptureReasonProjectionError,
-		}
-		devices = append(devices, topologySweepDeviceDiagnostic{
-			registrationID: registrationID,
-			outcome:        deviceRefreshOutcomeFailed,
-			retainedSuccess: topologyEvidenceRef{
-				registrationID: registrationID,
-				generation:     sequence,
-			},
-			hasRetainedSuccess: true,
-			acquisition:        retained,
-			latestAttempt:      latest,
-		})
-	}
-	return topologyDiagnostics{
-		lifecycle: topologyJobLifecycleDiagnosticCut{
-			state:  diagnosticCaptureLimitExceeded,
-			reason: diagnosticCaptureReasonGlobalRecordLimit,
-		},
-		producerScopeID: "benchmark-scope",
-		topology: &topologySweepDiagnosticCut{
-			sequence:      sequence,
-			captureState:  diagnosticCaptureAvailable,
-			captureReason: diagnosticCaptureReasonNone,
-			recordCount:   uint64(deviceCount + 1),
-			logicalBytes:  topologyDiagnosticCutLogicalBytes + uint64(deviceCount)*topologyDiagnosticRowLogicalBytes,
-			devices:       devices,
-		},
 	}
 }

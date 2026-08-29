@@ -722,24 +722,21 @@ live snapshot. Stable JSON v2 is used with explicit JSON v1 compatibility
 options and HTML escaping disabled. Invalid in-memory strings receive the JSON
 v1 replacement behavior, so the writer always emits valid UTF-8.
 
-The reader buffers only bounded compressed input and opens two bounded zstd
-streams over it. The first JSON token pass totals estimated slice backing across
-the DTO's array-valued fields and entries across its map-valued fields without
-constructing them. Array weights use the actual DTO element sizes, so compact
-wide elements cannot bypass the typed-allocation bound. The second pass decodes
-one owned DTO. Compressed bytes, decoded bytes, zstd decoder memory/window,
-estimated slice backing, and map entries cover four resource classes before
-reconstruction. Unknown members remain accepted; a member whose name matches an
-allowlisted dynamic field is conservatively counted. There are no per-field
-limits, JSON-path schema, custom unmarshalers, or generic token, string, depth,
-record, logical-byte, canonical-order, or replay-work policy.
+The reader performs one streaming decode: caller-bounded compressed input flows
+through one zstd decoder, then caller-bounded decoded bytes flow directly into
+JSON v2 and one owned DTO. Every invocation supplies both limits. The library
+provides generous defaults of 128 MiB compressed and 512 MiB decoded, and a
+maintainer tool can override either for a particular run. There is no compressed
+archive buffer, second decompression pass, DTO field classifier, allocation
+predictor, or generic token, string, depth, record, logical-byte,
+canonical-order, or replay-work policy.
 
-Raw invalid UTF-8 is rejected during the preflight pass rather than expanded by
-replacement during typed decoding. The reader bounds are independent and their
-worst cases are additive; they do not claim one exact process heap or RSS
-ceiling. Extreme supported or crafted archives can therefore remain expensive
-to inspect, but each input, decompression, slice, and map allocation class has
-an explicit finite envelope.
+Raw invalid UTF-8 is rejected during typed decoding rather than expanded by
+replacement. The two byte limits are operational stop conditions, not a typed
+allocation, exact process heap, or RSS guarantee. A deliberately hostile
+attachment can therefore remain expensive within the selected decoded-byte
+allowance; the initial source-only diagnostic tool deliberately favors a small,
+caller-controlled reader contract over schema-coupled allocation accounting.
 
 Reconstruction validates only the root format/version and the typed enum,
 capture-role/reference/generation, unique attempt-ordinal, registration,
@@ -748,13 +745,12 @@ inspection. BGP peer state remains an open scalar, matching live evidence rather
 than inventing a closed archive enum. Standard Go JSON unknown-field and
 duplicate-key behavior is intentional.
 
-Archives are sensitive, untrusted support attachments even though the Agent is
-the only supported producer. The reader limits protect the maintainer from
-oversized input, compressed amplification, and compact collection-cardinality
-amplification during typed decoding. Zstd frame integrity
-detects accidental corruption; it does not authenticate an archive. Arbitrary
-semantic JSON editing, signing, sanitization, filesystem publication, retention,
-and command-line behavior are separate contracts.
+Archives are sensitive support attachments even though the Agent is the only
+supported producer. The reader's caller-selected byte limits stop oversized
+compressed input and decompression output. Zstd frame integrity detects
+accidental corruption; it does not authenticate an archive. Arbitrary semantic
+JSON editing, signing, sanitization, filesystem publication, retention, and
+command-line behavior are separate contracts.
 
 ## Trap Enrichment
 
