@@ -764,11 +764,11 @@ operation:
 - `inspect-device` and `inspect-link` return typed positive-allowlist projections of the existing offline inspection
   reports.
 
-The small `internal/snmptopologydiagnostics` package owns only command request/report DTOs. A narrow collector adapter
-translates those DTOs and delegates to the existing archive reader, replay, and inspection code. The command does not own
-a second archive model, replay engine, backend registry, session, cache, daemon, or network service. Its query defaults
-come from production topology options; unknown map types, inference strategies, managed-device focus values, depths, and
-link families fail instead of silently selecting another request.
+The collector's diagnostic facade owns the command request/report DTOs beside the adapter that constructs them from
+private topology state. The command depends only on that facade; it does not own a second archive model, replay engine,
+backend registry, session, cache, daemon, or network service. Its query defaults come from production topology options;
+unknown map types, inference strategies, managed-device focus values, depths, and link families fail instead of silently
+selecting another request.
 
 Every successful operation emits one JSON document. Compressed and decoded limits are human-readable per-invocation
 flags initialized from the archive reader's defaults. Archives and their JSON reports remain sensitive support material;

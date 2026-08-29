@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/netdata/netdata/go/plugins/internal/snmptopologydiagnostics"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
@@ -14,29 +13,29 @@ import (
 
 func newDiagnosticDeviceInspection(
 	report topologyDeviceInspection,
-) (snmptopologydiagnostics.DeviceInspection, error) {
+) (DiagnosticDeviceInspection, error) {
 	lifecycle, err := newDiagnosticLifecycleInspection(report.lifecycle)
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, fmt.Errorf("project lifecycle inspection: %w", err)
+		return DiagnosticDeviceInspection{}, fmt.Errorf("project lifecycle inspection: %w", err)
 	}
 	sweep, err := newDiagnosticSweepInspection(report.sweep)
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, fmt.Errorf("project sweep inspection: %w", err)
+		return DiagnosticDeviceInspection{}, fmt.Errorf("project sweep inspection: %w", err)
 	}
 	latest, err := newDiagnosticCaptureInspection(report.latestAttempt)
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, fmt.Errorf("project latest-attempt inspection: %w", err)
+		return DiagnosticDeviceInspection{}, fmt.Errorf("project latest-attempt inspection: %w", err)
 	}
 	retained, err := newDiagnosticCaptureInspection(report.retainedSuccess)
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, fmt.Errorf("project retained-success inspection: %w", err)
+		return DiagnosticDeviceInspection{}, fmt.Errorf("project retained-success inspection: %w", err)
 	}
 	aborted, err := newDiagnosticAbortedSweep(report.lastAborted)
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, fmt.Errorf("project last aborted sweep: %w", err)
+		return DiagnosticDeviceInspection{}, fmt.Errorf("project last aborted sweep: %w", err)
 	}
 
-	result := snmptopologydiagnostics.DeviceInspection{
+	result := DiagnosticDeviceInspection{
 		RegistrationID:  uint64(report.registrationID),
 		Query:           diagnosticQueryOptionsFromInternal(report.options),
 		Lifecycle:       lifecycle,
@@ -58,21 +57,21 @@ func newDiagnosticDeviceInspection(
 
 func newDiagnosticLinkInspection(
 	report topologyLinkInspection,
-) (snmptopologydiagnostics.LinkInspection, error) {
+) (DiagnosticLinkInspection, error) {
 	cut, err := newDiagnosticCutInspection(report.diagnosticCut)
 	if err != nil {
-		return snmptopologydiagnostics.LinkInspection{}, fmt.Errorf("project diagnostic cut: %w", err)
+		return DiagnosticLinkInspection{}, fmt.Errorf("project diagnostic cut: %w", err)
 	}
 	source, err := newDiagnosticSourceInspection(report.source)
 	if err != nil {
-		return snmptopologydiagnostics.LinkInspection{}, fmt.Errorf("project source inspection: %w", err)
+		return DiagnosticLinkInspection{}, fmt.Errorf("project source inspection: %w", err)
 	}
 	aborted, err := newDiagnosticAbortedSweep(report.lastAborted)
 	if err != nil {
-		return snmptopologydiagnostics.LinkInspection{}, fmt.Errorf("project last aborted sweep: %w", err)
+		return DiagnosticLinkInspection{}, fmt.Errorf("project last aborted sweep: %w", err)
 	}
-	return snmptopologydiagnostics.LinkInspection{
-		Subject: snmptopologydiagnostics.LinkSubject{
+	return DiagnosticLinkInspection{
+		Subject: DiagnosticLinkSubject{
 			SourceIdentity:      report.subject.srcIdentity,
 			DestinationIdentity: report.subject.dstIdentity,
 			Family:              report.subject.family,
@@ -92,12 +91,12 @@ func newDiagnosticLinkInspection(
 
 func newDiagnosticLifecycleInspection(
 	result topologyInspectionLifecycleResult,
-) (snmptopologydiagnostics.LifecycleInspection, error) {
+) (diagnosticLifecycleInspection, error) {
 	capture, err := newDiagnosticCaptureStatus(result.captureState, result.captureReason)
 	if err != nil {
-		return snmptopologydiagnostics.LifecycleInspection{}, err
+		return diagnosticLifecycleInspection{}, err
 	}
-	converted := snmptopologydiagnostics.LifecycleInspection{
+	converted := diagnosticLifecycleInspection{
 		Membership: diagnosticStage(result.membership),
 		Capture:    capture,
 		Sequence:   result.sequence,
@@ -106,7 +105,7 @@ func newDiagnosticLifecycleInspection(
 	if result.entry != nil {
 		entry, err := newDiagnosticLifecycleRegistration(*result.entry)
 		if err != nil {
-			return snmptopologydiagnostics.LifecycleInspection{}, err
+			return diagnosticLifecycleInspection{}, err
 		}
 		converted.Entry = &entry
 	}
@@ -115,12 +114,12 @@ func newDiagnosticLifecycleInspection(
 
 func newDiagnosticCutInspection(
 	result topologyInspectionDiagnosticCutResult,
-) (snmptopologydiagnostics.DiagnosticCutInspection, error) {
+) (diagnosticCutInspection, error) {
 	capture, err := newDiagnosticCaptureStatus(result.captureState, result.captureReason)
 	if err != nil {
-		return snmptopologydiagnostics.DiagnosticCutInspection{}, err
+		return diagnosticCutInspection{}, err
 	}
-	return snmptopologydiagnostics.DiagnosticCutInspection{
+	return diagnosticCutInspection{
 		Capture:     capture,
 		Sequence:    result.sequence,
 		StartedAt:   result.startedAt,
@@ -130,19 +129,19 @@ func newDiagnosticCutInspection(
 
 func newDiagnosticSweepInspection(
 	result topologyInspectionSweepResult,
-) (snmptopologydiagnostics.SweepInspection, error) {
+) (diagnosticSweepInspection, error) {
 	cut, err := newDiagnosticCutInspection(result.topologyInspectionDiagnosticCutResult)
 	if err != nil {
-		return snmptopologydiagnostics.SweepInspection{}, err
+		return diagnosticSweepInspection{}, err
 	}
-	converted := snmptopologydiagnostics.SweepInspection{
-		DiagnosticCutInspection: cut,
+	converted := diagnosticSweepInspection{
+		diagnosticCutInspection: cut,
 		Membership:              diagnosticStage(result.membership),
 	}
 	if result.device != nil {
 		device, err := newDiagnosticSweepRegistration(result.device)
 		if err != nil {
-			return snmptopologydiagnostics.SweepInspection{}, err
+			return diagnosticSweepInspection{}, err
 		}
 		converted.Device = &device
 	}
@@ -151,8 +150,8 @@ func newDiagnosticSweepInspection(
 
 func newDiagnosticRemovedInspection(
 	result topologyInspectionRemovedResult,
-) snmptopologydiagnostics.RemovedInspection {
-	converted := snmptopologydiagnostics.RemovedInspection{
+) diagnosticRemovedInspection {
+	converted := diagnosticRemovedInspection{
 		Membership: diagnosticStage(result.membership),
 	}
 	if result.device != nil {
@@ -164,12 +163,12 @@ func newDiagnosticRemovedInspection(
 
 func newDiagnosticCaptureInspection(
 	result topologyInspectionCaptureResult,
-) (snmptopologydiagnostics.CaptureInspection, error) {
+) (diagnosticCaptureInspection, error) {
 	capture, err := newDiagnosticCaptureSummary(result.capture)
 	if err != nil {
-		return snmptopologydiagnostics.CaptureInspection{}, err
+		return diagnosticCaptureInspection{}, err
 	}
-	return snmptopologydiagnostics.CaptureInspection{
+	return diagnosticCaptureInspection{
 		Membership: diagnosticStage(result.membership),
 		Evidence:   diagnosticStage(result.evidence),
 		Capture:    capture,
@@ -178,11 +177,11 @@ func newDiagnosticCaptureInspection(
 
 func newDiagnosticActorInspection(
 	result topologyInspectionActorResult,
-) snmptopologydiagnostics.ActorInspection {
-	converted := snmptopologydiagnostics.ActorInspection{
+) diagnosticActorInspection {
+	converted := diagnosticActorInspection{
 		Membership:    diagnosticStage(result.membership),
 		SelectedIndex: result.index,
-		Candidates:    make([]snmptopologydiagnostics.GraphActor, 0, len(result.actors)),
+		Candidates:    make([]diagnosticGraphActor, 0, len(result.actors)),
 	}
 	for i := range result.actors {
 		index := -1
@@ -194,8 +193,8 @@ func newDiagnosticActorInspection(
 	return converted
 }
 
-func newDiagnosticGraphActor(index int, actor topologymodel.Actor) snmptopologydiagnostics.GraphActor {
-	converted := snmptopologydiagnostics.GraphActor{
+func newDiagnosticGraphActor(index int, actor topologymodel.Actor) diagnosticGraphActor {
+	converted := diagnosticGraphActor{
 		Index:        index,
 		ActorID:      actor.ActorID,
 		ActorType:    actor.ActorType,
@@ -216,9 +215,9 @@ func newDiagnosticGraphActor(index int, actor topologymodel.Actor) snmptopologyd
 	return converted
 }
 
-func newDiagnosticActorDetails(actor topologymodel.Actor) (snmptopologydiagnostics.ActorDetails, bool) {
+func newDiagnosticActorDetails(actor topologymodel.Actor) (diagnosticActorDetails, bool) {
 	arrayLabels := topologymodel.ActorDetailArrayLabelValues(actor)
-	details := snmptopologydiagnostics.ActorDetails{
+	details := diagnosticActorDetails{
 		DisplayName:           topologymodel.ActorDetailDisplayName(actor),
 		DisplaySource:         topologymodel.ActorDetailDisplaySource(actor),
 		ParentDevices:         slices.Clone(topologymodel.ActorDetailParentDevices(actor)),
@@ -244,8 +243,8 @@ func newDiagnosticActorDetails(actor topologymodel.Actor) (snmptopologydiagnosti
 	return details, present
 }
 
-func newDiagnosticRowInspection(result topologyInspectionRowResult) snmptopologydiagnostics.RowInspection {
-	return snmptopologydiagnostics.RowInspection{
+func newDiagnosticRowInspection(result topologyInspectionRowResult) diagnosticRowInspection {
+	return diagnosticRowInspection{
 		Membership: diagnosticStage(result.topologyInspectionStage),
 		Row:        result.row,
 	}
@@ -253,14 +252,14 @@ func newDiagnosticRowInspection(result topologyInspectionRowResult) snmptopology
 
 func newDiagnosticSourceInspection(
 	result topologyInspectionSourceResult,
-) (snmptopologydiagnostics.SourceInspection, error) {
-	converted := snmptopologydiagnostics.SourceInspection{
-		Contexts: make([]snmptopologydiagnostics.SourceContext, 0, len(result.contexts)),
+) (diagnosticSourceInspection, error) {
+	converted := diagnosticSourceInspection{
+		Contexts: make([]diagnosticSourceContext, 0, len(result.contexts)),
 	}
 	for i := range result.contexts {
 		context, err := newDiagnosticSourceContext(result.contexts[i])
 		if err != nil {
-			return snmptopologydiagnostics.SourceInspection{}, err
+			return diagnosticSourceInspection{}, err
 		}
 		converted.Contexts = append(converted.Contexts, context)
 	}
@@ -269,26 +268,26 @@ func newDiagnosticSourceInspection(
 
 func newDiagnosticSourceContext(
 	result topologyInspectionSourceContext,
-) (snmptopologydiagnostics.SourceContext, error) {
+) (diagnosticSourceContext, error) {
 	latest, err := newDiagnosticCaptureInspection(result.latestAttempt)
 	if err != nil {
-		return snmptopologydiagnostics.SourceContext{}, err
+		return diagnosticSourceContext{}, err
 	}
 	retained, err := newDiagnosticCaptureInspection(result.retainedSuccess)
 	if err != nil {
-		return snmptopologydiagnostics.SourceContext{}, err
+		return diagnosticSourceContext{}, err
 	}
-	converted := snmptopologydiagnostics.SourceContext{
+	converted := diagnosticSourceContext{
 		RegistrationID:  uint64(result.registrationID),
 		LatestAttempt:   latest,
 		RetainedSuccess: retained,
 		SameAttempt:     result.sameAttempt,
-		Captures:        make([]snmptopologydiagnostics.SourceCaptureContext, 0, len(result.captures)),
+		Captures:        make([]diagnosticSourceCaptureContext, 0, len(result.captures)),
 	}
 	for i := range result.captures {
 		capture, err := newDiagnosticSourceCaptureContext(result.captures[i])
 		if err != nil {
-			return snmptopologydiagnostics.SourceContext{}, err
+			return diagnosticSourceContext{}, err
 		}
 		converted.Captures = append(converted.Captures, capture)
 	}
@@ -297,16 +296,16 @@ func newDiagnosticSourceContext(
 
 func newDiagnosticSourceCaptureContext(
 	result topologyInspectionSourceCaptureContext,
-) (snmptopologydiagnostics.SourceCaptureContext, error) {
+) (diagnosticSourceCaptureContext, error) {
 	capture, err := newDiagnosticCaptureInspection(result.capture)
 	if err != nil {
-		return snmptopologydiagnostics.SourceCaptureContext{}, err
+		return diagnosticSourceCaptureContext{}, err
 	}
-	converted := snmptopologydiagnostics.SourceCaptureContext{
+	converted := diagnosticSourceCaptureContext{
 		LatestAttempt:   result.latestAttempt,
 		RetainedSuccess: result.retainedSuccess,
 		Capture:         capture,
-		Facts:           make([]snmptopologydiagnostics.SourceFact, 0, len(result.facts)),
+		Facts:           make([]diagnosticSourceFact, 0, len(result.facts)),
 	}
 	for i := range result.facts {
 		converted.Facts = append(converted.Facts, newDiagnosticSourceFact(result.facts[i]))
@@ -314,14 +313,14 @@ func newDiagnosticSourceCaptureContext(
 	return converted, nil
 }
 
-func newDiagnosticSourceFact(result topologyInspectionSourceFact) snmptopologydiagnostics.SourceFact {
-	converted := snmptopologydiagnostics.SourceFact{
+func newDiagnosticSourceFact(result topologyInspectionSourceFact) diagnosticSourceFact {
+	converted := diagnosticSourceFact{
 		RegistrationID: uint64(result.registrationID),
 		ContextOrdinal: result.contextOrdinal,
 		ProfileOrdinal: result.profileOrdinal,
 	}
 	if result.metric != nil {
-		converted.Metric = &snmptopologydiagnostics.MetricFact{
+		converted.Metric = &diagnosticMetricFact{
 			RouteOrdinal: result.metric.routeOrdinal,
 			RowOrdinal:   result.metric.rowOrdinal,
 			ValueOrdinal: result.metric.valueOrdinal,
@@ -335,11 +334,11 @@ func newDiagnosticSourceFact(result topologyInspectionSourceFact) snmptopologydi
 	return converted
 }
 
-func newDiagnosticBGPFact(row *topologyAcquisitionBGPRowValue) *snmptopologydiagnostics.BGPFact {
+func newDiagnosticBGPFact(row *topologyAcquisitionBGPRowValue) *diagnosticBGPFact {
 	if row == nil {
 		return nil
 	}
-	return &snmptopologydiagnostics.BGPFact{
+	return &diagnosticBGPFact{
 		RouteOrdinal:    row.routeOrdinal,
 		RowOrdinal:      row.rowOrdinal,
 		ValueOrdinal:    row.valueOrdinal,
@@ -373,13 +372,13 @@ func newDiagnosticBGPFact(row *topologyAcquisitionBGPRowValue) *snmptopologydiag
 
 func newDiagnosticGraphLinkInspection(
 	result topologyInspectionGraphLinkResult,
-) snmptopologydiagnostics.GraphLinkInspection {
-	converted := snmptopologydiagnostics.GraphLinkInspection{
+) diagnosticGraphLinkInspection {
+	converted := diagnosticGraphLinkInspection{
 		Membership:        diagnosticStage(result.membership),
 		SourceActors:      newDiagnosticActorInspection(result.srcActors),
 		DestinationActors: newDiagnosticActorInspection(result.dstActors),
 		SelectedIndex:     result.index,
-		Candidates:        make([]snmptopologydiagnostics.GraphLink, 0, len(result.links)),
+		Candidates:        make([]diagnosticGraphLink, 0, len(result.links)),
 	}
 	actorIDs := make(map[topologymodel.ActorHandle]string, len(result.srcActors.actors)+len(result.dstActors.actors))
 	for _, actor := range result.srcActors.actors {
@@ -397,8 +396,8 @@ func newDiagnosticGraphLinkInspection(
 func newDiagnosticGraphLink(
 	link topologymodel.Link,
 	actorIDs map[topologymodel.ActorHandle]string,
-) snmptopologydiagnostics.GraphLink {
-	converted := snmptopologydiagnostics.GraphLink{
+) diagnosticGraphLink {
+	converted := diagnosticGraphLink{
 		Family:             topologyInspectionLinkFamily(link),
 		Layer:              link.Layer,
 		Protocol:           link.Protocol,
@@ -427,18 +426,18 @@ func newDiagnosticGraphLink(
 	return converted
 }
 
-func newDiagnosticLinkEndpoint(endpoint topologymodel.LinkEndpoint) snmptopologydiagnostics.LinkEndpoint {
+func newDiagnosticLinkEndpoint(endpoint topologymodel.LinkEndpoint) diagnosticLinkEndpoint {
 	endpoint.Match = cloneDiagnosticMatch(endpoint.Match)
 	return endpoint
 }
 
-func newDiagnosticLinkDetail(detail topologymodel.LinkDetail) *snmptopologydiagnostics.LinkDetail {
+func newDiagnosticLinkDetail(detail topologymodel.LinkDetail) *diagnosticLinkDetail {
 	if detail.L3Subnet == nil && detail.L3SubnetMembership == nil && detail.OSPF == nil && detail.BGP == nil {
 		return nil
 	}
-	converted := &snmptopologydiagnostics.LinkDetail{}
+	converted := &diagnosticLinkDetail{}
 	if detail.L3Subnet != nil {
-		converted.L3Subnet = &snmptopologydiagnostics.L3SubnetLinkDetail{
+		converted.L3Subnet = &diagnosticL3SubnetLinkDetail{
 			Source:  detail.L3Subnet.Source,
 			SrcIP:   detail.L3Subnet.SrcIP,
 			DstIP:   detail.L3Subnet.DstIP,
@@ -449,7 +448,7 @@ func newDiagnosticLinkDetail(detail topologymodel.LinkDetail) *snmptopologydiagn
 		}
 	}
 	if detail.L3SubnetMembership != nil {
-		membership := &snmptopologydiagnostics.L3SubnetMembershipLinkDetail{
+		membership := &diagnosticL3SubnetMembershipLinkDetail{
 			Source:  detail.L3SubnetMembership.Source,
 			Subnet:  detail.L3SubnetMembership.Subnet,
 			Network: detail.L3SubnetMembership.Network,
@@ -457,7 +456,7 @@ func newDiagnosticLinkDetail(detail topologymodel.LinkDetail) *snmptopologydiagn
 			Prefix:  detail.L3SubnetMembership.Prefix,
 		}
 		for _, iface := range detail.L3SubnetMembership.Interfaces {
-			membership.Interfaces = append(membership.Interfaces, snmptopologydiagnostics.L3SubnetMembershipInterface{
+			membership.Interfaces = append(membership.Interfaces, diagnosticL3SubnetMembershipInterface{
 				MemberIP: iface.MemberIP,
 				IfIndex:  iface.IfIndex,
 				IfName:   iface.IfName,
@@ -467,7 +466,7 @@ func newDiagnosticLinkDetail(detail topologymodel.LinkDetail) *snmptopologydiagn
 		converted.L3SubnetMembership = membership
 	}
 	if detail.OSPF != nil {
-		converted.OSPF = &snmptopologydiagnostics.OSPFAdjacencyLinkDetail{
+		converted.OSPF = &diagnosticOSPFAdjacencyLinkDetail{
 			Source:           detail.OSPF.Source,
 			LocalRouterID:    detail.OSPF.LocalRouterID,
 			NeighborRouterID: detail.OSPF.NeighborRouterID,
@@ -481,7 +480,7 @@ func newDiagnosticLinkDetail(detail topologymodel.LinkDetail) *snmptopologydiagn
 		}
 	}
 	if detail.BGP != nil {
-		converted.BGP = &snmptopologydiagnostics.BGPAdjacencyLinkDetail{
+		converted.BGP = &diagnosticBGPAdjacencyLinkDetail{
 			Source:          detail.BGP.Source,
 			RoutingInstance: detail.BGP.RoutingInstance,
 			LocalIP:         detail.BGP.LocalIP,

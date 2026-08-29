@@ -14,7 +14,6 @@ import (
 	"strconv"
 
 	"github.com/docker/go-units"
-	"github.com/netdata/netdata/go/plugins/internal/snmptopologydiagnostics"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
@@ -26,25 +25,25 @@ var outputJSONOptions = jsonv2.JoinOptions(
 )
 
 type diagnosticArchive interface {
-	Identity() snmptopologydiagnostics.ArchiveIdentity
-	Summary() (snmptopologydiagnostics.Summary, error)
-	Replay(snmptopologydiagnostics.QueryOptions) (topologyv1.Data, error)
-	InspectDevice(snmptopologydiagnostics.QueryOptions, uint64) (snmptopologydiagnostics.DeviceInspection, error)
+	Identity() snmptopology.DiagnosticArchiveIdentity
+	Summary() (snmptopology.DiagnosticSummary, error)
+	Replay(snmptopology.DiagnosticQueryOptions) (topologyv1.Data, error)
+	InspectDevice(snmptopology.DiagnosticQueryOptions, uint64) (snmptopology.DiagnosticDeviceInspection, error)
 	InspectLink(
-		snmptopologydiagnostics.QueryOptions,
-		snmptopologydiagnostics.LinkSubject,
-	) (snmptopologydiagnostics.LinkInspection, error)
+		snmptopology.DiagnosticQueryOptions,
+		snmptopology.DiagnosticLinkSubject,
+	) (snmptopology.DiagnosticLinkInspection, error)
 }
 
-type archiveOpener func(io.Reader, snmptopologydiagnostics.ReadLimits) (diagnosticArchive, error)
+type archiveOpener func(io.Reader, snmptopology.DiagnosticReadLimits) (diagnosticArchive, error)
 
 type commandOptions struct {
 	archivePath       string
 	maxCompressedSize string
 	maxDecodedSize    string
-	query             snmptopologydiagnostics.QueryOptions
+	query             snmptopology.DiagnosticQueryOptions
 	registrationID    uint64
-	link              snmptopologydiagnostics.LinkSubject
+	link              snmptopology.DiagnosticLinkSubject
 }
 
 func main() {
@@ -54,7 +53,7 @@ func main() {
 func run(arguments []string, stdout, stderr io.Writer) int {
 	return runWithOpener(arguments, stdout, stderr, func(
 		reader io.Reader,
-		limits snmptopologydiagnostics.ReadLimits,
+		limits snmptopology.DiagnosticReadLimits,
 	) (diagnosticArchive, error) {
 		return snmptopology.ReadDiagnosticArchive(reader, limits)
 	})
@@ -179,7 +178,7 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 	return options, -1
 }
 
-func addQueryFlags(flags *flag.FlagSet, options *snmptopologydiagnostics.QueryOptions) {
+func addQueryFlags(flags *flag.FlagSet, options *snmptopology.DiagnosticQueryOptions) {
 	flags.BoolVar(
 		&options.CollapseActorsByIP,
 		"collapse-actors-by-ip",
@@ -211,7 +210,7 @@ func addQueryFlags(flags *flag.FlagSet, options *snmptopologydiagnostics.QueryOp
 func executeOperation(operation string, archive diagnosticArchive, options commandOptions) (any, error) {
 	switch operation {
 	case "validate":
-		return snmptopologydiagnostics.Validation{Valid: true, Archive: archive.Identity()}, nil
+		return snmptopology.DiagnosticValidation{Valid: true, Archive: archive.Identity()}, nil
 	case "summary":
 		return archive.Summary()
 	case "replay":
@@ -225,16 +224,16 @@ func executeOperation(operation string, archive diagnosticArchive, options comma
 	}
 }
 
-func readLimits(compressed, decoded string) (snmptopologydiagnostics.ReadLimits, error) {
+func readLimits(compressed, decoded string) (snmptopology.DiagnosticReadLimits, error) {
 	maxCompressedBytes, err := units.RAMInBytes(compressed)
 	if err != nil || maxCompressedBytes <= 0 {
-		return snmptopologydiagnostics.ReadLimits{}, fmt.Errorf("invalid maximum compressed size %q", compressed)
+		return snmptopology.DiagnosticReadLimits{}, fmt.Errorf("invalid maximum compressed size %q", compressed)
 	}
 	maxDecodedBytes, err := units.RAMInBytes(decoded)
 	if err != nil || maxDecodedBytes <= 0 {
-		return snmptopologydiagnostics.ReadLimits{}, fmt.Errorf("invalid maximum decoded size %q", decoded)
+		return snmptopology.DiagnosticReadLimits{}, fmt.Errorf("invalid maximum decoded size %q", decoded)
 	}
-	return snmptopologydiagnostics.ReadLimits{
+	return snmptopology.DiagnosticReadLimits{
 		MaxCompressedBytes: maxCompressedBytes,
 		MaxDecodedBytes:    maxDecodedBytes,
 	}, nil

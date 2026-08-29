@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/internal/snmptopologydiagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +23,7 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 		DefaultDiagnosticArchiveReadLimits(),
 	)
 	require.NoError(t, err)
-	require.Equal(t, snmptopologydiagnostics.ArchiveIdentity{
+	require.Equal(t, DiagnosticArchiveIdentity{
 		Format:               topologyDiagnosticArchiveFormat,
 		Version:              topologyDiagnosticArchiveVersion,
 		ProducerAgentVersion: "v-test",
@@ -52,18 +51,18 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, directDevice, device)
 	require.Equal(t, uint64(1), device.RegistrationID)
-	require.Equal(t, snmptopologydiagnostics.StatePresent, device.Sweep.Membership.State)
-	require.Equal(t, snmptopologydiagnostics.StatePresent, device.Observation.State)
-	require.Equal(t, snmptopologydiagnostics.StatePresent, device.GraphIdentity.Membership.State)
+	require.Equal(t, diagnosticStatePresent, device.Sweep.Membership.State)
+	require.Equal(t, diagnosticStatePresent, device.Observation.State)
+	require.Equal(t, diagnosticStatePresent, device.GraphIdentity.Membership.State)
 	require.NotEmpty(t, device.GraphIdentity.Candidates)
-	require.Equal(t, snmptopologydiagnostics.StatePresent, device.TypedIdentity.Membership.State)
+	require.Equal(t, diagnosticStatePresent, device.TypedIdentity.Membership.State)
 	require.Equal(t, 1, device.TypedIdentity.Membership.Candidates)
 	require.Equal(t, wantReplay.Stats, device.GraphStats)
 
 	stages := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
 	subject, ok := topologyInspectionSubjectFromLink(stages.data, 0)
 	require.True(t, ok)
-	link, err := archive.InspectLink(query, snmptopologydiagnostics.LinkSubject{
+	link, err := archive.InspectLink(query, DiagnosticLinkSubject{
 		SourceIdentity:      subject.srcIdentity,
 		DestinationIdentity: subject.dstIdentity,
 		Family:              subject.family,
@@ -76,9 +75,9 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	directLink, err := newDiagnosticLinkInspection(directLinkReport)
 	require.NoError(t, err)
 	require.Equal(t, directLink, link)
-	require.Equal(t, snmptopologydiagnostics.StatePresent, link.GraphLink.Membership.State)
+	require.Equal(t, diagnosticStatePresent, link.GraphLink.Membership.State)
 	require.NotEmpty(t, link.GraphLink.Candidates)
-	require.Equal(t, snmptopologydiagnostics.StatePresent, link.TypedLink.Membership.State)
+	require.Equal(t, diagnosticStatePresent, link.TypedLink.Membership.State)
 	require.Equal(t, 1, link.TypedLink.Membership.Candidates)
 	require.NotEmpty(t, link.Source.Contexts)
 	require.Equal(t, wantReplay.Stats, link.Stats)
@@ -94,34 +93,34 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		query   snmptopologydiagnostics.QueryOptions
-		subject snmptopologydiagnostics.LinkSubject
+		query   DiagnosticQueryOptions
+		subject DiagnosticLinkSubject
 		link    bool
 		want    string
 	}{
 		"map type": {
-			query: snmptopologydiagnostics.QueryOptions{MapType: "other"},
+			query: DiagnosticQueryOptions{MapType: "other"},
 			want:  "map type",
 		},
 		"inference strategy": {
-			query: snmptopologydiagnostics.QueryOptions{InferenceStrategy: "other"},
+			query: DiagnosticQueryOptions{InferenceStrategy: "other"},
 			want:  "inference strategy",
 		},
 		"managed focus": {
-			query: snmptopologydiagnostics.QueryOptions{ManagedDeviceFocus: "hostname:router"},
+			query: DiagnosticQueryOptions{ManagedDeviceFocus: "hostname:router"},
 			want:  "managed device focus",
 		},
 		"empty managed focus list": {
-			query: snmptopologydiagnostics.QueryOptions{ManagedDeviceFocus: ","},
+			query: DiagnosticQueryOptions{ManagedDeviceFocus: ","},
 			want:  "managed device focus",
 		},
 		"depth": {
-			query: snmptopologydiagnostics.QueryOptions{Depth: "eleven"},
+			query: DiagnosticQueryOptions{Depth: "eleven"},
 			want:  "depth",
 		},
 		"link family": {
 			query: diagnosticQueryOptionsFromInternal(newLLDPDirectScenario().opts),
-			subject: snmptopologydiagnostics.LinkSubject{
+			subject: DiagnosticLinkSubject{
 				SourceIdentity:      "actor:a",
 				DestinationIdentity: "actor:b",
 				Family:              "other",
@@ -131,7 +130,7 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 		},
 		"link direction": {
 			query: diagnosticQueryOptionsFromInternal(newLLDPDirectScenario().opts),
-			subject: snmptopologydiagnostics.LinkSubject{
+			subject: DiagnosticLinkSubject{
 				SourceIdentity:      "actor:a",
 				DestinationIdentity: "actor:b",
 				Family:              "lldp",

@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/internal/snmptopologydiagnostics"
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -26,16 +25,16 @@ type DiagnosticArchive struct {
 
 // DefaultDiagnosticArchiveReadLimits returns the generous defaults measured for
 // archives produced by the Agent.
-func DefaultDiagnosticArchiveReadLimits() snmptopologydiagnostics.ReadLimits {
+func DefaultDiagnosticArchiveReadLimits() DiagnosticReadLimits {
 	limits := defaultTopologyDiagnosticArchiveReadLimits()
-	return snmptopologydiagnostics.ReadLimits{
+	return DiagnosticReadLimits{
 		MaxCompressedBytes: limits.maxCompressedBytes,
 		MaxDecodedBytes:    limits.maxDecodedBytes,
 	}
 }
 
 // DefaultDiagnosticQueryOptions returns the production topology query defaults.
-func DefaultDiagnosticQueryOptions() snmptopologydiagnostics.QueryOptions {
+func DefaultDiagnosticQueryOptions() DiagnosticQueryOptions {
 	return diagnosticQueryOptionsFromInternal(topologyoptions.DefaultQueryOptions())
 }
 
@@ -43,7 +42,7 @@ func DefaultDiagnosticQueryOptions() snmptopologydiagnostics.QueryOptions {
 // same reader used by all offline diagnostic operations.
 func ReadDiagnosticArchive(
 	r io.Reader,
-	limits snmptopologydiagnostics.ReadLimits,
+	limits DiagnosticReadLimits,
 ) (*DiagnosticArchive, error) {
 	archive, err := readTopologyDiagnosticArchive(r, topologyDiagnosticArchiveReadLimits{
 		maxCompressedBytes: limits.MaxCompressedBytes,
@@ -55,26 +54,26 @@ func ReadDiagnosticArchive(
 	return &DiagnosticArchive{archive: archive}, nil
 }
 
-func (a *DiagnosticArchive) Identity() snmptopologydiagnostics.ArchiveIdentity {
+func (a *DiagnosticArchive) Identity() DiagnosticArchiveIdentity {
 	if a == nil {
-		return snmptopologydiagnostics.ArchiveIdentity{}
+		return DiagnosticArchiveIdentity{}
 	}
-	return snmptopologydiagnostics.ArchiveIdentity{
+	return DiagnosticArchiveIdentity{
 		Format:               topologyDiagnosticArchiveFormat,
 		Version:              topologyDiagnosticArchiveVersion,
 		ProducerAgentVersion: a.archive.producerVersion,
 	}
 }
 
-func (a *DiagnosticArchive) Summary() (snmptopologydiagnostics.Summary, error) {
+func (a *DiagnosticArchive) Summary() (DiagnosticSummary, error) {
 	if a == nil {
-		return snmptopologydiagnostics.Summary{}, errors.New("summarize SNMP topology diagnostic archive: nil archive")
+		return DiagnosticSummary{}, errors.New("summarize SNMP topology diagnostic archive: nil archive")
 	}
 	return newDiagnosticSummary(a.Identity(), a.archive.diagnostics)
 }
 
 func (a *DiagnosticArchive) Replay(
-	options snmptopologydiagnostics.QueryOptions,
+	options DiagnosticQueryOptions,
 ) (topologyapi.Data, error) {
 	if a == nil {
 		return topologyapi.Data{}, errors.New("replay SNMP topology diagnostic archive: nil archive")
@@ -94,51 +93,51 @@ func (a *DiagnosticArchive) Replay(
 }
 
 func (a *DiagnosticArchive) InspectDevice(
-	options snmptopologydiagnostics.QueryOptions,
+	options DiagnosticQueryOptions,
 	registrationID uint64,
-) (snmptopologydiagnostics.DeviceInspection, error) {
+) (DiagnosticDeviceInspection, error) {
 	if a == nil {
-		return snmptopologydiagnostics.DeviceInspection{}, errors.New("inspect SNMP topology device: nil archive")
+		return DiagnosticDeviceInspection{}, errors.New("inspect SNMP topology device: nil archive")
 	}
 	query, err := diagnosticQueryOptionsToInternal(options)
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, err
+		return DiagnosticDeviceInspection{}, err
 	}
 	report, err := inspectTopologyDevice(a.archive.diagnostics, query, ddsnmp.DeviceRegistrationID(registrationID))
 	if err != nil {
-		return snmptopologydiagnostics.DeviceInspection{}, err
+		return DiagnosticDeviceInspection{}, err
 	}
 	return newDiagnosticDeviceInspection(report)
 }
 
 func (a *DiagnosticArchive) InspectLink(
-	options snmptopologydiagnostics.QueryOptions,
-	subject snmptopologydiagnostics.LinkSubject,
-) (snmptopologydiagnostics.LinkInspection, error) {
+	options DiagnosticQueryOptions,
+	subject DiagnosticLinkSubject,
+) (DiagnosticLinkInspection, error) {
 	if a == nil {
-		return snmptopologydiagnostics.LinkInspection{}, errors.New("inspect SNMP topology link: nil archive")
+		return DiagnosticLinkInspection{}, errors.New("inspect SNMP topology link: nil archive")
 	}
 	query, err := diagnosticQueryOptionsToInternal(options)
 	if err != nil {
-		return snmptopologydiagnostics.LinkInspection{}, err
+		return DiagnosticLinkInspection{}, err
 	}
 	internalSubject, err := diagnosticLinkSubjectToInternal(subject)
 	if err != nil {
-		return snmptopologydiagnostics.LinkInspection{}, err
+		return DiagnosticLinkInspection{}, err
 	}
 	report, err := inspectTopologyLink(a.archive.diagnostics, query, internalSubject)
 	if err != nil {
-		return snmptopologydiagnostics.LinkInspection{}, err
+		return DiagnosticLinkInspection{}, err
 	}
 	return newDiagnosticLinkInspection(report)
 }
 
-func diagnosticQueryOptionsFromInternal(options topologyoptions.QueryOptions) snmptopologydiagnostics.QueryOptions {
+func diagnosticQueryOptionsFromInternal(options topologyoptions.QueryOptions) DiagnosticQueryOptions {
 	depth := strconv.Itoa(options.Depth)
 	if options.Depth == topologyoptions.DepthAllInternal {
 		depth = topologyoptions.DepthAll
 	}
-	return snmptopologydiagnostics.QueryOptions{
+	return DiagnosticQueryOptions{
 		CollapseActorsByIP:     options.CollapseActorsByIP,
 		EliminateNonIPInferred: options.EliminateNonIPInferred,
 		MapType:                options.MapType,
@@ -149,7 +148,7 @@ func diagnosticQueryOptionsFromInternal(options topologyoptions.QueryOptions) sn
 }
 
 func diagnosticQueryOptionsToInternal(
-	options snmptopologydiagnostics.QueryOptions,
+	options DiagnosticQueryOptions,
 ) (topologyoptions.QueryOptions, error) {
 	mapType := strings.ToLower(strings.TrimSpace(options.MapType))
 	if mapType == "" {
@@ -214,7 +213,7 @@ func diagnosticQueryOptionsToInternal(
 }
 
 func diagnosticLinkSubjectToInternal(
-	subject snmptopologydiagnostics.LinkSubject,
+	subject DiagnosticLinkSubject,
 ) (topologyInspectionLinkSubject, error) {
 	family := normalizeTopologyInspectionToken(subject.Family)
 	switch family {
@@ -242,47 +241,47 @@ func diagnosticLinkSubjectToInternal(
 }
 
 func newDiagnosticSummary(
-	identity snmptopologydiagnostics.ArchiveIdentity,
+	identity DiagnosticArchiveIdentity,
 	diagnostics topologyDiagnostics,
-) (snmptopologydiagnostics.Summary, error) {
+) (DiagnosticSummary, error) {
 	lifecycleStatus, err := newDiagnosticCaptureStatus(diagnostics.lifecycle.state, diagnostics.lifecycle.reason)
 	if err != nil {
-		return snmptopologydiagnostics.Summary{}, fmt.Errorf("summarize lifecycle cut: %w", err)
+		return DiagnosticSummary{}, fmt.Errorf("summarize lifecycle cut: %w", err)
 	}
-	result := snmptopologydiagnostics.Summary{
+	result := DiagnosticSummary{
 		Archive:         identity,
 		ProducerScopeID: diagnostics.producerScopeID,
-		Lifecycle: snmptopologydiagnostics.LifecycleCutSummary{
+		Lifecycle: diagnosticLifecycleCutSummary{
 			Capture:       lifecycleStatus,
 			Sequence:      diagnostics.lifecycle.cut.Sequence,
 			CapturedAt:    diagnostics.lifecycle.cut.CapturedAt,
 			Registrations: len(diagnostics.lifecycle.cut.Entries),
 		},
 	}
-	registrations := make(map[uint64]*snmptopologydiagnostics.RegistrationSummary)
-	registration := func(id uint64) *snmptopologydiagnostics.RegistrationSummary {
+	registrations := make(map[uint64]*diagnosticRegistrationSummary)
+	registration := func(id uint64) *diagnosticRegistrationSummary {
 		if registrations[id] == nil {
-			registrations[id] = &snmptopologydiagnostics.RegistrationSummary{RegistrationID: id}
+			registrations[id] = &diagnosticRegistrationSummary{RegistrationID: id}
 		}
 		return registrations[id]
 	}
 	for _, entry := range diagnostics.lifecycle.cut.Entries {
 		converted, err := newDiagnosticLifecycleRegistration(entry)
 		if err != nil {
-			return snmptopologydiagnostics.Summary{}, err
+			return DiagnosticSummary{}, err
 		}
 		registration(uint64(entry.RegistrationID)).Lifecycle = &converted
 	}
 	if diagnostics.topology != nil {
 		cut, err := newDiagnosticTopologyCutSummary(diagnostics.topology)
 		if err != nil {
-			return snmptopologydiagnostics.Summary{}, err
+			return DiagnosticSummary{}, err
 		}
 		result.Topology = &cut
 		for i := range diagnostics.topology.devices {
 			device, err := newDiagnosticSweepRegistration(&diagnostics.topology.devices[i])
 			if err != nil {
-				return snmptopologydiagnostics.Summary{}, err
+				return DiagnosticSummary{}, err
 			}
 			registration(uint64(diagnostics.topology.devices[i].registrationID)).Sweep = &device
 		}
@@ -293,14 +292,14 @@ func newDiagnosticSummary(
 	}
 	result.LastAborted, err = newDiagnosticAbortedSweep(diagnostics.lastAborted)
 	if err != nil {
-		return snmptopologydiagnostics.Summary{}, err
+		return DiagnosticSummary{}, err
 	}
 	ids := make([]uint64, 0, len(registrations))
 	for id := range registrations {
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)
-	result.Registrations = make([]snmptopologydiagnostics.RegistrationSummary, 0, len(ids))
+	result.Registrations = make([]diagnosticRegistrationSummary, 0, len(ids))
 	for _, id := range ids {
 		result.Registrations = append(result.Registrations, *registrations[id])
 	}
@@ -309,12 +308,12 @@ func newDiagnosticSummary(
 
 func newDiagnosticTopologyCutSummary(
 	cut *topologySweepDiagnosticCut,
-) (snmptopologydiagnostics.TopologyCutSummary, error) {
+) (diagnosticTopologyCutSummary, error) {
 	capture, err := newDiagnosticCaptureStatus(cut.captureState, cut.captureReason)
 	if err != nil {
-		return snmptopologydiagnostics.TopologyCutSummary{}, fmt.Errorf("summarize topology cut: %w", err)
+		return diagnosticTopologyCutSummary{}, fmt.Errorf("summarize topology cut: %w", err)
 	}
-	result := snmptopologydiagnostics.TopologyCutSummary{
+	result := diagnosticTopologyCutSummary{
 		Capture:      capture,
 		Sequence:     cut.sequence,
 		StartedAt:    cut.startedAt,
@@ -340,16 +339,16 @@ func newDiagnosticTopologyCutSummary(
 
 func newDiagnosticLifecycleRegistration(
 	entry ddsnmp.DeviceLifecycleEntry,
-) (snmptopologydiagnostics.LifecycleRegistration, error) {
+) (diagnosticLifecycleRegistration, error) {
 	phase, err := topologyDiagnosticArchiveLifecyclePhaseName(entry.LastCompleted.Phase)
 	if err != nil {
-		return snmptopologydiagnostics.LifecycleRegistration{}, fmt.Errorf("lifecycle phase: %w", err)
+		return diagnosticLifecycleRegistration{}, fmt.Errorf("lifecycle phase: %w", err)
 	}
 	outcome, err := topologyDiagnosticArchiveLifecycleOutcomeName(entry.LastCompleted.Outcome)
 	if err != nil {
-		return snmptopologydiagnostics.LifecycleRegistration{}, fmt.Errorf("lifecycle outcome: %w", err)
+		return diagnosticLifecycleRegistration{}, fmt.Errorf("lifecycle outcome: %w", err)
 	}
-	return snmptopologydiagnostics.LifecycleRegistration{
+	return diagnosticLifecycleRegistration{
 		Hostname:      entry.Info.Hostname,
 		Port:          entry.Info.Port,
 		SNMPVersion:   entry.Info.SNMPVersion,
@@ -362,20 +361,20 @@ func newDiagnosticLifecycleRegistration(
 
 func newDiagnosticSweepRegistration(
 	device *topologySweepDeviceDiagnostic,
-) (snmptopologydiagnostics.SweepRegistration, error) {
+) (diagnosticSweepRegistration, error) {
 	outcome, err := topologyDiagnosticArchiveDeviceOutcomeName(device.outcome)
 	if err != nil {
-		return snmptopologydiagnostics.SweepRegistration{}, fmt.Errorf("device outcome: %w", err)
+		return diagnosticSweepRegistration{}, fmt.Errorf("device outcome: %w", err)
 	}
 	latest, err := newDiagnosticCaptureSummary(device.latestAttempt)
 	if err != nil {
-		return snmptopologydiagnostics.SweepRegistration{}, fmt.Errorf("latest attempt: %w", err)
+		return diagnosticSweepRegistration{}, fmt.Errorf("latest attempt: %w", err)
 	}
 	retained, err := newDiagnosticCaptureSummary(device.acquisition)
 	if err != nil {
-		return snmptopologydiagnostics.SweepRegistration{}, fmt.Errorf("retained success: %w", err)
+		return diagnosticSweepRegistration{}, fmt.Errorf("retained success: %w", err)
 	}
-	return snmptopologydiagnostics.SweepRegistration{
+	return diagnosticSweepRegistration{
 		Selected:           device.selected,
 		Outcome:            outcome,
 		LastAttempt:        device.lastAttempt,
@@ -392,23 +391,23 @@ func newDiagnosticSweepRegistration(
 	}, nil
 }
 
-func newDiagnosticRemovedRegistration(device *topologyRemovedDeviceDiagnostic) snmptopologydiagnostics.RemovedRegistration {
-	return snmptopologydiagnostics.RemovedRegistration{
+func newDiagnosticRemovedRegistration(device *topologyRemovedDeviceDiagnostic) diagnosticRemovedRegistration {
+	return diagnosticRemovedRegistration{
 		RetainedSuccessRef: newDiagnosticEvidenceReference(device.retainedSuccess, device.hasRetainedSuccess),
 	}
 }
 
-func newDiagnosticEvidenceReference(ref topologyEvidenceRef, present bool) *snmptopologydiagnostics.EvidenceReference {
+func newDiagnosticEvidenceReference(ref topologyEvidenceRef, present bool) *diagnosticEvidenceReference {
 	if !present {
 		return nil
 	}
-	return &snmptopologydiagnostics.EvidenceReference{
+	return &diagnosticEvidenceReference{
 		RegistrationID: uint64(ref.registrationID),
 		Generation:     ref.generation,
 	}
 }
 
-func newDiagnosticCaptureSummary(capture *topologyAcquisitionCapture) (*snmptopologydiagnostics.CaptureSummary, error) {
+func newDiagnosticCaptureSummary(capture *topologyAcquisitionCapture) (*diagnosticCaptureSummary, error) {
 	if capture == nil {
 		return nil, nil
 	}
@@ -416,7 +415,7 @@ func newDiagnosticCaptureSummary(capture *topologyAcquisitionCapture) (*snmptopo
 	if err != nil {
 		return nil, err
 	}
-	result := &snmptopologydiagnostics.CaptureSummary{
+	result := &diagnosticCaptureSummary{
 		AttemptOrdinal: capture.attemptID.ordinal,
 		Capture:        status,
 		RecordCount:    capture.recordCount,
@@ -434,36 +433,36 @@ func newDiagnosticCaptureSummary(capture *topologyAcquisitionCapture) (*snmptopo
 
 func newDiagnosticAcquisitionEvidenceSummary(
 	evidence *topologyAcquisitionAttemptEvidence,
-) (snmptopologydiagnostics.AcquisitionEvidenceSummary, error) {
+) (diagnosticAcquisitionEvidenceSummary, error) {
 	target, err := topologyDiagnosticArchiveTargetOutcomeName(evidence.target.outcome)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("target outcome: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("target outcome: %w", err)
 	}
 	client, err := newDiagnosticPhaseStatus(evidence.client)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("client phase: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("client phase: %w", err)
 	}
 	connect, err := newDiagnosticPhaseStatus(evidence.connect)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("connect phase: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("connect phase: %w", err)
 	}
 	profiles, err := newDiagnosticPhaseStatus(evidence.profiles)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("profiles phase: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("profiles phase: %w", err)
 	}
 	collection, err := newDiagnosticPhaseStatus(evidence.collection)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("collection phase: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("collection phase: %w", err)
 	}
 	sysUptime, err := newDiagnosticPhaseStatus(evidence.sysUptime)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("sys_uptime phase: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("sys_uptime phase: %w", err)
 	}
 	vlanProfiles, err := newDiagnosticPhaseStatus(evidence.vlanProfiles)
 	if err != nil {
-		return snmptopologydiagnostics.AcquisitionEvidenceSummary{}, fmt.Errorf("VLAN profiles phase: %w", err)
+		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("VLAN profiles phase: %w", err)
 	}
-	result := snmptopologydiagnostics.AcquisitionEvidenceSummary{
+	result := diagnosticAcquisitionEvidenceSummary{
 		Hostname:      evidence.device.hostname,
 		SysObjectID:   evidence.device.sysObjectID,
 		SysName:       evidence.device.sysName,
@@ -492,35 +491,35 @@ func newDiagnosticAcquisitionEvidenceSummary(
 func newDiagnosticCaptureStatus(
 	state diagnosticCaptureState,
 	reason diagnosticCaptureReason,
-) (snmptopologydiagnostics.CaptureStatus, error) {
+) (diagnosticCaptureStatus, error) {
 	stateName, err := topologyDiagnosticArchiveCaptureStateName(state)
 	if err != nil {
-		return snmptopologydiagnostics.CaptureStatus{}, err
+		return diagnosticCaptureStatus{}, err
 	}
 	reasonName, err := topologyDiagnosticArchiveCaptureReasonName(reason)
 	if err != nil {
-		return snmptopologydiagnostics.CaptureStatus{}, err
+		return diagnosticCaptureStatus{}, err
 	}
-	return snmptopologydiagnostics.CaptureStatus{State: stateName, Reason: reasonName}, nil
+	return diagnosticCaptureStatus{State: stateName, Reason: reasonName}, nil
 }
 
 func newDiagnosticPhaseStatus(
 	phase topologyAcquisitionPhaseEvidence,
-) (snmptopologydiagnostics.PhaseStatus, error) {
+) (diagnosticPhaseStatus, error) {
 	outcome, err := topologyDiagnosticArchivePhaseOutcomeName(phase.outcome)
 	if err != nil {
-		return snmptopologydiagnostics.PhaseStatus{}, err
+		return diagnosticPhaseStatus{}, err
 	}
 	failure, err := topologyDiagnosticArchivePhaseFailureName(phase.failure)
 	if err != nil {
-		return snmptopologydiagnostics.PhaseStatus{}, err
+		return diagnosticPhaseStatus{}, err
 	}
-	return snmptopologydiagnostics.PhaseStatus{Outcome: outcome, Failure: failure}, nil
+	return diagnosticPhaseStatus{Outcome: outcome, Failure: failure}, nil
 }
 
 func newDiagnosticAbortedSweep(
 	aborted *topologyAbortedSweepDiagnostic,
-) (*snmptopologydiagnostics.AbortedSweep, error) {
+) (*diagnosticAbortedSweep, error) {
 	if aborted == nil {
 		return nil, nil
 	}
@@ -532,7 +531,7 @@ func newDiagnosticAbortedSweep(
 	if err != nil {
 		return nil, err
 	}
-	return &snmptopologydiagnostics.AbortedSweep{
+	return &diagnosticAbortedSweep{
 		Sequence:              aborted.sequence,
 		StartedAt:             aborted.startedAt,
 		AbortedAt:             aborted.abortedAt,
@@ -545,15 +544,15 @@ func newDiagnosticAbortedSweep(
 	}, nil
 }
 
-func diagnosticStage(stage topologyInspectionStage) snmptopologydiagnostics.Stage {
-	state := snmptopologydiagnostics.StateUndetermined
+func diagnosticStage(stage topologyInspectionStage) diagnosticStageReport {
+	state := diagnosticStateUndetermined
 	switch stage.state {
 	case topologyInspectionPresent:
-		state = snmptopologydiagnostics.StatePresent
+		state = diagnosticStatePresent
 	case topologyInspectionAbsent:
-		state = snmptopologydiagnostics.StateAbsent
+		state = diagnosticStateAbsent
 	}
-	return snmptopologydiagnostics.Stage{State: state, Candidates: stage.candidates}
+	return diagnosticStageReport{State: state, Candidates: stage.candidates}
 }
 
 func cloneStringMap(values map[string]string) map[string]string {

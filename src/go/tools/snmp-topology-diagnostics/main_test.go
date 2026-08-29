@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/internal/snmptopologydiagnostics"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
@@ -104,7 +103,7 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fake := &fakeDiagnosticArchive{}
 			openCalls := 0
-			opener := func(_ io.Reader, limits snmptopologydiagnostics.ReadLimits) (diagnosticArchive, error) {
+			opener := func(_ io.Reader, limits snmptopology.DiagnosticReadLimits) (diagnosticArchive, error) {
 				openCalls++
 				fake.limits = limits
 				return fake, nil
@@ -149,7 +148,7 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 func TestRunRealArchiveMatchesDirectOperations(t *testing.T) {
 	archivePath := replayableDiagnosticArchivePath()
 	query := snmptopology.DefaultDiagnosticQueryOptions()
-	link := snmptopologydiagnostics.LinkSubject{
+	link := snmptopology.DiagnosticLinkSubject{
 		SourceIdentity:      "ip:192.0.2.71",
 		DestinationIdentity: "ip:192.0.2.72",
 		Family:              "lldp",
@@ -162,7 +161,7 @@ func TestRunRealArchiveMatchesDirectOperations(t *testing.T) {
 		"validate": {
 			args: []string{"validate", "--archive", archivePath},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
-				return snmptopologydiagnostics.Validation{Valid: true, Archive: archive.Identity()}, nil
+				return snmptopology.DiagnosticValidation{Valid: true, Archive: archive.Identity()}, nil
 			},
 		},
 		"summary": {
@@ -332,23 +331,23 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 type fakeDiagnosticArchive struct {
 	operation      string
 	operationCalls int
-	limits         snmptopologydiagnostics.ReadLimits
-	query          snmptopologydiagnostics.QueryOptions
+	limits         snmptopology.DiagnosticReadLimits
+	query          snmptopology.DiagnosticQueryOptions
 }
 
-func (a *fakeDiagnosticArchive) Identity() snmptopologydiagnostics.ArchiveIdentity {
+func (a *fakeDiagnosticArchive) Identity() snmptopology.DiagnosticArchiveIdentity {
 	a.operation = "validate"
 	a.operationCalls++
-	return snmptopologydiagnostics.ArchiveIdentity{}
+	return snmptopology.DiagnosticArchiveIdentity{}
 }
 
-func (a *fakeDiagnosticArchive) Summary() (snmptopologydiagnostics.Summary, error) {
+func (a *fakeDiagnosticArchive) Summary() (snmptopology.DiagnosticSummary, error) {
 	a.operation = "summary"
 	a.operationCalls++
-	return snmptopologydiagnostics.Summary{}, nil
+	return snmptopology.DiagnosticSummary{}, nil
 }
 
-func (a *fakeDiagnosticArchive) Replay(options snmptopologydiagnostics.QueryOptions) (topologyv1.Data, error) {
+func (a *fakeDiagnosticArchive) Replay(options snmptopology.DiagnosticQueryOptions) (topologyv1.Data, error) {
 	a.operation = "replay"
 	a.operationCalls++
 	a.query = options
@@ -356,23 +355,23 @@ func (a *fakeDiagnosticArchive) Replay(options snmptopologydiagnostics.QueryOpti
 }
 
 func (a *fakeDiagnosticArchive) InspectDevice(
-	options snmptopologydiagnostics.QueryOptions,
+	options snmptopology.DiagnosticQueryOptions,
 	registrationID uint64,
-) (snmptopologydiagnostics.DeviceInspection, error) {
+) (snmptopology.DiagnosticDeviceInspection, error) {
 	a.operation = "inspect-device"
 	a.operationCalls++
 	a.query = options
-	return snmptopologydiagnostics.DeviceInspection{RegistrationID: registrationID}, nil
+	return snmptopology.DiagnosticDeviceInspection{RegistrationID: registrationID}, nil
 }
 
 func (a *fakeDiagnosticArchive) InspectLink(
-	options snmptopologydiagnostics.QueryOptions,
-	subject snmptopologydiagnostics.LinkSubject,
-) (snmptopologydiagnostics.LinkInspection, error) {
+	options snmptopology.DiagnosticQueryOptions,
+	subject snmptopology.DiagnosticLinkSubject,
+) (snmptopology.DiagnosticLinkInspection, error) {
 	a.operation = "inspect-link"
 	a.operationCalls++
 	a.query = options
-	return snmptopologydiagnostics.LinkInspection{Subject: subject}, nil
+	return snmptopology.DiagnosticLinkInspection{Subject: subject}, nil
 }
 
 func writeGoldenDiagnosticArchive(t testing.TB) string {
