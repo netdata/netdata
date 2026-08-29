@@ -1,23 +1,39 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.26.2
+go 1.27.0
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
 
 require (
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
+	github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.10.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/PaloAltoNetworks/pango v0.10.2
 	github.com/Wing924/ltsv v0.4.0
+	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
+	github.com/aws/aws-sdk-go-v2 v1.43.7
+	github.com/aws/aws-sdk-go-v2/config v1.32.38
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.37
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.66.6
+	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.36.2
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.3
+	github.com/aws/aws-sdk-go-v2/service/sts v1.45.7
+	github.com/aws/smithy-go v1.27.8
 	github.com/axiomhq/hyperloglog v0.2.6
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/catonetworks/cato-go-sdk v0.3.3
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.7.0
+	github.com/docker/go-units v0.5.0
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-ldap/ldap/v3 v3.4.14
@@ -30,75 +46,56 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
+	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
+	github.com/ibm-messaging/mq-golang/v5 v5.7.2
 	github.com/ibmdb/go_ibm_db v0.5.4 // Used by ibm.d.plugin (requires CGO)
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
+	github.com/klauspost/compress v1.19.2
 	github.com/likexian/whois v1.15.7
 	github.com/likexian/whois-parser v1.24.21
 	github.com/lmittmann/tint v1.2.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-xmlrpc v0.0.3
+	github.com/maxmind/mmdbwriter v1.2.0
+	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/miekg/dns v1.1.73
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/moby/moby/api v1.55.0
+	github.com/moby/moby/client v0.5.1
+	github.com/netdata/systemd-journal-sdk/go v0.8.1
+	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus-community/pro-bing v0.9.1
+	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.70.1
 	github.com/prometheus/prometheus v2.55.1+incompatible
 	github.com/redis/go-redis/v9 v9.22.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.19.0
 	github.com/valyala/fastjson v1.6.10
 	github.com/vmware/govmomi v0.56.0
+	go.mongodb.org/mongo-driver/v2 v2.8.0
 	go.opentelemetry.io/proto/otlp v1.11.0
 	go.uber.org/automaxprocs v1.6.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
 	golang.org/x/net v0.58.0
 	golang.org/x/sync v0.22.0
+	golang.org/x/sys v0.47.0
 	golang.org/x/text v0.41.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
 	google.golang.org/grpc v1.83.1
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.2
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.4
 	k8s.io/apimachinery v0.36.4
 	k8s.io/client-go v0.36.4
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
-)
-
-require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.0
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
-	github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.10.0
-	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
-	github.com/aws/aws-sdk-go-v2 v1.43.7
-	github.com/aws/aws-sdk-go-v2/config v1.32.38
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.37
-	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.66.6
-	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.36.2
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.3
-	github.com/aws/aws-sdk-go-v2/service/sts v1.45.7
-	github.com/aws/smithy-go v1.27.8
-	github.com/catonetworks/cato-go-sdk v0.3.3
-	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/docker/go-units v0.5.0
-	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
-	github.com/ibm-messaging/mq-golang/v5 v5.7.2
-	github.com/klauspost/compress v1.19.2
-	github.com/maxmind/mmdbwriter v1.2.0
-	github.com/microsoft/go-mssqldb v1.10.0
-	github.com/moby/moby/api v1.55.0
-	github.com/moby/moby/client v0.5.1
-	github.com/netdata/systemd-journal-sdk/go v0.8.1
-	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/prometheus/client_model v0.6.2
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	go.mongodb.org/mongo-driver/v2 v2.8.0
-	golang.org/x/sys v0.47.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

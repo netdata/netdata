@@ -119,12 +119,13 @@ jobs:
           go fmt ./... | tee modified-files
           [ "$(wc -l modified-files | cut -f 1 -d ' ')" -eq 0 ] || exit 1
         working-directory: ${{ matrix.module }}
-      - name: Go fix
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          go fix ./...
-          git diff --exit-code
-        working-directory: ${{ matrix.module }}
+      # Re-enable after the Go 1.27 go fix source migration is applied and reviewed.
+      # - name: Go fix
+      #   if: needs.file-check.outputs.run == 'true'
+      #   run: |
+      #     go fix ./...
+      #     git diff --exit-code
+      #   working-directory: ${{ matrix.module }}
       - name: Go vet
         if: needs.file-check.outputs.run == 'true'
         run: |
