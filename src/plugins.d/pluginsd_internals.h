@@ -16,6 +16,17 @@ PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const cha
 
 ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
+// Validate the sample time of a BEGIN2 sent by a child and sanitize the child
+// wall-clock: negative/zero values can only come from integer wrap-around and
+// are rejected; an unset wall-clock falls back to end_time.
+static ALWAYS_INLINE bool pluginsd_begin_v2_times_valid(time_t end_time, time_t wall_clock_time, time_t *wall_clock_out) {
+    if(end_time <= 0)
+        return false;
+
+    *wall_clock_out = (wall_clock_time > 0) ? wall_clock_time : end_time;
+    return true;
+}
+
 static ALWAYS_INLINE RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
     RRDHOST *host = parser->user.host;
 
