@@ -45,6 +45,7 @@ func TestInspectTopologyDeviceSeparatesLatestAttemptFromRetainedSuccess(t *testi
 	require.Equal(t, topologyInspectionPresent, report.observation.state)
 	require.Equal(t, topologyInspectionPresent, report.graphIdentity.membership.state)
 	require.Equal(t, topologyInspectionPresent, report.typedIdentity.state)
+	require.Equal(t, 1, report.typedIdentity.candidates)
 }
 
 func TestInspectTopologyDeviceKeepsIncompleteCutsUndetermined(t *testing.T) {
@@ -226,6 +227,7 @@ func TestInspectTopologyLinkUsesCandidateSubjectAndSingleRenderedRow(t *testing.
 	require.Equal(t, topologyInspectionPresent, report.graphLink.membership.state)
 	require.Equal(t, 1, report.graphLink.membership.candidates)
 	require.Equal(t, topologyInspectionPresent, report.typedLink.state)
+	require.Equal(t, 1, report.typedLink.candidates)
 	require.Equal(t, report.graphLink.index, report.typedLink.row)
 	sourceContext := report.source
 
@@ -235,6 +237,7 @@ func TestInspectTopologyLinkUsesCandidateSubjectAndSingleRenderedRow(t *testing.
 	require.NoError(t, err)
 	require.Equal(t, topologyInspectionPresent, report.graphLink.membership.state)
 	require.Equal(t, topologyInspectionPresent, report.typedLink.state)
+	require.Equal(t, 1, report.typedLink.candidates)
 
 	subject.dstIdentity = "ip:192.0.2.254"
 	report, err = inspectTopologyLink(diagnostics, scenario.opts, subject)
@@ -242,6 +245,7 @@ func TestInspectTopologyLinkUsesCandidateSubjectAndSingleRenderedRow(t *testing.
 	require.Equal(t, sourceContext, report.source)
 	require.Equal(t, topologyInspectionAbsent, report.graphLink.membership.state)
 	require.Equal(t, topologyInspectionAbsent, report.typedLink.state)
+	require.Zero(t, report.typedLink.candidates)
 }
 
 func TestInspectTopologyLinkAmbiguousIdentityIsUndetermined(t *testing.T) {

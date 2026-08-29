@@ -147,7 +147,7 @@ func normalizeTopologyInspectionDirection(value string) string {
 
 func topologyInspectionRenderedRow(
 	renderState topologyInspectionState,
-	membership topologyInspectionState,
+	membership topologyInspectionStage,
 	row int,
 	rows int,
 ) topologyInspectionRowResult {
@@ -155,7 +155,8 @@ func topologyInspectionRenderedRow(
 	if renderState != topologyInspectionPresent {
 		return result
 	}
-	switch membership {
+	result.candidates = membership.candidates
+	switch membership.state {
 	case topologyInspectionAbsent:
 		result.state = topologyInspectionAbsent
 	case topologyInspectionPresent:

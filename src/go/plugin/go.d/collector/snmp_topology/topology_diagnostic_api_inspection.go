@@ -246,7 +246,7 @@ func newDiagnosticActorDetails(actor topologymodel.Actor) (snmptopologydiagnosti
 
 func newDiagnosticRowInspection(result topologyInspectionRowResult) snmptopologydiagnostics.RowInspection {
 	return snmptopologydiagnostics.RowInspection{
-		Membership: diagnosticStage(topologyInspectionStage{state: result.state}),
+		Membership: diagnosticStage(result.topologyInspectionStage),
 		Row:        result.row,
 	}
 }

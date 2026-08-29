@@ -56,6 +56,8 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.Equal(t, snmptopologydiagnostics.StatePresent, device.Observation.State)
 	require.Equal(t, snmptopologydiagnostics.StatePresent, device.GraphIdentity.Membership.State)
 	require.NotEmpty(t, device.GraphIdentity.Candidates)
+	require.Equal(t, snmptopologydiagnostics.StatePresent, device.TypedIdentity.Membership.State)
+	require.Equal(t, 1, device.TypedIdentity.Membership.Candidates)
 	require.Equal(t, wantReplay.Stats, device.GraphStats)
 
 	stages := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
@@ -76,6 +78,8 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.Equal(t, directLink, link)
 	require.Equal(t, snmptopologydiagnostics.StatePresent, link.GraphLink.Membership.State)
 	require.NotEmpty(t, link.GraphLink.Candidates)
+	require.Equal(t, snmptopologydiagnostics.StatePresent, link.TypedLink.Membership.State)
+	require.Equal(t, 1, link.TypedLink.Membership.Candidates)
 	require.NotEmpty(t, link.Source.Contexts)
 	require.Equal(t, wantReplay.Stats, link.Stats)
 }

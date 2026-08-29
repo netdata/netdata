@@ -24,8 +24,9 @@ go run ./tools/snmp-topology-diagnostics inspect-link --archive /path/to/archive
 
 Every successful operation writes one JSON document to standard output. `validate` verifies the complete archive and
 reports its identity. `summary` reports the captured cuts and an ordered registration inventory. `replay` emits the
-production topology-v1 payload. The inspection operations explain one device or link through the captured evidence,
-graph, and rendered topology stages.
+production topology-v1 payload. The inspection operations report one device or link across captured evidence, graph, and
+rendered topology stages. Link reports also include family-wide source context; that context is not causal provenance for
+the inspected link.
 
 Use `summary` to find a device registration ID. A device inspection reports its graph identity keys; one of those keys can
 be supplied as a link endpoint identity. Link families are `lldp`, `cdp`, `bridge`, `fdb`, `stp`, `arp`, `l3_subnet`,
