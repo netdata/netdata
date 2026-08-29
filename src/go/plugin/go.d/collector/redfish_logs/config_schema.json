@@ -1,0 +1,67 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Redfish log backend configuration.",
+    "type": "object",
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Backend operational chart refresh interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "type": "string"
+      },
+      "retention": {
+        "title": "Retention",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "max_size": {
+            "title": "Maximum retained size",
+            "description": "Positive size target for this backend, for example 10GB.",
+            "type": "string",
+            "minLength": 1,
+            "default": "10GB"
+          }
+        }
+      }
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Collection",
+          "fields": ["update_every", "autodetection_retry"]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": ["vnode"]
+        },
+        {
+          "title": "Retention",
+          "fields": ["retention"]
+        }
+      ]
+    }
+  }
+}

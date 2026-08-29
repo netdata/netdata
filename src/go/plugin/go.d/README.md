@@ -121,6 +121,8 @@ All capabilities are set automatically during Netdata installation using the [of
 | [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pulsar)                         |         Apache Pulsar         |
 | [puppet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/puppet)                         |            Puppet             |
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rabbitmq)                     |           RabbitMQ            |
+| [redfish](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/redfish)                       |         Redfish BMCs          |
+| [redfish_logs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/redfish_logs)             |     Redfish Log Backends      |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/redis)                           |             Redis             |
 | [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rethinkdb)                   |           RethinkDB           |
 | [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/riakkv)                         |            Riak KV            |
