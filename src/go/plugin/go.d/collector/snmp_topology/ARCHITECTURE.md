@@ -634,9 +634,10 @@ The replay contract is hermetic:
 
 Live Function and offline replay use the same graph and renderer. Their typed
 topology structure is identical for the same scalar options; only PTR-derived
-presentation fields may differ. This replay entry point consumes trusted,
-already-bounded in-memory diagnostics. Validation and structural limits for
-untrusted archive input belong to the later archive reader boundary.
+presentation fields may differ. The live replay entry point consumes trusted,
+already-bounded in-memory diagnostics. The portable archive reader below owns
+the external byte, format, enum, role, and reference boundary before it exposes
+the same immutable diagnostic snapshot to replay or inspection.
 
 ## Offline Diagnostic Inspection
 
@@ -686,6 +687,70 @@ builds one graph, and renders once. Existing graph counters are returned as
 graph-wide context and never determine a subject's state. Any renderable-device
 replay failure makes graph and typed-output membership `undetermined` globally,
 while an independently replayable device observation remains available.
+
+## Portable Diagnostic Archive
+
+`topology_diagnostic_archive*.go` defines one portable representation of the
+complete diagnostic snapshot. It is one root-versioned JSON document inside a
+zstd stream, not a member container:
+
+```text
+topologyDiagnostics
+  -> positive-allowlist archive-v1 DTO
+  -> one JSON value
+  -> one checksummed zstd stream
+```
+
+The DTO mirrors only credential-free diagnostic state. It has no manifest,
+member paths, per-section revisions, checksums outside the zstd frame, captured
+profile programs, packet material, error text, or credential-bearing connection
+state. Producer Agent version is informational. The one archive version covers
+both the DTO and the replay kernel; changes to replay-affecting semantic, graph,
+enrichment, shaping, rendering, or compiled OUI behavior require a new archive
+version.
+
+Each device owns a capture list. A capture entry has `latest_attempt`,
+`retained_success`, or both roles. One entry with both roles reconstructs one
+shared pointer; separate entries reconstruct distinct captures. This preserves
+the runtime lineage without a global object table or cross-device reference
+graph.
+
+Writing and reading are invocation-local `io.Writer`/`io.Reader` operations.
+Both use one zstd worker. The writer streams JSON through zstd without retaining
+encoded Function output or imposing another byte ceiling on the already-bounded
+live snapshot. Stable JSON v2 is used with explicit JSON v1 compatibility
+options and HTML escaping disabled. Invalid in-memory strings receive the JSON
+v1 replacement behavior, so the writer always emits valid UTF-8.
+
+The reader performs one streaming decode: caller-bounded compressed input flows
+through one zstd decoder, then caller-bounded decoded bytes flow directly into
+JSON v2 and one owned DTO. Every invocation supplies both limits. The library
+provides generous defaults of 128 MiB compressed and 512 MiB decoded, and a
+maintainer tool can override either for a particular run. There is no compressed
+archive buffer, second decompression pass, DTO field classifier, allocation
+predictor, or generic token, string, depth, record, logical-byte,
+canonical-order, or replay-work policy.
+
+Raw invalid UTF-8 is rejected during typed decoding rather than expanded by
+replacement. The two byte limits are operational stop conditions, not a typed
+allocation, exact process heap, or RSS guarantee. A deliberately hostile
+attachment can therefore remain expensive within the selected decoded-byte
+allowance; the initial source-only diagnostic tool deliberately favors a small,
+caller-controlled reader contract over schema-coupled allocation accounting.
+
+Reconstruction validates only the root format/version and the typed enum,
+capture-role/reference/generation, unique attempt-ordinal, registration,
+address, and value-to-route invariants needed for safe replay and honest
+inspection. BGP peer state remains an open scalar, matching live evidence rather
+than inventing a closed archive enum. Standard Go JSON unknown-field and
+duplicate-key behavior is intentional.
+
+Archives are sensitive support attachments even though the Agent is the only
+supported producer. The reader's caller-selected byte limits stop oversized
+compressed input and decompression output. Zstd frame integrity detects
+accidental corruption; it does not authenticate an archive. Arbitrary semantic
+JSON editing, signing, sanitization, filesystem publication, retention, and
+command-line behavior are separate contracts.
 
 ## Trap Enrichment
 
