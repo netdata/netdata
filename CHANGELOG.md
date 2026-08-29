@@ -152,6 +152,13 @@
 - Regenerate integrations docs ([#23661](https://github.com/netdata/netdata/issues/23661))
 - Drop retries on artifact downloads. ([#23649](https://github.com/netdata/netdata/issues/23649))
 - Filter disk (Windows) ([#23660](https://github.com/netdata/netdata/issues/23660))
+- Fix(proc): parse interrupt counters adjacent to labels ([#23651](https://github.com/netdata/netdata/issues/23651))
+- Feat(go.d/snmp-topology): retain bounded diagnostic evidence ([#23665](https://github.com/netdata/netdata/issues/23665))
+- Fix charts.d disabled-message config filename ([#23662](https://github.com/netdata/netdata/issues/23662))
+- Regenerate integrations docs ([#23664](https://github.com/netdata/netdata/issues/23664))
+- Feat(go.d/snmp-topology): retain topology acquisition diagnostics ([#23667](https://github.com/netdata/netdata/issues/23667))
+- Feat(go.d/snmp_topology): add hermetic topology graph replay ([#23670](https://github.com/netdata/netdata/issues/23670))
+- Feat(go.d): add S3 and multisite replication checks ([#23669](https://github.com/netdata/netdata/issues/23669))
 
 ## [2.11.0] - 2026-08-12
 

@@ -21,10 +21,11 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 	}
 
 	dnsCandidates := a.registry.reverseDNSCandidateCollector()
+	environment := topologyGraphBuildEnvironment{}
 	if dnsCandidates != nil {
-		options.ResolveDNSName = dnsCandidates.lookupCached
+		environment.resolveDNSName = dnsCandidates.lookupCached
 	}
-	data, ok, err := a.registry.snapshotWithOptions(options)
+	data, ok, err := a.registry.snapshotWithEnvironment(options, environment)
 	if err != nil {
 		return topologyv1.Data{}, false, err
 	}

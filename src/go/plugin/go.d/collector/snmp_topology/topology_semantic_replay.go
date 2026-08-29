@@ -5,89 +5,121 @@ package snmptopology
 import (
 	"errors"
 	"fmt"
-	"maps"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 var errTopologySemanticBGPCollection = errors.New("captured BGP collection failure")
 
-func replayTopologySemanticEvidence(evidence *topologySemanticEvidence) (*topologyDeviceSnapshot, error) {
-	if err := validateTopologySemanticEvidence(evidence); err != nil {
+func replayTopologyAcquisitionEvidence(evidence *topologyAcquisitionAttemptEvidence) (*topologyDeviceSnapshot, error) {
+	if err := validateTopologyAcquisitionEvidence(evidence); err != nil {
 		return nil, err
 	}
 	builder := newTopologyBuilderFromSemanticInput(
 		evidence.device,
-		evidence.targets,
+		evidence.target.addresses,
 		evidence.collectedAt,
 		evidence.freshFor,
 	)
-	for _, event := range evidence.events {
-		applyTopologySemanticEvent(builder, topologySemanticEventFromEvidence(event))
+	main := acquisitionContextByOrdinal(evidence, 0)
+	profiles := topologySemanticProfilesFromAcquisition(main.profiles)
+	applyTopologySemanticEvent(builder, topologySemanticEvent{
+		kind: topologySemanticEventSysUptime, sysUptime: evidence.sysUptimeValue,
+	})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventProfileTags, profiles: profiles})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventTopologyMetrics, profiles: profiles})
+	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: profiles})
+	for _, context := range evidence.collectionContexts {
+		if context.ordinal == 0 || context.collection.outcome != topologyAcquisitionPhaseSuccess {
+			continue
+		}
+		applyTopologySemanticEvent(builder, topologySemanticEvent{
+			kind:     topologySemanticEventVLANContext,
+			profiles: topologySemanticProfilesFromAcquisition(context.profiles),
+			vlanID:   context.vlanID,
+			vlanName: context.vlanName,
+		})
 	}
 	snapshot, _ := freezeTopologyBuilder(builder)
 	return snapshot, nil
 }
 
-func validateTopologySemanticEvidence(evidence *topologySemanticEvidence) error {
+func validateTopologyAcquisitionEvidence(evidence *topologyAcquisitionAttemptEvidence) error {
 	if evidence == nil {
-		return errors.New("semantic evidence is missing")
+		return errors.New("acquisition evidence is missing")
 	}
 	if evidence.collectedAt.IsZero() {
-		return errors.New("semantic collected time is missing")
+		return errors.New("acquisition collected time is missing")
 	}
 	if evidence.freshFor <= 0 {
-		return errors.New("semantic freshness duration must be positive")
+		return errors.New("acquisition freshness duration must be positive")
 	}
-	want := []topologySemanticEventKind{
-		topologySemanticEventSysUptime,
-		topologySemanticEventProfileTags,
-		topologySemanticEventTopologyMetrics,
-		topologySemanticEventBGPPeers,
+	main := acquisitionContextByOrdinal(evidence, 0)
+	if main == nil || main.collection.outcome != topologyAcquisitionPhaseSuccess {
+		return errors.New("successful main acquisition context is missing")
 	}
-	if len(evidence.events) < len(want) {
-		return fmt.Errorf("semantic event order: got %d events, need at least %d", len(evidence.events), len(want))
-	}
-	for i, kind := range want {
-		if evidence.events[i].kind != kind {
-			return fmt.Errorf("semantic event order: event %d is %d, expected %d", i, evidence.events[i].kind, kind)
+	var previousContext uint32
+	for i, context := range evidence.collectionContexts {
+		if i > 0 && context.ordinal <= previousContext {
+			return fmt.Errorf("acquisition context order: ordinal %d follows %d", context.ordinal, previousContext)
 		}
-	}
-	for i := len(want); i < len(evidence.events); i++ {
-		if evidence.events[i].kind != topologySemanticEventVLANContext {
-			return fmt.Errorf("semantic event order: event %d is not a VLAN context", i)
+		previousContext = context.ordinal
+		var previousProfile uint32
+		for j, profile := range context.profiles {
+			if j > 0 && profile.identity.Ordinal <= previousProfile {
+				return fmt.Errorf("acquisition profile order: ordinal %d follows %d", profile.identity.Ordinal, previousProfile)
+			}
+			previousProfile = profile.identity.Ordinal
 		}
 	}
 	return nil
 }
 
-func topologySemanticEventFromEvidence(event topologySemanticEventEvidence) topologySemanticEvent {
-	profiles := make([]*ddsnmp.ProfileMetrics, 0, len(event.profiles))
-	for _, profile := range event.profiles {
-		profiles = append(profiles, topologySemanticProfileFromEvidence(profile))
+func acquisitionContextByOrdinal(
+	evidence *topologyAcquisitionAttemptEvidence,
+	ordinal uint32,
+) *topologyAcquisitionContextEvidence {
+	if evidence == nil {
+		return nil
 	}
-	return topologySemanticEvent{
-		kind:      event.kind,
-		sysUptime: event.sysUptime,
-		profiles:  profiles,
-		vlanID:    event.vlanID,
-		vlanName:  event.vlanName,
+	for i := range evidence.collectionContexts {
+		if evidence.collectionContexts[i].ordinal == ordinal {
+			return &evidence.collectionContexts[i]
+		}
 	}
+	return nil
 }
 
-func topologySemanticProfileFromEvidence(profile topologySemanticProfileEvidence) *ddsnmp.ProfileMetrics {
+func topologySemanticProfilesFromAcquisition(
+	profiles []topologyAcquisitionProfileEvidence,
+) []*ddsnmp.ProfileMetrics {
+	result := make([]*ddsnmp.ProfileMetrics, 0, len(profiles))
+	for _, profile := range profiles {
+		if profile.outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed ||
+			profile.outcome == ddsnmpcollector.AcquisitionProfileOutcomeUnknown {
+			continue
+		}
+		result = append(result, topologySemanticProfileFromAcquisition(profile.values))
+	}
+	return result
+}
+
+func topologySemanticProfileFromAcquisition(profile topologyAcquisitionProfileValues) *ddsnmp.ProfileMetrics {
+	// The semantic builder only reads these immutable evidence maps; borrowing
+	// them avoids rebuilding the acquisition value store during replay.
 	result := &ddsnmp.ProfileMetrics{
-		DeviceMetadata: maps.Clone(profile.metadata),
-		Tags:           maps.Clone(profile.tags),
+		DeviceMetadata: profile.metadata,
+		Tags:           profile.tags,
 	}
 	for _, metric := range profile.metrics {
 		result.TopologyMetrics = append(result.TopologyMetrics, ddsnmp.Metric{
 			TopologyKind: metric.kind,
-			Tags:         maps.Clone(metric.tags),
+			Tags:         metric.tags,
 		})
 	}
 	for _, row := range profile.bgpRows {
-		result.BGPRows = append(result.BGPRows, topologySemanticBGPRowFromEvidence(row))
+		result.BGPRows = append(result.BGPRows, topologySemanticBGPRowFromAcquisition(row))
 	}
 	if profile.bgpFailed {
 		result.BGPCollectError = errTopologySemanticBGPCollection
@@ -95,7 +127,7 @@ func topologySemanticProfileFromEvidence(profile topologySemanticProfileEvidence
 	return result
 }
 
-func topologySemanticBGPRowFromEvidence(row topologySemanticBGPRowEvidence) ddsnmp.BGPRow {
+func topologySemanticBGPRowFromAcquisition(row topologyAcquisitionBGPRowValue) ddsnmp.BGPRow {
 	return ddsnmp.BGPRow{
 		OriginProfileID: row.originProfileID,
 		Table:           row.table,
@@ -135,6 +167,6 @@ func topologySemanticBGPRowFromEvidence(row topologySemanticBGPRowEvidence) ddsn
 				Value: row.updateAge,
 			},
 		},
-		Tags: maps.Clone(row.tags),
+		Tags: row.tags,
 	}
 }

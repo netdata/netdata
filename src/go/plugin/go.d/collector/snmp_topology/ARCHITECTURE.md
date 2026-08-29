@@ -100,22 +100,24 @@ refreshTopology(ctx)
   build a plan of jobs whose next retry/refresh is due
   resolve planned DNS targets with up to eight workers under one shared 5s budget
   for each planned job, in registration-ID order:
-    refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, remainingSemanticLimits)
+    assign the next per-incarnation attempt ordinal
+    refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence, perDeviceAcquisitionLimits)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
   activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, registrationID, device, targetManagementIPs, semanticLimits)
+refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence, acquisitionLimits)
+  start one bounded acquisition-attempt envelope and its main collection context
   connect to the device with gosnmp
   select topology profiles
-  collect topology ProfileMetrics with ddsnmpcollector
+  collect topology ProfileMetrics with ddsnmpcollector and receive one terminal acquisition report per selected profile
   query sysUpTime
   build a fresh mutable per-device builder with private target candidates
   ingest topology metrics into the builder
-  collect VTP VLAN contexts when needed
+  collect VTP VLAN contexts into distinct acquisition contexts when needed
   filter target and observed addresses with collected masks, select one management IP, and finalize diagnostics
-  freeze one immutable DeviceSnapshot with its exact acquisition time
+  freeze one immutable DeviceSnapshot with its exact acquisition time and successful attempt evidence
 ```
 
 The refresh loop checks devices every `update_every` seconds, but a device is
@@ -186,23 +188,20 @@ Diagnostics preserve two intentionally independent inventory cuts:
 - the topology sweep cut attached to the same immutable generation as the
   Function-visible device vector.
 
-The topology cut's ordered device rows are the exact start-of-sweep registration
-inventory. Each row separates whether the job was selected, its committed
-outcome/retry state, its last successful evidence reference and capture state,
-and whether that retained generation is renderable or expired. Registrations
-removed since the preceding cut are recorded separately. A canceled or
-panicking sweep leaves both the published topology generation and its cut
-unchanged and replaces only one bounded last-aborted marker. That marker records the sweep phase and, during
-device refresh, the active registration ID.
+The topology cut's ordered device rows are the exact start-of-sweep registration inventory. Each row separates whether
+the job was selected, its committed outcome/retry state, its retained successful acquisition, its latest completed
+attempt, and whether the retained generation is renderable or expired. The two acquisition pointers alias when the
+latest attempt succeeded; a later failure or no-profile attempt replaces only the latest-attempt pointer. Registrations
+removed since the preceding cut are recorded separately. A canceled or panicking sweep leaves both the published
+topology generation and its cut unchanged and replaces only one bounded last-aborted marker. That marker records the
+sweep phase and, during device refresh, the active registration ID.
 
-Per-device semantic limits and one global latest-view record/logical-byte limit
-are checked directly. One serial usage counter includes sweep rows, non-due
-retained evidence, and each due device's new-or-retained evidence in registration
-order. The remaining allowance reaches the recorder before it copies an event,
-so peak optional evidence is globally bounded rather than capped after all due
-devices finish. Lifecycle rows are admitted independently against the remaining
-budget when diagnostics are acquired. There are no reservations, sessions,
-queues, or attempt ledgers.
+Per-device acquisition limits are applied while an attempt is projected. One serial global latest-view
+record/logical-byte counter then admits distinct retained captures in registration order. A retained successful
+generation is admitted before a different latest failure or no-profile attempt, preserving replayable evidence when
+only one fits. Aliased captures count once. Evidence that does not fit is replaced by an explicit limit marker;
+collection and topology publication continue. Lifecycle rows are admitted independently against the remaining budget
+when diagnostics are acquired. There are no reservations, sessions, queues, or attempt ledgers.
 
 ## Topology Profile Composition
 
@@ -210,6 +209,25 @@ Topology profile selection uses the shared SNMP profile catalog. Matching is
 additive: a device receives the combined topology rows from every matching
 selector and each profile's `extends` graph. The topology projection then keeps
 only topology-consumer fields and typed `topology:` rows.
+
+`ddsnmpcollector` exposes an optional synchronous acquisition observer. When enabled, it emits one terminal report for
+each selected profile, including preparation or table failures. A stable profile ordinal and route digest identify the
+configured logical acquisition units and distinguish processed, not-observed, empty, dependency-rejected,
+tag-rejected, partial, and failed acquisition. Reports cover topology rows, BGP rows, profile tags, and metadata used by
+the topology consumer; ordinary metric rows remain live collector inputs but are not diagnostic routes. Shared canonical
+WALKs remain a transport optimization: each logical unit keeps its configured root and counts only varbinds below that
+root. Compact route/row/value references join the
+synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
+reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
+definitions, and error text are excluded. With no observer, profile digests, route reports, and value references are not
+built.
+
+BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
+every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
+OIDs already classified unavailable by collector state. Table rows without required identity/signals are rejected.
+Optional absent descriptors are not missing; cross-table failures that reject a row or tag use the dependency class.
+Synthetic table-dependency units have no semantic rows, so they report zero rows and count only received varbinds below
+their configured root as values.
 
 The standard capabilities have separate owners:
 
@@ -269,20 +287,35 @@ Ingestion is split by source area:
 - `topology_bgp_peers.go`
 - `topology_vlan_context_*.go`
 
-Every successful device refresh also retains a bounded semantic replay input.
-The live builder and the replay path share one ordered event dispatcher for
-system uptime, profile tags, topology rows, BGP rows, and successful VLAN-context
-rows. The retained projection uses positive per-event/per-topology-kind field
-allowlists. It keeps only metadata, tags, rows, and BGP fallback tags consumed by
-those builder operations; non-VLAN rows in VLAN events, credentials, profile
-source paths, metric names, values, and other collector output are not copied.
+Every completed device attempt retains a bounded acquisition envelope when projection succeeds. The envelope records its
+registration/attempt identity, target-resolution outcome and safe addresses, closed outcomes for the outer collection
+phases, and ordered main/VLAN collection contexts. Each context contains the collector's terminal per-profile route
+report and, for replayable profiles, one immutable copy of the topology-consumer values needed for replay. The report's
+child references preserve
+the producing route and local row/value position for each retained topology or BGP value. Failed and no-profile attempts
+remain diagnostic; a successful attempt is also owned by the published device generation.
 
-Semantic capture has direct per-device record and logical-byte limits. The
-projection checks an event before copying it. Limit exhaustion, projection
-errors, or projection panics mark the generation's capture unavailable and
-release partial evidence without changing collection, builder ingestion, or
-topology publication. Replay reconstructs the allowlisted inputs and invokes
-the same event dispatcher; it rejects a missing or reordered main phase.
+The live builder and the replay path share one ordered event dispatcher for system uptime, profile tags, topology rows,
+BGP rows, and successful VLAN-context rows. The retained values use positive per-event/per-topology-kind field
+allowlists and are copied synchronously from the collector's borrowed result. They keep only metadata, tags, topology
+rows, and BGP fallback tags consumed by those builder operations. Non-VLAN rows in VLAN events, credentials, profile
+source paths, metric names, ordinary metric values, transform definitions, raw packets, and error text are not copied.
+Retained decoded strings are exact-sized copies so a small retained substring cannot keep a larger SNMP response buffer
+alive outside the logical-byte limit. Stable schema/profile tag keys may remain shared because they are not decoded
+response data and their owners outlive the capture.
+
+Acquisition capture has direct per-device record and logical-byte limits. Values from failed profiles are not retained
+because replay skips those profiles. Limit exhaustion, projection errors, or
+projection panics mark the attempt unavailable and release partial evidence without changing collection, builder
+ingestion, or topology publication. Replay validates the completed shape, reconstructs the allowlisted values once,
+invokes the same event dispatcher, and ignores failed profiles and unsuccessful VLAN contexts.
+
+The optional ddsnmp producer creates temporary route reports and value references alongside the live initial collection.
+Their size is linear in the selected profile routes and collected topology/BGP values; they are delivered synchronously
+to the topology recorder, which owns admission of the immutable evidence selected for retention. Acquisition reporting
+is explicitly an initial-collection facility on a fresh ddsnmp collector. The observer is released when the initial
+`Collect` call returns; later calls continue normal collection and live-cache reuse without emitting acquisition reports.
+The old/new generation overlap remains governed by the topology refresh lifecycle.
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately
@@ -294,24 +327,29 @@ Finalization converts the builder into an immutable `topologyDeviceGeneration`:
   reverse-DNS readers;
 - immutable trap-match, interface-name, and neighbor indexes;
 - collection and expiry timestamps;
-- the typed DeviceStore registration ID.
-- a generation-local evidence reference and semantic capture state/input.
+- the typed DeviceStore registration ID;
+- a generation-local evidence reference and successful acquisition capture.
 
 The collector separately owns `deviceRefreshState` per registration ID. It
 tracks `lastAttempt`, `lastSuccess`, `nextRetry`, the latest outcome,
-consecutive failures, and the last successful device generation.
+consecutive failures, the monotonic attempt ordinal, the latest completed
+attempt capture, and the last successful device generation.
+
+The published `topologyGeneration` also owns the producer scope captured at the
+same commit boundary. Graph readers therefore cannot combine an observation
+vector from one sweep with a later registry scope.
 
 ## Registry And Snapshot
 
 `topology_registry.go` owns one atomic pointer to the latest immutable
 `topologyGeneration`. The generation contains the complete, registration-ID
-ordered vector produced by one refresh sweep.
+ordered vector and producer scope produced by one refresh sweep.
 
 ```text
-topologyRegistry.snapshotWithOptions(options)
+topologyRegistry.snapshotWithEnvironment(options, environment)
   normalize query options
   acquire one topology generation
-  read the generation's fixed renderable device membership
+  read the generation's fixed renderable device membership and producer scope
   aggregate per-device observations
   build a topology graph
 ```
@@ -379,11 +417,12 @@ instead of copying or hashing those IDs per link:
 - the renderer validates unique actors and resolved link handles, then maps
   handles to final actor rows without serializing the handles.
 
-The aggregate also carries the producer scope id read from the parent Agent
-registry id. L3 subnet segment actor ids use that scope so identical private
-subnets observed by different Agents do not collide after Cloud aggregation.
-If the registry id is unavailable, L3 subnet segment actors are omitted; direct
-L3 subnet links, OSPF, and BGP enrichment still run.
+The aggregate also carries the producer scope id captured in its immutable
+generation from the parent Agent registry id. L3 subnet segment actor ids use
+that scope so identical private subnets observed by different Agents do not
+collide after Cloud aggregation. If the registry id is unavailable, L3 subnet
+segment actors are omitted; direct L3 subnet links, OSPF, and BGP enrichment
+still run.
 
 Renderable membership is fixed when a complete topology generation publishes;
 Function, focus, availability, and reverse-DNS readers therefore see one stable
@@ -470,8 +509,8 @@ and adapters to shared SNMP-family state.
 The internal packages are deliberately narrower:
 
 - `internal/topologymodel`: typed internal graph model used by SNMP topology.
-- `internal/topologyoptions`: Function/query option constants and
-  normalization.
+- `internal/topologyoptions`: comparable scalar Function/query option constants
+  and normalization.
 - `internal/topologyshape`: graph shaping and policy passes, such as collapse,
   map type filtering, probable-link marking, and depth/focus filtering.
 - `internal/topologyenrich`: pure graph enrichment for L3 subnet, OSPF, and BGP
@@ -526,7 +565,7 @@ flowchart TD
     Request["snmp:topology:snmp request"]
     Handler["snmptopologyfunc.Handle"]
     Options["resolve QueryOptions"]
-    Registry["topologyRegistry.snapshotWithOptions"]
+    Registry["topologyRegistry.snapshotWithEnvironment"]
     Snapshot["fresh device-generation snapshots"]
     Aggregate["aggregate observations"]
     L2["l2topology BuildL2Result -> ToGraph"]
@@ -543,7 +582,7 @@ flowchart TD
 snmp:topology:snmp request
   -> snmptopologyfunc.Handle
   -> funcDepsAdapter.Snapshot(options)
-  -> topologyRegistry.snapshotWithOptions(options)
+  -> topologyRegistry.snapshotWithEnvironment(options, cache-only DNS)
   -> topologyv1.Render(data)
   -> Function response with type "topology"
 ```
@@ -562,6 +601,42 @@ Reverse DNS is cache-backed and non-blocking on the Function path:
   sysName, hostname, IP, and MAC display-name order.
 
 Function requests must not perform live DNS I/O while serving a response.
+
+## Offline Graph Replay
+
+`topology_graph_replay.go` rebuilds a typed `netdata.topology.v1` payload from
+the committed diagnostic cut without retaining Function requests or rendered
+payloads:
+
+```text
+committed topology diagnostic cut
+  -> replay each renderable device's acquisition evidence
+  -> sort and aggregate observation snapshots
+  -> apply caller-supplied scalar query options
+  -> run the shared graph, enrichment, shaping, and topology-v1 renderer
+```
+
+The replay contract is hermetic:
+
+- query options contain only comparable scalar selectors; replay callers supply
+  the desired option set instead of selecting retained query history;
+- collection time comes from acquisition evidence, and replay rejects missing
+  collection timestamps instead of allowing the renderer's current-time
+  fallback;
+- producer scope comes from the same immutable generation as the diagnostic
+  cut;
+- the offline build environment has no reverse-DNS resolver, so PTR-derived DNS
+  names and display choices deterministically fall back to collected identity;
+- OUI enrichment uses the compiled-in lookup table and needs no captured
+  environment revision;
+- a renderable device without available acquisition evidence makes complete
+  replay fail rather than silently emitting a partial graph.
+
+Live Function and offline replay use the same graph and renderer. Their typed
+topology structure is identical for the same scalar options; only PTR-derived
+presentation fields may differ. This replay entry point consumes trusted,
+already-bounded in-memory diagnostics. Validation and structural limits for
+untrusted archive input belong to the later archive reader boundary.
 
 ## Trap Enrichment
 
@@ -592,8 +667,8 @@ and retained device-generation state; they are not the topology payload.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.
-- Function, focus, availability, reverse-DNS, and trap readers each load that
-  pointer once and never block on collection or builder locks.
+- Function, focus, availability, reverse-DNS, diagnostics, and trap readers each
+  load that pointer once and never block on collection or builder locks.
 - The registry mutex only protects producer-scope discovery and the reverse-DNS
   warmer context; it does not protect topology generations.
 
