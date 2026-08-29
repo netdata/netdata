@@ -268,6 +268,26 @@ func TestInferFDBPairwiseBridgeLinks_ReciprocalUniquePortPerSide(t *testing.T) {
 	require.Equal(t, "sw-b", records[0].port.deviceID)
 }
 
+func TestInferFDBPairwiseBridgeLinks_RejectsAmbiguousAliasOwners(t *testing.T) {
+	attachments := []model.Attachment{
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
+		{DeviceID: "sw-c", IfIndex: 3, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
+	}
+	ifaceByDeviceIndex := map[string]model.Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+		deviceIfIndexKey("sw-c", 3): {DeviceID: "sw-c", IfIndex: 3, IfName: "Gi0/3"},
+	}
+	reporterAliases := map[string][]string{
+		"sw-a": {"mac:aa:aa:aa:aa:aa:aa"},
+		"sw-b": {"mac:bb:bb:bb:bb:bb:bb"},
+		"sw-c": {"mac:bb:bb:bb:bb:bb:bb"},
+	}
+
+	require.Empty(t, inferFDBPairwiseBridgeLinks(attachments, ifaceByDeviceIndex, reporterAliases))
+}
+
 func TestInferFDBPairwiseBridgeLinks_EmitsOneRecordPerCompatibleVLANScope(t *testing.T) {
 	attachments := []model.Attachment{
 		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:10", "vlan_id": "100"}},
