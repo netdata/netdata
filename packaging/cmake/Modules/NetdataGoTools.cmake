@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Macros and functions to assist in working with Go
 
+include_guard()
+
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
     set(GO_LDFLAGS "")
 else()

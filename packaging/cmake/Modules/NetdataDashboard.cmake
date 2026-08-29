@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # CMake module to handle fetching and installing the dashboard code
 
+include_guard()
+
 include(NetdataUtil)
 
 function(handle_braindead_versioning_insanity prefix)
@@ -26,9 +28,6 @@ function(bundle_dashboard)
   set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
   set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
   set(dashboard_bin_dir "${CMAKE_BINARY_DIR}/dashboard-bin")
-  set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz" CACHE STRING
-      "URL used to fetch the local agent dashboard code")
-
   message(STATUS "Preparing local agent dashboard code")
 
   message(STATUS "  Fetching ${DASHBOARD_URL}")

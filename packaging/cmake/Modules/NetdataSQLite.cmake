@@ -8,6 +8,8 @@
 # so the parser supports UPDATE/DELETE ... LIMIT), then compiles it as
 # a separate static library that links into libnetdata.
 
+include_guard()
+
 include(ExternalProject)
 
 set(SQLITE_VERSION "3.53.4")
@@ -16,8 +18,6 @@ set(SQLITE_VERSION_YEAR "2026")
 
 set(SQLITE_TARBALL_SHA256 "d18fa15aec74d8c17e1463f861095adc01b5ad190256acb4f91d22f0368d232b")
 set(SQLITE_GIT_SHA "b09c88c14082339b66c7b7158d609a771e64ca69") # tag is: version-${SQLITE_VERSION}
-
-option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
 
 function(netdata_bundle_sqlite3)
         message(STATUS "Preparing SQLite ${SQLITE_VERSION}")
@@ -28,7 +28,13 @@ function(netdata_bundle_sqlite3)
 
         file(MAKE_DIRECTORY "${sqlite_OUTPUT_DIR}")
 
-        if(SQLITE_USE_GIT)
+        if(NETDATA_SQLITE_SOURCE_DIR)
+                # Offline builds: an already-unpacked SQLite source tree replaces
+                # the download step entirely (#23510).
+                message(STATUS "Using local SQLite sources: ${NETDATA_SQLITE_SOURCE_DIR}")
+                set(sqlite_SOURCE_DIR "${NETDATA_SQLITE_SOURCE_DIR}")
+                set(SQLITE_FETCH_ARGS "")
+        elseif(SQLITE_USE_GIT)
                 message(STATUS "Fetching SQLite via git clone")
                 set(SQLITE_FETCH_ARGS
                         GIT_REPOSITORY https://github.com/sqlite/sqlite.git

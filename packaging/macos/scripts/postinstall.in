@@ -1,0 +1,188 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# macOS package postinstall: service account, ownership, privileged plugin
+# bits, launchd bootstrap. Runs as root under installer(8); must be strictly
+# non-interactive and idempotent - Installer runs it on every install and
+# upgrade.
+
+set -e
+
+PREFIX="@NETDATA_RUNTIME_PREFIX@"
+NETDATA_USER="@NETDATA_USER@"
+LABEL="com.github.netdata"
+PLIST="/Library/LaunchDaemons/${LABEL}.plist"
+
+# Marker recording that this package created the service account, so
+# uninstall removes only an account it owns.
+ACCOUNT_MARKER="${PREFIX}/var/lib/netdata/.macos-pkg-created-account"
+
+log() {
+    echo "netdata postinstall: $*"
+}
+
+# First free id present in neither the user nor the group namespace, from
+# the macOS system range.
+find_free_id() {
+    used_uids="$(dscl . -list /Users UniqueID | awk '{print $2}')"
+    used_gids="$(dscl . -list /Groups PrimaryGroupID | awk '{print $2}')"
+    i=200
+    while [ "${i}" -le 400 ]; do
+        if ! printf '%s\n' "${used_uids}" | grep -qx "${i}" \
+           && ! printf '%s\n' "${used_gids}" | grep -qx "${i}"; then
+            echo "${i}"
+            return 0
+        fi
+        i=$((i + 1))
+    done
+    return 1
+}
+
+#
+# Service account: keep the name the platform has always used, but create it
+# properly - hidden, system-range id, no login shell. An existing account is
+# reused untouched (upgrades, prior source installs).
+#
+if ! dscl . -read "/Groups/${NETDATA_USER}" PrimaryGroupID >/dev/null 2>&1; then
+    new_id="$(find_free_id)" || { echo "netdata postinstall: no free system-range id" >&2; exit 1; }
+    log "creating group ${NETDATA_USER} (gid ${new_id})"
+    dscl . -create "/Groups/${NETDATA_USER}" PrimaryGroupID "${new_id}"
+    dscl . -create "/Groups/${NETDATA_USER}" RealName "Netdata Agent"
+fi
+gid="$(dscl . -read "/Groups/${NETDATA_USER}" PrimaryGroupID | awk '{print $2}')"
+
+if ! dscl . -read "/Users/${NETDATA_USER}" UniqueID >/dev/null 2>&1; then
+    new_id="$(find_free_id)" || { echo "netdata postinstall: no free system-range id" >&2; exit 1; }
+    log "creating user ${NETDATA_USER} (uid ${new_id})"
+    dscl . -create "/Users/${NETDATA_USER}" UniqueID "${new_id}"
+    dscl . -create "/Users/${NETDATA_USER}" PrimaryGroupID "${gid}"
+    dscl . -create "/Users/${NETDATA_USER}" UserShell /usr/bin/false
+    dscl . -create "/Users/${NETDATA_USER}" NFSHomeDirectory /var/empty
+    dscl . -create "/Users/${NETDATA_USER}" RealName "Netdata Agent"
+    dscl . -create "/Users/${NETDATA_USER}" IsHidden 1
+    dscl . -create "/Users/${NETDATA_USER}" Password '*'
+    mkdir -p "${PREFIX}/var/lib/netdata"
+    touch "${ACCOUNT_MARKER}"
+fi
+dseditgroup -o edit -a "${NETDATA_USER}" -t user "${NETDATA_USER}" 2>/dev/null || true
+
+#
+# Stock configuration: the payload carries it under usr/lib/netdata/conf.d
+# only, because Installer replaces payload files wholesale on upgrade.
+# Copy into etc/netdata when absent - the noreplace semantics of the other
+# packaging formats - so user edits survive upgrades.
+#
+for f in netdata.conf netdata-updater.conf; do
+    if [ ! -f "${PREFIX}/etc/netdata/${f}" ] && [ -f "${PREFIX}/usr/lib/netdata/conf.d/${f}" ]; then
+        cp "${PREFIX}/usr/lib/netdata/conf.d/${f}" "${PREFIX}/etc/netdata/${f}"
+    fi
+done
+
+#
+# Ownership. The Agent's writable state belongs to the service account;
+# configuration is root-owned and group-readable - a pre-staged claim.conf
+# keeps its content and ends up 0640 root:netdata like every other file
+# there.
+#
+chown -R "${NETDATA_USER}:${NETDATA_USER}" \
+    "${PREFIX}/var/cache/netdata" \
+    "${PREFIX}/var/log/netdata" \
+    "${PREFIX}/var/lib/netdata"
+chown -R "root:${NETDATA_USER}" "${PREFIX}/etc/netdata"
+chmod 0750 "${PREFIX}/etc/netdata"
+find "${PREFIX}/etc/netdata" -type d -exec chmod 0750 {} +
+find "${PREFIX}/etc/netdata" -type f -exec chmod 0640 {} +
+# edit-config is a tool, not configuration.
+chmod 0750 "${PREFIX}/etc/netdata/edit-config" 2>/dev/null || true
+
+#
+# Privileged plugins: setuid root, executable only by the service group.
+# setcap does not exist on Darwin, so these four escalate via setuid.
+#
+for plugin in ndsudo apps.plugin macos-logs.plugin network-viewer.plugin; do
+    p="${PREFIX}/usr/libexec/netdata/plugins.d/${plugin}"
+    if [ -f "${p}" ]; then
+        chown "root:${NETDATA_USER}" "${p}"
+        chmod 4750 "${p}"
+    fi
+done
+
+#
+# launchd: replace whatever registration exists and start the daemon.
+# preinstall booted out a running job; an upgrade may still have the label
+# registered from the old payload, and teardown is asynchronous - a
+# bootstrap racing it fails with EIO - so both the bootout wait and the
+# bootstrap itself retry.
+#
+if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
+    /bin/launchctl bootout "system/${LABEL}" 2>/dev/null || true
+    i=0
+    while [ "${i}" -lt 60 ] && /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; do
+        sleep 1
+        i=$((i + 1))
+    done
+fi
+
+log "bootstrapping ${LABEL}"
+i=0
+while :; do
+    if /bin/launchctl bootstrap system "${PLIST}"; then
+        break
+    fi
+    i=$((i + 1))
+    if [ "${i}" -ge 30 ]; then
+        echo "netdata postinstall: launchctl bootstrap kept failing" >&2
+        exit 1
+    fi
+    sleep 2
+done
+
+#
+# Auto-updater daemon. Opt-out (D15b): a pre-staged or user-edited
+# netdata-updater.conf with NETDATA_MACOS_AUTO_UPDATES='0' - stock config is
+# copy-if-absent, so a pre-staged file survives the install. The opt-out
+# uses launchctl disable, which persists in launchd's override database:
+# merely skipping the bootstrap would not survive a reboot, because launchd
+# loads every plist under /Library/LaunchDaemons at boot.
+#
+# Never touch the label while the updater is mid-transaction - this very
+# postinstall may be its grandchild, and booting it out would kill the
+# installer under itself. The freshly delivered plist then takes effect at
+# the next boot or the next idle (re)install; label and program path do not
+# change between versions.
+#
+UPDATER_LABEL="com.github.netdata.updater"
+UPDATER_PLIST="/Library/LaunchDaemons/${UPDATER_LABEL}.plist"
+
+auto_updates=1
+if [ -r "${PREFIX}/etc/netdata/netdata-updater.conf" ]; then
+    # shellcheck disable=SC1091
+    . "${PREFIX}/etc/netdata/netdata-updater.conf" 2>/dev/null || true
+    if [ "${NETDATA_MACOS_AUTO_UPDATES:-1}" = "0" ]; then
+        auto_updates=0
+    fi
+fi
+
+if /bin/launchctl print "system/${UPDATER_LABEL}" 2>/dev/null | grep -q "state = running"; then
+    log "updater is mid-transaction; leaving its registration untouched"
+else
+    if /bin/launchctl print "system/${UPDATER_LABEL}" >/dev/null 2>&1; then
+        /bin/launchctl bootout "system/${UPDATER_LABEL}" 2>/dev/null || true
+        i=0
+        while [ "${i}" -lt 60 ] && /bin/launchctl print "system/${UPDATER_LABEL}" >/dev/null 2>&1; do
+            sleep 1
+            i=$((i + 1))
+        done
+    fi
+    if [ "${auto_updates}" -eq 1 ]; then
+        log "bootstrapping ${UPDATER_LABEL}"
+        /bin/launchctl enable "system/${UPDATER_LABEL}" 2>/dev/null || true
+        /bin/launchctl bootstrap system "${UPDATER_PLIST}" \
+            || log "WARNING: updater bootstrap failed; it will register at the next boot"
+    else
+        log "auto-updates opted out; disabling ${UPDATER_LABEL}"
+        /bin/launchctl disable "system/${UPDATER_LABEL}" 2>/dev/null || true
+    fi
+fi
+
+exit 0

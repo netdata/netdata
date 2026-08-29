@@ -1,14 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # CMake Module to handle all the systemd-related checks for Netdata.
 
+include_guard()
+
+include(CheckCSourceCompiles)
+include(CheckSymbolExists)
 include(CMakePushCheckState)
 
 macro(detect_systemd)
-  find_library(SYSTEMD_LIBRARY NAMES systemd)
-
-  set(ENABLE_DSYSTEMD_DBUS NO)
-  pkg_check_modules(SYSTEMD libsystemd)
-
   if(SYSTEMD_FOUND)
     cmake_push_check_state()
     set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES};${SYSTEMD_LIBRARIES}")
@@ -21,7 +20,6 @@ macro(detect_systemd)
       return 0;
     }" HAVE_SD_JOURNAL_OS_ROOT)
 
-    check_symbol_exists(SD_JOURNAL_OS_ROOT "systemd/sd-journal.h" HAVE_SD_JOURNAL_OS_ROOT)
     check_symbol_exists(sd_journal_open_files_fd "systemd/sd-journal.h" HAVE_SD_JOURNAL_OPEN_FILES_FD)
     check_symbol_exists(sd_journal_restart_fields "systemd/sd-journal.h" HAVE_SD_JOURNAL_RESTART_FIELDS)
     check_symbol_exists(sd_journal_enumerate_available_unique "systemd/sd-journal.h" HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE)

@@ -2,6 +2,8 @@
 # CPack options
 #
 
+include_guard()
+
 # CPACK_PACKAGE_VERSION is set by the version handling code.
 
 set(CPACK_THREADS 0)
@@ -58,14 +60,15 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 #
 # RPM options
 #
-# The RPM configuration mirrors netdata.spec.in package for package,
-# deliberately including its quirks; deviations are commented in place.
+# The RPM configuration is deliberately conservative: the package split,
+# the dependency quirks and the file attributes are fixed by what has always
+# shipped, and are not re-derived here. Deviations are commented in place.
 #
 
 set(CPACK_RPM_COMPONENT_INSTALL YES)
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 
-# RPM forbids dashes in Version; the spec receives a pre-sanitized version
+# RPM forbids dashes in Version, so the version is sanitized before use
 # (nightly 2.10.0-809-nightly becomes 2.10.0.809.nightly).
 string(REPLACE "-" "." CPACK_RPM_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
 set(CPACK_RPM_PACKAGE_RELEASE 1)
@@ -74,24 +77,24 @@ set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)
 set(CPACK_RPM_PACKAGE_LICENSE "GPLv3+")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/System")
 set(CPACK_RPM_PACKAGE_URL "http://my-netdata.io")
-# The changelog is the spec's, verbatim — historical typos included; the
-# parity check compares it byte for byte.
+# The changelog is frozen historical content, typos included. It is shipped
+# verbatim and is not edited or regenerated.
 set(CPACK_RPM_CHANGELOG_FILE "${PKG_FILES_PATH}/rpm/changelog")
 
-# The spec disables all of __os_install_post (no stripping, no debuginfo
-# extraction, no brp scripts) and tolerates Go binaries without RPM build ids.
+# All of __os_install_post is disabled — no stripping, no debuginfo
+# extraction, no brp scripts — and Go binaries without RPM build ids are
+# tolerated rather than failing the build.
 set(CPACK_RPM_SPEC_MORE_DEFINE "%global __os_install_post %{nil}
 %global _missing_build_ids_terminate_build 0")
 
-# /usr/lib/netdata/system ships reference service files for many init systems;
-# the spec excludes them from automatic dependency scanning so their
-# interpreters do not become package requirements.
+# /usr/lib/netdata/system ships reference service files for many init systems.
+# They are excluded from automatic dependency scanning so their interpreters do
+# not become package requirements.
 set(CPACK_RPM_REQUIRES_EXCLUDE_FROM "^/usr/lib/netdata/system/.*$")
 
 # Shared system directories the packages must not claim ownership of, on top
 # of CPack's builtin list (/etc, /usr, /usr/lib, /usr/share, ...). The staged
-# custom-plugins.d and ssl dirs are unpackaged in the spec build and are
-# excluded for parity with it.
+# custom-plugins.d and ssl dirs are deliberately left unpackaged.
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     # plugin-journal-viewer has no install rules; CPack would otherwise
     # reduce its filelist to a lone "/" entry
@@ -115,7 +118,7 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /var/cache
     /var/lib
     /var/log
-    # staged but unpackaged in the spec build
+    # staged but deliberately unpackaged
     /var/run
     /var/run/netdata
     /etc/netdata/charts.d
@@ -124,7 +127,7 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /etc/netdata/otel.d
     /etc/netdata/otel.d/v1
     /etc/netdata/otel.d/v1/metrics
-    # the spec leaves the legacy eBPF object directory unowned
+    # the legacy eBPF object directory is deliberately left unowned
     /usr/libexec/netdata/plugins.d/ebpf.d
     # owned by exactly one package (other components stage them too); the
     # owning package's USER_FILELIST re-adds them as %dir entries
@@ -134,8 +137,8 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /usr/lib/netdata/conf.d
     /usr/share/netdata/web)
 
-# The spec does not own the vendored IBM MQ directory tree either; the list
-# of its directories is derived from the MQ manifest by install_ibm_runtime.
+# The vendored IBM MQ directory tree is not owned either; the list of its
+# directories is derived from the MQ manifest by install_ibm_runtime.
 if(NETDATA_IBM_MQ_RPM_DIR_EXCLUDES)
   list(APPEND CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
        ${NETDATA_IBM_MQ_RPM_DIR_EXCLUDES})
@@ -146,7 +149,7 @@ endif()
 # macros expand when rpmbuild parses the generated spec. On distros where RPM
 # handles the shipped sysusers file natively (EL >= 10, Fedora >= 43) the
 # netdata-user %post only manages supplemental groups; elsewhere it also
-# creates the user and group, exactly like the spec.
+# creates the user and group.
 #
 # CPack generates one spec per component whose Name: is the subpackage's
 # own, so the scriptlet files spell values out instead of using %{name}.
@@ -175,9 +178,9 @@ set(CPACK_RPM_NETDATA_POST_UNINSTALL_SCRIPT_FILE
 set(CPACK_RPM_USER_POST_INSTALL_SCRIPT_FILE
     "${PKG_FILES_PATH}/rpm/user/${NETDATA_RPM_USER_POST}")
 
-# Dependency predicates mirroring the spec's user handling: on sysusers
-# platforms the account comes from the shipped sysusers file, elsewhere every
-# payload package needs netdata-user installed first.
+# Dependency predicates for user handling: on sysusers platforms the account
+# comes from the shipped sysusers file, elsewhere every payload package needs
+# netdata-user installed first.
 if(NETDATA_DISTRO_SUSE OR
    (NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43))
@@ -186,8 +189,8 @@ else()
   set(NETDATA_RPM_HAVE_SYSUSER FALSE)
 endif()
 
-# rpm on EL 7 and Amazon Linux 2 has no weak dependencies; the spec turns the
-# load-bearing Recommends into hard Requires there and drops the Suggests.
+# rpm on EL 7 and Amazon Linux 2 has no weak dependencies, so there the
+# load-bearing Recommends become hard Requires and the Suggests are dropped.
 if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
    (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
   set(NETDATA_RPM_HAVE_WEAK_DEPS FALSE)
@@ -201,11 +204,10 @@ else()
   set(NETDATA_RPM_USER_PREDEP "")
 endif()
 
-# The spec gates the per-plugin Suggests on centos_ver == 7, which covers
-# Amazon Linux 2 as well: AL2 defines %rhel 7 and the spec remaps that into
-# centos_ver. (AL2's rpm 4.11 drops Suggests tags at build time anyway, so
-# the emitted packages are identical either way; this keeps the predicate
-# aligned with the spec's actual semantics.)
+# The per-plugin Suggests are dropped on EL <= 7 and on Amazon Linux 2, which
+# belongs in the same tier. (AL2's rpm 4.11 drops Suggests tags at build time
+# anyway, so the emitted packages are identical either way; the predicate is
+# written out so the intent is explicit rather than incidental.)
 if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
    (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
   set(NETDATA_RPM_PLUGIN_SUGGESTS FALSE)
@@ -295,8 +297,8 @@ if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_NETDATA_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
 
-# Mirrors the spec's main-package dependency block, quirks included: the
-# netdata-dashboard dependency is unversioned there.
+# The main-package dependency block, quirks included: the netdata-dashboard
+# dependency is deliberately unversioned.
 unset(_rpm_main_requires)
 unset(_rpm_main_recommends)
 unset(_rpm_main_suggests)
@@ -374,8 +376,8 @@ if(_rpm_main_suggests)
   list(JOIN _rpm_main_suggests ", " CPACK_RPM_NETDATA_PACKAGE_SUGGESTS)
 endif()
 
-# File attributes that differ from the staged tree (which is root:root with
-# install-rule modes), matching the spec's %files for the main package.
+# File attributes for the main package that differ from the staged tree, which
+# is root:root with the modes the install rules set.
 set(CPACK_RPM_NETDATA_USER_FILELIST
     "%dir /usr/libexec/netdata"
     "%dir /usr/libexec/netdata/plugins.d"
@@ -826,7 +828,8 @@ set(CPACK_RPM_PLUGIN-IBM_DEFAULT_GROUP "netdata")
 set(CPACK_RPM_PLUGIN-IBM_USER_FILELIST
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/ibm.d.plugin")
 
-set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DESCRIPTION
+set(CPACK_COMPONENT_PLUGIN-IBM-LIBS_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-IBM-LIBS_DESCRIPTION
 		"IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
  This package provides the IBM MQ client libraries needed by Netdata IBM
  ecosystem metrics collection plugin.")
@@ -1027,8 +1030,8 @@ if(NETDATA_RPM_USER_PREDEP)
 endif()
 set(CPACK_RPM_PLUGIN-PERF_DEFAULT_USER "root")
 set(CPACK_RPM_PLUGIN-PERF_DEFAULT_GROUP "netdata")
-# cap_perfmon exists on EL >= 9 and Fedora >= 36 (kernel 5.8+); older
-# targets fall back to cap_sys_admin, as the spec does.
+# cap_perfmon exists on EL >= 9 and Fedora >= 36 (kernel 5.8+); older targets
+# fall back to cap_sys_admin.
 if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 9) OR
    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 36))
   set(CPACK_RPM_PLUGIN-PERF_USER_FILELIST
@@ -1080,8 +1083,8 @@ if(NETDATA_RPM_USER_PREDEP)
 endif()
 set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_USER "root")
 set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_GROUP "netdata")
-# The spec's %defattr makes the whole python.d tree 0750; the stock configs
-# keep 0644 with a world-readable directory.
+# The python.d tree defaults to 0750; the stock configs below override that
+# with 0644 files under a world-readable directory.
 set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_FILE_PERMISSIONS
     OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
 set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_DIR_PERMISSIONS
@@ -1112,7 +1115,7 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SLABINFO-DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
 
 set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_NAME "netdata-plugin-slabinfo")
 set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_SUMMARY "The slabinfo metrics collector for the Netdata Agent")
@@ -1165,7 +1168,9 @@ set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
 
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_DEPENDS "netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION})")
+
+netdata_add_deb_copyright(plugin-journal-viewer netdata-plugin-journal-viewer)
 
 set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
 set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_SUMMARY "Transitional dummy package")
@@ -1187,7 +1192,7 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_PREDEPENDS "netdata-user")
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-units/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD_UNITS_DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_DEBUGINFO_PACKAGE On)
 
 set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_NAME "netdata-plugin-systemd-units")
 set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_SUMMARY "The systemd units plugin for the Netdata Agent")
@@ -1221,9 +1226,9 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 
-# The spec's xenstat gating is dead code (a typo makes it always disabled),
-# so no RPM ever ships this package today; the configuration exists for the
-# day ENABLE_PLUGIN_XENSTAT is turned on for RPM builds.
+# RPM builds disable ENABLE_PLUGIN_XENSTAT unconditionally
+# (packaging/build-package.sh), so no RPM ships this package today. The
+# configuration exists for the day that changes.
 set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_NAME "netdata-plugin-xenstat")
 set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_SUMMARY "The xenstat plugin for the Netdata Agent")
 set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
@@ -1241,7 +1246,12 @@ set(CPACK_RPM_PLUGIN-XENSTAT_USER_FILELIST
 #
 
 list(APPEND CPACK_COMPONENTS_ALL "netdata")
-list(APPEND CPACK_COMPONENTS_ALL "user")
+# The user component's whole payload (sysusers, copyright, maintainer scripts)
+# is host staging; registering it elsewhere would emit an empty package on any
+# future non-Linux cpack run.
+if(NETDATA_STAGE_HOST_FILES)
+  list(APPEND CPACK_COMPONENTS_ALL "user")
+endif()
 if(ENABLE_DASHBOARD)
   list(APPEND CPACK_COMPONENTS_ALL "dashboard")
 endif()
@@ -1306,6 +1316,24 @@ if(ENABLE_PLUGIN_XENSTAT)
 endif()
 if(ENABLE_PLUGIN_OTEL)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
+endif()
+# macos-logs.plugin has no ENABLE_PLUGIN_* option of its own, so this repeats the
+# guard its install rule uses in NetdataPluginMacosLogs.cmake rather than testing
+# an option. The guard matters: the component is registered only where the binary
+# is actually installed, so a DEB or RPM run cannot emit an empty package for a
+# macOS-only plugin.
+if(OS_MACOS AND OSLOG AND FOUNDATION)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-macos-logs")
+endif()
+# The Windows-only components. CPack never runs on Windows today (the MSI is
+# built by WiX), so these are inert; they exist to keep the invariant that every
+# install rule's component is registered wherever the rule fires.
+# wevt_netdata_dll's install rules carry an extra HAVE_WEL OR HAVE_ETW condition,
+# but src/libnetdata hardcodes both True under OS_WINDOWS, so OS_WINDOWS alone
+# is the same set.
+if(OS_WINDOWS)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-windows-events")
+        list(APPEND CPACK_COMPONENTS_ALL "netdata_driver" "netdata_driver_inf" "wevt_netdata_dll")
 endif()
 
 include(CPack)
