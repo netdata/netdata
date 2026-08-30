@@ -4,7 +4,8 @@
 
 [KEY FEATURES](#key-features) | [LOG SOURCE](#log-source) | [LOG FIELDS](#log-fields) |
 [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
-[PREREQUISITES](#prerequisites)
+[PREREQUISITES](#prerequisites) | [FAQ](#faq) | [TROUBLESHOOTING](#how-to-troubleshoot-common-issues) |
+[HOW TO VERIFY SETUP](#how-to-verify-setup)
 
 The macOS Logs plugin by Netdata makes viewing, exploring, and analyzing macOS unified logs simple and efficient.
 
@@ -98,3 +99,78 @@ timestamp range cannot produce a safe percentage, progress falls back to a scann
 For broad queries without full-text search or filters on high-cardinality detail fields, the plugin avoids materializing
 expensive row-detail fields for entries that cannot be returned in the current page. In that fast path, diagnostic
 `bytes_read` counters report materialized message bytes, not every raw OSLog payload byte scanned.
+
+
+## Exploring the logs
+
+The macOS Logs plugin uses the same explorer as every other log source in Netdata — field filters with counters,
+full-text search, per-field histograms, PLAY live tail, and sampling at scale. See [Exploring Logs](/docs/dashboards-and-charts/logs-tab.md) for the shared workflow.
+
+## FAQ
+
+<details>
+<summary><strong>Can I centralize macOS logs?</strong></summary>
+
+macOS provides no OS-native forwarding transport for the unified log (no equivalent of `systemd-journal-remote` or
+Windows Event Forwarding). To centralize macOS logs, ship them through the OpenTelemetry Collector Contrib
+`macosunifiedloggingreceiver` (alpha stability), which reads the unified log via the native `log` command and can
+forward to Netdata's OTLP endpoint — see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md).
+
+</details>
+
+<details>
+<summary><strong>Can I use this plugin from a parent Netdata?</strong></summary>
+
+Yes — when your nodes are connected to a Netdata parent, all their functions are accessible via the parent's UI,
+including `macos-logs` for each child node.
+
+</details>
+
+<details>
+<summary><strong>Does this plugin expose any data to Netdata Cloud?</strong></summary>
+
+No — when accessing the Agent directly, no log data is exposed to Netdata Cloud. The Cloud account is used for
+authentication; data flows directly from your Netdata Agent to your web browser.
+
+</details>
+
+<details>
+<summary><strong>Why does the plugin need elevated privileges?</strong></summary>
+
+Apple's OSLog API requires elevated privileges to read the local system log store. The installed plugin uses the same
+root-owned setuid permission model as Netdata's other privileged Function plugins.
+
+</details>
+
+## How to troubleshoot common issues
+
+| Symptom | Possible cause | Solution |
+|---------|----------------|----------|
+| The `macos-logs` source is missing | The plugin is not installed or not executable | See [How to check if the plugin is running](#how-to-check-if-the-plugin-is-running) |
+| Queries return no entries | The selected timeframe or filters exclude everything | Widen the timeframe, clear filters, try a full-text search for a common term |
+| Permission errors in the Agent log | The setuid permission model was not applied at install time | Reinstall or repair the Netdata package so the plugin is installed root-owned setuid |
+| Slow or cancelled broad queries | The Function timeout expired on a very wide scan | Narrow the timeframe, add filters, or keep `slice=true` so supported filters run natively in OSLog |
+| Facet counters look stale after filtering | With `slice=true`, previously discovered facet values are retained with zero counters by design | This is expected; counters reflect the selected slice |
+
+## How to verify setup
+
+### How to check if the plugin is running
+
+Confirm the plugin binary is present and executable:
+
+```bash
+ls -l /usr/libexec/netdata/plugins.d/macos-logs.plugin
+```
+
+Confirm the plugin process is running while the Agent is active:
+
+```bash
+ps aux | grep '[m]acos-logs.plugin'
+```
+
+### How to test basic queries
+
+1. Open the **Logs** tab in the Netdata UI and confirm the `macos-logs` source is offered.
+2. Apply a simple filter (for example `LEVEL = Error`) and confirm entries are returned.
+3. Use full-text search for a common term and verify results.
+4. Toggle **PLAY** mode and confirm new entries stream in as they are logged.

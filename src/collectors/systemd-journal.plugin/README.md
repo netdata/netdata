@@ -379,6 +379,29 @@ No additional configuration is required for this plugin to operate on supported 
 | **Verify** journal file **locations** | Confirms the plugin can access the intended sources |
 | **Review** source selections **periodically** | Adjusts scope as infrastructure changes |
 
+### Adding journal directories at runtime
+
+By default, the plugin scans `/var/log/journal` and `/run/log/journal` recursively. You can add more directories at runtime — for example journal files mounted from other systems, backups, or container hosts — without restarting the Agent.
+
+The plugin exposes a Dynamic Configuration entry, `systemd-journal:monitored-directories` (path `/logs/systemd-journal`), manageable from the Dynamic Configuration Manager in the Netdata UI or through the configuration API:
+
+```bash
+# read the current list
+curl "http://NODE:19999/api/v3/config?action=get&id=systemd-journal:monitored-directories"
+
+# set the additional directories (replaces the list)
+curl -X POST "http://NODE:19999/api/v3/config?action=update&id=systemd-journal:monitored-directories" \
+  -d '{"journalDirectories": ["/mnt/backup/journal", "/srv/container-journals"]}'
+```
+
+Rules:
+
+- Paths must be absolute. System directories (`/`, `/dev`, `/proc`, `/sys`, `/etc`, `/lib*`) are rejected.
+- Each update replaces the whole list, and the plugin rescans immediately — no Agent restart needed.
+- Directories that do not exist are accepted, with a warning in the API response. The directory watcher is `inotify`-based, so new journal files appearing in existing watched directories are detected automatically.
+
+The configured directories are scanned recursively, the same way as the default locations, and their journals appear as additional sources.
+
 ## FAQ
 
 <details>
