@@ -104,6 +104,11 @@ void ml_features_preprocess_predict(ml_features_t *features, DSample &sample)
     ml_features_diff(features);
     ml_features_smooth(features);
 
+    // DSample is a fixed 6-row matrix: set_size() does not resize it and its
+    // constructor leaves the rows uninitialized. With lag_n < 5 only the first
+    // lag_n + 1 rows are written below, but the anomaly score is computed over
+    // all 6, so the rest MUST be zero.
+    sample = 0;
     sample.set_size(features->lag_n + 1);
     for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
         sample(feature_idx) = features->src[feature_idx];
