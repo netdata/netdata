@@ -2,45 +2,17 @@
 
 #define PULSE_INTERNALS 1
 #include "pulse-gorilla.h"
-
-static struct gorilla_statistics {
-    bool enabled;
-
-    PAD64(uint64_t) tier0_hot_gorilla_buffers;
-
-    PAD64(uint64_t) gorilla_tier0_disk_actual_bytes;
-    PAD64(uint64_t) gorilla_tier0_disk_optimal_bytes;
-    PAD64(uint64_t) gorilla_tier0_disk_original_bytes;
-} gorilla_statistics = { 0 };
-
-void pulse_gorilla_hot_buffer_added() {
-    if(!gorilla_statistics.enabled) return;
-
-    __atomic_fetch_add(&gorilla_statistics.tier0_hot_gorilla_buffers, 1, __ATOMIC_RELAXED);
-}
-
-void pulse_gorilla_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original) {
-    if(!gorilla_statistics.enabled) return;
-
-    __atomic_fetch_add(&gorilla_statistics.gorilla_tier0_disk_actual_bytes, actual, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&gorilla_statistics.gorilla_tier0_disk_optimal_bytes, optimal, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&gorilla_statistics.gorilla_tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
-}
-
-static inline void global_statistics_copy(struct gorilla_statistics *gs) {
-    gs->tier0_hot_gorilla_buffers     = __atomic_load_n(&gorilla_statistics.tier0_hot_gorilla_buffers, __ATOMIC_RELAXED);
-    gs->gorilla_tier0_disk_actual_bytes = __atomic_load_n(&gorilla_statistics.gorilla_tier0_disk_actual_bytes, __ATOMIC_RELAXED);
-    gs->gorilla_tier0_disk_optimal_bytes = __atomic_load_n(&gorilla_statistics.gorilla_tier0_disk_optimal_bytes, __ATOMIC_RELAXED);
-    gs->gorilla_tier0_disk_original_bytes = __atomic_load_n(&gorilla_statistics.gorilla_tier0_disk_original_bytes, __ATOMIC_RELAXED);
-}
+#include "database/engine/dbengine-stats.h"
 
 void pulse_gorilla_do(bool extended __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(!extended) return;
-    gorilla_statistics.enabled = true;
 
-    struct gorilla_statistics gs;
-    global_statistics_copy(&gs);
+    const dbengine_stats_t *s = dbengine_get_stats();
+    uint64_t hot_buffers    = __atomic_load_n(&s->gorilla.hot_buffers_added,        __ATOMIC_RELAXED);
+    uint64_t actual_bytes   = __atomic_load_n(&s->gorilla.tier0_disk_actual_bytes,  __ATOMIC_RELAXED);
+    uint64_t optimal_bytes  = __atomic_load_n(&s->gorilla.tier0_disk_optimal_bytes, __ATOMIC_RELAXED);
+    uint64_t original_bytes = __atomic_load_n(&s->gorilla.tier0_disk_original_bytes, __ATOMIC_RELAXED);
 
     if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {
@@ -66,7 +38,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
             rd_num_gorilla_pages = rrddim_add(st_tier0_gorilla_pages, "count", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_tier0_gorilla_pages, rd_num_gorilla_pages, (collected_number)gs.tier0_hot_gorilla_buffers);
+        rrddim_set_by_pointer(st_tier0_gorilla_pages, rd_num_gorilla_pages, (collected_number)hot_buffers);
 
         rrdset_done(st_tier0_gorilla_pages);
     }
@@ -100,9 +72,9 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
             rd_uncompressed_bytes = rrddim_add(st_tier0_compression_info, "uncompressed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_tier0_compression_info, rd_actual_bytes, (collected_number)gs.gorilla_tier0_disk_actual_bytes);
-        rrddim_set_by_pointer(st_tier0_compression_info, rd_optimal_bytes, (collected_number)gs.gorilla_tier0_disk_optimal_bytes);
-        rrddim_set_by_pointer(st_tier0_compression_info, rd_uncompressed_bytes, (collected_number)gs.gorilla_tier0_disk_original_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_actual_bytes, (collected_number)actual_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_optimal_bytes, (collected_number)optimal_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_uncompressed_bytes, (collected_number)original_bytes);
 
         rrdset_done(st_tier0_compression_info);
     }
