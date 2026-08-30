@@ -8,6 +8,12 @@
 
 #include <array>
 
+// Upper bound on the prediction history ring:
+//   diff_n (0..1) + smoothing window (1..5) + lag_n (1..5)
+// per the clamps in ml_config.cc:173-175. ml_dimension_predict() asserts the
+// effective n against this.
+#define ML_DIMENSION_MAX_CNS 11
+
 struct ml_dimension_t {
     RRDDIM *rd;
 
@@ -21,13 +27,21 @@ struct ml_dimension_t {
     bool training_in_progress;
     bool has_received_downstream_model;
     bool create_new_model_queued;
-    size_t cns_head;
 
-    std::vector<calculated_number_t> cns;
+    // Prediction history, an inline ring instead of a heap vector: at most 11
+    // doubles, so a vector cost 24 bytes of header plus a 128-byte allocation
+    // to hold 88 bytes of payload.
+    //
+    // cns_count is the LOGICAL size and carries the warmup progress that
+    // cns.size() used to carry. Every site that used to cns.clear() MUST zero
+    // both cns_count and cns_head; zeroing cns_head alone would leave stale
+    // history readable.
+    uint8_t cns_head;
+    uint8_t cns_count;
 
     std::vector<ml_kmeans_inlined_t> km_contexts;
-    ml_kmeans_t kmeans;
-    DSample feature;
+
+    calculated_number_t cns[ML_DIMENSION_MAX_CNS];
 };
 
 bool

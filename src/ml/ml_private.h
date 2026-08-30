@@ -21,6 +21,12 @@ bool ml_should_publish_model_update(bool host_running,
                                     uint32_t expected_generation,
                                     bool *training_in_progress);
 
+// Sole accumulator for ml_machine_learning_stats_t. Both rollup steps
+// (dimension -> chart, chart -> host) go through it, so a field added to the
+// struct is propagated in one place. Non-static so ml-unittest.cc can assert
+// that it covers every field.
+void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machine_learning_stats_t &src);
+
 extern sqlite3 *ml_db;
 extern const char *db_models_create_table;
 

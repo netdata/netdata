@@ -231,7 +231,7 @@ void ml_host_stop(RRDHOST *rh) {
 
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
-            dim->cns.clear();
+            dim->cns_count = 0;
             dim->cns_head = 0;
             dim->km_contexts.clear();
             dim->has_received_downstream_model = false;
@@ -421,8 +421,7 @@ void ml_dimension_new(RRDDIM *rd)
     dim->create_new_model_queued = false;
     dim->reset_generation = 0;
     dim->cns_head = 0;
-
-    ml_kmeans_init(&dim->kmeans);
+    dim->cns_count = 0;
 
     if (simple_pattern_matches(Cfg.sp_charts_to_skip, rrdset_name(rd->rrdset)))
         dim->mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
@@ -548,6 +547,7 @@ void ml_init()
         worker->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
         worker->id = idx;
+        ml_kmeans_init(&worker->kmeans_scratch);
         worker->queue = ml_queue_init();
         worker->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&worker->nd_mutex);

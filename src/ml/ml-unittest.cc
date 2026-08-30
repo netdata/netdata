@@ -1115,6 +1115,156 @@ static void test_reset_generation_cancels_model_publish()
                    "successful publication path should leave training_in_progress unchanged");
 }
 
+// Test: the inline cns ring in ml_dimension_t.
+//
+// The prediction history used to be a std::vector whose size() carried the
+// warmup progress; it is now an inline array plus an explicit cns_count. Every
+// site that used to cns.clear() must zero BOTH cns_count and cns_head. Zeroing
+// cns_head alone would leave stale history readable and would let the very next
+// sample be scored as if the ring were still full.
+//
+// test_circular_buffer_equivalence() above models the ring with a local vector
+// and would pass even if the real ring were broken, so this test drives the
+// real ml_dimension_predict() instead.
+static void test_cns_ring_reset_semantics()
+{
+    fprintf(stderr, "  test_cns_ring_reset_semantics...\n");
+
+    // Saved so the test does not leak configuration into its neighbours.
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_smooth = Cfg.max_samples_to_smooth;
+    size_t saved_suppression_window = Cfg.suppression_window;
+    size_t saved_suppression_threshold = Cfg.suppression_threshold;
+    uint32_t saved_profile_update_every = nd_profile.update_every;
+
+    Cfg.diff_n = 1;
+    Cfg.lag_n = 5;
+    Cfg.max_samples_to_smooth = 3;
+    // Large enough that nothing in this test can reach TRAINING_STATUS_SILENCED.
+    Cfg.suppression_window = 1000000;
+    Cfg.suppression_threshold = 1000000;
+    nd_profile.update_every = 1;
+
+    RRDSET st = {};
+    st.update_every = 1;   // <= nd_profile.update_every, so smoothing window is max(3,1)=3
+
+    RRDDIM rd = {};
+    rd.rrdset = &st;
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.rd = &rd;
+    dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+    dim.mt = METRIC_TYPE_CONSTANT;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+
+    const unsigned n = Cfg.diff_n + 3 + Cfg.lag_n;   // 9
+    ML_TEST_ASSERT(n <= ML_DIMENSION_MAX_CNS, "test n must fit the inline ring");
+
+    // suppression_window_counter is incremented only on the full-ring path, so
+    // it is an exact count of "this sample was scored rather than buffered".
+    #define SCORED (dim.suppression_window_counter)
+
+    // --- warmup: the first n samples buffer and do not score --------------
+    for (unsigned i = 0; i < n; i++) {
+        (void) ml_dimension_predict(&dim, 100.0, true);
+        ML_TEST_ASSERT(dim.cns_count == i + 1, "warmup must grow cns_count by one per sample");
+        ML_TEST_ASSERT(dim.cns_head == 0, "cns_head must stay 0 until the ring first fills");
+        ML_TEST_ASSERT(SCORED == 0, "warmup samples must not be scored");
+    }
+
+    // --- first full-ring sample scores ------------------------------------
+    (void) ml_dimension_predict(&dim, 100.0, true);
+    ML_TEST_ASSERT(SCORED == 1, "the sample after warmup must be scored");
+    ML_TEST_ASSERT(dim.cns_count == n, "cns_count must saturate at n");
+    ML_TEST_ASSERT(dim.cns_head == 1, "cns_head must advance once the ring is full");
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "a repeated value must leave mt CONSTANT");
+
+    // A differing value must be detected against the NEWEST sample.
+    (void) ml_dimension_predict(&dim, 200.0, true);
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_VARIABLE, "a changed value must set mt VARIABLE");
+    ML_TEST_ASSERT(SCORED == 2, "the changed sample must also be scored");
+
+    // --- missing-data reset: BOTH fields must be zeroed --------------------
+    (void) ml_dimension_predict(&dim, 0.0, false);
+    ML_TEST_ASSERT(dim.cns_count == 0, "a missing sample must reset cns_count");
+    ML_TEST_ASSERT(dim.cns_head == 0, "a missing sample must reset cns_head");
+
+    // The regression this test exists for: with cns_count reset, the next n
+    // samples must warm up again. If only cns_head had been reset, the very
+    // next sample would take the full-ring path and score against stale history.
+    for (unsigned i = 0; i < n; i++) {
+        (void) ml_dimension_predict(&dim, 300.0, true);
+        ML_TEST_ASSERT(SCORED == 2, "samples after a reset must warm up, not score");
+    }
+    (void) ml_dimension_predict(&dim, 300.0, true);
+    ML_TEST_ASSERT(SCORED == 3, "scoring must resume once the ring refills");
+
+    // --- window-change reset while the ring is wrapped --------------------
+    ML_TEST_ASSERT(dim.cns_head != 0, "precondition: the ring must be wrapped here");
+    Cfg.max_samples_to_smooth = 5;                     // n becomes 1 + 5 + 5 = 11
+    const unsigned n2 = Cfg.diff_n + 5 + Cfg.lag_n;
+    ML_TEST_ASSERT(n2 <= ML_DIMENSION_MAX_CNS, "widened n must still fit the inline ring");
+
+    for (unsigned i = 0; i < n2; i++) {
+        (void) ml_dimension_predict(&dim, 400.0, true);
+        ML_TEST_ASSERT(SCORED == 3, "a window change with wrapped state must restart warmup");
+    }
+    (void) ml_dimension_predict(&dim, 400.0, true);
+    ML_TEST_ASSERT(SCORED == 4, "scoring must resume at the new window size");
+    ML_TEST_ASSERT(dim.cns_count == n2, "cns_count must saturate at the new n");
+
+    #undef SCORED
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_smooth;
+    Cfg.suppression_window = saved_suppression_window;
+    Cfg.suppression_threshold = saved_suppression_threshold;
+    nd_profile.update_every = saved_profile_update_every;
+}
+
+// Test: ml_chart_stats_add() must accumulate EVERY field of
+// ml_machine_learning_stats_t.
+//
+// The struct is rolled up twice -- dimension -> chart and chart -> host. The
+// chart -> host step used to be a hand-rolled copy of this function's field
+// list, and when num_dimensions_with_models was added to one enumeration but
+// not the other, the counter published a permanent zero at host level while
+// looking correct everywhere else.
+//
+// This test does not enumerate the fields, because a second enumeration is the
+// bug. Every member is uint32_t, so it walks the struct as an array of
+// uint32_t: add a field and forget the accumulator and this fails immediately.
+static void test_chart_stats_add_covers_every_field()
+{
+    fprintf(stderr, "  test_chart_stats_add_covers_every_field...\n");
+
+    static_assert(sizeof(ml_machine_learning_stats_t) % sizeof(uint32_t) == 0,
+                  "stats struct must be a whole number of uint32_t fields for this test to walk it");
+    const size_t nfields = sizeof(ml_machine_learning_stats_t) / sizeof(uint32_t);
+
+    ml_machine_learning_stats_t src = {};
+    uint32_t *sp = reinterpret_cast<uint32_t *>(&src);
+    for (size_t i = 0; i < nfields; i++)
+        sp[i] = (uint32_t)(i + 1);
+
+    ml_machine_learning_stats_t dst = {};
+    ml_chart_stats_add(&dst, src);
+
+    const uint32_t *dp = reinterpret_cast<const uint32_t *>(&dst);
+    for (size_t i = 0; i < nfields; i++)
+        ML_TEST_ASSERT(dp[i] == (uint32_t)(i + 1),
+                       "every stats field must be accumulated (one is missing from ml_chart_stats_add)");
+
+    // Accumulating is additive, not assignment.
+    ml_chart_stats_add(&dst, src);
+    for (size_t i = 0; i < nfields; i++)
+        ML_TEST_ASSERT(dp[i] == (uint32_t)(2 * (i + 1)),
+                       "ml_chart_stats_add must add, not overwrite");
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -1138,7 +1288,9 @@ extern "C" int ml_unittest()
     test_features_preprocess_below_min_for_kmeans();
     test_dimension_finalize_constant_state();
     test_chart_update_dimension_counts();
+    test_chart_stats_add_covers_every_field();
     test_circular_buffer_equivalence();
+    test_cns_ring_reset_semantics();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
