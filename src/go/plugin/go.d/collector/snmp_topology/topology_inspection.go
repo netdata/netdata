@@ -66,8 +66,8 @@ type topologyInspectionActorResult struct {
 }
 
 type topologyInspectionRowResult struct {
-	state topologyInspectionState
-	row   int
+	topologyInspectionStage
+	row int
 }
 
 type topologyDeviceInspection struct {
@@ -205,7 +205,7 @@ func inspectTopologyDevice(
 	)
 	report.typedIdentity = topologyInspectionRenderedRow(
 		replay.typed.state,
-		report.graphIdentity.membership.state,
+		report.graphIdentity.membership,
 		report.graphIdentity.index,
 		replay.payload.Actors.Rows,
 	)
@@ -240,7 +240,7 @@ func inspectTopologyLink(
 	report.graphLink = inspectTopologyGraphLink(replay.data, subject)
 	report.typedLink = topologyInspectionRenderedRow(
 		replay.typed.state,
-		report.graphLink.membership.state,
+		report.graphLink.membership,
 		report.graphLink.index,
 		replay.payload.Links.Rows,
 	)

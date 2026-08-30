@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/stretchr/testify/require"
+)
+
+var updateTopologyDiagnosticReplayFixture = flag.Bool(
+	"update-topology-diagnostic-replay-fixture",
+	false,
+	"update the replayable SNMP topology diagnostic archive fixture",
 )
 
 func TestTopologyDiagnosticArchiveRoundTripPreservesReplayAndInspection(t *testing.T) {
@@ -91,6 +99,21 @@ func TestTopologyDiagnosticArchiveV1GoldenDocument(t *testing.T) {
 	document, err := newTopologyDiagnosticArchiveDocumentV1(archive.diagnostics, archive.producerVersion)
 	require.NoError(t, err)
 	require.JSONEq(t, string(raw), archiveDocumentJSON(t, document))
+}
+
+func TestTopologyDiagnosticArchiveReplayFixture(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "v-test"))
+	path := filepath.Join("testdata", "topology-diagnostic-archive-replay-v1.zst")
+	if *updateTopologyDiagnosticReplayFixture {
+		require.NoError(t, os.WriteFile(path, encoded.Bytes(), 0o644))
+	}
+	fixture, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, encoded.Bytes(), fixture)
 }
 
 func TestTopologyDiagnosticArchiveRejectsMalformedAndUnsupportedInput(t *testing.T) {

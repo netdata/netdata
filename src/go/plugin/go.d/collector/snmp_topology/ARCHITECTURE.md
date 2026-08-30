@@ -750,7 +750,29 @@ supported producer. The reader's caller-selected byte limits stop oversized
 compressed input and decompression output. Zstd frame integrity detects
 accidental corruption; it does not authenticate an archive. Arbitrary semantic
 JSON editing, signing, sanitization, filesystem publication, retention, and
-command-line behavior are separate contracts.
+runtime publication are separate contracts.
+
+## Maintainer Diagnostic Tool
+
+`src/go/tools/snmp-topology-diagnostics` is a source-only, read-only command for support and development use. It is run
+with `go run` and is not installed with the Agent. One invocation opens and reconstructs one archive, then executes one
+operation:
+
+- `validate` reports the identity of a fully validated archive;
+- `summary` reports cut state/counts and an ordered registration inventory;
+- `replay` returns the unchanged production topology-v1 payload; and
+- `inspect-device` and `inspect-link` return typed positive-allowlist projections of the existing offline inspection
+  reports.
+
+The collector's diagnostic facade owns the command request/report DTOs beside the adapter that constructs them from
+private topology state. The command depends only on that facade; it does not own a second archive model, replay engine,
+backend registry, session, cache, daemon, or network service. Its query defaults come from production topology options;
+unknown map types, inference strategies, managed-device focus values, depths, and link families fail instead of silently
+selecting another request.
+
+Every successful operation emits one JSON document. Compressed and decoded limits are human-readable per-invocation
+flags initialized from the archive reader's defaults. Archives and their JSON reports remain sensitive support material;
+the command does not sanitize, upload, publish, or retain them.
 
 ## Trap Enrichment
 
