@@ -159,6 +159,11 @@
 - Feat(go.d/snmp-topology): retain topology acquisition diagnostics ([#23667](https://github.com/netdata/netdata/issues/23667))
 - Feat(go.d/snmp_topology): add hermetic topology graph replay ([#23670](https://github.com/netdata/netdata/issues/23670))
 - Feat(go.d): add S3 and multisite replication checks ([#23669](https://github.com/netdata/netdata/issues/23669))
+- Feat(go.d/snmp_topology): add offline diagnostic inspection ([#23675](https://github.com/netdata/netdata/issues/23675))
+- Fix(go.d/l2topology): reject ambiguous FDB alias owners ([#23678](https://github.com/netdata/netdata/issues/23678))
+- Regenerate integrations docs ([#23672](https://github.com/netdata/netdata/issues/23672))
+- Build(go): raise main toolchain baseline to 1.27 ([#23679](https://github.com/netdata/netdata/issues/23679))
+- Feat(go.d/snmp_topology): add portable diagnostic archive ([#23680](https://github.com/netdata/netdata/issues/23680))
 
 ## [2.11.0] - 2026-08-12
 
