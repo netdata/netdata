@@ -24,10 +24,28 @@ typedef struct pgd PGD;
 #define PGD_EMPTY (PGD *)(-1)
 
 void pgd_init_arals(void);
+int pgd_unittest(void);
 
 PGD *pgd_create(uint8_t type, uint32_t slots);
 PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size);
-void pgd_free(PGD *pg);
+// Every place a PGD can be freed, enumerated. The freed PGD records which one freed it,
+// so a double free names BOTH sites - and those tell apart three different bugs:
+//
+//   MAIN_CACHE_EVICT   twice -> the PGC evicted one page twice (a PGC_PAGE double delete)
+//   EXTENT_INSERT_LOST       -> pgc_page_add() reported !added but consumed the PGD anyway
+//   DISK_GORILLA_INVALID     -> a PGD freed on the from-disk error path was still published
+//
+// See the PGD lifetime guard in page.c.
+typedef enum {
+    PGD_FREE_SITE_UNKNOWN = 0,
+    PGD_FREE_SITE_MAIN_CACHE_EVICT,      // pagecache.c: main_cache_free_clean_page_callback()
+    PGD_FREE_SITE_EXTENT_INSERT_LOST,    // pdc.c: lost the main cache insert race
+    PGD_FREE_SITE_DISK_GORILLA_INVALID,  // page.c: invalid gorilla chain loaded from disk
+    PGD_FREE_SITE_CREATE_BAD_TYPE,       // page.c: unknown page type while creating
+} PGD_FREE_SITE;
+
+void pgd_free_with_trace(PGD *pg, PGD_FREE_SITE site, const char *func);
+#define pgd_free(pg, site) pgd_free_with_trace(pg, site, __FUNCTION__)
 
 uint32_t pgd_type(PGD *pg);
 bool pgd_is_empty(PGD *pg);

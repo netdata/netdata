@@ -20,11 +20,13 @@ typedef enum __attribute__((packed)) {
 typedef struct {
     uint8_t *data;
     uint16_t size;
+    uint16_t freed_mark;        // PGD lifetime guard - see below
 } page_raw_t;
 
-typedef struct {
+typedef struct xxx {
     gorilla_writer_t *writer;
     uint16_t num_buffers;
+    uint16_t freed_mark;        // PGD lifetime guard - same offset as page_raw_t's
 } page_gorilla_t;
 
 struct pgd {
@@ -50,6 +52,108 @@ struct pgd {
         page_gorilla_t gorilla;
     };
 };
+
+// ----------------------------------------------------------------------------
+// PGD lifetime guard
+//
+// aral_freez() writes ARAL_FREE { size_t size; struct aral_free *next; } over the FIRST
+// 16 BYTES of the element it frees (src/libnetdata/aral/aral.c). On a 24-byte PGD that
+// clobbers used, slots, type, partition, options, states and raw.data, and leaves bytes
+// 16..23 untouched. The clobbered values are not random: type reads back as 0, which is
+// RRDENG_PAGE_TYPE_ARRAY_32BIT, and partition reads back as 0.
+//
+// So a second pgd_free() on an already freed PGD passes every check it has, takes the
+// ARRAY branch even when the PGD was a GORILLA page, and calls
+//
+//     aral_freez(pgd-<stale raw.size>-0, <the free-list 'next' pointer>)
+//
+// which either fatals inside ARAL naming an arena and a pointer that have nothing to do
+// with the bug, or - when 'next' happens to be NULL - corrupts state silently, because
+// aral_freez(ar, NULL) is a no-op.
+//
+// We therefore mark a PGD as freed in the 8 bytes ARAL provably cannot reach, and check
+// that mark on entry. Same approach as SPINLOCK_TRACKED: record the actor inline in the
+// object's own memory, in production, on one narrowly scoped hot object.
+//
+// Under FSANITIZE_ADDRESS the pool is bypassed (aral_freez() delegates to freez()), so
+// the mark is never read back and ASAN catches the double free directly.
+
+// The guard has to survive what aral_freez() writes into a freed element:
+// ARAL_FREE { size_t size; struct aral_free *next; } - two pointer-sized words at offset
+// 0, on every ABI. The asserts below are what actually enforce that.
+//
+// freed_mark is a declared member of BOTH union arms at the same offset, not punned
+// padding, and it is a uint16 so it fits in padding those arms already had - so
+// sizeof(struct pgd) is unchanged on LP64 (24) and on ILP32 (16), and PGD does not move
+// aral size class on either. A member appended after the union instead would have cost
+// +8 bytes per PGD on LP64, because sizeof(page_raw_t) is already pointer-padded to 16.
+//
+// The ABIs differ, and it matters:
+//
+//   LP64  ARAL_FREE is 16 bytes and covers used/slots/type/partition/options/states AND
+//         raw.data. type reads back as 0 == RRDENG_PAGE_TYPE_ARRAY_32BIT and partition as
+//         0, so a second pgd_free() takes the ARRAY branch even for a GORILLA page and
+//         frees the free-list `next` pointer into the arena picked by the stale raw.size.
+//   ILP32 ARAL_FREE is 8 bytes and covers only used/slots/type/partition/options/states.
+//         raw.data SURVIVES, so a second pgd_free() frees the real data buffer again, and
+//         partition is a byte of the `next` pointer - i.e. an out-of-range index into
+//         aral_pgd[] once internal_fatal() is compiled out.
+//
+// Either way the resulting fatal describes the wrong thing, which is why this guard exists.
+// 8 bits of magic is enough: freed_mark is a declared member that nothing but this guard
+// ever writes, so it only has to tell "cleared by pgd_alloc()" from "freed". The low byte
+// carries the PGD_FREE_SITE.
+#define PGD_FREED_MAGIC      0x9D00U
+#define PGD_FREED_MAGIC_MASK 0xFF00U
+
+_Static_assert(offsetof(struct pgd, raw.freed_mark) >= 2 * sizeof(void *),
+               "freed_mark must sit past ARAL_FREE{size_t,pointer}, which aral_freez() "
+               "writes over the start of every freed element");
+_Static_assert(offsetof(struct pgd, raw.freed_mark) == offsetof(struct pgd, gorilla.freed_mark),
+               "both union arms must place freed_mark at the same offset");
+_Static_assert(offsetof(struct pgd, raw.freed_mark) >= offsetof(struct pgd, raw.size) + sizeof(((page_raw_t *)0)->size),
+               "freed_mark must not overlay page_raw_t.size");
+_Static_assert(offsetof(struct pgd, gorilla.freed_mark) >= offsetof(struct pgd, gorilla.num_buffers) + sizeof(((page_gorilla_t *)0)->num_buffers),
+               "freed_mark must not overlay page_gorilla_t.num_buffers");
+
+#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
+// The guard must stay free on the platform that carries the fleet: it has to fit in
+// padding struct pgd already had, so PGD does not change aral size class.
+_Static_assert(sizeof(PGD) == 24, "struct pgd grew on LP64 - the freed mark is no longer free");
+#endif
+
+static ALWAYS_INLINE bool pgd_mark_is_freed(uint16_t mark) {
+    return (mark & PGD_FREED_MAGIC_MASK) == PGD_FREED_MAGIC;
+}
+
+static const char *pgd_free_site_name(PGD_FREE_SITE site) {
+    switch(site) {
+        case PGD_FREE_SITE_MAIN_CACHE_EVICT:     return "main cache eviction (main_cache_free_clean_page_callback)";
+        case PGD_FREE_SITE_EXTENT_INSERT_LOST:   return "extent population, lost the main cache insert race";
+        case PGD_FREE_SITE_DISK_GORILLA_INVALID: return "invalid gorilla chain loaded from disk";
+        case PGD_FREE_SITE_CREATE_BAD_TYPE:      return "unknown page type while creating";
+        default:                                 return "unknown";
+    }
+}
+
+// Claim the PGD for freeing, and return what was there before.
+//
+// This is an exchange, taken on ENTRY to pgd_free(), not a store on the way out. Two
+// threads racing to free the same PGD would both pass a check-then-set guard and both run
+// the teardown; with an exchange exactly one wins, and the loser gets the winner's mark
+// back and reports it.
+static ALWAYS_INLINE uint16_t pgd_claim_freed(PGD *pg, PGD_FREE_SITE site) {
+    return __atomic_exchange_n(&pg->raw.freed_mark,
+                               (uint16_t)(PGD_FREED_MAGIC | ((uint16_t)site & 0xFFU)),
+                               __ATOMIC_ACQ_REL);
+}
+
+// aral does not zero recycled slots, so a PGD handed back out still carries the mark of
+// its previous life. Clearing it on allocation is what keeps the guard free of false
+// positives.
+static ALWAYS_INLINE void pgd_clear_freed(PGD *pg) {
+    __atomic_store_n(&pg->raw.freed_mark, 0, __ATOMIC_RELAXED);
+}
 
 static PRINTFLIKE(2, 3) void pgd_fatal(const PGD *pg, const char *fmt, ...) {
     BUFFER *wb = buffer_create(0, NULL);
@@ -382,6 +486,10 @@ static ALWAYS_INLINE PGD *pgd_alloc(bool for_collector) {
         pgd = aral_mallocz(pgd_alloc_globals.aral_pgd[partition]);
 
     pgd->partition = partition;
+
+    // the slot may be recycled from a previously freed PGD, which still carries its mark
+    pgd_clear_freed(pgd);
+
     return pgd;
 }
 
@@ -485,6 +593,7 @@ ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
 
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, type);
+            pgd_claim_freed(pg, PGD_FREE_SITE_CREATE_BAD_TYPE);
             aral_freez(pgd_alloc_globals.aral_pgd[pg->partition], pg);
             pg = PGD_EMPTY;
             break;
@@ -521,7 +630,7 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
                                               size / RRDENG_GORILLA_32BIT_BUFFER_SIZE,
                                               &total_entries))) {
                 netdata_log_error("DBENGINE: invalid gorilla disk page chain.");
-                pgd_free(pg);
+                pgd_free(pg, PGD_FREE_SITE_DISK_GORILLA_INVALID);
                 pg = PGD_EMPTY;
                 break;
             }
@@ -541,6 +650,7 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
 
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, type);
+            pgd_claim_freed(pg, PGD_FREE_SITE_CREATE_BAD_TYPE);
             aral_freez(pgd_alloc_globals.aral_pgd[pg->partition], pg);
             pg = PGD_EMPTY;
             break;
@@ -549,9 +659,28 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
     return pg;
 }
 
-void pgd_free(PGD *pg) {
+void pgd_free_with_trace(PGD *pg, PGD_FREE_SITE site, const char *func) {
     if (!pg || pg == PGD_EMPTY)
         return;
+
+    // Claim the PGD before trusting ANY field of it. On an already freed PGD every field
+    // below offset 2*sizeof(void*) has been overwritten by ARAL's free-list header, and on
+    // LP64 the values it leaves behind (type 0 == ARRAY_32BIT, partition 0) are precisely
+    // the ones that make the rest of this function proceed as if nothing were wrong.
+    uint16_t previous = pgd_claim_freed(pg, site);
+    if (unlikely(pgd_mark_is_freed(previous))) {
+        fatal("DBENGINE: PGD double free - pgd %p was first freed by: %s; "
+              "it is now being freed again by: %s (in '%s'). "
+              "Its first %zu bytes now hold ARAL's free-list header, so the values it "
+              "reports (type %u, partition %u, used %u, slots %u, data %p) belong to that "
+              "header, not to this PGD.",
+              (void *)pg,
+              pgd_free_site_name((PGD_FREE_SITE)(previous & 0xFFU)),
+              pgd_free_site_name(site), func ? func : "(unknown)",
+              (size_t)(2 * sizeof(void *)),
+              (unsigned)pg->type, (unsigned)pg->partition,
+              (unsigned)pg->used, (unsigned)pg->slots, pg->raw.data);
+    }
 
     internal_fatal(pg->partition >= pgd_alloc_globals.partitions,
                    "PGD partition is invalid %u", pg->partition);
@@ -565,9 +694,6 @@ void pgd_free(PGD *pg) {
 
                 pgd_data_free(pg->raw.data, pg->raw.size, pg->partition);
                 timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_ARAL);
-
-                pg->raw.data = NULL;
-                pg->raw.size = 0;
             }
             else if ((pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) ||
                      (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) ||
@@ -1122,4 +1248,94 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             return false;
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// unittest
+
+// The PGD lifetime guard rests on an assumption that lives in ANOTHER module: that
+// aral_freez() overwrites exactly the first 16 bytes of the element with
+// ARAL_FREE { size_t size; struct aral_free *next; }, leaving bytes 16..23 - where we put
+// the freed mark - alone. This test pins that assumption, so a future change to ARAL's
+// free-list layout fails here loudly instead of silently disarming the guard in
+// production.
+//
+// Skipped under FSANITIZE_ADDRESS: there aral_freez() delegates to freez(), so reading a
+// freed PGD back is a genuine use-after-free that ASAN traps first, and ASAN already
+// catches PGD double frees directly.
+int pgd_unittest(void) {
+#if defined(FSANITIZE_ADDRESS)
+    fprintf(stderr, "PGD: skipping lifetime-guard test under ASAN (aral bypasses its pool)\n");
+    return 0;
+#else
+    int errors = 0;
+
+    // pgd_init_arals() sorts and de-duplicates the static aral_sizes[] table in place, so
+    // it is not idempotent. Only initialise if nothing has yet.
+    if(!pgd_alloc_globals.partitions)
+        pgd_init_arals();
+
+    PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
+    if(!pg || pg == PGD_EMPTY) {
+        fprintf(stderr, "PGD: cannot create a page to test with\n");
+        return 1;
+    }
+
+    // a live PGD must never look freed
+    if(pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
+        fprintf(stderr, "PGD: a freshly created PGD is already marked as freed\n");
+        errors++;
+    }
+
+    pgd_free(pg, PGD_FREE_SITE_MAIN_CACHE_EVICT);
+
+    // Reading pg back is deliberate: the aral page is still mapped. Everything below
+    // 2*sizeof(void*) now belongs to aral's free-list header.
+    //
+    // This is the detector's own contract: a second free must see the FIRST freer's site.
+    // We exercise the exact claim the fatal path reads, rather than calling pgd_free()
+    // again - that would fatal and take this process down with it.
+    uint16_t previous = pgd_claim_freed(pg, PGD_FREE_SITE_EXTENT_INSERT_LOST);
+    if(!pgd_mark_is_freed(previous)) {
+        fprintf(stderr, "PGD: a freed PGD does not carry the freed mark - the guard is disarmed\n");
+        errors++;
+    }
+    else if((PGD_FREE_SITE)(previous & 0xFFU) != PGD_FREE_SITE_MAIN_CACHE_EVICT) {
+        fprintf(stderr, "PGD: the freed mark reports the wrong first-free site (%s) - "
+                        "the site is the whole point of the mark\n",
+                pgd_free_site_name((PGD_FREE_SITE)(previous & 0xFFU)));
+        errors++;
+    }
+
+    // pgd_alloc() must clear the mark, or every FIRST free of a recycled slot would be
+    // misreported as a double free. Test the clear directly - which slot aral hands back
+    // next is not ours to predict.
+    pgd_clear_freed(pg);
+    if(pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
+        fprintf(stderr, "PGD: clearing the freed mark did not clear it\n");
+        errors++;
+    }
+
+#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
+    // Pin the LP64 mechanism this guard exists to describe: aral's 16-byte free-list header
+    // makes a freed PGD read back as ARRAY_32BIT in partition 0, which is what lets a
+    // second pgd_free() misroute silently. The guard is correct either way, but if this
+    // stops holding, the comments in this file and the fatal's wording are stale.
+    if(pg->type != RRDENG_PAGE_TYPE_ARRAY_32BIT || pg->partition != 0) {
+        fprintf(stderr,
+                "PGD: aral's free-list header no longer makes a freed PGD read back as "
+                "ARRAY_32BIT/partition 0 (type %u, partition %u) - re-check ARAL_FREE in "
+                "aral.c against struct pgd\n",
+                (unsigned)pg->type, (unsigned)pg->partition);
+        errors++;
+    }
+#endif
+
+    if(errors)
+        fprintf(stderr, "PGD: lifetime-guard test FAILED with %d error(s)\n", errors);
+    else
+        fprintf(stderr, "PGD: lifetime-guard test PASSED\n");
+
+    return errors;
+#endif
 }
