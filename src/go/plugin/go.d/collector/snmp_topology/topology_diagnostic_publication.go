@@ -41,12 +41,21 @@ func writeTopologyDiagnosticArchiveFile(
 	diagnostics topologyDiagnostics,
 	replace func(string, string) error,
 ) error {
+	return writeTopologyDiagnosticArchiveFileWithClose(path, diagnostics, (*os.File).Close, replace)
+}
+
+func writeTopologyDiagnosticArchiveFileWithClose(
+	path string,
+	diagnostics topologyDiagnostics,
+	closeFile func(*os.File) error,
+	replace func(string, string) error,
+) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create SNMP topology diagnostic archive directory: %w", err)
 	}
 	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("secure SNMP topology diagnostic archive directory: %w", err)
+		return fmt.Errorf("set SNMP topology diagnostic archive directory permissions: %w", err)
 	}
 
 	tempPath := path + ".tmp"
@@ -66,14 +75,14 @@ func writeTopologyDiagnosticArchiveFile(
 	}()
 
 	if err := file.Chmod(0o600); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("secure temporary SNMP topology diagnostic archive: %w", err)
+		_ = closeFile(file)
+		return fmt.Errorf("set temporary SNMP topology diagnostic archive permissions: %w", err)
 	}
 	if err := writeTopologyDiagnosticArchive(file, diagnostics); err != nil {
-		_ = file.Close()
+		_ = closeFile(file)
 		return fmt.Errorf("write temporary SNMP topology diagnostic archive: %w", err)
 	}
-	if err := file.Close(); err != nil {
+	if err := closeFile(file); err != nil {
 		return fmt.Errorf("close temporary SNMP topology diagnostic archive: %w", err)
 	}
 	if err := replace(tempPath, path); err != nil {

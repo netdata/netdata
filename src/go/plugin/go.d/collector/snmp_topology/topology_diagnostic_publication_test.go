@@ -23,7 +23,7 @@ func TestTopologyDiagnosticArchivePathUsesAgentVarLib(t *testing.T) {
 	require.Equal(t, filepath.Join("agent", "varlib", "snmp-topology", "diagnostics", "latest.zst"), path)
 }
 
-func TestWriteTopologyDiagnosticArchiveFileCreatesPrivateValidatedArchive(t *testing.T) {
+func TestWriteTopologyDiagnosticArchiveFileCreatesValidatedArchiveWithPlatformPermissions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "latest.zst")
 	diagnostics := publicationTestDiagnostics(7)
 
@@ -96,7 +96,27 @@ func TestWriteTopologyDiagnosticArchiveFilePreservesPreviousArchiveOnFailure(t *
 		requirePreviousDiagnosticArchive(t, path, want)
 	})
 
-	t.Run("atomic replace", func(t *testing.T) {
+	t.Run("close", func(t *testing.T) {
+		closeErr := errors.New("close failed")
+		replaceCalled := false
+		err := writeTopologyDiagnosticArchiveFileWithClose(
+			path,
+			publicationTestDiagnostics(2),
+			func(file *os.File) error {
+				require.NoError(t, file.Close())
+				return closeErr
+			},
+			func(_, _ string) error {
+				replaceCalled = true
+				return nil
+			},
+		)
+		require.ErrorIs(t, err, closeErr)
+		require.False(t, replaceCalled)
+		requirePreviousDiagnosticArchive(t, path, want)
+	})
+
+	t.Run("replace", func(t *testing.T) {
 		replaceErr := errors.New("replace failed")
 		err := writeTopologyDiagnosticArchiveFile(path, publicationTestDiagnostics(2), func(_, _ string) error {
 			return replaceErr

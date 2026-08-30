@@ -140,11 +140,13 @@ The publisher owns one file below the Agent VarLib directory:
 snmp-topology/diagnostics/latest.zst
 ```
 
-It writes a private same-directory `latest.zst.tmp`, closes it, and uses `os.Rename` to replace the stable archive. A
-failed encode, close, or replacement removes the temporary file and preserves the previous valid archive. The directory
-and file are owner-private. There is no rolling history, retention scan, `fsync`, publication metric, configuration
-surface, upload, or sanitization step. Because a later publication replaces the archive, an operator must copy it while
-the problem is visible.
+It writes a same-directory `latest.zst.tmp`, completes and closes it, and uses `os.Rename` to replace the stable archive.
+On Unix, the rename atomically replaces the path and the directory and file use owner-private `0700` and `0600` modes.
+On Windows, the directory and file inherit the configured VarLib ACL; `os.Rename` does not promise uninterrupted-name
+atomicity, so a manual copy racing replacement may fail and should be retried. A failed encode, close, or replacement
+removes the temporary file and preserves the previous valid archive. There is no rolling history, retention scan,
+`fsync`, publication metric, configuration surface, upload, or sanitization step. Because a later publication replaces
+the archive, an operator must copy it while the problem is visible.
 
 `DeviceStore` keeps each caller-owned key private and assigns a typed, monotonic
 registration ID to each uninterrupted registration lifetime. Updating a live

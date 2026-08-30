@@ -15,7 +15,9 @@ The Agent periodically replaces one current archive at:
 ```
 
 If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is
-visible because the next publication replaces it. For a standard installation:
+visible because the next publication replaces it. Unix installations use owner-private directory and file modes. On
+Windows, access follows the configured VarLib directory's inherited ACL, and a copy racing replacement may need to be
+retried. For a standard Unix installation:
 
 ```bash
 sudo install -m 0600 -o "$(id -u)" -g "$(id -g)" \
