@@ -1,0 +1,17 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: xquik
+placements:
+  - id: xquik
+    section_id: applications
+    title: Xquik
+    icon: apps
+    properties: { important: false, grouping: true }
+    items:
+      - type: group
+        id: account
+        title: X account
+        items:
+          - xquik.account_audience
+          - xquik.account_posts
+          - xquik.account_verification_status

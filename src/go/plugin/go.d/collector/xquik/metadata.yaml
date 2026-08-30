@@ -1,0 +1,165 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-xquik
+      plugin_name: go.d.plugin
+      module_name: xquik
+      monitored_instance:
+        name: Xquik
+        link: https://xquik.com/
+        icon_filename: globe.svg
+        categories:
+          - data-collection.applications
+      keywords:
+        - xquik
+        - x api
+        - x account monitoring
+        - twitter monitoring
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor X account audience size, posting activity, and verification state through the Xquik API.
+
+          Xquik is an independent third-party service. Not affiliated with X Corp. "Twitter" and "X" are trademarks of X Corp.
+        method_description: |
+          The collector sends one authenticated `GET /api/v1/x/users/{user}` request per check or collection.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          An Xquik API key with access to profile reads is required.
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector does not auto-detect X accounts. Configure one job for each username or user ID.
+        limits:
+          description: |
+            Xquik meters profile reads. Each job makes one request per collection interval.
+        performance_impact:
+          description: |
+            The default interval is 300 seconds. The minimum interval is 60 seconds.
+    setup:
+      prerequisites:
+        list:
+          - title: Xquik API key
+            description: |
+              Create an Xquik API key with access to profile reads.
+      configuration:
+        file:
+          name: go.d/xquik.conf
+        options:
+          description: |
+            The following options can be defined globally: `update_every`, `autodetection_retry`.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval, in seconds. Must be at least 60.
+              default_value: 300
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval, in seconds. Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: user
+              description: X username without @, or a numeric user ID.
+              default_value: ""
+              required: true
+              group: Target
+            - name: url
+              description: Xquik REST API base URL. Production endpoints must use HTTPS.
+              default_value: https://xquik.com/api/v1
+              required: false
+              group: Target
+            - name: api_key
+              description: Xquik API key.
+              default_value: ""
+              required: true
+              group: Authentication
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 30
+              required: false
+              group: HTTP
+            - name: proxy_url
+              description: HTTP proxy URL. Empty value uses environment proxy variables.
+              default_value: ""
+              required: false
+              group: HTTP
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Monitor one X account through Xquik.
+              config: |
+                jobs:
+                  - name: x-account
+                    user: netdata
+                    api_key: ${env:XQUIK_API_KEY}
+    troubleshooting:
+      problems:
+        list:
+          - name: Authentication failure
+            description: |
+              Check `api_key` when Xquik returns HTTP status 401 or 403.
+          - name: Rate or usage limit
+            description: |
+              Increase `update_every` or review Xquik usage when the API returns HTTP status 429.
+          - name: Missing charts
+            description: |
+              Optional profile fields can be absent. Their charts appear after Xquik returns those fields.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: X account
+          description: These metrics refer to one X account.
+          labels:
+            - name: user_id
+              description: X account ID.
+            - name: username
+              description: X account username.
+            - name: name
+              description: X account display name.
+          metrics:
+            - name: xquik.account_audience
+              description: X account audience size.
+              unit: accounts
+              chart_type: line
+              dimensions:
+                - name: followers
+                - name: following
+            - name: xquik.account_posts
+              description: X account posting rate.
+              unit: posts/s
+              chart_type: line
+              dimensions:
+                - name: posts
+            - name: xquik.account_verification_status
+              description: X account verification status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: verified
+                - name: unverified
