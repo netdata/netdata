@@ -3182,6 +3182,10 @@ add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-handshake-hops-test.c)
 target_link_libraries(stream-receiver-hops-test libnetdata)
 
+add_executable(stream-receiver-line-cap-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-receiver-line-cap-test.c)
+target_link_libraries(stream-receiver-line-cap-test libnetdata)
+
 add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-replay-endpoints-test.c)
 target_link_libraries(stream-replay-endpoints-test libnetdata)
