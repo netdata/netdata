@@ -42,6 +42,7 @@ typedef enum {
     PGD_FREE_SITE_EXTENT_INSERT_LOST,    // pdc.c: lost the main cache insert race
     PGD_FREE_SITE_DISK_GORILLA_INVALID,  // page.c: invalid gorilla chain loaded from disk
     PGD_FREE_SITE_CREATE_BAD_TYPE,       // page.c: unknown page type while creating
+    PGD_FREE_SITE_UNITTEST,              // test teardown - never reached in a running agent
 } PGD_FREE_SITE;
 
 void pgd_free_with_trace(PGD *pg, PGD_FREE_SITE site, const char *func);

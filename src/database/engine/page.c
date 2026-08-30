@@ -132,6 +132,7 @@ static const char *pgd_free_site_name(PGD_FREE_SITE site) {
         case PGD_FREE_SITE_EXTENT_INSERT_LOST:   return "extent population, lost the main cache insert race";
         case PGD_FREE_SITE_DISK_GORILLA_INVALID: return "invalid gorilla chain loaded from disk";
         case PGD_FREE_SITE_CREATE_BAD_TYPE:      return "unknown page type while creating";
+        case PGD_FREE_SITE_UNITTEST:             return "unit test teardown";
         default:                                 return "unknown";
     }
 }
@@ -667,7 +668,13 @@ void pgd_free_with_trace(PGD *pg, PGD_FREE_SITE site, const char *func) {
     // below offset 2*sizeof(void*) has been overwritten by ARAL's free-list header, and on
     // LP64 the values it leaves behind (type 0 == ARRAY_32BIT, partition 0) are precisely
     // the ones that make the rest of this function proceed as if nothing were wrong.
-    uint16_t previous = pgd_claim_freed(pg, site);
+    // Read before claiming. On the path this guard exists for - a PGD that is already
+    // freed - we then fatal without writing to it at all. The exchange still happens on
+    // the normal path, so two threads racing to free one live PGD cannot both win.
+    uint16_t previous = __atomic_load_n(&pg->raw.freed_mark, __ATOMIC_ACQUIRE);
+    if (likely(!pgd_mark_is_freed(previous)))
+        previous = pgd_claim_freed(pg, site);
+
     if (unlikely(pgd_mark_is_freed(previous))) {
         fatal("DBENGINE: PGD double free - pgd %p was first freed by: %s; "
               "it is now being freed again by: %s (in '%s'). "
@@ -1287,7 +1294,7 @@ int pgd_unittest(void) {
         errors++;
     }
 
-    pgd_free(pg, PGD_FREE_SITE_MAIN_CACHE_EVICT);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 
     // Reading pg back is deliberate: the aral page is still mapped. Everything below
     // 2*sizeof(void*) now belongs to aral's free-list header.
@@ -1295,12 +1302,12 @@ int pgd_unittest(void) {
     // This is the detector's own contract: a second free must see the FIRST freer's site.
     // We exercise the exact claim the fatal path reads, rather than calling pgd_free()
     // again - that would fatal and take this process down with it.
-    uint16_t previous = pgd_claim_freed(pg, PGD_FREE_SITE_EXTENT_INSERT_LOST);
+    uint16_t previous = pgd_claim_freed(pg, PGD_FREE_SITE_CREATE_BAD_TYPE);
     if(!pgd_mark_is_freed(previous)) {
         fprintf(stderr, "PGD: a freed PGD does not carry the freed mark - the guard is disarmed\n");
         errors++;
     }
-    else if((PGD_FREE_SITE)(previous & 0xFFU) != PGD_FREE_SITE_MAIN_CACHE_EVICT) {
+    else if((PGD_FREE_SITE)(previous & 0xFFU) != PGD_FREE_SITE_UNITTEST) {
         fprintf(stderr, "PGD: the freed mark reports the wrong first-free site (%s) - "
                         "the site is the whole point of the mark\n",
                 pgd_free_site_name((PGD_FREE_SITE)(previous & 0xFFU)));
