@@ -121,6 +121,7 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
+	coll.publishDiagnosticArchiveFile = func(string, topologyDiagnostics) error { return nil }
 	builder := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(builder)
 	publishTestTopologyBuilder(coll.topologyRegistry, builder)

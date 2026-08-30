@@ -92,6 +92,8 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		acquisitionLimits:            defaultTopologyAcquisitionLimits,
 		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
 		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
+		diagnosticArchivePath:        defaultTopologyDiagnosticArchivePath(),
+		publishDiagnosticArchiveFile: publishTopologyDiagnosticArchiveFile,
 		store:                        metricStore,
 		metrics:                      newCollectorMetrics(metricStore),
 	}
@@ -126,6 +128,8 @@ type (
 		acquisitionLimits            topologyAcquisitionLimits
 		diagnosticGlobalLimits       topologyAcquisitionLimits
 		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
+		diagnosticArchivePath        string
+		publishDiagnosticArchiveFile func(string, topologyDiagnostics) error
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -165,6 +169,12 @@ func (c *Collector) Run(ctx context.Context) error {
 
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
+	publisherDone := make(chan struct{})
+	go func() {
+		defer close(publisherDone)
+		c.runTopologyDiagnosticArchivePublisher(ctx)
+	}()
+	defer func() { <-publisherDone }()
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()

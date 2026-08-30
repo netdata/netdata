@@ -6,6 +6,25 @@ paths used by the collector. It is run from the repository and is not installed 
 > Diagnostic archives can contain device addresses, hostnames, descriptions, inventory data, and topology evidence.
 > Treat an archive and the tool output as sensitive support material.
 
+## Getting an archive from an Agent
+
+The Agent periodically replaces one current archive at:
+
+```text
+/var/lib/netdata/snmp-topology/diagnostics/latest.zst
+```
+
+If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is
+visible because the next publication replaces it. For a standard installation:
+
+```bash
+sudo install -m 0600 -o "$(id -u)" -g "$(id -g)" \
+  /var/lib/netdata/snmp-topology/diagnostics/latest.zst \
+  ./snmp-topology-diagnostics.zst
+```
+
+Use the copied file with the commands below. The Agent does not upload the archive automatically.
+
 ## Usage
 
 Run commands from `src/go`:

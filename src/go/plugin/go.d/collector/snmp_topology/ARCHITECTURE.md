@@ -11,7 +11,7 @@ immutable topology generation from SNMP jobs registered by the SNMP collector.
 
 It has three independent entry points:
 
-- `Run(ctx)` refreshes topology in the background.
+- `Run(ctx)` refreshes topology and publishes the current diagnostic archive in the background.
 - `Collect(ctx)` only publishes internal collector metrics.
 - `snmp:topology:snmp` serves the latest cached topology through a Function.
 
@@ -128,6 +128,23 @@ restores the normal interval. Retry timing is internal and has no public tuning
 option. Retryable client-construction, connection, and collection warnings use
 the logger's built-in hourly limiter keyed by registration ID and
 bounded failure class; warning suppression does not change retry timing.
+
+After the initial refresh completes, `Run(ctx)` starts one diagnostic publisher. It writes immediately and then every
+`max(update_every, refresh_every)`, acquiring the current immutable diagnostic cut itself. The publisher is independent
+of the refresh loop, so compression and filesystem I/O do not hold `refreshMu` or delay collection and Function readers.
+Slow writes serialize in the one publisher goroutine, and the timer naturally coalesces missed periods without a queue.
+
+The publisher owns one file below the Agent VarLib directory:
+
+```text
+snmp-topology/diagnostics/latest.zst
+```
+
+It writes a private same-directory `latest.zst.tmp`, closes it, and uses `os.Rename` to replace the stable archive. A
+failed encode, close, or replacement removes the temporary file and preserves the previous valid archive. The directory
+and file are owner-private. There is no rolling history, retention scan, `fsync`, publication metric, configuration
+surface, upload, or sanitization step. Because a later publication replaces the archive, an operator must copy it while
+the problem is visible.
 
 `DeviceStore` keeps each caller-owned key private and assigns a typed, monotonic
 registration ID to each uninterrupted registration lifetime. Updating a live
@@ -749,8 +766,9 @@ Archives are sensitive support attachments even though the Agent is the only
 supported producer. The reader's caller-selected byte limits stop oversized
 compressed input and decompression output. Zstd frame integrity detects
 accidental corruption; it does not authenticate an archive. Arbitrary semantic
-JSON editing, signing, sanitization, filesystem publication, retention, and
-runtime publication are separate contracts.
+JSON editing, signing, sanitization, retention, and upload are separate
+contracts. Runtime filesystem publication uses the same writer through the
+fixed latest-only path described above.
 
 ## Maintainer Diagnostic Tool
 
@@ -788,7 +806,7 @@ The collector emits internal metrics only. These metrics describe refresh health
 and retained device-generation state; they are not the topology payload.
 
 - `Collect(ctx)` writes current internal metric values.
-- `Run(ctx)` performs SNMP topology refresh.
+- `Run(ctx)` performs SNMP topology refresh and publishes the current diagnostic archive.
 - `charts.go` and `metrix.go` define this internal observability surface.
 
 ## Concurrency Rules
@@ -805,6 +823,9 @@ and retained device-generation state; they are not the topology payload.
   the previous generation visible.
 - Function, focus, availability, reverse-DNS, diagnostics, and trap readers each
   load that pointer once and never block on collection or builder locks.
+- The diagnostic publisher is the only archive writer. It acquires the same
+  immutable cut as other diagnostic readers, writes outside `refreshMu`, and
+  stops with `Run(ctx)`.
 - The registry mutex only protects producer-scope discovery and the reverse-DNS
   warmer context; it does not protect topology generations.
 

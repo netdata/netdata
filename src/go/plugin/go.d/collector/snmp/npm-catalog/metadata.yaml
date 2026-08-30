@@ -9448,7 +9448,11 @@ modules:
             enabled: true
           list: []
       single_job: true
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
@@ -9490,7 +9494,11 @@ modules:
         performance_impact:
           description: ''
     setup: *id004
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
@@ -9533,7 +9541,11 @@ modules:
         performance_impact:
           description: ''
     setup: *id004
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
@@ -9575,7 +9587,11 @@ modules:
         performance_impact:
           description: ''
     setup: *id004
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
@@ -9617,7 +9633,11 @@ modules:
         performance_impact:
           description: ''
     setup: *id004
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
@@ -9661,7 +9681,11 @@ modules:
         performance_impact:
           description: ''
     setup: *id004
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
@@ -9704,7 +9728,11 @@ modules:
         performance_impact:
           description: ''
     setup: *id004
-    troubleshooting: *id002
+    troubleshooting:
+      problems:
+        list:
+          - name: Collect diagnostics for missing or incorrect topology
+            description: "The Agent periodically replaces one current SNMP topology diagnostic archive at `/var/lib/netdata/snmp-topology/diagnostics/latest.zst`. If `NETDATA_LIB_DIR` is set, replace `/var/lib/netdata` with that directory. Copy the archive while the problem is visible because the next publication replaces it.\n\n```bash\nsudo install -m 0600 -o \"$(id -u)\" -g \"$(id -g)\" /var/lib/netdata/snmp-topology/diagnostics/latest.zst ./snmp-topology-diagnostics.zst\n```\n\nSend the copied archive to Netdata support. It can contain device addresses, hostnames, descriptions, inventory data, and topology evidence, so treat it as sensitive support material."
     alerts: []
     metrics: *id003
   - meta:
