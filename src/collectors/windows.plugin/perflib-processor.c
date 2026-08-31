@@ -94,6 +94,17 @@ static unsigned int count_set_bits(KAFFINITY mask)
     return count;
 }
 
+static unsigned int processor_mask_span(KAFFINITY mask)
+{
+    unsigned int span = 0;
+    while (mask) {
+        span++;
+        mask >>= 1;
+    }
+
+    return span;
+}
+
 static bool
 processor_topology_add(struct processor_topology *topology, uint32_t numa_node, uint32_t numa_index, uint64_t cpu_id)
 {
@@ -184,7 +195,7 @@ static bool processor_topology_from_extended_api(struct processor_topology *topo
         group_offsets = callocz(group_count, sizeof(*group_offsets));
         for (WORD group = 1; group < group_count; group++)
             group_offsets[group] =
-                group_offsets[group - 1] + count_set_bits(entry->Group.GroupInfo[group - 1].ActiveProcessorMask);
+                group_offsets[group - 1] + processor_mask_span(entry->Group.GroupInfo[group - 1].ActiveProcessorMask);
         break;
     }
 
@@ -272,6 +283,26 @@ static bool processor_topology_find(uint32_t numa_node, uint32_t numa_index, int
     }
 
     return false;
+}
+
+int perflib_processor_unittest(void)
+{
+    struct processor_topology topology = {0};
+    const KAFFINITY first_group_mask = ((KAFFINITY)1 << 1) | ((KAFFINITY)1 << 3);
+    const KAFFINITY second_group_mask = (KAFFINITY)1 << 1;
+    const uint64_t second_group_offset = processor_mask_span(first_group_mask);
+    int errors = 0;
+
+    if (!processor_topology_add_mask(&topology, 0, first_group_mask, 0) ||
+        !processor_topology_add_mask(&topology, 1, second_group_mask, second_group_offset) ||
+        topology.entries_count != 3 || topology.entries[0].cpu_id != 1 || topology.entries[1].cpu_id != 3 ||
+        topology.entries[2].cpu_id != 5) {
+        fprintf(stderr, "perflib processor unittest: sparse processor masks produced duplicate CPU IDs\n");
+        errors++;
+    }
+
+    freez(topology.entries);
+    return errors;
 }
 
 static bool processor_information_instance_to_cpu_id(const char *instance_name, int *cpu_id)
