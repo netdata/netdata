@@ -1,6 +1,8 @@
 # RouterOS RB750Gr3 fixture evidence shows a device deviation: the standard
 # readable lldpRemManAddrIfSubtype row anchor (.3) is absent, while the
-# nominally not-accessible INDEX objects (.1/.2) are readable.
+# nominally not-accessible INDEX objects (.1/.2) are readable. Its row suffix
+# stops before the address subtype, length, and octets, so index-only decoding
+# cannot reconstruct the management address.
 
 selector:
   - sysobjectid:

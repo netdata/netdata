@@ -11,6 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
+const lldpManagementAddressMaxLength = 31
+
 func init() {
 	registerTopologyMetricHandler(ddsnmp.KindLldpLocPort, (*topologyBuilder).updateLldpLocPort)
 	registerTopologyMetricHandler(ddsnmp.KindLldpLocManAddr, (*topologyBuilder).updateLldpLocManAddr)
@@ -172,7 +174,7 @@ func validLLDPManagementAddressLength(addrHex, declaredLength string) bool {
 	}
 
 	length, err := strconv.Atoi(declaredLength)
-	if err != nil || length <= 0 {
+	if err != nil || length <= 0 || length > lldpManagementAddressMaxLength {
 		return false
 	}
 
