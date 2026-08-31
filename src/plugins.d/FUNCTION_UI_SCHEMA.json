@@ -846,7 +846,74 @@
             "next": { "type": "string" }
           },
           "additionalProperties": true
-        }
+        },
+        "overview": { "$ref": "#/definitions/traces_overview" }
+      },
+      "additionalProperties": true
+    },
+    "traces_facet_value": {
+      "type": "object",
+      "required": ["value", "traces"],
+      "properties": {
+        "value": { "type": "string" },
+        "traces": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "traces_facet_list": {
+      "type": "object",
+      "required": ["top", "other", "unattributed"],
+      "properties": {
+        "top": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_facet_value" }
+        },
+        "other": { "type": "integer", "minimum": 0 },
+        "unattributed": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "traces_overview": {
+      "type": "object",
+      "required": ["version", "unit", "status", "coverage", "scope", "grid", "totals"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "unit": { "type": "string" },
+        "status": { "$ref": "#/definitions/traces_status" },
+        "coverage": { "$ref": "#/definitions/traces_coverage" },
+        "scope": { "type": "string", "enum": ["window", "selection"] },
+        "grid": {
+          "type": "object",
+          "required": ["bucket_start_s", "bucket_width_s", "duration_bins", "cells"],
+          "properties": {
+            "bucket_start_s": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+            "bucket_width_s": { "type": "integer", "minimum": 1 },
+            "duration_bins": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "cells": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "totals": {
+          "type": "object",
+          "required": ["traces", "spans", "errors"],
+          "properties": {
+            "traces": { "type": "integer", "minimum": 0 },
+            "spans": { "type": "integer", "minimum": 0 },
+            "errors": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "top_root_services": { "$ref": "#/definitions/traces_facet_list" },
+        "top_root_operations": { "$ref": "#/definitions/traces_facet_list" }
       },
       "additionalProperties": true
     },

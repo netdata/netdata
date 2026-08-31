@@ -15,9 +15,10 @@ use sfsq::traces::{
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
-    OverviewResult, OverviewTotals, SearchItems, SearchResult, SlowestResult, SlowestTraceWire,
-    SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
+    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OVERVIEW_SCOPE_WINDOW,
+    OverviewGridWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems, SearchResult,
+    SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems, TraceResult,
+    TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -404,11 +405,22 @@ pub(crate) fn to_attribute_values_result(
 
 // ── Overview: engine data → wire ────────────────────────────────────
 
-/// Shape the trace-density grid into the wire result. The wire's
+/// Everything the standalone overview mode and the search response's
+/// embedded section share. Shaped once so the two surfaces cannot
+/// report the same window differently.
+struct OverviewParts {
+    status: StatusWire,
+    grid: OverviewGridWire,
+    totals: OverviewTotals,
+    top_root_services: Option<FacetListWire>,
+    top_root_operations: Option<FacetListWire>,
+}
+
+/// Shape the trace-density grid's shared body. The wire's
 /// second-granular geometry derives from the SAME `grid` the engine
 /// binned on — one source of truth; the shared derivation guarantees
 /// whole seconds (debug-asserted).
-pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> OverviewResult {
+fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
     const NS_PER_S: i64 = 1_000_000_000;
     debug_assert_eq!(grid.bucket_start_ns % NS_PER_S, 0);
     debug_assert_eq!(grid.bucket_width_ns % NS_PER_S, 0);
@@ -425,10 +437,7 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
         Some(f) => (Some(to_list(f.services)), Some(to_list(f.operations))),
         None => (None, None),
     };
-    OverviewResult {
-        mode: "overview",
-        version: 1,
-        unit: "traces",
+    OverviewParts {
         status: StatusWire::from(&data.status),
         grid: OverviewGridWire {
             bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
@@ -443,6 +452,48 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
         },
         top_root_services,
         top_root_operations,
+    }
+}
+
+/// Shape the standalone `overview` mode's response.
+pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> OverviewResult {
+    let parts = overview_parts(data, grid);
+    OverviewResult {
+        mode: "overview",
+        version: 1,
+        unit: "traces",
+        status: parts.status,
+        grid: parts.grid,
+        totals: parts.totals,
+        top_root_services: parts.top_root_services,
+        top_root_operations: parts.top_root_operations,
+    }
+}
+
+/// Shape the same aggregate as the SEARCH response's embedded section:
+/// the legacy body minus `mode`, plus `coverage` — the GRID's aligned
+/// window, which the caller derived together with `grid` — and `scope`.
+///
+/// `scope` is [`OVERVIEW_SCOPE_WINDOW`] because this pass carries no
+/// predicate at all: it aggregates the whole window, the page's
+/// selections included. The flag is the section's honesty, so it is set
+/// here from what actually ran, never from what a caller wanted.
+pub(crate) fn to_overview_section(
+    data: OverviewData,
+    grid: sfst::Grid,
+    coverage: CoverageWire,
+) -> OverviewSection {
+    let parts = overview_parts(data, grid);
+    OverviewSection {
+        version: 1,
+        unit: "traces",
+        status: parts.status,
+        coverage,
+        scope: OVERVIEW_SCOPE_WINDOW,
+        grid: parts.grid,
+        totals: parts.totals,
+        top_root_services: parts.top_root_services,
+        top_root_operations: parts.top_root_operations,
     }
 }
 
@@ -686,6 +737,10 @@ pub(crate) fn to_search_result(
         traces: traces.into_iter().map(summary_wire).collect(),
         field_kinds: field_kinds_wire(data.field_kinds),
         anchor,
+        // Composed by the caller when it ran the aggregate pass: only
+        // the Functions view does, and only it holds the second engine
+        // call's result.
+        overview: None,
     }
 }
 

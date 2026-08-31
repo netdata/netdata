@@ -52,7 +52,7 @@ async fn info_returns_the_descriptor() {
         json!([
             "info", "trace", "attributes", "attribute_values", "overview",
             "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
-            "min_trace_duration_ns"
+            "min_trace_duration_ns", "overview_facets"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -1000,6 +1000,162 @@ async fn overview_invalid_selectors_are_clean_client_errors() {
         let msg = err.to_string();
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
+}
+
+// ── The Functions view's window aggregate ────────────────────────────
+
+/// The Functions request for the corpus window: the protocol's own
+/// top-level fields, no mode selector.
+fn functions_body(last: usize) -> serde_json::Value {
+    json!({"after": T_S, "before": T_S + 100, "last": last})
+}
+
+#[tokio::test]
+async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
+    let h = handler_with_search_corpus().await;
+    let v = serde_json::to_value(call_on(&h, functions_body(2)).await.unwrap()).unwrap();
+    // The page is 2 of the window's 5 traces...
+    assert_eq!(v["data"]["items"], json!({"returned": 2, "max_to_return": 2}));
+    assert_eq!(ids(&v["data"]), ["0e", "0c"]);
+    // ...and the aggregate describes the WINDOW, not the page.
+    let o = &v["data"]["overview"];
+    assert_eq!(o["version"], 1);
+    assert_eq!(o["unit"], "traces");
+    assert_eq!(o["scope"], "window");
+    assert_eq!(o["status"], json!({"complete": true}));
+    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(o["grid"]["bucket_start_s"], T_S);
+    assert_eq!(o["grid"]["bucket_width_s"], 1);
+    assert_eq!(
+        o["grid"]["duration_bins"],
+        json!(["<1ms", "1-10ms", "10-100ms", "100ms-1s", "1-10s", ">10s"])
+    );
+    let cells = o["grid"]["cells"].as_array().unwrap();
+    assert_eq!(cells.len(), 100);
+    let sum: u64 = cells
+        .iter()
+        .flat_map(|r| r.as_array().unwrap())
+        .map(|c| c.as_u64().unwrap())
+        .sum();
+    assert_eq!(sum, 5, "cell sums equal totals.traces");
+    // The default paint stays cheap: root facets are opt-in here too.
+    assert!(o.get("top_root_services").is_none());
+    assert!(o.get("top_root_operations").is_none());
+}
+
+#[tokio::test]
+async fn the_aggregates_coverage_is_the_grids_aligned_window_not_the_pages() {
+    let h = handler_with_search_corpus().await;
+    // An 886s window: the grid picks 10s buckets and snaps outward to
+    // wall-clock multiples, while the page declares the same window
+    // widened by the completion slack. Three different windows, two of
+    // them reported.
+    let body = json!({"after": T_S + 7, "before": T_S + 893, "last": 20});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(
+        v["data"]["completion_coverage"],
+        json!({"after": T_S + 7 - 3_600, "before": T_S + 893 + 3_600})
+    );
+    let o = &v["data"]["overview"];
+    assert_eq!(o["coverage"], json!({"after": T_S, "before": T_S + 900}));
+    assert_eq!(o["grid"]["bucket_start_s"], T_S);
+    assert_eq!(o["grid"]["bucket_width_s"], 10);
+    assert_eq!(o["grid"]["cells"].as_array().unwrap().len(), 90);
+    assert_eq!(o["totals"]["traces"], 5);
+}
+
+#[tokio::test]
+async fn the_scope_gate_suppresses_the_root_facets_while_selections_are_active() {
+    let h = handler_with_search_corpus().await;
+
+    // No selections: page and aggregate describe the same population,
+    // so the opted-in facet lists are exact.
+    let mut body = functions_body(20);
+    body["overview_facets"] = json!(true);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "window");
+    assert_eq!(
+        o["top_root_services"],
+        json!({
+            "top": [
+                {"value": "svc-a", "traces": 3},
+                {"value": "svc-b", "traces": 2}
+            ],
+            "other": 0,
+            "unattributed": 0
+        })
+    );
+    assert_eq!(
+        o["top_root_operations"],
+        json!({"top": [{"value": "span-1", "traces": 5}], "other": 0, "unattributed": 0})
+    );
+
+    // Selections active: the aggregate is still the whole window (it
+    // applies no selections and says so), so the facet lists — which
+    // would enumerate filtered-out services with unfiltered counts —
+    // are suppressed even though the request opted in.
+    let mut body = functions_body(20);
+    body["overview_facets"] = json!(true);
+    body["selections"] = json!({"resource.service.name": ["svc-a"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "window");
+    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert!(
+        o.get("top_root_services").is_none(),
+        "window-scoped facet lists would contradict the rail"
+    );
+    assert!(o.get("top_root_operations").is_none());
+}
+
+#[tokio::test]
+async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() {
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, u64::from(T_S) * 1_000_000_000)],
+    )
+    .await;
+    // Tracked, never written: a probe is observable as source_failure.
+    // 30 minutes past the window edge — inside the page's completion
+    // slack (1h per side), outside the grid's aligned window.
+    install_sfst(&registries, "default", 2, T_S + 1_800, T_S + 1_900).await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(call_on(&h, functions_body(20)).await.unwrap()).unwrap();
+    // The page probed the slack file and says so...
+    assert_eq!(v["data"]["status"], json!({"partial": ["source_failure"]}));
+    // ...the aggregate never saw it: its capture is the grid's window,
+    // so its status is its own and its numbers are the standalone
+    // overview mode's for the same window.
+    assert_eq!(v["data"]["overview"]["status"], json!({"complete": true}));
+    assert_eq!(
+        v["data"]["overview"]["totals"],
+        json!({"traces": 1, "spans": 3, "errors": 0})
+    );
+
+    let native =
+        serde_json::to_value(call_on(&h, as_mode("overview", window_body())).await.unwrap())
+            .unwrap();
+    assert_eq!(native["status"], v["data"]["overview"]["status"]);
+    assert_eq!(native["totals"], v["data"]["overview"]["totals"]);
+    assert_eq!(native["grid"], v["data"]["overview"]["grid"]);
+    assert_eq!(native["unit"], v["data"]["overview"]["unit"]);
+}
+
+#[tokio::test]
+async fn the_legacy_search_mode_carries_no_aggregate_section() {
+    let h = handler_with_search_corpus().await;
+    let v =
+        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
+    assert_eq!(v["mode"], "search");
+    assert!(
+        v.get("overview").is_none(),
+        "the aggregate section is the Functions view's contract"
+    );
 }
 
 #[tokio::test]

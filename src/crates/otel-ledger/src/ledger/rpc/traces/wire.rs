@@ -56,6 +56,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "anchor",
     "selections",
     "min_trace_duration_ns",
+    "overview_facets",
 ];
 
 /// The raw top-level shape: the seven mode selectors and supported
@@ -105,6 +106,12 @@ struct RawOtelTracesRequest {
     selections: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     timeout: Option<serde_json::Value>,
+    /// The Functions view's root-facet opt-in for the embedded window
+    /// aggregate. A Functions PARAMETER, not a mode selector: the
+    /// `overview` key still selects the legacy mode, so the aggregate's
+    /// opt-in cannot share that name (see [`SearchResult::overview`]).
+    #[serde(default, deserialize_with = "present")]
+    overview_facets: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
     /// by the caller, not a security boundary; omitted/invalid falls
     /// back to the default tenant
@@ -199,7 +206,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.anchor.is_some()
             || raw.min_trace_duration_ns.is_some()
             || raw.selections.is_some()
-            || raw.timeout.is_some();
+            || raw.timeout.is_some()
+            || raw.overview_facets.is_some();
 
         match present.as_slice() {
             [] => {}
@@ -235,6 +243,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("min_trace_duration_ns", raw.min_trace_duration_ns.as_ref()),
                 ("selections", raw.selections.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
+                ("overview_facets", raw.overview_facets.as_ref()),
             ] {
                 if let Some(value) = value {
                     params.insert(name.to_string(), value.clone());
@@ -296,6 +305,15 @@ pub struct FunctionsParams {
     #[serde(default)]
     #[serde(rename = "timeout")]
     pub _timeout: Option<u32>,
+    /// Also compute the embedded aggregate's top-root-service/operation
+    /// facet lists. OPT-IN for the same reason the legacy mode's
+    /// [`OverviewParams::facets`] is — resolving roots costs the sealed
+    /// sources' dictionary decodes — and honoured only while no
+    /// selection is active (the composition site's scope gate: a
+    /// window-scoped list beside a filtered page contradicts the rail).
+    /// `null`, `false`, and absent all mean off; only `true` opts in.
+    #[serde(default)]
+    pub overview_facets: Option<bool>,
 }
 
 impl FunctionsParams {
@@ -546,8 +564,10 @@ pub enum OtelTracesResponse {
 }
 
 /// Functions protocol envelope for the trace-specific contract. The
-/// nested payload stays exactly the native developer-owned search
-/// response; the envelope's numeric status cannot collide with its
+/// nested payload is the native developer-owned search response, plus
+/// the full-window aggregate this view composes for it
+/// ([`SearchResult::overview`] — the legacy modes' shapes stay
+/// untouched); the envelope's numeric status cannot collide with its
 /// query-completeness `status` object.
 #[derive(Debug, Serialize)]
 pub struct FunctionsTracesResponse {
@@ -763,6 +783,13 @@ pub struct SearchResult {
     /// the `anchor` param for the following page; treat it as opaque.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
+    /// The FULL-WINDOW aggregate, composed from a second engine pass in
+    /// this same request. The Functions view's contract only — the
+    /// legacy `search` mode never carries it — and absent (never
+    /// `null`) when not composed, so a consumer detects it by PRESENCE
+    /// and degrades to page-derived numbers without a version gate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overview: Option<OverviewSection>,
 }
 
 /// A declared coverage range, unix seconds, always present — full
@@ -784,6 +811,62 @@ pub struct SearchItems {
 pub struct AnchorWire {
     pub next: String,
 }
+
+/// The search response's embedded full-window aggregate: the legacy
+/// [`OverviewResult`] minus `mode` (the enclosing result already
+/// self-describes as `search`), plus the grid's own `coverage`, the
+/// `scope` honesty flag, and its OWN `status`.
+///
+/// Its population is NOT the page's, in two directions that a caption
+/// must respect: the grid and totals are TRACE-ENVELOPE-aligned over
+/// the whole window (a trace whose envelope starts before the window is
+/// clipped from here even though `search` returns its in-window spans,
+/// so a returned row can have no cell), and `totals.spans` sums STORED
+/// rows where the page's per-row numbers are canonical-assembly
+/// figures. Two measurements, never a subset relation.
+#[derive(Debug, Serialize)]
+pub struct OverviewSection {
+    /// The section's own version, independent of the enclosing result's.
+    pub version: u32,
+    /// What the counts count. Always `"traces"` here — render verbatim,
+    /// never hardcode.
+    pub unit: &'static str,
+    /// The AGGREGATE's completeness. Separate from the page's because
+    /// the reasons do not overlap: `overview_ceiling` and
+    /// `rollup_absent` can only come from this pass and only ever
+    /// affect these numbers, while the page's `size_cap` can only come
+    /// from its own assembly — one merged array would name a reason
+    /// without naming the number it hit.
+    pub status: StatusWire,
+    /// The GRID's window, unix seconds: the request's window snapped
+    /// outward to wall-clock bucket multiples. Deliberately not the
+    /// page's `completion_coverage` (the same window widened by
+    /// assembly slack, ≥ 1h per side) — two derivations, two numbers,
+    /// both reported.
+    pub coverage: CoverageWire,
+    /// Which population these numbers cover, relative to the page:
+    /// [`OVERVIEW_SCOPE_WINDOW`] means the page's selections were NOT
+    /// applied. A consumer that captions the totals without reading
+    /// this lies as soon as the filter rail is non-empty.
+    pub scope: &'static str,
+    pub grid: OverviewGridWire,
+    pub totals: OverviewTotals,
+    /// The top-root facet lists over the SAME binned population as the
+    /// grid — present only when the request opted in AND the scope gate
+    /// allowed it (see `overview_facets`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_root_services: Option<FacetListWire>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_root_operations: Option<FacetListWire>,
+}
+
+/// [`OverviewSection::scope`]: the aggregate covers the whole window and
+/// applied NONE of the page's selections. The value a consumer must be
+/// ready for next is `"selection"` — the same window under the same
+/// selections — which needs an engine predicate this pass does not
+/// carry; shipping the flag from day one keeps that a data change
+/// rather than a contract change.
+pub const OVERVIEW_SCOPE_WINDOW: &str = "window";
 
 /// One returned trace summary; ids in W3C lowercase hex.
 #[derive(Debug, Serialize)]
