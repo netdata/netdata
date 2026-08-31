@@ -214,8 +214,7 @@ func TestRunTopologyDiagnosticArchivePublisherDoesNotPublishAfterCancellation(t 
 }
 
 func TestRunTopologyDiagnosticArchivePublisherRetriesRefreshesUntilMeaningfulSuccess(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	ticks := make(chan time.Time)
 	refreshes := make(chan struct{}, 1)
 	called := make(chan publicationCall, 4)

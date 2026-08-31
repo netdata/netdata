@@ -48,9 +48,7 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentH
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: collectorapi.Defaults{
-			UpdateEvery: 60,
-		},
+		UpdateEvery:     60,
 		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, reverseDNS) },
 		Config:          func() any { return &Config{} },
 		InstancePolicy:  collectorapi.InstancePolicySingle,
@@ -498,8 +496,8 @@ func (c *Collector) refreshDeviceTopology(
 	if err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
-			if context := recorder.contextByOrdinal(0); context != nil {
-				context.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
+			if ctx := recorder.contextByOrdinal(0); ctx != nil {
+				ctx.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
 			}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
@@ -509,8 +507,8 @@ func (c *Collector) refreshDeviceTopology(
 	}
 	if recorder.evidence != nil {
 		recorder.evidence.client = successfulAcquisitionPhase()
-		if context := recorder.contextByOrdinal(0); context != nil {
-			context.client = successfulAcquisitionPhase()
+		if ctx := recorder.contextByOrdinal(0); ctx != nil {
+			ctx.client = successfulAcquisitionPhase()
 		}
 	}
 	if dev.MaxRepetitions != 0 {
@@ -519,8 +517,8 @@ func (c *Collector) refreshDeviceTopology(
 	if err := snmpClient.Connect(); err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
-			if context := recorder.contextByOrdinal(0); context != nil {
-				context.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
+			if ctx := recorder.contextByOrdinal(0); ctx != nil {
+				ctx.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
 			}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
@@ -533,8 +531,8 @@ func (c *Collector) refreshDeviceTopology(
 	}
 	if recorder.evidence != nil {
 		recorder.evidence.connect = successfulAcquisitionPhase()
-		if context := recorder.contextByOrdinal(0); context != nil {
-			context.connect = successfulAcquisitionPhase()
+		if ctx := recorder.contextByOrdinal(0); ctx != nil {
+			ctx.connect = successfulAcquisitionPhase()
 		}
 	}
 	stopContextClose := closeSNMPClientOnContextCancel(ctx, snmpClient)
@@ -849,7 +847,7 @@ func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.Dev
 	client.SetRetries(dev.Retries)
 	client.SetTimeout(time.Duration(dev.Timeout) * time.Second)
 	client.SetMaxOids(dev.MaxOIDs)
-	client.SetMaxRepetitions(uint32(dev.MaxRepetitions))
+	client.SetMaxRepetitions(dev.MaxRepetitions)
 
 	ver := snmputils.ParseSNMPVersion(dev.SNMPVersion)
 
