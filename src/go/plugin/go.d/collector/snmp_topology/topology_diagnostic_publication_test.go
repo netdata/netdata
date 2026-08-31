@@ -20,7 +20,11 @@ import (
 
 func TestTopologyDiagnosticArchivePathUsesAgentVarLib(t *testing.T) {
 	path := topologyDiagnosticArchivePath(filepath.Join("agent", "varlib"))
-	require.Equal(t, filepath.Join("agent", "varlib", "snmp-topology", "diagnostics", "latest.zst"), path)
+	require.Equal(
+		t,
+		filepath.Join("agent", "varlib", "snmp-topology", "diagnostics", "netdata-snmp-topology-diagnostics.zst"),
+		path,
+	)
 }
 
 func TestWriteTopologyDiagnosticArchiveFileCreatesValidatedArchiveWithPlatformPermissions(t *testing.T) {

@@ -18,7 +18,7 @@ import (
 const topologyDiagnosticArchiveFailureLogKey = "snmp_topology:diagnostic-archive"
 
 func topologyDiagnosticArchivePath(varLibDir string) string {
-	return filepath.Join(varLibDir, "snmp-topology", "diagnostics", "latest.zst")
+	return filepath.Join(varLibDir, "snmp-topology", "diagnostics", "netdata-snmp-topology-diagnostics.zst")
 }
 
 func defaultTopologyDiagnosticArchivePath() string {
