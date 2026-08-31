@@ -228,10 +228,13 @@ func TestPaloAltoProfiles_LLDPV2IsFirewallTopologyOnly(t *testing.T) {
 			ordinary := resolved.Project(ConsumerMetrics).Profiles()
 			topology := resolved.Project(ConsumerTopology).Profiles()
 
-			var v2Kinds []ddprofiledefinition.TopologyKind
+			var legacyKinds, v2Kinds []ddprofiledefinition.TopologyKind
 			for _, profile := range topology {
 				for _, row := range profile.Definition.Topology {
-					if row.MIB == "LLDP-V2-MIB" {
+					switch row.MIB {
+					case "LLDP-MIB":
+						legacyKinds = append(legacyKinds, row.Kind)
+					case "LLDP-V2-MIB":
 						v2Kinds = append(v2Kinds, row.Kind)
 					}
 				}
@@ -242,6 +245,7 @@ func TestPaloAltoProfiles_LLDPV2IsFirewallTopologyOnly(t *testing.T) {
 				return
 			}
 
+			assert.Empty(t, legacyKinds, "effective Palo Alto firewall composition must not retain legacy LLDP topology")
 			assert.ElementsMatch(t, []ddprofiledefinition.TopologyKind{
 				ddprofiledefinition.KindLldpLocPort,
 				ddprofiledefinition.KindLldpLocManAddr,
@@ -282,7 +286,7 @@ func resolvedMetadataFields(profiles []*Profile) map[string]struct{} {
 	return fields
 }
 
-func TestTopologyProfiles_DoNotMixLLDPGenerations(t *testing.T) {
+func TestTopologyProfiles_DoNotDeclareBothLLDPGenerations(t *testing.T) {
 	for _, profile := range DefaultCatalog().catalogProfiles() {
 		var legacy, v2 bool
 		for _, row := range profile.Definition.Topology {

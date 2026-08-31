@@ -845,7 +845,8 @@ def build_topology_modules():
          'into the '
          '`topology:snmp` '
          'view.',
-         'Discovered automatically on devices that expose LLDP-MIB or LLDP-V2-MIB.'),
+         'Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently '
+         'enabled for Palo Alto firewalls.'),
         ('CDP Topology', ['cdp', 'cisco', 'topology', 'l2', 'snmp', 'npm'],
          'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache '
          'table '
