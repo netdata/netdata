@@ -1208,7 +1208,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: Build test environment
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: false
           load: true
