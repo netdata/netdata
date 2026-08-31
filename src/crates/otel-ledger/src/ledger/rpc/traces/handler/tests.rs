@@ -44,11 +44,14 @@ async fn info_returns_the_descriptor() {
     assert_eq!(v["mode"], "info");
     assert_eq!(v["version"], 1);
     assert_eq!(v["status"], 200);
+    assert_eq!(v["type"], "traces");
+    assert_eq!(v["has_history"], true);
+    assert_eq!(v["v"], 3);
     assert_eq!(
         v["accepted_params"],
         json!([
             "info", "trace", "attributes", "attribute_values", "overview",
-            "slowest", "search", "tenant"
+            "slowest", "search", "tenant", "after", "before", "last", "anchor"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -67,6 +70,24 @@ async fn an_empty_search_object_is_an_empty_complete_page() {
     assert_eq!(v["items"], json!({"returned": 0, "max_to_return": 20}));
     assert_eq!(v["traces"], json!([]));
     assert!(v.get("anchor").is_none(), "a short page has no next cursor");
+}
+
+#[tokio::test]
+async fn a_mode_less_request_wraps_the_existing_search_contract_as_traces() {
+    let resp = call(json!({"after": -3600, "before": 0, "last": 7})).await.unwrap();
+    let v = serde_json::to_value(&resp).unwrap();
+    assert_eq!(v["status"], 200);
+    assert_eq!(v["type"], "traces");
+    assert_eq!(v["data"]["mode"], "search");
+    assert_eq!(v["data"]["version"], 1);
+    assert_eq!(v["data"]["status"], json!({"complete": true}));
+    assert_eq!(v["data"]["items"], json!({"returned": 0, "max_to_return": 7}));
+    assert_eq!(v["data"]["traces"], json!([]));
+
+    let native = serde_json::to_value(call(json!({"search": {}})).await.unwrap()).unwrap();
+    assert_eq!(native["mode"], "search");
+    assert!(native.get("type").is_none());
+    assert!(native.get("data").is_none());
 }
 
 #[tokio::test]
@@ -1069,9 +1090,11 @@ async fn raw_call(payload: Option<&[u8]>) -> (u32, String) {
 #[tokio::test]
 async fn shape_errors_are_transport_400s() {
     for (payload, needle) in [
-        (&br#"{}"#[..], "missing mode selector"),
-        (br#"{"bogus": 1}"#, "unknown field"),
-        (br#"{"search": {}, "after": 1}"#, "unknown field"),
+        (&br#"{"bogus": 1}"#[..], "unknown field"),
+        (
+            br#"{"search": {}, "after": 1}"#,
+            "cannot mix a mode selector with Functions parameters",
+        ),
         (br#"{"trace": {}, "overview": {}}"#, "conflicting mode selectors"),
         (br#"{"info": true}"#, "invalid info selector"),
         (br#"{"trace": null}"#, "invalid trace selector"),
@@ -1106,18 +1129,18 @@ async fn semantic_errors_keep_the_handler_status() {
 }
 
 #[tokio::test]
-async fn the_three_400_payload_bodies_are_distinct() {
-    // Absent payload: the bridge's special empty-payload body (a
-    // misnomer now — the cause is the missing mode — but the bridge is
-    // frozen and this pin keeps anyone from "fixing" it here).
+async fn absent_and_empty_object_payloads_use_the_functions_view() {
     let (status, body) = raw_call(None).await;
-    assert_eq!(status, 400);
-    assert!(body.contains("Request payload is empty"), "{body}");
-    // Present `{}`: the ordinary missing-mode deserialization error.
+    assert_eq!(status, 200);
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["type"], "traces");
+    assert_eq!(v["data"]["mode"], "search");
+
     let (status, body) = raw_call(Some(b"{}")).await;
-    assert_eq!(status, 400);
-    assert!(body.contains("missing mode selector"), "{body}");
-    // Present zero bytes: the ordinary EOF deserialization error.
+    assert_eq!(status, 200);
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["type"], "traces");
+
     let (status, body) = raw_call(Some(b"")).await;
     assert_eq!(status, 400);
     assert!(body.contains("EOF"), "{body}");

@@ -1,14 +1,15 @@
 //! Netdata function wire types for `otel-traces`.
 //!
 //! The transport layer between the netdata function protocol and the
-//! wire-neutral [`sfsq::traces`] engine. One Function, seven peer
-//! modes, each selected by exactly one top-level sub-object — `info`,
+//! wire-neutral [`sfsq::traces`] engine. One Function view plus seven
+//! explicit peer modes, each selected by exactly one top-level sub-object — `info`,
 //! `trace`, `attributes`, `attribute_values`, `overview`, `slowest`,
-//! `search` — every mode's params self-contained in its object. A
-//! request naming zero or more than one selector is a client error;
-//! there is no implicit default mode. The top level is strict: the
-//! only other accepted key is `tenant`, and unknown keys anywhere are
-//! client errors.
+//! `search` — every explicit mode's params self-contained in its object.
+//! A request without a selector uses the standard Functions parameters
+//! and wraps the existing search payload as `type: "traces"`. Explicit
+//! modes preserve their native response shapes. Mixing the two request
+//! forms or naming more than one selector is a client error; unknown
+//! keys anywhere are client errors.
 //!
 //! Nanosecond values (`*_ns`, `time_unix_nano`) go on the wire as JSON
 //! numbers and exceed 2^53: JavaScript consumers read them with ~256 ns
@@ -24,10 +25,10 @@ use sfsq::traces::{PartialReason, QueryStatus};
 
 /// Request param names accepted by this function, advertised to the UI
 /// in [`InfoResponse::accepted_params`]. The list's rule: it carries
-/// exactly the TOP-LEVEL keys — the seven mode selectors plus
-/// `tenant`. Per-mode body fields (windows, `limit`, `selections`, …)
-/// live inside their mode objects and are documented on the param
-/// structs, never advertised as top-level params.
+/// exactly the TOP-LEVEL keys — the seven mode selectors, `tenant`,
+/// and the standard Functions fields supported by the implicit view.
+/// Per-mode body fields (windows, `limit`, `selections`, …) live inside
+/// their mode objects and are documented on the param structs.
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
@@ -37,10 +38,15 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "slowest",
     "search",
     "tenant",
+    "after",
+    "before",
+    "last",
+    "anchor",
 ];
 
-/// The raw top-level shape: the seven mode selectors captured
-/// presence-preserving (see [`present`]) plus `tenant`. Deserialized
+/// The raw top-level shape: the seven mode selectors and supported
+/// Functions fields captured presence-preserving (see [`present`]),
+/// plus `tenant`. Deserialized
 /// only through [`OtelTracesRequest`]'s manual `Deserialize` (which
 /// enforces a top-level JSON object) and immediately converted by
 /// [`TryFrom`] into the typed request — nothing outside this module
@@ -71,6 +77,18 @@ struct RawOtelTracesRequest {
     /// The search mode (bounded most-recent-first trace summaries).
     #[serde(default, deserialize_with = "present")]
     search: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    after: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    before: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    last: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    anchor: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    selections: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    timeout: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
     /// by the caller, not a security boundary; omitted/invalid falls
     /// back to the default tenant
@@ -99,6 +117,7 @@ pub struct OtelTracesRequest {
 /// The typed mode: selector identity plus its parsed params.
 #[derive(Debug, Clone)]
 pub enum TracesMode {
+    Functions(FunctionsParams),
     Info,
     Trace(TraceParams),
     Attributes(AttributesParams),
@@ -158,16 +177,21 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
         .filter_map(|(name, set)| set.then_some(name))
         .collect();
 
+        let has_function_params = raw.after.is_some()
+            || raw.before.is_some()
+            || raw.last.is_some()
+            || raw.anchor.is_some()
+            || raw.selections.is_some()
+            || raw.timeout.is_some();
+
         match present.as_slice() {
-            [] => {
-                return Err(
-                    "missing mode selector: exactly one of info, trace, attributes, \
-                     attribute_values, overview, slowest, search is required"
-                        .into(),
-                )
-            }
+            [] => {}
             [_] => {}
             names => return Err(format!("conflicting mode selectors: {}", names.join(", "))),
+        }
+
+        if !present.is_empty() && has_function_params {
+            return Err("cannot mix a mode selector with Functions parameters".into());
         }
 
         /// The typed parse behind an explicit object gate: serde's
@@ -184,7 +208,22 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             T::deserialize(v).map_err(|e| format!("invalid {name} selector: {e}"))
         }
 
-        let mode = if let Some(v) = &raw.info {
+        let mode = if present.is_empty() {
+            let mut params = serde_json::Map::new();
+            for (name, value) in [
+                ("after", raw.after.as_ref()),
+                ("before", raw.before.as_ref()),
+                ("last", raw.last.as_ref()),
+                ("anchor", raw.anchor.as_ref()),
+                ("selections", raw.selections.as_ref()),
+                ("timeout", raw.timeout.as_ref()),
+            ] {
+                if let Some(value) = value {
+                    params.insert(name.to_string(), value.clone());
+                }
+            }
+            TracesMode::Functions(typed("Functions", &serde_json::Value::Object(params))?)
+        } else if let Some(v) = &raw.info {
             typed::<InfoParams>("info", v)?;
             TracesMode::Info
         } else if let Some(v) = &raw.trace {
@@ -200,12 +239,79 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
         } else if let Some(v) = &raw.search {
             TracesMode::Search(typed("search", v)?)
         } else {
-            unreachable!("exactly one selector was verified present");
+            unreachable!("an explicit selector was verified present");
         };
 
         Ok(Self {
             tenant: raw.tenant,
             mode,
+        })
+    }
+}
+
+/// Standard Functions parameters for the default trace-search view.
+/// They translate into the native search mode without changing that
+/// mode's request or response contract.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FunctionsParams {
+    #[serde(default)]
+    pub after: i64,
+    #[serde(default)]
+    pub before: i64,
+    #[serde(default = "default_limit")]
+    pub last: usize,
+    #[serde(default)]
+    pub anchor: Option<String>,
+    #[serde(default)]
+    pub selections: std::collections::HashMap<String, Vec<String>>,
+    /// Accepted for parity with the Functions protocol. Execution
+    /// deadlines remain owned by the bridge call context.
+    #[serde(default)]
+    #[serde(rename = "timeout")]
+    pub _timeout: Option<u32>,
+}
+
+impl FunctionsParams {
+    pub fn search_params(&self, now: u32) -> Result<SearchParams, String> {
+        fn resolve(label: &str, value: i64, base: u32) -> Result<u32, String> {
+            let absolute = if value < 0 {
+                i64::from(base)
+                    .checked_add(value)
+                    .ok_or_else(|| format!("'{label}' is outside the supported time range"))?
+            } else {
+                value
+            };
+            u32::try_from(absolute)
+                .map_err(|_| format!("'{label}' is outside the supported time range"))
+        }
+
+        let before = if self.before == 0 {
+            if self.after.is_negative() { now } else { 0 }
+        } else {
+            resolve("before", self.before, now)?
+        };
+        let after = if self.after == 0 {
+            0
+        } else {
+            resolve(
+                "after",
+                self.after,
+                if before == 0 { now } else { before },
+            )?
+        };
+
+        Ok(SearchParams {
+            after,
+            before,
+            limit: self.last,
+            spans_per_trace: Some(0),
+            selections: self.selections.clone(),
+            min_duration_ns: None,
+            max_duration_ns: None,
+            min_trace_duration_ns: None,
+            max_trace_duration_ns: None,
+            anchor: self.anchor.clone(),
         })
     }
 }
@@ -403,6 +509,7 @@ pub struct TraceParams {
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum OtelTracesResponse {
+    Functions(Box<FunctionsTracesResponse>),
     Info(InfoResponse),
     Trace(Box<TraceResult>),
     Search(Box<SearchResult>),
@@ -410,6 +517,28 @@ pub enum OtelTracesResponse {
     AttributeValues(AttributeValuesResult),
     Overview(Box<OverviewResult>),
     Slowest(Box<SlowestResult>),
+}
+
+/// Functions protocol envelope for the trace-specific contract. The
+/// nested payload stays exactly the native developer-owned search
+/// response; the envelope's numeric status cannot collide with its
+/// query-completeness `status` object.
+#[derive(Debug, Serialize)]
+pub struct FunctionsTracesResponse {
+    pub status: u32,
+    #[serde(rename = "type")]
+    pub response_type: &'static str,
+    pub data: Box<SearchResult>,
+}
+
+impl FunctionsTracesResponse {
+    pub fn new(data: SearchResult) -> Self {
+        Self {
+            status: 200,
+            response_type: "traces",
+            data: Box::new(data),
+        }
+    }
 }
 
 // ── Overview response ───────────────────────────────────────────────
@@ -767,6 +896,11 @@ pub struct InfoResponse {
     pub mode: &'static str,
     version: u32,
     status: u32,
+    #[serde(rename = "type")]
+    response_type: &'static str,
+    has_history: bool,
+    #[serde(rename = "v")]
+    protocol_version: u32,
     accepted_params: Vec<&'static str>,
     required_params: Vec<&'static str>,
     help: &'static str,
@@ -778,6 +912,9 @@ impl Default for InfoResponse {
             mode: "info",
             version: 1,
             status: 200,
+            response_type: "traces",
+            has_history: true,
+            protocol_version: 3,
             accepted_params: ACCEPTED_PARAMS.to_vec(),
             required_params: vec![],
             help: "Query and visualize OpenTelemetry traces.",

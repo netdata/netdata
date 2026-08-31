@@ -67,6 +67,48 @@ func TestFunctionUISchemaValidationSkipsTopologySemanticsForTableResponses(t *te
 	}
 }
 
+func TestFunctionUISchemaAcceptsTracesResponse(t *testing.T) {
+	schemaBytes := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_UI_SCHEMA.json"))
+	input := []byte(`{
+		"status": 200,
+		"type": "traces",
+		"data": {
+			"mode": "search",
+			"version": 1,
+			"status": {"complete": true},
+			"completion_coverage": {"after": 0, "before": 4294967295},
+			"items": {"returned": 0, "max_to_return": 20},
+			"traces": [],
+			"field_kinds": {
+				"fields": [],
+				"event_attributes": [],
+				"link_attributes": []
+			}
+		}
+	}`)
+
+	if _, err := validateJSON(schemaBytes, input); err != nil {
+		t.Fatalf("validate traces response: %v", err)
+	}
+}
+
+func TestFunctionUISchemaRejectsTraceDataUnderTableType(t *testing.T) {
+	schemaBytes := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_UI_SCHEMA.json"))
+	input := []byte(`{
+		"status": 200,
+		"type": "table",
+		"data": {
+			"mode": "search",
+			"version": 1,
+			"status": {"complete": true}
+		}
+	}`)
+
+	if _, err := validateJSON(schemaBytes, input); err == nil {
+		t.Fatal("expected trace object data under table type to fail validation")
+	}
+}
+
 func TestValidationSkipsTopologySemanticsForNonTopologyObjectData(t *testing.T) {
 	schemaBytes := []byte(`{"type": "object"}`)
 	input := []byte(`{
