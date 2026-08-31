@@ -21,6 +21,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -48,9 +49,7 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentH
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: collectorapi.Defaults{
-			UpdateEvery: 60,
-		},
+		UpdateEvery:     60,
 		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, reverseDNS) },
 		Config:          func() any { return &Config{} },
 		InstancePolicy:  collectorapi.InstancePolicySingle,
@@ -92,6 +91,9 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		acquisitionLimits:            defaultTopologyAcquisitionLimits,
 		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
 		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
+		publishDiagnosticArchive:     !terminal.IsTerminal(),
+		diagnosticArchivePath:        defaultTopologyDiagnosticArchivePath(),
+		publishDiagnosticArchiveFile: publishTopologyDiagnosticArchiveFile,
 		store:                        metricStore,
 		metrics:                      newCollectorMetrics(metricStore),
 	}
@@ -126,6 +128,9 @@ type (
 		acquisitionLimits            topologyAcquisitionLimits
 		diagnosticGlobalLimits       topologyAcquisitionLimits
 		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
+		publishDiagnosticArchive     bool
+		diagnosticArchivePath        string
+		publishDiagnosticArchiveFile func(string, topologyDiagnostics) error
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -165,6 +170,16 @@ func (c *Collector) Run(ctx context.Context) error {
 
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
+	var diagnosticArchiveRefreshes chan struct{}
+	if c.publishDiagnosticArchive {
+		diagnosticArchiveRefreshes = make(chan struct{}, 1)
+		publisherDone := make(chan struct{})
+		go func() {
+			defer close(publisherDone)
+			c.runTopologyDiagnosticArchivePublisher(ctx, diagnosticArchiveRefreshes)
+		}()
+		defer func() { <-publisherDone }()
+	}
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()
@@ -176,6 +191,12 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
 			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
+			if diagnosticArchiveRefreshes != nil {
+				select {
+				case diagnosticArchiveRefreshes <- struct{}{}:
+				default:
+				}
+			}
 		}
 	}
 }
@@ -483,8 +504,8 @@ func (c *Collector) refreshDeviceTopology(
 	if err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
-			if context := recorder.contextByOrdinal(0); context != nil {
-				context.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
+			if ctx := recorder.contextByOrdinal(0); ctx != nil {
+				ctx.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
 			}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
@@ -494,8 +515,8 @@ func (c *Collector) refreshDeviceTopology(
 	}
 	if recorder.evidence != nil {
 		recorder.evidence.client = successfulAcquisitionPhase()
-		if context := recorder.contextByOrdinal(0); context != nil {
-			context.client = successfulAcquisitionPhase()
+		if ctx := recorder.contextByOrdinal(0); ctx != nil {
+			ctx.client = successfulAcquisitionPhase()
 		}
 	}
 	if dev.MaxRepetitions != 0 {
@@ -504,8 +525,8 @@ func (c *Collector) refreshDeviceTopology(
 	if err := snmpClient.Connect(); err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
-			if context := recorder.contextByOrdinal(0); context != nil {
-				context.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
+			if ctx := recorder.contextByOrdinal(0); ctx != nil {
+				ctx.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
 			}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
@@ -518,8 +539,8 @@ func (c *Collector) refreshDeviceTopology(
 	}
 	if recorder.evidence != nil {
 		recorder.evidence.connect = successfulAcquisitionPhase()
-		if context := recorder.contextByOrdinal(0); context != nil {
-			context.connect = successfulAcquisitionPhase()
+		if ctx := recorder.contextByOrdinal(0); ctx != nil {
+			ctx.connect = successfulAcquisitionPhase()
 		}
 	}
 	stopContextClose := closeSNMPClientOnContextCancel(ctx, snmpClient)
@@ -834,7 +855,7 @@ func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.Dev
 	client.SetRetries(dev.Retries)
 	client.SetTimeout(time.Duration(dev.Timeout) * time.Second)
 	client.SetMaxOids(dev.MaxOIDs)
-	client.SetMaxRepetitions(uint32(dev.MaxRepetitions))
+	client.SetMaxRepetitions(dev.MaxRepetitions)
 
 	ver := snmputils.ParseSNMPVersion(dev.SNMPVersion)
 

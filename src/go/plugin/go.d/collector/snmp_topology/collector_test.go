@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
@@ -68,6 +69,11 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 	})
 }
 
+func TestSNMPTopologyDiagnosticArchivePublicationFollowsTerminalMode(t *testing.T) {
+	coll := New(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	require.Equal(t, !terminal.IsTerminal(), coll.publishDiagnosticArchive)
+}
+
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	methods := creator.SharedFunctions()
@@ -121,6 +127,7 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
+	coll.publishDiagnosticArchiveFile = func(string, topologyDiagnostics) error { return nil }
 	builder := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(builder)
 	publishTestTopologyBuilder(coll.topologyRegistry, builder)

@@ -21,7 +21,10 @@ func newTestSNMPTopologyCollector() *Collector {
 
 func newTestSNMPTopologyCollectorWithStore() (*Collector, *ddsnmp.DeviceStore) {
 	store := ddsnmp.NewDeviceStore()
-	return New(store, NewTrapEnrichmentHandle(), newTestReverseDNSResolver()), store
+	coll := New(store, NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	coll.publishDiagnosticArchive = true
+	coll.publishDiagnosticArchiveFile = func(string, topologyDiagnostics) error { return nil }
+	return coll, store
 }
 
 func newTestReverseDNSResolver() *reversedns.Resolver { return reversedns.New(reversedns.Config{}) }
