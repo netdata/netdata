@@ -35,25 +35,24 @@ func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
 	tests := map[string]struct {
 		kind ddsnmp.TopologyKind
 	}{
-		"lldp_loc_port":            {kind: ddsnmp.KindLldpLocPort},
-		"lldp_loc_man_addr":        {kind: ddsnmp.KindLldpLocManAddr},
-		"lldp_rem":                 {kind: ddsnmp.KindLldpRem},
-		"lldp_rem_man_addr":        {kind: ddsnmp.KindLldpRemManAddr},
-		"lldp_rem_man_addr_compat": {kind: ddsnmp.KindLldpRemManAddrCompat},
-		"cdp_cache":                {kind: ddsnmp.KindCdpCache},
-		"if_name":                  {kind: ddsnmp.KindIfName},
-		"if_status":                {kind: ddsnmp.KindIfStatus},
-		"if_duplex":                {kind: ddsnmp.KindIfDuplex},
-		"ip_if_index":              {kind: ddsnmp.KindIpIfIndex},
-		"bridge_port_if_index":     {kind: ddsnmp.KindBridgePortIfIndex},
-		"fdb_entry":                {kind: ddsnmp.KindFdbEntry},
-		"qbridge_fdb_entry":        {kind: ddsnmp.KindQbridgeFdbEntry},
-		"qbridge_vlan_entry":       {kind: ddsnmp.KindQbridgeVlanEntry},
-		"stp_port":                 {kind: ddsnmp.KindStpPort},
-		"vtp_vlan":                 {kind: ddsnmp.KindVtpVlan},
-		"arp_entry":                {kind: ddsnmp.KindArpEntry},
-		"arp_legacy_entry":         {kind: ddsnmp.KindArpLegacyEntry},
-		"ospf_neighbor":            {kind: ddsnmp.KindOSPFNeighbor},
+		"lldp_loc_port":        {kind: ddsnmp.KindLldpLocPort},
+		"lldp_loc_man_addr":    {kind: ddsnmp.KindLldpLocManAddr},
+		"lldp_rem":             {kind: ddsnmp.KindLldpRem},
+		"lldp_rem_man_addr":    {kind: ddsnmp.KindLldpRemManAddr},
+		"cdp_cache":            {kind: ddsnmp.KindCdpCache},
+		"if_name":              {kind: ddsnmp.KindIfName},
+		"if_status":            {kind: ddsnmp.KindIfStatus},
+		"if_duplex":            {kind: ddsnmp.KindIfDuplex},
+		"ip_if_index":          {kind: ddsnmp.KindIpIfIndex},
+		"bridge_port_if_index": {kind: ddsnmp.KindBridgePortIfIndex},
+		"fdb_entry":            {kind: ddsnmp.KindFdbEntry},
+		"qbridge_fdb_entry":    {kind: ddsnmp.KindQbridgeFdbEntry},
+		"qbridge_vlan_entry":   {kind: ddsnmp.KindQbridgeVlanEntry},
+		"stp_port":             {kind: ddsnmp.KindStpPort},
+		"vtp_vlan":             {kind: ddsnmp.KindVtpVlan},
+		"arp_entry":            {kind: ddsnmp.KindArpEntry},
+		"arp_legacy_entry":     {kind: ddsnmp.KindArpLegacyEntry},
+		"ospf_neighbor":        {kind: ddsnmp.KindOSPFNeighbor},
 	}
 
 	for name, tc := range tests {
@@ -519,23 +518,6 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 				return cache.lldpRemotes["1:1"].managementAddrs
 			},
 		},
-		"reconstructed remote index": {
-			update: func(cache *topologyBuilder) {
-				cache.updateLldpRemManAddr(map[string]string{
-					tagLldpLocPortNum:                 "1",
-					tagLldpRemIndex:                   "1",
-					tagLldpRemMgmtAddrSubtype:         "16",
-					tagLldpRemMgmtAddrLen:             "4",
-					tagLldpRemMgmtAddrOctetPref + "1": "99",
-					tagLldpRemMgmtAddrOctetPref + "2": "111",
-					tagLldpRemMgmtAddrOctetPref + "3": "114",
-					tagLldpRemMgmtAddrOctetPref + "4": "101",
-				})
-			},
-			addrs: func(cache *topologyBuilder) []topologymodel.ManagementAddress {
-				return cache.lldpRemotes["1:1"].managementAddrs
-			},
-		},
 	}
 
 	for name, tc := range tests {
@@ -547,6 +529,40 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 			require.Equal(t, "636f7265", addrs[0].Address)
 			require.Equal(t, "16", addrs[0].AddressType)
 			require.Empty(t, pickManagementIP(addrs))
+		})
+	}
+}
+
+func TestTopologyCache_LLDPRemoteManagementAddressValidatesDeclaredLength(t *testing.T) {
+	tests := map[string]struct {
+		length string
+		want   string
+	}{
+		"matching length":   {length: "4", want: "192.0.2.2"},
+		"mismatched length": {length: "3"},
+		"invalid length":    {length: "invalid"},
+		"missing length":    {want: "192.0.2.2"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyBuilder()
+			cache.updateLldpRemManAddr(map[string]string{
+				tagLldpLocPortNum:         "1",
+				tagLldpRemIndex:           "1",
+				tagLldpRemMgmtAddrSubtype: "1",
+				tagLldpRemMgmtAddr:        "c0000202",
+				tagLldpRemMgmtAddrLen:     tc.length,
+			})
+
+			remote := cache.lldpRemotes["1:1"]
+			require.NotNil(t, remote)
+			if tc.want == "" {
+				require.Empty(t, remote.managementAddrs)
+			} else {
+				require.Len(t, remote.managementAddrs, 1)
+				require.Equal(t, tc.want, remote.managementAddrs[0].Address)
+			}
 		})
 	}
 }
@@ -897,19 +913,6 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	cache.updateTopologyCacheEntry(ddsnmp.Metric{
-		TopologyKind: ddsnmp.KindLldpRemManAddr,
-		Tags: map[string]string{
-			tagLldpLocPortNum:                 "1",
-			tagLldpRemIndex:                   "1",
-			tagLldpRemMgmtAddrSubtype:         "1",
-			tagLldpRemMgmtAddrLen:             "4",
-			tagLldpRemMgmtAddrOctetPref + "1": "10",
-			tagLldpRemMgmtAddrOctetPref + "2": "20",
-			tagLldpRemMgmtAddrOctetPref + "3": "4",
-			tagLldpRemMgmtAddrOctetPref + "4": "21",
-		},
-	})
-	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRem,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
@@ -931,7 +934,6 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	require.True(t, actorHasCapabilitiesEnabled(data))
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{
 		"10.0.0.2":              {},
-		"10.20.4.21":            {},
 		"10.20.4.84":            {},
 		"fc00:f853:ccd:e793::1": {},
 	}))

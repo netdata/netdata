@@ -6,7 +6,6 @@ import (
 	"net/netip"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -438,7 +437,7 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 			tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype:
 			return true
 		}
-	case ddsnmp.KindLldpRemManAddr, ddsnmp.KindLldpRemManAddrCompat:
+	case ddsnmp.KindLldpRemManAddr:
 		switch key {
 		case
 			tagLldpLocPortNum, tagLldpRemIndex, tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype,
@@ -446,7 +445,6 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 			tagLldpRemMgmtAddrOID:
 			return true
 		}
-		return topologySemanticLldpRemOctetTagAllowed(key)
 	case ddsnmp.KindCdpCache:
 		switch key {
 		case
@@ -505,10 +503,4 @@ func topologySemanticBGPTagAllowed(key string) bool {
 	default:
 		return false
 	}
-}
-
-func topologySemanticLldpRemOctetTagAllowed(key string) bool {
-	suffix := strings.TrimPrefix(key, tagLldpRemMgmtAddrOctetPref)
-	index, err := strconv.Atoi(suffix)
-	return err == nil && index >= 1 && index <= 16 && strconv.Itoa(index) == suffix
 }
