@@ -1428,7 +1428,8 @@ Examples:
   `lldpRemManAddrIfSubtype`; derive subtype with `index: 4`, retain the declared
   address length with `index: 5`, and derive address bytes with
   `index_transform: [{start: 5}]` plus `format: hex`. The topology consumer
-  rejects a row when the declared length does not match the encoded byte count.
+  rejects a row when the declared length is outside the MIB's `1..31` range or
+  does not match the encoded byte count.
 
 Audit recipe:
 

@@ -535,23 +535,36 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 
 func TestTopologyCache_LLDPRemoteManagementAddressValidatesDeclaredLength(t *testing.T) {
 	tests := map[string]struct {
-		length string
-		want   string
+		addrHex string
+		length  string
+		subtype string
+		want    string
 	}{
-		"matching length":   {length: "4", want: "192.0.2.2"},
-		"mismatched length": {length: "3"},
-		"invalid length":    {length: "invalid"},
-		"missing length":    {want: "192.0.2.2"},
+		"matching length":     {length: "4", want: "192.0.2.2"},
+		"mismatched length":   {length: "3"},
+		"invalid length":      {length: "invalid"},
+		"missing length":      {want: "192.0.2.2"},
+		"maximum MIB length":  {addrHex: strings.Repeat("00", 31), length: "31", subtype: "16", want: strings.Repeat("00", 31)},
+		"exceeds MIB maximum": {addrHex: strings.Repeat("00", 32), length: "32", subtype: "16"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			addrHex := tc.addrHex
+			if addrHex == "" {
+				addrHex = "c0000202"
+			}
+			subtype := tc.subtype
+			if subtype == "" {
+				subtype = "1"
+			}
+
 			cache := newTopologyBuilder()
 			cache.updateLldpRemManAddr(map[string]string{
 				tagLldpLocPortNum:         "1",
 				tagLldpRemIndex:           "1",
-				tagLldpRemMgmtAddrSubtype: "1",
-				tagLldpRemMgmtAddr:        "c0000202",
+				tagLldpRemMgmtAddrSubtype: subtype,
+				tagLldpRemMgmtAddr:        addrHex,
 				tagLldpRemMgmtAddrLen:     tc.length,
 			})
 
