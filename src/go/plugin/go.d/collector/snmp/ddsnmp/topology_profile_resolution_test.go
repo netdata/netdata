@@ -187,6 +187,42 @@ func TestCiscoProfiles_CDPIsTopologyOnly(t *testing.T) {
 	}
 }
 
+func TestPaloAltoProfile_LLDPV2IsTopologyOnly(t *testing.T) {
+	profile, err := LoadProfileByName("palo-alto")
+	require.NoError(t, err)
+	assert.True(t, profile.HasExtension("_std-topology-lldp-v2-mib.yaml"))
+	assert.False(t, profile.HasExtension("_std-lldp-mib.yaml"))
+
+	wantKinds := map[ddprofiledefinition.TopologyKind]bool{
+		ddprofiledefinition.KindLldpLocPort:    true,
+		ddprofiledefinition.KindLldpLocManAddr: true,
+		ddprofiledefinition.KindLldpRem:        true,
+		ddprofiledefinition.KindLldpRemManAddr: true,
+	}
+	gotKinds := make(map[ddprofiledefinition.TopologyKind]bool)
+	for _, row := range profile.Definition.Topology {
+		if row.MIB == "LLDP-V2-MIB" {
+			gotKinds[row.Kind] = true
+		}
+	}
+	assert.Equal(t, wantKinds, gotKinds)
+
+	for _, metric := range profile.Definition.Metrics {
+		assert.NotEqual(t, "LLDP-V2-MIB", metric.MIB, "LLDP-V2 capability must not add ordinary metrics")
+	}
+}
+
+func TestTopologyProfiles_DoNotMixLLDPGenerations(t *testing.T) {
+	for _, profile := range DefaultCatalog().catalogProfiles() {
+		var legacy, v2 bool
+		for _, row := range profile.Definition.Topology {
+			legacy = legacy || row.MIB == "LLDP-MIB"
+			v2 = v2 || row.MIB == "LLDP-V2-MIB"
+		}
+		assert.Falsef(t, legacy && v2, "%s mixes legacy and V2 LLDP topology", profile.SourceFile)
+	}
+}
+
 func TestTopologyRoleProfiles_AllExactSelectorsResolve(t *testing.T) {
 	tests := []struct {
 		profile string

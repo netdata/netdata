@@ -34,9 +34,9 @@ func TestFindTopologyProfiles_IPBaselineBoundaries(t *testing.T) {
 			device: ddsnmp.DeviceConnectionInfo{
 				ManualProfiles: []string{"palo-alto", "generic-device"},
 			},
-			// Projection drops the vendor profile after its OSPF topology symbol is
-			// deduplicated against generic-device; the explicit IP baseline remains.
-			wantProfiles: []string{"generic-device.yaml"},
+			// The generic profile owns the deduplicated IP/OSPF baseline while the
+			// vendor profile retains its distinct LLDP-V2 topology capability.
+			wantProfiles: []string{"generic-device.yaml", "palo-alto.yaml"},
 			wantIPKinds:  1,
 		},
 		"manual vendor alone does not inject baseline": {

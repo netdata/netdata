@@ -223,6 +223,43 @@ func TestTopologyProductionPath_LLDPRemoteManagementAddressProfiles(t *testing.T
 	}
 }
 
+func TestTopologyProductionPath_PaloAltoLLDPV2Fixture(t *testing.T) {
+	fixture := loadTopologySNMPRecHandler(t, "../../../../testdata/snmp/lldp-v2/librenms-panos-vsys.snmprec")
+	const sysObjectID = "1.3.6.1.4.1.25461.2.3.36"
+
+	profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
+		SysObjectID: sysObjectID,
+	}).Project(ddsnmp.ConsumerTopology).FilterByKind(map[ddsnmp.TopologyKind]bool{
+		ddsnmp.KindLldpLocPort:    true,
+		ddsnmp.KindLldpLocManAddr: true,
+		ddsnmp.KindLldpRem:        true,
+		ddsnmp.KindLldpRemManAddr: true,
+	}).Profiles()
+	require.Len(t, profiles, 1)
+	require.Equal(t, "palo-alto", strings.TrimSuffix(filepath.Base(profiles[0].SourceFile), filepath.Ext(profiles[0].SourceFile)))
+
+	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		SnmpClient:  fixture,
+		Profiles:    profiles,
+		Log:         newTestSNMPTopologyCollector().Logger,
+		SysObjectID: sysObjectID,
+	}).Collect()
+	require.NoError(t, err)
+	require.Len(t, profileMetrics, 1)
+	require.Len(t, profileMetrics[0].TopologyMetrics, 1)
+
+	metric := profileMetrics[0].TopologyMetrics[0]
+	require.Equal(t, ddsnmp.KindLldpRem, metric.TopologyKind)
+	require.Equal(t, "17", metric.Tags[tagLldpLocPortNum])
+	require.Equal(t, "1.1", metric.Tags[tagLldpRemIndex])
+	require.Equal(t, "fixture-neighbor", metric.Tags[tagLldpRemSysName])
+
+	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", SysObjectID: sysObjectID})
+	cache.ingestTopologyProfileMetrics(profileMetrics)
+	require.Contains(t, cache.lldpRemotes, "17:1.1")
+	require.Equal(t, "fixture-neighbor", cache.lldpRemotes["17:1.1"].sysName)
+}
+
 func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandler {
 	t.Helper()
 
