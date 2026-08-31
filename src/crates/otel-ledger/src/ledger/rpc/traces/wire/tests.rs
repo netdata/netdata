@@ -65,6 +65,23 @@ fn the_functions_view_forwards_the_minimum_trace_duration() {
 }
 
 #[test]
+fn overview_facets_rides_with_the_functions_parameters() {
+    // The aggregate's facet opt-in is a Functions parameter: it selects
+    // the Functions view like the others, and it cannot ride with a
+    // mode selector (the response key is not a request field — the
+    // `overview` selector still means the legacy mode).
+    assert!(matches!(
+        req(json!({"after": -900, "overview_facets": true})).mode,
+        TracesMode::Functions(_)
+    ));
+    let err = req_err(json!({"overview": {}, "overview_facets": true}));
+    assert!(
+        err.contains("cannot mix a mode selector with Functions parameters"),
+        "{err}"
+    );
+}
+
+#[test]
 fn info_is_the_strict_empty_object() {
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
     // Both of the old wire's boolean forms, junk scalars, null, and
@@ -340,7 +357,7 @@ fn info_response_shape_is_pinned() {
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
                 "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
-                "min_trace_duration_ns"
+                "min_trace_duration_ns", "overview_facets"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
