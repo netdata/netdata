@@ -31,7 +31,8 @@ const (
 )
 
 type SysInfo struct {
-	SysObjectID string `json:"-"`
+	SysObjectID string       `json:"-"`
+	Probe       SysInfoProbe `json:"-" yaml:"-"`
 
 	Descr    string `json:"description"`
 	Contact  string `json:"contact"`
@@ -44,10 +45,21 @@ type SysInfo struct {
 	Model        string `json:"model"`
 }
 
+type SysInfoProbe struct {
+	PDUCount        int
+	FirstOID        string
+	LastOID         string
+	SeenSysDescr    bool
+	SeenSysObjectID bool
+	SeenSysContact  bool
+	SeenSysName     bool
+	SeenSysLocation bool
+}
+
 func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 	pdus, err := client.WalkAll(RootOidMibSystem)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("walk SNMP system subtree %q: %w", RootOidMibSystem, err)
 	}
 
 	si := &SysInfo{
@@ -59,28 +71,42 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
+		si.Probe.PDUCount++
+		if si.Probe.PDUCount == 1 {
+			si.Probe.FirstOID = oid
+		}
+		si.Probe.LastOID = oid
 
 		switch oid {
 		case OidSysDescr:
+			si.Probe.SeenSysDescr = true
 			si.Descr, err = PduToString(pdu)
 			si.Descr = valueSanitizer.Replace(si.Descr)
 		case OidSysObject:
+			si.Probe.SeenSysObjectID = true
+			if pdu.Type != gosnmp.ObjectIdentifier {
+				err = fmt.Errorf("expected ObjectIdentifier, got %v", pdu.Type)
+				break
+			}
 			var sysObj string
 			if sysObj, err = PduToString(pdu); err == nil {
 				si.SysObjectID = sysObj
 			}
 		case OidSysContact:
+			si.Probe.SeenSysContact = true
 			si.Contact, err = PduToString(pdu)
 			si.Contact = valueSanitizer.Replace(si.Contact)
 		case OidSysName:
+			si.Probe.SeenSysName = true
 			si.Name, err = PduToString(pdu)
 			si.Name = valueSanitizer.Replace(si.Name)
 		case OidSysLocation:
+			si.Probe.SeenSysLocation = true
 			si.Location, err = PduToString(pdu)
 			si.Location = valueSanitizer.Replace(si.Location)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("OID '%s': %v", pdu.Name, err)
+			return nil, fmt.Errorf("OID %q: %w", pdu.Name, err)
 		}
 	}
 

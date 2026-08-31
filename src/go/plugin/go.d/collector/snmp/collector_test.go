@@ -716,6 +716,139 @@ func TestCollector_Check(t *testing.T) {
 	}
 }
 
+func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
+	tests := map[string]struct {
+		pdus           []gosnmp.SnmpPDU
+		pingEnabled    bool
+		pingOnly       bool
+		manualProfiles []string
+		wantErr        string
+		wantAbsent     []string
+	}{
+		"empty system walk": {
+			wantErr: "system subtree walk returned no PDUs",
+		},
+		"partial system walk with ordinary ping enabled": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte("private description")},
+				{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("private hostname")},
+			},
+			pingEnabled: true,
+			wantErr:     "without sysObjectID",
+			wantAbsent:  []string{"private description", "private hostname"},
+		},
+		"unmatched system object": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.2.1.999"},
+			},
+			manualProfiles: []string{"generic-device"},
+			wantErr:        "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
+			wantAbsent:     []string{"manual_profiles"},
+		},
+		"invalid manual profile": {
+			manualProfiles: []string{"profile-that-does-not-exist"},
+			wantErr:        "system subtree walk returned no PDUs",
+		},
+		"topology-only manual profile": {
+			manualProfiles: []string{"topology-role-qbridge"},
+			wantErr:        "system subtree walk returned no PDUs",
+		},
+		"applicable manual metric profile": {
+			manualProfiles: []string{"generic-device"},
+		},
+		"reported Cisco ASR identity": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9.1.1166"},
+			},
+		},
+		"explicit ping only": {
+			pingOnly: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			client := snmpmock.NewMockHandler(ctrl)
+			client.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return(tc.pdus, nil)
+
+			collr := newTestSNMPCollector()
+			collr.Config = prepareV2Config()
+			collr.CreateVnode = false
+			collr.Ping.Enabled = tc.pingEnabled
+			collr.PingOnly = tc.pingOnly
+			collr.ManualProfiles = tc.manualProfiles
+			collr.snmpClient = client
+
+			err := collr.Check(context.Background())
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			for _, value := range tc.wantAbsent {
+				assert.NotContains(t, err.Error(), value)
+			}
+		})
+	}
+}
+
+func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
+	}, nil).Times(1)
+
+	collr := newTestSNMPCollector()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpClient = client
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return &mockDdSnmpCollector{} }
+
+	require.NoError(t, collr.Check(context.Background()))
+	require.NoError(t, collr.ensureInitialized())
+	assert.Equal(t, "1.3.6.1.4.1.14988.1", collr.sysInfo.SysObjectID)
+}
+
+func TestSysInfoDiagnosticOmitsRawSystemValues(t *testing.T) {
+	si := &snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.9.1.1166",
+		Descr:       "private description",
+		Contact:     "private contact",
+		Name:        "private hostname",
+		Location:    "private location",
+		Vendor:      "Cisco",
+		Category:    "Router",
+		Model:       "ASR 1000",
+		Probe: snmputils.SysInfoProbe{
+			PDUCount:        5,
+			FirstOID:        snmputils.OidSysDescr,
+			LastOID:         snmputils.OidSysLocation,
+			SeenSysDescr:    true,
+			SeenSysObjectID: true,
+			SeenSysContact:  true,
+			SeenSysName:     true,
+			SeenSysLocation: true,
+		},
+	}
+
+	diagnostic := formatSysInfoDiagnostic(si)
+	assert.Contains(t, diagnostic, si.SysObjectID)
+	assert.Contains(t, diagnostic, "pdu_count=5")
+	assert.Contains(t, diagnostic, "sys_object_id=true")
+	for _, raw := range []string{si.Descr, si.Contact, si.Name, si.Location} {
+		assert.NotContains(t, diagnostic, raw)
+	}
+}
+
 func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
