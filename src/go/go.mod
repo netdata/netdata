@@ -39,7 +39,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/godbus/dbus/v5 v5.2.2
-	github.com/gofrs/flock v0.13.0
+	github.com/gofrs/flock v0.13.1
 	github.com/gohugoio/hashstructure v1.0.0
 	github.com/golang/mock v1.6.0
 	github.com/golangsnmp/gomib v0.13.2
