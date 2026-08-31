@@ -177,7 +177,7 @@ func TestTopologyProductionPath_LLDPRemoteManagementAddressProfiles(t *testing.T
 		},
 		"RouterOS readable index columns": {
 			fixture:        "routeros_rb750gr3.snmprec",
-			profile:        "mikrotik-router",
+			profile:        "topology-role-mikrotik-rb750gr3",
 			sysObjectID:    "1.3.6.1.4.1.14988.1",
 			managementAddr: "fdfd:0:2:1::1",
 		},

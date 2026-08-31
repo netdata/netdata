@@ -618,6 +618,8 @@ GENERIC_NAMES = {
     'generic-ups.yaml': 'Generic UPS (UPS-MIB)',
     'meraki-cloud-controller.yaml': 'Cisco Meraki (Cloud Controller)',
     'ubiquiti-net-snmp.yaml': 'Ubiquiti Net-SNMP Devices',
+    'mikrotik-router.yaml': 'MikroTik Router',
+    'mikrotik-swos.yaml': 'MikroTik Switch',
 }
 
 

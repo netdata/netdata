@@ -1368,11 +1368,12 @@ Rules:
 - `not-accessible` objects must not be read as `symbol.OID` values in generic standards profiles.
 - A `not-accessible` object that is part of a table `INDEX` can be derived from
   the row OID index using `index` or `index_transform`.
-- A selector-scoped device profile may override a generic row to read a
+- A selector-scoped device or topology-role profile may override a generic row to read a
   `not-accessible` object only when a checked fixture or repeatable device
   capture proves that the device returns the object as a column and omits the
-  standards-readable row anchor. Keep the exception in the device profile,
-  document it, and pin both profile merging and fixture-backed collection.
+  standards-readable row anchor. Keep the exception in the narrowest matching
+  profile, document it, and pin both profile resolution and fixture-backed
+  collection.
 - Keep SNMP index slicing in the profile YAML; keep format conversion in
   `symbol.format`.
 
@@ -1424,14 +1425,16 @@ Examples:
   preserved; topology normalization converts IP-compatible bytes later.
 - `LLDP-MIB::lldpRemManAddrSubtype` and `LLDP-MIB::lldpRemManAddr` are also
   `not-accessible` index components. Anchor the generic row on readable
-  `lldpRemManAddrIfSubtype`; derive subtype with `index: 4` and address bytes
-  with `index_transform: [{start: 5}]` plus `format: hex`.
+  `lldpRemManAddrIfSubtype`; derive subtype with `index: 4`, retain the declared
+  address length with `index: 5`, and derive address bytes with
+  `index_transform: [{start: 5}]` plus `format: hex`. The topology consumer
+  rejects a row when the declared length does not match the encoded byte count.
 
 Audit recipe:
 
 ```bash
 rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
-rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
 Any profile hit for a `not-accessible` object is valid only when the tag is

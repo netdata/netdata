@@ -55,10 +55,11 @@ func TestTopologyProfiles_FormerUmbrellaCapabilityMatrix(t *testing.T) {
 		{profile: "juniper-qfx", oid: "1.3.6.1.4.1.2636.1.1.1.2.82", want: "I,Q"},
 		{profile: "juniper-srx", oid: "1.3.6.1.4.1.2636.1.1.1.2.26", want: "I,C,S,A"},
 		{profile: "mikrotik-router", oid: "1.3.6.1.4.1.14988.1", want: "I,C,Q,S,A"},
+		{profile: "mikrotik-swos", oid: "1.3.6.1.4.1.14988.2", want: "I,C,S"},
 		{profile: "netgear-switch", oid: "1.3.6.1.4.1.4526.100.1.1", want: "I,C,Q,S,A"},
 		{profile: "zyxel-switch", oid: "1.3.6.1.4.1.890.1.15", want: "I,Q,S,A"},
 	}
-	require.Len(t, tests, 39)
+	require.Len(t, tests, 40)
 
 	counts := make(map[string]int)
 	for _, tc := range tests {
@@ -74,7 +75,85 @@ func TestTopologyProfiles_FormerUmbrellaCapabilityMatrix(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, map[string]int{"I": 32, "C": 8, "Q": 11, "S": 12, "A": 29, "V": 4}, counts)
+	assert.Equal(t, map[string]int{"I": 33, "C": 9, "Q": 11, "S": 13, "A": 29, "V": 4}, counts)
+}
+
+func TestMikroTikProfiles_LLDPIsRouterOSOnlyAndDeviationIsRB750Gr3Only(t *testing.T) {
+	tests := map[string]struct {
+		sysObjectID  string
+		sysDescr     string
+		profile      string
+		profileCount int
+		anchorOID    string
+	}{
+		"generic RouterOS": {
+			sysObjectID:  "1.3.6.1.4.1.14988.1",
+			sysDescr:     "RouterOS CCR2004-1G-12S+2XS",
+			profile:      "mikrotik-router",
+			profileCount: 2,
+			anchorOID:    "1.0.8802.1.1.2.1.4.2.1.3",
+		},
+		"RB750Gr3 RouterOS deviation": {
+			sysObjectID:  "1.3.6.1.4.1.14988.1",
+			sysDescr:     "RouterOS RB750Gr3",
+			profile:      "topology-role-mikrotik-rb750gr3",
+			profileCount: 3,
+			anchorOID:    "1.0.8802.1.1.2.1.4.2.1.1",
+		},
+		"SwOS": {
+			sysObjectID:  "1.3.6.1.4.1.14988.2",
+			sysDescr:     "CSS610-8G-2S+ SwOS",
+			profile:      "mikrotik-swos",
+			profileCount: 2,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := DefaultCatalog().Resolve(ResolveRequest{
+				SysObjectID: tc.sysObjectID,
+				SysDescr:    tc.sysDescr,
+			}).Profiles()
+			require.Len(t, profiles, tc.profileCount)
+			require.Equal(t, tc.profile, stripFileNameExt(profiles[0].SourceFile))
+
+			var anchors []string
+			for _, profile := range profiles {
+				for _, row := range profile.Definition.Topology {
+					if row.Kind == ddprofiledefinition.KindLldpRemManAddr {
+						require.Len(t, row.Symbols, 1)
+						anchors = append(anchors, row.Symbols[0].OID)
+					}
+				}
+			}
+			if tc.anchorOID == "" {
+				require.Empty(t, anchors)
+			} else {
+				require.Equal(t, []string{tc.anchorOID}, anchors)
+			}
+		})
+	}
+}
+
+func TestMikroTikProfiles_AreSplitByOS(t *testing.T) {
+	routerOS, err := LoadProfileByName("mikrotik-router")
+	require.NoError(t, err)
+	assert.True(t, routerOS.HasExtension("_mikrotik-hardware.yaml"))
+	assert.True(t, routerOS.HasExtension("_std-lldp-mib.yaml"))
+	assert.True(t, routerOS.HasExtension("_std-topology-arp-mib.yaml"))
+	assert.True(t, routerOS.HasExtension("_mikrotik-ipsec.yaml"))
+	assert.True(t, routerOS.HasExtension("_mikrotik-routeros-licensing.yaml"))
+
+	swOS, err := LoadProfileByName("mikrotik-swos")
+	require.NoError(t, err)
+	assert.True(t, swOS.HasExtension("_mikrotik-hardware.yaml"))
+	assert.True(t, swOS.HasExtension("_std-topology-fdb-mib.yaml"))
+	assert.True(t, swOS.HasExtension("_std-topology-stp-mib.yaml"))
+	assert.False(t, swOS.HasExtension("_std-lldp-mib.yaml"))
+	assert.False(t, swOS.HasExtension("_std-topology-arp-mib.yaml"))
+	assert.False(t, swOS.HasExtension("_std-topology-q-bridge-mib.yaml"))
+	assert.False(t, swOS.HasExtension("_mikrotik-ipsec.yaml"))
+	assert.False(t, swOS.HasExtension("_mikrotik-routeros-licensing.yaml"))
 }
 
 func TestCiscoProfiles_CDPIsTopologyOnly(t *testing.T) {

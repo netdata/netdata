@@ -52,6 +52,7 @@ from gen_npm_catalog import (  # noqa: E402
     is_device_catalog_profile,
     load_profiles,
     make_entry,
+    profile_display_name,
 )
 
 
@@ -82,6 +83,10 @@ class NPMCatalogProfileVisibilityTest(unittest.TestCase):
             for module in modules
         ]
         self.assertFalse(any("topology-role-" in value for value in method_descriptions))
+
+    def test_mikrotik_profile_names_preserve_product_capitalization(self):
+        self.assertEqual(profile_display_name("mikrotik-router.yaml", "MikroTik", "Router"), "MikroTik Router")
+        self.assertEqual(profile_display_name("mikrotik-swos.yaml", "MikroTik", "Switch"), "MikroTik Switch")
 
     def test_snmp_support_collection_is_not_attached_to_unrelated_catalog_entries(self):
         common = {

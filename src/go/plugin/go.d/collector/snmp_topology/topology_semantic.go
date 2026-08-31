@@ -441,7 +441,7 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 		switch key {
 		case
 			tagLldpLocPortNum, tagLldpRemIndex, tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype,
-			tagLldpRemMgmtAddrIfSubtype, tagLldpRemMgmtAddrIfID,
+			tagLldpRemMgmtAddrLen, tagLldpRemMgmtAddrIfSubtype, tagLldpRemMgmtAddrIfID,
 			tagLldpRemMgmtAddrOID:
 			return true
 		}

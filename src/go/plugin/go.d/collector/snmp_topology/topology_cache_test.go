@@ -533,6 +533,40 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 	}
 }
 
+func TestTopologyCache_LLDPRemoteManagementAddressValidatesDeclaredLength(t *testing.T) {
+	tests := map[string]struct {
+		length string
+		want   string
+	}{
+		"matching length":   {length: "4", want: "192.0.2.2"},
+		"mismatched length": {length: "3"},
+		"invalid length":    {length: "invalid"},
+		"missing length":    {want: "192.0.2.2"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyBuilder()
+			cache.updateLldpRemManAddr(map[string]string{
+				tagLldpLocPortNum:         "1",
+				tagLldpRemIndex:           "1",
+				tagLldpRemMgmtAddrSubtype: "1",
+				tagLldpRemMgmtAddr:        "c0000202",
+				tagLldpRemMgmtAddrLen:     tc.length,
+			})
+
+			remote := cache.lldpRemotes["1:1"]
+			require.NotNil(t, remote)
+			if tc.want == "" {
+				require.Empty(t, remote.managementAddrs)
+			} else {
+				require.Len(t, remote.managementAddrs, 1)
+				require.Equal(t, tc.want, remote.managementAddrs[0].Address)
+			}
+		})
+	}
+}
+
 func TestTopologyCache_CDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testing.T) {
 	for name, raw := range map[string]string{
 		"four encoded bytes": "0a000003",

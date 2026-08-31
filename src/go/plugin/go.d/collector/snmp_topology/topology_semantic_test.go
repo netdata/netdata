@@ -86,6 +86,7 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 					tagLldpRemIndex:           "1",
 					tagLldpRemMgmtAddrSubtype: "1",
 					tagLldpRemMgmtAddr:        "c0000202",
+					tagLldpRemMgmtAddrLen:     "4",
 					"unused_lldp":             "must-not-appear-unused-lldp-tag",
 				},
 			},
@@ -201,6 +202,7 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metadata, tagLldpLocChassisID)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
+	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[2].tags, tagLldpRemMgmtAddrLen)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows[0].tags, "neighbor")
 	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.metadata, tagOSPFRouterID)
 	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.tags, tagBridgeBaseAddress)

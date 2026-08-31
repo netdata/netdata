@@ -276,7 +276,7 @@ func TestTopologyProfile_LLDPRemoteManagementAddressUsesIndexFields(t *testing.T
 		{
 			Name:         "lldp_rem_man_addr",
 			Value:        0,
-			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "42", "lldp_rem_mgmt_addr_subtype": "1", "lldp_rem_mgmt_addr": "c0000202", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "12", "lldp_rem_mgmt_addr_oid": "0.0"},
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "42", "lldp_rem_mgmt_addr_subtype": "1", "lldp_rem_mgmt_addr": "c0000202", "lldp_rem_mgmt_addr_len": "4", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "12", "lldp_rem_mgmt_addr_oid": "0.0"},
 			MetricType:   "gauge",
 			IsTable:      true,
 			Table:        "lldpRemManAddrTable",
@@ -285,7 +285,7 @@ func TestTopologyProfile_LLDPRemoteManagementAddressUsesIndexFields(t *testing.T
 		{
 			Name:         "lldp_rem_man_addr",
 			Value:        0,
-			Tags:         map[string]string{"lldp_loc_port_num": "18", "lldp_rem_index": "43", "lldp_rem_mgmt_addr_subtype": "2", "lldp_rem_mgmt_addr": "20010db8000000000000000000000002", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "13", "lldp_rem_mgmt_addr_oid": "0.0"},
+			Tags:         map[string]string{"lldp_loc_port_num": "18", "lldp_rem_index": "43", "lldp_rem_mgmt_addr_subtype": "2", "lldp_rem_mgmt_addr": "20010db8000000000000000000000002", "lldp_rem_mgmt_addr_len": "16", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "13", "lldp_rem_mgmt_addr_oid": "0.0"},
 			MetricType:   "gauge",
 			IsTable:      true,
 			Table:        "lldpRemManAddrTable",
@@ -321,8 +321,8 @@ func TestTopologyProfile_LLDPRemoteManagementAddressOmitsMalformedIndexTag(t *te
 	}
 }
 
-func TestTopologyProfile_MikroTikOverridesLLDPRemoteManagementAddressRow(t *testing.T) {
-	profile, err := ddsnmp.LoadProfileByName("mikrotik-router")
+func TestTopologyProfile_MikroTikRB750Gr3OverridesLLDPRemoteManagementAddressRow(t *testing.T) {
+	profile, err := ddsnmp.LoadProfileByName("topology-role-mikrotik-rb750gr3")
 	require.NoError(t, err)
 
 	var rows []ddprofiledefinition.TopologyConfig
@@ -345,6 +345,7 @@ func TestTopologyProfile_MikroTikOverridesLLDPRemoteManagementAddressRow(t *test
 	}
 	require.Equal(t, "1.0.8802.1.1.2.1.4.2.1.1", tags["lldp_rem_mgmt_addr_subtype"].Symbol.OID)
 	require.Equal(t, "1.0.8802.1.1.2.1.4.2.1.2", tags["lldp_rem_mgmt_addr"].Symbol.OID)
+	require.Equal(t, uint(5), tags["lldp_rem_mgmt_addr_len"].Index)
 	require.Empty(t, tags["lldp_rem_mgmt_addr"].IndexTransform)
 }
 

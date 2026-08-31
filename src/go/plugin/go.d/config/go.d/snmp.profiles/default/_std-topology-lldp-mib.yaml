@@ -199,6 +199,8 @@ topology:
         index: 3
       - tag: lldp_rem_mgmt_addr_subtype
         index: 4
+      - tag: lldp_rem_mgmt_addr_len
+        index: 5
       - tag: lldp_rem_mgmt_addr
         symbol:
           name: lldpRemManAddr

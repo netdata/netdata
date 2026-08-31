@@ -3,6 +3,9 @@
 package snmptopology
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -143,6 +146,9 @@ func (c *topologyBuilder) updateLldpRemManAddr(tags map[string]string) {
 	}
 
 	addrHex := tags[tagLldpRemMgmtAddr]
+	if !validLLDPManagementAddressLength(addrHex, tags[tagLldpRemMgmtAddrLen]) {
+		return
+	}
 	addr, addrType := normalizeLLDPManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
 	if addr == "" {
 		return
@@ -157,4 +163,19 @@ func (c *topologyBuilder) updateLldpRemManAddr(tags map[string]string) {
 		Source:      "lldp_remote",
 	}
 	entry.managementAddrs = appendManagementAddress(entry.managementAddrs, mgmt)
+}
+
+func validLLDPManagementAddressLength(addrHex, declaredLength string) bool {
+	declaredLength = strings.TrimSpace(declaredLength)
+	if declaredLength == "" {
+		return true
+	}
+
+	length, err := strconv.Atoi(declaredLength)
+	if err != nil || length <= 0 {
+		return false
+	}
+
+	addrHex = strings.TrimSpace(addrHex)
+	return len(addrHex)%2 == 0 && len(addrHex)/2 == length
 }
