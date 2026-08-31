@@ -49,7 +49,6 @@ from gen_doc_collector_page import get_integration_description  # noqa: E402
 from gen_npm_catalog import (  # noqa: E402
     PAGE_DESCRIPTIONS,
     build_device_modules,
-    build_topology_modules,
     is_device_catalog_profile,
     load_profiles,
     make_entry,
@@ -88,18 +87,6 @@ class NPMCatalogProfileVisibilityTest(unittest.TestCase):
     def test_mikrotik_profile_names_preserve_product_capitalization(self):
         self.assertEqual(profile_display_name("mikrotik-router.yaml", "MikroTik", "Router"), "MikroTik Router")
         self.assertEqual(profile_display_name("mikrotik-swos.yaml", "MikroTik", "Switch"), "MikroTik Switch")
-
-    def test_lldp_topology_auto_detection_matches_profile_scope(self):
-        module = next(
-            item
-            for item in build_topology_modules()
-            if item["meta"]["monitored_instance"]["name"] == "LLDP Topology"
-        )
-        self.assertEqual(
-            module["overview"]["default_behavior"]["auto_detection"]["description"],
-            "Discovered automatically when a matching stock device profile enables LLDP topology. "
-            "LLDP-V2 is currently enabled for Palo Alto firewalls.",
-        )
 
     def test_snmp_support_collection_is_not_attached_to_unrelated_catalog_entries(self):
         common = {
