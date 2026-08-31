@@ -87,8 +87,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.1 h1:RmmWQPREQ
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.1/go.mod h1:0A3W4F+68ZnNk5XcNL/e9HFMwnP8RlEicFfy6eOEDyw=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.1 h1:ZMbtPZZQRca+3+XYQne9PBvRiYpHZlNJJOZfE9WNfT0=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.1/go.mod h1:YAGWQdCYlVCoqrzvfv3RLxO6zKwti7gsAULOGWPLYv4=
-github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.36.2 h1:oRm0IE8VDp96+Jb962uA0lMBizn9mzD46/W30JeTKJM=
-github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.36.2/go.mod h1:+39wzLNewz3MoCjhdLvW5nJnmHVayJeTAckPE6vWQ0w=
+github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.38.1 h1:go64duU3vqs7gfBo7xXfQI4boGwDILJ2fggFAmG8lJQ=
+github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.38.1/go.mod h1:p6ZFPJtZi+7H91M4/EjN7bzfbN7RcHKdbSRB8D6EEzY=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.109.1 h1:kVpzaDBzOdRtOftmiSpTdQbWVqRg0kONLXijktiwXnk=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.109.1/go.mod h1:CUr46sCpGAg/rHaclRyhJX0LJAmH73uWSJPPSaMUrSk=
 github.com/aws/aws-sdk-go-v2/service/signin v1.7.1 h1:mdMtSVKdQ3+mzBh+l0ogrFYZVQUCg6pJZOirA2ARsYE=
