@@ -1056,6 +1056,114 @@ jobs:
             && github.event_name == 'workflow_dispatch'
           }}
 
+  publish-nightly-artifacts:
+    name: Publish Nightly Release Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
+    needs:
+      - prepare-upload
+      - windows-test
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Install RClone
+        id: install-rclone
+        run: |
+          apt-get update || exit 1
+          apt-get install -y rclone || exit 1
+      - name: Retrieve Artifacts
+        id: fetch
+        use: actions/download-artifact@v4
+        with:
+          name: final-artifacts
+          path: final-artifacts
+      - name: Import GPG Keys
+        id: import-keys
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Prepare Data For Upload
+        id: prepare
+        run: |
+          mv final-artifacts/latest-version.txt . || exit 1
+          version=$(cat latest-version.txt)
+          mkdir -p upload || exit 1
+          cd upload || exit 1
+          mkdir -p latest || exit 1
+          cd latest || exit 1
+          cp -va ../final-artifacts/* . || exit 1
+          rm -f netdata-latest.*.run netdata-v*-g*.tar.* netdata-*${version}*.run sha256sums.txt || exit 1
+          sha256sum -b ./* | tee sha256sums.txt || exit 1
+          for f in * ; do
+            [ -f "${f}" ] || continue
+            sha256="$(sha256sum "$f" | awk '{print $1}')"
+            size="$(wc -c < "$f" | awk '{print $1}')"
+            printf '%s %s %s\n' "$sha256" "$size" "$f" >> manifest.txt || exit 1
+          done
+          gpg -u ${{ steps.import-keys.outputs.fingerprint }} --detach-sign manifest.txt || exit 1
+          cd .. || exit 1
+          mkdir -p ${version} || exit 1
+          cd ${version} || exit 1
+          cp -va ../final-artifacts/* . || exit 1
+          rm -f netdata*latest*.run netdata-latest.tar.* sha256sums.txt || exit 1
+          for f in netdata-*.tar.* ; do
+            ext=${f##*.}
+            mv -v ${f} netdata-${version}.tar.${ext} || exit 1
+          done
+          sha256sum -b ./* | tee sha256sums.txt || exit 1
+          for f in * ; do
+            [ -f "${f}" ] || continue
+            sha256="$(sha256sum "$f" | awk '{print $1}')"
+            size="$(wc -c < "$f" | awk '{print $1}')"
+            printf '%s %s %s\n' "$sha256" "$size" "$f" >> manifest.txt || exit 1
+          done
+          gpg -u ${{ steps.import-keys.outputs.fingerprint }} --detach-sign manifest.txt || exit 1
+          cd ../.. || exit 1
+      - name: Upload Versioned Artifacts
+        id: upload-versioned
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.S3_RELEASE_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.S3_RELEASE_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.S3_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        run: |
+          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./$(cat latest-version.txt) s3:${{ secrets.S3_NIGHTLY_BUCKET }}/nightlies
+      - name: Upload Latest Artifacts
+        id: upload-latest
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.S3_RELEASE_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.S3_RELEASE_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.S3_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        run: |
+          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest s3:${{ secrets.S3_NIGHTLY_BUCKET }}/nightlies/latest
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to upload nightly artifacts:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to upload nightly build artifacts.
+              Install RClone: ${{ steps.install-rclone.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
+              Import GPG keys: ${{ steps.import-keys.outcome }}
+              Prepare data for upload: ${{ steps.prepare.outcome }}
+              Upload versioned artifacts: ${{ steps.upload-versioned.outcome }}
+              Upload latest artifacts: ${{ steps.upload-latest.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'workflow_dispatch'
+          }}
+
   normalize-tag: # Fix the release tag if needed
     name: Normalize Release Tag
     runs-on: ubuntu-latest
