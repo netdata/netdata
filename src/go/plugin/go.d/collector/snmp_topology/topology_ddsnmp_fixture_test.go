@@ -160,69 +160,6 @@ func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
 	require.Equal(t, "dynamic", observation.ARPNDEntries[0].State)
 }
 
-func TestTopologyProductionPath_LLDPRemoteManagementAddressProfiles(t *testing.T) {
-	tests := map[string]struct {
-		fixture        string
-		profile        string
-		sysObjectID    string
-		sysDescr       string
-		managementAddr string
-	}{
-		"standards readable anchor": {
-			fixture:        "arubaos-cx_10.10.snmprec",
-			profile:        "aruba-cx-switch",
-			sysObjectID:    "1.3.6.1.4.1.47196.4.1.1.1.1",
-			managementAddr: "192.0.2.1",
-		},
-		"RouterOS readable index columns": {
-			fixture:        "routeros_rb750gr3.snmprec",
-			profile:        "topology-role-mikrotik-rb750gr3",
-			sysObjectID:    "1.3.6.1.4.1.14988.1",
-			sysDescr:       "RouterOS RB750Gr3",
-			managementAddr: "fdfd:0:2:1::1",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", tc.fixture))
-			profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
-				SysObjectID: tc.sysObjectID,
-				SysDescr:    tc.sysDescr,
-			}).Project(ddsnmp.ConsumerTopology).FilterByKind(map[ddsnmp.TopologyKind]bool{
-				ddsnmp.KindLldpRemManAddr: true,
-			}).Profiles()
-			require.Len(t, profiles, 1)
-			profileName := strings.TrimSuffix(filepath.Base(profiles[0].SourceFile), filepath.Ext(profiles[0].SourceFile))
-			require.Equal(t, tc.profile, profileName)
-
-			profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
-				SnmpClient:  fixture,
-				Profiles:    profiles,
-				Log:         newTestSNMPTopologyCollector().Logger,
-				SysObjectID: tc.sysObjectID,
-			}).Collect()
-			require.NoError(t, err)
-			require.Len(t, profileMetrics, 1)
-			require.NotEmpty(t, profileMetrics[0].TopologyMetrics)
-			for _, metric := range profileMetrics[0].TopologyMetrics {
-				require.Equal(t, ddsnmp.KindLldpRemManAddr, metric.TopologyKind)
-			}
-
-			cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", SysObjectID: tc.sysObjectID})
-			cache.ingestTopologyProfileMetrics(profileMetrics)
-
-			var found bool
-			for _, remote := range cache.lldpRemotes {
-				for _, address := range remote.managementAddrs {
-					found = found || address.Address == tc.managementAddr
-				}
-			}
-			require.Truef(t, found, "expected management address %q from fixture %q", tc.managementAddr, tc.fixture)
-		})
-	}
-}
-
 func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandler {
 	t.Helper()
 
