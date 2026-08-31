@@ -21,6 +21,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -90,6 +91,7 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		acquisitionLimits:            defaultTopologyAcquisitionLimits,
 		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
 		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
+		publishDiagnosticArchive:     !terminal.IsTerminal(),
 		diagnosticArchivePath:        defaultTopologyDiagnosticArchivePath(),
 		publishDiagnosticArchiveFile: publishTopologyDiagnosticArchiveFile,
 		store:                        metricStore,
@@ -126,6 +128,7 @@ type (
 		acquisitionLimits            topologyAcquisitionLimits
 		diagnosticGlobalLimits       topologyAcquisitionLimits
 		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
+		publishDiagnosticArchive     bool
 		diagnosticArchivePath        string
 		publishDiagnosticArchiveFile func(string, topologyDiagnostics) error
 	}
@@ -167,13 +170,16 @@ func (c *Collector) Run(ctx context.Context) error {
 
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
-	diagnosticArchiveRefreshes := make(chan struct{}, 1)
-	publisherDone := make(chan struct{})
-	go func() {
-		defer close(publisherDone)
-		c.runTopologyDiagnosticArchivePublisher(ctx, diagnosticArchiveRefreshes)
-	}()
-	defer func() { <-publisherDone }()
+	var diagnosticArchiveRefreshes chan struct{}
+	if c.publishDiagnosticArchive {
+		diagnosticArchiveRefreshes = make(chan struct{}, 1)
+		publisherDone := make(chan struct{})
+		go func() {
+			defer close(publisherDone)
+			c.runTopologyDiagnosticArchivePublisher(ctx, diagnosticArchiveRefreshes)
+		}()
+		defer func() { <-publisherDone }()
+	}
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()
@@ -185,9 +191,11 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
 			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
-			select {
-			case diagnosticArchiveRefreshes <- struct{}{}:
-			default:
+			if diagnosticArchiveRefreshes != nil {
+				select {
+				case diagnosticArchiveRefreshes <- struct{}{}:
+				default:
+				}
 			}
 		}
 	}

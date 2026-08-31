@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
@@ -66,6 +67,11 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil reverse DNS resolver", func() {
 		_ = newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), nil)
 	})
+}
+
+func TestSNMPTopologyDiagnosticArchivePublicationFollowsTerminalMode(t *testing.T) {
+	coll := New(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	require.Equal(t, !terminal.IsTerminal(), coll.publishDiagnosticArchive)
 }
 
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {

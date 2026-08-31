@@ -307,6 +307,45 @@ func TestPublishTopologyDiagnosticArchiveReportsOnlyMeaningfulSuccessfulWrites(t
 	require.False(t, coll.publishTopologyDiagnosticArchiveRecovering(true))
 }
 
+func TestCollectorDoesNotPublishDiagnosticArchiveWhenDisabled(t *testing.T) {
+	coll := newTestSNMPTopologyCollector()
+	coll.publishDiagnosticArchive = false
+	coll.UpdateEvery = 1
+	coll.RefreshEvery = confopt.LongDuration(time.Hour)
+
+	refreshes := make(chan struct{}, 2)
+	coll.projectTopologyDiagnosticCut = func(input topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error) {
+		refreshes <- struct{}{}
+		return projectTopologyDiagnosticCut(input)
+	}
+	var writes atomic.Int32
+	coll.publishDiagnosticArchiveFile = func(_ string, _ topologyDiagnostics) error {
+		writes.Add(1)
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- coll.Run(ctx) }()
+
+	for range 2 {
+		select {
+		case <-refreshes:
+		case <-time.After(2 * time.Second):
+			t.Fatal("topology refresh did not run")
+		}
+	}
+	require.Zero(t, writes.Load())
+
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("collector did not stop")
+	}
+}
+
 func TestCollectorStartsDiagnosticPublisherAfterInitialRefresh(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
 	coll.UpdateEvery = 3600
