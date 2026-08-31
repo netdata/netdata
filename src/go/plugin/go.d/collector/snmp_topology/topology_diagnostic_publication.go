@@ -96,20 +96,36 @@ func replaceTopologyDiagnosticArchiveFile(from, to string) error {
 	return os.Rename(from, to)
 }
 
-func runTopologyDiagnosticArchivePublisher(ctx context.Context, ticks <-chan time.Time, publish func()) {
+func runTopologyDiagnosticArchivePublisher(
+	ctx context.Context,
+	ticks <-chan time.Time,
+	refreshes <-chan struct{},
+	publish func(requireMeaningful bool) bool,
+) {
 	if ctx.Err() != nil {
 		return
 	}
-	publish()
+	if publish(false) {
+		refreshes = nil
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-refreshes:
+			if ctx.Err() != nil {
+				return
+			}
+			if publish(true) {
+				refreshes = nil
+			}
 		case <-ticks:
 			if ctx.Err() != nil {
 				return
 			}
-			publish()
+			if publish(false) {
+				refreshes = nil
+			}
 		}
 	}
 }
@@ -118,24 +134,32 @@ func (c *Collector) diagnosticArchiveEvery() time.Duration {
 	return max(c.deviceCheckEvery(), c.refreshEvery())
 }
 
-func (c *Collector) runTopologyDiagnosticArchivePublisher(ctx context.Context) {
+func (c *Collector) runTopologyDiagnosticArchivePublisher(ctx context.Context, refreshes <-chan struct{}) {
 	ticker := time.NewTicker(c.diagnosticArchiveEvery())
 	defer ticker.Stop()
-	runTopologyDiagnosticArchivePublisher(ctx, ticker.C, c.publishTopologyDiagnosticArchiveRecovering)
+	runTopologyDiagnosticArchivePublisher(ctx, ticker.C, refreshes, c.publishTopologyDiagnosticArchiveRecovering)
 }
 
-func (c *Collector) publishTopologyDiagnosticArchiveRecovering() {
+func (c *Collector) publishTopologyDiagnosticArchiveRecovering(requireMeaningful bool) (meaningful bool) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
+			meaningful = false
 			c.Limit(topologyDiagnosticArchiveFailureLogKey, 1, topologyRefreshWarningEvery).
 				Warningf("failed to publish SNMP topology diagnostic archive: panic: %v", recovered)
 		}
 	}()
 	if c.publishDiagnosticArchiveFile == nil {
-		return
+		return false
 	}
-	if err := c.publishDiagnosticArchiveFile(c.diagnosticArchivePath, c.acquireTopologyDiagnostics()); err != nil {
+	diagnostics := c.acquireTopologyDiagnostics()
+	meaningful = len(diagnostics.lifecycle.cut.Entries) > 0
+	if requireMeaningful && !meaningful {
+		return false
+	}
+	if err := c.publishDiagnosticArchiveFile(c.diagnosticArchivePath, diagnostics); err != nil {
 		c.Limit(topologyDiagnosticArchiveFailureLogKey, 1, topologyRefreshWarningEvery).
 			Warningf("failed to publish SNMP topology diagnostic archive: %v", err)
+		return false
 	}
+	return meaningful
 }

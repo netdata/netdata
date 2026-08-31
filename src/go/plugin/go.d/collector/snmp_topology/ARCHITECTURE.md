@@ -129,10 +129,16 @@ option. Retryable client-construction, connection, and collection warnings use
 the logger's built-in hourly limiter keyed by registration ID and
 bounded failure class; warning suppression does not change retry timing.
 
-After the initial refresh completes, `Run(ctx)` starts one diagnostic publisher. It writes immediately and then every
-`max(update_every, refresh_every)`, acquiring the current immutable diagnostic cut itself. The publisher is independent
-of the refresh loop, so compression and filesystem I/O do not hold `refreshMu` or delay collection and Function readers.
-Slow writes serialize in the one publisher goroutine, and the timer naturally coalesces missed periods without a queue.
+After the initial refresh completes, `Run(ctx)` starts one diagnostic publisher. It writes the current state immediately.
+If that archive does not yet contain a normal-SNMP lifecycle registration, each completed refresh can wake the publisher
+through one coalesced signal. Empty snapshots and failed writes remain eligible for a later refresh; the early path stops
+after a successful archive contains at least one lifecycle registration, even when that job is not topology-ready. The
+early wakeup does not replace the file while the lifecycle cut is still empty. The publisher then writes only every
+`max(update_every, refresh_every)`.
+
+The publisher acquires the current immutable diagnostic cut itself. It is independent of the refresh loop, so compression
+and filesystem I/O do not hold `refreshMu` or delay collection and Function readers. Slow writes serialize in the one
+publisher goroutine, and both refresh and timer wakeups coalesce without an archive or snapshot queue.
 
 The publisher owns one file below the Agent VarLib directory:
 

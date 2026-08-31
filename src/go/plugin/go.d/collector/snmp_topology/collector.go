@@ -169,10 +169,11 @@ func (c *Collector) Run(ctx context.Context) error {
 
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
+	diagnosticArchiveRefreshes := make(chan struct{}, 1)
 	publisherDone := make(chan struct{})
 	go func() {
 		defer close(publisherDone)
-		c.runTopologyDiagnosticArchivePublisher(ctx)
+		c.runTopologyDiagnosticArchivePublisher(ctx, diagnosticArchiveRefreshes)
 	}()
 	defer func() { <-publisherDone }()
 
@@ -186,6 +187,10 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
 			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
+			select {
+			case diagnosticArchiveRefreshes <- struct{}{}:
+			default:
+			}
 		}
 	}
 }

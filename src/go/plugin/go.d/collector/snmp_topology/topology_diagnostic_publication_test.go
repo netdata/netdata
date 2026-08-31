@@ -140,7 +140,8 @@ func TestWriteTopologyDiagnosticArchiveFileRemovesStaleTemporaryFile(t *testing.
 
 func TestRunTopologyDiagnosticArchivePublisherPublishesImmediatelyAndSerially(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	ticks := make(chan time.Time, 1)
+	ticks := make(chan time.Time)
+	refreshes := make(chan struct{}, 1)
 	started := make(chan struct{}, 2)
 	release := make(chan struct{}, 2)
 	done := make(chan struct{})
@@ -150,7 +151,7 @@ func TestRunTopologyDiagnosticArchivePublisherPublishesImmediatelyAndSerially(t 
 
 	go func() {
 		defer close(done)
-		runTopologyDiagnosticArchivePublisher(ctx, ticks, func() {
+		runTopologyDiagnosticArchivePublisher(ctx, ticks, refreshes, func(bool) bool {
 			calls.Add(1)
 			current := active.Add(1)
 			for {
@@ -162,6 +163,7 @@ func TestRunTopologyDiagnosticArchivePublisherPublishesImmediatelyAndSerially(t 
 			started <- struct{}{}
 			<-release
 			active.Add(-1)
+			return calls.Load() > 1
 		})
 	}()
 
@@ -170,10 +172,10 @@ func TestRunTopologyDiagnosticArchivePublisherPublishesImmediatelyAndSerially(t 
 	case <-time.After(time.Second):
 		t.Fatal("initial publication did not start")
 	}
-	ticks <- time.Now()
+	refreshes <- struct{}{}
 	select {
-	case ticks <- time.Now():
-		t.Fatal("more than one timer event must not queue while publication is blocked")
+	case refreshes <- struct{}{}:
+		t.Fatal("more than one refresh event must not queue while publication is blocked")
 	default:
 	}
 	release <- struct{}{}
@@ -199,9 +201,43 @@ func TestRunTopologyDiagnosticArchivePublisherDoesNotPublishAfterCancellation(t 
 	cancel()
 	var calls atomic.Int32
 
-	runTopologyDiagnosticArchivePublisher(ctx, make(chan time.Time), func() { calls.Add(1) })
+	runTopologyDiagnosticArchivePublisher(ctx, make(chan time.Time), make(chan struct{}), func(bool) bool {
+		calls.Add(1)
+		return true
+	})
 
 	require.Zero(t, calls.Load())
+}
+
+func TestRunTopologyDiagnosticArchivePublisherRetriesRefreshesUntilMeaningfulSuccess(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ticks := make(chan time.Time)
+	refreshes := make(chan struct{}, 1)
+	called := make(chan publicationCall, 4)
+	var calls atomic.Int32
+
+	go runTopologyDiagnosticArchivePublisher(ctx, ticks, refreshes, func(requireMeaningful bool) bool {
+		call := int(calls.Add(1))
+		called <- publicationCall{number: call, requireMeaningful: requireMeaningful}
+		return call == 3
+	})
+
+	require.Equal(t, publicationCall{number: 1}, receivePublicationCall(t, called))
+	refreshes <- struct{}{}
+	require.Equal(t, publicationCall{number: 2, requireMeaningful: true}, receivePublicationCall(t, called))
+	refreshes <- struct{}{}
+	require.Equal(t, publicationCall{number: 3, requireMeaningful: true}, receivePublicationCall(t, called))
+
+	refreshes <- struct{}{}
+	select {
+	case call := <-called:
+		t.Fatalf("refresh publication remained enabled after meaningful success: call %d", call.number)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	ticks <- time.Now()
+	require.Equal(t, publicationCall{number: 4}, receivePublicationCall(t, called))
 }
 
 func TestCollectorDiagnosticArchiveEveryUsesEffectiveRefreshCadence(t *testing.T) {
@@ -226,9 +262,10 @@ func TestPublishTopologyDiagnosticArchiveDoesNotUseRefreshLock(t *testing.T) {
 	coll.refreshMu.Lock()
 	defer coll.refreshMu.Unlock()
 	done := make(chan struct{})
+	meaningful := make(chan bool, 1)
 	go func() {
 		defer close(done)
-		coll.publishTopologyDiagnosticArchiveRecovering()
+		meaningful <- coll.publishTopologyDiagnosticArchiveRecovering(false)
 	}()
 
 	select {
@@ -241,6 +278,30 @@ func TestPublishTopologyDiagnosticArchiveDoesNotUseRefreshLock(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("diagnostic publication did not complete")
 	}
+	require.False(t, <-meaningful)
+}
+
+func TestPublishTopologyDiagnosticArchiveReportsOnlyMeaningfulSuccessfulWrites(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	var writes atomic.Int32
+	coll.publishDiagnosticArchiveFile = func(string, topologyDiagnostics) error {
+		writes.Add(1)
+		return nil
+	}
+
+	require.False(t, coll.publishTopologyDiagnosticArchiveRecovering(false))
+	require.EqualValues(t, 1, writes.Load())
+	require.False(t, coll.publishTopologyDiagnosticArchiveRecovering(true))
+	require.EqualValues(t, 1, writes.Load())
+
+	store.RegisterJob("job", ddsnmp.DeviceLifecycleInfo{Hostname: "switch.example"})
+	require.True(t, coll.publishTopologyDiagnosticArchiveRecovering(true))
+	require.EqualValues(t, 2, writes.Load())
+
+	coll.publishDiagnosticArchiveFile = func(string, topologyDiagnostics) error {
+		return errors.New("write failed")
+	}
+	require.False(t, coll.publishTopologyDiagnosticArchiveRecovering(true))
 }
 
 func TestCollectorStartsDiagnosticPublisherAfterInitialRefresh(t *testing.T) {
@@ -291,6 +352,37 @@ func TestCollectorStartsDiagnosticPublisherAfterInitialRefresh(t *testing.T) {
 	}
 }
 
+func TestCollectorPublishesFirstLifecycleRegistrationAfterRefresh(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	coll.UpdateEvery = 1
+	coll.RefreshEvery = confopt.LongDuration(time.Hour)
+	published := make(chan topologyDiagnostics, 4)
+	coll.publishDiagnosticArchiveFile = func(_ string, diagnostics topologyDiagnostics) error {
+		published <- diagnostics
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- coll.Run(ctx) }()
+
+	initial := receivePublishedDiagnostics(t, published)
+	require.Empty(t, initial.lifecycle.cut.Entries)
+
+	store.RegisterJob("job", ddsnmp.DeviceLifecycleInfo{Hostname: "switch.example"})
+	meaningful := receivePublishedDiagnostics(t, published)
+	require.Len(t, meaningful.lifecycle.cut.Entries, 1)
+	require.False(t, meaningful.lifecycle.cut.Entries[0].TopologyReady)
+
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("collector did not stop")
+	}
+}
+
 func publicationTestDiagnostics(sequence uint64) topologyDiagnostics {
 	return topologyDiagnostics{
 		lifecycle: topologyJobLifecycleDiagnosticCut{
@@ -311,4 +403,31 @@ func requirePreviousDiagnosticArchive(t *testing.T, path string, want []byte) {
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(want, got))
 	require.NoFileExists(t, path+".tmp")
+}
+
+type publicationCall struct {
+	number            int
+	requireMeaningful bool
+}
+
+func receivePublicationCall(t *testing.T, calls <-chan publicationCall) publicationCall {
+	t.Helper()
+	select {
+	case call := <-calls:
+		return call
+	case <-time.After(time.Second):
+		t.Fatal("diagnostic publication did not run")
+		return publicationCall{}
+	}
+}
+
+func receivePublishedDiagnostics(t *testing.T, published <-chan topologyDiagnostics) topologyDiagnostics {
+	t.Helper()
+	select {
+	case diagnostics := <-published:
+		return diagnostics
+	case <-time.After(2 * time.Second):
+		t.Fatal("diagnostic archive was not published")
+		return topologyDiagnostics{}
+	}
 }
