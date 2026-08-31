@@ -164,6 +164,9 @@
 - Regenerate integrations docs ([#23672](https://github.com/netdata/netdata/issues/23672))
 - Build(go): raise main toolchain baseline to 1.27 ([#23679](https://github.com/netdata/netdata/issues/23679))
 - Feat(go.d/snmp_topology): add portable diagnostic archive ([#23680](https://github.com/netdata/netdata/issues/23680))
+- Feat(go.d/snmp_topology): add archive diagnostic tool ([#23682](https://github.com/netdata/netdata/issues/23682))
+- Add permanent SNMP troubleshooting data workflow ([#23681](https://github.com/netdata/netdata/issues/23681))
+- Regenerate integrations docs ([#23686](https://github.com/netdata/netdata/issues/23686))
 
 ## [2.11.0] - 2026-08-12
 
