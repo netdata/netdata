@@ -1970,7 +1970,20 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             continue;
         }
 
-        if(cache->config.pgc_save_init_cb)
+        // Only for a non-empty batch. The gate above is
+        // `all_of_them || pages_added == optimal_flush_size`, so on the all_of_them path
+        // (datafile rotation, shutdown) pages_added can be 0 - the loop above only adds pages
+        // that win page_acquire() and page_transition_trylock().
+        //
+        // The init callback is what tells the user "a flush is starting", and main_cache pairs
+        // it with ctx->atomic.extents_currently_being_flushed, which is only ever decremented
+        // per COMPLETED extent write. Its save callback returns immediately for an empty batch
+        // and cannot rebalance the counter itself, because it recovers ctx from
+        // entries_array[0].section. The increment would leak, and datafile rotation
+        // (datafile.c) and shutdown (rrdengine.c) both wait on that counter forever.
+        //
+        // A batch of zero pages is not a flush.
+        if(cache->config.pgc_save_init_cb && pages_added)
             cache->config.pgc_save_init_cb(cache, last_section);
 
         pgc_queue_unlock(cache, &cache->dirty);
