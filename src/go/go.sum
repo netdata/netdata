@@ -23,8 +23,8 @@ github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0 h1:blbWEpcs
 github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0/go.mod h1:jWOswzu+YEJ01Csz2ZUir7KecMjHJNYwxufLqAYi+ls=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.10.0 h1:+1fJwTilk/X7inNqwREnYEOgFCdg8ut7GULxARDbu34=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.10.0/go.mod h1:EGwSLlGqrrfYQhtCi9JcIkPQKl9WxsL6ZPJd+63Vy1A=
-github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.4.0 h1:E4MgwLBGeVB5f2MdcIVD3ELVAWpr+WD6MUe1i+tM/PA=
-github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.4.0/go.mod h1:Y2b/1clN4zsAoUd/pgNAQHjLDnTis/6ROkUfyob6psM=
+github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.5.0 h1:MaKvxE6D0KkjOg6Wd9M00iqP5PR0kUxCfiezes4JweM=
+github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.5.0/go.mod h1:i2h9fsTFKZorh8RdV2IcSUf/Qj98GlTkrTvUbX/s8as=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0 h1:nCYfgcSyHZXJI8J0IWE5MsCGlb2xp9fJiXyxWgmOFg4=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0/go.mod h1:ucUjca2JtSZboY8IoUqyQyuuXvwbMBVwFOm0vdQPNhA=
 github.com/Azure/go-ntlmssp v0.1.1 h1:l+FM/EEMb0U9QZE7mKNEDw5Mu3mFiaa2GKOoTSsNDPw=
@@ -357,8 +357,8 @@ github.com/mdlayher/netlink v1.11.2 h1:HKh2jqe+omdSWcQ88nrT7INE61B0NXfiSPFdgL4Yb
 github.com/mdlayher/netlink v1.11.2/go.mod h1:uT2Yc/QLaZubzDpZIBi9d4GoeLwtp3x1AMeqSRrK2sA=
 github.com/mdlayher/socket v0.6.0 h1:ScZPaAGyO1icQnbFrhPM8mnXyMu9qukC1K4ZoM2IQKU=
 github.com/mdlayher/socket v0.6.0/go.mod h1:q7vozUAnxSqnjHc12Fik5yUKIzfZ8ITCfMkhOtE9z18=
-github.com/microsoft/go-mssqldb v1.10.0 h1:pHEt+Qz6YFPWqREq10mqSE524QQo+/QremwTCQht7TY=
-github.com/microsoft/go-mssqldb v1.10.0/go.mod h1:mnG7lGa9iYJbzJqGCXyuQCegStKMr3kogDLD6+bmggg=
+github.com/microsoft/go-mssqldb v1.11.0 h1:YbDqolEjGH9hBfvKzONTf5/dbl9RKXmizMJE93lVxNs=
+github.com/microsoft/go-mssqldb v1.11.0/go.mod h1:goQLDOPlMN/l1REhnNPElMoY/yX+fUWn1+7UoFJPH9Y=
 github.com/miekg/dns v1.1.73 h1:uhT8nJxmTrPJYClxVxTCX+CVn6qnzSiybRk72Z6DgrE=
 github.com/miekg/dns v1.1.73/go.mod h1:RW2Obtfd5NZHvOFe3zYG0W8koWOQtAzyHaLo8vASBuQ=
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721 h1:RlZweED6sbSArvlE924+mUcZuXKLBHA35U7LN621Bws=
