@@ -212,7 +212,7 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 	}
 	scheduler, err := NewScheduler(testModuleReconciler{})
 	require.NoError(t, err)
-	require.NoError(t, scheduler.bindAutoDetectionRetries(
+	require.NoError(t, scheduler.bindBackgroundWorkers(
 		commands,
 		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 			return jobmgr.WorkPlan{}, nil
@@ -240,8 +240,8 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 	}
 	commands.waitForSubmissions(t, 1)
 	close(release)
-	scheduler.StopAutoDetectionRetries()
-	require.NoError(t, scheduler.WaitAutoDetectionRetries(context.Background()))
+	scheduler.StopBackgroundWorkers()
+	require.NoError(t, scheduler.WaitBackgroundWorkers(context.Background()))
 	require.True(t, scheduler.retries.joined() && scheduler.pending.joined())
 }
 
@@ -421,9 +421,26 @@ func (adrtc *autoDetectionRetryTestCommands) SubmitPrepared(
 	request jobmgr.Request,
 	plan jobmgr.WorkPlan,
 ) error {
+	return adrtc.submit(request, plan, false)
+}
+
+func (adrtc *autoDetectionRetryTestCommands) SubmitPreparedAndWait(
+	_ context.Context,
+	request jobmgr.Request,
+	plan jobmgr.WorkPlan,
+) error {
+	return adrtc.submit(request, plan, true)
+}
+
+func (adrtc *autoDetectionRetryTestCommands) submit(
+	request jobmgr.Request,
+	plan jobmgr.WorkPlan,
+	waited bool,
+) error {
 	adrtc.mu.Lock()
 	adrtc.submitted = append(adrtc.submitted, request)
 	adrtc.plans = append(adrtc.plans, plan)
+	adrtc.waited = adrtc.waited || waited
 	if adrtc.notify == nil {
 		adrtc.notify = make(chan struct{}, 1)
 	}
@@ -439,17 +456,6 @@ func (adrtc *autoDetectionRetryTestCommands) SubmitPrepared(
 		<-block
 	}
 	return err
-}
-
-func (adrtc *autoDetectionRetryTestCommands) SubmitPreparedAndWait(
-	context.Context,
-	jobmgr.Request,
-	jobmgr.WorkPlan,
-) error {
-	adrtc.mu.Lock()
-	adrtc.waited = true
-	adrtc.mu.Unlock()
-	return nil
 }
 
 func (adrtc *autoDetectionRetryTestCommands) snapshot() ([]jobmgr.Request, []jobmgr.WorkPlan, bool) {

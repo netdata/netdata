@@ -708,6 +708,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
             pgc_open_add_hot_page(
                 (Word_t)ctx,
                 descr->metric_id,
+                descr->uuid_id,
                 (time_t)(descr->start_time_ut / USEC_PER_SEC),
                 (time_t)(descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,
@@ -1275,7 +1276,10 @@ static time_t find_uuid_first_time(
         if (no_signal_received) {
             time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
 
-            if (journal_start_time_s < global_first_time_s)
+            // same as journalfile_v2_populate_retention_to_mrg(): a zero header
+            // start time means the journal has no metrics, not that its
+            // retention starts at the epoch
+            if (journal_start_time_s > 0 && journal_start_time_s < global_first_time_s)
                 global_first_time_s = journal_start_time_s;
 
             size_t metric_offset = j2_header->metric_offset;

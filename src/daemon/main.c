@@ -226,6 +226,7 @@ int websocket_compression_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
+int stream_conf_unittest(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
@@ -245,6 +246,9 @@ int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
 int stream_path_json_unittest(void);
+#ifdef OS_WINDOWS
+int perflib_storage_unittest(void);
+#endif
 int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
 int exporting_json_connector_unittest(void);
@@ -477,6 +481,7 @@ int netdata_main(int argc, char **argv) {
 
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
+                            if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
@@ -500,6 +505,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_windows_virt_normalize()) return 1;
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
+                            if (perflib_storage_unittest()) return 1;
 #endif
 
                             // No call to load the config file on this code-path

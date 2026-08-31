@@ -4,14 +4,166 @@ package ddsnmpcollector
 
 import (
 	"fmt"
+	"maps"
 	"runtime"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
+
+type benchmarkTopologySNMPHandler struct {
+	gosnmp.Handler
+	pdus []gosnmp.SnmpPDU
+}
+
+type benchmarkAcquisitionProjection struct {
+	report AcquisitionProfileReport
+	values []benchmarkAcquisitionTopologyValue
+}
+
+type benchmarkAcquisitionTopologyValue struct {
+	kind ddsnmp.TopologyKind
+	tags map[string]string
+}
+
+func (p *benchmarkAcquisitionProjection) ObserveProfile(
+	report AcquisitionProfileReport,
+	metrics *ddsnmp.ProfileMetrics,
+) {
+	p.report = report
+	p.values = nil
+	if metrics == nil {
+		return
+	}
+	p.values = make([]benchmarkAcquisitionTopologyValue, 0, len(metrics.TopologyMetrics))
+	for _, metric := range metrics.TopologyMetrics {
+		p.values = append(p.values, benchmarkAcquisitionTopologyValue{
+			kind: metric.TopologyKind,
+			tags: maps.Clone(metric.Tags),
+		})
+	}
+}
+
+func benchmarkAcquisitionObserverModes() []struct {
+	name string
+	new  func() AcquisitionObserver
+} {
+	return []struct {
+		name string
+		new  func() AcquisitionObserver
+	}{
+		{name: "nil", new: func() AcquisitionObserver { return nil }},
+		{name: "noop", new: func() AcquisitionObserver {
+			return AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})
+		}},
+		{name: "projection", new: func() AcquisitionObserver { return &benchmarkAcquisitionProjection{} }},
+	}
+}
+
+func (h *benchmarkTopologySNMPHandler) Version() gosnmp.SnmpVersion {
+	return gosnmp.Version2c
+}
+
+func (h *benchmarkTopologySNMPHandler) BulkWalkAll(string) ([]gosnmp.SnmpPDU, error) {
+	return h.pdus, nil
+}
+
+func (h *benchmarkTopologySNMPHandler) MaxOids() int {
+	return 4096
+}
+
+func benchmarkTopologyProfile(ordinal int) *ddsnmp.Profile {
+	tableOID := fmt.Sprintf("1.3.6.1.4.1.99999.%d", ordinal+1)
+	return &ddsnmp.Profile{
+		SourceFile: fmt.Sprintf("benchmark-topology-%d.yaml", ordinal+1),
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{
+				{
+					Kind: ddsnmp.KindIfName,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  tableOID,
+							Name: fmt.Sprintf("benchmarkTable%d", ordinal+1),
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{
+								OID:  tableOID + ".1",
+								Name: fmt.Sprintf("benchmark_value_%d", ordinal+1),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
+	for _, profileCount := range []int{1, 4} {
+		profiles := make([]*ddsnmp.Profile, 0, profileCount)
+		for i := range profileCount {
+			profiles = append(profiles, benchmarkTopologyProfile(i))
+		}
+		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
+			b.Run(fmt.Sprintf("profiles=%d/observer=%s", profileCount, mode.name), func(b *testing.B) {
+				cfg := Config{
+					SnmpClient:                 &benchmarkTopologySNMPHandler{},
+					Profiles:                   profiles,
+					Log:                        logger.New(),
+					InitialAcquisitionObserver: mode.new(),
+				}
+				b.ReportAllocs()
+				for b.Loop() {
+					collector := New(cfg)
+					runtime.KeepAlive(collector)
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkCollector_InitialCollectTopologyRows(b *testing.B) {
+	const columnOID = "1.3.6.1.4.1.99999.1.1"
+
+	for _, rowCount := range []int{0, 256, 4096} {
+		pdus := make([]gosnmp.SnmpPDU, 0, rowCount)
+		for i := range rowCount {
+			oid := fmt.Sprintf("%s.%d", columnOID, i+1)
+			pdus = append(pdus, createGauge32PDU(oid, uint(i+1)))
+		}
+		profile := benchmarkTopologyProfile(0)
+		for _, mode := range benchmarkAcquisitionObserverModes() {
+			b.Run(fmt.Sprintf("rows=%d/observer=%s", rowCount, mode.name), func(b *testing.B) {
+				log := logger.New()
+				b.ReportAllocs()
+				b.ReportMetric(float64(rowCount), "rows/op")
+				for b.Loop() {
+					observer := mode.new()
+					collector := New(Config{
+						SnmpClient:                 &benchmarkTopologySNMPHandler{pdus: pdus},
+						Profiles:                   []*ddsnmp.Profile{profile},
+						Log:                        log,
+						InitialAcquisitionObserver: observer,
+					})
+					results, err := collector.Collect()
+					topologyCount := -1
+					if len(results) == 1 {
+						topologyCount = len(results[0].TopologyMetrics)
+					}
+					if err != nil || topologyCount != rowCount {
+						b.Fatalf("collection: profiles=%d topology_metrics=%d err=%v", len(results), topologyCount, err)
+					}
+					runtime.KeepAlive(results)
+					runtime.KeepAlive(observer)
+				}
+			})
+		}
+	}
+}
 
 func BenchmarkTableCollector_OrganizeRowsByCacheEligibility(b *testing.B) {
 	const (

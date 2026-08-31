@@ -1,0 +1,1 @@
+integrations/s3_compatible_object_storage.md

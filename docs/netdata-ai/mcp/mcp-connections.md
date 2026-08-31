@@ -155,4 +155,6 @@ Reports do not yet include a tool-call trace.
 
 ### Which IP addresses does Netdata connect from?
 
-If your MCP endpoint is behind an IP allowlist, contact support for Netdata Cloud's current outbound addresses.
+If your MCP endpoint is behind an IP allowlist, see
+[Netdata Cloud Outbound IP Addresses](/docs/netdata-cloud/netdata-cloud-outbound-ips.md) for the published list and how
+to consume it.

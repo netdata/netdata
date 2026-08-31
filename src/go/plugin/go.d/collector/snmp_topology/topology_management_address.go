@@ -87,7 +87,7 @@ func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topol
 	return append(addrs, addr)
 }
 
-func (c *topologyCache) appendLocalManagementAddress(addr topologymodel.ManagementAddress) {
+func (c *topologyBuilder) appendLocalManagementAddress(addr topologymodel.ManagementAddress) {
 	if c == nil {
 		return
 	}

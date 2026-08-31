@@ -75,23 +75,199 @@ struct _stream_receive stream_receive = {
     }
 };
 
-void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
+typedef struct {
+    bool enabled;
+    bool automatic;
+    uint32_t idle_s;
+} STREAM_RECEIVER_KEEPALIVE_CONFIG;
+
+static bool stream_conf_duration_is_explicit_zero(const char *value) {
+    const char *s = value;
+    while(isspace((uint8_t)*s))
+        s++;
+
+    if(!strcasecmp(s, "off") || !strcasecmp(s, "never"))
+        return true;
+
+    bool parsed_number = false;
+    while(*s) {
+        while(isspace((uint8_t)*s))
+            s++;
+        if(!*s || !strcasecmp(s, "ago"))
+            break;
+
+        char *end;
+        (void)str2ndd(s, &end);
+        if(end == s)
+            return false;
+
+        parsed_number = true;
+        for(const char *p = s; p < end && *p != 'e' && *p != 'E'; p++) {
+            if(*p >= '1' && *p <= '9')
+                return false;
+        }
+
+        s = end;
+        while(isspace((uint8_t)*s))
+            s++;
+        while(isalpha((uint8_t)*s))
+            s++;
+    }
+
+    return parsed_number;
+}
+
+static bool stream_conf_duration_has_ago_suffix(const char *value) {
+    const char *end = value + strlen(value);
+    while(end > value && isspace((uint8_t)end[-1]))
+        end--;
+
+    return end - value >= 3 && !strncasecmp(end - 3, "ago", 3);
+}
+
+static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_parse_receiver_keepalive(const char *value) {
+    STREAM_RECEIVER_KEEPALIVE_CONFIG parsed = {
+        .enabled = true,
+        .automatic = true,
+    };
+
+    if(!value || !strcasecmp(value, "auto"))
+        return parsed;
+
+    const char *trimmed = value;
+    while(isspace((uint8_t)*trimmed))
+        trimmed++;
+
+    int64_t ns;
+    if(*trimmed == '-' || !duration_parse(value, &ns, "s", "ns") || ns < 0)
+        return parsed;
+
+    bool explicit_zero = ns == 0 && stream_conf_duration_is_explicit_zero(value);
+    if(ns == 0 && !explicit_zero && stream_conf_duration_has_ago_suffix(value))
+        return parsed;
+
+    parsed.automatic = false;
+    if(explicit_zero) {
+        parsed.enabled = false;
+        return parsed;
+    }
+
+    uint64_t seconds = ns > 0 ? 1 + ((uint64_t)ns - 1) / NSEC_PER_SEC : 1;
+    parsed.idle_s = (uint32_t)MIN(
+        MAX(seconds, STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS),
+        STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS);
+    return parsed;
+}
+
+static STREAM_RECEIVER_KEEPALIVE_CONFIG stream_conf_resolve_receiver_keepalive(
+    struct config *config,
+    const char *api_key,
+    const char *machine_guid) {
+
+    const char *section = inicfg_exists(config, machine_guid, "tcp keepalive idle") ? machine_guid :
+        inicfg_exists(config, api_key, "tcp keepalive idle") ? api_key : NULL;
+    const char *value = section ? inicfg_get(config, section, "tcp keepalive idle", "auto") : "auto";
+    return stream_conf_parse_receiver_keepalive(value);
+}
+
+static void stream_conf_resolve_sender_compression_levels(
+    struct config *config,
+    ND_COMPRESSION_PROFILE profile,
+    int levels[COMPRESSION_ALGORITHM_MAX]) {
+
     switch(profile) {
         default:
         case ND_COMPRESSION_DEFAULT:
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]      = 3;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]       = 1;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]    = 3;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]      = 3;
+            levels[COMPRESSION_ALGORITHM_ZSTD]      = 3;
+            levels[COMPRESSION_ALGORITHM_LZ4]       = 1;
+            levels[COMPRESSION_ALGORITHM_BROTLI]    = 3;
+            levels[COMPRESSION_ALGORITHM_GZIP]      = 3;
             break;
 
         case ND_COMPRESSION_FASTEST:
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]      = 1;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]       = 9;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]    = 1;
-            stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]      = 1;
+            levels[COMPRESSION_ALGORITHM_ZSTD]      = 1;
+            levels[COMPRESSION_ALGORITHM_LZ4]       = 9;
+            levels[COMPRESSION_ALGORITHM_BROTLI]    = 1;
+            levels[COMPRESSION_ALGORITHM_GZIP]      = 1;
             break;
     }
+
+    levels[COMPRESSION_ALGORITHM_BROTLI] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "brotli compression level", levels[COMPRESSION_ALGORITHM_BROTLI]);
+    levels[COMPRESSION_ALGORITHM_ZSTD] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "zstd compression level", levels[COMPRESSION_ALGORITHM_ZSTD]);
+    levels[COMPRESSION_ALGORITHM_LZ4] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "lz4 compression acceleration", levels[COMPRESSION_ALGORITHM_LZ4]);
+    levels[COMPRESSION_ALGORITHM_GZIP] = (int)inicfg_get_number(
+        config, CONFIG_SECTION_STREAM, "gzip compression level", levels[COMPRESSION_ALGORITHM_GZIP]);
+}
+
+void stream_conf_set_sender_compression_levels(ND_COMPRESSION_PROFILE profile) {
+    stream_conf_resolve_sender_compression_levels(&stream_config, profile, stream_send.compression.levels);
+}
+
+int stream_conf_unittest(void) {
+    int errors = 0;
+
+    struct config config = APPCONFIG_INITIALIZER;
+    int levels[COMPRESSION_ALGORITHM_MAX] = { 0 };
+    stream_conf_resolve_sender_compression_levels(&config, ND_COMPRESSION_FASTEST, levels);
+    if(levels[COMPRESSION_ALGORITHM_ZSTD] != 1 || levels[COMPRESSION_ALGORITHM_LZ4] != 9 ||
+       levels[COMPRESSION_ALGORITHM_BROTLI] != 1 || levels[COMPRESSION_ALGORITHM_GZIP] != 1)
+        errors++;
+
+    inicfg_set(&config, CONFIG_SECTION_STREAM, "zstd compression level", "19");
+    stream_conf_resolve_sender_compression_levels(&config, ND_COMPRESSION_FASTEST, levels);
+    if(levels[COMPRESSION_ALGORITHM_ZSTD] != 19 || levels[COMPRESSION_ALGORITHM_LZ4] != 9)
+        errors++;
+
+    static const struct {
+        const char *value;
+        bool enabled;
+        bool automatic;
+        uint32_t idle_s;
+    } keepalive_tests[] = {
+        { "auto", true, true, 0 },
+        { "0", false, false, 0 },
+        { "0ms", false, false, 0 },
+        { "off", false, false, 0 },
+        { "never", false, false, 0 },
+        { "0.1ns", true, false, 30 },
+        { "-0.1ns", true, true, 0 },
+        { "0.1ns ago", true, true, 0 },
+        { "0.1nsago", true, true, 0 },
+        { "1e-400ns", true, false, 30 },
+        { "1e-400ns ago", true, true, 0 },
+        { "0e-400ns", false, false, 0 },
+        { "1ms", true, false, 30 },
+        { "2m", true, false, 120 },
+        { "2h", true, false, 3600 },
+        { "invalid", true, true, 0 },
+    };
+
+    for(size_t i = 0; i < _countof(keepalive_tests); i++) {
+        STREAM_RECEIVER_KEEPALIVE_CONFIG keepalive = stream_conf_parse_receiver_keepalive(keepalive_tests[i].value);
+        if(keepalive.enabled != keepalive_tests[i].enabled ||
+           keepalive.automatic != keepalive_tests[i].automatic ||
+           keepalive.idle_s != keepalive_tests[i].idle_s)
+            errors++;
+    }
+
+    inicfg_set(&config, "api", "tcp keepalive idle", "2m");
+    inicfg_set(&config, "machine", "tcp keepalive idle", "3m");
+    STREAM_RECEIVER_KEEPALIVE_CONFIG keepalive =
+        stream_conf_resolve_receiver_keepalive(&config, "api", "machine");
+    if(keepalive.automatic || !keepalive.enabled || keepalive.idle_s != 180)
+        errors++;
+
+    inicfg_free(&config);
+
+    if(errors)
+        fprintf(stderr, "STREAM CONF TESTS FAILED: %d error(s)\n", errors);
+    else
+        fprintf(stderr, "STREAM CONF TESTS PASSED\n");
+
+    return errors;
 }
 
 static void stream_conf_load_internal() {
@@ -190,22 +366,6 @@ void stream_conf_load() {
     stream_send.compression.enabled =
         inicfg_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable compression",
                               stream_send.compression.enabled);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "brotli compression level",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "zstd compression level",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "lz4 compression acceleration",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]);
-
-    stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP] = (int)inicfg_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "gzip compression level",
-        stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]);
 
     stream_send.parents.h2o = inicfg_get_boolean(
         &stream_config, CONFIG_SECTION_STREAM, "parent using h2o",
@@ -349,6 +509,12 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
                 &stream_config, machine_guid, "compression algorithms order",
                 inicfg_get(&stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
     }
+
+    STREAM_RECEIVER_KEEPALIVE_CONFIG keepalive =
+        stream_conf_resolve_receiver_keepalive(&stream_config, api_key, machine_guid);
+    config->tcp_keepalive.enabled = keepalive.enabled;
+    config->tcp_keepalive.automatic = keepalive.automatic;
+    config->tcp_keepalive.idle_s = keepalive.idle_s;
 }
 
 bool stream_conf_is_key_type(const char *api_key, const char *type) {

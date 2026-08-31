@@ -70,7 +70,7 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 	cache := newTestTopologyCache(dev)
 	cache.updateTopologyProfileTags(profileMetrics)
 	cache.ingestTopologyProfileMetrics(profileMetrics)
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	observation := cache.buildEngineObservation(cache.localDevice)
 	require.NotEmpty(t, observation.FDBEntries, "cache should retain collected FDB rows")
@@ -93,11 +93,11 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 	peer.localDevice.ChassisIDType = "macAddress"
 	peer.localDevice.Capabilities = []string{"bridge"}
 	peer.localDevice.Labels = map[string]string{"type": "switch"}
-	peer.finalizeTopologyCache()
+	peer.finalize()
 
 	registry := newTopologyRegistry()
-	registry.register(cache)
-	registry.register(peer)
+	publishTestTopologyBuilder(registry, cache)
+	publishTestTopologyBuilder(registry, peer)
 	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok, "default managed-fabric inference should render the collected cache")
 	require.GreaterOrEqual(t, testCountTopologyLinksByType(data.Links, "bridge"), 1,
@@ -150,7 +150,7 @@ func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
 
 	cache := newTestTopologyCache(dev)
 	cache.ingestTopologyProfileMetrics(profileMetrics)
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	observation := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, observation.ARPNDEntries, 1)

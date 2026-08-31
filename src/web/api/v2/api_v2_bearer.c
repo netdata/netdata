@@ -78,6 +78,10 @@ int bearer_get_token_json_response(BUFFER *wb, RRDHOST *host, const char *claim_
 
     nd_uuid_t uuid;
     time_t expires_s = bearer_create_token(&uuid, user_role, access, cloud_account_id, client_name);
+    if(!expires_s)
+        // the token could not be stored (the bearer tokens dictionary is being
+        // destroyed) - never hand out a token that was not registered
+        return nrpc_call_error(wb, "Failed to create a bearer token", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);

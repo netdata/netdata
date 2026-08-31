@@ -209,6 +209,54 @@ adaptation_contracts:
         unrelated sensor names that merely contain the source substring
       - each alert is installed as silent SHOULD policy because fixed temperature limits are workload- and vendor-dependent
       - unknown sensor families are intentionally not alerted by these rules
+  s3check_active_probe_stage:
+    preserved:
+      - categorical failure of a configured authenticated S3 lifecycle stage
+      - distinct stage identity and bounded payload-mismatch, visibility, deletion, cleanup, and timeout reasons
+      - cleanup failure remains visible after a successful functional path
+    differences:
+      - this is an active Netdata S3 probe rather than an upstream PromQL passive metric
+      - current stage state is evaluated on each health beat; no synthetic pending state is added
+      - raw provider errors, credentials, request IDs, and endpoint details are never labels
+  s3check_latency_objective:
+    preserved:
+      - client-vantage latency visibility for every successful lifecycle stage
+      - stage identity and operator-selected objective
+    differences:
+      - the threshold is explicit deployment policy rather than a universal source threshold
+      - failed or skipped requests do not raise a second latency incident
+      - the alert is silent until the operator enables and tunes the objective
+  s3check_multisite_phase_failure:
+    preserved:
+      - categorical inability to write, verify, reconcile, delete, or clean an explicitly configured route
+      - explicit source-site and destination-site identity
+      - dedicated payload-mismatch alert remains separate and non-duplicated
+    differences:
+      - endpoint, credential, reconciliation, cleanup, and restart failures notify by default
+      - RPO and delete-policy outcomes use their separate silent objectives
+      - raw provider errors, credentials, endpoints, request IDs, and payloads are never labels
+  s3check_multisite_payload_mismatch:
+    preserved:
+      - categorical correctness failure when a configured destination returns a different object
+      - explicit source-site and destination-site identity
+      - cleanup of both probe objects before a new directional probe starts
+    differences:
+      - client-visible payload digest is used instead of daemon replication success counters
+      - raw provider errors, credentials, endpoints, request IDs, and payloads are never labels
+  s3check_multisite_rpo:
+    preserved:
+      - source-write to destination-visibility objective for one explicit replication direction
+      - operator-selected RPO policy and silent default routing
+    differences:
+      - visibility is measured by an authenticated destination GET rather than sync telemetry
+      - polling spans bounded collection cycles and is abandoned at replication_timeout_ms
+  s3check_multisite_delete_propagation:
+    preserved:
+      - source-delete to destination-disappearance objective
+      - operator-selected policy and silent default routing
+    differences:
+      - the destination copy is explicitly removed after delete_timeout_ms so a probe cannot leak
+      - disabling verify_delete skips propagation measurement but never skips cleanup
 
 alerts:
   ceph_health_error:
@@ -2523,6 +2571,92 @@ netdata_extensions:
     fidelity: CORRECTED-INTENT
     owner: httpcheck
     context: httpcheck.status
+
+  s3check_stage_failed:
+    sow_id: RGW-M-05
+    reason: authenticated active S3 probe owns categorical PUT, GET integrity, LIST, DELETE,
+      and cleanup stage failure
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.stage_status
+    labels_policy: one stage instance with a bounded reason label
+    lookup: ''
+    calc: $failed
+    units: status
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: sysadmin
+    adaptation: s3check_active_probe_stage
+
+  s3check_stage_latency:
+    sow_id: RGW-S-11
+    reason: successful authenticated S3 stage latency is compared with the configured client-vantage
+      objective
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.stage_latency_status
+    labels_policy: one stage instance with a bounded reason label
+    lookup: ''
+    calc: $exceeded
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: silent
+    adaptation: s3check_latency_objective
+
+  s3check_multisite_phase_failed:
+    sow_id: RGW-M-05
+    reason: active multisite phase request, reconciliation, cleanup, or restart failure
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_phase_failure
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $failed
+    units: status
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: sysadmin
+    adaptation: s3check_multisite_phase_failure
+
+  s3check_multisite_payload_mismatch:
+    sow_id: RGW-M-11
+    reason: destination payload digest differs from the source probe payload
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_payload_mismatch
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $mismatch
+    units: status
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: sysadmin
+    adaptation: s3check_multisite_payload_mismatch
+
+  s3check_multisite_replication_rpo_breach:
+    sow_id: RGW-S-24
+    reason: source-write to destination-visibility exceeds the configured directional RPO
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_rpo_status
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $breached
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: silent
+    adaptation: s3check_multisite_rpo
+
+  s3check_multisite_delete_propagation_breach:
+    sow_id: RGW-S-25
+    reason: source-delete to destination-disappearance exceeds the configured objective
+    fidelity: NETDATA-ADAPTED
+    owner: s3check
+    context: s3check.multisite_delete_status
+    labels_policy: one source-site and destination-site route instance
+    lookup: ''
+    calc: $breached
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+    recipient: silent
+    adaptation: s3check_multisite_delete_propagation
 
   rgw_tls_certificate_expiring:
     sow_id: RGW-S-01

@@ -13,12 +13,102 @@ typedef enum __attribute__ ((__packed__)) {
     DICT_FLAG_QUEUED_FOR_DESTRUCTION = (1 << 1), // this dictionary is queued for delayed destruction
 } DICT_FLAGS;
 
-#define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_RELAXED) & (flag))
-#define dict_flag_set(dict, flag)   __atomic_or_fetch(&((dict)->flags), flag, __ATOMIC_RELAXED)
-#define dict_flag_clear(dict, flag) __atomic_and_fetch(&((dict)->flags), ~(flag), __ATOMIC_RELAXED)
+// These are __ATOMIC_SEQ_CST, not relaxed: DICT_FLAG_DESTROYED is one half of
+// the admission handshake with the in-flight counter below, and that handshake
+// is only provable if all four operations involved are sequentially consistent.
+// See the comment on dictionary_api_enter().
+#define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define dict_flag_set(dict, flag)   __atomic_or_fetch(&((dict)->flags), flag, __ATOMIC_SEQ_CST)
+#define dict_flag_clear(dict, flag) __atomic_and_fetch(&((dict)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
 // flags macros
 #define is_dictionary_destroyed(dict) dict_flag_check(dict, DICT_FLAG_DESTROYED)
+
+// ----------------------------------------------------------------------------
+// in-flight API callers
+//
+// referenced_items keeps ITEMS alive; this counter keeps the DICTIONARY OBJECT
+// alive. A thread inside the API - or blocked on one of the dictionary's own
+// locks - holds no item reference, so without this counter
+// dictionary_destroy() can free the DICTIONARY (and the locks inside it) from
+// under it. See dictionary_destroy() and dictionary_free_all_resources().
+//
+// Ordering: this is the store-buffer (Dekker) pattern over two objects, and it
+// is made safe by keeping ALL FOUR operations __ATOMIC_SEQ_CST, so that they
+// all appear in the single total order S the C memory model defines:
+//
+//   entering caller     destroy
+//   ---------------     -------
+//   1. RMW  inflight++  3. RMW  flags |= DESTROYED
+//   2. load flags       4. load inflight
+//
+// Proof that the two cannot miss each other: suppose the caller's load (2)
+// does not observe the flag, i.e. (2) precedes (3) in S. Sequentially
+// consistent operations respect program order in S, so
+// (1) < (2) < (3) < (4) in S. A SEQ_CST load reads the last preceding write in
+// S, so (4) observes the increment of (1) and destroy defers. Either the caller
+// is counted, or it sees the destroyed flag and bails out.
+//
+// This is why dict_flag_check() / dict_flag_set() are SEQ_CST and not relaxed:
+// with a relaxed flag access the argument above collapses. A SEQ_CST RMW is not
+// a fence in the C model - it does not order a later relaxed load of a
+// different object - so both sides could legally miss each other and destroy
+// would free the dictionary under an entering caller. No explicit
+// __atomic_thread_fence() is needed once every operation is SEQ_CST.
+//
+// Limit: this protects a caller that has already entered the API. It cannot
+// protect a caller holding a stale DICTIONARY * that has not entered yet -
+// destroy may read inflight == 0 and free the object a moment before that
+// caller increments it. That window is unclosable from inside the dictionary
+// (it needs a reference held by whoever owns the DICTIONARY *) and remains a
+// caller-ownership bug.
+//
+// Contract: every public function that takes one of the dictionary's own locks,
+// or that holds the dictionary object across a blocking point, must be
+// bracketed by dictionary_api_enter() / dictionary_api_exit(). That is the
+// exact race this closes: pass the destroyed check, then block on a lock inside
+// a struct that dictionary_destroy() already freed because it saw
+// inflight == 0.
+//
+// dictionary_destroy() is the one deliberate exception to that rule, and it
+// cannot be otherwise: bracketing it would count the destroying thread in
+// inflight, so its own recheck below would always observe a non-zero counter
+// and it could never take the immediate free path. It is instead SINGLE-OWNER
+// (dictionary.h) - exactly one thread ends a dictionary's life, externally
+// serialized against any other destroy of the same object. Two concurrent
+// destroys can both pass the destroyed-flag check, and one can free the object
+// while the other is blocked on ll_recursive_lock(); that is a
+// double-free-class caller error, in the same class as the stale-pointer case
+// above, and is likewise not detectable from inside the dictionary.
+//
+// Functions that only perform a single atomic load or add on the object
+// (dictionary_version(), dictionary_entries(), dictionary_referenced_items(),
+// dictionary_version_increment()) are deliberately not bracketed: they hold
+// nothing across a blocking point, so the bracket would close no window that
+// caller ownership does not already have to cover, and dictionary_api_enter()
+// itself is a plain atomic add of the same weight.
+//
+// The callback registration functions (dictionary_register_*_callback()) are
+// construction-time API; the rule is stated for callers in dictionary.h. They
+// write dict->hooks - and dict->options, with a non-atomic read-modify-write -
+// so they must be called before the dictionary is published to other threads.
+// enter/exit would not make them safe.
+//
+// The counter is incremented unconditionally, including for single-threaded
+// dictionaries. Testing DICT_OPTION_SINGLE_THREADED first would dereference the
+// dictionary before the caller is counted, widening the window above by the
+// length of that load, and would itself race the non-atomic dict->options
+// update in dictionary_register_conflict_callback(). One uncontended atomic RMW
+// is not worth either.
+#define dictionary_api_enter(dict) do {                                             \
+        __atomic_add_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);               \
+    } while(0)
+
+#define dictionary_api_exit(dict) do {                                              \
+        __atomic_sub_fetch(&((dict)->inflight), 1, __ATOMIC_SEQ_CST);               \
+    } while(0)
+
+#define dictionary_inflight(dict) __atomic_load_n(&((dict)->inflight), __ATOMIC_SEQ_CST)
 
 // configuration options macros
 #define is_dictionary_single_threaded(dict) ((dict)->options & DICT_OPTION_SINGLE_THREADED)
@@ -174,6 +264,7 @@ struct dictionary {
     int32_t entries;                   // how many items are currently in the index (the linked list may have more)
     int32_t referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
     int32_t pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
+    int32_t inflight;                  // how many threads are currently inside the dictionary API (see dictionary_inflight_enter)
 
 #ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_t global_pointer_registry_mutex;

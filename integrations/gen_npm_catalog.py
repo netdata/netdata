@@ -558,7 +558,20 @@ SNMP_TRAPS_SETUP = setup_block(
     }],
 )
 
-TROUBLESHOOTING = {'problems': {'list': []}}
+TROUBLESHOOTING = {
+    'problems': {
+        'list': [{
+            'name': 'Collect Live Data for Netdata Support',
+            'description':
+                'For missing SNMP metrics or incomplete SNMP-derived topology, follow '
+                "[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) "
+                "to create "
+                'a raw SNMP data archive that omits credentials and attach it to a '
+                'restricted Freshdesk ticket.',
+        }],
+    },
+}
+EMPTY_TROUBLESHOOTING = {'problems': {'list': []}}
 METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '', 'availability': [], 'scopes': []}
 
 
@@ -579,7 +592,7 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO
         },
         'overview': ov,
         'setup': setup if setup is not None else SETUP,
-        'troubleshooting': TROUBLESHOOTING,
+        'troubleshooting': TROUBLESHOOTING if module_name in ('snmp', 'snmp_topology') else EMPTY_TROUBLESHOOTING,
         'alerts': [],
         'metrics': metrics if metrics is not None else METRICS,
     }

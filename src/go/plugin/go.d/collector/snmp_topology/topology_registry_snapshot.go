@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
@@ -12,25 +11,10 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) snapshotEngineObservations() (topologymodel.ObservationSnapshot, bool) {
+func (c *topologyBuilder) buildObservationSnapshot() (topologymodel.ObservationSnapshot, bool) {
 	if c == nil {
 		return topologymodel.ObservationSnapshot{}, false
 	}
-
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if !c.hasFreshSnapshotAt(time.Now()) {
-		return topologymodel.ObservationSnapshot{}, false
-	}
-	if c.hasPreparedSnapshot {
-		return c.preparedSnapshot, true
-	}
-
-	return c.buildObservationSnapshotLocked()
-}
-
-func (c *topologyCache) buildObservationSnapshotLocked() (topologymodel.ObservationSnapshot, bool) {
 	local := normalizeTopologyDevice(c.localDevice)
 	localObservation := c.buildEngineObservation(local)
 	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)

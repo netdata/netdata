@@ -11,7 +11,7 @@ Live entrypoint: `${NETDATA_REPOS_DIR}/learn/ingest/ingest.py`.
 The legacy `ingest.js` and `ingest.md` at the learn-repo root
 are NOT the orchestrator -- ignore them.
 
-### Argument parsing (`ingest.py:2513-2762`)
+### Argument parsing (`ingest.py:3637-3915`)
 
 | Flag | Purpose |
 |---|---|
@@ -25,12 +25,23 @@ are NOT the orchestrator -- ignore them.
 | `--gh-token` | GitHub token for clones. |
 | `--use_plain_https` | Force HTTPS clone URLs (no SSH). |
 | `--ignore-on-prem-repo` | Skip `netdata-cloud-onprem` clone and ignore broken-link references to it. |
+| `--regenerate-grids-only` | Recover generated grids, categories, redirects, and sidebar positions from validated committed full-ingest state. |
+| `--kickstart-checksum CHECKSUM` | Supply the 32-character checksum for a full remote ingest. An explicit value takes precedence; when omitted with an explicit local `netdata` checkout, ingest derives it from that checkout's `packaging/installer/kickstart.sh`. |
 
-### The 16-step flow (`ingest.py:2513-3087`, `__main__`)
+### The 16-step flow (`ingest.py:3637-4253`, `__main__`)
 
-1. **Argument parsing**.
+1. **Argument parsing and checksum resolution**. A full ingest resolves the
+   kickstart checksum before cleanup:
+   - An explicit `--kickstart-checksum` must contain exactly 32 hexadecimal
+     characters and takes precedence over local derivation.
+   - Without the flag, an explicitly selected local `netdata` checkout must
+     contain a regular, non-symlinked
+     `packaging/installer/kickstart.sh`; ingest hashes that file.
+   - A full remote ingest without the flag exits before modifying output.
+   - `--regenerate-grids-only` validates committed full-ingest state and does
+     not resolve a checksum.
 
-2. **Cleanup** (`ingest.py:2766-2768`):
+2. **Cleanup** (`ingest.py:3917-3920`):
    - `unsafe_cleanup_folders('ingest-temp-folder')` -- wipes
      the work dir.
    - `safe_cleanup_learn_folders('docs')` -- walks
@@ -40,7 +51,7 @@ are NOT the orchestrator -- ignore them.
      hand-authored files** that should survive between runs.
      Currently only `docs/ask-nedi.mdx`.
 
-3. **Clone all repos** (`ingest.py:2776-2800`) into
+3. **Clone all repos** (`ingest.py:3928-3952`) into
    `ingest-temp-folder/<repo>/` with `--depth 1`. Each repo
    tracks the branch declared in `default_repos`
    (`ingest.py:74-105`). `--ignore-on-prem-repo` skips the
@@ -48,7 +59,7 @@ are NOT the orchestrator -- ignore them.
    `--local-repo X:/path` and `--repos /path/to/repo` use
    `shutil.copytree` for developer ergonomics.
 
-4. **Move + validate map** (`ingest.py:2802-2825`):
+4. **Move + validate map** (`ingest.py:3954-3977`):
    - `ingest-temp-folder/netdata/docs/.map/map.yaml` ->
      `./map.yaml`.
    - Validate against
@@ -57,23 +68,23 @@ are NOT the orchestrator -- ignore them.
      position assignment.
    - Schema failure -> exit code 2.
 
-5. **Enumerate markdowns** (`ingest.py:2828-2829`):
+5. **Enumerate markdowns** (`ingest.py:3979-3981`):
    `glob('ingest-temp-folder/**/*.md*')` plus dot-directories
-   (`fetch_markdown_from_repo`, `ingest.py:1207-1211`).
+   (`fetch_markdown_from_repo`, `ingest.py:2034-2047`).
 
-6. **Populate integrations** (`ingest.py:2832`): scan all
+6. **Populate integrations** (`ingest.py:3983-3984`): scan all
    markdowns for `INTEGRATION_MARKER`, parse hidden metadata,
    bucket by category, replace each `integration_placeholder`
    row in the map with sorted (by `learn_rel_path`,
    `sidebar_label`) integration rows. Writes the resulting
    tabular map to `ingest/generated_map.yaml`.
 
-7. **Sidebar position assignment** (`ingest.py:2838-2840`):
+7. **Sidebar position assignment** (`ingest.py:3989-3992`):
    `automate_sidebar_position` walks the (now expanded) map
    dataframe and assigns sibling-relative positions in steps
    of 10 within each parent scope, ordered by map traversal.
 
-8. **Inject metadata into source files** (`ingest.py:2842-2889`):
+8. **Inject metadata into source files** (`ingest.py:3994-4028`):
    for each markdown, look up its row by `custom_edit_url` and
    write the hidden metadata block at the top of the file. If
    `learn_status == Published`, compute the destination via
@@ -81,10 +92,10 @@ are NOT the orchestrator -- ignore them.
    ingestedRepo in `to_publish`, also inject `slug:` and
    `learn_link:` into the file. Otherwise file is dropped.
 
-9. **Path collision check** (`ingest.py:2891-2908`): warn if
+9. **Path collision check** (`ingest.py:4030-4059`): warn if
    any two `to_publish` entries collide case-insensitively.
 
-10. **Publish each file** (`ingest.py:2916-2919`):
+10. **Publish each file** (`ingest.py:4061-4070`):
     - `local_to_absolute_links(md_file, to_publish)` --
       convert relative/abs-from-repo-root markdown links into
       GitHub view URLs (rewritten in step 12).
@@ -93,48 +104,49 @@ are NOT the orchestrator -- ignore them.
     - `sanitize_page(learnPath)` -- runs MDX-escape transforms
       (see `mdx-rules.md`).
 
-11. **Build cross-reference dictionary** (`ingest.py:2925-2927`):
+11. **Build cross-reference dictionary** (`ingest.py:4072-4078`):
     `add_new_learn_path_key_to_dict` produces, for every
     published file, a map: GitHub-view-link AND
     GitHub-edit-link -> final `/docs/...` URL. Handles the
     duplicate-segment slug trim and explicit `slug:`
     overrides.
 
-12. **Rewrite GitHub links to Learn URLs** (`ingest.py:2929-2930`):
+12. **Rewrite GitHub links to Learn URLs** (`ingest.py:4080-4081`):
     `convert_github_links` walks every published file. Any
     `https://github.com/netdata/<repo>/blob/.../*.md` in the
     body that maps to a file in `to_publish` is rewritten to
     its final Learn URL. Header anchors are validated; broken
     anchors are accumulated. Links to integration md files
     that aren't in the map fall back to the parent README's
-    URL (`ingest.py:2153-2209`). Links to GitHub files that
+    URL (`ingest.py:3086-3101`). Links to GitHub files that
     exist in the repos but aren't in the map stay as GitHub
     links (intentional -- `file_exists_in_repos` at
-    `ingest.py:711-719`). Truly missing targets become
+    `ingest.py:1287-1295`). Truly missing targets become
     `UNCORRELATED_LINK_COUNTER` increments.
 
-13. **Generate redirects** (`ingest.py:2932`): see
+13. **Generate redirects** (`ingest.py:4083-4096`): see
     `redirects.md`.
 
-14. **Broken-link reporting** (`ingest.py:2940-3022`): print
+14. **Broken-link reporting** (`ingest.py:4103-4185`): print
     broken URLs grouped by repo, broken anchors grouped by
     repo, decide whether to exit 1 based on `--fail-links`
     flags.
 
-15. **Post-processing** (`ingest.py:3030-3065`):
+15. **Post-processing and recovery identity**:
     - Save current `(custom_edit_url -> new_learn_path)`
       mapping to `ingest/one_commit_back_file-dict.yaml` for
       next run's redirect diff.
-    - Cleanup `ingest-temp-folder` and `map.yaml`.
-    - `get_dir_make_file_and_recurse('./docs')` -- auto-create
-      grid pages for any integration directory that lacks an
-      overview.
-    - `ensure_category_json_for_dirs('docs')` -- write
-      `_category_.json` for any directory still without an
-      overview page.
-    - `normalize_sidebar_positions_by_parent('docs')` --
-      assign sibling positions deterministically per parent
-      scope.
+    - `apply_kickstart_checksum` requires exactly one placeholder in the
+      ingested Linux installation page and replaces it atomically.
+    - Cleanup `ingest-temp-folder`.
+    - `reconcile_generated_outputs` regenerates integration grids and owned
+      category files, normalizes sidebar positions, fixes Mermaid contrast,
+      and removes redirects whose targets no longer exist.
+    - `write_sidebar_order_state` records the map hash, normalized order, and
+      SHA-256 identity of the final non-generated documentation corpus. The
+      corpus therefore includes the resolved checksum rather than the source
+      placeholder.
+    - Remove the temporary `map.yaml` only after the recovery state is written.
 
 16. **No git push from the script.** The CI workflow handles
     `git add` / commit / PR.
@@ -142,7 +154,7 @@ are NOT the orchestrator -- ignore them.
 ### How content gets fetched
 
 `ingest.py` does NOT use the GitHub REST API for content. It
-clones full repos with `gitpython` (`ingest.py:1101-1137`), so
+clones full repos with `gitpython` (`ingest.py:1734-1776`), so
 there's no API rate-limit consideration in the live pipeline.
 (Legacy `ingest.js` did use the API; ignore it.)
 
@@ -160,7 +172,7 @@ Default at `ingest/ingest.py:74-105`:
 | `helmchart` | `netdata` | `master` | Kubernetes Helm chart docs. |
 
 Override at runtime: `--repos OWNER/REPO:BRANCH ...` or
-`--local-repo NAME:/path ...` (`ingest.py:2607-2613`).
+`--local-repo NAME:/path ...` (`ingest.py:3731-3737`).
 
 The legacy `ingest.js` listed only 4 repos (`netdata`, `.github`,
 `go.d.plugin`, `agent-service-discovery`). `go.d.plugin` is no
@@ -182,7 +194,7 @@ Python pipeline.
   in the LEARN repo (not in source repos -- those trigger
   ingest indirectly via the cron).
 
-### Steps (`ingest.yml:24-101`)
+### Steps
 
 1. Checkout (full history, `fetch-depth: 0`) using
    `secrets.GITHUB_TOKEN`.
@@ -191,20 +203,26 @@ Python pipeline.
 3. Python 3.13, install the hash-locked
    `${NETDATA_REPOS_DIR}/learn/.learn_environment/ingest-requirements.txt`
    with `python -m pip install --require-hashes`.
-4. **Run `python ingest/ingest.py --fail-links 2>&1`** --
+4. **Resolve the kickstart checksum** -- fetch Agent master's
+   `packaging/installer/kickstart.sh`, calculate its MD5 checksum, validate the
+   32-character hexadecimal result, and export it for ingestion.
+5. **Run `python ingest/ingest.py --fail-links --kickstart-checksum "$KICKSTART_CHECKSUM" 2>&1`** --
    captures output for issue creation, propagates exit code 1
    (broken links) into a workflow output but does NOT fail
-   the workflow on broken links (only on real errors,
-   `ingest.yml:65-77`).
-5. **Update kickstart checksum** -- fetches
-   `https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/kickstart.sh`,
-   MD5s it, replaces literal `@KICKSTART_CHECKSUM@` placeholder
-   in `docs/Netdata Agent/Installation/Linux/Linux.mdx`.
-6. **`peter-evans/create-pull-request@v6.0.1`** -- opens or
+   the workflow on broken links. Missing/incomplete final status and other
+   ingest failures stop the workflow.
+6. **Verify generated recovery state** -- snapshot every file under `docs/`
+   plus the generated map, sidebar state and checksum sidecar, and
+   `netlify.toml`; run `--regenerate-grids-only`; require an identical second
+   snapshot. This is the fixed-point gate that prevents full-ingest output and
+   committed recovery identity from drifting.
+7. **`peter-evans/create-pull-request@v8.1.1`** -- opens or
    updates a branch named `ingest` with title
    "Ingest New Documentation", labels `ingest, automation`. The
    PR is reviewed and merged manually by the team.
-7. If broken links were found, create or update a single open
+8. If the ingest PR was created or updated, dispatch the standalone rendered
+   link-integrity workflow against that exact PR head and base.
+9. If broken links were found, create or update a single open
    GitHub issue with label `broken-links`.
 
 ## CI: `${NETDATA_REPOS_DIR}/learn/.github/workflows/daily-learn-link-check.yml`
@@ -260,7 +278,8 @@ From within the learn repo:
 python3.13 -m venv venv && . venv/bin/activate
 python -m pip install --require-hashes -r .learn_environment/ingest-requirements.txt
 
-# Test against your local netdata clone.
+# Test against your local netdata checkout. Ingest derives the kickstart
+# checksum from this checkout before it records generated recovery state.
 python3 ingest/ingest.py --local-repo netdata:<repo> --ignore-on-prem-repo --fail-links-netdata
 
 # Then build the site locally.

@@ -204,8 +204,8 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 
 	// Merge in reverse so later extends override earlier ones while the
 	// current profile still keeps the highest precedence.
-	for i := len(mergedBases) - 1; i >= 0; i-- {
-		if err := prof.merge(mergedBases[i]); err != nil {
+	for _, mergedBase := range slices.Backward(mergedBases) {
+		if err := prof.merge(mergedBase); err != nil {
 			return nil, err
 		}
 	}
