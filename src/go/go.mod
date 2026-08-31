@@ -28,7 +28,7 @@ require (
 	github.com/axiomhq/hyperloglog v0.2.6
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
-	github.com/catonetworks/cato-go-sdk v0.3.3
+	github.com/catonetworks/cato-go-sdk v0.4.0
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
