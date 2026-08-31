@@ -873,12 +873,21 @@ self_update() {
   fi
 }
 
+# Parse the version into a (large) integer for easy comparison.
+#
+# The resultant integer consists of three groups of three digits encoding the major, minor, and patch versions,
+# followed by a single digit encoding the version type (0 for nightly builds and git builds based on a stable or
+# nightly version, 1 for release candidate builds, 2 for git builds based on a release candidate version, 3 for
+# stable versions, and 9 for unknown), three digits for the release candidate number (all zeroes if the build
+# isn’t a release candidate build), and five digits for the commit number for git builds (all zeroes if the
+# build isn’t a git build).
 parse_version() {
   r="${1}"
+  vmax="999999999999999999"
   if [ "${r}" = "latest" ]; then
     # If we get ‘latest’ as a version, return the largest possible
     # version value.
-    printf "999999999999999"
+    printf "%s" "${vmax}"
     return 0
   elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
@@ -888,10 +897,33 @@ parse_version() {
 
   tmpfile="$(mktemp)"
   echo "${r}" | tr '-' ' ' > "${tmpfile}"
-  read -r v b _ < "${tmpfile}"
+  read -r v b1 b2 _ < "${tmpfile}"
 
-  if echo "${b}" | grep -vEq "^[0-9]+$"; then
-    b="0"
+  if echo "${b1}" | grep -Eq "^rc[0-9]+$"; then
+    rc="$(echo "${b1}" | tr -d 'rc')"
+
+    if echo "${b2}" | grep -Eq "^[0-9]+$"; then
+      t=2
+      b="${b2}"
+    elif [ -z "${b2}" ]; then
+      t=1
+      b=0
+    else
+      t=9
+      b=99999
+    fi
+  elif echo "${b1}" | grep -Eq "^[0-9]+$"; then
+    t=0
+    rc=0
+    b="${b1}"
+  elif [ -z "${b1}" ]; then
+    t=3
+    rc=0
+    b=0
+  else
+    t=9
+    rc=999
+    b=99999
   fi
 
   echo "${v}" | tr '.' ' ' > "${tmpfile}"
@@ -899,7 +931,13 @@ parse_version() {
 
   rm -f "${tmpfile}"
 
-  printf "%04d%03d%03d%05d" "${maj}" "${min}" "${patch}" "${b}"
+  if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
+    warning "Failed to parse version ${r}"
+    printf "%s" "${vmax}"
+    return 0
+  fi
+
+  printf "%03d%03d%03d%01d%03d%05d" "${maj}" "${min}" "${patch}" "${t}" "${rc}" "${b}"
 }
 
 get_latest_tag() {
@@ -963,8 +1001,8 @@ update_available() {
     info "Update available"
 
     if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-      current_major="$(echo "${current_version}" | head -c 4)"
-      latest_major="$(echo "${latest_version}" | head -c 4)"
+      current_major="$(echo "${current_version}" | head -c 3)"
+      latest_major="$(echo "${latest_version}" | head -c 3)"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
@@ -1293,13 +1331,21 @@ update_binpkg() {
   elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
     RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
-  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]*0{5}$'; then # All five final digits are zero and at least one preceeding digit is non-zero.
-    RELEASE_CHANNEL="stable"
-  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]{0,4}$'; then # At least one of the final five digits is non-zero.
-    RELEASE_CHANNEL="nightly"
   else
-    RELEASE_CHANNEL="none"
-    warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+    case "$(echo "${initial_version}" | cut -c 10)" in
+      0)
+        RELEASE_CHANNEL="nightly"
+        repopkg="netdata-repo-edge"
+        ;;
+      3)
+        RELEASE_CHANNEL="stable"
+        repopkg="netdata-repo"
+        ;;
+      *)
+        RELEASE_CHANNEL="none"
+        warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+        ;;
+    esac
   fi
 
   if [ -n "${repo_path}" ]; then
@@ -1348,7 +1394,7 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(get_current_version | head -c 4 | awk '{ print $1 + 0 }')"
+  current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
   latest_major="$(get_new_binpkg_major)"
 
   # current_major == 0 means we could not determine the installed version
