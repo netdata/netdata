@@ -89,7 +89,7 @@ Every node and every aggregation point is a first-class citizen in Netdata Cloud
 
 Netdata Cloud unifies *access*, not the log streams: you open the Logs tab and select which node or aggregation point to explore, and the query runs on that machine's data. A query always returns entries from the selected point — an aggregation point already multiplexes its senders into one view, and distributed nodes answer for themselves.
 
-This means the operator's model is "decide where each system's logs converge, then select that point" — convergence planning replaces cluster scaling.
+This means the operator's model is "decide where each system's logs converge, then select that point" — each point serves only its own slice, so every point stays small and simple to operate.
 
 ## Choosing between journal centralization and OpenTelemetry
 

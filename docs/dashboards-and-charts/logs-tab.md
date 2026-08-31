@@ -1,6 +1,8 @@
-# Exploring Logs
+# Managing Logs
 
-The Logs tab provides a structured, searchable view of logs collected from across your infrastructure. Every log source uses the same explorer, so the workflow you learn on one operating system or pipeline applies to all of them.
+Netdata manages logs across your infrastructure — ingestion, storage, indexing, querying, and visualization — and the Logs tab is where you work with them. Every log source is managed and queried the same way, so the workflow you learn on one operating system or pipeline applies to all of them.
+
+This page covers how logs are organized (sources), how they are queried and explored, and how queries behave at scale. For the deployment architecture — where logs can live and how to centralize them — see [Logs Management](/docs/category-overview-pages/working-with-logs.md).
 
 ## Log sources
 
@@ -15,15 +17,15 @@ The Logs tab displays entries from the following sources, depending on the node'
 
 :::note
 
-On Linux systems without systemd (such as Alpine Linux), the `systemd-journal` source is unavailable. You can still make logs explorable by forwarding them to a remote `systemd-journal-remote` with [`systemd-cat-native --url`](/src/libnetdata/log/systemd-cat-native.md), or by using [OpenTelemetry log ingestion](/docs/opentelemetry/otlp-ingestion.md). See [Working with Logs](/docs/category-overview-pages/working-with-logs.md) for the full picture.
+On Linux systems without systemd (such as Alpine Linux), the `systemd-journal` source is unavailable. You can still make logs explorable by forwarding them to a remote `systemd-journal-remote` with [`systemd-cat-native --url`](/src/libnetdata/log/systemd-cat-native.md), or by using [OpenTelemetry log ingestion](/docs/opentelemetry/otlp-ingestion.md). See [Logs Management](/docs/category-overview-pages/working-with-logs.md) for the deployment options.
 
 :::
 
 Custom application logs from text files can appear under the journal or OpenTelemetry sources — see [Text Files to Journals](/docs/logs/text-files-to-journals.md).
 
-## The explorer
+## Querying and exploring logs
 
-### Sources selector
+### Sources and services
 
 Use the **Sources** selector on the right sidebar to choose what to query. The available values depend on the source:
 
@@ -80,7 +82,7 @@ Click ▶️ to stream newly received entries continuously, on single nodes and 
 
 ### Sampling at scale
 
-To stay responsive on very large datasets, the explorer samples:
+To stay responsive on very large datasets, the query engine samples:
 
 1. It fully evaluates the newest entries, up to a budget of 1,000,000 entries per query.
 2. Beyond the budget, entries are marked `[unsampled]` and counters become `[estimated]`.
@@ -106,6 +108,6 @@ The same function API that powers the Logs tab is used by Netdata AI assistants 
 
 ## Where to next
 
-- [Working with Logs](/docs/category-overview-pages/working-with-logs.md) — deployment patterns, centralization choices, and limitations.
+- [Logs Management](/docs/category-overview-pages/working-with-logs.md) — deployment architecture: where logs live, storage choices, centralization options, and current limitations.
 - [Text Files to Journals](/docs/logs/text-files-to-journals.md) — bring application log files into these sources.
 - [Logs Centralization Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md) — aggregate logs from many machines.

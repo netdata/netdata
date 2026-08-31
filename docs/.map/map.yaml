@@ -800,16 +800,16 @@ sidebar:
               description: A working syslog receiver configuration and how to make it durable.
   # Logs
   - meta:
-      label: Logs
+      label: Logs Management
       edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/working-with-logs.md
-      description: Operator's guide to logs with Netdata — keep logs fully distributed in native OS stores, or centralize them with OS-native transports or OpenTelemetry, and explore every source with the same tools.
-      keywords: [logs, systemd journal, windows events, macos logs, log2journal, opentelemetry, centralization, siem]
+      description: Logs management with Netdata — ingestion, storage, indexing, and querying of logs from native OS stores, text files, and OpenTelemetry, distributed or centralized.
+      keywords: [logs, logs management, systemd journal, windows events, macos logs, log2journal, opentelemetry, centralization, siem]
     items:
       - meta:
-          label: Exploring Logs
+          label: Managing Logs
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/logs-tab.md
-          description: One explorer for every log source — sources, field filters with counters, full-text search, histograms, live tail, and sampling at scale.
-          keywords: [logs, explorer, full-text search, facets, histogram, live tail, sampling]
+          description: How logs are organized, stored, queried, and explored in Netdata — sources, field filters with counters, full-text search, histograms, live tail, and sampling at scale.
+          keywords: [logs, management, full-text search, facets, histogram, live tail, sampling]
       - meta:
           label: Systemd Journal Logs
         items:
@@ -820,6 +820,24 @@ sidebar:
           - meta:
               label: Forward Secure Sealing (FSS) in Systemd-Journal
               edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md
+          - meta:
+              label: Logs Centralization Points
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md
+            items:
+              - meta:
+                  label: Passive journal centralization with encryption using self-signed certificates
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md
+              - meta:
+                  label: Passive journal centralization without encryption
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
+              - meta:
+                  label: Active journal source without encryption
+                  edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
+              - meta:
+                  label: Centralizing Journal Namespaces
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/centralizing-journal-namespaces.md
+                  description: Forward per-namespace systemd-journal logs to a central systemd-journal-remote server, including on systemd versions prior to 254.
+                  keywords: [systemd, journal, namespace, centralization, lognamespace]
       - meta:
           label: Windows Events Plugin Reference
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md
@@ -831,7 +849,7 @@ sidebar:
       - meta:
           label: Text Files to Journals
           edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/text-files-to-journals.md
-          description: Bring application text log files into Netdata — convert them to structured journal entries with log2journal, or ship them as OpenTelemetry logs, and when each path is the right one.
+          description: Bring application text log files under Netdata logs management — convert them to structured journal entries with log2journal, or ship them as OpenTelemetry logs, and when each path is the right one.
           keywords: [log2journal, systemd-cat-native, text logs, nginx logs, apache logs, json logs, siem]
         items:
           - meta:
@@ -842,25 +860,10 @@ sidebar:
               label: systemd-cat-native
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md
       - meta:
-          label: Logs Centralization Points
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md
+          label: Integrations
         items:
-          - meta:
-              label: Passive journal centralization with encryption using self-signed certificates
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md
-          - meta:
-              label: Passive journal centralization without encryption
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
-          - meta:
-              label: Active journal source without encryption
-              edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
-          - meta:
-              label: Centralizing Journal Namespaces
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/centralizing-journal-namespaces.md
-              description: Forward per-namespace systemd-journal logs to a central systemd-journal-remote server, including on systemd versions prior to 254.
-              keywords: [systemd, journal, namespace, centralization, lognamespace]
-      - type: integration_placeholder
-        integration_kind: logs
+          - type: integration_placeholder
+            integration_kind: logs
   # Live
   - meta:
       label: Live View

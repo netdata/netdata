@@ -101,10 +101,10 @@ expensive row-detail fields for entries that cannot be returned in the current p
 `bytes_read` counters report materialized message bytes, not every raw OSLog payload byte scanned.
 
 
-## Exploring the logs
+## Managing the logs
 
-The macOS Logs plugin uses the same explorer as every other log source in Netdata — field filters with counters,
-full-text search, per-field histograms, PLAY live tail, and sampling at scale. See [Exploring Logs](/docs/dashboards-and-charts/logs-tab.md) for the shared workflow.
+macOS logs are managed and queried the same way as every other log source in Netdata — field filters with counters,
+full-text search, per-field histograms, PLAY live tail, and sampling at scale. See [Managing Logs](/docs/dashboards-and-charts/logs-tab.md) for the shared workflow.
 
 ## FAQ
 

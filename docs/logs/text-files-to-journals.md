@@ -1,6 +1,6 @@
 # Text Files to Journals
 
-Applications that write plain text log files — web servers, legacy services, cron jobs — can be brought into the same Netdata log exploration experience as native OS logs. There are two bridges, and you can use both at the same time for different consumers.
+Applications that write plain text log files — web servers, legacy services, cron jobs — can be brought under Netdata logs management, alongside the native OS logs. There are two bridges, and you can use both at the same time for different consumers.
 
 ## Choose a bridge
 
@@ -36,7 +36,7 @@ The maintained recipes, including JSON lines and multiline parsing, live in [Col
 
 ## What you get either way
 
-Once the entries reach a journal or the OpenTelemetry store, the full explorer applies: field filters with counters, full-text search, per-field histograms, live tail, and sampling at scale — see [Exploring Logs](/docs/dashboards-and-charts/logs-tab.md).
+Once the entries reach a journal or the OpenTelemetry store, they are managed and queried like every other source: field filters with counters, full-text search, per-field histograms, live tail, and sampling at scale — see [Managing Logs](/docs/dashboards-and-charts/logs-tab.md).
 
 ## Reference documentation
 
