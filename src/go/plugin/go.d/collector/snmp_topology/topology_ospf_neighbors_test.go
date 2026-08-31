@@ -11,7 +11,7 @@ import (
 )
 
 func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.updateOSPFNeighbor(map[string]string{
 		tagOSPFNeighborRouterID: "0.0.0.0",
@@ -23,7 +23,7 @@ func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testi
 }
 
 func TestTopologyCache_MatchOSPFNeighborLocalInterfaceUsesLongestPrefix(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.l3InterfacesByIP = map[string]topologymodel.L3Interface{
 		"10.0.0.1": {
 			IP:      "10.0.0.1",

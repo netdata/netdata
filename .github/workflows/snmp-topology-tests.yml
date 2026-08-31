@@ -9,6 +9,7 @@ on:
       - 'src/go/plugin/go.d/collector/snmp/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'docs/npm/device-metrics/collect-snmp-troubleshooting-data.md'
       - 'src/go/pkg/topology/**'
       - 'src/go/pkg/l2topology/**'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'src/go/plugin/go.d/collector/snmp/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'docs/npm/device-metrics/collect-snmp-troubleshooting-data.md'
       - 'src/go/pkg/topology/**'
       - 'src/go/pkg/l2topology/**'
 
@@ -46,15 +48,16 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/snmpsim-data
           cp src/go/testdata/snmp/snmprec/arubaos-cx_10.10.snmprec /tmp/snmpsim-data/lldp1.snmprec
+          cp src/go/testdata/snmp/snmprec/arubaos-cx_10.10.snmprec /tmp/snmpsim-data/public.snmprec
           cp src/go/testdata/snmp/snmprec/aos6.snmprec /tmp/snmpsim-data/lldp2.snmprec
           cp src/go/testdata/snmp/snmprec/ciscosb_sg350x-24p.snmprec /tmp/snmpsim-data/cdp1.snmprec
 
-      - name: Start snmpsim
+      - name: Install test tools and start snmpsim
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y snmp
+          sudo apt-get install -y python3-yaml snmp
 
           docker run -d --name snmpsim-v2 -p 1161:161/udp -v /tmp/snmpsim-data:/usr/local/snmpsim/data tandrup/snmpsim:v0.4@sha256:a080b493042d91c4cec9282a83403e334660ed1c2c71e7e3afa920c3f1c42d7e
           docker run -d --name snmpsim-v3 -p 1162:161/udp -e EXTRA_FLAGS='--v3-only --v3-user=testuser --v3-auth-key=authpass1 --v3-auth-proto=MD5 --v3-priv-key=privpass1 --v3-priv-proto=AES' -v /tmp/snmpsim-data:/usr/local/snmpsim/data tandrup/snmpsim:v0.4@sha256:a080b493042d91c4cec9282a83403e334660ed1c2c71e7e3afa920c3f1c42d7e
@@ -80,6 +83,140 @@ jobs:
 
           wait_for_simulator snmpsim-v3 \
             snmpget -v3 -l authPriv -u testuser -a MD5 -A authpass1 -x AES -X privpass1 -n lldp1 127.0.0.1:1162 1.3.6.1.2.1.1.1.0
+
+      - name: Test SNMP troubleshooting data collector
+        run: python3 src/go/plugin/go.d/collector/snmp/tools/test_collect_snmp_troubleshooting_data.py -v
+
+      - name: Test troubleshooting collector on Python 3.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --volume "${PWD}:/workspace:ro" \
+            --workdir /workspace \
+            python:3.6-slim@sha256:2cfebc27956e6a55f78606864d91fe527696f9e32a724e6f9702b5f9602d0474 \
+            sh -c 'pip install --disable-pip-version-check PyYAML==5.3.1 && python src/go/plugin/go.d/collector/snmp/tools/test_collect_snmp_troubleshooting_data.py -v'
+
+      - name: Verify documented collector checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import re
+
+          script_path = 'src/go/plugin/go.d/collector/snmp/tools/collect-snmp-troubleshooting-data.py'
+          docs_path = 'docs/npm/device-metrics/collect-snmp-troubleshooting-data.md'
+          with open(script_path, 'rb') as handle:
+              actual = hashlib.sha256(handle.read()).hexdigest()
+          with open(docs_path, 'r') as handle:
+              match = re.search(r"SNMP_DIAG_SHA256='([0-9a-f]{64})'", handle.read())
+          if match is None:
+              raise SystemExit('documented SNMP_DIAG_SHA256 was not found')
+          if match.group(1) != actual:
+              raise SystemExit('documented SNMP collector checksum does not match the script')
+          PY
+
+      - name: Exercise collector against SNMPv2c and SNMPv3 fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="$(mktemp -d "${RUNNER_TEMP}/snmp-diagnostic.XXXXXX")"
+          mkdir -p "${test_root}/output" "${test_root}/extracted"
+          cat > "${test_root}/snmp.conf" <<'EOF'
+          jobs:
+            - name: fixture-v2c
+              hostname: 127.0.0.1
+              community: public
+              options:
+                version: 2c
+                port: 1161
+                timeout: 1
+                retries: 0
+            - name: fixture-v3
+              hostname: 127.0.0.1
+              options:
+                version: 3
+                port: 1162
+                timeout: 1
+                retries: 0
+              user:
+                name: testuser
+                level: authPriv
+                auth_proto: md5
+                auth_key: authpass1
+                priv_proto: aes
+                priv_key: privpass1
+                context_name: lldp1
+          EOF
+
+          set +e
+          python3 src/go/plugin/go.d/collector/snmp/tools/collect-snmp-troubleshooting-data.py \
+            --netdata-snmp-config "${test_root}/snmp.conf" \
+            --all-configured \
+            --yes \
+            --command-timeout 20 \
+            --output-dir "${test_root}/output"
+          collector_status=$?
+          set -e
+          test "${collector_status}" -eq 0 || test "${collector_status}" -eq 2
+
+          mapfile -t archives < <(find "${test_root}/output" -maxdepth 1 -type f -name '*.tar.gz' -print)
+          test "${#archives[@]}" -eq 1
+          tar -xzf "${archives[0]}" -C "${test_root}/extracted"
+          (
+            cd "${test_root}/extracted"
+            sha256sum --check manifest.sha256
+          )
+          awk -F '\t' '
+            NR == 1 { next }
+            $1 == "fixture-v2c" && $3 == "system" && $4 == "success" { v2c++ }
+            $1 == "fixture-v3" && $3 == "system" && $4 == "success" { v3++ }
+            END { exit !(v2c == 1 && v3 == 1) }
+          ' "${test_root}/extracted/collection-status.tsv"
+          if grep -R -F -e 'authpass1' -e 'privpass1' "${test_root}/extracted"; then
+            echo 'SNMP credentials were included in the support archive' >&2
+            exit 1
+          fi
+
+          mkdir -p "${test_root}/discovery-output" "${test_root}/discovery-extracted"
+          cat > "${test_root}/sd-snmp.conf" <<'EOF'
+          disabled: false
+          discoverer:
+            snmp:
+              credentials:
+                - name: fixture-v2c
+                  version: 2c
+                  community: public
+              networks:
+                - subnet: 127.0.0.1/32
+                  credential: fixture-v2c
+          services: []
+          EOF
+
+          set +e
+          python3 src/go/plugin/go.d/collector/snmp/tools/collect-snmp-troubleshooting-data.py \
+            --netdata-snmp-config "${test_root}/sd-snmp.conf" \
+            --node 127.0.0.1 \
+            --port 1161 \
+            --timeout 1 \
+            --retries 0 \
+            --yes \
+            --command-timeout 20 \
+            --output-dir "${test_root}/discovery-output"
+          discovery_status=$?
+          set -e
+          test "${discovery_status}" -eq 0 || test "${discovery_status}" -eq 2
+
+          mapfile -t discovery_archives < <(find "${test_root}/discovery-output" -maxdepth 1 -type f -name '*.tar.gz' -print)
+          test "${#discovery_archives[@]}" -eq 1
+          tar -xzf "${discovery_archives[0]}" -C "${test_root}/discovery-extracted"
+          awk -F '\t' '$3 == "system" && $4 == "success" { found = 1 } END { exit !found }' \
+            "${test_root}/discovery-extracted/collection-status.tsv"
+          if grep -R -F 'public' "${test_root}/discovery-extracted"; then
+            echo 'SNMP discovery credential was included in the support archive' >&2
+            exit 1
+          fi
 
       - name: Run topology fixture tests
         env:

@@ -46,7 +46,13 @@ from gen_docs_integrations import (  # noqa: E402
     read_integrations_js,
 )
 from gen_doc_collector_page import get_integration_description  # noqa: E402
-from gen_npm_catalog import PAGE_DESCRIPTIONS  # noqa: E402
+from gen_npm_catalog import (  # noqa: E402
+    PAGE_DESCRIPTIONS,
+    build_device_modules,
+    is_device_catalog_profile,
+    load_profiles,
+    make_entry,
+)
 
 
 MODE_BY_TYPE = {
@@ -61,6 +67,41 @@ MODE_BY_TYPE = {
     "secretstore": "secretstore",
     "service_discovery": "service_discovery",
 }
+
+
+class NPMCatalogProfileVisibilityTest(unittest.TestCase):
+    def test_internal_topology_roles_are_not_device_integrations(self):
+        self.assertFalse(is_device_catalog_profile("_std-topology-ip-mib.yaml"))
+        self.assertFalse(is_device_catalog_profile("topology-role-qbridge.yaml"))
+        self.assertTrue(is_device_catalog_profile("cisco-catalyst.yaml"))
+
+        modules = build_device_modules(load_profiles())
+        self.assertTrue(modules)
+        method_descriptions = [
+            module["overview"]["data_collection"]["method_description"]
+            for module in modules
+        ]
+        self.assertFalse(any("topology-role-" in value for value in method_descriptions))
+
+    def test_snmp_support_collection_is_not_attached_to_unrelated_catalog_entries(self):
+        common = {
+            "name": "Test",
+            "link": "",
+            "categories": ["data-collection.networking"],
+            "icon": "netdata.png",
+            "keywords": ["test"],
+            "ov": {},
+        }
+        snmp = make_entry(**common)
+        topology = make_entry(**common, module_name="snmp_topology")
+        traps = make_entry(**common, module_name="snmp_traps")
+        non_snmp = make_entry(**common, plugin_name="netdata", module_name="streaming")
+
+        self.assertTrue(snmp["troubleshooting"]["problems"]["list"])
+        self.assertTrue(topology["troubleshooting"]["problems"]["list"])
+        self.assertFalse(traps["troubleshooting"]["problems"]["list"])
+        self.assertFalse(non_snmp["troubleshooting"]["problems"]["list"])
+
 
 MARKDOWN_SPECIAL_CHARACTERS = "*_[]<>#`~"
 yaml = YAML(typ="safe")

@@ -51,6 +51,11 @@ developer-facing and must stay in this project skill, not under
 - Keep display composition in type-level and graph-level presentation metadata,
   not in high-cardinality rows.
 - Keep raw sensitive payload captures under `.local/` only.
+- The `topology:network-connections` producer also runs on Windows
+  (`network-viewer.plugin/network-viewer-windows.c` registers the Function; the
+  shared v1 renderer lives in `network-viewer-topology.c`). Windows payloads
+  follow the same v1 contract with process/endpoint actors only — no
+  cgroup/container/Kubernetes enrichment — and listener-only UDP rows.
 
 ## Workflow
 

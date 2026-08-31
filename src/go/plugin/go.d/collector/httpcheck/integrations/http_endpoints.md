@@ -115,7 +115,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Request** | method | HTTP method to use. | GET | no |
 |  | body | Request body (e.g., for POST/PUT). |  | no |
 |  | headers | Additional HTTP headers (one per line as key: value). |  | no |
-|  | cookie_file | Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat). |  | no |
+|  | cookie_file | Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat.html). |  | no |
 |  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
@@ -160,6 +160,25 @@ sudo ./edit-config go.d/httpcheck.conf
 ```
 
 ##### Examples
+
+###### Ceph RGW endpoint liveness
+
+Basic unauthenticated liveness check for a Ceph RGW HTTP endpoint. This does not verify authenticated S3 operations.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph-rgw-local
+    url: http://127.0.0.1:8080
+    status_accepted:
+      - 200
+      - 204
+      - 403
+      - 405
+
+```
+</details>
 
 ###### Basic
 

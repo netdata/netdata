@@ -11,7 +11,8 @@ import (
 )
 
 type tagAdder struct {
-	tags map[string]string
+	tags     map[string]string
+	observed *bool
 }
 
 func (ta *tagAdder) addTags(tags map[string]string) {
@@ -21,6 +22,9 @@ func (ta *tagAdder) addTags(tags map[string]string) {
 }
 
 func (ta *tagAdder) addTag(key, value string) {
+	if ta.observed != nil && value != "" {
+		*ta.observed = true
+	}
 	if existing, ok := ta.tags[key]; !ok || existing == "" {
 		ta.tags[key] = value
 	}
@@ -42,6 +46,21 @@ func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig,
 		return nil
 	}
 	return p.tp.processTag(cfg, pdu, ta)
+}
+
+func (p *globalTagProcessor) processTagObserved(
+	cfg ddprofiledefinition.MetricTagConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	ta tagAdder,
+) (bool, error) {
+	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
+	if !ok {
+		return false, nil
+	}
+	observed := false
+	ta.observed = &observed
+	err := p.tp.processTag(cfg, pdu, ta)
+	return observed, err
 }
 
 type tableTagProcessor struct{}

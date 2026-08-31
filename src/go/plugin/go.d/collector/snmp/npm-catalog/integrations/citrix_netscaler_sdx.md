@@ -200,3 +200,9 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_netscaler_sdx_nsNsMemoryUsage` | `%` | per netscaler_sdx_ns_uuid, netscaler_sdx_ns_name | Memory usage percentage |
 | `snmp.device_prof_netscaler_sdx_nsNsRx` | `bit/s` | per netscaler_sdx_ns_uuid, netscaler_sdx_ns_name | In throughput of netscaler instance in megabits per second |
 | `snmp.device_prof_netscaler_sdx_nsNsTx` | `bit/s` | per netscaler_sdx_ns_uuid, netscaler_sdx_ns_name | Out throughput of netscaler instance in megabits per second |
+
+
+
+### Collect Live Data for Netdata Support
+
+For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.

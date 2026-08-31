@@ -120,6 +120,10 @@ Metrics:
 | systemd.service.cachestat_dirties | Number of dirty pages | dirty | page/s |
 | systemd.service.cachestat_hits | Number of accessed files | hit | hits/s |
 | systemd.service.cachestat_misses | Files out of page cache | miss | misses/s |
+| systemd.service.dc_ratio | Percentage of directory lookups resolved by the cache | ratio | % |
+| systemd.service.dc_reference | Count file access | reference | files |
+| systemd.service.dc_not_cache | Files not present inside directory cache | slow | files |
+| systemd.service.dc_not_found | Files not found | miss | files |
 | systemd.service.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
 | systemd.service.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
 | systemd.service.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |

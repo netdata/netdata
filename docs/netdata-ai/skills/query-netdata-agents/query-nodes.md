@@ -112,12 +112,15 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
 
 | Field                                   | `.host_labels` key(s)                                                             |
 |-----------------------------------------|-------------------------------------------------------------------------------------|
-| Architecture, kernel, OS name/version   | `_architecture`, `_kernel_version`, `_os_name`, `_os_version`, `_os`                |
+| Architecture, kernel, OS metadata       | `_architecture`, `_kernel_version`, `_os`, `_os_name`, `_os_version`, `_os_marketing_version`, `_os_release`, `_os_codename`, `_os_edition`, `_os_build` |
 | CPU count, RAM, disk space               | `_system_cores`, `_system_cpu_model`, `_system_ram_total`, `_system_disk_space`     |
 | Hardware vendor/product                 | `_hw_sys_vendor`, `_hw_product_name`, `_hw_product_type`                           |
 | Cloud provider / region / instance type | `_cloud_provider_type`, `_cloud_instance_region`, `_cloud_instance_type`            |
 | Container/virtualization                | `_container`, `_container_detection`, `_virtualization`, `_virt_detection`, `_is_k8s_node` |
 | Streaming role / ephemerality            | `_is_parent`, `_is_ephemeral`                                                       |
+
+`_os_version` preserves the legacy display value. Use `_os_marketing_version` when filtering normalized product
+versions.
 
 ## Collection-job state (failed / disabled jobs)
 

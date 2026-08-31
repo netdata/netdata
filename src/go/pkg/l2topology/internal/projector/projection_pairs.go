@@ -18,6 +18,7 @@ func projectAdjacencyLinks(
 	deviceLinkMatchByID map[string]graph.Match,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
+	bridgePortAliases bridgePortAliasIndex,
 ) projectedLinks {
 	out := projectedLinks{
 		links: make([]graph.Link, 0, len(adjacencies)),
@@ -28,10 +29,21 @@ func projectAdjacencyLinks(
 
 	pairs := make(map[string]*pairedLinkAccumulator)
 	pairOrder := make([]string, 0)
+	directSTPSeen := make(map[string]struct{})
 
 	for _, adj := range adjacencies {
 		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
-		link := adjacencyToTopologyLink(adj, protocol, layer, collectedAt, deviceByID, deviceLinkMatchByID, ifIndexByDeviceName, ifaceByDeviceIndex)
+		link := adjacencyToTopologyLink(
+			adj,
+			protocol,
+			layer,
+			collectedAt,
+			deviceByID,
+			deviceLinkMatchByID,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+			bridgePortAliases,
+		)
 
 		pairID := strings.TrimSpace(adj.Labels[adjacencyLabelPairID])
 		if pairID != "" {
@@ -49,6 +61,21 @@ func projectAdjacencyLinks(
 			}
 			acc.all = append(acc.all, entry)
 			continue
+		}
+		if protocol == "stp" {
+			key := directPhysicalAdjacencyKey(
+				adj,
+				protocol,
+				ifIndexByDeviceName,
+				ifaceByDeviceIndex,
+				bridgePortAliases,
+			)
+			if key != "" {
+				if _, seen := directSTPSeen[key]; seen {
+					continue
+				}
+				directSTPSeen[key] = struct{}{}
+			}
 		}
 
 		out.links = append(out.links, link)
@@ -84,6 +111,21 @@ func projectAdjacencyLinks(
 
 	sortTopologyLinks(out.links)
 	return out
+}
+
+func directPhysicalAdjacencyKey(
+	adj model.Adjacency,
+	protocol string,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
+) string {
+	src, dst := bridgePortsFromAdjacency(adj, ifIndexByDeviceName, ifaceByDeviceIndex, aliases)
+	pair := bridgePairKey(src, dst)
+	if pair == "" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(protocol)) + keySep + pair
 }
 
 func reversePairEntriesForBidirectionalMerge(entries []*builtAdjacencyLink) (left, right *builtAdjacencyLink, ok bool) {
@@ -215,11 +257,32 @@ func adjacencyToTopologyLink(
 	deviceLinkMatchByID map[string]graph.Match,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
+	bridgePortAliases bridgePortAliasIndex,
 ) graph.Link {
 	srcDevice := deviceByID[adj.SourceID]
 	dstDevice := deviceByID[adj.TargetID]
-	src := adjacencySideToEndpointWithMatch(srcDevice, deviceLinkEndpointMatch(srcDevice, deviceLinkMatchByID), adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
-	dst := adjacencySideToEndpointWithMatch(dstDevice, deviceLinkEndpointMatch(dstDevice, deviceLinkMatchByID), adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
+	srcMatch := deviceLinkEndpointMatch(srcDevice, deviceLinkMatchByID)
+	dstMatch := deviceLinkEndpointMatch(dstDevice, deviceLinkMatchByID)
+	srcPort, dstPort := bridgePortsFromAdjacency(
+		adj,
+		ifIndexByDeviceName,
+		ifaceByDeviceIndex,
+		bridgePortAliases,
+	)
+	src := adjacencySideToEndpointWithBridgePortRef(
+		srcDevice,
+		srcMatch,
+		adj.SourcePort,
+		srcPort,
+		ifaceByDeviceIndex,
+	)
+	dst := adjacencySideToEndpointWithBridgePortRef(
+		dstDevice,
+		dstMatch,
+		adj.TargetPort,
+		dstPort,
+		ifaceByDeviceIndex,
+	)
 
 	link := graph.Link{
 		Layer:        layer,

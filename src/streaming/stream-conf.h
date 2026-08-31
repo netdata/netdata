@@ -10,6 +10,8 @@
 #include "daemon/config/netdata-conf-profile.h"
 
 #define SENDER_MIN_RECONNECT_DELAY 5
+#define STREAM_RECEIVER_KEEPALIVE_IDLE_MIN_SECONDS 30U
+#define STREAM_RECEIVER_KEEPALIVE_IDLE_MAX_SECONDS 3600U
 
 struct _stream_send {
     bool enabled;
@@ -84,6 +86,12 @@ struct stream_receiver_config {
         bool enabled;
         STREAM_CAPABILITIES priorities[COMPRESSION_ALGORITHM_MAX];
     } compression;
+
+    struct {
+        bool enabled;
+        bool automatic;
+        uint32_t idle_s;
+    } tcp_keepalive;
 };
 
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid);

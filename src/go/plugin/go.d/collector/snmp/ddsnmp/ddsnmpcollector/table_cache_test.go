@@ -3,6 +3,8 @@
 package ddsnmpcollector
 
 import (
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -57,7 +59,7 @@ func TestTableCache(t *testing.T) {
 			}
 
 			// Cache data
-			cache.cacheData(cfg, oidMap, tagValues, nil)
+			cache.cacheRows(cfg, oidMap, tagValues, nil)
 
 			// Retrieve cached data - should work
 			cachedOIDs, cachedTags, found := cache.getCachedData(cfg)
@@ -91,6 +93,68 @@ func TestTableCache(t *testing.T) {
 			assert.Empty(t, cache.tables)
 			assert.Empty(t, cache.timestamps)
 			assert.Empty(t, cache.tableTTLs)
+		})
+	}
+}
+
+func TestTableCacheEntryKinds(t *testing.T) {
+	cache := newTableCache(time.Hour, 0)
+	rowConfig := ddprofiledefinition.MetricsConfig{
+		Table:   ddprofiledefinition.SymbolConfig{OID: "1.2.3", Name: "rowTable"},
+		Symbols: []ddprofiledefinition.SymbolConfig{{OID: "1.2.3.1", Name: "value"}},
+	}
+	markerConfig := ddprofiledefinition.MetricsConfig{
+		Table: ddprofiledefinition.SymbolConfig{OID: "1.2.4", Name: "auxiliaryTable"},
+	}
+
+	cache.cacheRows(rowConfig, nil, nil, nil)
+	assert.False(t, cache.isConfigCached(rowConfig), "empty row snapshots must not become cache entries")
+
+	cache.cacheMarker(markerConfig)
+	assert.True(t, cache.isConfigCached(markerConfig), "markers must satisfy route planning")
+	_, _, found := cache.getCachedData(markerConfig)
+	assert.False(t, found, "markers must never be readable as row snapshots")
+
+	invalidConfig := ddprofiledefinition.MetricsConfig{
+		Table: ddprofiledefinition.SymbolConfig{OID: "1.2.5", Name: "invalidTable"},
+	}
+	invalidOID := invalidConfig.Table.OID
+	cache.tables[invalidOID] = map[string]tableCacheEntry{
+		cache.generateConfigID(invalidConfig): {kind: tableCacheEntryInvalid},
+	}
+	cache.timestamps[invalidOID] = time.Now()
+	cache.tableTTLs[invalidOID] = time.Hour
+	assert.False(t, cache.isConfigCached(invalidConfig), "reserved entry kinds must not satisfy route planning")
+}
+
+func BenchmarkTableCacheDiscardDependentsScaling(b *testing.B) {
+	for _, tableCount := range []int{16, 256, 4096} {
+		b.Run(fmt.Sprintf("tables=%d", tableCount), func(b *testing.B) {
+			configs := make([]ddprofiledefinition.MetricsConfig, tableCount)
+			for i := range configs {
+				tableOID := fmt.Sprintf("1.3.6.1.4.1.99999.%d", i+1)
+				configs[i] = ddprofiledefinition.MetricsConfig{
+					Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: fmt.Sprintf("table%d", i+1)},
+					Symbols: []ddprofiledefinition.SymbolConfig{{OID: tableOID + ".1", Name: "value"}},
+				}
+			}
+			data := map[string]map[string]string{"1": {"value": "value.1"}}
+			rootOID := configs[0].Table.OID
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				b.StopTimer()
+				cache := newTableCache(time.Hour, 0)
+				cache.cacheRows(configs[0], data, nil, nil)
+				for i := 1; i < len(configs); i++ {
+					cache.cacheRows(configs[i], data, nil, []string{configs[i-1].Table.OID})
+				}
+				b.StartTimer()
+
+				cache.discardTables([]string{rootOID})
+				runtime.KeepAlive(cache)
+			}
 		})
 	}
 }
@@ -155,8 +219,8 @@ func TestTableCacheMultipleConfigs(t *testing.T) {
 	}
 
 	// Cache both configs
-	cache.cacheData(cfg1, oidMap1, tagValues1, nil)
-	cache.cacheData(cfg2, oidMap2, tagValues2, nil)
+	cache.cacheRows(cfg1, oidMap1, tagValues1, nil)
+	cache.cacheRows(cfg2, oidMap2, tagValues2, nil)
 
 	// Both should be retrievable
 	cachedOIDs1, cachedTags1, found1 := cache.getCachedData(cfg1)
@@ -192,6 +256,117 @@ func TestTableCacheMultipleConfigs(t *testing.T) {
 	cachedOIDs1Reordered, _, found1Reordered := cache.getCachedData(cfg1Reordered)
 	assert.True(t, found1Reordered)
 	assert.Equal(t, cachedOIDs1, cachedOIDs1Reordered)
+}
+
+func TestTableCacheInvalidateConfig(t *testing.T) {
+	newConfig := func(tableOID, tableName, symbolName string) ddprofiledefinition.MetricsConfig {
+		return ddprofiledefinition.MetricsConfig{
+			Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: tableName},
+			Symbols: []ddprofiledefinition.SymbolConfig{{OID: tableOID + ".1", Name: symbolName}},
+		}
+	}
+	data := map[string]map[string]string{"1": {"column": "column.1"}}
+
+	t.Run("preserves sibling config", func(t *testing.T) {
+		cache := newTableCache(time.Hour, 0)
+		cfg1 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifInOctets")
+		cfg2 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifOutOctets")
+		cache.cacheRows(cfg1, data, nil, nil)
+		cache.cacheRows(cfg2, data, nil, nil)
+
+		cache.invalidateConfig(cfg1)
+
+		assert.False(t, cache.isConfigCached(cfg1))
+		assert.True(t, cache.isConfigCached(cfg2))
+		tables, configs, _, _ := cache.stats()
+		assert.Equal(t, 1, tables)
+		assert.Equal(t, 1, configs)
+	})
+
+	t.Run("clears dependency group after last config", func(t *testing.T) {
+		cache := newTableCache(time.Hour, 0)
+		cfg1 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifInOctets")
+		cfg2 := newConfig("1.3.6.1.2.1.31.1.1", "ifXTable", "ifHCInOctets")
+		cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID})
+		cache.cacheRows(cfg2, data, nil, nil)
+
+		cache.invalidateConfig(cfg1)
+
+		assert.False(t, cache.isConfigCached(cfg1))
+		assert.False(t, cache.isConfigCached(cfg2))
+		assert.Empty(t, cache.tables)
+		assert.Empty(t, cache.dependenciesByTable)
+		assert.Empty(t, cache.dependentsByTable)
+	})
+
+	t.Run("clears sibling configs and dependencies with table", func(t *testing.T) {
+		cache := newTableCache(time.Hour, 0)
+		cfg1 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifInOctets")
+		cfg2 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifOutOctets")
+		cfg3 := newConfig("1.3.6.1.2.1.31.1.1", "ifXTable", "ifHCInOctets")
+		cache.cacheRows(cfg1, data, nil, []string{cfg3.Table.OID})
+		cache.cacheRows(cfg2, data, nil, nil)
+		cache.cacheRows(cfg3, data, nil, nil)
+
+		cache.invalidateTable(cfg1.Table.OID)
+
+		assert.False(t, cache.isConfigCached(cfg1))
+		assert.False(t, cache.isConfigCached(cfg2))
+		assert.False(t, cache.isConfigCached(cfg3))
+		assert.Empty(t, cache.tables)
+		assert.Empty(t, cache.dependenciesByTable)
+		assert.Empty(t, cache.dependentsByTable)
+	})
+}
+
+func TestTableCacheDiscardTables(t *testing.T) {
+	newConfig := func(tableOID, tableName string) ddprofiledefinition.MetricsConfig {
+		return ddprofiledefinition.MetricsConfig{
+			Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: tableName},
+			Symbols: []ddprofiledefinition.SymbolConfig{{OID: tableOID + ".1", Name: tableName + "Value"}},
+		}
+	}
+
+	setup := func() (*tableCache, ddprofiledefinition.MetricsConfig, ddprofiledefinition.MetricsConfig, ddprofiledefinition.MetricsConfig, ddprofiledefinition.MetricsConfig) {
+		cache := newTableCache(time.Hour, 0)
+		dependency := newConfig("1.3.6.1.2.1.1", "dependency")
+		source := newConfig("1.3.6.1.2.1.2", "source")
+		dependent := newConfig("1.3.6.1.2.1.3", "dependent")
+		unrelated := newConfig("1.3.6.1.2.1.4", "unrelated")
+		data := map[string]map[string]string{"1": {"column": "column.1"}}
+
+		cache.cacheRows(dependency, data, nil, nil)
+		cache.cacheRows(source, data, nil, []string{dependency.Table.OID})
+		cache.cacheRows(dependent, data, nil, []string{source.Table.OID})
+		cache.cacheRows(unrelated, data, nil, nil)
+		return cache, dependency, source, dependent, unrelated
+	}
+
+	t.Run("discards transitive reverse dependents", func(t *testing.T) {
+		cache, dependency, source, dependent, unrelated := setup()
+
+		cache.discardTables([]string{dependency.Table.OID})
+
+		assert.False(t, cache.isConfigCached(dependency))
+		assert.False(t, cache.isConfigCached(source))
+		assert.False(t, cache.isConfigCached(dependent))
+		assert.True(t, cache.isConfigCached(unrelated))
+		assert.Empty(t, cache.dependenciesByTable)
+		assert.Empty(t, cache.dependentsByTable)
+	})
+
+	t.Run("preserves forward dependency", func(t *testing.T) {
+		cache, dependency, source, dependent, unrelated := setup()
+
+		cache.discardTables([]string{source.Table.OID})
+
+		assert.True(t, cache.isConfigCached(dependency), "settlement rollback must not cascade to a forward dependency")
+		assert.False(t, cache.isConfigCached(source))
+		assert.False(t, cache.isConfigCached(dependent))
+		assert.True(t, cache.isConfigCached(unrelated))
+		assert.Empty(t, cache.dependenciesByTable)
+		assert.Empty(t, cache.dependentsByTable)
+	})
 }
 
 func TestTableCacheDependencies(t *testing.T) {
@@ -246,11 +421,11 @@ func TestTableCacheDependencies(t *testing.T) {
 
 	// Cache tables with dependencies
 	// table1 and table2 depend on each other
-	cache.cacheData(cfg1, oidMap, tagValues, []string{cfg2.Table.OID})
-	cache.cacheData(cfg2, oidMap, tagValues, []string{cfg1.Table.OID})
+	cache.cacheRows(cfg1, oidMap, tagValues, []string{cfg2.Table.OID})
+	cache.cacheRows(cfg2, oidMap, tagValues, []string{cfg1.Table.OID})
 
 	// table3 depends on table2
-	cache.cacheData(cfg3, oidMap, nil, []string{cfg2.Table.OID})
+	cache.cacheRows(cfg3, oidMap, nil, []string{cfg2.Table.OID})
 
 	// All tables should be cached
 	assert.True(t, cache.areTablesCached([]string{cfg1.Table.OID, cfg2.Table.OID, cfg3.Table.OID}))
@@ -261,7 +436,10 @@ func TestTableCacheDependencies(t *testing.T) {
 
 	deps2 := cache.getDependencies(cfg2.Table.OID)
 	assert.Contains(t, deps2, cfg1.Table.OID)
-	assert.Contains(t, deps2, cfg3.Table.OID) // Bidirectional
+	assert.NotContains(t, deps2, cfg3.Table.OID)
+	dependents2 := cache.getDependents(cfg2.Table.OID)
+	assert.Contains(t, dependents2, cfg1.Table.OID)
+	assert.Contains(t, dependents2, cfg3.Table.OID)
 
 	deps3 := cache.getDependencies(cfg3.Table.OID)
 	assert.Contains(t, deps3, cfg2.Table.OID)
@@ -271,7 +449,7 @@ func TestTableCacheDependencies(t *testing.T) {
 	assert.Equal(t, 3, tables)
 	assert.Equal(t, 3, configs)
 	assert.Equal(t, 3, withDeps)
-	assert.Equal(t, 4, totalDeps) // 1->2, 2->1, 2->3, 3->2
+	assert.Equal(t, 3, totalDeps)
 
 	// Sleep to let table1 expire naturally
 	time.Sleep(220 * time.Millisecond)
@@ -287,7 +465,8 @@ func TestTableCacheDependencies(t *testing.T) {
 
 	// Cache should be empty
 	assert.Empty(t, cache.tables)
-	assert.Empty(t, cache.tableDeps)
+	assert.Empty(t, cache.dependenciesByTable)
+	assert.Empty(t, cache.dependentsByTable)
 }
 
 func TestTableCacheDependenciesCascade(t *testing.T) {
@@ -337,10 +516,10 @@ func TestTableCacheDependenciesCascade(t *testing.T) {
 	data := map[string]map[string]string{"1": {"col": "val"}}
 
 	// Cache with chain dependencies
-	cache.cacheData(cfgA, data, nil, []string{cfgB.Table.OID})
-	cache.cacheData(cfgB, data, nil, []string{cfgA.Table.OID, cfgC.Table.OID})
-	cache.cacheData(cfgC, data, nil, []string{cfgB.Table.OID, cfgD.Table.OID})
-	cache.cacheData(cfgD, data, nil, []string{cfgC.Table.OID})
+	cache.cacheRows(cfgA, data, nil, []string{cfgB.Table.OID})
+	cache.cacheRows(cfgB, data, nil, []string{cfgA.Table.OID, cfgC.Table.OID})
+	cache.cacheRows(cfgC, data, nil, []string{cfgB.Table.OID, cfgD.Table.OID})
+	cache.cacheRows(cfgD, data, nil, []string{cfgC.Table.OID})
 
 	// All should be cached
 	assert.True(t, cache.areTablesCached([]string{cfgA.Table.OID, cfgB.Table.OID, cfgC.Table.OID, cfgD.Table.OID}))
@@ -397,9 +576,9 @@ func TestTableCacheMixedDependencies(t *testing.T) {
 	data := map[string]map[string]string{"1": {"col": "val"}}
 
 	// Cache tables
-	cache.cacheData(cfg1, data, nil, []string{cfg2.Table.OID})
-	cache.cacheData(cfg2, data, nil, []string{cfg1.Table.OID})
-	cache.cacheData(cfg3, data, nil, nil) // No dependencies
+	cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID})
+	cache.cacheRows(cfg2, data, nil, []string{cfg1.Table.OID})
+	cache.cacheRows(cfg3, data, nil, nil) // No dependencies
 
 	// All should be cached
 	_, _, found1 := cache.getCachedData(cfg1)
@@ -464,14 +643,14 @@ func TestTableCacheDisabled(t *testing.T) {
 	}
 
 	// Try to cache data
-	cache.cacheData(cfg, oidMap, tagValues, nil)
+	cache.cacheRows(cfg, oidMap, tagValues, nil)
 
 	// Should not find anything
 	_, _, found := cache.getCachedData(cfg)
 	assert.False(t, found)
 
 	// Try to cache with dependencies
-	cache.cacheData(cfg, oidMap, tagValues, []string{"other.table"})
+	cache.cacheRows(cfg, oidMap, tagValues, []string{"other.table"})
 
 	// Should not find anything
 	_, _, found = cache.getCachedData(cfg)
@@ -504,7 +683,7 @@ func TestTableCacheDeepCopy(t *testing.T) {
 	}
 
 	// Cache the data
-	cache.cacheData(cfg, oidMap, tagValues, nil)
+	cache.cacheRows(cfg, oidMap, tagValues, nil)
 
 	// Modify original maps
 	oidMap["1"]["col2"] = "should not appear"
@@ -546,8 +725,8 @@ func TestTableCacheDependencyCleanup(t *testing.T) {
 	data := map[string]map[string]string{"1": {"col": "val"}}
 
 	// Cache with circular deps
-	cache.cacheData(cfg1, data, nil, []string{cfg2.Table.OID})
-	cache.cacheData(cfg2, data, nil, []string{cfg1.Table.OID})
+	cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID})
+	cache.cacheRows(cfg2, data, nil, []string{cfg1.Table.OID})
 
 	// Check initial state
 	tables, configs, withDeps, totalDeps := cache.stats()
@@ -570,7 +749,8 @@ func TestTableCacheDependencyCleanup(t *testing.T) {
 	assert.Equal(t, 0, totalDeps)
 
 	// Dependencies should be cleaned up
-	assert.Empty(t, cache.tableDeps)
+	assert.Empty(t, cache.dependenciesByTable)
+	assert.Empty(t, cache.dependentsByTable)
 }
 
 func TestTableCacheNonExistentDependency(t *testing.T) {
@@ -597,7 +777,7 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 	}
 
 	// Cache tableA with dependency on non-existent tableB
-	cache.cacheData(cfgA,
+	cache.cacheRows(cfgA,
 		map[string]map[string]string{"1": {"col": "val"}},
 		nil,
 		[]string{cfgB.Table.OID})
@@ -612,10 +792,10 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 
 	// Dependencies should exist
 	assert.Contains(t, cache.getDependencies(cfgA.Table.OID), cfgB.Table.OID)
-	assert.Contains(t, cache.getDependencies(cfgB.Table.OID), cfgA.Table.OID)
+	assert.Contains(t, cache.getDependents(cfgB.Table.OID), cfgA.Table.OID)
 
 	// Now cache tableB
-	cache.cacheData(cfgB,
+	cache.cacheRows(cfgB,
 		map[string]map[string]string{"1": {"col": "val"}},
 		nil,
 		[]string{cfgA.Table.OID})
@@ -670,9 +850,9 @@ func TestTableCacheMultipleConfigsSameTableExpiration(t *testing.T) {
 	}
 
 	// Cache multiple configs for the same table
-	cache.cacheData(cfg1, map[string]map[string]string{"1": {"col1": "val1"}}, nil, nil)
-	cache.cacheData(cfg2, map[string]map[string]string{"1": {"col2": "val2"}}, nil, nil)
-	cache.cacheData(cfg3, map[string]map[string]string{"1": {"col3": "val3"}}, nil, nil)
+	cache.cacheRows(cfg1, map[string]map[string]string{"1": {"col1": "val1"}}, nil, nil)
+	cache.cacheRows(cfg2, map[string]map[string]string{"1": {"col2": "val2"}}, nil, nil)
+	cache.cacheRows(cfg3, map[string]map[string]string{"1": {"col3": "val3"}}, nil, nil)
 
 	// All configs should be cached
 	assert.True(t, cache.isConfigCached(cfg1))
@@ -728,10 +908,19 @@ func TestTableCacheConfigIsolation(t *testing.T) {
 	config2Tags := map[string]map[string]string{
 		"1": {"interface": "eth0", "type": "ethernet"},
 	}
+	config1OIDs := map[string]map[string]string{
+		"1": {"1.3.6.1.2.1.2.2.1.10": "1.3.6.1.2.1.2.2.1.10.1"},
+	}
+	config2OIDs := map[string]map[string]string{
+		"1": {
+			"1.3.6.1.2.1.2.2.1.10": "1.3.6.1.2.1.2.2.1.10.1",
+			"1.3.6.1.2.1.2.2.1.16": "1.3.6.1.2.1.2.2.1.16.1",
+		},
+	}
 
 	// Cache configs with different tags
-	cache.cacheData(cfg1, nil, config1Tags, nil)
-	cache.cacheData(cfg2, nil, config2Tags, nil)
+	cache.cacheRows(cfg1, config1OIDs, config1Tags, nil)
+	cache.cacheRows(cfg2, config2OIDs, config2Tags, nil)
 
 	// Retrieve and verify isolation
 	_, tags1, found1 := cache.getCachedData(cfg1)

@@ -386,10 +386,10 @@ def _render_tech_navigation() -> str:
         {
             "title": "Cloud & Infrastructure:",
             "items": [
-                ("AWS", "#cloud-provider-managed"),
-                ("Azure", "#cloud-provider-managed"),
-                ("GCP", "#cloud-provider-managed"),
-                ("Kubernetes", "#kubernetes"),
+                ("AWS", "#cloud-and-devops"),
+                ("Azure", "#cloud-and-devops"),
+                ("GCP", "#cloud-and-devops"),
+                ("Kubernetes", "#containers-and-vms"),
                 ("Docker", "#containers-and-vms"),
                 ("VMware", "#containers-and-vms"),
             ]
@@ -401,37 +401,37 @@ def _render_tech_navigation() -> str:
                 ("PostgreSQL", "#databases"),
                 ("MongoDB", "#databases"),
                 ("Redis", "#databases"),
-                ("Elasticsearch", "#search-engines"),
+                ("Elasticsearch", "#databases"),
                 ("Oracle", "#databases"),
             ]
         },
         {
             "title": "Web & Application:",
             "items": [
-                ("NGINX", "#web-servers-and-web-proxies"),
-                ("Apache", "#web-servers-and-web-proxies"),
-                ("HAProxy", "#web-servers-and-web-proxies"),
-                ("Tomcat", "#web-servers-and-web-proxies"),
-                ("PHP-FPM", "#web-servers-and-web-proxies"),
+                ("NGINX", "#web-servers-and-proxies"),
+                ("Apache", "#web-servers-and-proxies"),
+                ("HAProxy", "#web-servers-and-proxies"),
+                ("Tomcat", "#web-servers-and-proxies"),
+                ("PHP-FPM", "#web-servers-and-proxies"),
             ]
         },
         {
             "title": "Message Queues:",
             "items": [
-                ("Kafka", "#message-brokers"),
-                ("RabbitMQ", "#message-brokers"),
-                ("ActiveMQ", "#message-brokers"),
-                ("NATS", "#message-brokers"),
-                ("Pulsar", "#message-brokers"),
+                ("Kafka", "#databases"),
+                ("RabbitMQ", "#databases"),
+                ("ActiveMQ", "#databases"),
+                ("NATS", "#databases"),
+                ("Pulsar", "#databases"),
             ]
         },
         {
             "title": "Operating Systems:",
             "items": [
-                ("Linux", "#linux-systems"),
-                ("Windows", "#windows-systems"),
-                ("macOS", "#macos-systems"),
-                ("FreeBSD", "#freebsd"),
+                ("Linux", "#operating-systems"),
+                ("Windows", "#operating-systems"),
+                ("macOS", "#operating-systems"),
+                ("FreeBSD", "#operating-systems"),
             ]
         },
     ]
@@ -443,9 +443,9 @@ def _render_tech_navigation() -> str:
 
     tech_section = "\n".join(tech_lines)
     generic_link = (
-        "**Don't see what you need?** We support [Prometheus endpoints](#generic-data-collection), "
-        "[SNMP devices](#generic-data-collection), [StatsD](#beyond-the-850-integrations), and "
-        "[custom data sources](#generic-data-collection)."
+        "**Don't see what you need?** We support [Prometheus endpoints](#beyond-the-850-integrations), "
+        "[SNMP devices](#networking), [StatsD](#beyond-the-850-integrations), and "
+        "[custom data sources](#beyond-the-850-integrations)."
     )
 
     return f"""### Find Your Technology

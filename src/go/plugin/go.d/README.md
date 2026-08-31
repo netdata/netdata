@@ -69,7 +69,6 @@ All capabilities are set automatically during Netdata installation using the [of
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/freeradius)                 |          FreeRADIUS           |
 | [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/gearman)                       |            Gearman            |
-| [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hdfs)                             |             HDFS              |
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hpssa)                           |        HPE Smart Array        |
@@ -126,6 +125,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rethinkdb)                   |           RethinkDB           |
 | [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/riakkv)                         |            Riak KV            |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rspamd)                         |            Rspamd             |
+| [s3check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/s3check)                        | S3 Compatible Object Storage |
 | [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/samba)                           |             Samba             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/scaleio)                       |       Dell EMC ScaleIO        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp)                             |             SNMP              |

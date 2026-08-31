@@ -99,10 +99,6 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    // send the chart functions
-    if(stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
-        stream_sender_send_rrdset_functions(st, wb);
-
     // send the chart local custom variables
     rrdvar_print_to_streaming_custom_chart_variables(st, wb);
 

@@ -410,10 +410,15 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
     }
 
     if (ok_to_send) {
-        // aclk_query_free() reports the outcome to whoever tracks what the cloud has been told;
-        // leaving it unset here is what makes a dropped message recoverable.
-        if (client)
-            query->manifest.published = (send_bin_msg(client, query) == 0);
+        if (client) {
+            bool sent = (send_bin_msg(client, query) == 0);
+
+            // aclk_query_free() reports the outcome to whoever tracks what the cloud has been told;
+            // leaving it unset here is what makes a dropped message recoverable. Only the manifest
+            // carries a publication record, so it is the only type with an outcome to record here.
+            if (query->type == UPDATE_NODE_MANIFEST)
+                query->manifest.published = sent;
+        }
         else
             nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
     }
@@ -1402,13 +1407,20 @@ void aclk_arm_node_manifest(RRDHOST *host)
     // caller - rrdhost_free_unlinked() - and everything this function's callers depend on is torn
     // down earlier in it:
     //   1. rrdhost_index_del_by_guid()          - the host stops being findable
-    //   2. stream_receiver_signal_to_stop_and_wait() - blocks until host->receiver is NULL
-    //   3. rrd_functions_host_destroy()         - host->functions becomes NULL
+    //   2. stream_receiver_signal_to_stop_and_wait() - waits for host->receiver to become NULL,
+    //      but the wait is BOUNDED (~2s) and gives up on a stalled receiver thread, so step 2 is
+    //      best-effort, not a guarantee (pre-existing residual, tracked separately)
+    //   3. nrpc_registry_destroy()         - the host's registry entry is synchronously DISARMED
+    //      (owner callbacks cleared under the entry's lock, so the component can no longer call
+    //      this function for that host) and leaves the component index
     //   4. destroy_aclk_config()                - only now is the config freed
-    // So the function-registry callers (which must first mutate host->functions) and
-    // rrdhost_clear_receiver() (which runs before host->receiver is cleared) cannot still be
-    // running here, and a caller that reached this host through rrdhost_find_by_guid() did so
-    // before step 1. Do NOT "fix" this by routing the arm back through the ACLK event loop: that
+    // So the function-registry paths (which reach this only through the owner callback the disarm
+    // cleared in step 3) and rrdhost_clear_receiver() (which runs before host->receiver is
+    // cleared) cannot still be running here, and a caller that reached this host through
+    // rrdhost_find_by_guid() did so before step 1. An owner-callback invocation that snapshotted
+    // the callback JUST before the disarm is bounded by the owner's thread lifecycle: the sender
+    // is joined and the receiver stopped (best-effort, step 2) before step 3 runs.
+    // Do NOT "fix" this by routing the arm back through the ACLK event loop: that
     // publishes a borrowed RRDHOST pointer to another thread (a wider window on a longer-lived
     // object) and blocks the caller in push_cmd() when the command pool is full, sometimes while
     // holding the host functions lock.
@@ -1432,12 +1444,31 @@ void aclk_arm_node_manifest(RRDHOST *host)
 // session is server-side behaviour this repository cannot verify, so treat "once per session" as an
 // assumption, not a guarantee; the suppression below is what makes repeats cheap either way.
 //
-// It is needed because publishing is never acked: what the previous session sent may have been
-// dropped after the send call - no mqtt client left by the time the query executed, or shutdown
-// reached before it ran - and the cloud may have lost it. build_node_manifest() scopes its
-// suppression to one session for exactly this reason, so the pair publishes one manifest per host
-// per session. A redundant arm costs one manifest build (rrd_rdlock plus a dictionary of string
-// copies) and one hash; the content hash then drops the publish.
+// It is needed because a successful send is NOT a delivery. send_bin_msg() returning 0 means only
+// that the PUBLISH was appended to mqtt_ng's transaction buffer, and that is exactly when the
+// publication record is kept (published = true). Three windows then lose the message with no
+// agent-side signal at all:
+//   1. disconnect before the bytes reach the socket - the fragment is still queued, and
+//      mqtt_ng_connect() purges the whole tx buffer on the next connect (buffer_purge()).
+//   2. disconnect after the write but before the PUBACK - QoS1, but mqtt_ng_connect() also calls
+//      destroy_timeout_monitor_list(), so nothing is retransmitted and there is no MQTT session
+//      continuation.
+//   3. no PUBACK within PACKET_ACK_TIMEOUT_SECS (60s) while still connected -
+//      check_packet_monitor_list_for_timeouts() calls mark_packet_acked(), the same path a real
+//      PUBACK takes, and the message is garbage collected as if it had been delivered.
+// Nothing correlates an ack back to a query in any case: send_bin_msg() passes NULL for the packet
+// id and puback_callback() only counts pubacks. build_node_manifest() scopes its suppression to one
+// session for exactly this reason, so the pair publishes one manifest per host per session. A
+// redundant arm costs one manifest build (rrd_rdlock plus a dictionary of string copies) and one
+// hash; the content hash then drops the publish.
+//
+// Note what this does NOT cover: a new session lets a rebuild through, but it does not cause one.
+// Something still has to arm the host. Every other arm is event-driven - a function registration,
+// pluginsd, a child reconnecting, host creation, an ingestion-status change, or a node info send
+// (build_node_info() arms too, and aclk_queue_node_info() is reached independently of this message,
+// from metadata load, label updates, streaming reconnect and pluginsd). None of them is tied to an
+// ACLK reconnect, so on a node whose functions and labels are stable this ask is what triggers the
+// rebuild, and without it a manifest lost above stays lost for the whole session.
 void aclk_arm_node_manifest_all_hosts(void)
 {
     RRDHOST *host;

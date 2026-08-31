@@ -35,7 +35,18 @@ func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, 
 
 // Collect gathers all scalar metrics from the profile
 func (sc *scalarCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	return sc.collectObserved(prof, stats, nil)
+}
+
+func (sc *scalarCollector) collectObserved(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+	observer *acquisitionTopologyScalarObserver,
+) ([]ddsnmp.Metric, error) {
 	oids, missingOIDs := sc.identifyScalarOIDs(prof.Definition.Metrics)
+	if observer != nil {
+		observer.start(prof.Definition.Metrics, sc.missingOIDs)
+	}
 
 	if len(missingOIDs) > 0 {
 		sc.log.Debugf("scalar metrics missing OIDs: %v", missingOIDs)
@@ -49,10 +60,16 @@ func (sc *scalarCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.Collectio
 	pdus, err := sc.getScalarValues(oids, stats)
 	if err != nil {
 		stats.Errors.SNMP++
+		if observer != nil {
+			observer.failUnfinished(AcquisitionFailureClassTransport)
+		}
 		return nil, err
 	}
+	if observer != nil {
+		observer.start(prof.Definition.Metrics, sc.missingOIDs)
+	}
 
-	return sc.processScalarMetrics(prof.Definition.Metrics, pdus, stats)
+	return sc.processScalarMetricsObserved(prof.Definition.Metrics, pdus, stats, observer)
 }
 
 // identifyScalarOIDs returns OIDs to collect and OIDs that are known to be missing
@@ -123,16 +140,28 @@ func (sc *scalarCollector) getScalarValues(oids []string, stats *ddsnmp.Collecti
 
 // processScalarMetrics converts PDUs into metrics
 func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	return sc.processScalarMetricsObserved(configs, pdus, stats, nil)
+}
+
+func (sc *scalarCollector) processScalarMetricsObserved(
+	configs []ddprofiledefinition.MetricsConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	stats *ddsnmp.CollectionStats,
+	observer *acquisitionTopologyScalarObserver,
+) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 	var errs []error
 
-	for _, cfg := range configs {
+	for i, cfg := range configs {
 		if !cfg.IsScalar() {
 			continue
 		}
 
-		metric, err := sc.processScalarMetric(cfg, pdus)
+		metric, err := sc.processScalarMetric(cfg, pdus, observer, i)
 		if err != nil {
+			if observer != nil {
+				observer.rejected(i)
+			}
 			errs = append(errs, fmt.Errorf("metric '%s': %w", cfg.Symbol.Name, err))
 			sc.log.Debugf("Error processing scalar metric '%s': %v", cfg.Symbol.Name, err)
 			stats.Errors.Processing.Scalar++
@@ -140,7 +169,14 @@ func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.Me
 		}
 
 		if metric != nil {
+			if observer != nil {
+				observer.value(i)
+			}
 			metrics = append(metrics, *metric)
+		} else {
+			if observer != nil {
+				observer.empty(i)
+			}
 		}
 	}
 
@@ -152,7 +188,12 @@ func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.Me
 }
 
 // processScalarMetric processes a single scalar metric configuration
-func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*ddsnmp.Metric, error) {
+func (sc *scalarCollector) processScalarMetric(
+	cfg ddprofiledefinition.MetricsConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	observer *acquisitionTopologyScalarObserver,
+	configIndex int,
+) (*ddsnmp.Metric, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		return nil, nil
@@ -176,6 +217,9 @@ func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsCo
 				continue
 			}
 			if err := sc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
+				if observer != nil {
+					observer.rejected(configIndex)
+				}
 				sc.log.Debugf("Error processing scalar tag '%s' for metric '%s': %v", tagCfg.Tag, cfg.Symbol.Name, err)
 			}
 		}

@@ -6,6 +6,12 @@ extends:
   - _cisco-base.yaml
   - _cisco-catalyst.yaml
   - _cisco-bgp4-mib.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _std-topology-arp-mib.yaml
+  - _std-topology-cisco-vtp-mib.yaml
 
 selector:
   - sysobjectid:

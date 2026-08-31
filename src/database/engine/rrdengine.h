@@ -206,6 +206,7 @@ struct jv2_page_info {
 
     // private
     struct pgc_page *page;
+    struct jv2_extents_info *ei;    // the extent this page was counted into
 };
 
 typedef enum __attribute__ ((__packed__)) {
@@ -322,6 +323,15 @@ struct extent_io_data {
     unsigned fileno;
     uint32_t block;
     unsigned bytes;
+
+    // The metric this page belongs to, as a uuidmap id.
+    //
+    // This exists so journal-v2 indexing never has to dereference the page's
+    // metric_id, which is a bare METRIC pointer with no reference behind it and
+    // can therefore be stale. Resolving the id through the MRG index is an
+    // indexed lookup that cannot touch freed memory; a dead metric simply
+    // misses. NOT a uuidmap reference - see mrg_metric_uuidmap_id().
+    UUIDMAP_ID uuid_id;
 };
 
 struct extent_io_descriptor {

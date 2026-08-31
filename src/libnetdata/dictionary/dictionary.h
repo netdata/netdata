@@ -119,6 +119,19 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 // Create a view on a dictionary
 DICTIONARY *dictionary_create_view(DICTIONARY *master);
 
+// ----------------------------------------------------------------------------
+// Callback registration - CONSTRUCTION TIME ONLY
+//
+// All four dictionary_register_*_callback() functions below must be called on
+// the creating thread, before the DICTIONARY * is published to any other
+// thread. They are NOT thread-safe and are NOT protected against a concurrent
+// dictionary_destroy():
+//   - they write dict->hooks without holding any of the dictionary's locks;
+//   - dictionary_register_conflict_callback() additionally performs a
+//     non-atomic read-modify-write on dict->options.
+// Registering a callback on a dictionary that other threads can already reach
+// is a data race, regardless of what those threads are doing with it.
+
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
 typedef void (*dict_cb_insert_t)(const DICTIONARY_ITEM *item, void *value, void *data);
@@ -157,6 +170,11 @@ void dictionary_version_increment(DICTIONARY *dict);
 
 void dictionary_garbage_collect(DICTIONARY *dict);
 
+// like dictionary_garbage_collect(), but the victims' delete callbacks are
+// delivered OUTSIDE the dictionary locks (use when the delete callback can
+// take mutexes or deliver results to waiters); not supported on views
+size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict);
+
 size_t cleanup_destroyed_dictionaries(bool shutdown);
 
 // Report on allocated dictionaries - used during Address Sanitizer builds
@@ -178,6 +196,36 @@ void dictionary_print_still_allocated_stacktraces(void);
 //
 // Passing NULL as value, the dictionary will callocz() the newly allocated value, otherwise it will copy it.
 // Passing 0 as value_len, the dictionary will set the value to NULL (no allocations for value will be made).
+//
+// The set family MAY REFUSE THE INSERT: if another thread is destroying the
+// dictionary, nothing is inserted. How that is reported depends on the form:
+//
+//   dictionary_set_and_acquire_item*() - returns NULL. This is the ONLY
+//       unambiguous failure signal in the family: a successful insert always
+//       returns an acquired item. Callers that can race a dictionary_destroy()
+//       must check it.
+//   dictionary_set() / dictionary_set_advanced() / dictionary_view_set*() -
+//       return the item's value, so NULL is AMBIGUOUS. They also return NULL
+//       after a SUCCESSFUL insert with value_len == 0 (the value is NULL by
+//       design, see above), and on invalid input (bad or over-long name,
+//       over-long value). A caller that must distinguish refusal from either
+//       of those has to use the *_and_acquire_item*() form.
+//
+// Concurrency contract for dictionary_destroy():
+//   Safe   - other threads already inside the dictionary API (a set/get/del
+//            call, or a traversal between dfe_start and dfe_done). They are
+//            counted, and destruction is deferred until they leave;
+//            cleanup_destroyed_dictionaries() frees the dictionary afterwards.
+//   Unsafe - a thread holding a DICTIONARY * that has not entered the API yet.
+//            Nothing inside the dictionary can see such a thread, so the caller
+//            owns that lifetime.
+//   Unsafe - two threads calling dictionary_destroy() on the same dictionary.
+//            dictionary_destroy() is SINGLE-OWNER: exactly one thread may end a
+//            dictionary's life, and it must be externally serialized against any
+//            other destroy of the same object. Concurrent destroys are a
+//            double-free-class caller error, not something the dictionary
+//            detects: both can pass the destroyed-flag check and one can free
+//            the object while the other is blocked on its write lock.
 #define dictionary_set(dict, name, value, value_len) dictionary_set_advanced(dict, name, -1, value, value_len, NULL)
 void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data);
 
@@ -213,6 +261,17 @@ bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_le
 // reference counters management
 
 void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
+
+// Acquire a reference on an item reached through a secondary index rather than
+// through a dictionary lookup, so its value stays alive until it is released.
+// Returns NULL if the item is deleted or is currently being deleted.
+//
+// Unlike dictionary_acquired_item_dup(), the caller does not need to already
+// hold a reference. It MUST however serialize this call against the item's
+// removal from that secondary index, so the item memory is still valid here:
+// holding a dictionary lock is NOT enough, because dict_item_free_with_hooks()
+// runs after item_linked_list_remove() has released the items write lock.
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_item_acquire_if_not_deleted(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
 

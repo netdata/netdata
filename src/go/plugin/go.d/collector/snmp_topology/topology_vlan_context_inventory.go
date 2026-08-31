@@ -13,12 +13,9 @@ type topologyVLANContext struct {
 	vlanName string
 }
 
-func (c *topologyCache) vtpVLANContexts() []topologyVLANContext {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	contexts := make([]topologyVLANContext, 0, len(c.vlanIDToName))
-	for vlanID, vlanName := range c.vlanIDToName {
+func (c *topologyBuilder) vtpVLANContexts() []topologyVLANContext {
+	contexts := make([]topologyVLANContext, 0, len(c.vlanNameByID))
+	for vlanID, mapping := range c.vlanNameByID {
 		id := strings.TrimSpace(vlanID)
 		if id == "" {
 			continue
@@ -28,12 +25,19 @@ func (c *topologyCache) vtpVLANContexts() []topologyVLANContext {
 		}
 		contexts = append(contexts, topologyVLANContext{
 			vlanID:   id,
-			vlanName: strings.TrimSpace(vlanName),
+			vlanName: resolvedVLANName(mapping),
 		})
 	}
 
 	sortTopologyVLANContexts(contexts)
 	return contexts
+}
+
+func resolvedVLANName(mapping vlanNameMapping) string {
+	if mapping.ambiguous {
+		return ""
+	}
+	return strings.TrimSpace(mapping.name)
 }
 
 func sortTopologyVLANContexts(contexts []topologyVLANContext) {

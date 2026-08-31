@@ -3,10 +3,22 @@
 package topologyoptions
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestQueryOptionsContainsOnlyComparableScalarValues(t *testing.T) {
+	typeOfOptions := reflect.TypeFor[QueryOptions]()
+	for field := range typeOfOptions.Fields() {
+		switch field.Type.Kind() {
+		case reflect.Bool, reflect.Int, reflect.String:
+		default:
+			t.Errorf("QueryOptions.%s has non-scalar type %s", field.Name, field.Type)
+		}
+	}
+}
 
 func TestParseDepth(t *testing.T) {
 	tests := map[string]struct {
@@ -38,7 +50,7 @@ func TestNormalizeQueryOptions(t *testing.T) {
 	}{
 		"defaults": {
 			want: QueryOptions{
-				MapType:            MapTypeLLDPCDPManaged,
+				MapType:            MapTypeManagedFabric,
 				InferenceStrategy:  InferenceStrategyFDBMinimumKnowledge,
 				ManagedDeviceFocus: ManagedFocusAllDevices,
 				Depth:              0,
@@ -77,6 +89,31 @@ func TestNormalizeQueryOptions(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tc.want, NormalizeQueryOptions(tc.in))
+		})
+	}
+}
+
+func TestNormalizeMapTypeUsesOneManagedFabricFallback(t *testing.T) {
+	tests := map[string]struct {
+		value string
+		want  string
+	}{
+		"empty":                    {want: MapTypeManagedFabric},
+		"invalid":                  {value: "invalid", want: MapTypeManagedFabric},
+		"trimmed-invalid":          {value: "  INVALID  ", want: MapTypeManagedFabric},
+		"managed-fabric":           {value: MapTypeManagedFabric, want: MapTypeManagedFabric},
+		"case-folded-managed":      {value: "MANAGED_FABRIC", want: MapTypeManagedFabric},
+		"lldp-cdp-managed":         {value: MapTypeLLDPCDPManaged, want: MapTypeLLDPCDPManaged},
+		"high-confidence-inferred": {value: MapTypeHighConfidenceInferred, want: MapTypeHighConfidenceInferred},
+		"all-devices-low-confidence": {
+			value: MapTypeAllDevicesLowConfidence,
+			want:  MapTypeAllDevicesLowConfidence,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, NormalizeMapType(tc.value))
 		})
 	}
 }

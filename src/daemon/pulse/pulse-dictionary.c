@@ -10,7 +10,6 @@ struct dictionary_stats dictionary_stats_category_rrddim = { .name = "rrddim" };
 struct dictionary_stats dictionary_stats_category_rrdcontext = { .name = "context" };
 struct dictionary_stats dictionary_stats_category_rrdlabels = { .name = "labels" };
 struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health" };
-struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
 struct dictionary_stats dictionary_stats_category_replication = { .name = "replication" };
 struct dictionary_stats dictionary_stats_category_dyncfg = { .name = "dyncfg" };
 

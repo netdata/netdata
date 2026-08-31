@@ -5,6 +5,7 @@ package snmp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -205,23 +207,380 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	}
 
 	require.NoError(t, collr.Init(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseInit, ddsnmp.DeviceLifecycleOutcomeSuccess, false)
 	require.NoError(t, collr.Check(context.Background()))
-	require.Empty(t, deviceStore.Devices())
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCheck, ddsnmp.DeviceLifecycleOutcomeSuccess, false)
+	require.Empty(t, deviceStore.Entries())
 
 	_ = collr.Collect(context.Background())
 
-	devices := deviceStore.Devices()
-	require.Len(t, devices, 1)
-	assert.Equal(t, "192.0.2.1", devices[0].Hostname)
-	assert.Equal(t, 161, devices[0].Port)
-	assert.Equal(t, gosnmp.Version2c.String(), devices[0].SNMPVersion)
-	assert.Equal(t, "mock sysName", devices[0].SysName)
-	assert.Equal(t, "mock sysDescr", devices[0].SysDescr)
-	assert.Equal(t, "mock sysContact", devices[0].SysContact)
-	assert.Equal(t, "mock sysLocation", devices[0].SysLocation)
+	entries := deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.NotZero(t, entries[0].RegistrationID)
+	assert.Equal(t, "192.0.2.1", entries[0].Info.Hostname)
+	assert.Equal(t, 161, entries[0].Info.Port)
+	assert.Equal(t, gosnmp.Version2c.String(), entries[0].Info.SNMPVersion)
+	assert.Equal(t, "mock sysName", entries[0].Info.SysName)
+	assert.Equal(t, "mock sysDescr", entries[0].Info.SysDescr)
+	assert.Equal(t, "mock sysContact", entries[0].Info.SysContact)
+	assert.Equal(t, "mock sysLocation", entries[0].Info.SysLocation)
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeSuccess, true)
 
 	collr.Cleanup(context.Background())
-	require.Empty(t, deviceStore.Devices())
+	require.Empty(t, deviceStore.Entries())
+	require.Empty(t, deviceStore.LifecycleCut().Entries)
+}
+
+func TestCollector_InitFailurePublishesSafeLifecycle(t *testing.T) {
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV3Config()
+	collr.User.Name = ""
+	collr.Community = "must-not-appear-in-lifecycle"
+	collr.User.AuthKey = "must-not-appear-in-lifecycle"
+	collr.User.PrivKey = "must-not-appear-in-lifecycle"
+	collr.ManualProfiles = []string{"/must/not/appear/in/lifecycle.yaml"}
+
+	require.Error(t, collr.Init(context.Background()))
+	cut := deviceStore.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	entry := cut.Entries[0]
+	require.Equal(t, ddsnmp.DeviceLifecycleInfo{
+		Hostname:    collr.Hostname,
+		Port:        collr.Options.Port,
+		SNMPVersion: collr.Options.Version,
+	}, entry.Info)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, entry.LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, entry.LastCompleted.Outcome)
+	require.False(t, entry.TopologyReady)
+	require.NotZero(t, entry.LastCompleted.CompletedAt)
+
+	serialized := fmt.Sprintf("%+v", cut)
+	require.NotContains(t, serialized, collr.Community)
+	require.NotContains(t, serialized, collr.User.AuthKey)
+	require.NotContains(t, serialized, collr.User.PrivKey)
+	require.NotContains(t, serialized, collr.ManualProfiles[0])
+}
+
+func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	collr := New(store)
+	collr.Hostname = ""
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+
+	hook.Bind(identity, job)
+	require.Error(t, collr.Init(context.Background()))
+	snapshot := hook.Capture(identity, job)
+	collr.Cleanup(context.Background())
+	require.Empty(t, store.LifecycleCut().Entries)
+
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, nil)
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	require.False(t, cut.Entries[0].TopologyReady)
+}
+
+func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+	config := map[string]any{
+		"hostname":  "switch-a.example",
+		"community": "must-not-appear",
+		"user": map[any]any{
+			"auth_key": "must-not-appear",
+			"priv_key": "must-not-appear",
+		},
+		"options": map[any]any{
+			"port":    1161,
+			"version": "3",
+		},
+	}
+
+	snapshot := hook.Project(identity, config)
+	config["hostname"] = "changed-after-projection.example"
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, nil)
+
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, ddsnmp.DeviceLifecycleInfo{
+		Hostname:    "switch-a.example",
+		Port:        1161,
+		SNMPVersion: "3",
+	}, cut.Entries[0].Info)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseUnknown, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeUnknown, cut.Entries[0].LastCompleted.Outcome)
+	require.NotContains(t, fmt.Sprintf("%+v", snapshot), "must-not-appear")
+}
+
+func TestCollectorRejectedManagedCandidateDoesNotRemoveIncumbentConnection(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	identity := collectorapi.JobConfigIdentity{1}
+	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{Hostname: "incumbent.example"})
+	collr := New(store)
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+
+	hook.Bind(identity, job)
+	collr.Cleanup(context.Background())
+
+	require.Len(t, store.Entries(), 1)
+	require.Equal(t, "incumbent.example", store.Entries()[0].Info.Hostname)
+}
+
+func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	collr := New(store)
+	collr.Config = prepareV2Config()
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+
+	hook.Bind(identity, job)
+	collr.beginDeviceLifecycle()
+	collr.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseInit, errors.New("initial failure"))
+	snapshot := hook.Capture(identity, job)
+
+	collr.deviceLifecycleMu.Lock()
+	collr.deviceLifecycleInfo.Hostname = "changed-after-capture.example"
+	collr.deviceLifecycleStatus = ddsnmp.DeviceLifecycleStatus{
+		Phase:   ddsnmp.DeviceLifecyclePhaseCollect,
+		Outcome: ddsnmp.DeviceLifecycleOutcomeSuccess,
+	}
+	collr.deviceLifecycleMu.Unlock()
+
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, nil)
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, prepareV2Config().Hostname, cut.Entries[0].Info.Hostname)
+	require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+}
+
+func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
+	t.Run("init", func(t *testing.T) {
+		store := ddsnmp.NewDeviceStore()
+		collr := New(store)
+		collr.Config = prepareV2Config()
+		collr.newSnmpClient = func() gosnmp.Handler { panic("init panic") }
+
+		require.Panics(t, func() { _ = collr.Init(context.Background()) })
+		cut := store.LifecycleCut()
+		require.Len(t, cut.Entries, 1)
+		require.Equal(t, ddsnmp.DeviceLifecyclePhaseInit, cut.Entries[0].LastCompleted.Phase)
+		require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	})
+
+	t.Run("check", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		store := ddsnmp.NewDeviceStore()
+		collr := New(store)
+		collr.Config = prepareV2Config()
+		mockSNMP := snmpmock.NewMockHandler(ctrl)
+		mockSNMP.EXPECT().WalkAll(gomock.Any()).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+			panic("check panic")
+		})
+		collr.snmpClient = mockSNMP
+		collr.beginDeviceLifecycle()
+
+		require.Panics(t, func() { _ = collr.Check(context.Background()) })
+		cut := store.LifecycleCut()
+		require.Len(t, cut.Entries, 1)
+		require.Equal(t, ddsnmp.DeviceLifecyclePhaseCheck, cut.Entries[0].LastCompleted.Phase)
+		require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, cut.Entries[0].LastCompleted.Outcome)
+	})
+}
+
+func TestCollectorManagedConnectionCollectedBeforeReconcileIsPublishedAtReconcile(t *testing.T) {
+	store := ddsnmp.NewDeviceStore()
+	collr := New(store)
+	collr.Config = prepareV2Config()
+	collr.ManualProfiles = []string{"profile-a"}
+	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	hook := newCreator(store).JobConfigLifecycle
+	identity := collectorapi.JobConfigIdentity{1}
+
+	hook.Bind(identity, job)
+	collr.beginDeviceLifecycle()
+	collr.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseInit, nil)
+	collr.registerDeviceState(&snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+		Name:        "switch-a",
+	}, nil)
+	collr.ManualProfiles[0] = "changed"
+	require.Empty(t, store.Entries())
+	require.Empty(t, store.LifecycleCut().Entries)
+
+	snapshot := hook.Capture(identity, job)
+	require.NotNil(t, snapshot)
+	hook.Reconcile(collectorapi.JobConfigIdentity{}, snapshot, job)
+	require.Len(t, store.Entries(), 1)
+	require.Equal(t, []string{"profile-a"}, store.Entries()[0].Info.ManualProfiles)
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.True(t, cut.Entries[0].TopologyReady)
+}
+
+type snmpLifecycleTestRuntimeJob struct {
+	collector *Collector
+}
+
+func (snmpLifecycleTestRuntimeJob) FullName() string   { return "snmp_test" }
+func (snmpLifecycleTestRuntimeJob) ModuleName() string { return "snmp" }
+func (snmpLifecycleTestRuntimeJob) Name() string       { return "test" }
+func (snmpLifecycleTestRuntimeJob) IsRunning() bool    { return false }
+func (j snmpLifecycleTestRuntimeJob) Collector() any   { return j.collector }
+
+func TestCollector_CheckFailureUpdatesLifecycleWithoutTopologyRegistration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientSetterExpect(mockSNMP)
+	mockSNMP.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
+
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.Error(t, collr.Check(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCheck, ddsnmp.DeviceLifecycleOutcomeFailed, false)
+	require.Empty(t, deviceStore.Entries())
+
+	require.Nil(t, collr.Collect(context.Background()))
+	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed, false)
+	require.Empty(t, deviceStore.Entries())
+}
+
+func TestCollector_LifecycleDiagnosticsFailOpenOnPanic(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+
+	collr := New(ddsnmp.NewDeviceStore())
+	collr.Config = prepareV2Config()
+	collr.deviceLifecycleStore = panickingDeviceLifecycleStore{}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+
+	require.NotPanics(t, func() {
+		require.NoError(t, collr.Init(context.Background()))
+	})
+}
+
+func assertDeviceLifecycle(
+	t *testing.T,
+	store *ddsnmp.DeviceStore,
+	phase ddsnmp.DeviceLifecyclePhase,
+	outcome ddsnmp.DeviceLifecycleOutcome,
+	topologyReady bool,
+) {
+	t.Helper()
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, phase, cut.Entries[0].LastCompleted.Phase)
+	require.Equal(t, outcome, cut.Entries[0].LastCompleted.Outcome)
+	require.Equal(t, topologyReady, cut.Entries[0].TopologyReady)
+	require.NotZero(t, cut.Entries[0].LastCompleted.CompletedAt)
+}
+
+type panickingDeviceLifecycleStore struct{}
+
+func (panickingDeviceLifecycleStore) RegisterJob(string, ddsnmp.DeviceLifecycleInfo) {
+	panic("register lifecycle")
+}
+
+func (panickingDeviceLifecycleStore) RecordJobLifecycle(string, ddsnmp.DeviceLifecycleStatus) {
+	panic("record lifecycle")
+}
+
+func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	profileMetrics := &ddsnmp.ProfileMetrics{
+		Source: "dynamic-device.yaml",
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			"vendor": {Value: "profile-vendor", IsExactMatch: true},
+			"model":  {Value: "profile-model", IsExactMatch: true},
+		},
+	}
+	mockCollector := &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{profileMetrics}}
+
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return mockCollector }
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	entries := deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
+	assert.Equal(t, "profile-model", entries[0].Info.Model)
+	assert.Zero(t, mockCollector.metadataCalls, "normal collection metadata must be reused without a separate request")
+
+	profileMetrics.DeviceMetadata["vendor"] = ddsnmp.MetaTag{Value: "later-vendor", IsExactMatch: true}
+	profileMetrics.DeviceMetadata["model"] = ddsnmp.MetaTag{Value: "later-model", IsExactMatch: true}
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	entries = deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
+	assert.Equal(t, "profile-model", entries[0].Info.Model)
+	assert.Equal(t, 2, mockCollector.collectCalls)
+	assert.Zero(t, mockCollector.metadataCalls)
+}
+
+func TestCollector_SetupVnodeAndRegisterDeviceStateShareResolvedMetadata(t *testing.T) {
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.Vnode.Labels = map[string]string{
+		"model": "operator-model",
+	}
+
+	si := &snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.41112",
+		Name:        "unifi-ap",
+		Vendor:      "static-vendor",
+		Model:       "static-model",
+	}
+	profileMetadata := map[string]ddsnmp.MetaTag{
+		"vendor": {Value: "profile-vendor", IsExactMatch: true},
+		"model":  {Value: "profile-model", IsExactMatch: true},
+	}
+
+	collr.vnode = collr.setupVnode(si, profileMetadata)
+	collr.registerDeviceState(si, nil)
+
+	entries := deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "profile-vendor", entries[0].Info.VnodeLabels["vendor"])
+	assert.Equal(t, "operator-model", entries[0].Info.VnodeLabels["model"])
+	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
+	assert.Equal(t, "operator-model", entries[0].Info.Model)
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -983,7 +1342,8 @@ type mockDdSnmpCollector struct {
 	meta map[string]ddsnmp.MetaTag
 	err  error
 
-	collectCalls int
+	collectCalls  int
+	metadataCalls int
 }
 
 func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
@@ -992,6 +1352,7 @@ func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 }
 
 func (m *mockDdSnmpCollector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+	m.metadataCalls++
 	return m.meta, nil
 }
 

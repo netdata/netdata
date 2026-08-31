@@ -58,6 +58,14 @@ bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric);
 nd_uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
 UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg, METRIC *metric);
+
+// Read the metric's uuidmap id WITHOUT taking a uuidmap reference.
+// Use this to store an id somewhere that must NOT own the metric (an
+// open-cache page, for example): ids are unique for the lifetime of the
+// uuidmap, so a stale id simply fails to resolve rather than aliasing a
+// different metric. Taking a reference instead would make the holder an
+// owner, which is exactly what we want to avoid.
+UUIDMAP_ID mrg_metric_uuidmap_id(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);

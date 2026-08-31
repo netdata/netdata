@@ -323,9 +323,9 @@ BuildRequires: cups-devel
 # distro handling of versioning).
 %if %{?_upstream_go_toolchain:0}%{!?_upstream_go_toolchain:1}
 %if 0%{?suse_version}
-BuildRequires: go >= 1.26
+BuildRequires: go >= 1.27
 %else
-BuildRequires: golang >= 1.26
+BuildRequires: golang >= 1.27
 %endif
 %endif
 # end - go.d.plugin plugin dependencies
@@ -551,7 +551,7 @@ if ! getent passwd %{name} > /dev/null; then
 fi
 
 # I am not sure that the corresponding group names are exactly the same as in Debian, but we should start somewhere, shouldn't we?
-for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+for item in docker nginx varnish adm nsd proxy squid ceph nobody I2C; do
   if getent group $item > /dev/null 2>&1; then
     usermod -a -G ${item} %{name}
   fi

@@ -11,7 +11,7 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
+func (c *topologyBuilder) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
 	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)

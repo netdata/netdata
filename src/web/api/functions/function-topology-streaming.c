@@ -250,7 +250,7 @@ static int streaming_topology_return_error(BUFFER *wb, char *function_copy, int 
     buffer_json_member_add_string(wb, "type", "topology");
     buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_STREAMING_TOPOLOGY_HELP);
     buffer_json_member_add_string(wb, "error", error);
     buffer_json_finalize(wb);
 
@@ -263,7 +263,7 @@ static void streaming_topology_v1_emit_response_metadata(BUFFER *wb) {
     buffer_json_member_add_string(wb, "type", "topology");
     buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_STREAMING_TOPOLOGY_HELP);
     buffer_json_member_add_array(wb, "accepted_params");
     {
         buffer_json_add_array_item_string(wb, "info");

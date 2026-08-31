@@ -57,6 +57,17 @@ func normalizeInterfaceNameForLookup(value string) string {
 }
 
 func resolveIfIndexByPortName(deviceID, port string, ifIndexByDeviceName map[string]int) int {
+	if idx := resolveIfIndexByInterfaceName(deviceID, port, ifIndexByDeviceName); idx > 0 {
+		return idx
+	}
+	port = strings.TrimSpace(port)
+	if parsed, err := strconv.Atoi(port); err == nil && parsed > 0 {
+		return parsed
+	}
+	return 0
+}
+
+func resolveIfIndexByInterfaceName(deviceID, port string, ifIndexByDeviceName map[string]int) int {
 	deviceID = strings.TrimSpace(deviceID)
 	port = strings.TrimSpace(port)
 	if deviceID == "" || port == "" {
@@ -69,9 +80,6 @@ func resolveIfIndexByPortName(deviceID, port string, ifIndexByDeviceName map[str
 		if idx, ok := ifIndexByDeviceName[deviceIfNameKey(deviceID, normalized)]; ok && idx > 0 {
 			return idx
 		}
-	}
-	if parsed, err := strconv.Atoi(port); err == nil && parsed > 0 {
-		return parsed
 	}
 	return 0
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -31,11 +30,10 @@ type cachestatGlobalPublish struct {
 }
 
 type cachestatGlobalState struct {
-	initialized bool
-	prev        cachestatGlobalCounters
-	cumDirty    int64
-	cumHits     int64
-	cumMisses   int64
+	prev      cachestatGlobalCounters
+	cumDirty  int64
+	cumHits   int64
+	cumMisses int64
 }
 
 type cachestatGlobalChart struct {
@@ -130,7 +128,6 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	publish.Hit = s.cumHits
 	publish.Miss = s.cumMisses
 	s.prev = current
-	s.initialized = true
 
 	return publish, true
 }
@@ -212,7 +209,7 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 // Both the global metric snapshot and the per-PID SHM publish run here
 // sequentially so that only one OS thread is needed for CGO calls.
 // store may be nil when apps/cgroups integration is disabled.
-func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore, updateEvery int) {
+func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *ebpfSharedMemoryStore, updateEvery int) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -244,9 +241,30 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
 		if store != nil {
+			publishSharedStore := func() {
+				// Cachestat is the elected publisher when it has apps/cgroup
+				// integration. Open its segment even when its own snapshot fails:
+				// dcstat/socket may still have healthy rows to publish.
+				if handle.SharedMemory == nil {
+					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
+					if perr != nil {
+						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
+					} else {
+						handle.SharedMemory = publisher
+					}
+				}
+				if handle.SharedMemory != nil {
+					if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagCachestat); perr != nil {
+						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", perr)
+					}
+				}
+			}
+
 			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 			if err != nil {
-				logPluginErr("cachestat.snapshot", "cachestat", "snapshot-apps", err)
+				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
+				store.ClearCachestatApps()
+				publishSharedStore()
 			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {
@@ -265,29 +283,14 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 					if len(deadPIDs) > 0 {
 						if err := handle.Runtime.DeletePids(deadPIDs); err != nil {
 							rateLimitedStderr("cachestat.delete_pids",
-								fmt.Sprintf("ebpf-go.plugin: failed to delete %d stale PIDs from cstat_pid: %v\n",
-									len(deadPIDs), err))
+								"ebpf-go.plugin: failed to delete %d stale PIDs from cstat_pid: %v\n",
+								len(deadPIDs), err)
+						} else {
+							store.RemoveCachestatPIDs(deadPIDs)
 						}
 					}
 				}
-				// Lazy SHM open: allocate the publisher on the first
-				// cycle that has a non-empty store so the default config
-				// (no apps, no cgroups) does not pay the 17.5 MB VMA
-				// cost.  The handle is mutated under the loop's single-
-				// goroutine guarantee so no extra lock is needed.
-				if handle.SharedMemory == nil {
-					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
-					if perr != nil {
-						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
-					} else {
-						handle.SharedMemory = publisher
-					}
-				}
-				if handle.SharedMemory != nil {
-					if err := store.Publish(handle.SharedMemory); err != nil {
-						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", err)
-					}
-				}
+				publishSharedStore()
 			}
 		}
 	}

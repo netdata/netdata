@@ -4,6 +4,7 @@
 #define NETDATA_RRDHOST_H
 
 #include "libnetdata/libnetdata.h"
+#include "nrpc/nrpc.h"   // NRPC_OWNER: the host doubles as the owner token of its function registry
 
 #define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
 #define NETDATA_VIRTUAL_HOST "Netdata Virtual Host 1.0"
@@ -244,6 +245,9 @@ struct rrdhost {
         // --- receiver ---
 
         struct {
+            uint32_t min_update_every;
+            uint32_t min_update_every_applied;
+
             struct {
                 SPINLOCK spinlock;                  // lock for the management of the allocation
                 uint32_t size;
@@ -331,6 +335,16 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
 
+    // Secondary index of the above, keyed by the interned STRING* of
+    // rc->config.name, so health expression variable lookups can resolve an
+    // alert name without scanning every alert of the host. Alert names are not
+    // unique per host (the primary key is "{alert},on[{chart}]"), so each entry
+    // is the head of a list threaded through RRDCALC.name_next / name_prev.
+    struct {
+        RW_SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } rrdcalc_by_name;
+
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
@@ -352,10 +366,6 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // Support for host-level labels
     RRDLABELS *rrdlabels;
-
-    // ------------------------------------------------------------------------
-    // Support for functions
-    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // indexes
@@ -509,6 +519,16 @@ RRDHOST *rrdhost_create(
 
 void rrdhost_init(void);
 #endif
+
+// The host as an nRPC owner: the token the component keys its function-
+// registry index on and hands back to the owner callbacks. The component never
+// dereferences it - these two lines are the only place that casts.
+static inline NRPC_OWNER rrdhost_nrpc_owner(RRDHOST *host) { return (NRPC_OWNER){ .ptr = host }; }
+static inline RRDHOST *rrdhost_from_nrpc_owner(NRPC_OWNER id) { return (RRDHOST *)id.ptr; }
+
+// fill the host's nRPC function-registry owner vtable (see rrdhost.c); also
+// used by the nRPC unittests to re-init localhost's registry identically
+void rrdhost_nrpc_registry_owner(RRDHOST *host, struct nrpc_registry_owner *owner);
 
 RRDHOST *rrdhost_find_or_create(
     const char *hostname,

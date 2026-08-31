@@ -235,45 +235,6 @@ calculate:
     cgroup_ebpfgo_cachestat_calculate(cg);
 }
 
-static void cgroup_ebpfgo_cachestat_update_single_chart(
-    struct cgroup *cg,
-    RRDSET **chart_ptr,
-    const char *chart_id,
-    const char *title,
-    const char *context,
-    const char *dimension,
-    const char *units,
-    int priority,
-    collected_number divisor,
-    collected_number value)
-{
-    RRDSET *chart = *chart_ptr;
-    collected_number scale = divisor ? divisor : 1;
-
-    if (unlikely(!chart)) {
-        char buff[RRD_ID_LENGTH_MAX + 1];
-        chart = *chart_ptr = rrdset_create_localhost(
-            cgroup_chart_type(buff, cg),
-            chart_id,
-            NULL,
-            "page_cache",
-            context,
-            title,
-            units,
-            PLUGIN_CGROUPS_NAME,
-            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
-            priority,
-            cgroup_update_every,
-            RRDSET_TYPE_LINE);
-
-        rrdset_update_rrdlabels(chart, cg->chart_labels);
-        rrddim_add(chart, dimension, NULL, 1, scale, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    rrddim_set(chart, dimension, value);
-    rrdset_done(chart);
-}
-
 void cgroup_ebpfgo_refresh_pid_lists(void)
 {
     char path_buf[FILENAME_MAX + 1];
@@ -355,11 +316,12 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
     const char *miss_context = is_service ? "systemd.service.cachestat_misses" : "cgroup.cachestat_misses";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5200;
 
-    cgroup_ebpfgo_cachestat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_cachestat_ratio,
         "cachestat_ratio",
         "Hit ratio",
+        "page_cache",
         ratio_context,
         "ratio",
         "%",
@@ -367,11 +329,12 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         1,
         (collected_number)cg->cachestat.ratio);
 
-    cgroup_ebpfgo_cachestat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_cachestat_dirties,
         "cachestat_dirties",
         "Number of dirty pages",
+        "page_cache",
         dirty_context,
         "dirty",
         "page/s",
@@ -379,11 +342,12 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         cgroup_update_every,
         (collected_number)cg->cachestat.dirty);
 
-    cgroup_ebpfgo_cachestat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_cachestat_hits,
         "cachestat_hits",
         "Number of accessed files",
+        "page_cache",
         hit_context,
         "hit",
         "hits/s",
@@ -391,11 +355,12 @@ void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg)
         cgroup_update_every,
         (collected_number)cg->cachestat.hit);
 
-    cgroup_ebpfgo_cachestat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_cachestat_misses,
         "cachestat_misses",
         "Files out of page cache",
+        "page_cache",
         miss_context,
         "miss",
         "misses/s",

@@ -24,7 +24,7 @@ Netdata builds your topology by reading, over SNMP, what your devices already kn
 
 - **BGP** — the BGP peering relationships between your routers (neighbor and remote AS), drawn as router-to-router links.
 - **OSPF** — the OSPF adjacencies between your routers.
-- **Connected subnets** — point-to-point router links inferred from interface IP addresses that share a `/30` or `/31` subnet, catching the router-to-router links that aren't carried by BGP or OSPF (directly-connected or statically-routed links).
+- **Connected subnets** — direct router links inferred from two interfaces sharing a `/30` or `/31`, plus logical subnet segments for managed devices sharing a `/24` through `/29`. These are rendered as logical Layer 3 relationships rather than physical links.
 
 ## How they come together
 
@@ -35,7 +35,7 @@ Netdata fuses these per device into one live graph: LLDP and CDP give the links,
 The device topology is served by the **`topology:snmp`** function — open it from the topology view to see the fabric. A few controls shape what you see, so you can move between a high-trust overview and the complete picture:
 
 - **Nodes identity** — show actors by **IP** (the default, which collapses duplicates and drops non-IP inferred nodes) or by **MAC**.
-- **Map** — choose **LLDP/CDP/Managed Devices Map** (the default — the links your monitored devices advertise directly over LLDP and CDP; "managed" devices are the ones Netdata polls over SNMP), **High Confidence Inferred Map** (adds links Netdata infers with strong evidence), or **All Devices (Low Confidence)** (everything seen, including weakly-inferred links).
+- **Map** — choose **Managed Fabric Map** (the default — all monitored SNMP devices, direct LLDP/CDP and managed STP links, and FDB paths through qualified broadcast-domain segments), the legacy **LLDP/CDP/Managed Devices Map**, **High Confidence Inferred Map**, or **All Devices (Low Confidence)**. Logical Layer 3 subnet, OSPF, and BGP relationships remain visible in every mode with their distinct dashed presentation.
 - **Infer strategy** — how Netdata reconstructs links the devices don't advertise directly, from **FDB Minimum-Knowledge (Baseline)** (the default) through **STP Parent Tree**, **FDB Pairwise Minimum-Knowledge**, **STP + FDB Correlated**, and **CDP + FDB Hybrid**. Different strategies suit different fabrics.
 - **Focus on** and **Focus depth** — pick one or more devices as roots and limit the map to a number of hops out from them, to zoom into one part of a large network.
 

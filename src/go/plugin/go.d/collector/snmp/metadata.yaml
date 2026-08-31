@@ -450,7 +450,7 @@ modules:
 
             - name: manual_profiles
               group: Profiles
-              description: A list of profiles to force-apply when auto-detection cannot be used.
+              description: A list of profiles to use when `sysObjectID`-based auto-detection cannot be used. To retain baseline IPv4 topology for a device without a usable `sysObjectID`, include `generic-device` alongside its vendor profile.
               default_value: "[]"
               required: false
 
@@ -552,9 +552,9 @@ modules:
                   - <<: *snmp_v3_job
                     name: switch3
                     hostname: 192.0.2.3
-            - name: BGP router with forced profile
+            - name: BGP router without sysObjectID detection
               description: |
-                Use `manual_profiles` when auto-detection cannot safely distinguish the device, or when you want to force a specific vendor BGP profile during testing.
+                Use `manual_profiles` when the device does not expose a usable `sysObjectID`. List the vendor profile for its BGP data and `generic-device` for baseline IPv4 interface facts used by topology.
 
                 This example targets a Cisco ASR router and keeps the optional ICMP latency charts enabled.
               config: |
@@ -565,6 +565,7 @@ modules:
                     community: public
                     manual_profiles:
                       - cisco-asr
+                      - generic-device
                     options:
                       version: 2
             - name: Additional node labels
@@ -891,10 +892,11 @@ modules:
           description: |
             Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
 
-            This function reads cached LLDP/CDP, bridge, FDB, ARP, and STP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. No additional SNMP requests are triggered when calling this function.
+            This function reads cached interface/IP, LLDP/CDP, bridge, FDB, ARP, STP, OSPF, and BGP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. Ordinary automatically detected SNMP devices contribute IPv4 interface and netmask facts for logical subnet membership; bridge and neighbor tables remain device-role scoped. No additional SNMP requests are triggered when calling this function.
 
             Use cases:
             - Discover Layer 2 neighbors and link mapping
+            - See managed devices that share an IPv4 subnet
             - Validate cabling and port connections
             - Identify adjacent devices that are discovered but not monitored
           parameters:
@@ -912,14 +914,16 @@ modules:
                   name: MAC
             - id: map_type
               name: Map
-              description: Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links.
+              description: Select the topology map mode. The default Managed Fabric Map keeps monitored devices, direct LLDP/CDP and managed STP links, and qualified FDB broadcast-domain paths. Logical L3 subnet, OSPF, and BGP relationships remain visible with distinct presentation. Legacy and broader inferred views remain selectable.
               type: select
               required: true
-              default: lldp_cdp_managed
+              default: managed_fabric
               options:
+                - id: managed_fabric
+                  name: Managed Fabric Map
+                  default: true
                 - id: lldp_cdp_managed
                   name: LLDP/CDP/Managed Devices Map
-                  default: true
                 - id: high_confidence_inferred
                   name: High Confidence Inferred Map
                 - id: all_devices_low_confidence
@@ -1036,11 +1040,11 @@ modules:
                 unit: ""
                 description: Summary stats for collected observations, actors, links, and pruning/filtering decisions.
           performance: |
-            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows
+            Uses cached SNMP data only; calling the function triggers no additional SNMP requests.<br/>• Each request builds and renders a topology snapshot from the current cache<br/>• CPU time, allocations, and payload size scale with cached devices, interfaces, FDB entries, neighbors, segments, and links<br/>• Large or concurrent requests can require materially more processing even though no device walk occurs
           security: |
             Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
           availability: |
-            Available when:<br/>• The collector has completed at least one successful topology refresh cycle<br/>• LLDP/CDP topology data is present in cache from the last successful topology refresh<br/>• Returns HTTP 503 if topology cache is not ready yet
+            Available when:<br/>• At least one topology-enabled SNMP job has a fresh successful snapshot<br/>• That snapshot contains enough device identity to render a managed actor; LLDP/CDP rows are not required<br/>• Returns HTTP 503 if no current renderable topology snapshot is available
 
         - id: licenses
           name: Licenses
@@ -1238,6 +1242,9 @@ modules:
     troubleshooting:
       problems:
         list:
+          - name: Collect Live Data for Netdata Support
+            description: |
+              For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.
           - name: Debugging Gaps on Charts
             description: |
               If your SNMP charts show gaps, it means the collector could not finish metric collection before the next scheduled run. This usually happens when SNMP tables take longer to collect than your configured `update_every`.

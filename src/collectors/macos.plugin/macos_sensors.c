@@ -1430,11 +1430,17 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
     // function workers are the only other readers and they take the mutex
     static bool function_registered = false;
     if (unlikely(!function_registered && sensor_charts_root)) {
-        rrd_function_add_inline(localhost, NULL, "sensors", 10,
-                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                                MACOS_SENSORS_FUNCTION_HELP,
-                                "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                                macos_sensors_function);
+        nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+            .owner = rrdhost_nrpc_owner(localhost),
+            .name = "sensors",
+            .help = MACOS_SENSORS_FUNCTION_HELP,
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .handler = macos_sensors_function,
+        });
         function_registered = true;
     }
 

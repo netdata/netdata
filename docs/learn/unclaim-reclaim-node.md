@@ -122,5 +122,5 @@ After reclaiming, verify the node appears in:
 ## Related Documentation
 
 - [Remove a node from Netdata Cloud entirely](/docs/learn/remove-node.md) - For permanent node removal
-- [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) - Initial connection setup
+- [Connect Agent to Cloud](/src/claim/README.md) - Initial connection setup
 - [Reconnect Agent](/src/claim/README.md#reconnect-agent) - Linux/ Docker-based installations

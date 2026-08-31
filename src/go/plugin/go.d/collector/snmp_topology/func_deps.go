@@ -21,10 +21,11 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 	}
 
 	dnsCandidates := a.registry.reverseDNSCandidateCollector()
+	environment := topologyGraphBuildEnvironment{}
 	if dnsCandidates != nil {
-		options.ResolveDNSName = dnsCandidates.lookupCached
+		environment.resolveDNSName = dnsCandidates.lookupCached
 	}
-	data, ok, err := a.registry.snapshotWithOptions(options)
+	data, ok, err := a.registry.snapshotWithEnvironment(options, environment)
 	if err != nil {
 		return topologyv1.Data{}, false, err
 	}
@@ -54,10 +55,10 @@ func topologyMethods() []funcapi.FunctionConfig {
 }
 
 func (c *Collector) FunctionAvailable(functionID string) bool {
-	if functionID != snmptopologyfunc.MethodID {
+	if c == nil || functionID != snmptopologyfunc.MethodID || c.topologyRegistry == nil {
 		return false
 	}
-	return c.functionAvailability.Load()
+	return c.topologyRegistry.hasRenderableObservations()
 }
 
 func topologyFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

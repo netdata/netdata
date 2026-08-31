@@ -71,14 +71,16 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.db = db
 	}
 
-	if c.version == "" {
-		ver, err := c.queryVersion()
+	version, majorVersion, engineEdition, loaded := c.serverProperties()
+	if !loaded {
+		var err error
+		version, engineEdition, err = c.queryVersion()
 		if err != nil {
 			return nil, fmt.Errorf("failed to query version: %v", err)
 		}
-		c.version = ver
-		c.majorVersion = parseMajorVersion(c.version)
-		c.Debugf("connected to SQL Server version %s (major: %d)", c.version, c.majorVersion)
+		c.setServerProperties(version, engineEdition)
+		version, majorVersion, engineEdition, _ = c.serverProperties()
+		c.Debugf("connected to SQL Server version %s (major: %d, engine edition: %d)", version, majorVersion, engineEdition)
 	}
 
 	if !c.hadrChecked {
@@ -154,17 +156,11 @@ func (c *Collector) resolveConnectionParams() (string, string, error) {
 	return driverName, dsn, nil
 }
 
-func (c *Collector) queryVersion() (string, error) {
+func (c *Collector) queryVersion() (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	var version string
-	err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version)
-	if err != nil {
-		return "", err
-	}
-
-	return version, nil
+	return c.queryServerProperties(ctx)
 }
 
 func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {
@@ -706,17 +702,20 @@ func (c *Collector) collectJobStatus(mx map[string]int64) {
 		return
 	}
 
-	assignJobChartIDs(jobs, c.seenJobs)
-	c.updateJobCharts(jobs, complete)
-
+	assignJobChartIDs(jobs, c.jobChartIDs)
 	for _, job := range jobs {
 		px := fmt.Sprintf("job_%s_", job.chartID)
 		mx[px+"enabled"] = boolToInt64(job.enabled)
 		mx[px+"disabled"] = boolToInt64(!job.enabled)
 	}
 
+	selectedJobs := c.updateJobCharts(jobs, complete)
+	if len(selectedJobs) == 0 {
+		return
+	}
+
 	if lastExecutions, ok := c.querySQLAgentJobLastExecutions(); ok {
-		for _, job := range jobs {
+		for _, job := range selectedJobs {
 			if lastExec, ok := lastExecutions[job.id]; ok {
 				collectJobLastExecution(mx, job, &lastExec)
 			} else {
@@ -726,7 +725,7 @@ func (c *Collector) collectJobStatus(mx map[string]int64) {
 	}
 
 	if currentExecutions, ok := c.querySQLAgentJobCurrentExecutions(); ok {
-		for _, job := range jobs {
+		for _, job := range selectedJobs {
 			mx[fmt.Sprintf("job_%s_current_execution_time", job.chartID)] = currentExecutions[job.id]
 		}
 	}
@@ -780,7 +779,17 @@ func assignJobChartIDs(jobs []sqlAgentJob, previous map[string]string) {
 		return jobs[i].id < jobs[j].id
 	})
 
-	used := make(map[string]bool, len(jobs))
+	current := make(map[string]bool, len(jobs))
+	for _, job := range jobs {
+		current[job.id] = true
+	}
+
+	used := make(map[string]bool, len(previous)+len(jobs))
+	for jobID, chartID := range previous {
+		if !current[jobID] {
+			used[chartID] = true
+		}
+	}
 	for i := range jobs {
 		if chartID := previous[jobs[i].id]; chartID != "" && !used[chartID] {
 			jobs[i].chartID = chartID
@@ -806,48 +815,63 @@ func assignJobChartIDs(jobs []sqlAgentJob, previous map[string]string) {
 	}
 }
 
-func (c *Collector) updateJobCharts(jobs []sqlAgentJob, removeMissing bool) {
+func (c *Collector) updateJobCharts(jobs []sqlAgentJob, inventoryComplete bool) []sqlAgentJob {
 	seen := make(map[string]bool, len(jobs))
 	currentChartIDs := make(map[string]bool, len(jobs))
 	for _, job := range jobs {
+		seen[job.id] = true
+		c.jobChartIDs[job.id] = job.chartID
 		currentChartIDs[job.chartID] = true
 	}
 
+	selected := jobs[:0]
 	for _, job := range jobs {
-		seen[job.id] = true
-
-		if chartID, ok := c.seenJobs[job.id]; ok {
+		if chartID, ok := c.activeJobs[job.id]; ok {
 			if chartID != job.chartID {
 				if !currentChartIDs[chartID] {
 					c.removeJobCharts(chartID)
 				}
-				c.addJobCharts(job)
-			} else {
-				c.updateJobChartsLabels(job)
 			}
-		} else {
-			c.addJobCharts(job)
 		}
-		c.seenJobs[job.id] = job.chartID
+
+		c.ensureJobStatusChart(job)
+		if job.enabled || c.CollectDisabledJobs {
+			c.ensureJobExecutionCharts(job)
+			selected = append(selected, job)
+		} else {
+			c.removeJobExecutionCharts(job.chartID)
+		}
+		c.updateJobChartsLabels(job)
+		c.activeJobs[job.id] = job.chartID
 	}
 
-	if !removeMissing {
-		return
+	if !inventoryComplete {
+		return selected
 	}
-	for jobID, chartID := range c.seenJobs {
+	for jobID, chartID := range c.activeJobs {
 		if seen[jobID] {
 			continue
 		}
 		c.removeJobCharts(chartID)
-		delete(c.seenJobs, jobID)
+		delete(c.activeJobs, jobID)
 	}
+	for jobID := range c.jobChartIDs {
+		if !seen[jobID] {
+			delete(c.jobChartIDs, jobID)
+		}
+	}
+	return selected
 }
 
 func (c *Collector) querySQLAgentJobLastExecutions() (map[string]sqlAgentJobLastExecution, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(ctx, queryJobLastExecutions)
+	query := queryJobLastExecutions
+	if c.CollectDisabledJobs {
+		query = queryJobLastExecutionsAll
+	}
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		c.Debugf("job last executions query failed: %v", err)
 		return nil, false
@@ -920,7 +944,11 @@ func (c *Collector) querySQLAgentJobCurrentExecutions() (map[string]int64, bool)
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(ctx, queryJobCurrentExecutions)
+	query := queryJobCurrentExecutions
+	if c.CollectDisabledJobs {
+		query = queryJobCurrentExecutionsAll
+	}
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		c.Debugf("job current executions query failed: %v", err)
 		return nil, false
@@ -1180,7 +1208,7 @@ func (c *Collector) collectAvailabilityGroups(mx map[string]int64) error {
 	if err := c.collectAGAutoPageRepair(mx); err != nil {
 		c.Debugf("AG auto page repair query failed: %v", err)
 	}
-	if c.majorVersion >= 15 { // SQL Server 2019+
+	if c.currentMajorVersion() >= 15 { // SQL Server 2019+
 		if err := c.collectAGThreads(mx); err != nil {
 			c.Debugf("AG threads query failed: %v", err)
 		}
@@ -1286,7 +1314,7 @@ func (c *Collector) collectAGDatabaseReplicas(mx map[string]int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	query := agDatabaseReplicaQuery(c.majorVersion)
+	query := agDatabaseReplicaQuery(c.currentMajorVersion())
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("AG database replicas query failed: %v", err)

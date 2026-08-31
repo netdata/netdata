@@ -128,14 +128,14 @@ There are no alerts configured by default for this integration.
 
 On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Cisco SB profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.
 
-**27 metrics** in 4 groups; each row is a chart context usable in alerts.
+**18 metrics** in 4 groups; each row is a chart context usable in alerts.
 
 | Group | Metrics |
 |---|---|
 | Network / Interface | 4 |
 | System / CPU | 1 |
 | System / Uptime | 1 |
-| Uncategorized | 21 |
+| Uncategorized | 12 |
 
 ### Network / Interface
 
@@ -162,15 +162,6 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_cdpGlobalDeviceId` | — | device |  |
-| `snmp.device_prof_cdpGlobalDeviceIdFormat` | — | device |  |
-| `snmp.device_prof_cdpGlobalHoldTime` | — | device |  |
-| `snmp.device_prof_cdpGlobalLastChange` | — | device |  |
-| `snmp.device_prof_cdpGlobalMessageInterval` | — | device |  |
-| `snmp.device_prof_cdpGlobalRun` | — | device |  |
-| `snmp.device_prof_cdpInterfaceEnable` | — | per cdp_if_index |  |
-| `snmp.device_prof_cdpInterfaceMessageInterval` | — | per cdp_if_index |  |
-| `snmp.device_prof_cdpInterfaceName` | — | per cdp_if_index |  |
 | `snmp.device_prof_lldpStatsRemTablesAgeouts` | — | device |  |
 | `snmp.device_prof_lldpStatsRemTablesDeletes` | — | device |  |
 | `snmp.device_prof_lldpStatsRemTablesDrops` | — | device |  |
@@ -183,3 +174,9 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 | `snmp.device_prof_lldpStatsRxPortTLVsDiscardedTotal` | — | per lldp_loc_port_num |  |
 | `snmp.device_prof_lldpStatsRxPortTLVsUnrecognizedTotal` | — | per lldp_loc_port_num |  |
 | `snmp.device_prof_lldpStatsTxPortFramesTotal` | — | per lldp_loc_port_num |  |
+
+
+
+### Collect Live Data for Netdata Support
+
+For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.

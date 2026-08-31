@@ -41,6 +41,9 @@ func (s *l2BuildState) applyBridge(observations []model.L2Observation) {
 			if status := strings.TrimSpace(candidate.statusRaw); status != "" {
 				labels["fdb_status"] = status
 			}
+			if candidate.fdbDomainID != "" {
+				labels["fdb_domain_id"] = candidate.fdbDomainID
+			}
 			if candidate.ifIndex > 0 {
 				ifName := strings.TrimSpace(s.ifNameByDeviceIfIndex[deviceIfIndexKey(sourceID, candidate.ifIndex)])
 				if ifName != "" {

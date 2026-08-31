@@ -402,4 +402,4 @@ log a few errors in error.log complaining about files it cannot find, but immedi
 - Number of processes
 
 Network interfaces inside containers are discovered and monitored by the cgroups plugin using
-[`cgroup-network-helper.sh`](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-network-helper.sh).
+[`cgroup-network-helper.sh`](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-network-helper.sh.in).

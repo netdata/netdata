@@ -3,6 +3,7 @@
 #include "pluginsd_internals.h"
 #include "streaming/stream-replication-receiver.h"
 #include "database/rrddim-collection.h"
+#include "database/rrdset-collection.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -549,6 +550,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
+        if(SERVING_STREAMING(parser))
+            rrdset_set_update_every_s(st, st->update_every);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART, NULL);
@@ -819,8 +822,9 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     bool labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
     labels_changed |= pluginsd_update_host_ephemerality(host);
 
-    if(!rrdlabels_exist(host->rrdlabels, "_os"))
+    if(!rrdlabels_exist(host->rrdlabels, "_os")) {
         labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
+    }
 
     if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
         labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
@@ -850,7 +854,8 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
     if(unlikely(parser->user.clabel_count++ == 0))
         rrdlabels_unmark_all(st->rrdlabels);
 
-    rrdlabels_add(st->rrdlabels, name, value, str2l(label_source));
+    if(rrdlabels_add_changed(st->rrdlabels, name, value, str2l(label_source)))
+        parser->user.clabel_changed = true;
 
     return PARSER_RC_OK;
 }
@@ -869,18 +874,26 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
-    bool labels_changed = rrdlabels_remove_all_unmarked_and_changed(st->rrdlabels);
+    // rrdlabels_remove_all_unmarked_and_changed() only sees added/removed pairs; a source-only
+    // change lands on an existing slot, so pick that up from the per-CLABEL results.
+    bool labels_changed = rrdlabels_remove_all_unmarked_and_changed(st->rrdlabels) ||
+                          parser->user.clabel_changed;
 
-    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
-    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
-    rrdset_metadata_updated(st);
-
+    // CLABEL_COMMIT arrives on every chart definition the child sends, but the labels are usually
+    // identical to what we already hold. Only flag metadata dirty and bump RRDSET.version when they
+    // actually changed - an unconditional bump re-sends the whole chart definition upstream and
+    // re-queues the chart for context post-processing on every commit.
     if(labels_changed) {
+        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+        rrdset_metadata_updated(st);
+
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     parser->user.clabel_count = 0;
+    parser->user.clabel_changed = false;
 
     return PARSER_RC_OK;
 }
@@ -1417,7 +1430,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
     pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
 
-    rrd_collector_started();
+    nrpc_serving_started();
 
     size_t count = 0;
 
@@ -1477,9 +1490,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
         cd->serial_failures++;
 
     // The vnodes this plugin fed also carry its functions, and those only become unavailable
-    // once rrd_collector_finished() runs below. The manifest refresh therefore has to happen
+    // once nrpc_serving_finished() runs below. The manifest refresh therefore has to happen
     // after that, so snapshot the hosts here - the JudyL lives in the parser, which is
-    // destroyed first.
+    // also destroyed below (before the manifest arms).
     //
     // Snapshot machine guids rather than RRDHOST pointers: the loop below clears
     // RRDHOST_FLAG_COLLECTOR_ONLINE, which is exactly what makes rrdhost_is_online() false and so
@@ -1526,10 +1539,19 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
     rrdset_foreach_done(st);
 
+    // Invalidate the collector and drain in-flight dispatchers BEFORE freeing
+    // the parser: cancel/progress callbacks registered by this plugin's
+    // functions carry parser-derived pointers, so the parser must outlive the
+    // dispatcher drain (defense-in-depth on the plugin path; the streaming
+    // path has no per-receiver equivalent - its collector is per stream
+    // thread - and relies on the transport lifetime instead). Safe to
+    // reorder: the obsolete-charts sweep above keys on collector_tid, the
+    // vnode snapshot was taken earlier, and nrpc_serving_finished() is
+    // idempotent per worker iteration.
+    nrpc_serving_finished();
     pluginsd_process_cleanup(parser);
-    rrd_collector_finished();
 
-    // the functions this plugin registered are still in host->functions, but their collector
+    // the functions this plugin registered are still in the host's function registry, but their collector
     // is no longer running, so they must drop out of the cloud manifest
     aclk_arm_node_manifest(host);
     for (size_t i = 0; i < vnodes_used; i++)

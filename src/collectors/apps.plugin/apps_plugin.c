@@ -5,18 +5,11 @@
 #include "apps-lookup-netipc.h"
 #include "libnetdata/parsers/duration.h"
 
-#define APPS_PLUGIN_FUNCTIONS() do { \
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",         \
-            PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
-            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_SENSITIVE_DATA),     \
-            RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
-} while(0)
-
 #define APPS_PLUGIN_GLOBAL_FUNCTIONS() do { \
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",  \
             PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_SENSITIVE_DATA),     \
-            RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
+            NRPC_PRIORITY_DEFAULT / 10);                                                                    \
 } while(0)
 
 // ----------------------------------------------------------------------------
@@ -103,7 +96,7 @@ NETDATA_DOUBLE
 
 int update_every = 1;
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_STATE == 1)
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",
@@ -899,6 +892,8 @@ int main(int argc, char **argv) {
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_is_available())
             apps_ebpf_accumulate_cachestat();
+        if (apps_ebpf_dcstat_is_available())
+            apps_ebpf_accumulate_dcstat();
 #endif
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);

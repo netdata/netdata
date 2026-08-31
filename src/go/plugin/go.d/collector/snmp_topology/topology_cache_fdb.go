@@ -11,15 +11,13 @@ import (
 )
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindFdbEntry, (*topologyCache).updateFdbEntry)
-	registerTopologyMetricHandler(ddsnmp.KindQbridgeFdbEntry, (*topologyCache).updateFdbEntry)
-	registerTopologyMetricHandler(ddsnmp.KindQbridgeVlanEntry, (*topologyCache).updateDot1qVlanMap)
-	registerTopologyMetricHandler(ddsnmp.KindVtpVlan, (*topologyCache).updateVtpVlanEntry)
+	registerTopologyMetricHandler(ddsnmp.KindFdbEntry, (*topologyBuilder).updateFdbEntry)
+	registerTopologyMetricHandler(ddsnmp.KindQbridgeFdbEntry, (*topologyBuilder).updateFdbEntry)
+	registerTopologyMetricHandler(ddsnmp.KindQbridgeVlanEntry, (*topologyBuilder).updateDot1qVlanMap)
+	registerTopologyMetricHandler(ddsnmp.KindVtpVlan, (*topologyBuilder).updateVtpVlanEntry)
 }
 
-func (c *topologyCache) updateFdbEntry(tags map[string]string) {
-	c.updateLocalBridgeIdentityFromTags(tags)
-
+func (c *topologyBuilder) updateFdbEntry(tags map[string]string) {
 	mac := topologyutil.NormalizeMAC(topologyutil.FirstNonEmptyString(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		c.fdbRowsDroppedNoMAC++
@@ -48,28 +46,20 @@ func (c *topologyCache) updateFdbEntry(tags map[string]string) {
 	if v := strings.TrimSpace(topologyutil.FirstNonEmptyString(tags[tagFdbStatus], tags[tagDot1qFdbStatus])); v != "" {
 		entry.status = v
 	}
-	if entry.vlanID == "" && contextVLANID != "" {
+	if !entry.vlanIDExplicit && contextVLANID != "" {
 		entry.vlanID = contextVLANID
+		entry.vlanIDExplicit = true
 	}
-	if entry.vlanName == "" && contextVLANName != "" {
+	if !entry.vlanNameExplicit && contextVLANName != "" {
 		entry.vlanName = contextVLANName
+		entry.vlanNameExplicit = true
 	}
 	if entry.fdbID == "" && fdbID != "" {
 		entry.fdbID = fdbID
 	}
-	if entry.vlanID == "" && entry.fdbID != "" {
-		if vlanID := strings.TrimSpace(c.fdbIDToVlanID[entry.fdbID]); vlanID != "" {
-			entry.vlanID = vlanID
-		}
-	}
-	if entry.vlanName == "" && entry.vlanID != "" {
-		if vlanName := strings.TrimSpace(c.vlanIDToName[entry.vlanID]); vlanName != "" {
-			entry.vlanName = vlanName
-		}
-	}
 }
 
-func (c *topologyCache) updateDot1qVlanMap(tags map[string]string) {
+func (c *topologyBuilder) updateDot1qVlanMap(tags map[string]string) {
 	fdbID := strings.TrimSpace(tags[tagDot1qVlanFdbID])
 	if fdbID == "" {
 		return
@@ -83,21 +73,17 @@ func (c *topologyCache) updateDot1qVlanMap(tags map[string]string) {
 		return
 	}
 
-	c.fdbIDToVlanID[fdbID] = vlanID
-	for _, entry := range c.fdbEntries {
-		if entry == nil || strings.TrimSpace(entry.fdbID) != fdbID {
-			continue
-		}
-		if strings.TrimSpace(entry.vlanID) == "" {
-			entry.vlanID = vlanID
-		}
-		if strings.TrimSpace(entry.vlanName) == "" {
-			entry.vlanName = strings.TrimSpace(c.vlanIDToName[vlanID])
-		}
+	mapping, ok := c.vlanByFDBID[fdbID]
+	if !ok {
+		c.vlanByFDBID[fdbID] = fdbVLANMapping{vlanID: vlanID}
+		return
+	}
+	if !mapping.ambiguous && mapping.vlanID != vlanID {
+		c.vlanByFDBID[fdbID] = fdbVLANMapping{ambiguous: true}
 	}
 }
 
-func (c *topologyCache) updateVtpVlanEntry(tags map[string]string) {
+func (c *topologyBuilder) updateVtpVlanEntry(tags map[string]string) {
 	vlanID := strings.TrimSpace(tags[tagVtpVlanIndex])
 	vlanName := strings.TrimSpace(tags[tagVtpVlanName])
 	if vlanID == "" || vlanName == "" {
@@ -113,13 +99,38 @@ func (c *topologyCache) updateVtpVlanEntry(tags map[string]string) {
 		return
 	}
 
-	c.vlanIDToName[vlanID] = vlanName
+	mapping, ok := c.vlanNameByID[vlanID]
+	if !ok {
+		c.vlanNameByID[vlanID] = vlanNameMapping{name: vlanName}
+		return
+	}
+	if !mapping.ambiguous && mapping.name != vlanName {
+		c.vlanNameByID[vlanID] = vlanNameMapping{ambiguous: true}
+	}
+}
+
+func (c *topologyBuilder) finalizeFDBVLANs() {
 	for _, entry := range c.fdbEntries {
-		if entry == nil || strings.TrimSpace(entry.vlanID) != vlanID {
+		if entry == nil {
 			continue
 		}
-		if strings.TrimSpace(entry.vlanName) == "" {
-			entry.vlanName = vlanName
+
+		if !entry.vlanIDExplicit {
+			entry.vlanID = ""
+			mapping, ok := c.vlanByFDBID[strings.TrimSpace(entry.fdbID)]
+			if ok && !mapping.ambiguous {
+				entry.vlanID = strings.TrimSpace(mapping.vlanID)
+			}
+		}
+
+		if !entry.vlanNameExplicit {
+			entry.vlanName = ""
+			if vlanID := strings.TrimSpace(entry.vlanID); vlanID != "" {
+				mapping := c.vlanNameByID[vlanID]
+				if !mapping.ambiguous {
+					entry.vlanName = strings.TrimSpace(mapping.name)
+				}
+			}
 		}
 	}
 }

@@ -367,6 +367,22 @@ static void pulse_child_chart_labels(RRDSET *st, RRDHOST *host) {
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 }
 
+// The per-child charts are refreshed on every pulse step, for every streamed host. rrddim_add() is a
+// dictionary write (conflict callback, destroy_lock trylock, collection reinitialise) and is only
+// needed the first time each dimension appears, so look it up first and fall back to creating it.
+static inline RRDDIM *pulse_child_dim(RRDSET *st, const char *id, collected_number multiplier, RRD_ALGORITHM algorithm) {
+    // rrddim_find_active() only hides an obsolete dimension when its chart is ALSO undiscoverable
+    // (rrdset_is_discoverable()), and these pulse charts are never obsolete - so it can hand back an
+    // obsolete dimension. Returning it unrevived would defer revival to rrdset_done(), which logs
+    // "has the OBSOLETE flag set, but it is collected" as an error. Fall through to rrddim_add(),
+    // whose pre-lookup revives it properly.
+    RRDDIM *rd = rrddim_find_active(st, id);
+    if(likely(rd && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        return rd;
+
+    return rrddim_add(st, id, NULL, multiplier, 1, algorithm);
+}
+
 static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) {
     char id[RRD_ID_LENGTH_MAX + 1];
     const char *guid = host->machine_guid;
@@ -386,9 +402,9 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         130160, localhost->rrd_update_every, RRDSET_TYPE_AREA);
     if(unlikely(refresh_labels || !rrdlabels_exist(st_traffic->rrdlabels, "machine_guid")))
         pulse_child_chart_labels(st_traffic, host);
-    rrddim_set_by_pointer(st_traffic, rrddim_add(st_traffic, "in", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL),
+    rrddim_set_by_pointer(st_traffic, pulse_child_dim(st_traffic, "in", 1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)single_writer_atomic_read(&host->stream.rcv.status.bytes_in));
-    rrddim_set_by_pointer(st_traffic, rrddim_add(st_traffic, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL),
+    rrddim_set_by_pointer(st_traffic, pulse_child_dim(st_traffic, "out", -1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)single_writer_atomic_read(&host->stream.rcv.status.bytes_out));
     rrdset_done(st_traffic);
 
@@ -410,7 +426,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         pulse_child_chart_labels(st_state, host);
     for(size_t i = 0; i < PULSE_INBOUND_MAX ; i++) {
         if(!state_dim[i]) continue;
-        rrddim_set_by_pointer(st_state, rrddim_add(st_state, state_dim[i], NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE),
+        rrddim_set_by_pointer(st_state, pulse_child_dim(st_state, state_dim[i], 1, RRD_ALGORITHM_ABSOLUTE),
             (collected_number)(state == i ? 1 : 0));
     }
     rrdset_done(st_state);
@@ -423,7 +439,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         130162, localhost->rrd_update_every, RRDSET_TYPE_LINE);
     if(unlikely(refresh_labels || !rrdlabels_exist(st_reconnects->rrdlabels, "machine_guid")))
         pulse_child_chart_labels(st_reconnects, host);
-    rrddim_set_by_pointer(st_reconnects, rrddim_add(st_reconnects, "connections", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL),
+    rrddim_set_by_pointer(st_reconnects, pulse_child_dim(st_reconnects, "connections", 1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)__atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED));
     rrdset_done(st_reconnects);
 
@@ -437,7 +453,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         pulse_child_chart_labels(st_age, host);
     time_t changed = __atomic_load_n(&host->stream.rcv.status.state_changed_s, __ATOMIC_RELAXED);
     time_t now_s = now_realtime_sec();
-    rrddim_set_by_pointer(st_age, rrddim_add(st_age, "age", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE),
+    rrddim_set_by_pointer(st_age, pulse_child_dim(st_age, "age", 1, RRD_ALGORITHM_ABSOLUTE),
         (collected_number)((changed && now_s > changed) ? now_s - changed : 0));
     rrdset_done(st_age);
 }

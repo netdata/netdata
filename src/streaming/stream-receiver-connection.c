@@ -5,14 +5,6 @@
 #include "stream-receiver-internals.h"
 #include "stream-replication-sender.h"
 
-#if defined(__APPLE__) && !defined(TCP_KEEPIDLE)
-#define TCP_KEEPIDLE TCP_KEEPALIVE
-#endif
-
-#define CONNECTION_PROBE_AFTER_SECONDS (30)
-#define CONNECTION_PROBE_INTERVAL_SECONDS (10)
-#define CONNECTION_PROBE_COUNT (3)
-
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host);
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -258,6 +250,9 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
             return false;
         }
+
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELEASE);
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -315,32 +310,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set timeout for socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
-            // Enable TCP keepalive to detect dead connections faster
-            // When a child vanishes (e.g., VM powered off), the socket won't close normally.
-            // TCP keepalive will probe the connection and detect it's dead.
-            int enable = 1;
-            int idle = CONNECTION_PROBE_AFTER_SECONDS;
-            int interval = CONNECTION_PROBE_INTERVAL_SECONDS;
-            int count = CONNECTION_PROBE_COUNT;
-
-            if (setsockopt(rpt->sock.fd, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot enable SO_KEEPALIVE on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-#ifdef TCP_KEEPIDLE
-            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPIDLE on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPINTVL on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPCNT on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-#endif
+            stream_receiver_reconcile_keepalive(rpt);
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->remote_ip, initial_response);
@@ -409,8 +379,10 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         else if(!strcmp(name, "machine_guid") && !rpt->machine_guid)
             rpt->machine_guid = strdupz(value);
 
-        else if(!strcmp(name, "update_every"))
+        else if(!strcmp(name, "update_every")) {
             rpt->config.update_every = (int)strtoul(value, NULL, 0);
+            rpt->handshake_update_every = rpt->config.update_every;
+        }
 
         else if(!strcmp(name, "os") && !rpt->os)
             rpt->os = strdupz(value);

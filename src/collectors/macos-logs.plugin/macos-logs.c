@@ -256,23 +256,23 @@ static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QU
     switch(status) {
         case MACOS_LOGS_QUERY_OK:
             if(lqs->rq.if_modified_since && !lqs->c.rows_useful)
-                return rrd_call_function_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
+                return nrpc_call_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
             break;
 
         case MACOS_LOGS_QUERY_TIMED_OUT:
             break;
 
         case MACOS_LOGS_QUERY_CANCELLED:
-            return rrd_call_function_error(wb, "client closed connection", HTTP_RESP_CLIENT_CLOSED_REQUEST);
+            return nrpc_call_error(wb, "client closed connection", HTTP_RESP_CLIENT_CLOSED_REQUEST);
 
         case MACOS_LOGS_QUERY_OPEN_FAILED:
-            return rrd_call_function_error(wb, "failed to open macOS unified log store", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "failed to open macOS unified log store", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         case MACOS_LOGS_QUERY_ENUMERATOR_FAILED:
-            return rrd_call_function_error(wb, "failed to enumerate macOS unified logs", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "failed to enumerate macOS unified logs", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         default:
-            return rrd_call_function_error(wb, "unknown macOS unified log query status", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "unknown macOS unified log query status", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -675,7 +675,7 @@ int main(int argc, char **argv) {
             MACOS_LOGS_DEFAULT_TIMEOUT,
             MACOS_LOGS_FUNCTION_DESCRIPTION,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
-            RRDFUNCTIONS_PRIORITY_DEFAULT);
+            NRPC_PRIORITY_DEFAULT);
     fflush(stdout);
     netdata_mutex_unlock(&stdout_mutex);
 

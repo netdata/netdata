@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+var snmpHexSeparatorReplacer = strings.NewReplacer(":", "", "-", "", ".", "", " ", "")
+
 func CanonicalSNMPEnumValue(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	if value == "" {
@@ -24,7 +26,7 @@ func CanonicalSNMPEnumValue(value string) string {
 
 func DecodeHexString(value string) ([]byte, error) {
 	clean := strings.TrimPrefix(strings.ToLower(NormalizeSNMPHexText(value)), "0x")
-	clean = strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(clean)
+	clean = snmpHexSeparatorReplacer.Replace(clean)
 	if clean == "" {
 		return nil, fmt.Errorf("empty hex string")
 	}
@@ -146,7 +148,7 @@ func NormalizeMAC(value string) string {
 		return strings.ToLower(hw.String())
 	}
 
-	clean := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(strings.ToLower(value))
+	clean := snmpHexSeparatorReplacer.Replace(strings.ToLower(value))
 	if clean == "" {
 		return ""
 	}
@@ -185,7 +187,7 @@ func NormalizeHexIdentifier(value string) string {
 		return strings.ToLower(hex.EncodeToString(bs))
 	}
 
-	clean := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(strings.ToLower(value))
+	clean := snmpHexSeparatorReplacer.Replace(strings.ToLower(value))
 	if clean == "" {
 		return ""
 	}
