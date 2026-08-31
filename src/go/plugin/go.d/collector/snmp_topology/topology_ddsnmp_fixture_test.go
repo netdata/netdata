@@ -225,10 +225,18 @@ func TestTopologyProductionPath_LLDPRemoteManagementAddressProfiles(t *testing.T
 
 func TestTopologyProductionPath_PaloAltoLLDPV2Fixture(t *testing.T) {
 	fixture := loadTopologySNMPRecHandler(t, "../../../../testdata/snmp/lldp-v2/librenms-panos-vsys.snmprec")
-	const sysObjectID = "1.3.6.1.4.1.25461.2.3.36"
+	sysObjectIDPDU, ok := fixture.byOID["1.3.6.1.2.1.1.2.0"]
+	require.True(t, ok, "fixture must retain its real sysObjectID")
+	sysObjectID, ok := sysObjectIDPDU.Value.(string)
+	require.True(t, ok)
+	sysDescrPDU, ok := fixture.byOID["1.3.6.1.2.1.1.1.0"]
+	require.True(t, ok, "fixture must retain its real sysDescr")
+	sysDescrBytes, ok := sysDescrPDU.Value.([]byte)
+	require.True(t, ok)
 
 	profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
 		SysObjectID: sysObjectID,
+		SysDescr:    string(sysDescrBytes),
 	}).Project(ddsnmp.ConsumerTopology).FilterByKind(map[ddsnmp.TopologyKind]bool{
 		ddsnmp.KindLldpLocPort:    true,
 		ddsnmp.KindLldpLocManAddr: true,
@@ -236,7 +244,7 @@ func TestTopologyProductionPath_PaloAltoLLDPV2Fixture(t *testing.T) {
 		ddsnmp.KindLldpRemManAddr: true,
 	}).Profiles()
 	require.Len(t, profiles, 1)
-	require.Equal(t, "palo-alto", strings.TrimSuffix(filepath.Base(profiles[0].SourceFile), filepath.Ext(profiles[0].SourceFile)))
+	require.Equal(t, "topology-role-palo-alto-firewall-lldp-v2", strings.TrimSuffix(filepath.Base(profiles[0].SourceFile), filepath.Ext(profiles[0].SourceFile)))
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
 		SnmpClient:  fixture,

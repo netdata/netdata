@@ -187,29 +187,99 @@ func TestCiscoProfiles_CDPIsTopologyOnly(t *testing.T) {
 	}
 }
 
-func TestPaloAltoProfile_LLDPV2IsTopologyOnly(t *testing.T) {
-	profile, err := LoadProfileByName("palo-alto")
+func TestPaloAltoProfiles_LLDPV2IsFirewallTopologyOnly(t *testing.T) {
+	paloAlto, err := LoadProfileByName("palo-alto")
 	require.NoError(t, err)
-	assert.True(t, profile.HasExtension("_std-topology-lldp-v2-mib.yaml"))
-	assert.False(t, profile.HasExtension("_std-lldp-mib.yaml"))
+	assert.False(t, paloAlto.HasExtension("_std-topology-lldp-v2-mib.yaml"))
+	assert.False(t, paloAlto.HasExtension("_std-lldp-mib.yaml"))
 
-	wantKinds := map[ddprofiledefinition.TopologyKind]bool{
-		ddprofiledefinition.KindLldpLocPort:    true,
-		ddprofiledefinition.KindLldpLocManAddr: true,
-		ddprofiledefinition.KindLldpRem:        true,
-		ddprofiledefinition.KindLldpRemManAddr: true,
-	}
-	gotKinds := make(map[ddprofiledefinition.TopologyKind]bool)
-	for _, row := range profile.Definition.Topology {
-		if row.MIB == "LLDP-V2-MIB" {
-			gotKinds[row.Kind] = true
-		}
-	}
-	assert.Equal(t, wantKinds, gotKinds)
+	role, err := LoadProfileByName("topology-role-palo-alto-firewall-lldp-v2")
+	require.NoError(t, err)
+	assert.True(t, role.HasExtension("_std-topology-lldp-v2-mib.yaml"))
 
-	for _, metric := range profile.Definition.Metrics {
+	tests := map[string]struct {
+		sysObjectID string
+		sysDescr    string
+		wantV2      bool
+	}{
+		"product firewall": {
+			sysObjectID: "1.3.6.1.4.1.25461.2.3.36",
+			sysDescr:    "Palo Alto Networks PA-820 series firewall",
+			wantV2:      true,
+		},
+		"enterprise-root fixture firewall": {
+			sysObjectID: "1.3.6.1.4.1.25461",
+			sysDescr:    "Palo Alto Networks PA-3000 series firewall",
+			wantV2:      true,
+		},
+		"Panorama": {
+			sysObjectID: "1.3.6.1.4.1.25461.2.3.7",
+			sysDescr:    "Palo Alto Networks Panorama",
+		},
+		"WildFire appliance": {
+			sysObjectID: "1.3.6.1.4.1.25461.2.3.33",
+			sysDescr:    "Palo Alto Networks WildFire Appliance",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			resolved := DefaultCatalog().Resolve(ResolveRequest{SysObjectID: tc.sysObjectID, SysDescr: tc.sysDescr})
+			ordinary := resolved.Project(ConsumerMetrics).Profiles()
+			topology := resolved.Project(ConsumerTopology).Profiles()
+
+			var v2Kinds []ddprofiledefinition.TopologyKind
+			for _, profile := range topology {
+				for _, row := range profile.Definition.Topology {
+					if row.MIB == "LLDP-V2-MIB" {
+						v2Kinds = append(v2Kinds, row.Kind)
+					}
+				}
+			}
+
+			if !tc.wantV2 {
+				assert.Empty(t, v2Kinds)
+				return
+			}
+
+			assert.ElementsMatch(t, []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindLldpLocPort,
+				ddprofiledefinition.KindLldpLocManAddr,
+				ddprofiledefinition.KindLldpRem,
+				ddprofiledefinition.KindLldpRemManAddr,
+			}, v2Kinds)
+
+			ordinaryMetadata := resolvedMetadataFields(ordinary)
+			topologyMetadata := resolvedMetadataFields(topology)
+			for _, field := range []string{
+				"lldp_loc_chassis_id",
+				"lldp_loc_chassis_id_subtype",
+				"lldp_loc_sys_name",
+				"lldp_loc_sys_desc",
+				"lldp_loc_sys_cap_supported",
+				"lldp_loc_sys_cap_enabled",
+			} {
+				assert.NotContains(t, ordinaryMetadata, field, "ordinary SNMP projection must not retain LLDP-V2 topology metadata")
+				assert.Contains(t, topologyMetadata, field, "topology projection must retain LLDP-V2 metadata")
+			}
+		})
+	}
+
+	for _, metric := range role.Definition.Metrics {
 		assert.NotEqual(t, "LLDP-V2-MIB", metric.MIB, "LLDP-V2 capability must not add ordinary metrics")
 	}
+}
+
+func resolvedMetadataFields(profiles []*Profile) map[string]struct{} {
+	fields := make(map[string]struct{})
+	for _, profile := range profiles {
+		for _, resource := range profile.Definition.Metadata {
+			for name := range resource.Fields {
+				fields[name] = struct{}{}
+			}
+		}
+	}
+	return fields
 }
 
 func TestTopologyProfiles_DoNotMixLLDPGenerations(t *testing.T) {
