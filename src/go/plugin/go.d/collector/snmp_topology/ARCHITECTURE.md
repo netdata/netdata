@@ -660,15 +660,21 @@ identity representation of the retained observation after shaping; it is not
 claimed to be the registration itself or proof that one registration caused a
 collapsed actor.
 
-Link inspection resolves both endpoints through exact normalized actor identity
-keys, then matches the existing link family, protocol, and direction. These
-fields define a candidate subject rather than a unique link identity; the full
-matching graph rows retain interface, subnet, adjacency, routing-instance, and
-other parallel-link details. Endpoint reversal is accepted for bidirectional
-links and unordered direct L3/OSPF/BGP adjacencies; ordered STP and
-subnet-membership roles remain exact. Zero matches is `absent` only after the
-relevant stage completed, one is `present`, and multiple actor or link matches
-is `undetermined` with every candidate returned.
+Link inspection has two selectors with distinct purposes. Exact inspection
+selects one existing graph link by its zero-based replay index, derives its
+ordinary subject and family-wide source context, and maps the same index to the
+typed link row. The index belongs to one archive and query option set; it is not
+a persistent link identity.
+
+Candidate inspection resolves both endpoints through exact normalized actor
+identity keys, then matches the existing link family, protocol, and direction.
+These fields can describe a link that is absent but do not define a unique link
+identity; the full matching graph rows retain interface, subnet, adjacency,
+routing-instance, and other parallel-link details. Endpoint reversal is
+accepted for bidirectional links and unordered direct L3/OSPF/BGP adjacencies;
+ordered STP and subnet-membership roles remain exact. Zero matches is `absent`
+only after the relevant stage completed, one is `present`, and multiple actor
+or link matches is `undetermined` with every candidate returned.
 
 Every link report also carries the committed diagnostic cut's capture state,
 reason, sequence, and timestamps. A cut rejected by projection or diagnostic
@@ -762,7 +768,7 @@ operation:
 - `summary` reports cut state/counts and an ordered registration inventory;
 - `replay` returns the unchanged production topology-v1 payload; and
 - `inspect-device` and `inspect-link` return typed positive-allowlist projections of the existing offline inspection
-  reports.
+  reports; link inspection accepts either an existing replay index or the candidate identity selector.
 
 The collector's diagnostic facade owns the command request/report DTOs beside the adapter that constructs them from
 private topology state. The command depends only on that facade; it does not own a second archive model, replay engine,
