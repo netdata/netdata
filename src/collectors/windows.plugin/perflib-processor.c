@@ -51,6 +51,28 @@ void dict_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *
 
 static DICTIONARY *processors = NULL;
 
+struct processor_topology_entry {
+    uint32_t numa_node;
+    uint32_t numa_index;
+    int cpu_id;
+};
+
+struct processor_topology {
+    struct processor_topology_entry *entries;
+    size_t entries_count;
+    size_t entries_capacity;
+};
+
+// Windows 20H2 extends the SDK's NUMA_NODE_RELATIONSHIP with GroupCount and GroupMasks.
+struct processor_numa_node_relationship {
+    DWORD node_number;
+    BYTE reserved[18];
+    WORD group_count;
+    GROUP_AFFINITY group_masks[ANYSIZE_ARRAY];
+};
+
+static struct processor_topology processor_topology = {0};
+
 static void initialize(void)
 {
     initialize_processor_keys(&total);
@@ -61,10 +83,201 @@ static void initialize(void)
     dictionary_register_insert_callback(processors, dict_processor_insert_cb, NULL);
 }
 
+static unsigned int count_set_bits(KAFFINITY mask)
+{
+    unsigned int count = 0;
+    while (mask) {
+        count += (unsigned int)(mask & 1);
+        mask >>= 1;
+    }
+
+    return count;
+}
+
+static bool
+processor_topology_add(struct processor_topology *topology, uint32_t numa_node, uint32_t numa_index, uint64_t cpu_id)
+{
+    if (cpu_id > INT_MAX)
+        return false;
+
+    if (topology->entries_count == topology->entries_capacity) {
+        size_t capacity = topology->entries_capacity ? topology->entries_capacity * 2 : 64;
+        topology->entries = reallocz(topology->entries, capacity * sizeof(*topology->entries));
+        topology->entries_capacity = capacity;
+    }
+
+    topology->entries[topology->entries_count++] = (struct processor_topology_entry){
+        .numa_node = numa_node,
+        .numa_index = numa_index,
+        .cpu_id = (int)cpu_id,
+    };
+    return true;
+}
+
+static bool processor_topology_add_mask(
+    struct processor_topology *topology,
+    uint32_t numa_node,
+    KAFFINITY mask,
+    uint64_t group_offset)
+{
+    uint32_t numa_index = 0;
+    for (size_t i = 0; i < topology->entries_count; i++) {
+        if (topology->entries[i].numa_node == numa_node)
+            numa_index++;
+    }
+
+    for (unsigned int bit = 0; mask; bit++, mask >>= 1) {
+        if (!(mask & 1))
+            continue;
+
+        if (!processor_topology_add(topology, numa_node, numa_index++, group_offset + bit))
+            return false;
+    }
+
+    return true;
+}
+
+static bool processor_topology_from_extended_api(struct processor_topology *topology)
+{
+    typedef BOOL(WINAPI * get_logical_processor_information_ex_t)(
+        LOGICAL_PROCESSOR_RELATIONSHIP relationship_type,
+        PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX buffer,
+        PDWORD returned_length);
+
+    HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
+    union {
+        FARPROC raw;
+        get_logical_processor_information_ex_t typed;
+    } api = {.raw = kernel32 ? GetProcAddress(kernel32, "GetLogicalProcessorInformationEx") : NULL};
+    get_logical_processor_information_ex_t get_logical_processor_information_ex = api.typed;
+    if (!get_logical_processor_information_ex)
+        return false;
+
+    DWORD buffer_length = 0;
+    if (get_logical_processor_information_ex(RelationAll, NULL, &buffer_length) ||
+        GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        return false;
+
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX buffer = mallocz(buffer_length);
+    if (!get_logical_processor_information_ex(RelationAll, buffer, &buffer_length)) {
+        freez(buffer);
+        return false;
+    }
+
+    uint64_t *group_offsets = NULL;
+    WORD group_count = 0;
+    BYTE *end = (BYTE *)buffer + buffer_length;
+    for (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX entry = buffer; (BYTE *)entry < end;
+         entry = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)((BYTE *)entry + entry->Size)) {
+        size_t group_header_size =
+            offsetof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, Group) + offsetof(GROUP_RELATIONSHIP, GroupInfo);
+        if (entry->Size < group_header_size || (BYTE *)entry + entry->Size > end)
+            goto cleanup;
+
+        if (entry->Relationship != RelationGroup)
+            continue;
+
+        group_count = entry->Group.ActiveGroupCount;
+        if (!group_count || (size_t)(entry->Size - group_header_size) / sizeof(*entry->Group.GroupInfo) < group_count)
+            goto cleanup;
+
+        group_offsets = callocz(group_count, sizeof(*group_offsets));
+        for (WORD group = 1; group < group_count; group++)
+            group_offsets[group] =
+                group_offsets[group - 1] + count_set_bits(entry->Group.GroupInfo[group - 1].ActiveProcessorMask);
+        break;
+    }
+
+    if (!group_offsets)
+        goto cleanup;
+
+    for (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX entry = buffer; (BYTE *)entry < end;
+         entry = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)((BYTE *)entry + entry->Size)) {
+        size_t numa_header_size = offsetof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, NumaNode) +
+                                  offsetof(struct processor_numa_node_relationship, group_masks);
+        if (entry->Size < numa_header_size || (BYTE *)entry + entry->Size > end)
+            goto cleanup;
+
+        if (entry->Relationship != RelationNumaNode)
+            continue;
+
+        const struct processor_numa_node_relationship *numa = (const void *)&entry->NumaNode;
+        WORD node_group_count = numa->group_count;
+        if (!node_group_count)
+            node_group_count = 1;
+        if ((size_t)(entry->Size - numa_header_size) / sizeof(*numa->group_masks) < node_group_count)
+            goto cleanup;
+
+        for (WORD i = 0; i < node_group_count; i++) {
+            const GROUP_AFFINITY *group_mask = &numa->group_masks[i];
+            if (group_mask->Group >= group_count ||
+                !processor_topology_add_mask(
+                    topology, numa->node_number, group_mask->Mask, group_offsets[group_mask->Group]))
+                goto cleanup;
+        }
+    }
+
+    freez(group_offsets);
+    freez(buffer);
+    return topology->entries_count != 0;
+
+cleanup:
+    freez(group_offsets);
+    freez(buffer);
+    freez(topology->entries);
+    *topology = (struct processor_topology){0};
+    return false;
+}
+
+static bool processor_topology_from_legacy_api(struct processor_topology *topology)
+{
+    ULONG highest_node;
+    if (!GetNumaHighestNodeNumber(&highest_node))
+        return false;
+
+    for (ULONG node = 0; node <= highest_node; node++) {
+        ULONGLONG mask;
+        if (!GetNumaNodeProcessorMask((UCHAR)node, &mask) || !mask)
+            continue;
+
+        if (!processor_topology_add_mask(topology, node, (KAFFINITY)mask, 0)) {
+            freez(topology->entries);
+            *topology = (struct processor_topology){0};
+            return false;
+        }
+    }
+
+    return topology->entries_count != 0;
+}
+
+static bool processor_topology_refresh(void)
+{
+    struct processor_topology topology = {0};
+    if (!processor_topology_from_extended_api(&topology) && !processor_topology_from_legacy_api(&topology))
+        return false;
+
+    freez(processor_topology.entries);
+    processor_topology = topology;
+    return true;
+}
+
+static bool processor_topology_find(uint32_t numa_node, uint32_t numa_index, int *cpu_id)
+{
+    for (size_t i = 0; i < processor_topology.entries_count; i++) {
+        const struct processor_topology_entry *entry = &processor_topology.entries[i];
+        if (entry->numa_node == numa_node && entry->numa_index == numa_index) {
+            *cpu_id = entry->cpu_id;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool processor_information_instance_to_cpu_id(const char *instance_name, int *cpu_id)
 {
     char *separator;
-    uint32_t processor_group = str2uint32_t(instance_name, &separator);
+    uint32_t numa_node = str2uint32_t(instance_name, &separator);
     if (separator == instance_name || *separator != ',')
         return false;
 
@@ -77,27 +290,14 @@ static bool processor_information_instance_to_cpu_id(const char *instance_name, 
     if (end == processor_number || *end != '\0')
         return false;
 
-    WORD processor_group_count = GetActiveProcessorGroupCount();
-    if (processor_group >= processor_group_count)
-        return false;
+    if (processor_topology_find(numa_node, processor, cpu_id))
+        return true;
 
-    DWORD processors_in_group = GetActiveProcessorCount((WORD)processor_group);
-    if (processor >= processors_in_group)
-        return false;
-
-    uint64_t global_processor = processor;
-    for (WORD group = 0; group < processor_group; group++)
-        global_processor += GetActiveProcessorCount(group);
-
-    if (global_processor > INT_MAX)
-        return false;
-
-    *cpu_id = (int)global_processor;
-    return true;
+    return processor_topology_refresh() && processor_topology_find(numa_node, processor, cpu_id);
 }
 
-static bool do_processors(
-    PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool processor_information, int update_every)
+static bool
+do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool processor_information, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, object_name);
     if (!pObjectType)
@@ -133,8 +333,7 @@ static bool do_processors(
                 cpu = str2i(windows_shared_buffer);
             snprintfz(windows_shared_buffer, sizeof(windows_shared_buffer), "cpu%d", cpu);
 
-            if (cpu + 1 > cores_found)
-                cores_found = cpu + 1;
+            cores_found++;
         }
 
         if (!is_total && !p->collected_metadata) {
