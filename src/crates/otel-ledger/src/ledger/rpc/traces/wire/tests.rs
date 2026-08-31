@@ -15,13 +15,36 @@ fn req_err(v: serde_json::Value) -> String {
 }
 
 #[test]
-fn a_request_without_a_mode_selector_is_a_client_error() {
-    // The bridge deserializes a missing payload as `{}`; there is no
-    // implicit default mode.
-    let err = req_err(json!({}));
-    assert!(err.contains("missing mode selector"), "{err}");
-    let err = req_err(json!({"tenant": "t1"}));
-    assert!(err.contains("missing mode selector"), "{err}");
+fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
+    let TracesMode::Functions(p) = req(json!({})).mode else {
+        panic!("Functions mode expected");
+    };
+    assert_eq!((p.after, p.before, p.last), (0, 0, 20));
+    assert_eq!(p.anchor, None);
+    assert!(p.selections.is_empty());
+
+    let r = req(json!({"tenant": "t1"}));
+    assert!(matches!(r.mode, TracesMode::Functions(_)));
+    assert_eq!(r.tenant.as_deref(), Some("t1"));
+
+    let TracesMode::Functions(p) = req(json!({
+        "after": -3600,
+        "before": -60,
+        "last": 7,
+        "anchor": "cursor",
+        "selections": {"root_name": ["GET /api"]},
+        "timeout": 120000
+    }))
+    .mode
+    else {
+        panic!("Functions mode expected");
+    };
+    assert_eq!((p.after, p.before, p.last), (-3600, -60, 7));
+    assert_eq!(p.anchor.as_deref(), Some("cursor"));
+    assert_eq!(p.selections["root_name"], ["GET /api"]);
+
+    let search = p.search_params(10_000).unwrap();
+    assert_eq!((search.after, search.before), (6_340, 9_940));
 }
 
 #[test]
@@ -115,17 +138,22 @@ fn the_top_level_must_be_a_json_object() {
 
 #[test]
 fn unknown_and_retired_top_level_keys_are_client_errors() {
-    // The old flat fields moved into their mode objects; `timeout` is
-    // gone entirely. Nothing at the top level is silently dropped.
+    for body in [json!({"search": {}, "bogus": 1}), json!({"bogus": 1})] {
+        let err = req_err(body.clone());
+        assert!(err.contains("unknown field"), "for {body}: {err}");
+    }
+
     for body in [
-        json!({"search": {}, "bogus": 1}),
         json!({"search": {}, "after": 1, "before": 2}),
         json!({"search": {}, "last": 5}),
         json!({"search": {}, "timeout": 30}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
     ] {
         let err = req_err(body.clone());
-        assert!(err.contains("unknown field"), "for {body}: {err}");
+        assert!(
+            err.contains("cannot mix a mode selector with Functions parameters"),
+            "for {body}: {err}"
+        );
     }
 }
 
@@ -288,9 +316,12 @@ fn info_response_shape_is_pinned() {
             "mode": "info",
             "version": 1,
             "status": 200,
+            "type": "traces",
+            "has_history": true,
+            "v": 3,
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
-                "slowest", "search", "tenant"
+                "slowest", "search", "tenant", "after", "before", "last", "anchor"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
