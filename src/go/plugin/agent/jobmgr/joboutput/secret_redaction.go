@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -14,6 +15,18 @@ import (
 var errResolvedLifecycleRedacted = errors.New(
 	"job output: collector lifecycle failed; resolved configuration details redacted",
 )
+
+type redactedResolvedProcessControlError struct {
+	cause error
+}
+
+func (err *redactedResolvedProcessControlError) Error() string {
+	return errResolvedLifecycleRedacted.Error()
+}
+
+func (err *redactedResolvedProcessControlError) Unwrap() error {
+	return err.cause
+}
 
 type redactedResolvedCodedError struct {
 	cause     error
@@ -39,6 +52,29 @@ func redactResolvedLifecycleError(err error) error {
 		return nil
 	}
 	safe := error(errResolvedLifecycleRedacted)
+	if jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	) {
+		retired := errors.Is(err, jobmgr.ErrProcessAttemptRetired)
+		stopped := errors.Is(err, jobmgr.ErrProcessAttemptStopped)
+		var cause error
+		switch {
+		case retired && stopped:
+			cause = errors.Join(
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			)
+		case retired:
+			cause = jobmgr.ErrProcessAttemptRetired
+		case stopped:
+			cause = jobmgr.ErrProcessAttemptStopped
+		}
+		if cause != nil {
+			safe = &redactedResolvedProcessControlError{cause: cause}
+		}
+	}
 	if errors.Is(err, context.Canceled) {
 		safe = errors.Join(safe, context.Canceled)
 	}
