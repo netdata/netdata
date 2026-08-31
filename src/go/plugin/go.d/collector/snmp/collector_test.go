@@ -741,7 +741,9 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			pdus: []gosnmp.SnmpPDU{
 				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.2.1.999"},
 			},
-			wantErr: "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
+			manualProfiles: []string{"generic-device"},
+			wantErr:        "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
+			wantAbsent:     []string{"manual_profiles"},
 		},
 		"invalid manual profile": {
 			manualProfiles: []string{"profile-that-does-not-exist"},

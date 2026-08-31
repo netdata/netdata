@@ -84,6 +84,10 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 			si.Descr = valueSanitizer.Replace(si.Descr)
 		case OidSysObject:
 			si.Probe.SeenSysObjectID = true
+			if pdu.Type != gosnmp.ObjectIdentifier {
+				err = fmt.Errorf("expected ObjectIdentifier, got %v", pdu.Type)
+				break
+			}
 			var sysObj string
 			if sysObj, err = PduToString(pdu); err == nil {
 				si.SysObjectID = sysObj

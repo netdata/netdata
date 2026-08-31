@@ -57,20 +57,24 @@ func (c *Collector) ensureDeviceProfile() error {
 }
 
 func noMetricProfilesError(si *snmputils.SysInfo) error {
-	const remediation = "configure an applicable manual_profiles entry or set ping_only: true"
+	const missingIdentityRemediation = "configure an applicable metric profile in manual_profiles or set ping_only: true"
 
 	switch {
 	case si == nil || si.Probe.PDUCount == 0:
-		return fmt.Errorf("no SNMP metric profiles available: system subtree walk returned no PDUs; %s", remediation)
+		return fmt.Errorf("no SNMP metric profiles available: system subtree walk returned no PDUs; %s", missingIdentityRemediation)
 	case si.SysObjectID == "":
 		return fmt.Errorf(
 			"no SNMP metric profiles available: system subtree walk returned %d PDU(s) without sysObjectID (%s); %s",
 			si.Probe.PDUCount,
 			formatSysInfoDiagnostic(si),
-			remediation,
+			missingIdentityRemediation,
 		)
 	default:
-		return fmt.Errorf("no SNMP metric profiles available for sysObjectID %q; %s", si.SysObjectID, remediation)
+		return fmt.Errorf(
+			"no SNMP metric profiles available for sysObjectID %q; add or update a profile whose selector matches this sysObjectID, "+
+				"or set ping_only: true",
+			si.SysObjectID,
+		)
 	}
 }
 

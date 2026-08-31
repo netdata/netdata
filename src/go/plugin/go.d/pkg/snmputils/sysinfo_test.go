@@ -98,6 +98,23 @@ func TestGetSysInfoWrapsWalkErrorWithSystemRoot(t *testing.T) {
 	assert.Contains(t, err.Error(), RootOidMibSystem)
 }
 
+func TestGetSysInfoRejectsWrongTypedSysObjectWithoutEchoingValue(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	const rawValue = "private device identifier"
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().WalkAll(RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+		{Name: OidSysObject, Type: gosnmp.OctetString, Value: []byte(rawValue)},
+	}, nil)
+
+	si, err := GetSysInfo(client)
+	require.Error(t, err)
+	assert.Nil(t, si)
+	assert.Contains(t, err.Error(), "expected ObjectIdentifier")
+	assert.NotContains(t, err.Error(), rawValue)
+}
+
 func TestSysInfoProbeIsNotSerialized(t *testing.T) {
 	si := SysInfo{
 		SysObjectID: "1.3.6.1.4.1.9.1.1166",
