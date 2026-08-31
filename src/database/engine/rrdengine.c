@@ -942,7 +942,10 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     }
 
     if (!count) {
-        __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+        // No decrement here. The only caller does `if (!xt_io_descr) goto done;` and `done:`
+        // decrements extents_currently_being_flushed, so decrementing here too would take the
+        // unsigned counter below zero and wrap it - and both waiters on it (datafile.c for
+        // rotation, rrdengine.c for shutdown) would then spin forever.
         return NULL;
     }
 
