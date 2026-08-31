@@ -3,12 +3,9 @@
 package snmptopology
 
 import (
-	"encoding/hex"
-	"fmt"
 	"net"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -317,30 +314,6 @@ func finalizeLocalManagementAddresses(
 	clear(addrs[len(filtered):])
 	device.ManagementAddresses = filtered
 	device.ManagementIP = selector.selected()
-}
-
-func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
-	lengthStr := strings.TrimSpace(tags[tagLldpRemMgmtAddrLen])
-	length, err := strconv.Atoi(lengthStr)
-	if err != nil || length <= 0 || length > net.IPv6len {
-		return ""
-	}
-
-	addr := make([]byte, 0, length)
-	for i := 1; i <= length; i++ {
-		tag := fmt.Sprintf("%s%d", tagLldpRemMgmtAddrOctetPref, i)
-		v := strings.TrimSpace(tags[tag])
-		if v == "" {
-			return ""
-		}
-		octet, err := strconv.Atoi(v)
-		if err != nil || octet < 0 || octet > 255 {
-			return ""
-		}
-		addr = append(addr, byte(octet))
-	}
-
-	return hex.EncodeToString(addr)
 }
 
 func normalizeLLDPManagementAddress(rawAddr, rawType string) (string, string) {

@@ -37,8 +37,6 @@ const (
 	tagLldpRemSysCapEnabled    = "lldp_rem_sys_cap_enabled"
 
 	tagLldpRemMgmtAddrSubtype   = "lldp_rem_mgmt_addr_subtype"
-	tagLldpRemMgmtAddrLen       = "lldp_rem_mgmt_addr_len"
-	tagLldpRemMgmtAddrOctetPref = "lldp_rem_mgmt_addr_octet_"
 	tagLldpRemMgmtAddrIfSubtype = "lldp_rem_mgmt_addr_if_subtype"
 	tagLldpRemMgmtAddrIfID      = "lldp_rem_mgmt_addr_if_id"
 	tagLldpRemMgmtAddrOID       = "lldp_rem_mgmt_addr_oid"

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
@@ -158,6 +160,73 @@ func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
 	require.Equal(t, "192.0.2.18", observation.ARPNDEntries[0].IP)
 	require.Equal(t, "00:50:56:ab:cd:ef", observation.ARPNDEntries[0].MAC)
 	require.Equal(t, "dynamic", observation.ARPNDEntries[0].State)
+}
+
+func TestTopologyProductionPath_LLDPRemoteManagementAddressProfiles(t *testing.T) {
+	tests := map[string]struct {
+		fixture        string
+		profile        string
+		sysObjectID    string
+		managementAddr string
+	}{
+		"standards readable anchor": {
+			fixture:        "arubaos-cx_10.10.snmprec",
+			profile:        "_std-topology-lldp-mib",
+			sysObjectID:    "1.3.6.1.4.1.47196.4.1.1.1.1",
+			managementAddr: "192.0.2.1",
+		},
+		"RouterOS readable index columns": {
+			fixture:        "routeros_rb750gr3.snmprec",
+			profile:        "mikrotik-router",
+			sysObjectID:    "1.3.6.1.4.1.14988.1",
+			managementAddr: "fdfd:0:2:1::1",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", tc.fixture))
+			profile, err := ddsnmp.LoadProfileByName(tc.profile)
+			require.NoError(t, err)
+
+			profile.Definition.Metadata = nil
+			profile.Definition.SysobjectIDMetadata = nil
+			profile.Definition.MetricTags = nil
+			profile.Definition.StaticTags = nil
+			profile.Definition.Metrics = nil
+			profile.Definition.VirtualMetrics = nil
+			profile.Definition.Licensing = nil
+			profile.Definition.BGP = nil
+			profile.Definition.Topology = slices.DeleteFunc(profile.Definition.Topology, func(row ddprofiledefinition.TopologyConfig) bool {
+				return row.Table.Name != "lldpRemManAddrTable"
+			})
+			require.Len(t, profile.Definition.Topology, 1)
+
+			profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+				SnmpClient:  fixture,
+				Profiles:    []*ddsnmp.Profile{profile},
+				Log:         newTestSNMPTopologyCollector().Logger,
+				SysObjectID: tc.sysObjectID,
+			}).Collect()
+			require.NoError(t, err)
+			require.Len(t, profileMetrics, 1)
+			require.NotEmpty(t, profileMetrics[0].TopologyMetrics)
+			for _, metric := range profileMetrics[0].TopologyMetrics {
+				require.Equal(t, ddsnmp.KindLldpRemManAddr, metric.TopologyKind)
+			}
+
+			cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", SysObjectID: tc.sysObjectID})
+			cache.ingestTopologyProfileMetrics(profileMetrics)
+
+			var found bool
+			for _, remote := range cache.lldpRemotes {
+				for _, address := range remote.managementAddrs {
+					found = found || address.Address == tc.managementAddr
+				}
+			}
+			require.Truef(t, found, "expected management address %q from fixture %q", tc.managementAddr, tc.fixture)
+		})
+	}
 }
 
 func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandler {

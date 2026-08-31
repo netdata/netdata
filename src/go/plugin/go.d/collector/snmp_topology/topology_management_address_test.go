@@ -128,16 +128,6 @@ func TestNormalizeManagementAddressHonorsProtocolFamilies(t *testing.T) {
 	}
 }
 
-func TestReconstructLldpRemMgmtAddrHex_FromOctets(t *testing.T) {
-	require.Equal(t, "0a14043c", reconstructLldpRemMgmtAddrHex(map[string]string{
-		tagLldpRemMgmtAddrLen:             "4",
-		tagLldpRemMgmtAddrOctetPref + "1": "10",
-		tagLldpRemMgmtAddrOctetPref + "2": "20",
-		tagLldpRemMgmtAddrOctetPref + "3": "4",
-		tagLldpRemMgmtAddrOctetPref + "4": "60",
-	}))
-}
-
 func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testing.T) {
 	var addrs []topologymodel.ManagementAddress
 	for _, address := range []string{

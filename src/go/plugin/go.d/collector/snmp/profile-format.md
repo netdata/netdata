@@ -443,7 +443,6 @@ lldp_loc_port
 lldp_loc_man_addr
 lldp_rem
 lldp_rem_man_addr
-lldp_rem_man_addr_compat
 cdp_cache
 if_name
 if_status
@@ -1366,9 +1365,14 @@ Rules:
 
 - `read-only`, `read-write`, and `read-create` objects can be read as
   `symbol.OID` values.
-- `not-accessible` objects must not be read as `symbol.OID` values.
+- `not-accessible` objects must not be read as `symbol.OID` values in generic standards profiles.
 - A `not-accessible` object that is part of a table `INDEX` can be derived from
   the row OID index using `index` or `index_transform`.
+- A selector-scoped device profile may override a generic row to read a
+  `not-accessible` object only when a checked fixture or repeatable device
+  capture proves that the device returns the object as a column and omits the
+  standards-readable row anchor. Keep the exception in the device profile,
+  document it, and pin both profile merging and fixture-backed collection.
 - Keep SNMP index slicing in the profile YAML; keep format conversion in
   `symbol.format`.
 
@@ -1418,6 +1422,10 @@ Examples:
   `lldpLocManAddrLen`, then derive subtype and address from the row index. Use
   `format: hex` for the address bytes so non-IP management-address subtypes are
   preserved; topology normalization converts IP-compatible bytes later.
+- `LLDP-MIB::lldpRemManAddrSubtype` and `LLDP-MIB::lldpRemManAddr` are also
+  `not-accessible` index components. Anchor the generic row on readable
+  `lldpRemManAddrIfSubtype`; derive subtype with `index: 4` and address bytes
+  with `index_transform: [{start: 5}]` plus `format: hex`.
 
 Audit recipe:
 
@@ -1427,7 +1435,8 @@ rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysica
 ```
 
 Any profile hit for a `not-accessible` object is valid only when the tag is
-index-derived and does not declare a `symbol.OID` for that object.
+index-derived without a `symbol.OID`, or when it satisfies the proof-gated,
+selector-scoped device exception above.
 
 ## Tag Transformation
 

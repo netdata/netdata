@@ -3,8 +3,6 @@
 package snmptopology
 
 import (
-	"strings"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -15,7 +13,6 @@ func init() {
 	registerTopologyMetricHandler(ddsnmp.KindLldpLocManAddr, (*topologyBuilder).updateLldpLocManAddr)
 	registerTopologyMetricHandler(ddsnmp.KindLldpRem, (*topologyBuilder).updateLldpRemote)
 	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddr, (*topologyBuilder).updateLldpRemManAddr)
-	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddrCompat, (*topologyBuilder).updateLldpRemManAddr)
 }
 
 func (c *topologyBuilder) updateLldpLocPort(tags map[string]string) {
@@ -146,9 +143,6 @@ func (c *topologyBuilder) updateLldpRemManAddr(tags map[string]string) {
 	}
 
 	addrHex := tags[tagLldpRemMgmtAddr]
-	if strings.TrimSpace(addrHex) == "" {
-		addrHex = reconstructLldpRemMgmtAddrHex(tags)
-	}
 	addr, addrType := normalizeLLDPManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
 	if addr == "" {
 		return
