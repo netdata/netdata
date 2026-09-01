@@ -118,7 +118,7 @@ receivers:
 
 Use `start_at: beginning` only for an intentional backfill. It can replay a large journal, increase Collector load, and send records that Netdata rejects because their timestamps are outside its acceptance window.
 
-See the pinned upstream [journald receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/journaldreceiver) for container settings, field matches, namespaces, retry behavior, and the complete option set.
+See the upstream [journald receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/journaldreceiver) for container settings, field matches, namespaces, retry behavior, and the complete option set.
 
 ## Application log files
 
@@ -209,7 +209,7 @@ Configure exactly one of `line_start_pattern` or `line_end_pattern`. Test the ex
 | `poll_interval` | `200ms`  | Control how often the receiver checks for file changes.                           |
 | `storage`       | none     | Persist offsets through a named storage extension.                                |
 
-See the pinned upstream [file log receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/filelogreceiver) for rotation behavior, retry settings, maximum record size, supported encodings, and the complete operator set.
+See the upstream [file log receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver) for rotation behavior, retry settings, maximum record size, supported encodings, and the complete operator set.
 
 ## Windows event channels
 
@@ -223,15 +223,15 @@ extensions:
     create_directory: true
 
 receivers:
-  windowseventlog/application:
+  windows_event_log/application:
     channel: Application
     start_at: end
     storage: file_storage
-  windowseventlog/system:
+  windows_event_log/system:
     channel: System
     start_at: end
     storage: file_storage
-  windowseventlog/security:
+  windows_event_log/security:
     channel: Security
     start_at: end
     storage: file_storage
@@ -250,7 +250,7 @@ service:
   extensions: [file_storage]
   pipelines:
     logs:
-      receivers: [windowseventlog/application, windowseventlog/system, windowseventlog/security]
+      receivers: [windows_event_log/application, windows_event_log/system, windows_event_log/security]
       processors: [resource/windows]
       exporters: [otlp_grpc/netdata]
 ```
@@ -259,7 +259,7 @@ On a Windows Event Collector, add a receiver for the `ForwardedEvents` channel t
 The `storage` extension keeps a bookmark per channel, so a restart resumes where it stopped. Event bodies are
 structured records by default; set `raw: true` to keep the original XML instead. The receiver builds only on Windows,
 so validate this configuration on a Windows host. See the pinned upstream
-[windowseventlog receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/windowseventlogreceiver)
+[windowseventlog receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/windowseventlogreceiver)
 for remote collection, XML queries, and the complete option set.
 
 ## Kubernetes and containers
@@ -331,6 +331,21 @@ container parser adds the pod, namespace, and container from the file path. `sto
 by rendering them with the `opentelemetry-collector` Helm chart 0.172.0 and validating the resulting Collector
 configuration with Contrib 0.157.0.
 
+The `kubernetes` tenant the exporter selects needs its own retention policy on the receiving Agent, or its records
+land under the 7-day, 1GB defaults:
+
+```yaml
+auth:
+  enabled: true
+logs:
+  retention:
+    kubernetes:
+      max_total_size: "50GB"
+      max_age: "30 days"
+```
+
+See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how tenant retention and offloading work.
+
 Without Helm, the receiver the preset generates is:
 
 ```yaml
@@ -351,7 +366,7 @@ receivers:
 Mount `/var/log/pods` and `/var/lib/otelcol` from the node into the Collector pod, and grant the service account the
 read permissions the `k8sattributes` processor needs (pods, namespaces, and replica sets across the cluster). See the
 upstream [opentelemetry-collector Helm chart documentation](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
-and the pinned [k8sattributes processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/processor/k8sattributesprocessor)
+and the pinned [k8sattributes processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
 for every preset and association option.
 
 ## macOS unified log
@@ -386,7 +401,7 @@ service:
 `max_log_age` bounds how far back the receiver reads on its first start. Run the Collector as a `launchd` service
 with permission to read system logs. The receiver builds only on macOS, so validate this configuration on a Mac. See
 the pinned upstream
-[macOS unified logging receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/macosunifiedloggingreceiver)
+[macOS unified logging receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/macosunifiedloggingreceiver)
 for archive mode, predicates, and the complete option set.
 
 ## Syslog

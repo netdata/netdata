@@ -798,13 +798,13 @@ sidebar:
                   description: Forward per-namespace systemd-journal logs to a central systemd-journal-remote server, including on systemd versions prior to 254.
                   keywords: [systemd, journal, namespace, centralization, lognamespace]
       - meta:
-          label: Windows Events Plugin Reference
+          label: Windows Event Logs
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md
-          path: Windows Event Logs
+          description: View, explore and analyze Windows event channels from the Netdata dashboard, including forwarded-events channels on a Windows Event Collector.
       - meta:
-          label: macOS Logs Plugin Reference
+          label: macOS Unified Logs
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/macos-logs.plugin/README.md
-          path: macOS Unified Logs
+          description: View, explore and analyze the macOS unified log from the Netdata dashboard.
       - meta:
           label: SNMP Trap Logs
           edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/snmp-trap-logs.md
@@ -855,6 +855,11 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
           description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
           keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
+      - meta:
+          label: Securing the OTLP Endpoint
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/securing-the-otlp-endpoint.md
+          description: Bind the OTLP endpoint safely — loopback by default, TLS and mutual TLS for remote senders, network controls, certificate rotation, and what tenant selection does and does not protect.
+          keywords: [opentelemetry, otlp, tls, mutual tls, certificates, tenants, security]
       - meta:
           label: Metrics Collection
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md

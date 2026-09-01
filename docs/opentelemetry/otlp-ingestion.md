@@ -10,7 +10,7 @@ Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry
 | An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata as described below                                               |
 | Network devices send syslog                                                         | Use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) |
 
-The Netdata Agent receives OTLP metrics and logs. It does not currently expose a public trace-ingestion workflow.
+The Netdata Agent receives OTLP metrics, logs, and traces. Traces are accepted and stored under their own retention settings (the `traces` options in the [plugin reference](/src/crates/otel-plugin/README.md)); a traces view is not yet available in the dashboards. Stay tuned.
 
 ## How data flows
 

@@ -129,6 +129,8 @@ Per-tenant sections inherit every field they omit from `default`. The section na
 `X-Scope-OrgID` header value when tenant selection is enabled:
 
 ```yaml
+auth:
+  enabled: true
 logs:
   retention:
     default:
@@ -138,6 +140,9 @@ logs:
       max_total_size: "200GB"
       max_age: "400 days"
 ```
+
+With tenant selection enabled, a sender that omits the `X-Scope-OrgID` header is rejected; with it disabled, every
+record lands in the `default` tenant regardless of headers.
 
 Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and restart
 the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md).
@@ -161,6 +166,18 @@ remote_storage:
   an instance role available to the Netdata service account; to pass environment variables to the `netdata` service,
   use a root-only systemd `EnvironmentFile`. Non-secret backend options such as `region` and `endpoint` go in the query
   string.
+
+  ```bash
+  # /etc/systemd/system/netdata.service.d/s3-credentials.conf
+  [Service]
+  EnvironmentFile=/etc/netdata/s3-credentials.env
+
+  # /etc/netdata/s3-credentials.env  (root-only, mode 0600)
+  AWS_ACCESS_KEY_ID=...
+  AWS_SECRET_ACCESS_KEY=...
+  ```
+
+  Apply with `systemctl daemon-reload && systemctl restart netdata`.
 - Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
   a ceiling. Monitor free disk on the receiving node.
 - This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
@@ -169,7 +186,9 @@ remote_storage:
 ### Sizing the receiving node
 
 Run the pipeline for a full day, then measure `du -sh` on the tenant's `index` directory under `base_dir` and multiply
-by the retention you want locally. Add headroom for active write-ahead logs (`max_file_size` per stream) and for the
+by the retention you want locally. For a long-retention tenant such as the `audit` example above, the same arithmetic
+sizes the object storage: one day's index size × 400 days, while `max_age` keeps only the recent days on local disk
+and the rest lives in S3, fetched back through the read cache when queried. Add headroom for active write-ahead logs (`max_file_size` per stream) and for the
 read cache when offloading is enabled. Queries are bounded only by their time range, so on large stores keep the
 default window and narrow it further before running a full-text search; see
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).

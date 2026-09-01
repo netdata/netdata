@@ -490,7 +490,7 @@ Description=NGINX Log to Systemd Journal
 After=network.target
 
 [Service]
-ExecStart=/bin/sh -c 'tail -F /var/log/nginx/access.log | log2journal -f /path/to/nginx.yaml' | systemd-cat-native
+ExecStart=/bin/sh -c 'tail -F /var/log/nginx/access.log | log2journal -f /path/to/nginx.yaml | systemd-cat-native'
 LogNamespace=nginx-logs
 Restart=always
 RestartSec=3

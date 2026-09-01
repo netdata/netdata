@@ -22,9 +22,12 @@ text of System and User fields, and break down event frequency per field value o
 
 ### Prerequisites
 
-`windows-events.plugin` is a Netdata Function Plugin.
-
-To protect your privacy, as with all Netdata Functions, a free Netdata Cloud user account is required to access it.
+- Netdata installed on the Windows machine; the Windows installer includes this plugin, and Netdata starts it
+  automatically.
+- A Netdata Cloud account and sign-in: as with all Netdata Functions that expose sensitive data, viewing events
+  requires a signed-in Netdata Cloud user of the Agent's Space (a free Community account is sufficient).
+- The Netdata service account must be able to read the channels you want to explore; the Security channel in
+  particular requires explicit read permission when Netdata does not run as Local System.
 For more information check [this discussion](https://github.com/netdata/netdata/discussions/16136).
 
 ## Events Sources
@@ -206,8 +209,10 @@ Yes. Where a Windows Event Collector already exists, install Netdata on it: the 
 channels like any other local channel, and groups them under the `All-Forwarded` shortcut, so you explore the events of
 all forwarders from that machine.
 
-We do not recommend building Windows Event Forwarding just for Netdata. To centralize logs into Netdata's own log
-store, use OpenTelemetry — see
+We do not recommend building Windows Event Forwarding just for Netdata; when you want WEF, set it up with
+[Microsoft's Windows Event Forwarding documentation](https://learn.microsoft.com/en-us/windows/win32/wec/windows-event-collector)
+— Netdata can be installed on the collector before or after, it makes no difference. To centralize logs into Netdata's
+own log store instead, use OpenTelemetry — see
 [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
 ### Can I use this plugin from a parent Netdata?
@@ -287,6 +292,15 @@ Event Log API directly or other Windows administrative tools.
 The plugin updates its data in real-time when in PLAY mode. In normal mode, it refreshes data based on the
 query you've submitted. The plugin is designed to provide the most up-to-date information available in the
 Windows Event Logs at the time of the query.
+
+## How to verify setup
+
+1. Open the node's dashboard and select the **Logs** tab; the `windows-events` source appears when the plugin runs.
+2. Confirm the expected channels are listed in the **Sources** selector, including `All-Forwarded` on a Windows Event
+   Collector.
+3. Apply a single filter (for example `Level`) and confirm events are returned; open one event and check its fields.
+4. Click ▶️ (PLAY) and generate a test event (for example `eventcreate /T INFORMATION /ID 100 /L APPLICATION /D "netdata test"`)
+   to confirm live tail.
 
 ## TODO
 

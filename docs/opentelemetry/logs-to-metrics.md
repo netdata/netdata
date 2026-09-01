@@ -117,4 +117,4 @@ If the chart is absent:
 
 To alert on the derived chart, use the standard [Netdata alert configuration reference](/src/health/REFERENCE.md). For the shared endpoint, security, and basic metrics/logs workflows, see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md).
 
-See the pinned upstream [count connector documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/connector/countconnector) and [filter processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/processor/filterprocessor) for every matching condition and option beyond these examples.
+See the upstream [count connector documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/countconnector) and [filter processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor) for every matching condition and option beyond these examples.

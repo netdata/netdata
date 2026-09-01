@@ -24,4 +24,4 @@ Netdata does not listen for syslog directly. Your devices send syslog to an **Op
 
 ## Where to start
 
-- Netdata publishes ready-to-use OpenTelemetry Collector configurations for syslog. The entry in this section walks through the collector configuration and what to expect in the Logs tab.
+- Netdata publishes ready-to-use OpenTelemetry Collector configurations for syslog. [OpenTelemetry Collector Setup](/docs/npm/syslog/otel-collector.md) walks through the collector configuration and what to expect in the Logs tab.

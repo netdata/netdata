@@ -53,10 +53,11 @@ The filter panel offers a set of fields, each with a live counter of matching en
 - Toggle a value between inclusion and exclusion.
 - Selections persist across page reloads.
 
-Which fields are offered as filters depends on the source. The OS-native sources offer a curated set of fields chosen
-to keep queries fast; for OpenTelemetry logs, every field with a bounded set of values is offered, and fields with very
-many distinct values stay searchable but are not offered as filters. Each plugin reference lists its filter fields. A
-"full data queries" mode enables negative and empty matches at the cost of slower queries.
+Each source offers a default set of fields as filters, and you can enable any other field of your logs as a filter or
+histogram dimension from the panel — the query then evaluates it like any default field. Message text is covered by
+full-text search rather than filters. For OpenTelemetry logs, fields with very many distinct values stay searchable
+and filterable but cannot drive facet counters or histograms. A "full data queries" mode enables negative and empty
+matches at the cost of slower queries.
 
 ## Full-text search
 
@@ -96,17 +97,21 @@ for every source.
 
 The OS-native sources and the OpenTelemetry log store use different query engines.
 
-### OS-native sources (systemd journal, Windows events, macOS logs)
+### systemd journal
 
-- Netdata reads the OS log store directly. Journal files are queried one file at a time with cached file metadata
-  lookups, so a query costs no more than the equivalent `journalctl` query on the same files.
+- Netdata reads the journal files directly, one file at a time with cached file metadata lookups, so a query costs no
+  more than the equivalent `journalctl` query on the same files.
 - Each query fully evaluates the newest entries up to a budget of 1,000,000 entries. Beyond the budget:
   - the rows shown are always real entries;
   - the histogram shows the remaining volume as `[unsampled]` and `[estimated]`;
   - the filter counters stop counting beyond the budget, they are not extrapolated.
-- Where journal sequence numbers are available, estimates use them for precision. Because the budget is large, value
-  distributions stay tight even on multi-million-entry datasets. See
+- Where journal sequence numbers are available, estimates use them for precision. See
   [Performance at scale](/src/collectors/systemd-journal.plugin/README.md#performance-at-scale) for the math.
+
+### Windows events and macOS logs
+
+- Both plugins evaluate every entry in the queried timeframe — no sampling is applied yet — so on very busy systems
+  narrow the timeframe and the selected channels before broad queries.
 
 ### OpenTelemetry log store
 

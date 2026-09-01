@@ -1,0 +1,60 @@
+# Securing the OTLP Endpoint
+
+The OTLP endpoint accepts whatever reaches it, so its security is the transport: where it listens, TLS, and network
+controls. Everything below is set in `otel.yaml` (edit it with
+[`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files)) and applied by restarting the
+Agent — including certificate replacements.
+
+## Keep the default when you can
+
+The plugin listens on `127.0.0.1:4317` by default: only same-host senders can reach it, and TLS is unnecessary. If a
+Collector runs on every node and forwards to its local Agent, no endpoint hardening is needed at all.
+
+## Accepting remote senders
+
+Bind beyond loopback only with TLS, and prefer mutual TLS:
+
+```yaml
+endpoint:
+  path: "0.0.0.0:4317"
+  tls_cert_path: /etc/netdata/ssl/server-cert.pem
+  tls_key_path: /etc/netdata/ssl/server-key.pem
+  # Require client certificates (mutual TLS): senders must present a
+  # certificate signed by this CA.
+  tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+```
+
+- Never expose a plaintext listener beyond loopback.
+- Restrict port 4317 with network access controls (firewall, security groups) to the senders' addresses; the endpoint
+  speaks OTLP/gRPC only.
+- Issue the server certificate from whatever your infrastructure already trusts — an internal CA or your certificate
+  automation; the senders configure the matching `ca_file` (and, for mutual TLS, their client certificate and key) as
+  shown in [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md#shared-exporter).
+- After rotating certificates, restart the Netdata Agent to load the new files.
+
+## Tenants are selection, not authentication
+
+```yaml
+auth:
+  enabled: true
+```
+
+With tenant selection enabled, every sender must set the `X-Scope-OrgID` header and requests without it are rejected;
+the header chooses the tenant — its storage tree and its retention policy — and nothing more. It does not authenticate
+the sender: any client that passes TLS can claim any tenant, so rely on mutual TLS and network controls to decide who
+can send at all, and treat tenants as an organization tool (one retention policy per team, environment, or system).
+See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for per-tenant retention.
+
+## What reaches Netdata Cloud
+
+Received telemetry is stored on the Agent, not in Netdata Cloud. Viewing logs requires a signed-in Netdata Cloud user
+of the Agent's Space; when viewing through Netdata Cloud, content is transmitted encrypted to the browser and is not
+stored in Netdata Cloud.
+
+## Checklist
+
+- [ ] Endpoint bound only where senders need it; plaintext only on loopback.
+- [ ] TLS server certificate and key in place; mutual TLS where the network is not trusted.
+- [ ] Port 4317 restricted to known sender addresses.
+- [ ] Tenant selection enabled when different sender groups need separate retention.
+- [ ] A restart procedure for certificate rotation.

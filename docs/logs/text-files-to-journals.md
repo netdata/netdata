@@ -18,7 +18,7 @@ The pipeline looks like:
 
 ```bash
 tail -F -n 0 /var/log/nginx/access.log \
-  | log2journal -f /etc/netdata/log2journal.d/nginx-combined.yaml \
+  | log2journal -c nginx-combined \
   | systemd-cat-native --namespace=nginx
 ```
 
@@ -26,7 +26,7 @@ tail -F -n 0 /var/log/nginx/access.log \
 - Use `LogNamespace=` in a systemd unit to keep the converted logs isolated from the system journal, and to make them appear as a separate source in the Logs tab.
 - The result is a first-class journal stream: query it with `journalctl`, forward it with the standard journal centralization mechanisms, ingest it with SIEM agents, and explore it in Netdata under the `systemd-journal` source.
 
-For an end-to-end, production-grade setup (persistent units, namespaces, rotation), follow [Monitor Nginx or Apache web server log files](/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs.md).
+For an end-to-end, production-grade setup (persistent units, namespaces, stock configurations), follow the [log2journal best practices](/src/collectors/log2journal/README.md#best-practices).
 
 ## Bridge 2: ship files through an OpenTelemetry Collector
 

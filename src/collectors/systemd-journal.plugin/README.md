@@ -158,9 +158,10 @@ The sidebar shows:
 
 ### Fields as filters
 
-The plugin offers a curated allowlist of about 55 journal fields as filters, each with counters. Fields matching
-`*MESSAGE*`, `*TIMESTAMP*` and `__*` are never offered as filters. Full-text search is not limited to this list: it
-searches the full text of every field of every entry.
+The plugin offers a curated set of journal fields as filters by default, each with counters, and you can enable any
+other journal field as a filter from the dashboard — the query then evaluates it the same way. Message text and
+timestamps are covered by full-text search and the time selection rather than filters, which search the full text of
+every field of every entry.
 
 :::tip
 
@@ -480,7 +481,8 @@ For more, check `man systemd-journald`.
 
 The plugin reads the journal files directly, so every field each entry carries is available, including dynamic,
 high-cardinality fields. No schema or field selection has to be declared in advance: full-text search covers the full
-text of every field, and a curated set of fields is offered as filters with counters.
+text of every field, a curated set of fields is offered as filters by default, and any other field can be enabled as
+a filter from the dashboard.
 
 </details>
 
