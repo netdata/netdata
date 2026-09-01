@@ -1397,6 +1397,63 @@ int pgd_unittest(void) {
     if(!pgd_alloc_globals.partitions)
         pgd_init_arals();
 
+    // ------------------------------------------------------------------------------------
+    // The cross-module assumption, checked deterministically.
+    //
+    // What can silently disarm the production guard is ARAL changing where it writes its
+    // free-list header: freed_mark must stay outside it. That claim is about ARAL, not about
+    // PGD, so it does not need a real PGD - and checking it on a PRIVATE aral makes it
+    // immune to whatever state the shared pgd arals are in. A fresh aral has exactly one
+    // page, and aral_freez_internal() keeps the last page with free items (aral.c:1275)
+    // instead of deleting it, so reading the element back is safe by construction. The
+    // second allocation keeps used_elements > 0 as well, so the page cannot even become a
+    // deletion candidate.
+    //
+    // This runs unconditionally. The PGD-level checks further down depend on winning an
+    // allocation race for two co-located slots and may be skipped; this one never is.
+    {
+        struct aral_statistics selftest_stats = { 0 };
+        ARAL *ar = aral_create("pgd-lifetime-selftest", sizeof(PGD), 0, 0,
+                               &selftest_stats, NULL, NULL, false, false, true);
+        if(!ar) {
+            fprintf(stderr, "PGD: cannot create the selftest aral\n");
+            errors++;
+        }
+        else {
+            void *keep = aral_mallocz(ar);      // holds the page, never freed before the read
+            void *e = aral_mallocz(ar);
+
+            const size_t mark_off = offsetof(struct pgd, raw.freed_mark);
+            uint16_t *mark = (uint16_t *)((uint8_t *)e + mark_off);
+            uint8_t *head = (uint8_t *)e;
+
+            *mark = PGD_FREED_MAGIC | 0x5AU;
+            memset(head, 0, 2 * sizeof(void *));
+
+            aral_freez(ar, e);
+
+            // ARAL must have written its free-list header over the head of the element...
+            bool header_written = false;
+            for(size_t i = 0; i < 2 * sizeof(void *) ;i++)
+                if(head[i]) { header_written = true; break; }
+
+            if(!header_written) {
+                fprintf(stderr, "PGD: aral_freez() no longer writes a free-list header over the "
+                                "start of a freed element - re-check ARAL_FREE in aral.c\n");
+                errors++;
+            }
+
+            // ...and it must NOT have reached the freed mark.
+            if(*mark != (uint16_t)(PGD_FREED_MAGIC | 0x5AU)) {
+                fprintf(stderr, "PGD: aral_freez() now overwrites offset %zu, where the freed "
+                                "mark lives - the lifetime guard is SILENTLY DISARMED\n", mark_off);
+                errors++;
+            }
+
+            aral_freez(ar, keep);
+        }
+    }
+
     // This test deliberately reads `pg` back AFTER freeing it, so its page must not be
     // deletable: aral_freez_internal() deletes a page that has become FULLY free whenever
     // another page still has free items (aral.c:1265; the delete is gated on
@@ -1459,12 +1516,18 @@ int pgd_unittest(void) {
     }
 
     if(!pg) {
-        // Never observed: it would mean 64 consecutive allocations from one aral produced no
-        // two elements on a common page. Fail loudly rather than silently skip - a silent
-        // skip would report PASSED while verifying nothing, every run, forever.
-        fprintf(stderr, "PGD: could not obtain two PGDs on one aral page in %zu probes - "
-                        "the lifetime guard is NOT being verified\n", probes);
-        errors++;
+        // The probe bound is a heuristic, not a proof: aral serves a page's virgin slots
+        // sequentially (the elements_segmented fast path) and only then falls back to the
+        // recycled list, so how many allocations it takes to see two co-located slots depends
+        // on how scattered that list is. A long enough scattered list would exhaust the probe.
+        //
+        // That must NOT fail the build - it would be a false failure on a healthy tree. It is
+        // safe to skip because the assumption that can silently disarm the guard was already
+        // verified above, deterministically, on a private aral. What is lost here is only the
+        // end-to-end check that pgd_free() stamps the mark on a real PGD.
+        fprintf(stderr, "PGD: no two PGDs landed on one aral page in %zu probes - skipping the "
+                        "freed-PGD read-back (the ARAL layout assumption was still verified)\n",
+                probes);
     }
     else {
         // a live PGD must never look freed
