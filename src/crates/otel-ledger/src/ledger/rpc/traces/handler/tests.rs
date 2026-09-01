@@ -52,7 +52,7 @@ async fn info_returns_the_descriptor() {
         json!([
             "info", "trace", "attributes", "attribute_values", "overview",
             "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
-            "min_trace_duration_ns", "overview_facets"
+            "min_trace_duration_ns", "max_trace_duration_ns", "overview_facets"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
