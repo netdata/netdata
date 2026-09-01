@@ -540,6 +540,72 @@ func TestCleanupJournalFailureReportsRuntimeError(t *testing.T) {
 	restored = true
 }
 
+func TestExactCleanupRequiresDurablePhaseBeforeDeletingVersions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("renaming an open journal directory is not portable to Windows")
+	}
+	source, destination, model := newAWSClients()
+	engine := newAWSEngine(t, source, destination, nil)
+
+	engine.Collect(context.Background())
+	key, sourceObjectID := model.onlySourceObject(t)
+	model.replicateObject(t, key, sourceObjectID)
+	engine.Collect(context.Background())
+	sourceMarkerID := model.onlySourceMarker(t, key)
+	model.replicateMarker(t, key, sourceMarkerID)
+
+	var durable state
+	found, err := engine.journal.Load(&durable)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, key, durable.ActiveKey)
+	require.Equal(t, phaseWaitMarker, durable.Entries[0].Phase)
+	require.Empty(t, durable.Entries[0].DestinationMarkerID)
+
+	root := filepath.Dir(engine.journal.Path())
+	backup := root + "-backup"
+	require.NoError(t, os.Rename(root, backup))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_ = os.Remove(root)
+			_ = os.Rename(backup, root)
+		}
+	})
+
+	firstFailure := engine.Collect(context.Background())
+	require.Error(t, firstFailure.Err)
+	secondFailure := engine.Collect(context.Background())
+	require.Error(t, secondFailure.Err)
+	assertNoExactVersionDeletes(t, source)
+	assertNoExactVersionDeletes(t, destination)
+	engine.Cleanup(context.Background())
+	assertNoExactVersionDeletes(t, source)
+	assertNoExactVersionDeletes(t, destination)
+
+	require.NoError(t, os.Remove(root))
+	require.NoError(t, os.Rename(backup, root))
+	restored = true
+	successorJournal, err := journal.New(
+		root,
+		"agent",
+		"job",
+		journal.Fingerprint(
+			"aws_replication", "", "source", "netdata-s3check/", "", "destination", "exact-key",
+		),
+	)
+	require.NoError(t, err)
+	successor := newAWSEngineWithJournal(t, source, destination, nil, successorJournal, nil)
+	t.Cleanup(func() { successor.Cleanup(context.Background()) })
+
+	recovered := successor.Collect(context.Background())
+	require.NotNil(t, recovered.Probe)
+	assert.Equal(t, contract.StatusSuccess, recovered.Probe.Status)
+	assert.False(t, model.hasVersions("source", key))
+	assert.False(t, model.hasVersions("destination", key))
+}
+
 func TestValidateEntryPhaseRejectsMutationWithoutRequiredProof(t *testing.T) {
 	err := validateEntryPhase(entry{
 		Phase:          phaseDeleteIntent,
@@ -572,6 +638,17 @@ func newAWSEngineWithOptions(
 		),
 	)
 	require.NoError(t, err)
+	return newAWSEngineWithJournal(t, source, destination, now, j, modify)
+}
+
+func newAWSEngineWithJournal(
+	t *testing.T,
+	source, destination *testutil.S3,
+	now *time.Time,
+	j *journal.Journal,
+	modify func(*Options),
+) *Engine {
+	t.Helper()
 	opts := Options{
 		Source: source, Destination: destination,
 		SourceBucket: "source", DestinationBucket: "destination",

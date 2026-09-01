@@ -127,6 +127,7 @@ type Engine struct {
 	now                       func() time.Time
 
 	state      state
+	durable    state
 	diagnostic error
 	locked     bool
 	closed     bool
@@ -203,6 +204,7 @@ func New(opts Options) (*Engine, error) {
 			return nil, fmt.Errorf("validate AWS ownership: %w", err)
 		}
 	}
+	engine.durable = cloneState(engine.state)
 	return engine, nil
 }
 
@@ -389,6 +391,7 @@ func (e *Engine) takeover() error {
 		e.journal.Unlock()
 		return fmt.Errorf("validate authoritative AWS ownership: %w", err)
 	}
+	e.durable = cloneState(e.state)
 	e.locked = true
 	return nil
 }
@@ -401,8 +404,10 @@ func (e *Engine) persist() error {
 		err = e.journal.Save(e.state)
 	}
 	if err == nil {
+		e.durable = cloneState(e.state)
 		return nil
 	}
+	e.state = cloneState(e.durable)
 	err = fmt.Errorf("persist AWS ownership: %w", err)
 	e.diagnostic = errors.Join(e.diagnostic, err)
 	return err
@@ -442,6 +447,13 @@ func (e *Engine) finishTerminal(result *contract.ProbeResult) *contract.ProbeRes
 	e.state.LastTerminal = cloneProbeResult(result)
 	_ = e.persist()
 	return cloneProbeResult(result)
+}
+
+func cloneState(value state) state {
+	cloned := value
+	cloned.Entries = append([]entry(nil), value.Entries...)
+	cloned.LastTerminal = cloneProbeResult(value.LastTerminal)
+	return cloned
 }
 
 func (e *Engine) validateState() error {
