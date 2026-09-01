@@ -433,6 +433,18 @@ topology:
   symbols and for `metric_tags`.
 - `metric_tags` inside a topology row work like table metric tags and identify
   or enrich the topology row.
+- A cross-table tag whose target table has no row producer creates an internal
+  dependency-only collection route. For topology rows, that route is walked
+  only after its owning row produces at least one anchor PDU. A target table
+  with its own symbol-bearing row remains an independent eager producer.
+- When a topology row has exactly one readable anchor symbol and its `table.OID`
+  is the symbol column plus a fixed structural index prefix, simple same-index
+  cross-table dependencies inherit that prefix. For example, an anchor root
+  `<column>.1` constrains dependency column walks to `<dependency-column>.1`.
+  Dependencies using `lookup_symbol`, `index_transform`, multiple anchors, or
+  conflicting scopes use their ordinary common-prefix route instead. This
+  structural prefix propagation is topology-only; ordinary metric-table
+  dependencies retain their existing common-prefix collection roots.
 - `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
   topology kind and should not be declared under `topology:`.
 
@@ -470,8 +482,15 @@ Stock profiles compose topology capabilities independently:
 - `_std-topology-ip-mib.yaml` provides IPv4 address, interface-index, and
   netmask facts used for L3 subnet topology. `generic-device.yaml` and
   `generic-ups.yaml` extend it as their baseline. The legacy `ipAddrTable`
-  address is derived from the row index, so the readable ifIndex and netmask
-  columns are sufficient.
+  address is derived from the row index. RFC 4293 `ipAddressTable` IPv4 rows
+  anchor on the readable `ipAddressIfIndex` column with the exact IPv4
+  type-and-four-octet-length index prefix, then derive the raw address suffix
+  from the index. The topology consumer accepts only exactly four decimal
+  octets in `0..255`. Their type, prefix pointer, address status, and row status
+  dependency columns share that scope and remain dormant when the anchor is
+  empty; a malformed descendant can activate them but cannot emit topology.
+  Both sources resolve into one legacy-preferred per-IP fact; a valid modern
+  prefix fills only a missing legacy mask on the same ifIndex.
 - `_std-topology-interface-mib.yaml` provides interface identity and status.
 - `_std-topology-bridge-base-mib.yaml`, `_std-topology-fdb-mib.yaml`,
   `_std-topology-q-bridge-mib.yaml`, `_std-topology-stp-mib.yaml`, and
@@ -1418,6 +1437,13 @@ Examples:
   `IP-MIB::ipNetToPhysicalNetAddress` are `not-accessible` index components.
   Derive them from the row index. The physical MAC value,
   `ipNetToPhysicalPhysAddress`, is readable and can stay as a column symbol.
+- `IP-MIB::ipAddressAddr` is a `not-accessible` `ipAddressTable` index
+  component. For IPv4, constrain the readable `ipAddressIfIndex` anchor to the
+  type-and-length prefix `1.4` and keep the transformed suffix raw. The
+  consumer MUST require exactly four decimal octets in `0..255`; the walk root
+  alone cannot reject extra suffix components.
+  `ipAddressType`, `ipAddressPrefix`, `ipAddressStatus`, and
+  `ipAddressRowStatus` are readable tag sources.
 - `LLDP-MIB::lldpLocManAddrSubtype` and `LLDP-MIB::lldpLocManAddr` are
   `not-accessible` index components. Anchor the row on a readable column such as
   `lldpLocManAddrLen`, then derive subtype and address from the row index. Use
@@ -1435,7 +1461,7 @@ Audit recipe:
 
 ```bash
 rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
-rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipAddressAddr|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
 Any profile hit for a `not-accessible` object is valid only when the tag is

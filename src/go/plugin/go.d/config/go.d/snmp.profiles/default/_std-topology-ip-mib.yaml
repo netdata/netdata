@@ -1,5 +1,5 @@
 # Baseline IPv4 interface facts for logical L3 topology.
-# Source: IP-MIB ipAddrTable.
+# Sources: legacy IP-MIB ipAddrTable and RFC 4293 ipAddressTable.
 
 topology:
   - kind: ip_if_index
@@ -10,6 +10,9 @@ topology:
     symbols:
       - OID: 1.3.6.1.2.1.4.20.1.2
         name: ip_if_index
+    static_tags:
+      - tag: topo_ip_source
+        value: legacy
     metric_tags:
       - tag: topo_ip_addr
         symbol:
@@ -26,3 +29,67 @@ topology:
         symbol:
           OID: 1.3.6.1.2.1.4.20.1.3
           name: ipAdEntNetMask
+
+  # RFC 4293 ipAddressTable IPv4 rows. The walk root is the readable
+  # ipAddressIfIndex column narrowed by the InetAddressType and length indexes.
+  - kind: ip_if_index
+    MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.34.1.3.1.4
+      name: ipAddressTableIPv4
+    symbols:
+      - OID: 1.3.6.1.2.1.4.34.1.3
+        name: ip_if_index
+    static_tags:
+      - tag: topo_ip_source
+        value: modern
+    metric_tags:
+      - tag: topo_ip_addr
+        symbol:
+          name: ipAddressAddr
+        index_transform:
+          - start: 2
+      - tag: topo_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.4.34.1.3
+          name: ipAddressIfIndex
+      - tag: topo_ip_type
+        table: ipAddressTypeIPv4
+        symbol:
+          OID: 1.3.6.1.2.1.4.34.1.4
+          name: ipAddressType
+        mapping:
+          1: unicast
+          2: anycast
+          3: broadcast
+      - tag: topo_ip_prefix_pointer
+        table: ipAddressPrefixIPv4
+        symbol:
+          OID: 1.3.6.1.2.1.4.34.1.5
+          name: ipAddressPrefix
+      - tag: topo_ip_status
+        table: ipAddressStatusIPv4
+        symbol:
+          OID: 1.3.6.1.2.1.4.34.1.7
+          name: ipAddressStatus
+        mapping:
+          1: preferred
+          2: deprecated
+          3: invalid
+          4: inaccessible
+          5: unknown
+          6: tentative
+          7: duplicate
+          8: optimistic
+      - tag: topo_ip_row_status
+        table: ipAddressRowStatusIPv4
+        symbol:
+          OID: 1.3.6.1.2.1.4.34.1.10
+          name: ipAddressRowStatus
+        mapping:
+          1: active
+          2: notInService
+          3: notReady
+          4: createAndGo
+          5: createAndWait
+          6: destroy
