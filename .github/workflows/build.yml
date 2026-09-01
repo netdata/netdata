@@ -1124,23 +1124,23 @@ jobs:
         env:
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
-          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.S3_RELEASE_ACCESS_KEY }}"
-          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.S3_RELEASE_SECRET_KEY }}"
-          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.S3_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
           RCLONE_CONFIG_S3_REGION: "auto"
         run: |
-          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./$(cat latest-version.txt) s3:${{ secrets.S3_NIGHTLY_BUCKET }}/nightlies
+          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./$(cat latest-version.txt) s3:netdata-agent-artifacts/nightlies
       - name: Upload Latest Artifacts
         id: upload-latest
         env:
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
-          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.S3_RELEASE_ACCESS_KEY }}"
-          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.S3_RELEASE_SECRET_KEY }}"
-          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.S3_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
           RCLONE_CONFIG_S3_REGION: "auto"
         run: |
-          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest s3:${{ secrets.S3_NIGHTLY_BUCKET }}/nightlies/latest
+          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest s3:netdata-agent-artifacts/nightlies/latest
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
