@@ -3,6 +3,7 @@
 #include "sqlite_health.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
+#include "sqlite_metadata.h"
 #include "health/health_internals.h"
 #include "health/health-alert-entry.h"
 
@@ -353,33 +354,71 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
  *
  */
 
+// Rows are deleted in bounded batches. The eligible set is extremely bimodal: on a large
+// parent most hourly runs have a few dozen rows to delete, but roughly three times a day a
+// run finds ~800k rows that crossed the retention boundary together. Deleting those in one
+// transaction rewrites the table plus every index on it, and the resulting fsync storm
+// saturates the database disk long enough to starve dbengine queries - which stalls health
+// evaluation itself, since health is the biggest query consumer on a parent.
+//
+// The rowid-IN form is used rather than "DELETE ... LIMIT": both produce an identical query
+// plan, but DELETE-with-LIMIT needs SQLITE_ENABLE_UPDATE_DELETE_LIMIT, which is not enabled
+// in every SQLite build netdata may link against.
+#define HEALTH_LOG_CLEANUP_BATCH_SIZE (5000)
+
 #define SQL_CLEANUP_HEALTH_LOG_DETAIL                                                                                  \
-    "DELETE FROM health_log_detail WHERE health_log_id IN "                                                            \
-    " (SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND when_key < UNIXEPOCH() - @history "          \
-    " AND updated_by_id <> 0 AND transition_id NOT IN "                                                                \
-    " (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"
+    "DELETE FROM health_log_detail WHERE rowid IN ("                                                                   \
+    "  SELECT d.rowid FROM health_log_detail d WHERE d.health_log_id IN "                                              \
+    "   (SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND d.when_key < UNIXEPOCH() - @history "      \
+    "   AND d.updated_by_id <> 0 AND d.transition_id NOT IN "                                                          \
+    "   (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"                                    \
+    "  LIMIT @batch)"
 
 void sql_health_alarm_log_cleanup(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
     int rc;
+    int param = 0;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res))
         return;
 
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
+    time_t started = now_monotonic_sec();
 
-    param = 0;
-    rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to cleanup health log detail table, rc = %d", rc);
+    // Each iteration is its own transaction, so the WAL can be checkpointed and other writers
+    // can make progress between batches. We stop early on the same two conditions the other
+    // cleanups in run_metadata_cleanup() respect - an oversized WAL and a runtime budget - and
+    // whatever is left is picked up by the next cleanup cycle.
+    while (true) {
+        param = 0;
+        SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)HEALTH_LOG_CLEANUP_BATCH_SIZE));
+
+        param = 0;
+        rc = sqlite3_step_monitored(res);
+        if (unlikely(rc != SQLITE_DONE)) {
+            error_report("Failed to cleanup health log detail table, rc = %d", rc);
+            break;
+        }
+
+        // a short batch means the eligible set for this host is exhausted
+        if (sqlite3_changes(db_meta) < HEALTH_LOG_CLEANUP_BATCH_SIZE)
+            break;
+
+        if (!sql_metadata_wal_size_acceptable())
+            break;
+
+        if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD)
+            break;
+
+        SQLITE_RESET(res);
+    }
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-    
+
     // After cleaning up SQLite entries, also clean up in-memory entries
     health_alarm_log_cleanup(host);
 }

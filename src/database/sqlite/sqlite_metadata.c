@@ -203,7 +203,6 @@ sqlite3 *db_meta = NULL;
 #define METADATA_MAINTENANCE_CTX_CLEAN_REPEAT (300) // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
 #define METADATA_LABEL_CHECK_INTERVAL (3600)        // Repeat maintenance for labels
-#define METADATA_RUNTIME_THRESHOLD (5)              // Run time threshold for cleanup task
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
 #define METADATA_HOST_CHECK_INTERVAL (5)            // Repeat check for pending metadata
@@ -733,7 +732,7 @@ static int64_t sql_get_wal_size(const char *database_file)
 
 #define SQLITE_METADATA_WAL_LIMIT_X (10)
 
-bool sql_metadata_wal_size_acceptable()
+bool sql_metadata_wal_size_acceptable(void)
 {
     int64_t wal_size = sql_get_wal_size("netdata-meta.db");
 
