@@ -48,8 +48,6 @@ type SysInfo struct {
 
 type SysInfoProbe struct {
 	PDUCount        int
-	FirstOID        string
-	LastOID         string
 	SeenSysDescr    bool
 	SeenSysObjectID bool
 	SeenSysContact  bool
@@ -73,10 +71,6 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
 		si.Probe.PDUCount++
-		if si.Probe.PDUCount == 1 {
-			si.Probe.FirstOID = oid
-		}
-		si.Probe.LastOID = oid
 		if !isPduWithData(pdu) {
 			continue
 		}

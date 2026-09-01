@@ -85,15 +85,13 @@ func formatSysInfoDiagnostic(si *snmputils.SysInfo) string {
 
 	p := si.Probe
 	return fmt.Sprintf(
-		"sys_object_id=%q vendor=%q category=%q model=%q probe={pdu_count=%d first_oid=%q last_oid=%q "+
+		"sys_object_id=%q vendor=%q category=%q model=%q probe={pdu_count=%d "+
 			"sys_descr=%t sys_object_id=%t sys_contact=%t sys_name=%t sys_location=%t}",
 		si.SysObjectID,
 		si.Vendor,
 		si.Category,
 		si.Model,
 		p.PDUCount,
-		p.FirstOID,
-		p.LastOID,
 		p.SeenSysDescr,
 		p.SeenSysObjectID,
 		p.SeenSysContact,

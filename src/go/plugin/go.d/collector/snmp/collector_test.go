@@ -830,8 +830,6 @@ func TestSysInfoDiagnosticOmitsRawSystemValues(t *testing.T) {
 		Model:       "ASR 1000",
 		Probe: snmputils.SysInfoProbe{
 			PDUCount:        5,
-			FirstOID:        snmputils.OidSysDescr,
-			LastOID:         snmputils.OidSysLocation,
 			SeenSysDescr:    true,
 			SeenSysObjectID: true,
 			SeenSysContact:  true,

@@ -36,8 +36,6 @@ func TestGetSysInfoRecordsProbeDiagnostics(t *testing.T) {
 	assert.Equal(t, "1.3.6.1.4.1.9.1.1166", si.SysObjectID)
 	assert.Equal(t, SysInfoProbe{
 		PDUCount:        len(pdus),
-		FirstOID:        OidSysDescr,
-		LastOID:         OidSysLocation,
 		SeenSysDescr:    true,
 		SeenSysObjectID: true,
 		SeenSysContact:  true,
@@ -103,8 +101,6 @@ func TestGetSysInfoReturnsPartialProbeWithoutIdentityError(t *testing.T) {
 	assert.Empty(t, si.SysObjectID)
 	assert.Equal(t, SysInfoProbe{
 		PDUCount:     2,
-		FirstOID:     OidSysDescr,
-		LastOID:      OidSysName,
 		SeenSysDescr: true,
 		SeenSysName:  true,
 	}, si.Probe)
@@ -240,8 +236,6 @@ func TestGetSysInfoReturnsPartialResultForExceptionPDUs(t *testing.T) {
 	assert.Empty(t, si.SysObjectID)
 	assert.Equal(t, SysInfoProbe{
 		PDUCount:     5,
-		FirstOID:     OidSysDescr,
-		LastOID:      OidSysLocation,
 		SeenSysDescr: true,
 		SeenSysName:  true,
 	}, si.Probe)
@@ -303,8 +297,6 @@ func TestSysInfoProbeIsNotSerialized(t *testing.T) {
 		SysObjectID: "1.3.6.1.4.1.9.1.1166",
 		Probe: SysInfoProbe{
 			PDUCount:        2,
-			FirstOID:        OidSysDescr,
-			LastOID:         OidSysObject,
 			SeenSysDescr:    true,
 			SeenSysObjectID: true,
 		},
