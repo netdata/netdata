@@ -74,6 +74,10 @@ struct netdata_ebpf_cachestat_runtime {
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_cachestat_pid_snapshot *items_buf;
     size_t items_cap;
+    /* (map key -> TGID) pairs from the last apps snapshot.  Eviction needs
+     * them because the snapshot reports TGIDs while the map is keyed by
+     * something else entirely — see struct nd_ebpf_key_tgid. */
+    struct nd_ebpf_key_table pid_keys;
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     union {
         struct cachestat_bpf *base;
@@ -737,7 +741,8 @@ int netdata_cachestat_runtime_snapshot_apps(
         sizeof(*values),
         offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid),
         (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
-        cachestat_apps_snap_fold, cachestat_snapshot_merge_same_pid);
+        cachestat_apps_snap_fold, cachestat_snapshot_merge_same_pid,
+        &rt->pid_keys);
 
     if (out_count == 0) {
         out->items = NULL;
@@ -763,7 +768,8 @@ int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *
         return -1;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pid(cachestat_runtime_object(rt), "cstat_pid", pid, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        cachestat_runtime_object(rt), "cstat_pid", &rt->pid_keys, &pid, 1, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -785,7 +791,8 @@ int netdata_cachestat_runtime_delete_pids(
         return 0;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pids(cachestat_runtime_object(rt), "cstat_pid", pids, count, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        cachestat_runtime_object(rt), "cstat_pid", &rt->pid_keys, pids, count, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -826,6 +833,7 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
     freez(rt->percpu_u64);
     freez(rt->percpu_entries);
     freez(rt->items_buf);
+    nd_ebpf_key_table_free(&rt->pid_keys);
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         cachestat_destroy_ring_buffer(rt);

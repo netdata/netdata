@@ -19,8 +19,19 @@ static inline long long cgroup_ebpfgo_fd_normalize_rate(uint32_t delta, uint32_t
     return rate > LLONG_MAX ? LLONG_MAX : (long long)rate;
 }
 
+/* Saturating accumulate.
+ *
+ * INVARIANT: rate MUST be >= 0.  `LLONG_MAX - rate` is what makes the overflow
+ * test work, and with a negative rate that subtraction itself overflows, which
+ * is undefined behaviour.  The invariant holds by construction today — every
+ * caller passes cgroup_ebpfgo_fd_normalize_rate() output, which is a uint64
+ * quotient clamped into [0, LLONG_MAX] — but this is a header-visible helper, so
+ * the cheap guard is kept rather than relying on callers to stay disciplined. */
 static inline long long cgroup_ebpfgo_fd_add_rate(long long total, long long rate)
 {
+    if (rate <= 0)
+        return total;
+
     return total > LLONG_MAX - rate ? LLONG_MAX : total + rate;
 }
 

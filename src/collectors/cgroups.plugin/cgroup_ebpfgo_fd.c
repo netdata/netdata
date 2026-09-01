@@ -64,6 +64,13 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
         if (fd->ct > ct)
             ct = fd->ct;
 
+        /* A PID that has just moved into this cgroup can trail the cgroup's
+         * watermark, in which case its already-published interval is skipped
+         * here.  The loss is bounded to that single interval: the producer stamps
+         * a fresh store-wide token on every active PID each cycle, so the PID's
+         * next active publish carries ct > prev_ct and is consumed.  Same
+         * trade-off the dcstat consumer documents — this under-counts a trailing
+         * PID rather than double-counting it. */
         if (fd->ct <= prev_ct)
             continue;
 

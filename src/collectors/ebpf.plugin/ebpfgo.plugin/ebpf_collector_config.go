@@ -52,11 +52,22 @@ func applyCommonCollectorConfig(fileCfg pluginConfigFile, dst collectorCommonCon
 	if fileCfg.CollectPidLevel != nil && dst.AppsLevel != nil {
 		*dst.AppsLevel = *fileCfg.CollectPidLevel
 	}
+	// `ebpf type format` and `ebpf object flavor` both want to decide which object
+	// is loaded, so an explicit type format wins — but ONLY for a collector that
+	// actually consumes the load method.
+	//
+	// fd is currently the only one (it derives the base flavor from LoadLegacy in
+	// BuildFDLegacyPlan), so for fd the flavor merge is suppressed and the
+	// operator's `ebpf object flavor` is left untouched rather than clobbered with
+	// the legacy marker.  cachestat, dcstat and socket pass no LoadMethod
+	// destination; for them the legacy marker must still reach ObjectFlavor, or
+	// `ebpf type format = legacy` silently selects nothing at all.
+	loadMethodApplied := false
 	if fileCfg.LoadMethod != nil && *fileCfg.LoadMethod != LoadPlayDice && dst.LoadMethod != nil {
 		*dst.LoadMethod = *fileCfg.LoadMethod
+		loadMethodApplied = true
 	}
-	if (fileCfg.LoadMethod == nil || *fileCfg.LoadMethod == LoadPlayDice) &&
-		fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
+	if !loadMethodApplied && fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
 		*dst.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 	if fileCfg.LoadModeReturn != nil && dst.ReturnMode != nil {

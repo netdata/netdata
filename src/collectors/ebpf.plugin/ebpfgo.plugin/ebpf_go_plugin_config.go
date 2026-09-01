@@ -308,12 +308,22 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			case "legacy":
 				cfg.LoadMethod = new(LoadLegacy)
 				cfg.ObjectFlavor = new("tracing")
-			case "co-re":
-				cfg.LoadMethod = new(LoadCore)
-			case "auto":
-				// Preserve an explicit reset from an earlier merged legacy/co-re
-				// setting; LoadPlayDice means auto-detection in this config layer.
-				cfg.LoadMethod = new(LoadPlayDice)
+			case "co-re", "auto":
+				// Both mean "let auto-detection choose the object", so they must
+				// also RETRACT a legacy marker merged from an earlier config layer.
+				// Clearing LoadMethod alone is not enough: apply() merges each
+				// field independently, so a stale ObjectFlavor of "tracing" would
+				// survive and still force the base object, leaving the override
+				// unable to restore the normal family.  The empty string is the
+				// reset: applyCommonCollectorConfig skips a blank flavor, so the
+				// collector default applies.
+				cfg.ObjectFlavor = new("")
+				if strings.EqualFold(value, "co-re") {
+					cfg.LoadMethod = new(LoadCore)
+				} else {
+					// LoadPlayDice means auto-detection in this config layer.
+					cfg.LoadMethod = new(LoadPlayDice)
+				}
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf type format %q, using default\n", path, value)
 			}

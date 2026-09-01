@@ -190,7 +190,7 @@ func TestBuildFDFallbackPlansCapBaseSelector(t *testing.T) {
 func TestBuildFDFallbackPlansRHFKeepsReturnPrefix(t *testing.T) {
 	cfg := baseFDConfig()
 	cfg.IsRHF = 9*256 + 0
-	cfg.KernelVersion = 331264 // 5.15 — lowest kernel at which SelectMaxIndex reaches 5.14 on RHF
+	cfg.KernelVersion = 331264 // 5.14 — the RHF rung at which SelectMaxIndex reaches selector 7
 	cfg.HasBTF = true
 	cfg.ObjectFlavor = "buffer"
 

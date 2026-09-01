@@ -302,6 +302,81 @@ typedef void (*nd_ebpf_apps_snap_fold_fn)(void *dst, const void *values, int cpu
  *     as needed.
  *
  * Returns the merged item count, or 0 if the map is empty. */
+/* ------------------------------------------------------------------------
+ * BPF map key <-> TGID translation
+ * ------------------------------------------------------------------------ */
+
+/* One row of the per-cycle translation table built while the apps snapshot walks
+ * the per-PID BPF map.
+ *
+ * The map key is NOT the TGID, at any apps level.  Upstream
+ * netdata_get_pid(ctrl_tbl, tgid) in netdata/kernel-collector
+ * includes/netdata_common.h decides the key:
+ *   REAL_PARENT (the default) -> key = real parent PID,  *tgid = current TGID
+ *   PARENT                    -> key = parent PID,       *tgid = current TGID
+ *   ALL                       -> key = current TID,      *tgid = current TGID
+ * so the two coincide only by accident (a single-threaded process that is its
+ * own real parent).
+ *
+ * The snapshot deliberately reports the TGID, because shared memory has to be
+ * indexed by TGID for cgroup.procs lookups to resolve.  Eviction therefore
+ * cannot reuse that value as a map key: doing so made bpf_map_delete_elem()
+ * return ENOENT (swallowed as success), so entries were never removed and the
+ * fixed-size BPF_MAP_TYPE_HASH eventually filled, at which point new processes
+ * stopped being accounted at all.  Worse, a TGID that happens to equal some
+ * other bucket's key would evict a LIVE entry.
+ *
+ * This table records the (key, tgid) pair for every bucket the snapshot visited,
+ * so eviction can map a dead TGID back to the key(s) that actually hold it.  The
+ * relation is many-to-one at level ALL (every thread of a process), so all
+ * matching keys must be deleted, not just the first. */
+struct nd_ebpf_key_tgid {
+    uint32_t key;
+    uint32_t tgid;
+};
+
+/* Per-runtime, rebuilt on every apps snapshot and consumed by the eviction that
+ * follows it in the same collection cycle.  Owned by the runtime; freed in
+ * close(). */
+struct nd_ebpf_key_table {
+    struct nd_ebpf_key_tgid *items;
+    size_t count;
+    size_t cap;
+};
+
+static inline void nd_ebpf_key_table_reset(struct nd_ebpf_key_table *t)
+{
+    if (t)
+        t->count = 0;
+}
+
+static inline void nd_ebpf_key_table_add(struct nd_ebpf_key_table *t, uint32_t key, uint32_t tgid)
+{
+    if (!t)
+        return;
+
+    if (t->count == t->cap) {
+        size_t cap = t->cap ? t->cap * 2 : 256;
+        t->items = reallocz(t->items, cap * sizeof(*t->items));
+        t->cap = cap;
+    }
+
+    t->items[t->count].key = key;
+    t->items[t->count].tgid = tgid;
+    t->count++;
+}
+
+static inline void nd_ebpf_key_table_free(struct nd_ebpf_key_table *t)
+{
+    if (!t)
+        return;
+
+    freez(t->items);
+    t->items = NULL;
+    t->count = 0;
+    t->cap = 0;
+}
+
 static inline size_t nd_ebpf_apps_snap_iterate(
     struct bpf_map *map,
     int map_fd,
@@ -313,8 +388,14 @@ static inline size_t nd_ebpf_apps_snap_iterate(
     size_t *items_cap,
     size_t item_size,
     nd_ebpf_apps_snap_fold_fn fold,
-    nd_ebpf_snapshot_merge_fn merge_same_pid)
+    nd_ebpf_snapshot_merge_fn merge_same_pid,
+    struct nd_ebpf_key_table *keys)
 {
+    /* Rebuilt every cycle: the eviction that consumes it runs immediately after
+     * this snapshot, so a stale pair could delete a bucket that has since been
+     * recreated for a different process. */
+    nd_ebpf_key_table_reset(keys);
+
     /* Re-query the actual post-load map type; bpf_map__set_type can silently
      * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
     enum bpf_map_type mtype = bpf_map__type(map);
@@ -336,6 +417,10 @@ static inline size_t nd_ebpf_apps_snap_iterate(
         nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
 
         uint32_t tgid = nd_ebpf_snapshot_tgid(values, count, value_size, tgid_offset, next_key);
+
+        /* Record the pair BEFORE the rows are merged: merging folds same-TGID
+         * buckets together and loses the individual keys that must be deleted. */
+        nd_ebpf_key_table_add(keys, next_key, tgid);
 
         void *dst = (char *)*items_buf + out_count * item_size;
         memset(dst, 0, item_size);
@@ -704,68 +789,27 @@ static inline int nd_ebpf_update_controller(
     return 0;
 }
 
-/*
- * Bulk-deletes PIDs from a per-PID map.  Prefers bpf_map_delete_batch
- * (kernel >= 5.6) and falls back to a tight loop of bpf_map_delete_elem.
+/* Evicts the buckets belonging to a set of dead TGIDs.
  *
- * map_missing is set when the object has no such map, which is the normal case
- * for the buffer/arena flavors: the caller then evicts from its userspace
- * accumulator instead.
- */
-static inline int nd_ebpf_map_delete_pids(
+ * This is the eviction entry point every per-PID collector must use.  Deleting
+ * the TGIDs directly does not work — see struct nd_ebpf_key_tgid for why the map
+ * key is not the TGID — so each dead TGID is translated back through the pairs
+ * the last snapshot recorded.  A TGID maps to several keys at apps level ALL (one
+ * per thread), so the scan does not stop at the first hit.
+ *
+ * The cost is O(keys x tgids), but tgids is an eviction batch confirmed dead by
+ * kill(pid, 0) and is typically a handful, so this stays far cheaper than the
+ * alternative of re-walking the BPF map once per eviction.
+ *
+ * map_missing is set when the object has no such map at all (the buffer and arena
+ * flavors publish events instead), which the caller handles by evicting from its
+ * userspace accumulator instead. */
+static inline int nd_ebpf_map_delete_tgids(
     struct bpf_object *obj,
     const char *map_name,
-    uint32_t *pids,
+    const struct nd_ebpf_key_table *keys,
+    const uint32_t *tgids,
     size_t count,
-    bool *map_missing)
-{
-    *map_missing = false;
-
-    if (!obj || !pids || count == 0)
-        return 0;
-
-    struct bpf_map *map = bpf_object__find_map_by_name(obj, map_name);
-    if (!map) {
-        *map_missing = true;
-        return 0;
-    }
-
-    int fd = bpf_map__fd(map);
-    if (fd < 0)
-        return -1;
-
-    /* Fall back to per-key delete on ENOSYS (older kernels) or
-     * EINVAL/EOPNOTSUPP (the kernel rejected the batch shape).  ENOENT also
-     * falls through because htab_map_delete_batch stops at the first missing
-     * key — the remaining PIDs are still deletable individually.
-     *
-     * bpf_map_delete_batch takes __u32 count, not size_t; on overflow we skip
-     * the batch and go straight to the loop. */
-    if (count <= UINT32_MAX) {
-        uint32_t batch_count = (uint32_t)count;
-        int rc = bpf_map_delete_batch(fd, pids, &batch_count, NULL);
-        if (rc == 0)
-            return 0;
-        if (rc != -ENOSYS && rc != -EINVAL && rc != -EOPNOTSUPP && rc != -ENOENT)
-            return rc;
-    }
-
-    for (size_t i = 0; i < count; i++) {
-        int per = bpf_map_delete_elem(fd, &pids[i]);
-        /* Treat "not found" as success: the PID may have been removed by the
-         * BPF program between snapshot and delete. */
-        if (per != 0 && per != -ENOENT)
-            return per;
-    }
-    return 0;
-}
-
-/* Deletes one PID from a per-PID map; see nd_ebpf_map_delete_pids for
- * map_missing. */
-static inline int nd_ebpf_map_delete_pid(
-    struct bpf_object *obj,
-    const char *map_name,
-    uint32_t pid,
     bool *map_missing)
 {
     *map_missing = false;
@@ -783,7 +827,26 @@ static inline int nd_ebpf_map_delete_pid(
     if (fd < 0)
         return -1;
 
-    return bpf_map_delete_elem(fd, &pid);
+    if (!keys || !keys->items || keys->count == 0 || !tgids || count == 0)
+        return 0;
+
+    int rc = 0;
+    for (size_t k = 0; k < keys->count; k++) {
+        for (size_t i = 0; i < count; i++) {
+            if (keys->items[k].tgid != tgids[i])
+                continue;
+
+            uint32_t map_key = keys->items[k].key;
+            int per = bpf_map_delete_elem(fd, &map_key);
+            /* Treat "not found" as success: the BPF program may have removed the
+             * bucket between snapshot and delete. */
+            if (per != 0 && per != -ENOENT)
+                rc = per;
+            break;
+        }
+    }
+
+    return rc;
 }
 
 /* Converts the requested per-core preference into the map types the object must

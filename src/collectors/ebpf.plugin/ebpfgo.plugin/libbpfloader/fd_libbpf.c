@@ -86,6 +86,10 @@ struct netdata_ebpf_fd_runtime {
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_fd_pid_snapshot *items_buf;
     size_t items_cap;
+    /* (map key -> TGID) pairs from the last apps snapshot.  Eviction needs
+     * them because the snapshot reports TGIDs while the map is keyed by
+     * something else entirely — see struct nd_ebpf_key_tgid. */
+    struct nd_ebpf_key_table pid_keys;
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
     union {
         struct fd_bpf *base;
@@ -728,7 +732,8 @@ int netdata_fd_runtime_snapshot_apps(
         sizeof(*values),
         offsetof(struct netdata_ebpf_fd_pid_entry, tgid),
         (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
-        fd_apps_snap_fold, fd_snapshot_merge_same_pid);
+        fd_apps_snap_fold, fd_snapshot_merge_same_pid,
+        &rt->pid_keys);
 
     if (out_count == 0) {
         out->items = NULL;
@@ -754,7 +759,8 @@ int netdata_fd_runtime_delete_pid(struct netdata_ebpf_fd_runtime *rt, uint32_t p
         return -1;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pid(fd_runtime_object(rt), "tbl_fd_pid", pid, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        fd_runtime_object(rt), "tbl_fd_pid", &rt->pid_keys, &pid, 1, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -775,7 +781,8 @@ int netdata_fd_runtime_delete_pids(
         return 0;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pids(fd_runtime_object(rt), "tbl_fd_pid", pids, count, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        fd_runtime_object(rt), "tbl_fd_pid", &rt->pid_keys, pids, count, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -800,6 +807,7 @@ void netdata_fd_runtime_close(struct netdata_ebpf_fd_runtime *rt)
     freez(rt->percpu_u64);
     freez(rt->percpu_entries);
     freez(rt->items_buf);
+    nd_ebpf_key_table_free(&rt->pid_keys);
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_FD_RUNTIME_CORE) {
         fd_destroy_ring_buffer(rt);

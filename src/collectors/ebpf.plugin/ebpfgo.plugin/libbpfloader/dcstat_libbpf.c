@@ -87,6 +87,10 @@ struct netdata_ebpf_dcstat_runtime {
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_dcstat_pid_snapshot *items_buf;
     size_t items_cap;
+    /* (map key -> TGID) pairs from the last apps snapshot.  Eviction needs
+     * them because the snapshot reports TGIDs while the map is keyed by
+     * something else entirely — see struct nd_ebpf_key_tgid. */
+    struct nd_ebpf_key_table pid_keys;
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
     union {
         struct dc_bpf *base;
@@ -704,7 +708,8 @@ int netdata_dcstat_runtime_snapshot_apps(
         sizeof(*values),
         offsetof(struct netdata_ebpf_dcstat_pid_entry, tgid),
         (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
-        dcstat_apps_snap_fold, dcstat_snapshot_merge_same_pid);
+        dcstat_apps_snap_fold, dcstat_snapshot_merge_same_pid,
+        &rt->pid_keys);
 
     if (out_count == 0) {
         out->items = NULL;
@@ -730,7 +735,8 @@ int netdata_dcstat_runtime_delete_pid(struct netdata_ebpf_dcstat_runtime *rt, ui
         return -1;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pid(dcstat_runtime_object(rt), "dcstat_pid", pid, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        dcstat_runtime_object(rt), "dcstat_pid", &rt->pid_keys, &pid, 1, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -751,7 +757,8 @@ int netdata_dcstat_runtime_delete_pids(
         return 0;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pids(dcstat_runtime_object(rt), "dcstat_pid", pids, count, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        dcstat_runtime_object(rt), "dcstat_pid", &rt->pid_keys, pids, count, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -776,6 +783,7 @@ void netdata_dcstat_runtime_close(struct netdata_ebpf_dcstat_runtime *rt)
     freez(rt->percpu_u64);
     freez(rt->percpu_entries);
     freez(rt->items_buf);
+    nd_ebpf_key_table_free(&rt->pid_keys);
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_DCSTAT_RUNTIME_CORE) {
         dcstat_destroy_ring_buffer(rt);

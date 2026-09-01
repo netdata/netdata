@@ -110,10 +110,14 @@ func TestResolveFDLegacyConfigLoadMode(t *testing.T) {
 }
 
 func TestResolveFDLegacyConfigTypeFormatOverridesObjectFlavor(t *testing.T) {
+	// The fixture must use a NON-default flavor.  With `ebpf object flavor = buffer`
+	// this assertion was vacuous: fdDefaultObjectFlavor is "buffer" too, so a
+	// regression that wrongly applied the file's flavor — or the parser's "tracing"
+	// marker — still produced "buffer" and the guard passed silently.
 	writeCollectorConfigFixture(t, "fd.conf", `
 [global]
+    ebpf object flavor = arena
     ebpf type format = legacy
-    ebpf object flavor = buffer
 
 [ebpf programs]
     fd = yes
@@ -126,8 +130,38 @@ func TestResolveFDLegacyConfigTypeFormatOverridesObjectFlavor(t *testing.T) {
 	if cfg.LoadMethod != LoadLegacy {
 		t.Fatalf("LoadMethod = %v, want %v", cfg.LoadMethod, LoadLegacy)
 	}
-	if cfg.ObjectFlavor != "buffer" {
-		t.Fatalf("ObjectFlavor = %q, want the default unchanged when type format wins", cfg.ObjectFlavor)
+	// fd consumes LoadMethod, so the flavor merge is suppressed entirely and the
+	// collector default survives — neither "arena" from the file nor "tracing"
+	// from the legacy marker may leak through.
+	if cfg.ObjectFlavor != fdDefaultObjectFlavor {
+		t.Fatalf("ObjectFlavor = %q, want the default %q unchanged when type format wins",
+			cfg.ObjectFlavor, fdDefaultObjectFlavor)
+	}
+}
+
+// TestResolveFDLegacyConfigTypeFormatAutoRetractsLegacy pins the retraction: a
+// later config layer setting `auto` must be able to restore the normal object
+// family, not stay pinned to the base object by a stale legacy marker.
+func TestResolveFDLegacyConfigTypeFormatAutoRetractsLegacy(t *testing.T) {
+	// The later layer sets ONLY the type format.  If it also set an object flavor
+	// that value would overwrite the stale "tracing" marker on its own and the
+	// test would pass even with the retraction missing.
+	writeCollectorConfigFixture(t, "fd.conf",
+		"[global]\n    ebpf type format = legacy\n\n[ebpf programs]\n    fd = yes\n",
+		"",
+		"[global]\n    ebpf type format = auto\n",
+		"")
+
+	cfg, err := resolveFDLegacyConfig()
+	if err != nil {
+		t.Fatalf("resolveFDLegacyConfig: %v", err)
+	}
+	if cfg.LoadMethod == LoadLegacy {
+		t.Fatalf("LoadMethod = %v, want the legacy marker retracted by `auto`", cfg.LoadMethod)
+	}
+	if cfg.ObjectFlavor != fdDefaultObjectFlavor {
+		t.Fatalf("ObjectFlavor = %q, want the default %q: `auto` must clear the stale legacy flavor",
+			cfg.ObjectFlavor, fdDefaultObjectFlavor)
 	}
 }
 
