@@ -277,13 +277,19 @@ func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfaceP
 	cache.updateIfIndexByIP(map[string]string{
 		tagTopoIPSource: topoIPSourceLegacy,
 		tagTopoIPAddr:   "10.20.4.2",
-		tagTopoIfIndex:  "1",
+		tagTopoIfIndex:  "2",
 	})
 	cache.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "1",
+		tagTopoIfName:  "UnrelatedPort",
+		tagTopoIfPhys:  "02:00:00:00:00:01",
+	})
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "2",
 		tagTopoIfName:  "Port1",
 		tagTopoIfPhys:  "\"18 FD 74 33 1A 9C \"",
 	})
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Equal(t, "18:fd:74:33:1a:9c", obs.BaseBridgeAddress)

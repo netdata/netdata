@@ -49,6 +49,7 @@ func (c *topologyBuilder) snapshotOSPFNeighbors(
 		return nil
 	}
 
+	localInterfaces := newTopologyOSPFLocalInterfaceIndex(l3Interfaces)
 	keys := topologyutil.SortedMapKeys(c.ospfNeighborsByKey)
 	rows := make([]topologymodel.OSPFNeighbor, 0, len(keys))
 	for _, key := range keys {
@@ -57,7 +58,7 @@ func (c *topologyBuilder) snapshotOSPFNeighbors(
 		if row.LocalRouterID == "" {
 			row.LocalRouterID = topologyutil.NormalizeTopologyRouterID(c.localDevice.OSPFRouterID)
 		}
-		if iface, ok := matchOSPFNeighborLocalInterface(row.NeighborIP, l3Interfaces); ok {
+		if iface, ok := localInterfaces.match(row.NeighborIP); ok {
 			row.LocalIP = iface.IP
 			row.Network = iface.Network
 			row.Netmask = iface.Netmask
@@ -80,10 +81,43 @@ type topologyOSPFLocalInterfaceMatch struct {
 	Prefix  int
 }
 
-func matchOSPFNeighborLocalInterface(
-	neighborIP string,
-	l3Interfaces []topologymodel.L3Interface,
-) (topologyOSPFLocalInterfaceMatch, bool) {
+type topologyOSPFLocalInterfaceEntry struct {
+	ip      string
+	network netip.Addr
+	netmask string
+	prefix  int
+}
+
+type topologyOSPFLocalInterfaceIndex map[netip.Prefix]topologyOSPFLocalInterfaceEntry
+
+func newTopologyOSPFLocalInterfaceIndex(l3Interfaces []topologymodel.L3Interface) topologyOSPFLocalInterfaceIndex {
+	var index topologyOSPFLocalInterfaceIndex
+	for _, row := range l3Interfaces {
+		subnet, ok := topologymodel.L3SubnetForInterface(row)
+		if !ok {
+			continue
+		}
+		prefix := netip.PrefixFrom(subnet.Network, subnet.Prefix).Masked()
+		if _, exists := index[prefix]; exists {
+			continue
+		}
+		if index == nil {
+			index = make(topologyOSPFLocalInterfaceIndex)
+		}
+		index[prefix] = topologyOSPFLocalInterfaceEntry{
+			ip:      row.IP,
+			network: subnet.Network,
+			netmask: row.Netmask,
+			prefix:  subnet.Prefix,
+		}
+	}
+	return index
+}
+
+func (index topologyOSPFLocalInterfaceIndex) match(neighborIP string) (topologyOSPFLocalInterfaceMatch, bool) {
+	if len(index) == 0 {
+		return topologyOSPFLocalInterfaceMatch{}, false
+	}
 	neighbor, ok := topologyutil.ParseIPAddress(neighborIP)
 	if !ok || !neighbor.Is4() {
 		return topologyOSPFLocalInterfaceMatch{}, false
@@ -92,31 +126,20 @@ func matchOSPFNeighborLocalInterface(
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
 
-	var best topologyOSPFLocalInterfaceMatch
-	found := false
-	for _, row := range l3Interfaces {
-		subnet, ok := topologymodel.L3SubnetForInterface(row)
-		if !ok {
-			continue
-		}
-		prefix := netip.PrefixFrom(subnet.Network, subnet.Prefix)
-		if !prefix.Contains(neighbor) {
-			continue
-		}
-		candidate := topologyOSPFLocalInterfaceMatch{
-			IP:      topologyutil.NormalizeIPAddress(row.IP),
-			Network: subnet.Network.String(),
-			Netmask: subnet.Netmask.String(),
-			Subnet:  subnet.Network.String() + "/" + strconv.Itoa(subnet.Prefix),
-			Prefix:  subnet.Prefix,
-		}
-		if !found || candidate.Prefix > best.Prefix {
-			best = candidate
-			found = true
+	for bits := 32; bits >= 0; bits-- {
+		entry, found := index[netip.PrefixFrom(neighbor, bits).Masked()]
+		if found {
+			network := entry.network.String()
+			return topologyOSPFLocalInterfaceMatch{
+				IP:      entry.ip,
+				Network: network,
+				Netmask: entry.netmask,
+				Subnet:  network + "/" + strconv.Itoa(entry.prefix),
+				Prefix:  entry.prefix,
+			}, true
 		}
 	}
-
-	return best, found
+	return topologyOSPFLocalInterfaceMatch{}, false
 }
 
 func topologyOSPFNeighborCacheKey(row topologymodel.OSPFNeighbor) string {

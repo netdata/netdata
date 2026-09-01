@@ -302,6 +302,7 @@ Ingestion is split by source area:
 - `topology_cache_cdp.go`
 - `topology_cache_fdb.go`
 - `topology_cache_interfaces.go`
+- `topology_ip_addresses.go`
 - `topology_cache_stp_arp.go`
 - `topology_l3_interfaces.go`
 - `topology_ospf_neighbors.go`
