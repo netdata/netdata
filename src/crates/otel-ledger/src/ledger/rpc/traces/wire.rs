@@ -645,12 +645,13 @@ pub struct OverviewGridWire {
     /// Per time bucket, the per-duration-bin TRACE counts (each trace
     /// bins by its merged envelope).
     pub cells: Vec<Vec<u64>>,
-    /// Per time bucket, the binned traces' STORED ERROR-status spans —
-    /// index-parallel to `cells`, summing to `totals.errors`. The same
-    /// ERROR-SPAN statistic as that total, sliced by the trace's
-    /// bucket: a bucket holding one trace with three failed spans
-    /// reads 3, not 1.
-    pub errors: Vec<u64>,
+    /// Per cell, the binned traces' STORED ERROR-status spans —
+    /// index-parallel to `cells` in BOTH dimensions, summing to
+    /// `totals.errors`. The same ERROR-SPAN statistic as that total,
+    /// sliced by the trace's cell: a cell holding one trace with three
+    /// failed spans reads 3, not 1. Read beside `cells[bucket][bin]` to
+    /// paint one heatmap cell's count and error rate together.
+    pub error_cells: Vec<Vec<u64>>,
     /// Per time bucket, the binned traces' EXACT envelope-duration
     /// percentiles, nanoseconds.
     pub duration_percentiles_ns: OverviewPercentilesWire,

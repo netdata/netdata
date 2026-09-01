@@ -988,7 +988,7 @@ async fn overview_counts_error_spans_in_totals() {
 }
 
 #[tokio::test]
-async fn the_grid_carries_per_bucket_error_spans() {
+async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     use crate::ledger::rpc::traces::fixtures::otlp_req_err;
     let registries = make_registries();
     install_wal(
@@ -1007,16 +1007,29 @@ async fn the_grid_carries_per_bucket_error_spans() {
     merge(&mut body, json!({}));
     let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
     assert_eq!(v["totals"], json!({"traces": 3, "spans": 6, "errors": 2}));
-    let errors = v["grid"]["errors"].as_array().unwrap();
-    assert_eq!(errors.len(), 100, "index-parallel to the cell rows");
-    assert_eq!(errors[10], 0, "the healthy trace's bucket");
-    assert_eq!(errors[20], 2, "both failing traces share the second");
-    let sum: u64 = errors.iter().map(|e| e.as_u64().unwrap()).sum();
-    assert_eq!(sum, 2, "the per-bucket errors sum to totals.errors");
+    let cells = v["grid"]["cells"].as_array().unwrap();
+    let errors = v["grid"]["error_cells"].as_array().unwrap();
+    assert_eq!(errors.len(), cells.len(), "index-parallel to the cells");
+    for row in errors {
+        assert_eq!(row.as_array().unwrap().len(), 6, "one column per duration bin");
+    }
+    // Every corpus envelope is sub-millisecond, so the failures land in
+    // the first duration bin of the second the traces started in.
+    assert_eq!(errors[10], json!([0, 0, 0, 0, 0, 0]), "the healthy trace's bucket");
+    assert_eq!(errors[20], json!([2, 0, 0, 0, 0, 0]), "both failing traces");
+    let sum: u64 = errors
+        .iter()
+        .flat_map(|r| r.as_array().unwrap())
+        .map(|e| e.as_u64().unwrap())
+        .sum();
+    assert_eq!(sum, 2, "the error cells sum to totals.errors");
 
-    // The Functions view's embedded section reports the same array.
+    // The Functions view's embedded section reports the same grid.
     let s = serde_json::to_value(call_on(&h, functions_body(20)).await.unwrap()).unwrap();
-    assert_eq!(s["data"]["overview"]["grid"]["errors"], v["grid"]["errors"]);
+    assert_eq!(
+        s["data"]["overview"]["grid"]["error_cells"],
+        v["grid"]["error_cells"]
+    );
 }
 
 #[tokio::test]
