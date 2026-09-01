@@ -19,8 +19,135 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
+
+func TestTopologyProductionPath_CatalogFixtureReconcilesLegacyAndModernIPRows(t *testing.T) {
+	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "iosxe_c9800.snmprec"))
+	dev, profileMetrics := collectCatalogFixtureTopology(t, fixture)
+
+	type sourceRows struct {
+		legacy map[string]string
+		modern map[string]string
+	}
+	rowsByIP := make(map[string]*sourceRows)
+	for _, pm := range profileMetrics {
+		for _, metric := range pm.TopologyMetrics {
+			if metric.TopologyKind != ddsnmp.KindIpIfIndex {
+				continue
+			}
+			ip := metric.Tags[tagTopoIPAddr]
+			if ip == "" {
+				continue
+			}
+			rows := rowsByIP[ip]
+			if rows == nil {
+				rows = &sourceRows{}
+				rowsByIP[ip] = rows
+			}
+			switch metric.Tags[tagTopoIPSource] {
+			case topoIPSourceLegacy:
+				rows.legacy = metric.Tags
+			case topoIPSourceModern:
+				rows.modern = metric.Tags
+			}
+		}
+	}
+
+	var ip string
+	var rows *sourceRows
+	for candidateIP, candidateRows := range rowsByIP {
+		if candidateRows.legacy != nil && candidateRows.modern != nil &&
+			candidateRows.legacy[tagTopoIfIndex] == candidateRows.modern[tagTopoIfIndex] {
+			ip, rows = candidateIP, candidateRows
+			break
+		}
+	}
+	require.NotEmpty(t, ip, "fixture should contain one address represented by both IP-MIB generations")
+
+	cache := newTestTopologyCache(dev)
+	cache.ingestTopologyProfileMetrics(profileMetrics)
+	cache.finalize()
+
+	require.Equal(t, rows.legacy[tagTopoIfIndex], cache.ipIfIndex(ip))
+	require.Equal(t, rows.legacy[tagTopoIPMask], cache.ipNetmask(ip))
+	_, hasL3 := cache.ipL3Interface(ip)
+	require.True(t, hasL3)
+	require.Contains(t, cache.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+		Address: ip, AddressType: "ipv4", Source: "ip_mib",
+	})
+	require.Equal(t, "management_address", cache.trapMatchMethodByIP[ip])
+}
+
+func TestTopologyProductionPath_CatalogFixtureKeepsModernInventoryWithoutPrefix(t *testing.T) {
+	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "gam.snmprec"))
+	dev, profileMetrics := collectCatalogFixtureTopology(t, fixture)
+
+	var modernTags map[string]string
+	for _, pm := range profileMetrics {
+		for _, metric := range pm.TopologyMetrics {
+			if metric.TopologyKind == ddsnmp.KindIpIfIndex &&
+				metric.Tags[tagTopoIPSource] == topoIPSourceModern &&
+				metric.Tags[tagTopoIPPrefix] == "0.0" {
+				modernTags = metric.Tags
+				break
+			}
+		}
+		if modernTags != nil {
+			break
+		}
+	}
+	require.NotNil(t, modernTags, "fixture should expose an RFC 4293 IPv4 row without a prefix row")
+	ip := modernTags[tagTopoIPAddr]
+	require.NotEmpty(t, ip)
+
+	cache := newTestTopologyCache(dev)
+	cache.ingestTopologyProfileMetrics(profileMetrics)
+	cache.finalize()
+
+	require.Equal(t, modernTags[tagTopoIfIndex], cache.ipIfIndex(ip))
+	require.Empty(t, cache.ipNetmask(ip))
+	_, hasL3 := cache.ipL3Interface(ip)
+	require.False(t, hasL3)
+	require.Contains(t, cache.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+		Address: ip, AddressType: "ipv4", Source: "ip_mib",
+	})
+	require.Equal(t, "management_address", cache.trapMatchMethodByIP[ip])
+}
+
+func collectCatalogFixtureTopology(
+	t testing.TB,
+	fixture *topologySNMPRecHandler,
+) (ddsnmp.DeviceConnectionInfo, []*ddsnmp.ProfileMetrics) {
+	t.Helper()
+	sysObjectPDU, ok := fixture.byOID["1.3.6.1.2.1.1.2.0"]
+	require.True(t, ok, "fixture should contain sysObjectID")
+	sysObjectID, ok := sysObjectPDU.Value.(string)
+	require.True(t, ok)
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:       "192.0.2.10",
+		Port:           161,
+		SNMPVersion:    gosnmp.Version2c.String(),
+		SysObjectID:    sysObjectID,
+		SysName:        "catalog-fixture",
+		MaxOIDs:        60,
+		MaxRepetitions: 25,
+	}
+	profiles := (&Collector{}).findTopologyProfiles(dev)
+	require.NotEmpty(t, profiles, "stock catalog should resolve topology profiles")
+
+	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		SnmpClient:  fixture,
+		Profiles:    profiles,
+		Log:         newTestSNMPTopologyCollector().Logger,
+		SysObjectID: dev.SysObjectID,
+	}).Collect()
+	require.NoError(t, err)
+	require.NotEmpty(t, profileMetrics)
+	return dev, profileMetrics
+}
 
 func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "iosxe_ie32008t2s-ios17-12.snmprec"))
@@ -191,6 +318,7 @@ func TestTopologySNMPRecPDURejectsMalformedValues(t *testing.T) {
 	}{
 		"integer":    {typeCode: "2", raw: "invalid"},
 		"octets":     {typeCode: "4x", raw: "not-hex"},
+		"ip-address": {typeCode: "64x", raw: "not-hex"},
 		"counter32":  {typeCode: "65", raw: "4294967296"},
 		"gauge32":    {typeCode: "66", raw: "4294967296"},
 		"time-ticks": {typeCode: "67", raw: "4294967296"},
@@ -245,6 +373,19 @@ func topologySNMPRecPDU(name, typeCode, raw string) (gosnmp.SnmpPDU, error) {
 			Name:  name,
 			Type:  gosnmp.IPAddress,
 			Value: raw,
+		}, nil
+	case "64x":
+		value, err := hex.DecodeString(raw)
+		if err != nil {
+			return gosnmp.SnmpPDU{}, err
+		}
+		if len(value) != 4 && len(value) != 16 {
+			return gosnmp.SnmpPDU{}, fmt.Errorf("unsupported 64x length %d", len(value))
+		}
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.IPAddress,
+			Value: value,
 		}, nil
 	case "65":
 		value, err := strconv.ParseUint(raw, 10, 32)

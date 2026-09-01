@@ -31,13 +31,12 @@ type topologyBuilder struct {
 	lldpRemotes  map[string]*lldpRemote
 	cdpRemotes   map[string]*cdpRemote
 
-	ifNamesByIndex      map[string]string
-	ifStatusByIndex     map[string]ifStatus
-	// ipAddressesByIP is the build-only source of truth for legacy/modern reconciliation.
-	ipAddressesByIP     map[string]ipAddressCandidates
-	ifIndexByIP         map[string]string
-	ifNetmaskByIP       map[string]string
-	l3InterfacesByIP    map[string]topologymodel.L3Interface
+	ifNamesByIndex  map[string]string
+	ifStatusByIndex map[string]ifStatus
+	// ipAddressCandidatesByIP is build-only provenance state and is released at finalization.
+	ipAddressCandidatesByIP map[string]ipAddressCandidates
+	// ipAddressesByIP is the single resolved interface-address inventory.
+	ipAddressesByIP     map[string]resolvedIPAddress
 	trapMatchMethodByIP map[string]string
 	bridgePortToIf      map[string]string
 	fdbEntries          map[string]*fdbEntry

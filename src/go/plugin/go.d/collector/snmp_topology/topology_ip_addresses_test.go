@@ -62,6 +62,12 @@ func TestTopologyCache_ModernIPAddressEligibilityAndPrefix(t *testing.T) {
 			},
 			wantAddress: true,
 		},
+		"pointer with trailing index components keeps inventory": {
+			mutate: func(tags map[string]string) {
+				tags[tagTopoIPPrefix] = "1.3.6.1.2.1.4.32.1.5.7.1.4.192.0.2.16.28.99"
+			},
+			wantAddress: true,
+		},
 		"pointer with invalid octet keeps inventory": {
 			mutate: func(tags map[string]string) {
 				tags[tagTopoIPPrefix] = "1.3.6.1.2.1.4.32.1.5.7.1.4.192.0.256.16.28"
@@ -89,8 +95,14 @@ func TestTopologyCache_ModernIPAddressEligibilityAndPrefix(t *testing.T) {
 		"anycast is not a device-unique identity": {
 			mutate: func(tags map[string]string) { tags[tagTopoIPType] = "anycast" },
 		},
+		"broadcast is not a device-unique identity": {
+			mutate: func(tags map[string]string) { tags[tagTopoIPType] = "broadcast" },
+		},
 		"invalid address is unusable": {
 			mutate: func(tags map[string]string) { tags[tagTopoIPStatus] = "invalid" },
+		},
+		"optimistic address is not yet usable": {
+			mutate: func(tags map[string]string) { tags[tagTopoIPStatus] = "optimistic" },
 		},
 		"inactive conceptual row is unusable": {
 			mutate: func(tags map[string]string) { tags[tagTopoIPRow] = "notInService" },
@@ -118,17 +130,16 @@ func TestTopologyCache_ModernIPAddressEligibilityAndPrefix(t *testing.T) {
 			cache.finalize()
 
 			if !test.wantAddress {
-				assert.NotContains(t, cache.ifIndexByIP, "192.0.2.17")
-				assert.NotContains(t, cache.ifNetmaskByIP, "192.0.2.17")
-				assert.NotContains(t, cache.l3InterfacesByIP, "192.0.2.17")
+				assert.NotContains(t, cache.ipAddressesByIP, "192.0.2.17")
 				return
 			}
-			assert.Equal(t, "7", cache.ifIndexByIP["192.0.2.17"])
-			assert.Equal(t, test.wantNetmask, cache.ifNetmaskByIP["192.0.2.17"])
+			assert.Equal(t, "7", cache.ipIfIndex("192.0.2.17"))
+			assert.Equal(t, test.wantNetmask, cache.ipNetmask("192.0.2.17"))
+			_, hasL3 := cache.ipL3Interface("192.0.2.17")
 			if test.wantNetmask == "" {
-				assert.NotContains(t, cache.l3InterfacesByIP, "192.0.2.17")
+				assert.False(t, hasL3)
 			} else {
-				assert.Contains(t, cache.l3InterfacesByIP, "192.0.2.17")
+				assert.True(t, hasL3)
 			}
 		})
 	}
@@ -143,9 +154,7 @@ func TestTopologyCache_ModernIPAddressRejectsIPv6(t *testing.T) {
 	))
 	cache.finalize()
 
-	assert.Empty(t, cache.ifIndexByIP)
-	assert.Empty(t, cache.ifNetmaskByIP)
-	assert.Empty(t, cache.l3InterfacesByIP)
+	assert.Empty(t, cache.ipAddressesByIP)
 }
 
 func TestTopologyCache_IPAddressMergeIsOrderIndependent(t *testing.T) {
@@ -197,8 +206,8 @@ func TestTopologyCache_IPAddressMergeIsOrderIndependent(t *testing.T) {
 				}
 				cache.finalize()
 
-				assert.Equal(t, test.wantIfIndex, cache.ifIndexByIP["192.0.2.17"])
-				assert.Equal(t, test.wantMask, cache.ifNetmaskByIP["192.0.2.17"])
+				assert.Equal(t, test.wantIfIndex, cache.ipIfIndex("192.0.2.17"))
+				assert.Equal(t, test.wantMask, cache.ipNetmask("192.0.2.17"))
 				require.Len(t, cache.localDevice.ManagementAddresses, 1)
 			})
 		}
@@ -215,8 +224,8 @@ func TestTopologyCache_IPAddressUnknownSourceCannotOverride(t *testing.T) {
 	})
 	cache.finalize()
 
-	assert.Equal(t, "7", cache.ifIndexByIP["192.0.2.17"])
-	assert.Equal(t, "255.255.255.0", cache.ifNetmaskByIP["192.0.2.17"])
+	assert.Equal(t, "7", cache.ipIfIndex("192.0.2.17"))
+	assert.Equal(t, "255.255.255.0", cache.ipNetmask("192.0.2.17"))
 }
 
 func TestTopologyCache_IPAddressSameSourceCandidateResolution(t *testing.T) {
@@ -256,12 +265,66 @@ func TestTopologyCache_IPAddressSameSourceCandidateResolution(t *testing.T) {
 			}
 			cache.finalize()
 
-			assert.Equal(t, test.wantIfIndex, cache.ifIndexByIP["192.0.2.17"])
-			assert.Equal(t, test.wantMask, cache.ifNetmaskByIP["192.0.2.17"])
+			assert.Equal(t, test.wantIfIndex, cache.ipIfIndex("192.0.2.17"))
+			assert.Equal(t, test.wantMask, cache.ipNetmask("192.0.2.17"))
 			if test.wantMask == "" {
-				assert.NotContains(t, cache.l3InterfacesByIP, "192.0.2.17")
+				_, hasL3 := cache.ipL3Interface("192.0.2.17")
+				assert.False(t, hasL3)
 			}
 		})
+	}
+}
+
+func TestTopologyCache_LegacyAmbiguityDoesNotFallBackToModern(t *testing.T) {
+	tests := map[string]struct {
+		legacyRows  []map[string]string
+		wantIfIndex string
+	}{
+		"conflicting legacy interfaces suppress the address": {
+			legacyRows: []map[string]string{
+				legacyIPv4Tags("192.0.2.17", "7", "255.255.255.0"),
+				legacyIPv4Tags("192.0.2.17", "8", "255.255.255.0"),
+			},
+		},
+		"conflicting legacy masks retain inventory without modern prefix": {
+			legacyRows: []map[string]string{
+				legacyIPv4Tags("192.0.2.17", "7", "255.255.255.0"),
+				legacyIPv4Tags("192.0.2.17", "7", "255.255.255.128"),
+			},
+			wantIfIndex: "7",
+		},
+	}
+
+	for name, test := range tests {
+		for _, modernFirst := range []bool{false, true} {
+			order := "legacy_first"
+			if modernFirst {
+				order = "modern_first"
+			}
+			t.Run(name+"/"+order, func(t *testing.T) {
+				cache := newTopologyBuilder()
+				modern := modernIPv4Tags(
+					"192.0.2.17",
+					"7",
+					"1.3.6.1.2.1.4.32.1.5.7.1.4.192.0.2.16.28",
+				)
+				if modernFirst {
+					cache.updateIfIndexByIP(modern)
+				}
+				for _, row := range test.legacyRows {
+					cache.updateIfIndexByIP(row)
+				}
+				if !modernFirst {
+					cache.updateIfIndexByIP(modern)
+				}
+				cache.finalize()
+
+				assert.Equal(t, test.wantIfIndex, cache.ipIfIndex("192.0.2.17"))
+				assert.Empty(t, cache.ipNetmask("192.0.2.17"))
+				_, hasL3 := cache.ipL3Interface("192.0.2.17")
+				assert.False(t, hasL3)
+			})
+		}
 	}
 }
 

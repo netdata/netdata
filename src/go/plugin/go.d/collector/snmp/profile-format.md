@@ -441,8 +441,10 @@ topology:
   is the symbol column plus a fixed structural index prefix, simple same-index
   cross-table dependencies inherit that prefix. For example, an anchor root
   `<column>.1` constrains dependency column walks to `<dependency-column>.1`.
-  Dependencies using `lookup_symbol`, multiple anchors, or conflicting scopes
-  use their ordinary common-prefix route instead.
+  Dependencies using `lookup_symbol`, `index_transform`, multiple anchors, or
+  conflicting scopes use their ordinary common-prefix route instead. This
+  structural prefix propagation is topology-only; ordinary metric-table
+  dependencies retain their existing common-prefix collection roots.
 - `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
   topology kind and should not be declared under `topology:`.
 
@@ -480,8 +482,12 @@ Stock profiles compose topology capabilities independently:
 - `_std-topology-ip-mib.yaml` provides IPv4 address, interface-index, and
   netmask facts used for L3 subnet topology. `generic-device.yaml` and
   `generic-ups.yaml` extend it as their baseline. The legacy `ipAddrTable`
-  address is derived from the row index, so the readable ifIndex and netmask
-  columns are sufficient.
+  address is derived from the row index. RFC 4293 `ipAddressTable` IPv4 rows
+  anchor on the readable `ipAddressIfIndex` column and derive the address from
+  the variable-length index. Their type, prefix pointer, address status, and
+  row status dependency columns are IPv4-scoped and remain dormant when the
+  anchor is empty. Both sources resolve into one legacy-preferred per-IP fact;
+  a valid modern prefix fills only a missing legacy mask on the same ifIndex.
 - `_std-topology-interface-mib.yaml` provides interface identity and status.
 - `_std-topology-bridge-base-mib.yaml`, `_std-topology-fdb-mib.yaml`,
   `_std-topology-q-bridge-mib.yaml`, `_std-topology-stp-mib.yaml`, and

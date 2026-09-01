@@ -19,6 +19,7 @@ type tableRouteState uint8
 
 const (
 	tableRoutePending tableRouteState = iota
+	tableRouteDormant
 	tableRouteNeedsFresh
 	tableRouteCached
 	tableRouteFresh
@@ -202,6 +203,8 @@ func (s *tableCollectionSession) resolve() {
 		if trigger := s.stageCached(route); trigger != nil {
 			s.requireFresh(route, trigger, &freshQueue)
 			s.resolveFreshQueue(&freshQueue)
+		} else if s.isDependencyOnlyTopologyRoute(route) {
+			route.state = tableRouteDormant
 		} else {
 			route.state = tableRouteCached
 		}
@@ -529,6 +532,9 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 		}
 
 		switch req.route.state {
+		case tableRouteDormant:
+			// The owner had no eligible rows, so this dependency was never observed.
+			continue
 		case tableRouteCached:
 			tablesSeen[req.route.oid] = true
 			if acquisition != nil {

@@ -1,5 +1,5 @@
 # Baseline IPv4 interface facts for logical L3 topology.
-# Source: IP-MIB ipAddrTable.
+# Sources: legacy IP-MIB ipAddrTable and RFC 4293 ipAddressTable.
 
 topology:
   - kind: ip_if_index

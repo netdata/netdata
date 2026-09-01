@@ -4,6 +4,7 @@ package ddsnmp
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -39,8 +40,9 @@ func handleCrossTableTagsWithoutMetricsForRows(metrics *[]ddprofiledefinition.Me
 		seenTableNames[m.Table.Name] = true
 	}
 
-	tagCrossTableOnlyOIDs := crossTableOnlyTagOIDs(*metrics, seenTableNames)
-	for tableName, dependency := range tagCrossTableOnlyOIDs {
+	tagCrossTableOnlyOIDs := crossTableOnlyTagOIDs(*metrics, seenTableNames, false)
+	for _, tableName := range sortedDependencyNames(tagCrossTableOnlyOIDs) {
+		dependency := tagCrossTableOnlyOIDs[tableName]
 		*metrics = append(*metrics, syntheticCrossTableMetric(tableName, dependency.walkOID()))
 	}
 }
@@ -51,16 +53,25 @@ func handleCrossTableTagsWithoutMetricsForTopologyRows(topology *[]ddprofiledefi
 		seenTableNames[topo.Table.Name] = true
 	}
 
-	for i := range *topology {
-		topo := &(*topology)[i]
-		tagCrossTableOnlyOIDs := crossTableOnlyTagOIDs([]ddprofiledefinition.MetricsConfig{topo.MetricsConfig}, seenTableNames)
-		for tableName, dependency := range tagCrossTableOnlyOIDs {
-			*topology = append(*topology, ddprofiledefinition.TopologyConfig{
-				Kind:          topo.Kind,
-				MetricsConfig: syntheticCrossTableMetric(tableName, dependency.walkOID()),
-			})
-			seenTableNames[tableName] = true
+	metrics := make([]ddprofiledefinition.MetricsConfig, 0, len(*topology))
+	dependencyKinds := make(map[string]ddprofiledefinition.TopologyKind)
+	for _, topo := range *topology {
+		metrics = append(metrics, topo.MetricsConfig)
+		for _, tag := range topo.MetricTags {
+			if tag.Table != "" && !seenTableNames[tag.Table] {
+				if _, ok := dependencyKinds[tag.Table]; !ok {
+					dependencyKinds[tag.Table] = topo.Kind
+				}
+			}
 		}
+	}
+
+	tagCrossTableOnlyOIDs := crossTableOnlyTagOIDs(metrics, seenTableNames, true)
+	for _, tableName := range sortedDependencyNames(tagCrossTableOnlyOIDs) {
+		*topology = append(*topology, ddprofiledefinition.TopologyConfig{
+			Kind:          dependencyKinds[tableName],
+			MetricsConfig: syntheticCrossTableMetric(tableName, tagCrossTableOnlyOIDs[tableName].walkOID()),
+		})
 	}
 }
 
@@ -80,7 +91,8 @@ func (d *crossTableDependency) add(tag ddprofiledefinition.MetricTagConfig, inde
 	}
 
 	scopedWalkOID := ""
-	if indexScope != "" && tag.Symbol.OID != "" && tag.LookupSymbol.OID == "" {
+	if indexScope != "" && tag.Index == 0 && len(tag.IndexTransform) == 0 &&
+		tag.Symbol.OID != "" && tag.LookupSymbol.OID == "" {
 		scopedWalkOID = trimProfileOID(tag.Symbol.OID) + "." + indexScope
 	}
 	if d.seen && d.scopedWalkOID != scopedWalkOID {
@@ -97,13 +109,20 @@ func (d crossTableDependency) walkOID() string {
 	return longestCommonPrefix(d.oids)
 }
 
-func crossTableOnlyTagOIDs(metrics []ddprofiledefinition.MetricsConfig, seenTableNames map[string]bool) map[string]*crossTableDependency {
+func crossTableOnlyTagOIDs(
+	metrics []ddprofiledefinition.MetricsConfig,
+	seenTableNames map[string]bool,
+	propagateIndexScope bool,
+) map[string]*crossTableDependency {
 	tagCrossTableOnlyOIDs := make(map[string]*crossTableDependency)
 	for _, m := range metrics {
 		if m.IsScalar() {
 			continue
 		}
-		indexScope := tableIndexScope(m)
+		indexScope := ""
+		if propagateIndexScope {
+			indexScope = tableIndexScope(m)
+		}
 		for _, tag := range m.MetricTags {
 			if tag.Table == "" || seenTableNames[tag.Table] {
 				continue
@@ -117,6 +136,15 @@ func crossTableOnlyTagOIDs(metrics []ddprofiledefinition.MetricsConfig, seenTabl
 		}
 	}
 	return tagCrossTableOnlyOIDs
+}
+
+func sortedDependencyNames(dependencies map[string]*crossTableDependency) []string {
+	names := make([]string, 0, len(dependencies))
+	for name := range dependencies {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func syntheticCrossTableMetric(tableName, walkOID string) ddprofiledefinition.MetricsConfig {

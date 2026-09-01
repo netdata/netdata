@@ -281,14 +281,27 @@ func finalizeLocalManagementAddresses(
 	targets []netip.Addr,
 	netmasks map[string]string,
 ) {
+	finalizeLocalManagementAddressesWithLookup(device, targets, func(ip string) string {
+		return netmasks[ip]
+	})
+}
+
+func finalizeLocalManagementAddressesWithLookup(
+	device *topologymodel.Device,
+	targets []netip.Addr,
+	netmask func(string) string,
+) {
 	if device == nil {
 		return
+	}
+	if netmask == nil {
+		netmask = func(string) string { return "" }
 	}
 
 	var selector managementIPSelector
 	addTarget := func(addr netip.Addr) {
 		addr = addr.Unmap()
-		if isEligibleManagementInterfaceAddress(addr.String(), netmasks[addr.String()]) {
+		if isEligibleManagementInterfaceAddress(addr.String(), netmask(addr.String())) {
 			selector.add(addr, managementAddressSourceCollectorTarget)
 		}
 	}
@@ -303,7 +316,7 @@ func finalizeLocalManagementAddresses(
 	filtered := addrs[:0]
 	for _, addr := range addrs {
 		ip, ok := managementAddressIP(addr)
-		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmasks[ip.String()]) {
+		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmask(ip.String())) {
 			continue
 		}
 		filtered = append(filtered, addr)

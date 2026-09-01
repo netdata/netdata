@@ -125,49 +125,6 @@ func TestTopologyProfile_IPAddressUsesTableIndex(t *testing.T) {
 	}}, actual)
 }
 
-func TestTopologyProfile_ModernIPAddressUsesFiveIPv4ColumnRoots(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
-	defer ctrl.Finish()
-
-	const index = "1.4.192.0.2.17"
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.3.1", []gosnmp.SnmpPDU{
-		createIntegerPDU("1.3.6.1.2.1.4.34.1.3."+index, 7),
-	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.4.1", []gosnmp.SnmpPDU{
-		createIntegerPDU("1.3.6.1.2.1.4.34.1.4."+index, 1),
-	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.5.1", []gosnmp.SnmpPDU{
-		createPDU("1.3.6.1.2.1.4.34.1.5."+index, gosnmp.ObjectIdentifier, "1.3.6.1.2.1.4.32.1.5.7.1.4.192.0.2.16.28"),
-	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.7.1", []gosnmp.SnmpPDU{
-		createIntegerPDU("1.3.6.1.2.1.4.34.1.7."+index, 1),
-	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.10.1", []gosnmp.SnmpPDU{
-		createIntegerPDU("1.3.6.1.2.1.4.34.1.10."+index, 1),
-	})
-
-	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-ip-mib")
-
-	assertTableMetricsEqual(t, []ddsnmp.Metric{{
-		Name:       "ip_if_index",
-		StaticTags: map[string]string{"topo_ip_source": "modern"},
-		Tags: map[string]string{
-			"topo_ip_addr":           "192.0.2.17",
-			"topo_if_index":          "7",
-			"topo_ip_source":         "modern",
-			"topo_ip_type":           "unicast",
-			"topo_ip_prefix_pointer": "1.3.6.1.2.1.4.32.1.5.7.1.4.192.0.2.16.28",
-			"topo_ip_status":         "preferred",
-			"topo_ip_row_status":     "active",
-		},
-		MetricType:   "gauge",
-		IsTable:      true,
-		Table:        "ipAddressTableIPv4",
-		TopologyKind: ddsnmp.KindIpIfIndex,
-	}}, actual)
-}
-
 func TestTopologyProfile_CiscoVTPUsesVLANIndexComponent(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()

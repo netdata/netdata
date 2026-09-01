@@ -55,8 +55,9 @@ Use this skill before editing files under:
 15. To constrain a topology table to a fixed structural index prefix, use one
     readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
     Simple same-index cross-table dependencies inherit that prefix and are
-    anchor-gated. Do not rely on propagation for multiple anchors,
-    `lookup_symbol`, or conflicting dependency scopes.
+    anchor-gated. Do not rely on propagation for ordinary metrics, multiple
+    anchors, `lookup_symbol`, `index_transform`, or conflicting dependency
+    scopes.
 
 ## Device-Scoped MIB Deviations
 

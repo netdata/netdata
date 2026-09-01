@@ -315,29 +315,34 @@ func TestTopologyCache_UpdateIfIndexByIP_PreservesInventoryAndFiltersManagementC
 		tagTopoIPAddr:   "10.20.4.1",
 		tagTopoIPMask:   "255.255.255.0",
 	})
+	cache.finalize()
 
-	require.Equal(t, "1", cache.ifIndexByIP["10.20.4.1"])
-	require.Equal(t, "2", cache.ifIndexByIP["2001:db8::1"])
+	require.Equal(t, "1", cache.ipIfIndex("10.20.4.1"))
+	require.Equal(t, "2", cache.ipIfIndex("2001:db8::1"))
 	for _, row := range rows[2:] {
-		require.Equal(t, row[tagTopoIfIndex], cache.ifIndexByIP[row[tagTopoIPAddr]])
+		require.Equal(t, row[tagTopoIfIndex], cache.ipIfIndex(row[tagTopoIPAddr]))
 	}
-	require.Equal(t, "255.255.255.0", cache.ifNetmaskByIP["10.20.4.1"])
-	require.Empty(t, cache.ifNetmaskByIP["2001:db8::1"])
+	require.Equal(t, "255.255.255.0", cache.ipNetmask("10.20.4.1"))
+	require.Empty(t, cache.ipNetmask("2001:db8::1"))
+	l3, ok := cache.ipL3Interface("10.20.4.1")
+	require.True(t, ok)
 	require.Equal(t, topologymodel.L3Interface{
 		IP:      "10.20.4.1",
 		Netmask: "255.255.255.0",
 		IfIndex: "1",
-	}, cache.l3InterfacesByIP["10.20.4.1"])
-	require.NotContains(t, cache.l3InterfacesByIP, "2001:db8::1")
+	}, l3)
+	_, ok = cache.ipL3Interface("2001:db8::1")
+	require.False(t, ok)
 	for _, row := range rows[2:] {
+		l3, ok := cache.ipL3Interface(row[tagTopoIPAddr])
+		require.True(t, ok)
 		require.Equal(t, topologymodel.L3Interface{
 			IP:      row[tagTopoIPAddr],
 			Netmask: row[tagTopoIPMask],
 			IfIndex: row[tagTopoIfIndex],
-		}, cache.l3InterfacesByIP[row[tagTopoIPAddr]])
+		}, l3)
 	}
 
-	cache.finalize()
 	addrs := cache.localDevice.ManagementAddresses
 	require.Len(t, addrs, 3)
 	require.Contains(t, addrs, topologymodel.ManagementAddress{
@@ -399,8 +404,9 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 			}
 			cache.finalize()
 
-			require.Equal(t, "1", cache.ifIndexByIP["192.0.2.0"])
-			require.Contains(t, cache.l3InterfacesByIP, "192.0.2.0")
+			require.Equal(t, "1", cache.ipIfIndex("192.0.2.0"))
+			_, ok := cache.ipL3Interface("192.0.2.0")
+			require.True(t, ok)
 			require.Equal(t, "192.0.2.10", cache.localDevice.ManagementIP)
 			require.Equal(t, []topologymodel.ManagementAddress{{
 				Address:     "192.0.2.10",

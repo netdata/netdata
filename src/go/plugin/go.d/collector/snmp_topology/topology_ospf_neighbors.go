@@ -87,16 +87,21 @@ func (c *topologyBuilder) matchOSPFNeighborLocalInterface(neighborIP string) (to
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
 
-	ips := make([]string, 0, len(c.l3InterfacesByIP))
-	for ip := range c.l3InterfacesByIP {
-		ips = append(ips, ip)
+	ips := make([]string, 0, len(c.ipAddressesByIP))
+	for ip, resolved := range c.ipAddressesByIP {
+		if resolved.netmask != "" {
+			ips = append(ips, ip)
+		}
 	}
 	sort.Strings(ips)
 
 	var best topologyOSPFLocalInterfaceMatch
 	found := false
 	for _, ip := range ips {
-		row := c.l3InterfacesByIP[ip]
+		row, ok := c.ipL3Interface(ip)
+		if !ok {
+			continue
+		}
 		row.DeviceID = "local"
 		subnet, ok := topologymodel.L3SubnetForInterface(row)
 		if !ok {

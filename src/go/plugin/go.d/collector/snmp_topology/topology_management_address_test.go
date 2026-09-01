@@ -210,7 +210,7 @@ func TestTopologyCacheManagementAddressIngestionRejectsAmbiguousIPMIBCandidate(t
 	require.Nil(t, cache.localManagementAddressKeys)
 }
 
-func BenchmarkTopologyCacheIPManagementAddressIngest(b *testing.B) {
+func BenchmarkTopologyCacheIPManagementAddressLifecycle(b *testing.B) {
 	for _, rows := range []int{256, 1024, 4096, 65536} {
 		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
 			metrics := make([]ddsnmp.Metric, rows)
@@ -231,13 +231,14 @@ func BenchmarkTopologyCacheIPManagementAddressIngest(b *testing.B) {
 			for range b.N {
 				cache := newTopologyBuilder()
 				cache.ingestTopologyProfileMetrics(pms)
+				cache.finalize()
 				runtime.KeepAlive(cache)
 			}
 		})
 	}
 }
 
-func BenchmarkTopologyCacheModernIPAddressIngest(b *testing.B) {
+func BenchmarkTopologyCacheModernIPAddressLifecycle(b *testing.B) {
 	for _, rows := range []int{256, 1024, 4096, 65536} {
 		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
 			metrics := make([]ddsnmp.Metric, rows)
@@ -259,6 +260,7 @@ func BenchmarkTopologyCacheModernIPAddressIngest(b *testing.B) {
 			for range b.N {
 				cache := newTopologyBuilder()
 				cache.ingestTopologyProfileMetrics(pms)
+				cache.finalize()
 				runtime.KeepAlive(cache)
 			}
 		})

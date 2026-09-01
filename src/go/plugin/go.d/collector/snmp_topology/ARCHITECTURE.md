@@ -227,7 +227,8 @@ every configured identity, descriptor, signal, tag source, and cross-table depen
 OIDs already classified unavailable by collector state. Table rows without required identity/signals are rejected.
 Optional absent descriptors are not missing; cross-table failures that reject a row or tag use the dependency class.
 Synthetic table-dependency units have no semantic rows, so they report zero rows and count only received varbinds below
-their configured root as values.
+their configured root as values. A dependency left dormant because its anchor had no eligible rows keeps source `none`
+and outcome `not_observed`; it is not reported as an empty cache result.
 
 The standard capabilities have separate owners:
 
@@ -237,9 +238,12 @@ The standard capabilities have separate owners:
   readable `ipAddressIfIndex` column constrained by the IPv4 address-type index;
   its type, prefix pointer, address status, and row status columns are walked
   only when the anchor returns rows. Unsupported and IPv6-only agents therefore
-  pay for one empty modern anchor walk, while supported IPv4 agents return at
-  most five required varbinds per address. The address itself is derived from
-  the not-accessible row index.
+  pay for one empty modern logical anchor walk, while supported IPv4 agents use
+  five IPv4-scoped logical walks and return at most five required varbinds per
+  address. A logical walk can require multiple SNMP request/response exchanges
+  for pagination, termination, or transport fallback; the bound here is on
+  selected roots and returned row data, not a claim of one wire packet. The
+  address itself is derived from the not-accessible row index.
 - Both IP-MIB sources feed one canonical per-IP record. Valid legacy facts take
   precedence; a valid modern prefix may fill a missing legacy mask only when
   the interface index agrees. Modern rows must be active unicast addresses in

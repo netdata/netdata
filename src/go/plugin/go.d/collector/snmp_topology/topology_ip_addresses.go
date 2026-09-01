@@ -21,15 +21,17 @@ const (
 )
 
 type ipAddressCandidate struct {
-	ifIndex string
-	mask    string
+	ifIndex      string
+	prefixLength uint8
+	hasPrefix    bool
 }
 
 type ipAddressCandidateSet struct {
 	ifIndex         string
 	ifIndexConflict bool
-	mask            string
-	maskConflict    bool
+	prefixLength    uint8
+	hasPrefix       bool
+	prefixConflict  bool
 }
 
 type ipAddressCandidates struct {
@@ -37,17 +39,23 @@ type ipAddressCandidates struct {
 	modern ipAddressCandidateSet
 }
 
+type resolvedIPAddress struct {
+	ifIndex string
+	netmask string
+}
+
 func (s *ipAddressCandidateSet) add(candidate ipAddressCandidate) {
 	if s.ifIndex == "" {
 		s.ifIndex = candidate.ifIndex
-	} else if s.ifIndex != candidate.ifIndex {
+	} else if topologyutil.ParsePositiveInt64(s.ifIndex) != topologyutil.ParsePositiveInt64(candidate.ifIndex) {
 		s.ifIndexConflict = true
 	}
-	if candidate.mask != "" {
-		if s.mask == "" {
-			s.mask = candidate.mask
-		} else if s.mask != candidate.mask {
-			s.maskConflict = true
+	if candidate.hasPrefix {
+		if !s.hasPrefix {
+			s.prefixLength = candidate.prefixLength
+			s.hasPrefix = true
+		} else if s.prefixLength != candidate.prefixLength {
+			s.prefixConflict = true
 		}
 	}
 }
@@ -57,8 +65,9 @@ func (s ipAddressCandidateSet) resolve() (ipAddressCandidate, bool) {
 		return ipAddressCandidate{}, false
 	}
 	candidate := ipAddressCandidate{ifIndex: s.ifIndex}
-	if !s.maskConflict {
-		candidate.mask = s.mask
+	if !s.prefixConflict && s.hasPrefix {
+		candidate.prefixLength = s.prefixLength
+		candidate.hasPrefix = true
 	}
 	return candidate, true
 }
@@ -73,10 +82,10 @@ func (c *topologyBuilder) updateIPAddressCandidate(tags map[string]string) {
 	if !ok {
 		return
 	}
-	if c.ipAddressesByIP == nil {
-		c.ipAddressesByIP = make(map[string]ipAddressCandidates)
+	if c.ipAddressCandidatesByIP == nil {
+		c.ipAddressCandidatesByIP = make(map[string]ipAddressCandidates)
 	}
-	record := c.ipAddressesByIP[ip]
+	record := c.ipAddressCandidatesByIP[ip]
 	switch source {
 	case topoIPSourceLegacy:
 		record.legacy.add(candidate)
@@ -85,8 +94,7 @@ func (c *topologyBuilder) updateIPAddressCandidate(tags map[string]string) {
 	default:
 		return
 	}
-	c.ipAddressesByIP[ip] = record
-	c.materializeIPAddress(ip, record)
+	c.ipAddressCandidatesByIP[ip] = record
 }
 
 func ipAddressCandidateFromTags(source string, tags map[string]string) (ipAddressCandidate, string, bool) {
@@ -102,19 +110,22 @@ func ipAddressCandidateFromTags(source string, tags map[string]string) (ipAddres
 
 	switch source {
 	case topoIPSourceLegacy:
-		mask := ""
+		var prefixLength uint8
+		var hasPrefix bool
 		if addr.Is4() {
-			mask = normalizeIPv4Mask(tags[tagTopoIPMask])
+			prefixLength, hasPrefix = ipv4PrefixLengthFromMask(tags[tagTopoIPMask])
 		}
-		return ipAddressCandidate{ifIndex: ifIndex, mask: mask}, ip, true
+		return ipAddressCandidate{
+			ifIndex:      ifIndex,
+			prefixLength: prefixLength,
+			hasPrefix:    hasPrefix,
+		}, ip, true
 	case topoIPSourceModern:
 		if !addr.Is4() || !modernIPAddressEligible(tags) {
 			return ipAddressCandidate{}, "", false
 		}
-		return ipAddressCandidate{
-			ifIndex: ifIndex,
-			mask:    ipv4MaskFromPrefixPointer(addr, ifIndex, tags[tagTopoIPPrefix]),
-		}, ip, true
+		prefixLength, hasPrefix := ipv4PrefixLengthFromPointer(addr, ifIndex, tags[tagTopoIPPrefix])
+		return ipAddressCandidate{ifIndex: ifIndex, prefixLength: prefixLength, hasPrefix: hasPrefix}, ip, true
 	default:
 		return ipAddressCandidate{}, "", false
 	}
@@ -132,110 +143,109 @@ func modernIPAddressEligible(tags map[string]string) bool {
 	return strings.TrimSpace(tags[tagTopoIPRow]) == "active"
 }
 
-func normalizeIPv4Mask(value string) string {
+func ipv4PrefixLengthFromMask(value string) (uint8, bool) {
 	maskAddr, ok := topologyutil.ParseIPAddress(value)
 	if !ok || !maskAddr.Is4() {
-		return ""
+		return 0, false
 	}
 	mask := net.IPMask(maskAddr.AsSlice())
-	if _, bits := mask.Size(); bits != 32 {
-		return ""
+	ones, bits := mask.Size()
+	if bits != 32 {
+		return 0, false
 	}
-	return maskAddr.String()
+	return uint8(ones), true
 }
 
-func ipv4MaskFromPrefixPointer(address netip.Addr, ifIndex, value string) string {
+func ipv4PrefixLengthFromPointer(address netip.Addr, ifIndex string, value string) (uint8, bool) {
 	value = strings.TrimPrefix(strings.TrimSpace(value), ".")
 	suffix, ok := strings.CutPrefix(value, ipAddressPrefixOriginOID+".")
 	if !ok {
-		return ""
+		return 0, false
 	}
 	var parts [8]string
 	for i := 0; i < len(parts)-1; i++ {
 		var found bool
 		parts[i], suffix, found = strings.Cut(suffix, ".")
 		if !found {
-			return ""
+			return 0, false
 		}
 	}
 	parts[len(parts)-1] = suffix
 	pointerIfIndex, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil || pointerIfIndex <= 0 || pointerIfIndex != topologyutil.ParsePositiveInt64(ifIndex) {
-		return ""
+		return 0, false
 	}
 	if parts[1] != "1" || parts[2] != "4" {
-		return ""
+		return 0, false
 	}
 
 	var prefixBytes [4]byte
 	for i := range prefixBytes {
 		value, err := strconv.Atoi(parts[i+3])
 		if err != nil || value < 0 || value > 255 {
-			return ""
+			return 0, false
 		}
 		prefixBytes[i] = byte(value)
 	}
 	prefixLength, err := strconv.Atoi(parts[7])
 	if err != nil || prefixLength < 0 || prefixLength > 32 {
-		return ""
+		return 0, false
 	}
 	prefixAddress := netip.AddrFrom4(prefixBytes)
 	prefix := netip.PrefixFrom(prefixAddress, prefixLength)
 	if prefix.Masked().Addr() != prefixAddress || !prefix.Contains(address) {
-		return ""
+		return 0, false
 	}
-	return net.IP(net.CIDRMask(prefixLength, 32)).String()
+	return uint8(prefixLength), true
 }
 
 func (c *topologyBuilder) materializeIPAddress(ip string, record ipAddressCandidates) {
-	delete(c.ifIndexByIP, ip)
-	delete(c.ifNetmaskByIP, ip)
-	delete(c.l3InterfacesByIP, ip)
-
 	candidate, ok := resolveIPAddressCandidates(record)
 	if !ok {
 		return
 	}
-	c.ifIndexByIP[ip] = candidate.ifIndex
-	if candidate.mask == "" {
+	resolved := resolvedIPAddress{ifIndex: candidate.ifIndex}
+	if !candidate.hasPrefix {
+		c.ipAddressesByIP[ip] = resolved
 		return
 	}
-	c.ifNetmaskByIP[ip] = candidate.mask
-	c.l3InterfacesByIP[ip] = topologymodel.L3Interface{
-		IP:      ip,
-		Netmask: candidate.mask,
-		IfIndex: candidate.ifIndex,
-	}
+	resolved.netmask = net.IP(net.CIDRMask(int(candidate.prefixLength), 32)).String()
+	c.ipAddressesByIP[ip] = resolved
 }
 
 func resolveIPAddressCandidates(record ipAddressCandidates) (ipAddressCandidate, bool) {
+	if record.legacy.ifIndexConflict {
+		return ipAddressCandidate{}, false
+	}
 	legacy, hasLegacy := record.legacy.resolve()
 	modern, hasModern := record.modern.resolve()
 	if !hasLegacy {
 		return modern, hasModern
 	}
-	if legacy.mask == "" && hasModern && modern.ifIndex == legacy.ifIndex {
-		legacy.mask = modern.mask
+	if !legacy.hasPrefix && !record.legacy.prefixConflict && hasModern && modern.ifIndex == legacy.ifIndex {
+		legacy.prefixLength = modern.prefixLength
+		legacy.hasPrefix = modern.hasPrefix
 	}
 	return legacy, true
 }
 
 func (c *topologyBuilder) finalizeIPAddresses() {
-	if c == nil || len(c.ipAddressesByIP) == 0 {
+	if c == nil || len(c.ipAddressCandidatesByIP) == 0 {
 		return
 	}
-	ips := make([]string, 0, len(c.ipAddressesByIP))
-	for ip := range c.ipAddressesByIP {
+	c.ipAddressesByIP = make(map[string]resolvedIPAddress, len(c.ipAddressCandidatesByIP))
+	ips := make([]string, 0, len(c.ipAddressCandidatesByIP))
+	for ip := range c.ipAddressCandidatesByIP {
 		ips = append(ips, ip)
 	}
 	slices.Sort(ips)
 	for _, ip := range ips {
-		ifIndex := c.ifIndexByIP[ip]
-		if ifIndex == "" {
+		c.materializeIPAddress(ip, c.ipAddressCandidatesByIP[ip])
+		resolved, ok := c.ipAddressesByIP[ip]
+		if !ok {
 			continue
 		}
-		mask := c.ifNetmaskByIP[ip]
-		if !isEligibleManagementInterfaceAddress(ip, mask) {
+		if !isEligibleManagementInterfaceAddress(ip, resolved.netmask) {
 			continue
 		}
 		c.appendLocalManagementAddress(topologymodel.ManagementAddress{
@@ -244,5 +254,30 @@ func (c *topologyBuilder) finalizeIPAddresses() {
 			Source:      "ip_mib",
 		})
 	}
-	c.ipAddressesByIP = nil
+	c.ipAddressCandidatesByIP = nil
+}
+
+func (c *topologyBuilder) ipIfIndex(ip string) string {
+	if c == nil {
+		return ""
+	}
+	return c.ipAddressesByIP[ip].ifIndex
+}
+
+func (c *topologyBuilder) ipNetmask(ip string) string {
+	if c == nil {
+		return ""
+	}
+	return c.ipAddressesByIP[ip].netmask
+}
+
+func (c *topologyBuilder) ipL3Interface(ip string) (topologymodel.L3Interface, bool) {
+	if c == nil {
+		return topologymodel.L3Interface{}, false
+	}
+	resolved, ok := c.ipAddressesByIP[ip]
+	if !ok || resolved.ifIndex == "" || resolved.netmask == "" {
+		return topologymodel.L3Interface{}, false
+	}
+	return topologymodel.L3Interface{IP: ip, Netmask: resolved.netmask, IfIndex: resolved.ifIndex}, true
 }
