@@ -391,7 +391,8 @@ func (e *Engine) cleanupBacklog(
 				}
 				continue
 			}
-			if now.Sub(*owned.AbsentObservedAt) < e.updateEvery {
+			quietFor := max(e.updateEvery, e.requestTimeout)
+			if now.Sub(*owned.AbsentObservedAt) < quietFor {
 				continue
 			}
 		}

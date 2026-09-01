@@ -5,6 +5,7 @@ package ceph
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -194,6 +195,65 @@ func TestWriteTimeoutMovesProbeToCleanupWithoutBlockingNewActiveSlot(t *testing.
 	assert.Equal(t, 2, source.Count("put"))
 	assert.GreaterOrEqual(t, next.Cleanup.Pending, 1)
 	engine.Cleanup(context.Background())
+}
+
+func TestAmbiguousPutRetainsOwnershipForSourceRequestUncertaintyWindow(t *testing.T) {
+	j := newCephJournal(t, t.TempDir())
+	source, destination, model := newCephClients()
+	var key string
+	var payload []byte
+	source.PutFunc = func(
+		_ context.Context, bucket, objectKey string, objectPayload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		if bucket != "source" {
+			return s3client.PutResult{}, fmt.Errorf("unexpected source bucket %q", bucket)
+		}
+		if key == "" {
+			key = objectKey
+			payload = append([]byte(nil), objectPayload...)
+		}
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	now := time.Unix(100, 0)
+	engine, err := New(Options{
+		Source: source, Destination: destination,
+		SourceBucket: "source", DestinationBucket: "destination",
+		Journal: j, Generator: newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Minute, DestinationRequestTimeout: time.Second,
+		WriteObjective: time.Second, WriteTimeout: 10 * time.Second,
+		DeleteObjective: time.Second, DeleteTimeout: time.Second,
+		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { engine.Cleanup(context.Background()) })
+
+	first := engine.Collect(context.Background())
+	require.NotNil(t, first.Probe)
+	require.Equal(t, contract.StatusFailed, first.Probe.Status)
+	require.NotEmpty(t, key)
+	firstAbsence := engine.Collect(context.Background())
+	require.Equal(t, 1, firstAbsence.Cleanup.Pending)
+
+	now = now.Add(11 * time.Second)
+	beforeLatePut := engine.Collect(context.Background())
+	assert.Equal(t, 1, beforeLatePut.Cleanup.Pending)
+	assert.Equal(t, 1, source.Count("put"))
+
+	model.mu.Lock()
+	model.source[key] = append([]byte(nil), payload...)
+	model.mu.Unlock()
+	afterLatePut := engine.Collect(context.Background())
+	model.mu.Lock()
+	_, exists := model.source[key]
+	model.mu.Unlock()
+	assert.False(t, exists)
+	assert.Equal(t, 1, afterLatePut.Cleanup.Pending)
+	assert.Equal(t, 1, source.Count("put"))
+
+	now = now.Add(50 * time.Second)
+	beforeLateReplicationWindowCloses := engine.Collect(context.Background())
+	assert.Equal(t, 1, beforeLateReplicationWindowCloses.Cleanup.Pending)
+	assert.Equal(t, 1, source.Count("put"))
 }
 
 func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {

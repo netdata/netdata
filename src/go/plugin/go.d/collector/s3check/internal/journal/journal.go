@@ -151,7 +151,7 @@ func (j *Journal) TryLock() (bool, error) {
 	if j.locked {
 		return true, nil
 	}
-	if err := ensurePrivateDir(filepath.Dir(j.path)); err != nil {
+	if err := ensurePrivateDir(filepath.Dir(j.path), true); err != nil {
 		return false, err
 	}
 	locked, err := j.locker.Lock(j.ownerID)
@@ -238,7 +238,7 @@ func (j *Journal) Clear() error {
 
 func writeAtomic(path string, raw []byte) (retErr error) {
 	dir := filepath.Dir(path)
-	if err := ensurePrivateDir(dir); err != nil {
+	if err := ensurePrivateDir(dir, false); err != nil {
 		return err
 	}
 	tmpPath := path + ".tmp"
@@ -272,7 +272,7 @@ func writeAtomic(path string, raw []byte) (retErr error) {
 	return syncDirectory(dir)
 }
 
-func ensurePrivateDir(dir string) error {
+func ensurePrivateDir(dir string, syncParent bool) error {
 	dir = filepath.Clean(dir)
 	parents, modeChanged, err := privateDirSyncTargets(dir)
 	if err != nil {
@@ -283,6 +283,10 @@ func ensurePrivateDir(dir string) error {
 	}
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return fmt.Errorf("restrict s3check journal directory: %w", err)
+	}
+	parent := filepath.Dir(dir)
+	if syncParent && (len(parents) == 0 || parents[0] != parent) {
+		parents = append([]string{parent}, parents...)
 	}
 	if len(parents) == 0 && !modeChanged {
 		return nil

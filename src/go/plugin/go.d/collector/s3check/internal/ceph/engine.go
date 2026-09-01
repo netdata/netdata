@@ -722,6 +722,12 @@ func (e *Engine) moveToCleanup(owned *entry) {
 		base = *owned.PutAt
 	}
 	owned.CleanupAfter = base.Add(e.writeTimeout)
+	if owned.PutAt == nil {
+		deadline := e.now().UTC().Add(e.sourceRequestTimeout).Add(e.writeTimeout)
+		if deadline.After(owned.CleanupAfter) {
+			owned.CleanupAfter = deadline
+		}
+	}
 	if owned.DeleteAt != nil {
 		if deadline := owned.DeleteAt.Add(e.deleteTimeout); deadline.After(owned.CleanupAfter) {
 			owned.CleanupAfter = deadline

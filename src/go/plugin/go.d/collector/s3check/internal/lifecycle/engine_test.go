@@ -243,6 +243,56 @@ func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestAmbiguousPutRetainsOwnershipForRequestUncertaintyWindow(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client := newLifecycleClient()
+	model := clientModel(client)
+	var key string
+	var payload []byte
+	client.PutFunc = func(
+		_ context.Context, bucket, objectKey string, objectPayload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		if key == "" {
+			key = objectKey
+			payload = append([]byte(nil), objectPayload...)
+		}
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	client.DeleteFunc = func(
+		_ context.Context, bucket, objectKey string, _ s3client.DeleteOptions,
+	) (s3client.DeleteResult, error) {
+		model.delete(bucket, objectKey)
+		return s3client.DeleteResult{}, nil
+	}
+	now := time.Unix(100, 0)
+	engine, err := New(Options{
+		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
+		RequestTimeout: time.Minute, UpdateEvery: time.Second,
+		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { engine.Cleanup(context.Background()) })
+
+	first := engine.Collect(context.Background())
+	require.NotNil(t, first.Probe)
+	require.Equal(t, contract.StatusFailed, first.Probe.Status)
+	require.NotEmpty(t, key)
+	firstAbsence := engine.Collect(context.Background())
+	require.Equal(t, 1, firstAbsence.Cleanup.Pending)
+
+	now = now.Add(2 * time.Second)
+	beforeLatePut := engine.Collect(context.Background())
+	assert.Equal(t, 1, beforeLatePut.Cleanup.Pending)
+	assert.Equal(t, 1, client.Count("put"))
+
+	model.put("bucket", key, payload)
+	afterLatePut := engine.Collect(context.Background())
+	_, exists := model.get("bucket", key)
+	assert.False(t, exists)
+	assert.Equal(t, 1, afterLatePut.Cleanup.Pending)
+	assert.Equal(t, 1, client.Count("put"))
+}
+
 func TestSameOwnerTakeoverReloadsIncumbentOwnership(t *testing.T) {
 	root := t.TempDir()
 	firstJournal := newTestJournal(t, root)

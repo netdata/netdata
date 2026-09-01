@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,6 +93,66 @@ func TestTryLockDurablyCreatesJournalDirectory(t *testing.T) {
 
 	assert.Contains(t, synced, filepath.Clean(root))
 	assert.Contains(t, synced, filepath.Clean(parent))
+}
+
+func TestConcurrentOwnerSyncsParentBeforeAcquiringLock(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "s3check")
+	first, err := New(root, "agent", "job-a", testFingerprint)
+	require.NoError(t, err)
+	second, err := New(root, "agent", "job-b", testFingerprint)
+	require.NoError(t, err)
+
+	originalSyncDirectory := syncDirectory
+	var blockFirstRootSync sync.Once
+	firstRootSyncStarted := make(chan struct{})
+	releaseFirstRootSync := make(chan struct{})
+	var syncedMu sync.Mutex
+	var synced []string
+	syncDirectory = func(dir string) error {
+		clean := filepath.Clean(dir)
+		block := false
+		if clean == filepath.Clean(root) {
+			blockFirstRootSync.Do(func() {
+				block = true
+				close(firstRootSyncStarted)
+			})
+		}
+		syncedMu.Lock()
+		synced = append(synced, clean)
+		syncedMu.Unlock()
+		if block {
+			<-releaseFirstRootSync
+		}
+		return nil
+	}
+	t.Cleanup(func() { syncDirectory = originalSyncDirectory })
+
+	type lockResult struct {
+		locked bool
+		err    error
+	}
+	firstDone := make(chan lockResult, 1)
+	go func() {
+		locked, lockErr := first.TryLock()
+		firstDone <- lockResult{locked: locked, err: lockErr}
+	}()
+	<-firstRootSyncStarted
+
+	secondLocked, secondErr := second.TryLock()
+	syncedMu.Lock()
+	syncedBeforeFirstCompletes := append([]string(nil), synced...)
+	syncedMu.Unlock()
+	close(releaseFirstRootSync)
+	firstResult := <-firstDone
+
+	require.NoError(t, firstResult.err)
+	require.True(t, firstResult.locked)
+	require.NoError(t, secondErr)
+	require.True(t, secondLocked)
+	t.Cleanup(first.Unlock)
+	t.Cleanup(second.Unlock)
+	assert.Contains(t, syncedBeforeFirstCompletes, filepath.Clean(parent))
 }
 
 func TestMutationRequiresLifetimeLock(t *testing.T) {
