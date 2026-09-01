@@ -5,6 +5,7 @@
 
 #define _COMMON_PLUGIN_NAME PLUGIN_WINDOWS_NAME
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
+#define CONFIG_SECTION_PERFLIB_STORAGE "plugin:windows:PerflibStorage"
 #include "../common-contexts/common-contexts.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
@@ -184,9 +185,23 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
 static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL;
 static usec_t mountPointsRefreshedUT = 0;
+
+static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
+
+static inline bool logical_disk_is_excluded(const char *mount_point)
+{
+    return excluded_logical_disk_paths && simple_pattern_matches(excluded_logical_disk_paths, mount_point);
+}
+
 static void initialize(void)
 {
     physical_disk_initialize(&system_physical_total);
+
+    excluded_logical_disk_paths = simple_pattern_create(
+        inicfg_get(&netdata_config, CONFIG_SECTION_PERFLIB_STORAGE, "exclude space metrics on paths", ""),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        false);
 
     logicalDisks = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
@@ -207,12 +222,10 @@ static void initialize(void)
 // --------------------------------------------------------------------------------------------------------------------
 // mount point registry
 //
-// The perflib LogicalDisk object cannot enumerate every volume worth reporting. Failover Clustering
-// hides Cluster Shared Volumes from the volume manager: a CSV gets no drive letter, no volume GUID
-// and no LogicalDisk instance, and it is invisible to the volume enumeration APIs too. Its only
-// per-node handle is the mount point under %SystemDrive%\ClusterStorage. Volumes mounted into a
-// folder may also be published by perflib under their bare device name (HarddiskVolumeN), which an
-// operator cannot map back to anything.
+// The perflib LogicalDisk object cannot enumerate every volume worth reporting. CSVs do not have a
+// drive letter or LogicalDisk instance; Windows exposes their stable per-node access path below
+// %SystemDrive%\ClusterStorage. Volumes mounted into a folder may also be published by perflib
+// under their bare device name (HarddiskVolumeN), which an operator cannot map back to anything.
 //
 // So we keep our own registry of mount paths, refreshed on an interval, and use it both to resolve
 // perflib device names and to publish the volumes perflib never lists.
@@ -279,7 +292,8 @@ static bool volume_space(const char *name, uint64_t *total_bytes, uint64_t *free
     return true;
 }
 
-// Register every mount path of a volume; returns the first one, used as the volume's display name.
+// Register one canonical mount path per volume; returning every alias would create duplicate
+// full-capacity charts for a single volume.
 static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first_path, size_t first_path_size)
 {
     wchar_t stack_buf[512];
@@ -310,7 +324,8 @@ static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first
         if (!*path)
             continue;
 
-        dictionary_set(mountPoints, path, NULL, 0);
+        if (logical_disk_is_excluded(path))
+            continue;
 
         if (first_path && !*first_path)
             snprintfz(first_path, first_path_size, "%s", path);
@@ -318,6 +333,9 @@ static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first
 
     if (buf != stack_buf)
         freez(buf);
+
+    if (first_path && *first_path)
+        dictionary_set(mountPoints, first_path, NULL, 0);
 }
 
 // Map the volume's NT device name (\Device\HarddiskVolumeN) to a mount path, so a perflib instance
@@ -375,8 +393,8 @@ static void mount_points_scan_volumes(void)
     FindVolumeClose(h);
 }
 
-// Cluster Shared Volumes are hidden from the volume APIs above; the mount points under
-// %SystemDrive%\ClusterStorage are the only handle every cluster node has on them.
+// Cluster Shared Volumes have their stable per-node access paths below %SystemDrive%\ClusterStorage.
+// Scan that directory in addition to regular volume mount points, which need not enumerate CSVs.
 static void mount_points_scan_cluster_storage(void)
 {
     wchar_t windir[MAX_PATH + 1];
@@ -409,7 +427,8 @@ static void mount_points_scan_cluster_storage(void)
 
         char path[ND_MOUNT_PATH_MAX];
         snprintfz(path, sizeof(path), "%c:\\ClusterStorage\\%s", (char)windir[0], name);
-        dictionary_set(mountPoints, path, NULL, 0);
+        if (!logical_disk_is_excluded(path))
+            dictionary_set(mountPoints, path, NULL, 0);
 
     } while (FindNextFileW(h, &fd));
 
@@ -605,6 +624,9 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
         char name[ND_MOUNT_PATH_MAX];
         logical_disk_resolve_name(windows_shared_buffer, name, sizeof(name));
 
+        if (logical_disk_is_excluded(name))
+            continue;
+
         struct logical_disk *d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
         d->last_collected = now_ut;
 
@@ -629,6 +651,9 @@ static void do_mount_points(int update_every, usec_t now_ut)
     dfe_start_read(mountPoints, v)
     {
         const char *name = v_dfe.name;
+
+        if (logical_disk_is_excluded(name))
+            continue;
 
         struct logical_disk *d = dictionary_get(logicalDisks, name);
         if (d && d->last_collected == now_ut)
@@ -1000,10 +1025,6 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
 
     logical_id = RegistryFindIDByName("LogicalDisk");
     physical_id = RegistryFindIDByName("PhysicalDisk");
-
-    // the mount point pass does not depend on perflib, so it still runs when LogicalDisk is missing
-    if (logical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND && physical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-        return -1;
 
     // Each perflibGetPerformanceData() call reuses the same internal buffer, so we must
     // query and consume each block before issuing the next call to avoid pointer aliasing.
