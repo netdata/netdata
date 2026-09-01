@@ -137,8 +137,11 @@ func TestTopologyProductionPath_CatalogFixtureKeepsModernInventoryWithoutPrefix(
 
 func TestTopologyProductionPath_CatalogFixtureRejectsMalformedModernIPv4Indexes(t *testing.T) {
 	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "iosxe_c9800.snmprec"))
-	addMalformedModernIPv4FixtureRow(fixture, "1.16.0.0.0.0.0.0.0.0.0.0.255.255.203.0.113.241", 7)
-	addMalformedModernIPv4FixtureRow(fixture, "1.4.0.0.0.0.0.0.0.0.0.0.255.255.203.0.113.242", 8)
+	addMalformedModernIPv4FixtureRow(fixture, "1.16.0.0.0.0.0.0.0.0.0.0.255.255.203.0.113.241", 7001)
+	addMalformedModernIPv4FixtureRow(fixture, "1.4.0.0.0.0.0.0.0.0.0.0.255.255.203.0.113.242", 7002)
+	addMalformedModernIPv4FixtureRow(fixture, "1.4.1.2.3.4.5.6.7.8", 7003)
+	addMalformedModernIPv4FixtureRow(fixture, "1.4.192.0.2.256", 7004)
+	addMalformedModernIPv4FixtureRow(fixture, "1.4.123.45.67", 7005)
 
 	dev, profileMetrics := collectCatalogFixtureTopology(t, fixture)
 	cache := newTestTopologyCache(dev)
@@ -147,6 +150,12 @@ func TestTopologyProductionPath_CatalogFixtureRejectsMalformedModernIPv4Indexes(
 
 	require.Empty(t, cache.ipIfIndex("203.0.113.241"), "IPv4 type with a 16-octet declared address must be rejected")
 	require.Empty(t, cache.ipIfIndex("203.0.113.242"), "IPv4 length with trailing mapped payload must be rejected")
+	for _, aliasedAddress := range []string{"18.52.86.120", "25.32.34.86", "1.35.69.103"} {
+		require.Empty(t, cache.ipIfIndex(aliasedAddress), "malformed index must not alias to %s", aliasedAddress)
+	}
+	for _, address := range cache.ipAddressesByIP {
+		require.NotContains(t, []string{"7001", "7002", "7003", "7004", "7005"}, address.ifIndex)
+	}
 }
 
 func addMalformedModernIPv4FixtureRow(fixture *topologySNMPRecHandler, index string, ifIndex int) {

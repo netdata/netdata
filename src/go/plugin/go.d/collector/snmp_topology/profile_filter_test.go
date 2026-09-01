@@ -43,15 +43,30 @@ func TestFindTopologyProfiles_IPBaselineBoundaries(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			profiles := (&Collector{}).findTopologyProfiles(tc.device)
-			hasIPBaseline := false
+			ipSources := make(map[string]int)
 			for _, profile := range profiles {
 				for _, topology := range profile.Definition.Topology {
-					if topology.Kind == ddprofiledefinition.KindIpIfIndex {
-						hasIPBaseline = true
+					if topology.Kind != ddprofiledefinition.KindIpIfIndex {
+						continue
 					}
+					source := ""
+					for _, tag := range topology.StaticTags {
+						if tag.Tag == tagTopoIPSource {
+							source = tag.Value
+						}
+					}
+					if source == "" {
+						continue
+					}
+					ipSources[source]++
 				}
 			}
-			assert.Equal(t, tc.wantIPBaseline, hasIPBaseline)
+			want := map[string]int{}
+			if tc.wantIPBaseline {
+				want[topoIPSourceLegacy] = 1
+				want[topoIPSourceModern] = 1
+			}
+			assert.Equal(t, want, ipSources)
 		})
 	}
 }

@@ -237,15 +237,19 @@ The standard capabilities have separate owners:
   also collects RFC 4293 `ipAddressTable` IPv4 rows. The modern anchor is the
   readable `ipAddressIfIndex` column constrained by the IPv4 address-type and
   four-octet-length indexes; its type, prefix pointer, address status, and row
-  status columns are walked only when the anchor returns rows. Unsupported,
-  IPv6-only, and malformed-width agents therefore pay for one empty modern
-  logical anchor walk, while supported IPv4 agents use five IPv4-scoped logical
-  walks and return at most five required varbinds per address. A logical walk
-  can require multiple SNMP request/response exchanges
+  status columns are walked only when the anchor returns a descendant.
+  Unsupported and IPv6-only agents therefore pay for one empty modern logical
+  anchor walk, while a non-empty structurally scoped anchor activates five
+  IPv4-scoped logical walks and returns at most five required varbinds per row.
+  A malformed descendant under `.1.4` can activate those dependency walks, but
+  the topology consumer rejects it unless its remaining suffix is exactly four
+  decimal octets in `0..255`. A logical walk can require multiple SNMP
+  request/response exchanges
   for pagination, termination, or transport fallback; the bound here is on
   selected roots and returned row data, not a claim of one wire packet. The
-  address itself is derived as exactly four raw octets from the not-accessible
-  row index, so trailing components cannot be normalized as another family.
+  address itself is derived from the not-accessible row index without using the
+  general SNMP hex/IP parser, so malformed components cannot alias to another
+  IPv4 identity.
 - Both IP-MIB sources feed one canonical per-IP record. Valid legacy facts take
   precedence; a valid modern prefix may fill a missing legacy mask only when
   the interface index agrees. Modern rows must be active unicast addresses in

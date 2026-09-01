@@ -484,11 +484,13 @@ Stock profiles compose topology capabilities independently:
   `generic-ups.yaml` extend it as their baseline. The legacy `ipAddrTable`
   address is derived from the row index. RFC 4293 `ipAddressTable` IPv4 rows
   anchor on the readable `ipAddressIfIndex` column with the exact IPv4
-  type-and-four-octet-length index prefix, then derive the raw four address
-  octets from the index. Their type, prefix pointer, address status, and row
-  status dependency columns share that scope and remain dormant when the
-  anchor is empty. Both sources resolve into one legacy-preferred per-IP fact;
-  a valid modern prefix fills only a missing legacy mask on the same ifIndex.
+  type-and-four-octet-length index prefix, then derive the raw address suffix
+  from the index. The topology consumer accepts only exactly four decimal
+  octets in `0..255`. Their type, prefix pointer, address status, and row status
+  dependency columns share that scope and remain dormant when the anchor is
+  empty; a malformed descendant can activate them but cannot emit topology.
+  Both sources resolve into one legacy-preferred per-IP fact; a valid modern
+  prefix fills only a missing legacy mask on the same ifIndex.
 - `_std-topology-interface-mib.yaml` provides interface identity and status.
 - `_std-topology-bridge-base-mib.yaml`, `_std-topology-fdb-mib.yaml`,
   `_std-topology-q-bridge-mib.yaml`, `_std-topology-stp-mib.yaml`, and
@@ -1437,8 +1439,9 @@ Examples:
   `ipNetToPhysicalPhysAddress`, is readable and can stay as a column symbol.
 - `IP-MIB::ipAddressAddr` is a `not-accessible` `ipAddressTable` index
   component. For IPv4, constrain the readable `ipAddressIfIndex` anchor to the
-  exact type-and-length prefix `1.4` and keep the four transformed address
-  octets raw so malformed widths or trailing components fail IPv4 parsing.
+  type-and-length prefix `1.4` and keep the transformed suffix raw. The
+  consumer MUST require exactly four decimal octets in `0..255`; the walk root
+  alone cannot reject extra suffix components.
   `ipAddressType`, `ipAddressPrefix`, `ipAddressStatus`, and
   `ipAddressRowStatus` are readable tag sources.
 - `LLDP-MIB::lldpLocManAddrSubtype` and `LLDP-MIB::lldpLocManAddr` are

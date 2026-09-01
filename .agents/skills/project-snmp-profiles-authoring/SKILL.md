@@ -125,8 +125,10 @@ metric_tags:
 The table root anchors on readable `ipAddressIfIndex` and appends index prefix
 `1.4` for IPv4 type and its required four-octet length. The address is the
 not-accessible `ipAddressAddr` index component; `start: 2` skips address type
-and length. Keep the transformed octets raw so malformed trailing components
-cannot be normalized as another address family.
+and length. Keep the transformed components raw and require the topology
+consumer to decode exactly four decimal octets in `0..255`; structural walk
+scope alone does not validate the remaining instance suffix. A malformed
+descendant can activate dependency walks, but it MUST NOT emit topology.
 
 LLDP-MIB local management address:
 

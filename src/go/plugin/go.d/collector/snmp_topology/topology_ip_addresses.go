@@ -102,14 +102,13 @@ func ipAddressCandidateFromTags(source string, tags map[string]string) (ipAddres
 	if topologyutil.ParsePositiveInt64(ifIndex) == 0 {
 		return ipAddressCandidate{}, "", false
 	}
-	addr, ok := topologyutil.ParseIPAddress(tags[tagTopoIPAddr])
-	if !ok {
-		return ipAddressCandidate{}, "", false
-	}
-	ip := addr.String()
 
 	switch source {
 	case topoIPSourceLegacy:
+		addr, ok := topologyutil.ParseIPAddress(tags[tagTopoIPAddr])
+		if !ok {
+			return ipAddressCandidate{}, "", false
+		}
 		var prefixLength uint8
 		var hasPrefix bool
 		if addr.Is4() {
@@ -119,16 +118,48 @@ func ipAddressCandidateFromTags(source string, tags map[string]string) (ipAddres
 			ifIndex:      ifIndex,
 			prefixLength: prefixLength,
 			hasPrefix:    hasPrefix,
-		}, ip, true
+		}, addr.String(), true
 	case topoIPSourceModern:
-		if !addr.Is4() || !modernIPAddressEligible(tags) {
+		addr, ok := parseModernIPv4IndexAddress(tags[tagTopoIPAddr])
+		if !ok || !modernIPAddressEligible(tags) {
 			return ipAddressCandidate{}, "", false
 		}
 		prefixLength, hasPrefix := ipv4PrefixLengthFromPointer(addr, ifIndex, tags[tagTopoIPPrefix])
-		return ipAddressCandidate{ifIndex: ifIndex, prefixLength: prefixLength, hasPrefix: hasPrefix}, ip, true
+		return ipAddressCandidate{ifIndex: ifIndex, prefixLength: prefixLength, hasPrefix: hasPrefix}, addr.String(), true
 	default:
 		return ipAddressCandidate{}, "", false
 	}
+}
+
+func parseModernIPv4IndexAddress(value string) (netip.Addr, bool) {
+	value = strings.TrimSpace(value)
+	var octets [4]byte
+	for i := range octets {
+		part := value
+		if i < len(octets)-1 {
+			var found bool
+			part, value, found = strings.Cut(value, ".")
+			if !found {
+				return netip.Addr{}, false
+			}
+		} else if strings.Contains(value, ".") {
+			return netip.Addr{}, false
+		}
+		if part == "" {
+			return netip.Addr{}, false
+		}
+		for _, char := range part {
+			if char < '0' || char > '9' {
+				return netip.Addr{}, false
+			}
+		}
+		octet, err := strconv.ParseUint(part, 10, 8)
+		if err != nil {
+			return netip.Addr{}, false
+		}
+		octets[i] = byte(octet)
+	}
+	return netip.AddrFrom4(octets), true
 }
 
 func modernIPAddressEligible(tags map[string]string) bool {

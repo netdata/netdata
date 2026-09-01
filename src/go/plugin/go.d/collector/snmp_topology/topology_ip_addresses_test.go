@@ -157,6 +157,24 @@ func TestTopologyCache_ModernIPAddressRejectsIPv6(t *testing.T) {
 	assert.Empty(t, cache.ipAddressesByIP)
 }
 
+func TestTopologyCache_ModernIPAddressRejectsMalformedIndexAddress(t *testing.T) {
+	for name, address := range map[string]string{
+		"extra components": "1.2.3.4.5.6.7.8",
+		"invalid octet":    "192.0.2.256",
+		"truncated":        "123.45.67",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyBuilder()
+			cache.updateIfIndexByIP(modernIPv4Tags(address, "7", "0.0"))
+			cache.finalize()
+
+			assert.Empty(t, cache.ipAddressesByIP)
+			assert.Empty(t, cache.localDevice.ManagementAddresses)
+			assert.Empty(t, cache.trapMatchMethodByIP)
+		})
+	}
+}
+
 func TestTopologyCache_IPAddressMergeIsOrderIndependent(t *testing.T) {
 	tests := map[string]struct {
 		legacy      map[string]string
