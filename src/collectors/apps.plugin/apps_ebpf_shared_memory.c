@@ -18,6 +18,7 @@ static netdata_ebpfgo_shared_pid_memory_t apps_ebpf_shared_memory_ctx = {
 static bool apps_ebpf_cachestat_available = false;
 static bool apps_ebpf_dcstat_available = false;
 static bool apps_ebpf_fd_available = false;
+static uint32_t apps_ebpf_shm_flags = 0;
 
 /* Whether fd is publishing with `ebpf load mode = return`, i.e. whether its
  * error charts may be created.  Sticky like the availability flags above: once
@@ -37,6 +38,17 @@ static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previou
         return 0;
 
     return (int64_t)(current - previous);
+}
+
+static inline void apps_ebpf_add_fd_totals(struct target *w, const struct ebpf_publish_fd_stat *fd)
+{
+    if (!w)
+        return;
+
+    w->fd_totals.open_call += fd->open_call;
+    w->fd_totals.close_call += fd->close_call;
+    w->fd_totals.open_err += fd->open_err;
+    w->fd_totals.close_err += fd->close_err;
 }
 
 void apps_ebpf_accumulate_cachestat(void)
@@ -117,6 +129,7 @@ bool apps_ebpf_shared_memory_refresh(void)
 
     if (ok) {
         uint32_t flags = netdata_ebpfgo_shared_pid_memory_flags(&apps_ebpf_shared_memory_ctx);
+        apps_ebpf_shm_flags = flags;
         if (flags & EBPFGO_SHM_FLAG_CACHESTAT)
             apps_ebpf_cachestat_available = true;
         if (flags & EBPFGO_SHM_FLAG_DCSTAT)
@@ -231,10 +244,20 @@ void apps_ebpf_accumulate_fd(void)
         if (p->ebpf.fd.ct <= p->ebpf_fd_ct)
             continue;
 
-        w->fd_totals.open_call += p->ebpf.fd.open_call;
-        w->fd_totals.close_call += p->ebpf.fd.close_call;
-        w->fd_totals.open_err += p->ebpf.fd.open_err;
-        w->fd_totals.close_err += p->ebpf.fd.close_err;
+        apps_ebpf_add_fd_totals(w, &p->ebpf.fd);
+#if (PROCESSES_HAVE_UID == 1)
+        apps_ebpf_add_fd_totals(p->uid_target, &p->ebpf.fd);
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+        apps_ebpf_add_fd_totals(p->gid_target, &p->ebpf.fd);
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+        apps_ebpf_add_fd_totals(p->sid_target, &p->ebpf.fd);
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+        if (enable_services_charts)
+            apps_ebpf_add_fd_totals(p->service_target, &p->ebpf.fd);
+#endif
 
         p->ebpf_fd_ct = p->ebpf.fd.ct;
     }
@@ -242,7 +265,8 @@ void apps_ebpf_accumulate_fd(void)
 
 bool apps_ebpf_fd_data_ready(void)
 {
-    return apps_ebpf_fd_available && apps_ebpf_last_refresh_ok;
+    return apps_ebpf_fd_available && apps_ebpf_last_refresh_ok &&
+           (apps_ebpf_shm_flags & EBPFGO_SHM_FLAG_FD);
 }
 
 bool apps_ebpf_fd_is_available(void)

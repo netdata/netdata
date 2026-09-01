@@ -4,10 +4,16 @@
 #include "cgroup_ebpfgo_shared_memory.h"
 
 #if defined(OS_LINUX)
-
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+static int cgroup_ebpfgo_pid_compare(const void *a, const void *b)
+{
+    const pid_t left = *(const pid_t *)a;
+    const pid_t right = *(const pid_t *)b;
+    return (left > right) - (left < right);
+}
 
 static bool cgroup_ebpfgo_cachestat_snapshot_ready = false;
 
@@ -260,6 +266,7 @@ void cgroup_ebpfgo_refresh_pid_lists(void)
                     pids[count++] = pid;
             }
             if (count > 0) {
+                qsort(pids, count, sizeof(*pids), cgroup_ebpfgo_pid_compare);
                 cg->ebpf_pids       = pids;
                 cg->ebpf_pids_count = count;
             } else {

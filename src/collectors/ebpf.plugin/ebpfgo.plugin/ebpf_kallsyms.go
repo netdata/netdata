@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,7 +15,11 @@ import (
 type kallsymsOpener func() (io.ReadCloser, error)
 
 func openProcKallsyms() (io.ReadCloser, error) {
-	return os.Open("/proc/kallsyms")
+	path := "/proc/kallsyms"
+	if prefix := os.Getenv("NETDATA_HOST_PREFIX"); prefix != "" {
+		path = filepath.Join(prefix, path)
+	}
+	return os.Open(path)
 }
 
 // isProbeableKallsymsType reports whether a /proc/kallsyms type letter denotes a

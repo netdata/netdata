@@ -16,6 +16,58 @@ static bool cgroup_ebpfgo_fd_snapshot_ready = false;
 // retract charts that are already on the dashboard.
 static bool cgroup_ebpfgo_fd_errors_ready = false;
 
+static size_t cgroup_ebpfgo_fd_token_index(const struct cgroup *cg, pid_t pid, bool *found)
+{
+    size_t left = 0;
+    size_t right = cg->ebpf_fd_pid_tokens_count;
+    while (left < right) {
+        size_t mid = left + (right - left) / 2;
+        if (cg->ebpf_fd_pid_tokens[mid].pid < pid)
+            left = mid + 1;
+        else
+            right = mid;
+    }
+    *found = left < cg->ebpf_fd_pid_tokens_count && cg->ebpf_fd_pid_tokens[left].pid == pid;
+    return left;
+}
+
+static uint64_t *cgroup_ebpfgo_fd_consumed_token(struct cgroup *cg, pid_t pid)
+{
+    bool found;
+    size_t index = cgroup_ebpfgo_fd_token_index(cg, pid, &found);
+    if (!found) {
+        if (cg->ebpf_fd_pid_tokens_count == cg->ebpf_fd_pid_tokens_capacity) {
+            size_t capacity = cg->ebpf_fd_pid_tokens_capacity ? cg->ebpf_fd_pid_tokens_capacity * 2 : 16;
+            cg->ebpf_fd_pid_tokens = reallocz(cg->ebpf_fd_pid_tokens,
+                                               capacity * sizeof(*cg->ebpf_fd_pid_tokens));
+            cg->ebpf_fd_pid_tokens_capacity = capacity;
+        }
+        memmove(&cg->ebpf_fd_pid_tokens[index + 1], &cg->ebpf_fd_pid_tokens[index],
+                (cg->ebpf_fd_pid_tokens_count - index) * sizeof(*cg->ebpf_fd_pid_tokens));
+        cg->ebpf_fd_pid_tokens[index] = (cgroup_ebpfgo_fd_pid_token_t){.pid = pid};
+        cg->ebpf_fd_pid_tokens_count++;
+    }
+    return &cg->ebpf_fd_pid_tokens[index].ct;
+}
+
+static void cgroup_ebpfgo_fd_prune_tokens(struct cgroup *cg)
+{
+    size_t token = 0, pid = 0;
+    while (token < cg->ebpf_fd_pid_tokens_count && pid < cg->ebpf_pids_count) {
+        if (cg->ebpf_fd_pid_tokens[token].pid < cg->ebpf_pids[pid]) {
+            memmove(&cg->ebpf_fd_pid_tokens[token], &cg->ebpf_fd_pid_tokens[token + 1],
+                    (cg->ebpf_fd_pid_tokens_count - token - 1) * sizeof(*cg->ebpf_fd_pid_tokens));
+            cg->ebpf_fd_pid_tokens_count--;
+        } else if (cg->ebpf_fd_pid_tokens[token].pid > cg->ebpf_pids[pid])
+            pid++;
+        else {
+            token++;
+            pid++;
+        }
+    }
+    cg->ebpf_fd_pid_tokens_count = token;
+}
+
 void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors)
 {
     cgroup_ebpfgo_fd_snapshot_ready = ready;
@@ -29,13 +81,10 @@ void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors)
  * has a single counter set with no curr/prev pair — so unlike the cachestat and
  * dcstat consumers there is nothing to diff here.  cgroups.plugin ticks faster
  * than the Go publisher, so a PID only contributes when its ct is newer than the
- * ct this cgroup consumed last tick; without that gate the same delta would be
- * counted once per tick until the next publish. */
+ * token this cgroup consumed for that PID; without that gate the same delta would
+ * be counted once per tick until the next publish. */
 static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
 {
-    uint64_t prev_ct = cg->fd.ct;
-    uint64_t ct = 0;
-
     cg->fd.open_call = 0;
     cg->fd.close_call = 0;
     cg->fd.open_err = 0;
@@ -61,17 +110,8 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
 
         const struct ebpf_publish_fd_stat *fd = &item->fd;
 
-        if (fd->ct > ct)
-            ct = fd->ct;
-
-        /* A PID that has just moved into this cgroup can trail the cgroup's
-         * watermark, in which case its already-published interval is skipped
-         * here.  The loss is bounded to that single interval: the producer stamps
-         * a fresh store-wide token on every active PID each cycle, so the PID's
-         * next active publish carries ct > prev_ct and is consumed.  Same
-         * trade-off the dcstat consumer documents — this under-counts a trailing
-         * PID rather than double-counting it. */
-        if (fd->ct <= prev_ct)
+        uint64_t *consumed_ct = cgroup_ebpfgo_fd_consumed_token(cg, pid);
+        if (fd->ct <= *consumed_ct)
             continue;
 
         uint32_t update_every_s = fd->fd_update_every_s;
@@ -86,16 +126,10 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
             open_err, cgroup_ebpfgo_fd_normalize_rate(fd->open_err, update_every_s));
         close_err = cgroup_ebpfgo_fd_add_rate(
             close_err, cgroup_ebpfgo_fd_normalize_rate(fd->close_err, update_every_s));
+        *consumed_ct = fd->ct;
     }
 
-    /* The consumed marker is a watermark and must only move forward.  It is the
-     * maximum ct of whichever PIDs the cgroup happens to hold this tick, so a
-     * PID leaving the cgroup can lower that maximum; adopting it would move the
-     * boundary back and replay rows already accounted for on the next tick.
-     * ct only ever decreases across a reboot, which restarts the agent and
-     * zeroes this field anyway. */
-    if (ct > cg->fd.ct)
-        cg->fd.ct = ct;
+    cgroup_ebpfgo_fd_prune_tokens(cg);
 
     cg->fd.open_call = open_call;
     cg->fd.close_call = close_call;
