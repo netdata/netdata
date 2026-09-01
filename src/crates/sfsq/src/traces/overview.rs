@@ -13,7 +13,9 @@
 //!
 //! - **Stored-row statistics**: span/error totals sum the stored
 //!   rows; a resent span counts every time it is stored. Canonical
-//!   dedup remains assembly's property (`search`/`trace_by_id`).
+//!   dedup remains assembly's property (`search`/`trace_by_id`). The
+//!   per-bucket error array is that same ERROR-SPAN statistic sliced by
+//!   time bucket — NOT "buckets holding a failed trace".
 //! - **No mixed units**: a sealed source WITHOUT the rollup chunk
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
@@ -164,6 +166,11 @@ pub struct OverviewData {
     /// duration bin of `max_end − min_start` (saturating). Length =
     /// `grid.num_buckets`; each row = [`DURATION_BIN_COUNT`].
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
+    /// Per time bucket, the binned traces' STORED ERROR-status spans —
+    /// index-parallel to `cells`'s outer index, summing to
+    /// `total_errors`. Sliced by the trace's bucket, so a failed span
+    /// counts where its TRACE binned.
+    pub bucket_errors: Vec<u64>,
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub total_traces: u64,
     /// Their STORED spans, summed (resends included). Totals are
@@ -183,6 +190,7 @@ impl OverviewData {
     fn empty(num_buckets: usize, facets_requested: bool, status: QueryStatus) -> Self {
         Self {
             cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
+            bucket_errors: vec![0; num_buckets],
             total_traces: 0,
             total_spans: 0,
             total_errors: 0,
@@ -244,6 +252,7 @@ pub fn overview(
     // whose envelope START lies outside the grid are clipped (the same
     // rule spans followed in v1).
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
+    let mut bucket_errors = vec![0u64; grid.num_buckets];
     let mut total_traces = 0u64;
     let mut total_spans = 0u64;
     let mut total_errors = 0u64;
@@ -255,6 +264,7 @@ pub fn overview(
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
         let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
         cells[bucket][duration_bin(duration)] += 1;
+        bucket_errors[bucket] = bucket_errors[bucket].saturating_add(m.error_count);
         total_traces = total_traces.saturating_add(1);
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
@@ -265,6 +275,7 @@ pub fn overview(
 
     Ok(OverviewData {
         cells,
+        bucket_errors,
         total_traces,
         total_spans,
         total_errors,

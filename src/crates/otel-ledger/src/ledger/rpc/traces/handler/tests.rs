@@ -988,6 +988,38 @@ async fn overview_counts_error_spans_in_totals() {
 }
 
 #[tokio::test]
+async fn the_grid_carries_per_bucket_error_spans() {
+    use crate::ledger::rpc::traces::fixtures::otlp_req_err;
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_svc(0x0A, 2, base_ns(10), "svc"),
+            otlp_req_err(0x0B, 2, base_ns(20), "svc"), // span 1 = ERROR
+            otlp_req_err(0x0C, 2, base_ns(20), "svc"), // a second failing trace, same second
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    let mut body = window_body();
+    merge(&mut body, json!({}));
+    let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
+    assert_eq!(v["totals"], json!({"traces": 3, "spans": 6, "errors": 2}));
+    let errors = v["grid"]["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 100, "index-parallel to the cell rows");
+    assert_eq!(errors[10], 0, "the healthy trace's bucket");
+    assert_eq!(errors[20], 2, "both failing traces share the second");
+    let sum: u64 = errors.iter().map(|e| e.as_u64().unwrap()).sum();
+    assert_eq!(sum, 2, "the per-bucket errors sum to totals.errors");
+
+    // The Functions view's embedded section reports the same array.
+    let s = serde_json::to_value(call_on(&h, functions_body(20)).await.unwrap()).unwrap();
+    assert_eq!(s["data"]["overview"]["grid"]["errors"], v["grid"]["errors"]);
+}
+
+#[tokio::test]
 async fn overview_invalid_selectors_are_clean_client_errors() {
     let h = handler_with_search_corpus().await;
     // Shape errors are wire-test territory; the inverted window is the
