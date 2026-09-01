@@ -430,7 +430,10 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 		c.Lifetime = other.Lifetime
 	}
 	if other.ObjectFlavor != nil {
-		c.ObjectFlavor = other.ObjectFlavor
+		if *other.ObjectFlavor != "" || !c.objectFlavorExplicit {
+			c.ObjectFlavor = other.ObjectFlavor
+		}
+		c.objectFlavorExplicit = c.objectFlavorExplicit || other.objectFlavorExplicit
 	}
 	if other.LoadMethod != nil {
 		c.LoadMethod = other.LoadMethod

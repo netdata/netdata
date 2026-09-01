@@ -14,12 +14,14 @@ import (
 // depending on the host's /proc.
 type kallsymsOpener func() (io.ReadCloser, error)
 
+var openKallsymsFile = os.Open
+
 func openProcKallsyms() (io.ReadCloser, error) {
 	path := "/proc/kallsyms"
 	if prefix := os.Getenv("NETDATA_HOST_PREFIX"); prefix != "" {
 		path = filepath.Join(prefix, path)
 	}
-	return os.Open(path)
+	return openKallsymsFile(path)
 }
 
 // isProbeableKallsymsType reports whether a /proc/kallsyms type letter denotes a

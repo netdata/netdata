@@ -81,3 +81,26 @@ func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
 		t.Fatalf("expected empty config, got %#v", cfg)
 	}
 }
+
+func TestCachestatConfigAutoPreservesEarlierExplicitFlavor(t *testing.T) {
+	tests := map[string]string{
+		"auto":  "auto",
+		"co-re": "co-re",
+	}
+
+	for name, typeFormat := range tests {
+		t.Run(name, func(t *testing.T) {
+			writeCollectorConfigFixture(t, "cachestat.conf",
+				"[global]\n    ebpf object flavor = arena\n", "", "",
+				"[global]\n    ebpf type format = "+typeFormat+"\n")
+
+			cfg, err := resolveCachestatLegacyConfig()
+			if err != nil {
+				t.Fatalf("resolveCachestatLegacyConfig(): %v", err)
+			}
+			if cfg.ObjectFlavor != "arena" {
+				t.Fatalf("ObjectFlavor = %q, want arena", cfg.ObjectFlavor)
+			}
+		})
+	}
+}

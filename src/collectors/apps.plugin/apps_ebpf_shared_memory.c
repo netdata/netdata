@@ -246,13 +246,16 @@ void apps_ebpf_accumulate_fd(void)
 
         apps_ebpf_add_fd_totals(w, &p->ebpf.fd);
 #if (PROCESSES_HAVE_UID == 1)
-        apps_ebpf_add_fd_totals(p->uid_target, &p->ebpf.fd);
+        if (enable_users_charts)
+            apps_ebpf_add_fd_totals(p->uid_target, &p->ebpf.fd);
 #endif
 #if (PROCESSES_HAVE_GID == 1)
-        apps_ebpf_add_fd_totals(p->gid_target, &p->ebpf.fd);
+        if (enable_groups_charts)
+            apps_ebpf_add_fd_totals(p->gid_target, &p->ebpf.fd);
 #endif
 #if (PROCESSES_HAVE_SID == 1)
-        apps_ebpf_add_fd_totals(p->sid_target, &p->ebpf.fd);
+        if (enable_users_charts)
+            apps_ebpf_add_fd_totals(p->sid_target, &p->ebpf.fd);
 #endif
 #if (PROCESSES_HAVE_SERVICE == 1)
         if (enable_services_charts)

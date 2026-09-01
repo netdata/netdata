@@ -3,6 +3,7 @@
 #ifndef NETDATA_CGROUP_EBPFGO_FD_H
 #define NETDATA_CGROUP_EBPFGO_FD_H
 
+#include <stdbool.h>
 #include <limits.h>
 #include <stdint.h>
 
@@ -33,6 +34,32 @@ static inline long long cgroup_ebpfgo_fd_add_rate(long long total, long long rat
         return total;
 
     return total > LLONG_MAX - rate ? LLONG_MAX : total + rate;
+}
+
+/* Keep consumed counter tokens for at least one producer interval, expressed
+ * in cgroup refreshes, so a temporary cgroup.procs gap cannot replay a row. */
+static inline uint64_t cgroup_ebpfgo_fd_token_grace_generations(
+    uint32_t fd_update_every_s,
+    uint32_t cgroup_update_every_s)
+{
+    if (!cgroup_update_every_s)
+        cgroup_update_every_s = 1;
+    if (!fd_update_every_s)
+        fd_update_every_s = cgroup_update_every_s;
+
+    uint64_t grace = ((uint64_t)fd_update_every_s + cgroup_update_every_s - 1) / cgroup_update_every_s;
+    return grace < 2 ? 2 : grace;
+}
+
+static inline bool cgroup_ebpfgo_fd_token_expired(
+    uint64_t last_seen,
+    uint64_t generation,
+    uint32_t fd_update_every_s,
+    uint32_t cgroup_update_every_s)
+{
+    return generation > last_seen &&
+           generation - last_seen > cgroup_ebpfgo_fd_token_grace_generations(
+               fd_update_every_s, cgroup_update_every_s);
 }
 
 #endif

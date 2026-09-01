@@ -18,6 +18,7 @@ typedef struct {
     pid_t pid;
     uint64_t ct;
     uint64_t last_seen;
+    uint32_t fd_update_every_s;
 } cgroup_ebpfgo_fd_pid_token_t;
 
 static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_pid_tokens;
@@ -40,7 +41,7 @@ static size_t cgroup_ebpfgo_fd_token_index(pid_t pid, bool *found)
     return left;
 }
 
-static uint64_t *cgroup_ebpfgo_fd_consumed_token(pid_t pid)
+static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_consumed_token(pid_t pid, uint32_t fd_update_every_s)
 {
     bool found;
     size_t index = cgroup_ebpfgo_fd_token_index(pid, &found);
@@ -57,14 +58,19 @@ static uint64_t *cgroup_ebpfgo_fd_consumed_token(pid_t pid)
         cgroup_ebpfgo_fd_pid_tokens_count++;
     }
     cgroup_ebpfgo_fd_pid_tokens[index].last_seen = cgroup_ebpfgo_fd_generation;
-    return &cgroup_ebpfgo_fd_pid_tokens[index].ct;
+    cgroup_ebpfgo_fd_pid_tokens[index].fd_update_every_s = fd_update_every_s;
+    return &cgroup_ebpfgo_fd_pid_tokens[index];
 }
 
 static void cgroup_ebpfgo_fd_prune_tokens(void)
 {
     size_t write = 0;
     for (size_t read = 0; read < cgroup_ebpfgo_fd_pid_tokens_count; read++) {
-        if (cgroup_ebpfgo_fd_pid_tokens[read].last_seen + 2 < cgroup_ebpfgo_fd_generation)
+        if (cgroup_ebpfgo_fd_token_expired(
+                cgroup_ebpfgo_fd_pid_tokens[read].last_seen,
+                cgroup_ebpfgo_fd_generation,
+                cgroup_ebpfgo_fd_pid_tokens[read].fd_update_every_s,
+                cgroup_update_every > 0 ? (uint32_t)cgroup_update_every : 1))
             continue;
         cgroup_ebpfgo_fd_pid_tokens[write++] = cgroup_ebpfgo_fd_pid_tokens[read];
     }
@@ -112,13 +118,13 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
 
         const struct ebpf_publish_fd_stat *fd = &item->fd;
 
-        uint64_t *consumed_ct = cgroup_ebpfgo_fd_consumed_token(pid);
-        if (fd->ct <= *consumed_ct)
-            continue;
-
         uint32_t update_every_s = fd->fd_update_every_s;
         if (!update_every_s && cgroup_update_every > 0)
             update_every_s = (uint32_t)cgroup_update_every;
+
+        cgroup_ebpfgo_fd_pid_token_t *token = cgroup_ebpfgo_fd_consumed_token(pid, update_every_s);
+        if (fd->ct <= token->ct)
+            continue;
 
         open_call = cgroup_ebpfgo_fd_add_rate(
             open_call, cgroup_ebpfgo_fd_normalize_rate(fd->open_call, update_every_s));
@@ -128,7 +134,7 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
             open_err, cgroup_ebpfgo_fd_normalize_rate(fd->open_err, update_every_s));
         close_err = cgroup_ebpfgo_fd_add_rate(
             close_err, cgroup_ebpfgo_fd_normalize_rate(fd->close_err, update_every_s));
-        *consumed_ct = fd->ct;
+        token->ct = fd->ct;
     }
 
     cg->fd.open_call = open_call;

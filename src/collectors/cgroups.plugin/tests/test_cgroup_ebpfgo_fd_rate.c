@@ -27,5 +27,11 @@ int main(void)
     int failed = 0;
     failed |= expect_rate("mixed-cadence open", open, 20 * CGROUP_EBPFGO_FD_RATE_SCALE);
     failed |= expect_rate("mixed-cadence close", close, 20 * CGROUP_EBPFGO_FD_RATE_SCALE);
+
+    /* A ten-second FD row remains consumed across three one-second cgroup.procs
+     * gaps, then expires after a complete producer interval. */
+    failed |= expect_rate("fd token grace", cgroup_ebpfgo_fd_token_grace_generations(10, 1), 10);
+    failed |= expect_rate("fd token survives short gap", cgroup_ebpfgo_fd_token_expired(1, 4, 10, 1), 0);
+    failed |= expect_rate("fd token expires after producer interval", cgroup_ebpfgo_fd_token_expired(1, 12, 10, 1), 1);
     return failed;
 }

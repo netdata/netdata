@@ -786,6 +786,67 @@ static inline int nd_ebpf_update_controller(
     return 0;
 }
 
+static inline bool nd_ebpf_tgid_in_batch(const uint32_t *tgids, size_t count, uint32_t tgid)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (tgids[i] == tgid)
+            return true;
+    }
+    return false;
+}
+
+static inline bool nd_ebpf_key_has_snapshot(
+    const struct nd_ebpf_key_table *keys,
+    uint32_t key,
+    uint32_t tgid,
+    uint64_t ct)
+{
+    if (!ct)
+        return false;
+
+    for (size_t i = 0; i < keys->count; i++) {
+        const struct nd_ebpf_key_tgid *item = &keys->items[i];
+        if (item->key == key && item->tgid == tgid && item->ct == ct)
+            return true;
+    }
+    return false;
+}
+
+/* A map key can contain a different process in every per-CPU slot.  It is
+ * safe to delete only when every populated slot still matches the snapshot and
+ * every occupant is in the confirmed-dead batch. */
+static inline bool nd_ebpf_map_key_delete_eligible(
+    const struct nd_ebpf_key_table *keys,
+    const uint32_t *tgids,
+    size_t count,
+    uint32_t map_key,
+    const void *values,
+    size_t value_size,
+    size_t tgid_offset,
+    size_t ct_offset,
+    int slots)
+{
+    bool populated = false;
+
+    for (int slot = 0; slot < slots; slot++) {
+        uint32_t current_tgid;
+        memcpy(&current_tgid, (const char *)values + (size_t)slot * value_size + tgid_offset,
+               sizeof(current_tgid));
+        if (!current_tgid)
+            continue;
+
+        populated = true;
+        uint64_t current_ct;
+        memcpy(&current_ct, (const char *)values + (size_t)slot * value_size + ct_offset,
+               sizeof(current_ct));
+        if (!nd_ebpf_tgid_in_batch(tgids, count, current_tgid) ||
+            !nd_ebpf_key_has_snapshot(keys, map_key, current_tgid, current_ct))
+            return false;
+    }
+
+    return populated;
+}
+
 /* Evicts the buckets belonging to a set of dead TGIDs.
  *
  * This is the eviction entry point every per-PID collector must use.  Deleting
@@ -834,52 +895,33 @@ static inline int nd_ebpf_map_delete_tgids(
 
     int rc = 0;
     for (size_t k = 0; k < keys->count; k++) {
-        for (size_t i = 0; i < count; i++) {
-            if (keys->items[k].tgid != tgids[i])
-                continue;
+        const struct nd_ebpf_key_tgid *item = &keys->items[k];
+        if (!item->ct || !nd_ebpf_tgid_in_batch(tgids, count, item->tgid))
+            continue;
 
-            /* Zero is the uninitialized marker, not a process generation.  A
-             * zero-generation row cannot be distinguished from a newly reused
-             * PID, so leave it for a later snapshot with a real marker. */
-            if (!keys->items[k].ct)
-                continue;
-
-            uint32_t map_key = keys->items[k].key;
-            if (!values || !value_size || bpf_map_lookup_elem(fd, &map_key, values) != 0)
-                continue;
-
-            enum bpf_map_type mtype = bpf_map__type(map);
-            int slots = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
-                        ? percpu_entries_cap : 1;
-            bool still_belongs_to_tgid = false;
-            bool belongs_to_another_tgid = false;
-            bool generation_matches = false;
-            for (int slot = 0; slot < slots; slot++) {
-                uint32_t current_tgid;
-                memcpy(&current_tgid, (char *)values + (size_t)slot * value_size + tgid_offset,
-                       sizeof(current_tgid));
-                if (!current_tgid)
-                    continue;
-                if (current_tgid == tgids[i])
-                    still_belongs_to_tgid = true;
-                else
-                    belongs_to_another_tgid = true;
-
-                uint64_t current_ct;
-                memcpy(&current_ct, (char *)values + (size_t)slot * value_size + ct_offset, sizeof(current_ct));
-                if (current_tgid == keys->items[k].tgid && current_ct == keys->items[k].ct)
-                    generation_matches = true;
+        uint32_t map_key = item->key;
+        bool seen = false;
+        for (size_t previous = 0; previous < k; previous++) {
+            if (keys->items[previous].key == map_key) {
+                seen = true;
+                break;
             }
-            if (!still_belongs_to_tgid || belongs_to_another_tgid || !generation_matches)
-                continue;
-
-            int per = bpf_map_delete_elem(fd, &map_key);
-            /* Treat "not found" as success: the BPF program may have removed the
-             * bucket between snapshot and delete. */
-            if (per != 0 && per != -ENOENT)
-                rc = per;
-            break;
         }
+        if (seen || !values || !value_size || bpf_map_lookup_elem(fd, &map_key, values) != 0)
+            continue;
+
+        enum bpf_map_type mtype = bpf_map__type(map);
+        int slots = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
+                    ? percpu_entries_cap : 1;
+        if (!nd_ebpf_map_key_delete_eligible(
+                keys, tgids, count, map_key, values, value_size, tgid_offset, ct_offset, slots))
+            continue;
+
+        int per = bpf_map_delete_elem(fd, &map_key);
+        /* Treat "not found" as success: the BPF program may have removed the
+         * bucket between snapshot and delete. */
+        if (per != 0 && per != -ENOENT)
+            rc = per;
     }
 
     return rc;

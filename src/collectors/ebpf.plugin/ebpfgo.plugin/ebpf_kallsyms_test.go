@@ -3,9 +3,48 @@ package main
 import (
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestOpenProcKallsymsPath(t *testing.T) {
+	original := openKallsymsFile
+	t.Cleanup(func() { openKallsymsFile = original })
+
+	tests := map[string]struct {
+		prefix string
+		want   string
+	}{
+		"without host prefix": {want: "/proc/kallsyms"},
+		"with host prefix": {
+			prefix: t.TempDir(),
+			want:   "", // set below to keep the fixture path local to the test
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.prefix != "" {
+				tc.want = filepath.Join(tc.prefix, "/proc/kallsyms")
+			}
+			t.Setenv("NETDATA_HOST_PREFIX", tc.prefix)
+
+			var got string
+			openKallsymsFile = func(path string) (*os.File, error) {
+				got = path
+				return nil, errors.New("test open")
+			}
+			if _, err := openProcKallsyms(); err == nil {
+				t.Fatal("openProcKallsyms() succeeded, want test open error")
+			}
+			if got != tc.want {
+				t.Fatalf("openProcKallsyms() opened %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestIsProbeableKallsymsType(t *testing.T) {
 	cases := map[string]bool{
