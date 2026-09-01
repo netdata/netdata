@@ -3326,19 +3326,23 @@ if(ENABLE_PLUGIN_EBPF)
 
     # GLOB_RECURSE descends into subdirectories, so netipc/*.go covers
     # protocol/, service/, and transport/ even though no .go files exist at
-    # netipc/'s root level.  go.mod and go.sum are listed explicitly so a
-    # Go-version bump or new transitive dep in go/plugins triggers a rebuild.
+    # netipc/'s root level. Keep fixed workspace and module files out of the
+    # recursive glob so CMake does not scan their parent trees on every build.
     file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
-            "${CMAKE_SOURCE_DIR}/go.work"
-            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
-            "${CMAKE_SOURCE_DIR}/src/go/go.sum"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
+    # go.work is optional; watch its exact path so appearance or removal regenerates the graph.
+    file(GLOB EBPF_GO_WORKSPACE_FILE CONFIGURE_DEPENDS LIST_DIRECTORIES false
+            "${CMAKE_SOURCE_DIR}/go.work")
+    list(APPEND EBPF_GO_PLUGIN_FILES
+            ${EBPF_GO_WORKSPACE_FILE}
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
+            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/go/go.sum")
 
     set(EBPF_GO_LIBBPF_LIB_DIR lib)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
