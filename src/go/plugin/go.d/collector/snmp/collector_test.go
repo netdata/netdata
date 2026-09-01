@@ -383,7 +383,7 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		collr := New(store)
 		collr.Config = prepareV2Config()
 		mockSNMP := snmpmock.NewMockHandler(ctrl)
-		mockSNMP.EXPECT().WalkAll(gomock.Any()).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+		mockSNMP.EXPECT().Get(gomock.Any()).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
 			panic("check panic")
 		})
 		collr.snmpClient = mockSNMP
@@ -618,17 +618,13 @@ func TestCollector_Check(t *testing.T) {
 			},
 		},
 
-		"failure: sysInfo walk error": {
+		"failure: sysInfo query error": {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
-				// Normal init succeeds
 				setMockClientInitExpect(m)
-				// But sysInfo retrieval (WalkAll on system tree) fails
-				// If your helper is too opinionated, stub directly:
-				// The collector ultimately calls WalkAll on the system OID tree.
 				m.EXPECT().
-					WalkAll(gomock.Any()).
-					Return(nil, errors.New("walk failed"))
+					Get(sysInfoOIDsForTest()).
+					Return(nil, errors.New("query failed"))
 
 				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
@@ -725,10 +721,10 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 		wantErr        string
 		wantAbsent     []string
 	}{
-		"empty system walk": {
-			wantErr: "system subtree walk returned no PDUs",
+		"empty system query": {
+			wantErr: "SNMP system scalar query returned no PDUs",
 		},
-		"partial system walk with ordinary ping enabled": {
+		"partial system query with ordinary ping enabled": {
 			pdus: []gosnmp.SnmpPDU{
 				{Name: snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte("private description")},
 				{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("private hostname")},
@@ -747,11 +743,11 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 		},
 		"invalid manual profile": {
 			manualProfiles: []string{"profile-that-does-not-exist"},
-			wantErr:        "system subtree walk returned no PDUs",
+			wantErr:        "SNMP system scalar query returned no PDUs",
 		},
 		"topology-only manual profile": {
 			manualProfiles: []string{"topology-role-qbridge"},
-			wantErr:        "system subtree walk returned no PDUs",
+			wantErr:        "SNMP system scalar query returned no PDUs",
 		},
 		"applicable manual metric profile": {
 			manualProfiles: []string{"generic-device"},
@@ -772,7 +768,7 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			defer ctrl.Finish()
 
 			client := snmpmock.NewMockHandler(ctrl)
-			client.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return(tc.pdus, nil)
+			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
 
 			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
@@ -801,9 +797,9 @@ func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
-	}, nil).Times(1)
+	}}, nil).Times(1)
 
 	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
@@ -1561,11 +1557,21 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
 		{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
-	}, nil).MinTimes(1)
+	}}, nil).MinTimes(1)
+}
+
+func sysInfoOIDsForTest() []string {
+	return []string{
+		snmputils.OidSysDescr,
+		snmputils.OidSysObject,
+		snmputils.OidSysContact,
+		snmputils.OidSysName,
+		snmputils.OidSysLocation,
+	}
 }

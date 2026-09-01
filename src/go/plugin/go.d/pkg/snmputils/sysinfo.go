@@ -57,9 +57,9 @@ type SysInfoProbe struct {
 }
 
 func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
-	pdus, err := client.WalkAll(RootOidMibSystem)
+	pdus, err := getSysInfoPDUs(client)
 	if err != nil {
-		return nil, fmt.Errorf("walk SNMP system subtree %q: %w", RootOidMibSystem, err)
+		return nil, err
 	}
 
 	si := &SysInfo{
@@ -76,6 +76,9 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 			si.Probe.FirstOID = oid
 		}
 		si.Probe.LastOID = oid
+		if !isPduWithData(pdu) {
+			continue
+		}
 
 		switch oid {
 		case OidSysDescr:
@@ -113,6 +116,58 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 	updateMetadata(si)
 
 	return si, nil
+}
+
+func sysInfoOIDs() []string {
+	return []string{
+		OidSysDescr,
+		OidSysObject,
+		OidSysContact,
+		OidSysName,
+		OidSysLocation,
+	}
+}
+
+func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
+	oids := sysInfoOIDs()
+
+	for len(oids) > 0 {
+		packet, err := client.Get(oids)
+		if err != nil {
+			return nil, fmt.Errorf("get SNMP system scalars: %w", err)
+		}
+		if packet == nil {
+			return nil, fmt.Errorf("get SNMP system scalars: nil response")
+		}
+
+		switch packet.Error {
+		case gosnmp.NoError:
+			return packet.Variables, nil
+		case gosnmp.NoSuchName:
+			idx := int(packet.ErrorIndex)
+			if idx < 1 || idx > len(oids) {
+				return nil, fmt.Errorf(
+					"get SNMP system scalars: response error %s with invalid error index %d for %d requested OIDs",
+					packet.Error,
+					packet.ErrorIndex,
+					len(oids),
+				)
+			}
+
+			next := make([]string, 0, len(oids)-1)
+			next = append(next, oids[:idx-1]...)
+			next = append(next, oids[idx:]...)
+			oids = next
+		default:
+			return nil, fmt.Errorf(
+				"get SNMP system scalars: response error %s (index %d)",
+				packet.Error,
+				packet.ErrorIndex,
+			)
+		}
+	}
+
+	return nil, nil
 }
 
 var valueSanitizer = strings.NewReplacer(
