@@ -187,6 +187,7 @@ const (
 )
 
 func (m *mockSnmpHandler) setExpectSysInfo() {
+	m.EXPECT().MaxOids().Return(60).AnyTimes()
 	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},

@@ -383,6 +383,7 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		collr := New(store)
 		collr.Config = prepareV2Config()
 		mockSNMP := snmpmock.NewMockHandler(ctrl)
+		mockSNMP.EXPECT().MaxOids().Return(20)
 		mockSNMP.EXPECT().Get(gomock.Any()).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
 			panic("check panic")
 		})
@@ -622,6 +623,7 @@ func TestCollector_Check(t *testing.T) {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
 				setMockClientInitExpect(m)
+				m.EXPECT().MaxOids().Return(20)
 				m.EXPECT().
 					Get(sysInfoOIDsForTest()).
 					Return(nil, errors.New("query failed"))
@@ -768,6 +770,7 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			defer ctrl.Finish()
 
 			client := snmpmock.NewMockHandler(ctrl)
+			client.EXPECT().MaxOids().Return(20)
 			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
 
 			collr := newTestSNMPCollector()
@@ -797,6 +800,7 @@ func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(20)
 	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
 	}}, nil).Times(1)
@@ -1557,6 +1561,7 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
+	m.EXPECT().MaxOids().Return(20).MinTimes(1)
 	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},

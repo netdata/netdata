@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -129,8 +130,24 @@ func sysInfoOIDs() []string {
 }
 
 func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
-	oids := sysInfoOIDs()
+	maxOids := client.MaxOids()
+	if maxOids < 1 {
+		return nil, fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids)
+	}
 
+	oids := sysInfoOIDs()
+	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
+	for chunk := range slices.Chunk(oids, maxOids) {
+		chunkPDUs, err := getSysInfoChunkPDUs(client, chunk)
+		if err != nil {
+			return nil, err
+		}
+		pdus = append(pdus, chunkPDUs...)
+	}
+	return pdus, nil
+}
+
+func getSysInfoChunkPDUs(client gosnmp.Handler, oids []string) ([]gosnmp.SnmpPDU, error) {
 	for len(oids) > 0 {
 		packet, err := client.Get(oids)
 		if err != nil {
