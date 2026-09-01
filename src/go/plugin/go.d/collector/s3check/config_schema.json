@@ -19,7 +19,7 @@
       "credentials": {
         "title": "Static credentials",
         "description": "Optional explicit credentials for this endpoint. Omit this object to use the AWS SDK default credential chain.",
-        "type": "object",
+        "type": ["object", "null"],
         "additionalProperties": false,
         "properties": {
           "access_key_id": {

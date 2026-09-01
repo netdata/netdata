@@ -42,13 +42,11 @@ func New(ctx context.Context, cfg Config) (Client, error) {
 	if err != nil {
 		return nil, errors.New("invalid S3 HTTP transport configuration")
 	}
-	awsConfig, err := cfg.Identity.NewConfig(ctx, awsauth.ConfigOptions{Region: cfg.Region})
+	awsConfig, err := cfg.Identity.NewConfig(ctx, awsauth.ConfigOptions{Region: cfg.Region, HTTPClient: httpClient})
 	if err != nil {
 		httpClient.CloseIdleConnections()
 		return nil, fmt.Errorf("create AWS configuration: %w", err)
 	}
-	awsConfig.HTTPClient = httpClient
-
 	client := s3.NewFromConfig(awsConfig, func(options *s3.Options) { configureS3Options(options, cfg) })
 	return &awsClient{client: client, httpClient: httpClient}, nil
 }

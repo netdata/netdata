@@ -45,6 +45,8 @@ type AssumeRoleConfig struct {
 type ConfigOptions struct {
 	// Region is the AWS region the resulting config targets.
 	Region string
+	// HTTPClient is shared by service clients and assume-role credential retrieval.
+	HTTPClient aws.HTTPClient
 	// STSRegion overrides the STS endpoint region for assume_role mode.
 	// Defaults to Region (a regional endpoint, which also works in gov/cn
 	// partitions where the global STS endpoint does not exist).
@@ -161,6 +163,9 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 	}
 	if region != "" {
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
+	}
+	if opts.HTTPClient != nil {
+		loadOpts = append(loadOpts, awsconfig.WithHTTPClient(opts.HTTPClient))
 	}
 	if id.credentials.Type == CredentialTypeStatic {
 		static := id.credentials.TypeStatic

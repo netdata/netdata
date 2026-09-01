@@ -86,6 +86,18 @@ func TestConfigSchemaModeBranches(t *testing.T) {
 	missing := validConfig(contract.ModeAWSReplication)
 	missing.ModeAWSReplication = nil
 	require.Error(t, schema.Validate(jsonValue(t, missing)))
+
+	nullCredentials := jsonValue(t, validConfig(contract.ModeLifecycle)).(map[string]any)
+	lifecycle := nullCredentials["mode_lifecycle"].(map[string]any)
+	source := lifecycle["source"].(map[string]any)
+	source["credentials"] = nil
+	require.NoError(t, schema.Validate(nullCredentials))
+
+	raw, err := json.Marshal(nullCredentials)
+	require.NoError(t, err)
+	var runtimeConfig Config
+	require.NoError(t, json.Unmarshal(raw, &runtimeConfig))
+	require.NoError(t, runtimeConfig.validate())
 }
 
 func TestConfigDefaultsUseHumanDurations(t *testing.T) {
