@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/fairqueue"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
@@ -40,7 +41,6 @@ type Options struct {
 	Generator         probe.Generator
 
 	RequestTimeout  time.Duration
-	UpdateEvery     time.Duration
 	WriteObjective  time.Duration
 	WriteTimeout    time.Duration
 	DeleteObjective time.Duration
@@ -62,9 +62,10 @@ type entry struct {
 }
 
 type state struct {
-	Entries      []entry               `json:"entries"`
-	ActiveKey    string                `json:"active_key,omitempty"`
-	LastTerminal *contract.ProbeResult `json:"last_terminal,omitempty"`
+	Entries       []entry               `json:"entries"`
+	ActiveKey     string                `json:"active_key,omitempty"`
+	CleanupCursor int                   `json:"cleanup_cursor,omitempty"`
+	LastTerminal  *contract.ProbeResult `json:"last_terminal,omitempty"`
 }
 
 type Engine struct {
@@ -77,7 +78,6 @@ type Engine struct {
 	generator         probe.Generator
 
 	requestTimeout  time.Duration
-	updateEvery     time.Duration
 	writeObjective  time.Duration
 	writeTimeout    time.Duration
 	deleteObjective time.Duration
@@ -103,10 +103,10 @@ func New(opts Options) (*Engine, error) {
 		return nil, errors.New("Ceph destination bucket is required")
 	case opts.Journal == nil:
 		return nil, errors.New("Ceph journal is required")
+	case opts.Generator.OwnerID != opts.Journal.OwnerID():
+		return nil, errors.New("Ceph generator and journal owners differ")
 	case opts.RequestTimeout <= 0:
 		return nil, errors.New("Ceph request timeout must be positive")
-	case opts.UpdateEvery <= 0:
-		return nil, errors.New("Ceph update interval must be positive")
 	case opts.WriteObjective <= 0 || opts.WriteTimeout <= 0 || opts.WriteObjective > opts.WriteTimeout:
 		return nil, errors.New("Ceph write objective must be positive and not exceed its timeout")
 	case opts.DeleteObjective <= 0 || opts.DeleteTimeout <= 0 || opts.DeleteObjective > opts.DeleteTimeout:
@@ -136,7 +136,6 @@ func New(opts Options) (*Engine, error) {
 		journal:           opts.Journal,
 		generator:         opts.Generator,
 		requestTimeout:    opts.RequestTimeout,
-		updateEvery:       opts.UpdateEvery,
 		writeObjective:    opts.WriteObjective,
 		writeTimeout:      opts.WriteTimeout,
 		deleteObjective:   opts.DeleteObjective,
@@ -165,12 +164,12 @@ func (e *Engine) Check(ctx context.Context) error {
 }
 
 func checkUnversioned(ctx context.Context, client s3client.Client, bucket, name string) error {
-	status, err := client.BucketVersioning(ctx, bucket)
+	versioning, err := client.BucketVersioning(ctx, bucket)
 	if err != nil {
 		return fmt.Errorf("check Ceph %s bucket versioning: %w", name, err)
 	}
-	if status != s3client.VersioningDisabled {
-		return fmt.Errorf("Ceph %s bucket must be unversioned, got %q", name, status)
+	if versioning.Status != s3client.VersioningDisabled {
+		return fmt.Errorf("Ceph %s bucket must be unversioned, got %q", name, versioning.Status)
 	}
 	return nil
 }
@@ -184,13 +183,9 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		result.Probe = failedProbe(contract.ReasonInternal)
 		return result
 	}
-	if !e.locked {
-		locked, err := e.journal.TryLock()
-		if err != nil || !locked {
-			result.Probe = failedProbe(contract.ReasonOwnership)
-			return result
-		}
-		e.locked = true
+	if err := e.takeover(); err != nil {
+		result.Probe = failedProbe(contract.ReasonOwnership)
+		return result
 	}
 
 	cleanup, err := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
@@ -456,12 +451,18 @@ func (e *Engine) cleanupBacklog(
 	operations *[]contract.OperationResult,
 ) (contract.CleanupResult, error) {
 	result := contract.CleanupResult{}
-	for index := 0; index < len(e.state.Entries) && result.Attempted < limit; {
-		owned := &e.state.Entries[index]
-		if owned.Key == e.state.ActiveKey {
-			index++
+	keys := make([]string, 0, len(e.state.Entries))
+	for _, owned := range e.state.Entries {
+		keys = append(keys, owned.Key)
+	}
+	selected, next := fairqueue.Select(keys, e.state.ActiveKey, e.state.CleanupCursor, limit)
+	e.state.CleanupCursor = next
+	for _, key := range selected {
+		index := e.entryIndex(key)
+		if index < 0 {
 			continue
 		}
+		owned := &e.state.Entries[index]
 		result.Attempted++
 		now := e.now().UTC()
 
@@ -496,7 +497,6 @@ func (e *Engine) cleanupBacklog(
 		)
 		if sourceDeleteErr != nil || destinationDeleteErr != nil {
 			result.Failed++
-			index++
 			continue
 		}
 
@@ -518,11 +518,9 @@ func (e *Engine) cleanupBacklog(
 		)
 		if sourceErr != nil || destinationErr != nil {
 			result.Failed++
-			index++
 			continue
 		}
 		if !sourceAbsent || !destinationAbsent || now.Before(owned.CleanupAfter) {
-			index++
 			continue
 		}
 
@@ -530,6 +528,16 @@ func (e *Engine) cleanupBacklog(
 		result.Removed++
 		if err := e.persist(); err != nil {
 			return result, err
+		}
+	}
+	if len(e.state.Entries) == 0 {
+		e.state.CleanupCursor = 0
+	} else {
+		e.state.CleanupCursor %= len(e.state.Entries)
+		if len(selected) > 0 {
+			if err := e.persist(); err != nil {
+				return result, err
+			}
 		}
 	}
 	result.Pending = len(e.state.Entries)
@@ -582,10 +590,45 @@ func (e *Engine) call(
 			Status:   status,
 			Reason:   reason,
 			Duration: duration,
-			Requests: 1,
+			Calls:    1,
+			Err:      err,
 		})
 	}
 	return duration, err
+}
+
+func (e *Engine) takeover() error {
+	if e.locked {
+		return nil
+	}
+	var authoritative state
+	locked, found, err := e.journal.TryTakeover(&authoritative)
+	if err != nil {
+		return fmt.Errorf("take over Ceph ownership: %w", err)
+	}
+	if !locked {
+		return errors.New("Ceph ownership is held by another runtime")
+	}
+	if found {
+		e.state = authoritative
+	} else {
+		e.state = state{}
+	}
+	if err := e.validateState(); err != nil {
+		e.journal.Unlock()
+		return fmt.Errorf("validate authoritative Ceph ownership: %w", err)
+	}
+	e.locked = true
+	return nil
+}
+
+func (e *Engine) entryIndex(key string) int {
+	for index := range e.state.Entries {
+		if e.state.Entries[index].Key == key {
+			return index
+		}
+	}
+	return -1
 }
 
 func (e *Engine) active() *entry {
@@ -644,6 +687,9 @@ func (e *Engine) persist() error {
 func (e *Engine) validateState() error {
 	if len(e.state.Entries) > e.queueCapacity {
 		return fmt.Errorf("journal has %d entries, capacity is %d", len(e.state.Entries), e.queueCapacity)
+	}
+	if e.state.CleanupCursor < 0 {
+		return errors.New("journal cleanup cursor is negative")
 	}
 	namespace := e.generator.Prefix + e.journal.OwnerID()[:16] + "/"
 	seen := make(map[string]struct{}, len(e.state.Entries))

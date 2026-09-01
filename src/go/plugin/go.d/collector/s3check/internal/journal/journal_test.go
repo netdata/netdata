@@ -122,6 +122,36 @@ func TestSameOwnerSerializesButDifferentOwnersDoNot(t *testing.T) {
 	other.Unlock()
 }
 
+func TestTryTakeoverLoadsStateAfterWaitingOwnerReleases(t *testing.T) {
+	root := t.TempDir()
+	incumbent, err := New(root, "agent", "job", testFingerprint)
+	require.NoError(t, err)
+	successor, err := New(root, "agent", "job", testFingerprint)
+	require.NoError(t, err)
+
+	locked, err := incumbent.TryLock()
+	require.NoError(t, err)
+	require.True(t, locked)
+	require.NoError(t, incumbent.Save(testState{Pending: []string{"old"}}))
+
+	var stale testState
+	found, err := successor.Load(&stale)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, []string{"old"}, stale.Pending)
+
+	require.NoError(t, incumbent.Save(testState{Pending: []string{"authoritative"}}))
+	incumbent.Unlock()
+
+	var authoritative testState
+	locked, found, err = successor.TryTakeover(&authoritative)
+	require.NoError(t, err)
+	require.True(t, locked)
+	require.True(t, found)
+	t.Cleanup(successor.Unlock)
+	assert.Equal(t, []string{"authoritative"}, authoritative.Pending)
+}
+
 func TestFingerprintMismatchRequiresOldConfiguration(t *testing.T) {
 	root := t.TempDir()
 	original, err := New(root, "agent", "job", testFingerprint)

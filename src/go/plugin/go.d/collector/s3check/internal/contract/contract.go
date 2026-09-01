@@ -70,7 +70,8 @@ type OperationResult struct {
 	Status   Status
 	Reason   Reason
 	Duration time.Duration
-	Requests int64
+	Calls    int64
+	Err      error
 }
 
 type ObjectiveResult struct {

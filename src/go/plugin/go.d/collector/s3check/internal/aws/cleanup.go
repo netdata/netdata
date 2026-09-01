@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/fairqueue"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
 )
@@ -18,16 +19,13 @@ func (e *Engine) cleanupBacklog(
 	operations *[]contract.OperationResult,
 ) contract.CleanupResult {
 	result := contract.CleanupResult{}
-	keys := make([]string, 0, limit)
+	keys := make([]string, 0, len(e.state.Entries))
 	for _, owned := range e.state.Entries {
-		if owned.Key != e.state.ActiveKey {
-			keys = append(keys, owned.Key)
-			if len(keys) == limit {
-				break
-			}
-		}
+		keys = append(keys, owned.Key)
 	}
-	for _, key := range keys {
+	selected, next := fairqueue.Select(keys, e.state.ActiveKey, e.state.CleanupCursor, limit)
+	e.state.CleanupCursor = next
+	for _, key := range selected {
 		owned := e.find(key)
 		if owned == nil {
 			continue
@@ -40,6 +38,14 @@ func (e *Engine) cleanupBacklog(
 		}
 		if removed {
 			result.Removed++
+		}
+	}
+	if len(e.state.Entries) == 0 {
+		e.state.CleanupCursor = 0
+	} else {
+		e.state.CleanupCursor %= len(e.state.Entries)
+		if len(selected) > 0 && e.persist() != nil {
+			result.Failed++
 		}
 	}
 	result.Pending = len(e.state.Entries)
@@ -65,14 +71,17 @@ func (e *Engine) advanceRetired(
 				return e.find(key) == nil, nil
 			}
 		case phaseWaitObject:
-			proceed, _ := e.observeObject(ctx, owned, operations, false)
+			proceed, _, err := e.observeObject(ctx, owned, operations, false)
+			if err != nil {
+				return false, err
+			}
 			if !proceed {
 				return false, nil
 			}
 		case phaseDeleteIntent:
-			if owned.DeleteAt == nil {
+			if owned.DeleteAttemptAt == nil {
 				now := e.now().UTC()
-				owned.DeleteAt = &now
+				owned.DeleteAttemptAt = &now
 				if err := e.persist(); err != nil {
 					return false, err
 				}
@@ -96,6 +105,7 @@ func (e *Engine) advanceRetired(
 				return false, nil
 			}
 			owned.SourceMarkerID = deleted.VersionID
+			owned.MeasureDelete = false
 			owned.Phase = phaseWaitMarker
 			if err := e.persist(); err != nil {
 				return false, err
@@ -106,7 +116,10 @@ func (e *Engine) advanceRetired(
 				return false, err
 			}
 		case phaseWaitMarker:
-			proceed, _ := e.observeMarker(ctx, owned, operations, false)
+			proceed, _, err := e.observeMarker(ctx, owned, operations, false)
+			if err != nil {
+				return false, err
+			}
 			if !proceed {
 				return false, nil
 			}
@@ -202,23 +215,23 @@ func (e *Engine) listExact(
 				continue
 			}
 			if version.VersionID == "" {
-				return nil, errors.New("AWS exact version has no ID")
+				return nil, ownershipError("exact version has no ID")
 			}
 			versions = append(versions, version)
 			if len(versions) > maxListedVersions {
-				return nil, fmt.Errorf("AWS exact-key version count exceeds %d", maxListedVersions)
+				return nil, fmt.Errorf("%w: exact-key version count exceeds %d", errOwnershipInvariant, maxListedVersions)
 			}
 		}
 		if !page.Truncated {
 			return versions, nil
 		}
 		if page.NextKeyMarker == "" && page.NextVersionIDMarker == "" {
-			return nil, errors.New("AWS truncated version page has no continuation markers")
+			return nil, ownershipError("truncated version page has no continuation markers")
 		}
 		keyMarker = page.NextKeyMarker
 		versionMarker = page.NextVersionIDMarker
 	}
-	return nil, fmt.Errorf("AWS exact-key version listing exceeds %d pages", maxListPages)
+	return nil, fmt.Errorf("%w: exact-key version listing exceeds %d pages", errOwnershipInvariant, maxListPages)
 }
 
 func (e *Engine) find(key string) *entry {

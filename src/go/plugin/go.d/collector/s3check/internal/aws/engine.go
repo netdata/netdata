@@ -25,6 +25,19 @@ const (
 	listPageSize         = 16
 )
 
+var errOwnershipInvariant = errors.New("AWS ownership invariant failed")
+
+func ownershipError(message string) error {
+	return fmt.Errorf("%w: %s", errOwnershipInvariant, message)
+}
+
+func reasonForError(err error) contract.Reason {
+	if errors.Is(err, errOwnershipInvariant) {
+		return contract.ReasonOwnership
+	}
+	return contract.ReasonRequest
+}
+
 type phase string
 
 const (
@@ -71,10 +84,12 @@ type entry struct {
 	SourceMarkerID      string `json:"source_marker_id,omitempty"`
 	DestinationMarkerID string `json:"destination_marker_id,omitempty"`
 
-	PutAt     *time.Time `json:"put_at,omitempty"`
-	VisibleAt *time.Time `json:"visible_at,omitempty"`
-	DeleteAt  *time.Time `json:"delete_at,omitempty"`
-	MarkerAt  *time.Time `json:"marker_at,omitempty"`
+	PutAt           *time.Time `json:"put_at,omitempty"`
+	VisibleAt       *time.Time `json:"visible_at,omitempty"`
+	DeleteAt        *time.Time `json:"delete_at,omitempty"`
+	MarkerAt        *time.Time `json:"marker_at,omitempty"`
+	DeleteAttemptAt *time.Time `json:"delete_attempt_at,omitempty"`
+	PutAbsentSince  *time.Time `json:"put_absent_since,omitempty"`
 
 	MeasureWrite  bool `json:"measure_write,omitempty"`
 	MeasureDelete bool `json:"measure_delete,omitempty"`
@@ -83,9 +98,10 @@ type entry struct {
 }
 
 type state struct {
-	Entries      []entry               `json:"entries"`
-	ActiveKey    string                `json:"active_key,omitempty"`
-	LastTerminal *contract.ProbeResult `json:"last_terminal,omitempty"`
+	Entries       []entry               `json:"entries"`
+	ActiveKey     string                `json:"active_key,omitempty"`
+	CleanupCursor int                   `json:"cleanup_cursor,omitempty"`
+	LastTerminal  *contract.ProbeResult `json:"last_terminal,omitempty"`
 }
 
 type Engine struct {
@@ -99,6 +115,7 @@ type Engine struct {
 	generator         probe.Generator
 
 	requestTimeout  time.Duration
+	updateEvery     time.Duration
 	writeObjective  time.Duration
 	writeTimeout    time.Duration
 	deleteObjective time.Duration
@@ -128,6 +145,8 @@ func New(opts Options) (*Engine, error) {
 		return nil, errors.New("AWS generator and configured probe prefixes differ")
 	case opts.Journal == nil:
 		return nil, errors.New("AWS journal is required")
+	case opts.Generator.OwnerID != opts.Journal.OwnerID():
+		return nil, errors.New("AWS generator and journal owners differ")
 	case opts.RequestTimeout <= 0:
 		return nil, errors.New("AWS request timeout must be positive")
 	case opts.UpdateEvery <= 0:
@@ -160,7 +179,7 @@ func New(opts Options) (*Engine, error) {
 		source: opts.Source, destination: opts.Destination,
 		sourceBucket: opts.SourceBucket, destinationBucket: opts.DestinationBucket,
 		probePrefix: opts.ProbePrefix, journal: opts.Journal, generator: opts.Generator,
-		requestTimeout: opts.RequestTimeout,
+		requestTimeout: opts.RequestTimeout, updateEvery: opts.UpdateEvery,
 		writeObjective: opts.WriteObjective, writeTimeout: opts.WriteTimeout,
 		deleteObjective: opts.DeleteObjective, deleteTimeout: opts.DeleteTimeout,
 		queueCapacity: opts.QueueCapacity, cleanupBatch: opts.CleanupBatch, now: opts.Now,
@@ -205,12 +224,15 @@ func (e *Engine) checkVersioning(
 	client s3client.Client,
 	bucket, endpoint string,
 ) error {
-	status, err := client.BucketVersioning(ctx, bucket)
+	versioning, err := client.BucketVersioning(ctx, bucket)
 	if err != nil {
 		return fmt.Errorf("check AWS %s bucket versioning: %w", endpoint, err)
 	}
-	if status != s3client.VersioningEnabled {
-		return fmt.Errorf("AWS %s bucket versioning must be enabled, got %q", endpoint, status)
+	if versioning.Status != s3client.VersioningEnabled {
+		return fmt.Errorf("AWS %s bucket versioning must be enabled, got %q", endpoint, versioning.Status)
+	}
+	if versioning.MFADelete {
+		return fmt.Errorf("AWS %s bucket must not have MFA Delete enabled", endpoint)
 	}
 	return nil
 }
@@ -223,7 +245,7 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		result.Probe = failedProbe(contract.ReasonInternal)
 		return result
 	}
-	if !e.acquire() {
+	if err := e.takeover(); err != nil {
 		result.Probe = failedProbe(contract.ReasonOwnership)
 		return result
 	}
@@ -259,16 +281,29 @@ func (e *Engine) Cleanup(ctx context.Context) {
 	e.destination.CloseIdleConnections()
 }
 
-func (e *Engine) acquire() bool {
+func (e *Engine) takeover() error {
 	if e.locked {
-		return true
+		return nil
 	}
-	locked, err := e.journal.TryLock()
-	if err != nil || !locked {
-		return false
+	var authoritative state
+	locked, found, err := e.journal.TryTakeover(&authoritative)
+	if err != nil {
+		return fmt.Errorf("take over AWS ownership: %w", err)
+	}
+	if !locked {
+		return errors.New("AWS ownership is held by another runtime")
+	}
+	if found {
+		e.state = authoritative
+	} else {
+		e.state = state{}
+	}
+	if err := e.validateState(); err != nil {
+		e.journal.Unlock()
+		return fmt.Errorf("validate authoritative AWS ownership: %w", err)
 	}
 	e.locked = true
-	return true
+	return nil
 }
 
 func (e *Engine) persist() error {
@@ -318,6 +353,9 @@ func (e *Engine) validateState() error {
 	if len(e.state.Entries) > e.queueCapacity {
 		return fmt.Errorf("journal has %d entries, capacity is %d", len(e.state.Entries), e.queueCapacity)
 	}
+	if e.state.CleanupCursor < 0 {
+		return errors.New("journal cleanup cursor is negative")
+	}
 	namespace := e.generator.Prefix + e.journal.OwnerID()[:16] + "/"
 	seen := make(map[string]struct{}, len(e.state.Entries))
 	activeFound := e.state.ActiveKey == ""
@@ -332,6 +370,9 @@ func (e *Engine) validateState() error {
 		case !validPhase(owned.Phase):
 			return fmt.Errorf("journal entry has invalid phase %q", owned.Phase)
 		}
+		if err := validateEntryPhase(owned); err != nil {
+			return fmt.Errorf("journal entry %q: %w", owned.Key, err)
+		}
 		if _, ok := seen[owned.Key]; ok {
 			return errors.New("journal contains a duplicate key")
 		}
@@ -342,6 +383,72 @@ func (e *Engine) validateState() error {
 	}
 	if !activeFound {
 		return errors.New("active journal key is missing")
+	}
+	return nil
+}
+
+func validateEntryPhase(owned entry) error {
+	if owned.MeasureWrite && owned.PutAt == nil {
+		return errors.New("measured write has no confirmed PUT time")
+	}
+	if owned.MeasureDelete && owned.DeleteAt == nil {
+		return errors.New("measured delete has no confirmed marker time")
+	}
+	requireObject := func() error {
+		if owned.SourceObjectID == "" || owned.SourceObjectETag == "" {
+			return errors.New("source object identity is incomplete")
+		}
+		return nil
+	}
+	requireReplicatedObject := func() error {
+		if err := requireObject(); err != nil {
+			return err
+		}
+		if owned.DestinationObjectID == "" || !owned.ObjectSeen || owned.VisibleAt == nil {
+			return errors.New("destination object identity is incomplete")
+		}
+		return nil
+	}
+
+	switch owned.Phase {
+	case phasePutIntent, phaseReconcilePut:
+		if owned.SourceObjectID != "" || owned.SourceObjectETag != "" || owned.ObjectSeen || owned.MarkerSeen {
+			return errors.New("PUT intent contains later-phase ownership")
+		}
+	case phaseWaitObject:
+		return requireObject()
+	case phaseDeleteIntent:
+		if err := requireReplicatedObject(); err != nil {
+			return err
+		}
+		if owned.SourceMarkerID != "" {
+			return errors.New("delete intent already contains a source marker")
+		}
+	case phaseReconcileDelete:
+		if err := requireReplicatedObject(); err != nil {
+			return err
+		}
+		if owned.DeleteAttemptAt == nil {
+			return errors.New("delete reconciliation has no attempt time")
+		}
+	case phaseWaitMarker:
+		if err := requireReplicatedObject(); err != nil {
+			return err
+		}
+		if owned.SourceMarkerID == "" || owned.DeleteAttemptAt == nil {
+			return errors.New("source marker identity is incomplete")
+		}
+	case phaseExactCleanup:
+		if err := requireReplicatedObject(); err != nil {
+			return err
+		}
+		if owned.SourceMarkerID == "" || owned.DestinationMarkerID == "" ||
+			!owned.MarkerSeen || owned.MarkerAt == nil {
+			return errors.New("replicated marker identity is incomplete")
+		}
+	case phaseBlocked:
+		// Blocked state is intentionally non-mutating and retains whatever proof
+		// was available when an invariant failed.
 	}
 	return nil
 }

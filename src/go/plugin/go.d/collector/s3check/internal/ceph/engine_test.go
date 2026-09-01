@@ -5,6 +5,7 @@ package ceph
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -31,7 +32,6 @@ func TestCheckReadsBothUnversionedBucketsWithoutMutation(t *testing.T) {
 		Journal:           j,
 		Generator:         newCephGenerator(j.OwnerID()),
 		RequestTimeout:    time.Second,
-		UpdateEvery:       time.Minute,
 		WriteObjective:    10 * time.Minute,
 		WriteTimeout:      20 * time.Minute,
 		DeleteObjective:   5 * time.Minute,
@@ -58,7 +58,6 @@ func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing
 		Journal:           j,
 		Generator:         newCephGenerator(j.OwnerID()),
 		RequestTimeout:    time.Second,
-		UpdateEvery:       time.Minute,
 		WriteObjective:    15 * time.Second,
 		WriteTimeout:      time.Minute,
 		DeleteObjective:   10 * time.Second,
@@ -109,7 +108,6 @@ func TestWriteTimeoutMovesProbeToCleanupWithoutBlockingNewActiveSlot(t *testing.
 		Journal:           j,
 		Generator:         newCephGenerator(j.OwnerID()),
 		RequestTimeout:    time.Second,
-		UpdateEvery:       time.Minute,
 		WriteObjective:    time.Minute,
 		WriteTimeout:      2 * time.Minute,
 		DeleteObjective:   time.Minute,
@@ -191,8 +189,8 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 	model := &cephModel{source: make(map[string][]byte), destination: make(map[string][]byte)}
 	source := &testutil.S3{}
 	destination := &testutil.S3{}
-	versioning := func(context.Context, string) (s3client.VersioningStatus, error) {
-		return s3client.VersioningDisabled, nil
+	versioning := func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
 	}
 	source.BucketVersioningFunc = versioning
 	destination.BucketVersioningFunc = versioning
@@ -200,7 +198,10 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		return nil, s3client.ErrReplicationConfigAbsent
 	}
 	destination.BucketReplicationFunc = source.BucketReplicationFunc
-	source.PutFunc = func(_ context.Context, _ string, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
+	source.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
+		if bucket != "source" {
+			return s3client.PutResult{}, fmt.Errorf("unexpected source bucket %q", bucket)
+		}
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		model.source[key] = append([]byte(nil), payload...)
@@ -209,7 +210,10 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 	destination.PutFunc = func(context.Context, string, string, []byte, s3client.PutOptions) (s3client.PutResult, error) {
 		panic("destination PUT is not part of the Ceph probe")
 	}
-	source.GetFunc = func(_ context.Context, _ string, key, _ string, _ int64) (s3client.GetResult, error) {
+	source.GetFunc = func(_ context.Context, bucket, key, _ string, _ int64) (s3client.GetResult, error) {
+		if bucket != "source" {
+			return s3client.GetResult{}, fmt.Errorf("unexpected source bucket %q", bucket)
+		}
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		payload, ok := model.source[key]
@@ -218,7 +222,10 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		}
 		return s3client.GetResult{Payload: append([]byte(nil), payload...)}, nil
 	}
-	destination.GetFunc = func(_ context.Context, _ string, key, _ string, _ int64) (s3client.GetResult, error) {
+	destination.GetFunc = func(_ context.Context, bucket, key, _ string, _ int64) (s3client.GetResult, error) {
+		if bucket != "different-destination" && bucket != "destination" {
+			return s3client.GetResult{}, fmt.Errorf("unexpected destination bucket %q", bucket)
+		}
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		model.lastDestinationReadKey = key
@@ -228,13 +235,19 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		}
 		return s3client.GetResult{Payload: append([]byte(nil), payload...)}, nil
 	}
-	source.DeleteFunc = func(_ context.Context, _ string, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
+	source.DeleteFunc = func(_ context.Context, bucket, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
+		if bucket != "source" {
+			return s3client.DeleteResult{}, fmt.Errorf("unexpected source bucket %q", bucket)
+		}
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		delete(model.source, key)
 		return s3client.DeleteResult{}, nil
 	}
-	destination.DeleteFunc = func(_ context.Context, _ string, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
+	destination.DeleteFunc = func(_ context.Context, bucket, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
+		if bucket != "different-destination" && bucket != "destination" {
+			return s3client.DeleteResult{}, fmt.Errorf("unexpected destination bucket %q", bucket)
+		}
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		delete(model.destination, key)

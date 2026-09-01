@@ -161,6 +161,22 @@ func (j *Journal) TryLock() (bool, error) {
 	return locked, nil
 }
 
+// TryTakeover acquires the owner lock and then loads the authoritative state.
+// A caller that waited for an incumbent must not continue with a state snapshot
+// loaded before the lock was acquired.
+func (j *Journal) TryTakeover(dst any) (locked, found bool, err error) {
+	locked, err = j.TryLock()
+	if err != nil || !locked {
+		return locked, false, err
+	}
+	found, err = j.Load(dst)
+	if err != nil {
+		j.Unlock()
+		return false, false, err
+	}
+	return true, found, nil
+}
+
 func (j *Journal) Unlock() {
 	j.mu.Lock()
 	defer j.mu.Unlock()

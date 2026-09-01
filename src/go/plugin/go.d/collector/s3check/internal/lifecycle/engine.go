@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/fairqueue"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
@@ -45,8 +46,9 @@ type entry struct {
 }
 
 type state struct {
-	Entries      []entry               `json:"entries"`
-	LastTerminal *contract.ProbeResult `json:"last_terminal,omitempty"`
+	Entries       []entry               `json:"entries"`
+	CleanupCursor int                   `json:"cleanup_cursor,omitempty"`
+	LastTerminal  *contract.ProbeResult `json:"last_terminal,omitempty"`
 }
 
 type Engine struct {
@@ -75,6 +77,9 @@ func New(opts Options) (*Engine, error) {
 	}
 	if opts.Journal == nil {
 		return nil, errors.New("lifecycle journal is required")
+	}
+	if opts.Generator.OwnerID != opts.Journal.OwnerID() {
+		return nil, errors.New("lifecycle generator and journal owners differ")
 	}
 	if opts.RequestTimeout <= 0 {
 		return nil, errors.New("lifecycle request timeout must be positive")
@@ -122,12 +127,12 @@ func New(opts Options) (*Engine, error) {
 }
 
 func (e *Engine) Check(ctx context.Context) error {
-	status, err := e.client.BucketVersioning(ctx, e.bucket)
+	versioning, err := e.client.BucketVersioning(ctx, e.bucket)
 	if err != nil {
 		return fmt.Errorf("check lifecycle bucket versioning: %w", err)
 	}
-	if status != s3client.VersioningDisabled {
-		return fmt.Errorf("lifecycle bucket must be unversioned, got %q", status)
+	if versioning.Status != s3client.VersioningDisabled {
+		return fmt.Errorf("lifecycle bucket must be unversioned, got %q", versioning.Status)
 	}
 	return nil
 }
@@ -141,13 +146,9 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		result.Probe = failedProbe(contract.ReasonInternal)
 		return result
 	}
-	if !e.locked {
-		locked, err := e.journal.TryLock()
-		if err != nil || !locked {
-			result.Probe = failedProbe(contract.ReasonOwnership)
-			return result
-		}
-		e.locked = true
+	if err := e.takeover(); err != nil {
+		result.Probe = failedProbe(contract.ReasonOwnership)
+		return result
 	}
 
 	cleanup, cleanupErr := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
@@ -294,7 +295,17 @@ func (e *Engine) cleanupBacklog(
 	operations *[]contract.OperationResult,
 ) (contract.CleanupResult, error) {
 	result := contract.CleanupResult{}
-	for index := 0; index < len(e.state.Entries) && result.Attempted < limit; {
+	keys := make([]string, 0, len(e.state.Entries))
+	for _, owned := range e.state.Entries {
+		keys = append(keys, owned.Key)
+	}
+	selected, next := fairqueue.Select(keys, "", e.state.CleanupCursor, limit)
+	e.state.CleanupCursor = next
+	for _, key := range selected {
+		index := e.entryIndex(key)
+		if index < 0 {
+			continue
+		}
 		owned := &e.state.Entries[index]
 		result.Attempted++
 
@@ -304,7 +315,6 @@ func (e *Engine) cleanupBacklog(
 		})
 		if deleteErr != nil {
 			result.Failed++
-			index++
 			continue
 		}
 
@@ -319,7 +329,6 @@ func (e *Engine) cleanupBacklog(
 		})
 		if getErr != nil {
 			result.Failed++
-			index++
 			continue
 		}
 		if !absent {
@@ -327,7 +336,6 @@ func (e *Engine) cleanupBacklog(
 			if err := e.persist(); err != nil {
 				return result, err
 			}
-			index++
 			continue
 		}
 		if !owned.PutConfirmed {
@@ -337,11 +345,9 @@ func (e *Engine) cleanupBacklog(
 				if err := e.persist(); err != nil {
 					return result, err
 				}
-				index++
 				continue
 			}
 			if now.Sub(*owned.AbsentObservedAt) < e.updateEvery {
-				index++
 				continue
 			}
 		}
@@ -350,6 +356,16 @@ func (e *Engine) cleanupBacklog(
 		result.Removed++
 		if err := e.persist(); err != nil {
 			return result, err
+		}
+	}
+	if len(e.state.Entries) == 0 {
+		e.state.CleanupCursor = 0
+	} else {
+		e.state.CleanupCursor %= len(e.state.Entries)
+		if len(selected) > 0 {
+			if err := e.persist(); err != nil {
+				return result, err
+			}
 		}
 	}
 	result.Pending = len(e.state.Entries)
@@ -381,10 +397,45 @@ func (e *Engine) call(
 			Status:   status,
 			Reason:   reason,
 			Duration: duration,
-			Requests: 1,
+			Calls:    1,
+			Err:      err,
 		})
 	}
 	return duration, err
+}
+
+func (e *Engine) takeover() error {
+	if e.locked {
+		return nil
+	}
+	var authoritative state
+	locked, found, err := e.journal.TryTakeover(&authoritative)
+	if err != nil {
+		return fmt.Errorf("take over lifecycle ownership: %w", err)
+	}
+	if !locked {
+		return errors.New("lifecycle ownership is held by another runtime")
+	}
+	if found {
+		e.state = authoritative
+	} else {
+		e.state = state{}
+	}
+	if err := e.validateState(); err != nil {
+		e.journal.Unlock()
+		return fmt.Errorf("validate authoritative lifecycle ownership: %w", err)
+	}
+	e.locked = true
+	return nil
+}
+
+func (e *Engine) entryIndex(key string) int {
+	for index := range e.state.Entries {
+		if e.state.Entries[index].Key == key {
+			return index
+		}
+	}
+	return -1
 }
 
 func (e *Engine) finish(result *contract.ProbeResult) *contract.ProbeResult {
@@ -402,6 +453,9 @@ func (e *Engine) persist() error {
 func (e *Engine) validateState() error {
 	if len(e.state.Entries) > e.queueCapacity {
 		return fmt.Errorf("journal has %d entries, capacity is %d", len(e.state.Entries), e.queueCapacity)
+	}
+	if e.state.CleanupCursor < 0 {
+		return errors.New("journal cleanup cursor is negative")
 	}
 	namespace := e.generator.Prefix + e.journal.OwnerID()[:16] + "/"
 	seen := make(map[string]struct{}, len(e.state.Entries))

@@ -49,13 +49,15 @@ func New(ctx context.Context, cfg Config) (Client, error) {
 	}
 	awsConfig.HTTPClient = httpClient
 
-	client := s3.NewFromConfig(awsConfig, func(options *s3.Options) {
-		if endpoint := strings.TrimSpace(cfg.Endpoint); endpoint != "" {
-			options.BaseEndpoint = aws.String(endpoint)
-		}
-		options.UsePathStyle = cfg.PathStyle
-	})
+	client := s3.NewFromConfig(awsConfig, func(options *s3.Options) { configureS3Options(options, cfg) })
 	return &awsClient{client: client, httpClient: httpClient}, nil
+}
+
+func configureS3Options(options *s3.Options, cfg Config) {
+	if endpoint := strings.TrimSpace(cfg.Endpoint); endpoint != "" {
+		options.BaseEndpoint = aws.String(endpoint)
+	}
+	options.UsePathStyle = cfg.PathStyle
 }
 
 type awsClient struct {
@@ -63,12 +65,15 @@ type awsClient struct {
 	httpClient *http.Client
 }
 
-func (c *awsClient) BucketVersioning(ctx context.Context, bucket string) (VersioningStatus, error) {
+func (c *awsClient) BucketVersioning(ctx context.Context, bucket string) (BucketVersioningResult, error) {
 	out, err := c.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: aws.String(bucket)})
 	if err != nil {
-		return "", err
+		return BucketVersioningResult{}, err
 	}
-	return VersioningStatus(out.Status), nil
+	return BucketVersioningResult{
+		Status:    VersioningStatus(out.Status),
+		MFADelete: out.MFADelete == types.MFADeleteStatusEnabled,
+	}, nil
 }
 
 func (c *awsClient) BucketReplication(ctx context.Context, bucket string) ([]ReplicationRule, error) {

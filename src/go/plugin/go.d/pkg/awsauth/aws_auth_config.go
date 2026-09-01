@@ -30,8 +30,7 @@ type StaticCredentialConfig struct {
 }
 
 // CredentialConfig describes only how the base AWS credentials are acquired.
-// Which identity is monitored, including optional role assumption, is a separate
-// Identity compiled from a CloudWatch target.
+// The caller compiles it with optional role assumption into an Identity.
 type CredentialConfig struct {
 	Type       string                  `yaml:"type" json:"type"`
 	TypeStatic *StaticCredentialConfig `yaml:"type_static,omitempty" json:"type_static,omitempty"`

@@ -156,6 +156,47 @@ func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestSameOwnerTakeoverReloadsIncumbentOwnership(t *testing.T) {
+	root := t.TempDir()
+	firstJournal := newTestJournal(t, root)
+	secondJournal := newTestJournal(t, root)
+	client := newLifecycleClient()
+	model := clientModel(client)
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		model.put(bucket, key, payload)
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	client.DeleteFunc = func(context.Context, string, string, s3client.DeleteOptions) (s3client.DeleteResult, error) {
+		return s3client.DeleteResult{}, errors.New("cleanup unavailable")
+	}
+	newEngine := func(j *journal.Journal) *Engine {
+		engine, err := New(Options{
+			Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
+			RequestTimeout: time.Second, UpdateEvery: time.Minute, QueueCapacity: 1, CleanupBatch: 1,
+		})
+		require.NoError(t, err)
+		return engine
+	}
+	incumbent := newEngine(firstJournal)
+	successor := newEngine(secondJournal)
+
+	first := incumbent.Collect(context.Background())
+	require.NotNil(t, first.Probe)
+	blocked := successor.Collect(context.Background())
+	require.NotNil(t, blocked.Probe)
+	assert.Equal(t, contract.ReasonOwnership, blocked.Probe.Reason)
+	assert.Equal(t, 1, client.Count("put"))
+
+	incumbent.Cleanup(context.Background())
+	takenOver := successor.Collect(context.Background())
+	assert.Equal(t, 1, takenOver.Cleanup.Pending)
+	assert.True(t, takenOver.Cleanup.Backpressure)
+	assert.Equal(t, 1, client.Count("put"), "successor must not overwrite incumbent state with its stale constructor snapshot")
+	successor.Cleanup(context.Background())
+}
+
 func newTestJournal(t *testing.T, root string) *journal.Journal {
 	t.Helper()
 	j, err := journal.New(
@@ -230,8 +271,8 @@ func (m *objectModel) keys(bucket, prefix string) []string {
 func newLifecycleClient() *testutil.S3 {
 	client := &testutil.S3{}
 	model := clientModel(client)
-	client.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
-		return s3client.VersioningDisabled, nil
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
 	}
 	client.BucketReplicationFunc = func(context.Context, string) ([]s3client.ReplicationRule, error) {
 		return nil, s3client.ErrReplicationConfigAbsent

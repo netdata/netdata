@@ -37,13 +37,18 @@ func TestCheckValidatesVersioningAndApplicableDeleteMarkerRuleWithoutMutation(t 
 func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
 	tests := map[string]func(*testutil.S3, *testutil.S3){
 		"source versioning disabled": func(source, _ *testutil.S3) {
-			source.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
-				return s3client.VersioningDisabled, nil
+			source.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+				return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
 			}
 		},
 		"destination versioning suspended": func(_, destination *testutil.S3) {
-			destination.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
-				return s3client.VersioningSuspended, nil
+			destination.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+				return s3client.BucketVersioningResult{Status: s3client.VersioningSuspended}, nil
+			}
+		},
+		"MFA Delete enabled": func(source, _ *testutil.S3) {
+			source.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+				return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled, MFADelete: true}, nil
 			}
 		},
 		"wrong destination": func(source, _ *testutil.S3) {
@@ -123,7 +128,9 @@ func TestProbeOwnsIndependentVersionsAndCleansExactIdentities(t *testing.T) {
 func TestAmbiguousPutReconcilesExactSourceVersion(t *testing.T) {
 	source, destination, model := newAWSClients()
 	model.failPutAfterMutation = true
-	engine := newAWSEngine(t, source, destination, nil)
+	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
+		opts.QueueCapacity = 1
+	})
 
 	failed := engine.Collect(context.Background())
 	require.NotNil(t, failed.Probe)
@@ -132,9 +139,9 @@ func TestAmbiguousPutReconcilesExactSourceVersion(t *testing.T) {
 	key, sourceObjectID := model.onlySourceObject(t)
 
 	waiting := engine.Collect(context.Background())
-	require.NotNil(t, waiting.Probe)
-	assert.Equal(t, contract.StatusWaiting, waiting.Probe.Status)
-	assert.False(t, waiting.Probe.WriteVisibility.Performed)
+	assert.Nil(t, waiting.Probe)
+	assert.Equal(t, 1, waiting.Cleanup.Pending)
+	assert.Equal(t, 1, source.Count("put"))
 	assert.GreaterOrEqual(t, source.Count("list_versions"), 1)
 
 	model.replicateObject(t, key, sourceObjectID)
@@ -205,17 +212,117 @@ func TestReconciliationIsBoundedAndRetainsStateOnPaginationOverflow(t *testing.T
 			Truncated: true, NextKeyMarker: "next", NextVersionIDMarker: "next-version",
 		}, nil
 	}
-	engine := newAWSEngine(t, source, destination, nil)
+	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
+		opts.QueueCapacity = 1
+	})
 
 	engine.Collect(context.Background())
 	result := engine.Collect(context.Background())
-	require.NotNil(t, result.Probe)
-	assert.Equal(t, contract.StatusFailed, result.Probe.Status)
-	assert.Equal(t, contract.ReasonOwnership, result.Probe.Reason)
+	assert.Nil(t, result.Probe)
+	assert.Equal(t, 1, result.Cleanup.Failed)
 	assert.LessOrEqual(t, source.Count("list_versions"), maxListPages)
 	assert.Equal(t, 1, result.Cleanup.Pending)
 	engine.Cleanup(context.Background())
 }
+
+func TestRestartRetainsPutIntentUntilCrossCycleAbsenceProof(t *testing.T) {
+	source, destination, _ := newAWSClients()
+	now := time.Unix(100, 0)
+	engine := newAWSEngineWithOptions(t, source, destination, &now, func(opts *Options) {
+		opts.QueueCapacity = 1
+		opts.UpdateEvery = time.Minute
+		opts.WriteTimeout = 2 * time.Minute
+	})
+	object, err := engine.generator.Next()
+	require.NoError(t, err)
+	locked, err := engine.journal.TryLock()
+	require.NoError(t, err)
+	require.True(t, locked)
+	require.NoError(t, engine.journal.Save(state{
+		Entries: []entry{{
+			Key: object.Key, Digest: object.Digest, CreatedAt: now, Phase: phasePutIntent,
+		}},
+		ActiveKey: object.Key,
+	}))
+	engine.journal.Unlock()
+
+	crashRecovered := engine.Collect(context.Background())
+	require.NotNil(t, crashRecovered.Probe)
+	assert.Equal(t, contract.StatusFailed, crashRecovered.Probe.Status)
+	assert.Equal(t, 1, crashRecovered.Cleanup.Pending)
+	assert.Zero(t, source.Count("put"))
+
+	firstAbsence := engine.Collect(context.Background())
+	assert.Equal(t, 1, firstAbsence.Cleanup.Pending)
+	assert.Zero(t, source.Count("put"))
+
+	now = now.Add(2*time.Minute + time.Second)
+	cleared := engine.Collect(context.Background())
+	assert.Equal(t, 1, source.Count("put"), "new mutation starts only after delayed source/destination absence proof")
+	assert.NotNil(t, cleared.Probe)
+	engine.Cleanup(context.Background())
+}
+
+func TestDeleteLagStartsAfterSuccessfulMarkerCreation(t *testing.T) {
+	source, destination, model := newAWSClients()
+	now := time.Unix(100, 0)
+	originalDelete := source.DeleteFunc
+	source.DeleteFunc = func(
+		ctx context.Context, bucket, key string, opts s3client.DeleteOptions,
+	) (s3client.DeleteResult, error) {
+		if opts.VersionID == "" {
+			now = now.Add(8 * time.Second)
+		}
+		return originalDelete(ctx, bucket, key, opts)
+	}
+	engine := newAWSEngine(t, source, destination, &now)
+
+	engine.Collect(context.Background())
+	key, sourceObjectID := model.onlySourceObject(t)
+	model.replicateObject(t, key, sourceObjectID)
+	engine.Collect(context.Background())
+	sourceMarkerID := model.onlySourceMarker(t, key)
+
+	now = now.Add(5 * time.Second)
+	model.replicateMarker(t, key, sourceMarkerID)
+	result := engine.Collect(context.Background())
+	require.NotNil(t, result.Probe)
+	assert.Equal(t, 5*time.Second, result.Probe.DeleteVisibility.Lag)
+	engine.Cleanup(context.Background())
+}
+
+func TestRetiredReconciliationReportsProviderFailureAndDiagnostic(t *testing.T) {
+	source, destination, model := newAWSClients()
+	model.failPutAfterMutation = true
+	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
+		opts.QueueCapacity = 1
+	})
+
+	engine.Collect(context.Background())
+	wantErr := errors.New("list unavailable")
+	source.ListVersionsFunc = func(context.Context, string, string, string, string, int32) (s3client.VersionPage, error) {
+		return s3client.VersionPage{}, wantErr
+	}
+	result := engine.Collect(context.Background())
+
+	assert.Equal(t, 1, result.Cleanup.Failed)
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	require.NotEmpty(t, result.Operations)
+	assert.ErrorIs(t, result.Operations[0].Err, wantErr)
+	assert.Equal(t, contract.ReasonRequest, result.Operations[0].Reason)
+	engine.Cleanup(context.Background())
+}
+
+func TestValidateEntryPhaseRejectsMutationWithoutRequiredProof(t *testing.T) {
+	err := validateEntryPhase(entry{
+		Phase:          phaseDeleteIntent,
+		SourceObjectID: "source-version", DestinationObjectID: "destination-version",
+		ObjectSeen: true, VisibleAt: ptrTime(time.Unix(100, 0)),
+	})
+	assert.ErrorContains(t, err, "source object identity")
+}
+
+func ptrTime(value time.Time) *time.Time { return &value }
 
 func newAWSEngine(t *testing.T, source, destination *testutil.S3, now *time.Time) *Engine {
 	t.Helper()
@@ -416,8 +523,8 @@ func newAWSClients() (*testutil.S3, *testutil.S3, *awsModel) {
 
 func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
 	client := &testutil.S3{}
-	client.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
-		return s3client.VersioningEnabled, nil
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
 	}
 	client.PutFunc = func(
 		_ context.Context, bucket, key string, payload []byte, opts s3client.PutOptions,

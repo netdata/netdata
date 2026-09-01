@@ -21,6 +21,11 @@ const (
 	VersioningSuspended VersioningStatus = "Suspended"
 )
 
+type BucketVersioningResult struct {
+	Status    VersioningStatus
+	MFADelete bool
+}
+
 type PutResult struct {
 	VersionID string
 	ETag      string
@@ -86,7 +91,7 @@ type ReplicationRule struct {
 // Provider packages use this interface so their transition tests do not need
 // AWS SDK response types.
 type Client interface {
-	BucketVersioning(ctx context.Context, bucket string) (VersioningStatus, error)
+	BucketVersioning(ctx context.Context, bucket string) (BucketVersioningResult, error)
 	BucketReplication(ctx context.Context, bucket string) ([]ReplicationRule, error)
 	Put(ctx context.Context, bucket, key string, payload []byte, opts PutOptions) (PutResult, error)
 	Get(ctx context.Context, bucket, key, versionID string, maxBytes int64) (GetResult, error)

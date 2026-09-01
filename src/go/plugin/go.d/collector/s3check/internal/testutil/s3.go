@@ -12,7 +12,7 @@ import (
 type S3 struct {
 	mu sync.Mutex
 
-	BucketVersioningFunc  func(context.Context, string) (s3client.VersioningStatus, error)
+	BucketVersioningFunc  func(context.Context, string) (s3client.BucketVersioningResult, error)
 	BucketReplicationFunc func(context.Context, string) ([]s3client.ReplicationRule, error)
 	PutFunc               func(context.Context, string, string, []byte, s3client.PutOptions) (s3client.PutResult, error)
 	GetFunc               func(context.Context, string, string, string, int64) (s3client.GetResult, error)
@@ -39,7 +39,7 @@ func (s *S3) record(call Call) {
 	s.Calls = append(s.Calls, call)
 }
 
-func (s *S3) BucketVersioning(ctx context.Context, bucket string) (s3client.VersioningStatus, error) {
+func (s *S3) BucketVersioning(ctx context.Context, bucket string) (s3client.BucketVersioningResult, error) {
 	s.record(Call{Operation: "bucket_versioning", Bucket: bucket})
 	return s.BucketVersioningFunc(ctx, bucket)
 }

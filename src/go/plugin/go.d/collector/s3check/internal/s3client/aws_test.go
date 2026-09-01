@@ -6,9 +6,20 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestConfigureS3OptionsCanonicalizesEndpointAndPathStyle(t *testing.T) {
+	var options s3.Options
+	configureS3Options(&options, Config{
+		Endpoint: " https://s3.example ", PathStyle: true,
+	})
+
+	assert.Equal(t, "https://s3.example", aws.ToString(options.BaseEndpoint))
+	assert.True(t, options.UsePathStyle)
+}
 
 func TestConvertReplicationRule(t *testing.T) {
 	tests := map[string]struct {
