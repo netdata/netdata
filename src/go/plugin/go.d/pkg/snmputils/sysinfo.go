@@ -151,36 +151,16 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids
 		if packet == nil {
 			return nil, fmt.Errorf("get SNMP system scalars: nil response")
 		}
-		if packet.PDUType != gosnmp.GetResponse {
-			return nil, fmt.Errorf("get SNMP system scalars: unexpected response PDU type %s", packet.PDUType)
-		}
-		if packet.Version != version {
-			return nil, fmt.Errorf(
-				"get SNMP system scalars: response SNMP version %s does not match requested version %s",
-				packet.Version,
-				version,
-			)
-		}
 
 		switch packet.Error {
 		case gosnmp.NoError:
-			if packet.ErrorIndex != 0 {
-				return nil, fmt.Errorf(
-					"get SNMP system scalars: response error %s with nonzero error index %d",
-					packet.Error,
-					packet.ErrorIndex,
-				)
-			}
-			if err := validateSysInfoResponsePDUs(oids, packet.Variables); err != nil {
-				return nil, err
-			}
 			return packet.Variables, nil
 		case gosnmp.NoSuchName:
-			if packet.Version != gosnmp.Version1 {
+			if version != gosnmp.Version1 {
 				return nil, fmt.Errorf(
-					"get SNMP system scalars: unexpected response error %s for SNMP version %s (index %d)",
+					"get SNMP system scalars: unexpected response error %s for requested SNMP version %s (index %d)",
 					packet.Error,
-					packet.Version,
+					version,
 					packet.ErrorIndex,
 				)
 			}
@@ -208,21 +188,6 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids
 	}
 
 	return nil, nil
-}
-
-func validateSysInfoResponsePDUs(requestedOIDs []string, pdus []gosnmp.SnmpPDU) error {
-	seen := make(map[string]struct{}, len(pdus))
-	for _, pdu := range pdus {
-		oid := strings.TrimPrefix(pdu.Name, ".")
-		if !slices.Contains(requestedOIDs, oid) {
-			return fmt.Errorf("get SNMP system scalars: response contains unrequested OID %q", pdu.Name)
-		}
-		if _, ok := seen[oid]; ok {
-			return fmt.Errorf("get SNMP system scalars: response contains duplicate OID %q", pdu.Name)
-		}
-		seen[oid] = struct{}{}
-	}
-	return nil
 }
 
 var valueSanitizer = strings.NewReplacer(
