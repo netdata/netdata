@@ -170,6 +170,31 @@ func TestCollectValidatesExactOwnedKeysBeforeCleanup(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestCleanupValidatesExactOwnedKeysBeforeShutdownMutation(t *testing.T) {
+	source, destination, model := newAWSClients()
+	engine := newAWSEngine(t, source, destination, nil)
+
+	engine.Collect(context.Background())
+	key, sourceObjectID := model.onlySourceObject(t)
+	model.replicateObject(t, key, sourceObjectID)
+	source.BucketReplicationFunc = replicationRules(
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+			DeleteMarkerReplication: true, Priority: 10,
+		},
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "unowned-destination", Prefix: key,
+			DeleteMarkerReplication: true, Priority: 20,
+		},
+	)
+
+	engine.Cleanup(context.Background())
+
+	assert.Zero(t, source.Count("delete"))
+	assert.True(t, model.hasVersions("source", key))
+	assert.FileExists(t, engine.journal.Path())
+}
+
 func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
 	tests := map[string]func(*testutil.S3, *testutil.S3){
 		"source versioning disabled": func(source, _ *testutil.S3) {

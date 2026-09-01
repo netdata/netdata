@@ -27,6 +27,7 @@ var (
 	ErrNotLocked           = errors.New("s3check journal is not locked")
 	ErrFingerprintMismatch = errors.New("s3check journal fingerprint mismatch")
 	ErrStateTooLarge       = errors.New("s3check journal state is too large")
+	syncDirectory          = syncDir
 )
 
 type envelope struct {
@@ -232,7 +233,7 @@ func (j *Journal) Clear() error {
 	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
-	return syncDir(dir)
+	return syncDirectory(dir)
 }
 
 func writeAtomic(path string, raw []byte) (retErr error) {
@@ -268,17 +269,58 @@ func writeAtomic(path string, raw []byte) (retErr error) {
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("publish s3check journal: %w", err)
 	}
-	return syncDir(dir)
+	return syncDirectory(dir)
 }
 
 func ensurePrivateDir(dir string) error {
+	dir = filepath.Clean(dir)
+	parents, modeChanged, err := privateDirSyncTargets(dir)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create s3check journal directory: %w", err)
 	}
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return fmt.Errorf("restrict s3check journal directory: %w", err)
 	}
+	if len(parents) == 0 && !modeChanged {
+		return nil
+	}
+	if err := syncDirectory(dir); err != nil {
+		return err
+	}
+	for _, parent := range parents {
+		if err := syncDirectory(parent); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func privateDirSyncTargets(dir string) (parents []string, modeChanged bool, err error) {
+	current := dir
+	for {
+		info, statErr := os.Stat(current)
+		if statErr == nil {
+			if !info.IsDir() {
+				return nil, false, fmt.Errorf("s3check journal path %q is not a directory", current)
+			}
+			if current == dir {
+				modeChanged = info.Mode().Perm() != 0o700
+			}
+			return parents, modeChanged, nil
+		}
+		if !errors.Is(statErr, os.ErrNotExist) {
+			return nil, false, fmt.Errorf("inspect s3check journal directory: %w", statErr)
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return nil, false, fmt.Errorf("find existing parent for s3check journal directory %q", dir)
+		}
+		parents = append(parents, parent)
+		current = parent
+	}
 }
 
 func syncDir(dir string) error {

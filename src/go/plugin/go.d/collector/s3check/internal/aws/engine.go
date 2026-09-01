@@ -314,10 +314,7 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
 	}()
-	keys := make([]string, 0, len(e.state.Entries))
-	for _, owned := range e.state.Entries {
-		keys = append(keys, owned.Key)
-	}
+	keys := e.ownedKeys()
 	if len(keys) == 0 {
 		keys = append(keys, e.keyPrefix)
 	}
@@ -345,17 +342,30 @@ func (e *Engine) Cleanup(ctx context.Context) {
 	}
 	e.closed = true
 	if e.locked {
-		if active := e.active(); active != nil {
-			e.state.ActiveKey = ""
+		keys := e.ownedKeys()
+		if len(keys) == 0 {
+			_ = e.persist()
+		} else if _, err := e.validateProvider(ctx, nil, keys...); err == nil {
+			if active := e.active(); active != nil {
+				e.state.ActiveKey = ""
+				_ = e.persist()
+			}
+			_ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
 			_ = e.persist()
 		}
-		_ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
-		_ = e.persist()
 		e.journal.Unlock()
 		e.locked = false
 	}
 	e.source.CloseIdleConnections()
 	e.destination.CloseIdleConnections()
+}
+
+func (e *Engine) ownedKeys() []string {
+	keys := make([]string, 0, len(e.state.Entries))
+	for _, owned := range e.state.Entries {
+		keys = append(keys, owned.Key)
+	}
+	return keys
 }
 
 func (e *Engine) takeover() error {

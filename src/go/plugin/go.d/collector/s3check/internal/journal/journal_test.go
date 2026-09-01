@@ -72,6 +72,28 @@ func TestLoadIsReadOnly(t *testing.T) {
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
 }
 
+func TestTryLockDurablyCreatesJournalDirectory(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "s3check")
+	originalSyncDirectory := syncDirectory
+	var synced []string
+	syncDirectory = func(dir string) error {
+		synced = append(synced, filepath.Clean(dir))
+		return nil
+	}
+	t.Cleanup(func() { syncDirectory = originalSyncDirectory })
+
+	j, err := New(root, "agent", "job", testFingerprint)
+	require.NoError(t, err)
+	locked, err := j.TryLock()
+	require.NoError(t, err)
+	require.True(t, locked)
+	t.Cleanup(j.Unlock)
+
+	assert.Contains(t, synced, filepath.Clean(root))
+	assert.Contains(t, synced, filepath.Clean(parent))
+}
+
 func TestMutationRequiresLifetimeLock(t *testing.T) {
 	j, err := New(t.TempDir(), "agent", "job", testFingerprint)
 	require.NoError(t, err)
