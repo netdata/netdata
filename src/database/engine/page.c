@@ -23,7 +23,7 @@ typedef struct {
     uint16_t freed_mark;        // PGD lifetime guard - see below
 } page_raw_t;
 
-typedef struct xxx {
+typedef struct {
     gorilla_writer_t *writer;
     uint16_t num_buffers;
     uint16_t freed_mark;        // PGD lifetime guard - same offset as page_raw_t's
@@ -1397,59 +1397,85 @@ int pgd_unittest(void) {
     if(!pgd_alloc_globals.partitions)
         pgd_init_arals();
 
-    // Pin the aral page before allocating the PGD under test. This test deliberately reads
-    // `pg` back AFTER freeing it, and aral_freez_internal() deletes a page that has become
-    // FULLY free whenever another page still has free items (aral.c:1265; the delete is
-    // gated on used_elements == 0). pgd_unittest() runs at position 33 of -W unittest, well
-    // after test_dbengine() has exercised these same arals, so "there is only one page"
-    // does NOT hold here - it only holds for a standalone -W pgdtest.
+    // This test deliberately reads `pg` back AFTER freeing it, so its page must not be
+    // deletable: aral_freez_internal() deletes a page that has become FULLY free whenever
+    // another page still has free items (aral.c:1265; the delete is gated on
+    // used_elements == 0). Keeping a live element ON THE SAME PAGE prevents that.
     //
-    // pgd_alloc() picks its aral by gettid_cached() % partitions, so both allocations on this
-    // thread come from the same aral. But same aral does NOT mean same page: if `pin` takes
-    // the last free slot of the current page, the next allocation starts a fresh one, and a
-    // pin on a different page holds nothing. So the pin is not sufficient on its own - it is
-    // verified below, and the read-back is skipped when it cannot be proven.
+    // "Same aral" is not enough. pgd_alloc() picks its aral by gettid_cached() % partitions,
+    // so every allocation here shares one aral, but aral serves recycled free-list slots
+    // before fresh ones and those are scattered across pages - and a fresh page starts as
+    // soon as the current one is exhausted. So co-location has to be PROVEN, not assumed:
+    // two elements exactly one slot apart are necessarily on the same page, because distinct
+    // pages are separate mallocs each carrying its own ARAL_PAGE header.
     //
-    // Worth being precise about the hazard: these arals are created with mmap=false
-    // (page.c:518), so a deleted page is freez()'d, not nd_munmap()'d - a stale read would be
-    // a heap use-after-free, not a fault. Still UB, and invisible here because ASAN skips
-    // this test - which is why it is proven rather than assumed.
-    PGD *pin = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
+    // Probe until such a pair appears. Recycled slots are scattered, but the free list is
+    // finite: once it is drained, aral hands out consecutive slots from a page's tail, so a
+    // bounded probe finds an adjacent pair. All probes stay allocated until the end, which
+    // also keeps every page they touch alive.
+    //
+    // pgd_unittest() runs at position 33 of -W unittest, well after test_dbengine() has
+    // exercised these arals, so this is the realistic case - not the standalone -W pgdtest
+    // one, where the aral is fresh and any two allocations are trivially adjacent. Note CI
+    // only ever runs -W unittest.
+    //
+    // The hazard if this were wrong: these arals are created with mmap=false (page.c:518),
+    // so a deleted page is freez()'d, not nd_munmap()'d - a stale read would be a heap
+    // use-after-free rather than a fault. Silent, and invisible to ASAN because this whole
+    // test is skipped there. That is why it is proven rather than assumed.
+    PGD *probe[64];
+    size_t probes = 0;
+    PGD *pg = NULL;          // the one under test: proven to share a page with another probe
+    size_t slot = 0;
 
-    PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
-    if(!pg || pg == PGD_EMPTY || !pin || pin == PGD_EMPTY) {
+    while(probes < _countof(probe)) {
+        PGD *p = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
+        if(!p || p == PGD_EMPTY)
+            break;
+
+        if(!slot)
+            slot = aral_actual_element_size(pgd_alloc_globals.aral_pgd[p->partition]);
+
+        // is this one adjacent to any probe already taken?
+        for(size_t i = 0; i < probes ;i++) {
+            uintptr_t a = (uintptr_t)p, b = (uintptr_t)probe[i];
+            if((a > b ? a - b : b - a) == (uintptr_t)slot) {
+                // probe[i] is on p's page and stays allocated until the end of the test,
+                // which is what keeps that page's used_elements > 0 while we read p back
+                pg = p;
+                break;
+            }
+        }
+
+        probe[probes++] = p;
+
+        if(pg)
+            break;
+    }
+
+    if(!probes) {
         fprintf(stderr, "PGD: cannot create a page to test with\n");
-        if(pin && pin != PGD_EMPTY) pgd_free(pin, PGD_FREE_SITE_UNITTEST);
-        if(pg && pg != PGD_EMPTY) pgd_free(pg, PGD_FREE_SITE_UNITTEST);
         return 1;
     }
 
-    // a live PGD must never look freed
-    if(pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
-        fprintf(stderr, "PGD: a freshly created PGD is already marked as freed\n");
+    if(!pg) {
+        // Never observed: it would mean 64 consecutive allocations from one aral produced no
+        // two elements on a common page. Fail loudly rather than silently skip - a silent
+        // skip would report PASSED while verifying nothing, every run, forever.
+        fprintf(stderr, "PGD: could not obtain two PGDs on one aral page in %zu probes - "
+                        "the lifetime guard is NOT being verified\n", probes);
         errors++;
     }
-
-    // Prove `pin` shares pg's page before trusting it. aral hands out consecutive slots
-    // within a page, so if the two elements are exactly one slot apart they are on the same
-    // page - and `pin` then keeps that page's used_elements > 0, which is what makes it
-    // undeletable (the delete at aral.c:1265 requires used_elements == 0). Distinct pages are
-    // separate mallocs with their own headers, so they cannot be exactly one slot apart.
-    size_t slot = aral_actual_element_size(pgd_alloc_globals.aral_pgd[pg->partition]);
-    uintptr_t a = (uintptr_t)pg, b = (uintptr_t)pin;
-    bool pinned = (a > b ? a - b : b - a) == (uintptr_t)slot;
-
-    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
-
-    if(!pinned) {
-        // Rare: pin landed on the previous page's last slot. Reading pg back would be a
-        // genuine use-after-free, so skip it rather than commit the UB this test exists to
-        // reason about. Not an error - the coverage is simply unavailable this run.
-        fprintf(stderr, "PGD: skipping the freed-slot read-back - the pin is on another aral "
-                        "page, so the freed page could be deleted under us\n");
-    }
     else {
-        // Reading pg back is deliberate, and safe because `pin` provably holds the page.
+        // a live PGD must never look freed
+        if(pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
+            fprintf(stderr, "PGD: a freshly created PGD is already marked as freed\n");
+            errors++;
+        }
+
+        pgd_free(pg, PGD_FREE_SITE_UNITTEST);
+
+        // Reading pg back is deliberate, and safe because a probe provably holds its page.
         // Everything below 2*sizeof(void*) now belongs to aral's free-list header.
         //
         // This is the detector's own contract: a second free must see the FIRST freer's site.
@@ -1481,9 +1507,9 @@ int pgd_unittest(void) {
     pgd_check_alive(NULL, "unittest: NULL must be accepted");
     pgd_check_alive(PGD_EMPTY, "unittest: PGD_EMPTY must be accepted");
 
-    // Everything below reads or writes the freed `pg`, so it runs only while the pin
-    // provably holds its page.
-    if(pinned) {
+    // Everything below reads or writes the freed `pg`, so it runs only when a co-located
+    // probe was proven above (pg is NULL otherwise, and that already counted an error).
+    if(pg) {
         // pgd_alloc() must clear the mark, or every FIRST free of a recycled slot would be
         // misreported as a double free, AND every first USE of it as a use-after-free. Test
         // the clear directly - which slot aral hands back next is not ours to predict.
@@ -1512,8 +1538,12 @@ int pgd_unittest(void) {
 #endif
     }
 
-    // every read of the freed `pg` is done - the page may be released now
-    pgd_free(pin, PGD_FREE_SITE_UNITTEST);
+    // every read of the freed `pg` is done - the probes may go back to the aral now.
+    // pg was freed by the test itself, so skip it here and never free it twice.
+    for(size_t i = 0; i < probes ;i++) {
+        if(probe[i] != pg)
+            pgd_free(probe[i], PGD_FREE_SITE_UNITTEST);
+    }
 
     if(errors)
         fprintf(stderr, "PGD: lifetime-guard test FAILED with %d error(s)\n", errors);
