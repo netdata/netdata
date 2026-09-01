@@ -200,13 +200,13 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		return nil, s3client.ErrReplicationConfigAbsent
 	}
 	destination.BucketReplicationFunc = source.BucketReplicationFunc
-	source.PutFunc = func(_ context.Context, _ string, key string, payload []byte) (s3client.PutResult, error) {
+	source.PutFunc = func(_ context.Context, _ string, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		model.source[key] = append([]byte(nil), payload...)
 		return s3client.PutResult{}, nil
 	}
-	destination.PutFunc = func(context.Context, string, string, []byte) (s3client.PutResult, error) {
+	destination.PutFunc = func(context.Context, string, string, []byte, s3client.PutOptions) (s3client.PutResult, error) {
 		panic("destination PUT is not part of the Ceph probe")
 	}
 	source.GetFunc = func(_ context.Context, _ string, key, _ string, _ int64) (s3client.GetResult, error) {
@@ -228,13 +228,13 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		}
 		return s3client.GetResult{Payload: append([]byte(nil), payload...)}, nil
 	}
-	source.DeleteFunc = func(_ context.Context, _ string, key, _ string) (s3client.DeleteResult, error) {
+	source.DeleteFunc = func(_ context.Context, _ string, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		delete(model.source, key)
 		return s3client.DeleteResult{}, nil
 	}
-	destination.DeleteFunc = func(_ context.Context, _ string, key, _ string) (s3client.DeleteResult, error) {
+	destination.DeleteFunc = func(_ context.Context, _ string, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
 		model.mu.Lock()
 		defer model.mu.Unlock()
 		delete(model.destination, key)

@@ -1,0 +1,523 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package aws
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/testutil"
+)
+
+func TestCheckValidatesVersioningAndApplicableDeleteMarkerRuleWithoutMutation(t *testing.T) {
+	source, destination, _ := newAWSClients()
+	engine := newAWSEngine(t, source, destination, nil)
+
+	require.NoError(t, engine.Check(context.Background()))
+	assert.Equal(t, 1, source.Count("bucket_versioning"))
+	assert.Equal(t, 1, destination.Count("bucket_versioning"))
+	assert.Equal(t, 1, source.Count("bucket_replication"))
+	assert.Zero(t, source.Count("put"))
+	assert.Zero(t, destination.Count("put"))
+}
+
+func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
+	tests := map[string]func(*testutil.S3, *testutil.S3){
+		"source versioning disabled": func(source, _ *testutil.S3) {
+			source.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
+				return s3client.VersioningDisabled, nil
+			}
+		},
+		"destination versioning suspended": func(_, destination *testutil.S3) {
+			destination.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
+				return s3client.VersioningSuspended, nil
+			}
+		},
+		"wrong destination": func(source, _ *testutil.S3) {
+			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "other", Prefix: "netdata-s3check/", DeleteMarkerReplication: true,
+			})
+		},
+		"prefix does not contain probes": func(source, _ *testutil.S3) {
+			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "destination", Prefix: "other/", DeleteMarkerReplication: true,
+			})
+		},
+		"tag filtered": func(source, _ *testutil.S3) {
+			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/", TagFiltered: true,
+				DeleteMarkerReplication: true,
+			})
+		},
+		"delete markers disabled": func(source, _ *testutil.S3) {
+			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+			})
+		},
+	}
+
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			source, destination, _ := newAWSClients()
+			mutate(source, destination)
+			engine := newAWSEngine(t, source, destination, nil)
+
+			err := engine.Check(context.Background())
+			require.Error(t, err)
+			assert.Zero(t, source.Count("put"))
+		})
+	}
+}
+
+func TestProbeOwnsIndependentVersionsAndCleansExactIdentities(t *testing.T) {
+	source, destination, model := newAWSClients()
+	now := time.Unix(100, 0)
+	engine := newAWSEngine(t, source, destination, &now)
+
+	wantObject := engine.Collect(context.Background())
+	require.NotNil(t, wantObject.Probe)
+	assert.Equal(t, contract.StatusWaiting, wantObject.Probe.Status)
+	key, sourceObjectID := model.onlySourceObject(t)
+	require.True(t, model.lastPutConditional)
+
+	now = now.Add(10 * time.Second)
+	destinationObjectID := model.replicateObject(t, key, sourceObjectID)
+	wantMarker := engine.Collect(context.Background())
+	require.NotNil(t, wantMarker.Probe)
+	assert.Equal(t, contract.StatusWaiting, wantMarker.Probe.Status)
+	assert.Equal(t, 10*time.Second, wantMarker.Probe.WriteVisibility.Lag)
+	sourceMarkerID := model.onlySourceMarker(t, key)
+	require.NotEmpty(t, model.lastLogicalDeleteIfMatch)
+
+	now = now.Add(5 * time.Second)
+	destinationMarkerID := model.replicateMarker(t, key, sourceMarkerID)
+	success := engine.Collect(context.Background())
+	require.NotNil(t, success.Probe)
+	assert.Equal(t, contract.StatusSuccess, success.Probe.Status)
+	assert.Equal(t, 10*time.Second, success.Probe.WriteVisibility.Lag)
+	assert.Equal(t, 5*time.Second, success.Probe.DeleteVisibility.Lag)
+	assert.Zero(t, success.Cleanup.Pending)
+	assert.False(t, model.hasVersions("source", key))
+	assert.False(t, model.hasVersions("destination", key))
+
+	assertExactVersionDeleted(t, source, key, sourceObjectID)
+	assertExactVersionDeleted(t, source, key, sourceMarkerID)
+	assertExactVersionDeleted(t, destination, key, destinationObjectID)
+	assertExactVersionDeleted(t, destination, key, destinationMarkerID)
+	engine.Cleanup(context.Background())
+}
+
+func TestAmbiguousPutReconcilesExactSourceVersion(t *testing.T) {
+	source, destination, model := newAWSClients()
+	model.failPutAfterMutation = true
+	engine := newAWSEngine(t, source, destination, nil)
+
+	failed := engine.Collect(context.Background())
+	require.NotNil(t, failed.Probe)
+	assert.Equal(t, contract.StatusFailed, failed.Probe.Status)
+	assert.Equal(t, contract.ReasonRequest, failed.Probe.Reason)
+	key, sourceObjectID := model.onlySourceObject(t)
+
+	waiting := engine.Collect(context.Background())
+	require.NotNil(t, waiting.Probe)
+	assert.Equal(t, contract.StatusWaiting, waiting.Probe.Status)
+	assert.False(t, waiting.Probe.WriteVisibility.Performed)
+	assert.GreaterOrEqual(t, source.Count("list_versions"), 1)
+
+	model.replicateObject(t, key, sourceObjectID)
+	engine.Collect(context.Background())
+	assert.NotEmpty(t, model.onlySourceMarker(t, key))
+	engine.Cleanup(context.Background())
+}
+
+func TestAmbiguousLogicalDeleteReconcilesExactMarker(t *testing.T) {
+	source, destination, model := newAWSClients()
+	engine := newAWSEngine(t, source, destination, nil)
+
+	engine.Collect(context.Background())
+	key, sourceObjectID := model.onlySourceObject(t)
+	model.replicateObject(t, key, sourceObjectID)
+	model.failDeleteAfterMutation = true
+
+	failed := engine.Collect(context.Background())
+	require.NotNil(t, failed.Probe)
+	assert.Equal(t, contract.StatusFailed, failed.Probe.Status)
+	sourceMarkerID := model.onlySourceMarker(t, key)
+
+	waiting := engine.Collect(context.Background())
+	require.NotNil(t, waiting.Probe)
+	assert.Equal(t, contract.StatusWaiting, waiting.Probe.Status)
+	assert.GreaterOrEqual(t, source.Count("list_versions"), 1)
+
+	model.replicateMarker(t, key, sourceMarkerID)
+	success := engine.Collect(context.Background())
+	require.NotNil(t, success.Probe)
+	assert.Equal(t, contract.StatusSuccess, success.Probe.Status)
+	engine.Cleanup(context.Background())
+}
+
+func TestLateMarkerRetainsOwnershipAndBackpressuresInsteadOfDeletingVersions(t *testing.T) {
+	source, destination, model := newAWSClients()
+	now := time.Unix(100, 0)
+	engine := newAWSEngineWithOptions(t, source, destination, &now, func(opts *Options) {
+		opts.QueueCapacity = 1
+		opts.DeleteTimeout = time.Minute
+	})
+
+	engine.Collect(context.Background())
+	key, sourceObjectID := model.onlySourceObject(t)
+	model.replicateObject(t, key, sourceObjectID)
+	engine.Collect(context.Background())
+
+	now = now.Add(time.Minute + time.Second)
+	timedOut := engine.Collect(context.Background())
+	require.NotNil(t, timedOut.Probe)
+	assert.Equal(t, contract.ReasonDeleteTimeout, timedOut.Probe.Reason)
+
+	blocked := engine.Collect(context.Background())
+	assert.True(t, blocked.Cleanup.Backpressure)
+	assert.Equal(t, 1, blocked.Cleanup.Pending)
+	assert.Equal(t, 1, source.Count("put"))
+	assertNoExactVersionDeletes(t, source)
+	assertNoExactVersionDeletes(t, destination)
+	engine.Cleanup(context.Background())
+}
+
+func TestReconciliationIsBoundedAndRetainsStateOnPaginationOverflow(t *testing.T) {
+	source, destination, model := newAWSClients()
+	model.failPutAfterMutation = true
+	source.ListVersionsFunc = func(context.Context, string, string, string, string, int32) (s3client.VersionPage, error) {
+		return s3client.VersionPage{
+			Versions:  []s3client.Version{{Kind: s3client.VersionObject, Key: "different-key", VersionID: "v"}},
+			Truncated: true, NextKeyMarker: "next", NextVersionIDMarker: "next-version",
+		}, nil
+	}
+	engine := newAWSEngine(t, source, destination, nil)
+
+	engine.Collect(context.Background())
+	result := engine.Collect(context.Background())
+	require.NotNil(t, result.Probe)
+	assert.Equal(t, contract.StatusFailed, result.Probe.Status)
+	assert.Equal(t, contract.ReasonOwnership, result.Probe.Reason)
+	assert.LessOrEqual(t, source.Count("list_versions"), maxListPages)
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	engine.Cleanup(context.Background())
+}
+
+func newAWSEngine(t *testing.T, source, destination *testutil.S3, now *time.Time) *Engine {
+	t.Helper()
+	return newAWSEngineWithOptions(t, source, destination, now, nil)
+}
+
+func newAWSEngineWithOptions(
+	t *testing.T,
+	source, destination *testutil.S3,
+	now *time.Time,
+	modify func(*Options),
+) *Engine {
+	t.Helper()
+	j, err := journal.New(
+		t.TempDir(),
+		"agent",
+		"job",
+		journal.Fingerprint(
+			"aws_replication", "", "source", "netdata-s3check/", "", "destination", "exact-key",
+		),
+	)
+	require.NoError(t, err)
+	opts := Options{
+		Source: source, Destination: destination,
+		SourceBucket: "source", DestinationBucket: "destination",
+		ProbePrefix: "netdata-s3check/", Journal: j,
+		Generator: probe.Generator{
+			Prefix: "netdata-s3check/", OwnerID: j.OwnerID(), Now: time.Now,
+			Random: bytes.NewReader(bytes.Repeat([]byte{3}, 64*(16+probe.PayloadBytes))),
+		},
+		RequestTimeout: time.Second, UpdateEvery: time.Minute,
+		WriteObjective: 15 * time.Second, WriteTimeout: time.Minute,
+		DeleteObjective: 10 * time.Second, DeleteTimeout: time.Minute,
+	}
+	if now != nil {
+		opts.Now = func() time.Time { return *now }
+	}
+	if modify != nil {
+		modify(&opts)
+	}
+	engine, err := New(opts)
+	require.NoError(t, err)
+	return engine
+}
+
+func replicationRules(rules ...s3client.ReplicationRule) func(context.Context, string) ([]s3client.ReplicationRule, error) {
+	return func(context.Context, string) ([]s3client.ReplicationRule, error) { return rules, nil }
+}
+
+func assertExactVersionDeleted(t *testing.T, client *testutil.S3, key, versionID string) {
+	t.Helper()
+	for _, call := range client.Calls {
+		if call.Operation == "delete" && call.Key == key && call.VersionID == versionID {
+			return
+		}
+	}
+	assert.Failf(t, "missing exact deletion", "key=%q version=%q calls=%+v", key, versionID, client.Calls)
+}
+
+func assertNoExactVersionDeletes(t *testing.T, client *testutil.S3) {
+	t.Helper()
+	for _, call := range client.Calls {
+		if call.Operation == "delete" {
+			assert.Empty(t, call.VersionID)
+		}
+	}
+}
+
+type awsVersion struct {
+	kind    s3client.VersionKind
+	id      string
+	etag    string
+	payload []byte
+	latest  bool
+}
+
+type awsModel struct {
+	mu sync.Mutex
+
+	source      map[string][]awsVersion
+	destination map[string][]awsVersion
+	nextID      int
+
+	failPutAfterMutation     bool
+	failDeleteAfterMutation  bool
+	lastPutConditional       bool
+	lastLogicalDeleteIfMatch string
+}
+
+func (m *awsModel) onlySourceObject(t *testing.T) (string, string) {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var key, id string
+	for candidate, versions := range m.source {
+		for _, version := range versions {
+			if version.kind == s3client.VersionObject {
+				require.Empty(t, id)
+				key, id = candidate, version.id
+			}
+		}
+	}
+	require.NotEmpty(t, id)
+	return key, id
+}
+
+func (m *awsModel) onlySourceMarker(t *testing.T, key string) string {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var id string
+	for _, version := range m.source[key] {
+		if version.kind == s3client.VersionDeleteMarker {
+			require.Empty(t, id)
+			id = version.id
+		}
+	}
+	require.NotEmpty(t, id)
+	return id
+}
+
+func (m *awsModel) replicateObject(t *testing.T, key, sourceID string) string {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	version := m.findLocked(t, m.source, key, sourceID)
+	require.Equal(t, s3client.VersionObject, version.kind)
+	return m.addLocked(m.destination, key, s3client.VersionObject, version.payload, version.etag)
+}
+
+func (m *awsModel) replicateMarker(t *testing.T, key, sourceID string) string {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	version := m.findLocked(t, m.source, key, sourceID)
+	require.Equal(t, s3client.VersionDeleteMarker, version.kind)
+	return m.addLocked(m.destination, key, s3client.VersionDeleteMarker, nil, "")
+}
+
+func (m *awsModel) hasVersions(bucket, key string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.bucketLocked(bucket)[key]) > 0
+}
+
+func (m *awsModel) addLocked(
+	versions map[string][]awsVersion,
+	key string,
+	kind s3client.VersionKind,
+	payload []byte,
+	etag string,
+) string {
+	for index := range versions[key] {
+		versions[key][index].latest = false
+	}
+	m.nextID++
+	id := fmt.Sprintf("v-%d", m.nextID)
+	versions[key] = append([]awsVersion{{
+		kind: kind, id: id, etag: etag, payload: append([]byte(nil), payload...), latest: true,
+	}}, versions[key]...)
+	return id
+}
+
+func (m *awsModel) findLocked(
+	t *testing.T,
+	versions map[string][]awsVersion,
+	key, id string,
+) awsVersion {
+	t.Helper()
+	for _, version := range versions[key] {
+		if version.id == id {
+			return version
+		}
+	}
+	require.FailNowf(t, "missing version", "key=%q id=%q", key, id)
+	return awsVersion{}
+}
+
+func (m *awsModel) bucketLocked(bucket string) map[string][]awsVersion {
+	if bucket == "source" {
+		return m.source
+	}
+	return m.destination
+}
+
+func newAWSClients() (*testutil.S3, *testutil.S3, *awsModel) {
+	model := &awsModel{source: make(map[string][]awsVersion), destination: make(map[string][]awsVersion)}
+	source := newAWSClient(model, "source")
+	destination := newAWSClient(model, "destination")
+	source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+		Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/", DeleteMarkerReplication: true,
+	})
+	destination.BucketReplicationFunc = func(context.Context, string) ([]s3client.ReplicationRule, error) {
+		return nil, s3client.ErrReplicationConfigAbsent
+	}
+	return source, destination, model
+}
+
+func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
+	client := &testutil.S3{}
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.VersioningStatus, error) {
+		return s3client.VersioningEnabled, nil
+	}
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, opts s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		model.mu.Lock()
+		defer model.mu.Unlock()
+		if bucket != bucketName {
+			return s3client.PutResult{}, fmt.Errorf("unexpected bucket %q", bucket)
+		}
+		model.lastPutConditional = opts.IfNoneMatch
+		versions := model.bucketLocked(bucket)
+		if opts.IfNoneMatch && len(versions[key]) > 0 && versions[key][0].kind == s3client.VersionObject {
+			return s3client.PutResult{}, errors.New("precondition failed")
+		}
+		etag := fmt.Sprintf("etag-%d", model.nextID+1)
+		id := model.addLocked(versions, key, s3client.VersionObject, payload, etag)
+		if model.failPutAfterMutation {
+			model.failPutAfterMutation = false
+			return s3client.PutResult{}, errors.New("ambiguous PUT")
+		}
+		return s3client.PutResult{VersionID: id, ETag: etag}, nil
+	}
+	client.GetFunc = func(
+		_ context.Context, bucket, key, versionID string, _ int64,
+	) (s3client.GetResult, error) {
+		model.mu.Lock()
+		defer model.mu.Unlock()
+		versions := model.bucketLocked(bucket)
+		var found *awsVersion
+		for index := range versions[key] {
+			if versionID == "" && versions[key][index].latest || versions[key][index].id == versionID {
+				found = &versions[key][index]
+				break
+			}
+		}
+		if found == nil || found.kind == s3client.VersionDeleteMarker {
+			return s3client.GetResult{}, s3client.ErrObjectNotFound
+		}
+		return s3client.GetResult{
+			Payload: append([]byte(nil), found.payload...), VersionID: found.id, ETag: found.etag,
+		}, nil
+	}
+	client.ListCurrentFunc = func(context.Context, string, string, int32) (s3client.CurrentPage, error) {
+		return s3client.CurrentPage{}, nil
+	}
+	client.ListVersionsFunc = func(
+		_ context.Context, bucket, prefix, _, _ string, _ int32,
+	) (s3client.VersionPage, error) {
+		model.mu.Lock()
+		defer model.mu.Unlock()
+		var keys []string
+		for key := range model.bucketLocked(bucket) {
+			if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+				keys = append(keys, key)
+			}
+		}
+		sort.Strings(keys)
+		var page s3client.VersionPage
+		for _, key := range keys {
+			for _, version := range model.bucketLocked(bucket)[key] {
+				page.Versions = append(page.Versions, s3client.Version{
+					Kind: version.kind, Key: key, VersionID: version.id, IsLatest: version.latest,
+				})
+			}
+		}
+		return page, nil
+	}
+	client.DeleteFunc = func(
+		_ context.Context, bucket, key string, opts s3client.DeleteOptions,
+	) (s3client.DeleteResult, error) {
+		model.mu.Lock()
+		defer model.mu.Unlock()
+		versions := model.bucketLocked(bucket)
+		if opts.VersionID != "" {
+			for index, version := range versions[key] {
+				if version.id == opts.VersionID {
+					versions[key] = append(versions[key][:index], versions[key][index+1:]...)
+					if len(versions[key]) > 0 {
+						versions[key][0].latest = true
+					} else {
+						delete(versions, key)
+					}
+					return s3client.DeleteResult{}, nil
+				}
+			}
+			return s3client.DeleteResult{}, nil
+		}
+		if len(versions[key]) == 0 || versions[key][0].kind != s3client.VersionObject {
+			return s3client.DeleteResult{}, errors.New("precondition failed")
+		}
+		if opts.IfMatch == "" || versions[key][0].etag != opts.IfMatch {
+			return s3client.DeleteResult{}, errors.New("precondition failed")
+		}
+		model.lastLogicalDeleteIfMatch = opts.IfMatch
+		id := model.addLocked(versions, key, s3client.VersionDeleteMarker, nil, "")
+		if model.failDeleteAfterMutation {
+			model.failDeleteAfterMutation = false
+			return s3client.DeleteResult{}, errors.New("ambiguous DELETE")
+		}
+		return s3client.DeleteResult{VersionID: id, DeleteMarker: true}, nil
+	}
+	return client
+}

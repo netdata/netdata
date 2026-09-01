@@ -1,0 +1,439 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package aws
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
+)
+
+func (e *Engine) startProbe(
+	ctx context.Context,
+	operations *[]contract.OperationResult,
+) *contract.ProbeResult {
+	object, err := e.generator.Next()
+	if err != nil {
+		return e.finishTerminal(failedProbe(contract.ReasonInternal))
+	}
+	owned := entry{
+		Key: object.Key, Digest: object.Digest, CreatedAt: e.now().UTC(), Phase: phasePutIntent,
+	}
+	e.state.Entries = append(e.state.Entries, owned)
+	e.state.ActiveKey = owned.Key
+	if err := e.persist(); err != nil {
+		e.remove(owned.Key)
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+
+	var put s3client.PutResult
+	_, err = e.call(ctx, operations, contract.EndpointSource, contract.OperationPut, func(callCtx context.Context) error {
+		var callErr error
+		put, callErr = e.source.Put(
+			callCtx,
+			e.sourceBucket,
+			object.Key,
+			object.Payload,
+			s3client.PutOptions{IfNoneMatch: true},
+		)
+		return callErr
+	})
+	active := e.active()
+	if active == nil {
+		return e.finishTerminal(failedProbe(contract.ReasonInternal))
+	}
+	if err != nil {
+		active.Phase = phaseReconcilePut
+		_ = e.persist()
+		return e.finishTerminal(failedProbe(contract.ReasonRequest))
+	}
+	if put.VersionID == "" || put.ETag == "" {
+		active.Phase = phaseReconcilePut
+		_ = e.persist()
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+	now := e.now().UTC()
+	active.SourceObjectID = put.VersionID
+	active.SourceObjectETag = put.ETag
+	active.PutAt = &now
+	active.MeasureWrite = true
+	active.Phase = phaseWaitObject
+	if err := e.persist(); err != nil {
+		e.retire(active)
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+	return e.advanceActive(ctx, active, operations)
+}
+
+func (e *Engine) advanceActive(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+) *contract.ProbeResult {
+	for transitions := 0; transitions < 6; transitions++ {
+		switch owned.Phase {
+		case phaseReconcilePut:
+			key := owned.Key
+			resolved, err := e.reconcilePut(ctx, owned, operations)
+			if err != nil {
+				return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+			}
+			if !resolved {
+				if e.find(key) == nil {
+					if e.state.LastTerminal != nil {
+						return cloneProbeResult(e.state.LastTerminal)
+					}
+					return e.finishTerminal(failedProbe(contract.ReasonRequest))
+				}
+				return waitingProbe(owned, e.now().UTC(), e.writeObjective, e.deleteObjective)
+			}
+		case phaseWaitObject:
+			proceed, result := e.observeObject(ctx, owned, operations, true)
+			if result != nil {
+				return result
+			}
+			if !proceed {
+				return waitingProbe(owned, e.now().UTC(), e.writeObjective, e.deleteObjective)
+			}
+		case phaseDeleteIntent:
+			if result := e.createMarker(ctx, owned, operations); result != nil {
+				return result
+			}
+		case phaseReconcileDelete:
+			resolved, err := e.reconcileDelete(ctx, owned, operations)
+			if err != nil {
+				return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+			}
+			if !resolved {
+				return waitingProbe(owned, e.now().UTC(), e.writeObjective, e.deleteObjective)
+			}
+		case phaseWaitMarker:
+			proceed, result := e.observeMarker(ctx, owned, operations, true)
+			if result != nil {
+				return result
+			}
+			if !proceed {
+				return waitingProbe(owned, e.now().UTC(), e.writeObjective, e.deleteObjective)
+			}
+		case phaseExactCleanup:
+			result := successProbe(owned, e.writeObjective, e.deleteObjective)
+			removed, err := e.cleanupExact(ctx, owned, operations)
+			if err != nil {
+				e.retire(owned)
+				_ = e.persist()
+				return e.finishTerminal(failedProbe(contract.ReasonCleanup))
+			}
+			if !removed {
+				return waitingProbe(owned, e.now().UTC(), e.writeObjective, e.deleteObjective)
+			}
+			e.remove(owned.Key)
+			result = e.finishTerminal(result)
+			_ = e.persist()
+			return result
+		case phaseBlocked:
+			e.retire(owned)
+			_ = e.persist()
+			return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		default:
+			return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		}
+	}
+	return e.finishTerminal(failedProbe(contract.ReasonInternal))
+}
+
+func (e *Engine) reconcilePut(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+) (bool, error) {
+	versions, err := e.listExact(
+		ctx, e.source, e.sourceBucket, contract.EndpointSource, contract.OperationReconcile, owned.Key, operations,
+	)
+	if err != nil {
+		return false, err
+	}
+	objects, markers := splitVersions(versions)
+	if len(markers) != 0 || len(objects) > 1 {
+		owned.Phase = phaseBlocked
+		_ = e.persist()
+		return false, errors.New("unexpected source versions while reconciling PUT")
+	}
+	if len(objects) == 0 {
+		e.remove(owned.Key)
+		return false, e.persist()
+	}
+
+	var got s3client.GetResult
+	_, err = e.call(ctx, operations, contract.EndpointSource, contract.OperationReconcile, func(callCtx context.Context) error {
+		var callErr error
+		got, callErr = e.source.Get(
+			callCtx, e.sourceBucket, owned.Key, objects[0].VersionID, probe.PayloadBytes,
+		)
+		return callErr
+	})
+	if err != nil || got.VersionID == "" || got.ETag == "" || probe.Digest(got.Payload) != owned.Digest {
+		owned.Phase = phaseBlocked
+		_ = e.persist()
+		return false, errors.New("cannot prove reconciled source object ownership")
+	}
+	owned.SourceObjectID = got.VersionID
+	owned.SourceObjectETag = got.ETag
+	owned.MeasureWrite = false
+	owned.Phase = phaseWaitObject
+	return true, e.persist()
+}
+
+func (e *Engine) observeObject(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+	active bool,
+) (bool, *contract.ProbeResult) {
+	var got s3client.GetResult
+	_, err := e.call(
+		ctx, operations, contract.EndpointDestination, contract.OperationWriteVisibility,
+		func(callCtx context.Context) error {
+			var callErr error
+			got, callErr = e.destination.Get(
+				callCtx, e.destinationBucket, owned.Key, "", probe.PayloadBytes,
+			)
+			return callErr
+		},
+	)
+	if errors.Is(err, s3client.ErrObjectNotFound) {
+		if active && e.writeTimedOut(owned) {
+			e.retire(owned)
+			result := failedProbe(contract.ReasonVisibilityTimeout)
+			result.WriteVisibility = writeResult(owned, e.now().UTC(), e.writeObjective)
+			result = e.finishTerminal(result)
+			_ = e.persist()
+			return false, result
+		}
+		return false, nil
+	}
+	if err != nil {
+		if active {
+			e.retire(owned)
+			result := e.finishTerminal(failedProbe(contract.ReasonRequest))
+			_ = e.persist()
+			return false, result
+		}
+		return false, nil
+	}
+	if got.VersionID == "" || probe.Digest(got.Payload) != owned.Digest {
+		owned.Phase = phaseBlocked
+		if active {
+			e.retire(owned)
+			result := failedProbe(contract.ReasonPayloadMismatch)
+			result.PayloadMismatch = true
+			result = e.finishTerminal(result)
+			_ = e.persist()
+			return false, result
+		}
+		_ = e.persist()
+		return false, nil
+	}
+	now := e.now().UTC()
+	owned.DestinationObjectID = got.VersionID
+	owned.VisibleAt = &now
+	owned.ObjectSeen = true
+	owned.Phase = phaseDeleteIntent
+	if err := e.persist(); err != nil && active {
+		e.retire(owned)
+		return false, e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+	return true, nil
+}
+
+func (e *Engine) createMarker(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+) *contract.ProbeResult {
+	if owned.DeleteAt == nil {
+		now := e.now().UTC()
+		owned.DeleteAt = &now
+		if err := e.persist(); err != nil {
+			e.retire(owned)
+			return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		}
+	}
+	var deleted s3client.DeleteResult
+	_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationDelete, func(callCtx context.Context) error {
+		var callErr error
+		deleted, callErr = e.source.Delete(
+			callCtx,
+			e.sourceBucket,
+			owned.Key,
+			s3client.DeleteOptions{IfMatch: owned.SourceObjectETag},
+		)
+		return callErr
+	})
+	if err != nil {
+		owned.Phase = phaseReconcileDelete
+		owned.MeasureDelete = false
+		_ = e.persist()
+		return e.finishTerminal(failedProbe(contract.ReasonRequest))
+	}
+	if !deleted.DeleteMarker || deleted.VersionID == "" {
+		owned.Phase = phaseReconcileDelete
+		owned.MeasureDelete = false
+		_ = e.persist()
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+	owned.SourceMarkerID = deleted.VersionID
+	owned.MeasureDelete = true
+	owned.Phase = phaseWaitMarker
+	if err := e.persist(); err != nil {
+		e.retire(owned)
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+	return nil
+}
+
+func (e *Engine) reconcileDelete(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+) (bool, error) {
+	versions, err := e.listExact(
+		ctx, e.source, e.sourceBucket, contract.EndpointSource, contract.OperationReconcile, owned.Key, operations,
+	)
+	if err != nil {
+		return false, err
+	}
+	objects, markers := splitVersions(versions)
+	if len(objects) != 1 || objects[0].VersionID != owned.SourceObjectID || len(markers) > 1 {
+		owned.Phase = phaseBlocked
+		_ = e.persist()
+		return false, errors.New("unexpected source versions while reconciling DELETE")
+	}
+	if len(markers) == 0 {
+		owned.Phase = phaseDeleteIntent
+		return true, e.persist()
+	}
+	owned.SourceMarkerID = markers[0].VersionID
+	owned.MeasureDelete = false
+	owned.Phase = phaseWaitMarker
+	return true, e.persist()
+}
+
+func (e *Engine) observeMarker(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+	active bool,
+) (bool, *contract.ProbeResult) {
+	_, err := e.call(
+		ctx, operations, contract.EndpointDestination, contract.OperationDeleteVisibility,
+		func(callCtx context.Context) error {
+			_, callErr := e.destination.Get(
+				callCtx, e.destinationBucket, owned.Key, "", probe.PayloadBytes,
+			)
+			return callErr
+		},
+	)
+	if err == nil {
+		if active && e.deleteTimedOut(owned) {
+			e.retire(owned)
+			result := failedProbe(contract.ReasonDeleteTimeout)
+			result.WriteVisibility = writeResult(owned, e.now().UTC(), e.writeObjective)
+			result.DeleteVisibility = deleteResult(owned, e.now().UTC(), e.deleteObjective)
+			result = e.finishTerminal(result)
+			_ = e.persist()
+			return false, result
+		}
+		return false, nil
+	}
+	if !errors.Is(err, s3client.ErrObjectNotFound) {
+		if active {
+			e.retire(owned)
+			result := e.finishTerminal(failedProbe(contract.ReasonRequest))
+			_ = e.persist()
+			return false, result
+		}
+		return false, nil
+	}
+
+	versions, listErr := e.listExact(
+		ctx,
+		e.destination,
+		e.destinationBucket,
+		contract.EndpointDestination,
+		contract.OperationReconcile,
+		owned.Key,
+		operations,
+	)
+	if listErr != nil {
+		if active {
+			return false, e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		}
+		return false, nil
+	}
+	objects, markers := splitVersions(versions)
+	if len(objects) != 1 || objects[0].VersionID != owned.DestinationObjectID ||
+		len(markers) != 1 || !markers[0].IsLatest {
+		if active && e.deleteTimedOut(owned) {
+			e.retire(owned)
+			result := e.finishTerminal(failedProbe(contract.ReasonDeleteTimeout))
+			_ = e.persist()
+			return false, result
+		}
+		return false, nil
+	}
+	owned.DestinationMarkerID = markers[0].VersionID
+	owned.MarkerSeen = true
+	markerAt := e.now().UTC()
+	owned.MarkerAt = &markerAt
+	owned.Phase = phaseExactCleanup
+	if err := e.persist(); err != nil && active {
+		e.retire(owned)
+		return false, e.finishTerminal(failedProbe(contract.ReasonOwnership))
+	}
+	return true, nil
+}
+
+func (e *Engine) writeTimedOut(owned *entry) bool {
+	base := owned.CreatedAt
+	if owned.PutAt != nil {
+		base = *owned.PutAt
+	}
+	return e.now().UTC().Sub(base) >= e.writeTimeout
+}
+
+func (e *Engine) deleteTimedOut(owned *entry) bool {
+	if owned.DeleteAt == nil {
+		return false
+	}
+	return e.now().UTC().Sub(*owned.DeleteAt) >= e.deleteTimeout
+}
+
+func (e *Engine) call(
+	parent context.Context,
+	operations *[]contract.OperationResult,
+	endpoint contract.Endpoint,
+	name contract.Operation,
+	fn func(context.Context) error,
+) (time.Duration, error) {
+	ctx, cancel := context.WithTimeout(parent, e.requestTimeout)
+	started := time.Now()
+	err := fn(ctx)
+	duration := time.Since(started)
+	cancel()
+	if operations != nil {
+		status := contract.StatusSuccess
+		reason := contract.ReasonNone
+		if err != nil && !errors.Is(err, s3client.ErrObjectNotFound) {
+			status = contract.StatusFailed
+			reason = contract.ReasonRequest
+		}
+		*operations = append(*operations, contract.OperationResult{
+			Name: name, Endpoint: endpoint, Status: status, Reason: reason, Duration: duration, Requests: 1,
+		})
+	}
+	return duration, err
+}

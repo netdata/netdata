@@ -14,21 +14,23 @@ type S3 struct {
 
 	BucketVersioningFunc  func(context.Context, string) (s3client.VersioningStatus, error)
 	BucketReplicationFunc func(context.Context, string) ([]s3client.ReplicationRule, error)
-	PutFunc               func(context.Context, string, string, []byte) (s3client.PutResult, error)
+	PutFunc               func(context.Context, string, string, []byte, s3client.PutOptions) (s3client.PutResult, error)
 	GetFunc               func(context.Context, string, string, string, int64) (s3client.GetResult, error)
 	ListCurrentFunc       func(context.Context, string, string, int32) (s3client.CurrentPage, error)
 	ListVersionsFunc      func(context.Context, string, string, string, string, int32) (s3client.VersionPage, error)
-	DeleteFunc            func(context.Context, string, string, string) (s3client.DeleteResult, error)
+	DeleteFunc            func(context.Context, string, string, s3client.DeleteOptions) (s3client.DeleteResult, error)
 
 	Calls  []Call
 	Closed int
 }
 
 type Call struct {
-	Operation string
-	Bucket    string
-	Key       string
-	VersionID string
+	Operation   string
+	Bucket      string
+	Key         string
+	VersionID   string
+	IfMatch     string
+	Conditional bool
 }
 
 func (s *S3) record(call Call) {
@@ -51,9 +53,10 @@ func (s *S3) Put(
 	ctx context.Context,
 	bucket, key string,
 	payload []byte,
+	opts s3client.PutOptions,
 ) (s3client.PutResult, error) {
-	s.record(Call{Operation: "put", Bucket: bucket, Key: key})
-	return s.PutFunc(ctx, bucket, key, payload)
+	s.record(Call{Operation: "put", Bucket: bucket, Key: key, Conditional: opts.IfNoneMatch})
+	return s.PutFunc(ctx, bucket, key, payload, opts)
 }
 
 func (s *S3) Get(
@@ -89,11 +92,10 @@ func (s *S3) ListVersions(
 }
 
 func (s *S3) Delete(
-	ctx context.Context,
-	bucket, key, versionID string,
+	ctx context.Context, bucket, key string, opts s3client.DeleteOptions,
 ) (s3client.DeleteResult, error) {
-	s.record(Call{Operation: "delete", Bucket: bucket, Key: key, VersionID: versionID})
-	return s.DeleteFunc(ctx, bucket, key, versionID)
+	s.record(Call{Operation: "delete", Bucket: bucket, Key: key, VersionID: opts.VersionID, IfMatch: opts.IfMatch})
+	return s.DeleteFunc(ctx, bucket, key, opts)
 }
 
 func (s *S3) CloseIdleConnections() {

@@ -127,17 +127,26 @@ func bucketFromARN(value string) string {
 	return value
 }
 
-func (c *awsClient) Put(ctx context.Context, bucket, key string, payload []byte) (PutResult, error) {
-	out, err := c.client.PutObject(ctx, &s3.PutObjectInput{
+func (c *awsClient) Put(
+	ctx context.Context,
+	bucket, key string,
+	payload []byte,
+	opts PutOptions,
+) (PutResult, error) {
+	input := &s3.PutObjectInput{
 		Bucket:        aws.String(bucket),
 		Key:           aws.String(key),
 		Body:          bytes.NewReader(payload),
 		ContentLength: aws.Int64(int64(len(payload))),
-	})
+	}
+	if opts.IfNoneMatch {
+		input.IfNoneMatch = aws.String("*")
+	}
+	out, err := c.client.PutObject(ctx, input)
 	if err != nil {
 		return PutResult{}, err
 	}
-	return PutResult{VersionID: aws.ToString(out.VersionId)}, nil
+	return PutResult{VersionID: aws.ToString(out.VersionId), ETag: aws.ToString(out.ETag)}, nil
 }
 
 func (c *awsClient) Get(
@@ -168,6 +177,7 @@ func (c *awsClient) Get(
 	return GetResult{
 		Payload:           payload,
 		VersionID:         aws.ToString(out.VersionId),
+		ETag:              aws.ToString(out.ETag),
 		ReplicationStatus: string(out.ReplicationStatus),
 	}, nil
 }
@@ -242,12 +252,14 @@ func (c *awsClient) ListVersions(
 }
 
 func (c *awsClient) Delete(
-	ctx context.Context,
-	bucket, key, versionID string,
+	ctx context.Context, bucket, key string, opts DeleteOptions,
 ) (DeleteResult, error) {
 	input := &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}
-	if versionID != "" {
-		input.VersionId = aws.String(versionID)
+	if opts.VersionID != "" {
+		input.VersionId = aws.String(opts.VersionID)
+	}
+	if opts.IfMatch != "" {
+		input.IfMatch = aws.String(opts.IfMatch)
 	}
 	out, err := c.client.DeleteObject(ctx, input)
 	if err != nil {

@@ -23,17 +23,28 @@ const (
 
 type PutResult struct {
 	VersionID string
+	ETag      string
+}
+
+type PutOptions struct {
+	IfNoneMatch bool
 }
 
 type GetResult struct {
 	Payload           []byte
 	VersionID         string
+	ETag              string
 	ReplicationStatus string
 }
 
 type DeleteResult struct {
 	VersionID    string
 	DeleteMarker bool
+}
+
+type DeleteOptions struct {
+	VersionID string
+	IfMatch   string
 }
 
 type CurrentPage struct {
@@ -77,7 +88,7 @@ type ReplicationRule struct {
 type Client interface {
 	BucketVersioning(ctx context.Context, bucket string) (VersioningStatus, error)
 	BucketReplication(ctx context.Context, bucket string) ([]ReplicationRule, error)
-	Put(ctx context.Context, bucket, key string, payload []byte) (PutResult, error)
+	Put(ctx context.Context, bucket, key string, payload []byte, opts PutOptions) (PutResult, error)
 	Get(ctx context.Context, bucket, key, versionID string, maxBytes int64) (GetResult, error)
 	ListCurrent(ctx context.Context, bucket, prefix string, maxKeys int32) (CurrentPage, error)
 	ListVersions(
@@ -85,6 +96,6 @@ type Client interface {
 		bucket, prefix, keyMarker, versionIDMarker string,
 		maxKeys int32,
 	) (VersionPage, error)
-	Delete(ctx context.Context, bucket, key, versionID string) (DeleteResult, error)
+	Delete(ctx context.Context, bucket, key string, opts DeleteOptions) (DeleteResult, error)
 	CloseIdleConnections()
 }

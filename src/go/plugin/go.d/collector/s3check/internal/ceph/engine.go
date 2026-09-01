@@ -242,7 +242,7 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		contract.EndpointSource,
 		contract.OperationPut,
 		func(callCtx context.Context) error {
-			_, callErr := e.source.Put(callCtx, e.sourceBucket, object.Key, object.Payload)
+			_, callErr := e.source.Put(callCtx, e.sourceBucket, object.Key, object.Payload, s3client.PutOptions{IfNoneMatch: true})
 			return callErr
 		},
 	); err != nil {
@@ -347,7 +347,7 @@ func (e *Engine) advanceActive(
 			contract.EndpointSource,
 			contract.OperationDelete,
 			func(callCtx context.Context) error {
-				_, callErr := e.source.Delete(callCtx, e.sourceBucket, owned.Key, "")
+				_, callErr := e.source.Delete(callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{})
 				return callErr
 			},
 		); err != nil {
@@ -471,7 +471,7 @@ func (e *Engine) cleanupBacklog(
 			contract.EndpointSource,
 			contract.OperationCleanup,
 			func(callCtx context.Context) error {
-				_, err := e.source.Delete(callCtx, e.sourceBucket, owned.Key, "")
+				_, err := e.source.Delete(callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{})
 				return err
 			},
 		)
@@ -490,7 +490,7 @@ func (e *Engine) cleanupBacklog(
 			contract.EndpointDestination,
 			contract.OperationCleanup,
 			func(callCtx context.Context) error {
-				_, err := e.destination.Delete(callCtx, e.destinationBucket, owned.Key, "")
+				_, err := e.destination.Delete(callCtx, e.destinationBucket, owned.Key, s3client.DeleteOptions{})
 				return err
 			},
 		)

@@ -1,0 +1,247 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package aws
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
+)
+
+func (e *Engine) cleanupBacklog(
+	ctx context.Context,
+	limit int,
+	operations *[]contract.OperationResult,
+) contract.CleanupResult {
+	result := contract.CleanupResult{}
+	keys := make([]string, 0, limit)
+	for _, owned := range e.state.Entries {
+		if owned.Key != e.state.ActiveKey {
+			keys = append(keys, owned.Key)
+			if len(keys) == limit {
+				break
+			}
+		}
+	}
+	for _, key := range keys {
+		owned := e.find(key)
+		if owned == nil {
+			continue
+		}
+		result.Attempted++
+		removed, err := e.advanceRetired(ctx, owned, operations)
+		if err != nil {
+			result.Failed++
+			continue
+		}
+		if removed {
+			result.Removed++
+		}
+	}
+	result.Pending = len(e.state.Entries)
+	result.Backpressure = result.Pending >= e.queueCapacity
+	return result
+}
+
+func (e *Engine) advanceRetired(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+) (bool, error) {
+	for transitions := 0; transitions < 6; transitions++ {
+		switch owned.Phase {
+		case phasePutIntent, phaseReconcilePut:
+			key := owned.Key
+			owned.Phase = phaseReconcilePut
+			resolved, err := e.reconcilePut(ctx, owned, operations)
+			if err != nil {
+				return false, err
+			}
+			if !resolved {
+				return e.find(key) == nil, nil
+			}
+		case phaseWaitObject:
+			proceed, _ := e.observeObject(ctx, owned, operations, false)
+			if !proceed {
+				return false, nil
+			}
+		case phaseDeleteIntent:
+			if owned.DeleteAt == nil {
+				now := e.now().UTC()
+				owned.DeleteAt = &now
+				if err := e.persist(); err != nil {
+					return false, err
+				}
+			}
+			var deleted s3client.DeleteResult
+			_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationCleanup, func(callCtx context.Context) error {
+				var callErr error
+				deleted, callErr = e.source.Delete(
+					callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{IfMatch: owned.SourceObjectETag},
+				)
+				return callErr
+			})
+			if err != nil {
+				owned.Phase = phaseReconcileDelete
+				_ = e.persist()
+				return false, nil
+			}
+			if !deleted.DeleteMarker || deleted.VersionID == "" {
+				owned.Phase = phaseReconcileDelete
+				_ = e.persist()
+				return false, nil
+			}
+			owned.SourceMarkerID = deleted.VersionID
+			owned.Phase = phaseWaitMarker
+			if err := e.persist(); err != nil {
+				return false, err
+			}
+		case phaseReconcileDelete:
+			resolved, err := e.reconcileDelete(ctx, owned, operations)
+			if err != nil || !resolved {
+				return false, err
+			}
+		case phaseWaitMarker:
+			proceed, _ := e.observeMarker(ctx, owned, operations, false)
+			if !proceed {
+				return false, nil
+			}
+		case phaseExactCleanup:
+			removed, err := e.cleanupExact(ctx, owned, operations)
+			if err != nil || !removed {
+				return false, err
+			}
+			e.remove(owned.Key)
+			return true, e.persist()
+		case phaseBlocked:
+			return false, nil
+		default:
+			return false, errors.New("invalid AWS cleanup phase")
+		}
+	}
+	return false, errors.New("AWS cleanup transition budget exhausted")
+}
+
+func (e *Engine) cleanupExact(
+	ctx context.Context,
+	owned *entry,
+	operations *[]contract.OperationResult,
+) (bool, error) {
+	if !owned.ObjectSeen || !owned.MarkerSeen ||
+		owned.SourceObjectID == "" || owned.DestinationObjectID == "" ||
+		owned.SourceMarkerID == "" || owned.DestinationMarkerID == "" {
+		return false, errors.New("AWS exact cleanup lacks proven replicated identities")
+	}
+	targets := []struct {
+		client   s3client.Client
+		bucket   string
+		endpoint contract.Endpoint
+		version  string
+	}{
+		{e.source, e.sourceBucket, contract.EndpointSource, owned.SourceObjectID},
+		{e.destination, e.destinationBucket, contract.EndpointDestination, owned.DestinationObjectID},
+		{e.source, e.sourceBucket, contract.EndpointSource, owned.SourceMarkerID},
+		{e.destination, e.destinationBucket, contract.EndpointDestination, owned.DestinationMarkerID},
+	}
+	for _, target := range targets {
+		_, err := e.call(ctx, operations, target.endpoint, contract.OperationCleanup, func(callCtx context.Context) error {
+			_, callErr := target.client.Delete(
+				callCtx, target.bucket, owned.Key, s3client.DeleteOptions{VersionID: target.version},
+			)
+			return callErr
+		})
+		if err != nil {
+			return false, err
+		}
+	}
+
+	sourceVersions, err := e.listExact(
+		ctx, e.source, e.sourceBucket, contract.EndpointSource, contract.OperationCleanup, owned.Key, operations,
+	)
+	if err != nil {
+		return false, err
+	}
+	destinationVersions, err := e.listExact(
+		ctx, e.destination, e.destinationBucket, contract.EndpointDestination, contract.OperationCleanup, owned.Key, operations,
+	)
+	if err != nil {
+		return false, err
+	}
+	return len(sourceVersions) == 0 && len(destinationVersions) == 0, nil
+}
+
+func (e *Engine) listExact(
+	ctx context.Context,
+	client s3client.Client,
+	bucket string,
+	endpoint contract.Endpoint,
+	operation contract.Operation,
+	key string,
+	operations *[]contract.OperationResult,
+) ([]s3client.Version, error) {
+	var versions []s3client.Version
+	var keyMarker, versionMarker string
+	for pageNumber := 0; pageNumber < maxListPages; pageNumber++ {
+		var page s3client.VersionPage
+		_, err := e.call(ctx, operations, endpoint, operation, func(callCtx context.Context) error {
+			var callErr error
+			page, callErr = client.ListVersions(
+				callCtx, bucket, key, keyMarker, versionMarker, listPageSize,
+			)
+			return callErr
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, version := range page.Versions {
+			if version.Key != key {
+				continue
+			}
+			if version.VersionID == "" {
+				return nil, errors.New("AWS exact version has no ID")
+			}
+			versions = append(versions, version)
+			if len(versions) > maxListedVersions {
+				return nil, fmt.Errorf("AWS exact-key version count exceeds %d", maxListedVersions)
+			}
+		}
+		if !page.Truncated {
+			return versions, nil
+		}
+		if page.NextKeyMarker == "" && page.NextVersionIDMarker == "" {
+			return nil, errors.New("AWS truncated version page has no continuation markers")
+		}
+		keyMarker = page.NextKeyMarker
+		versionMarker = page.NextVersionIDMarker
+	}
+	return nil, fmt.Errorf("AWS exact-key version listing exceeds %d pages", maxListPages)
+}
+
+func (e *Engine) find(key string) *entry {
+	for index := range e.state.Entries {
+		if e.state.Entries[index].Key == key {
+			return &e.state.Entries[index]
+		}
+	}
+	return nil
+}
+
+func splitVersions(versions []s3client.Version) (objects, markers []s3client.Version) {
+	for _, version := range versions {
+		switch version.Kind {
+		case s3client.VersionObject:
+			objects = append(objects, version)
+		case s3client.VersionDeleteMarker:
+			markers = append(markers, version)
+		}
+	}
+	return objects, markers
+}
+
+func payloadMatches(got s3client.GetResult, digest string) bool {
+	return probe.Digest(got.Payload) == digest
+}

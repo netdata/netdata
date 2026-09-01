@@ -185,7 +185,7 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 	index := len(e.state.Entries) - 1
 
 	if _, err := e.call(ctx, &result.Operations, contract.OperationPut, func(callCtx context.Context) error {
-		_, callErr := e.client.Put(callCtx, e.bucket, object.Key, object.Payload)
+		_, callErr := e.client.Put(callCtx, e.bucket, object.Key, object.Payload, s3client.PutOptions{IfNoneMatch: true})
 		return callErr
 	}); err != nil {
 		result.Probe = e.finish(failedProbe(contract.ReasonRequest))
@@ -238,7 +238,7 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 	}
 
 	if _, err := e.call(ctx, &result.Operations, contract.OperationDelete, func(callCtx context.Context) error {
-		_, callErr := e.client.Delete(callCtx, e.bucket, object.Key, "")
+		_, callErr := e.client.Delete(callCtx, e.bucket, object.Key, s3client.DeleteOptions{})
 		return callErr
 	}); err != nil {
 		result.Probe = e.finish(failedProbe(contract.ReasonRequest))
@@ -299,7 +299,7 @@ func (e *Engine) cleanupBacklog(
 		result.Attempted++
 
 		_, deleteErr := e.call(ctx, operations, contract.OperationCleanup, func(callCtx context.Context) error {
-			_, err := e.client.Delete(callCtx, e.bucket, owned.Key, "")
+			_, err := e.client.Delete(callCtx, e.bucket, owned.Key, s3client.DeleteOptions{})
 			return err
 		})
 		if deleteErr != nil {

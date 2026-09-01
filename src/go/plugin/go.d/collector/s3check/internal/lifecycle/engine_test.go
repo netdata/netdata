@@ -73,11 +73,11 @@ func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 func TestBackpressureNeverEvictsUnresolvedOwnership(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client := newLifecycleClient()
-	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte) (s3client.PutResult, error) {
+	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
 		clientModel(client).put(bucket, key, payload)
 		return s3client.PutResult{}, errors.New("ambiguous put")
 	}
-	client.DeleteFunc = func(context.Context, string, string, string) (s3client.DeleteResult, error) {
+	client.DeleteFunc = func(context.Context, string, string, s3client.DeleteOptions) (s3client.DeleteResult, error) {
 		return s3client.DeleteResult{}, errors.New("cleanup unavailable")
 	}
 	engine, err := New(Options{
@@ -117,11 +117,11 @@ func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client := newLifecycleClient()
 	model := clientModel(client)
-	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte) (s3client.PutResult, error) {
+	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
 		model.put(bucket, key, payload)
 		return s3client.PutResult{}, errors.New("ambiguous put")
 	}
-	client.DeleteFunc = func(_ context.Context, bucket, key, _ string) (s3client.DeleteResult, error) {
+	client.DeleteFunc = func(_ context.Context, bucket, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
 		model.delete(bucket, key)
 		return s3client.DeleteResult{}, nil
 	}
@@ -146,7 +146,7 @@ func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 	assert.Equal(t, 2, atCapacity.Cleanup.Pending)
 
 	now = now.Add(time.Minute + time.Second)
-	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte) (s3client.PutResult, error) {
+	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
 		model.put(bucket, key, payload)
 		return s3client.PutResult{}, nil
 	}
@@ -236,7 +236,7 @@ func newLifecycleClient() *testutil.S3 {
 	client.BucketReplicationFunc = func(context.Context, string) ([]s3client.ReplicationRule, error) {
 		return nil, s3client.ErrReplicationConfigAbsent
 	}
-	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte) (s3client.PutResult, error) {
+	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
 		model.put(bucket, key, payload)
 		return s3client.PutResult{}, nil
 	}
@@ -253,7 +253,7 @@ func newLifecycleClient() *testutil.S3 {
 	client.ListVersionsFunc = func(context.Context, string, string, string, string, int32) (s3client.VersionPage, error) {
 		return s3client.VersionPage{}, nil
 	}
-	client.DeleteFunc = func(_ context.Context, bucket, key, _ string) (s3client.DeleteResult, error) {
+	client.DeleteFunc = func(_ context.Context, bucket, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
 		model.delete(bucket, key)
 		return s3client.DeleteResult{}, nil
 	}
