@@ -757,16 +757,6 @@ sidebar:
               label: Troubleshooting
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/troubleshooting.md
               description: Diagnose missing rows, inactive listeners, UDP delivery, allowlist drops, SNMPv3 failures, profile issues, backend failures, and retention problems.
-      # Syslog from Network Devices
-      - meta:
-          label: Syslog from Network Devices
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md
-          description: Ingest syslog from network devices through the OpenTelemetry Collector and explore it in the Logs tab.
-        items:
-          - meta:
-              label: OpenTelemetry Collector Setup
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md
-              description: A working syslog receiver configuration and how to make it durable.
   # Logs
   - meta:
       label: Logs Management
@@ -885,6 +875,16 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
           description: Count matching OpenTelemetry log records and chart their rate in Netdata
           keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
+      # Syslog from Network Devices
+      - meta:
+          label: Syslog from Network Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md
+          description: Ingest syslog from network devices through the OpenTelemetry Collector and explore it in the Logs tab.
+        items:
+          - meta:
+              label: OpenTelemetry Collector Setup
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md
+              description: A working syslog receiver configuration and how to make it durable.
       - meta:
           label: OpenTelemetry Plugin Reference
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md

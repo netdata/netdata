@@ -258,7 +258,9 @@ service:
 On a Windows Event Collector, add a receiver for the `ForwardedEvents` channel to centralize what the forwarders send.
 The `storage` extension keeps a bookmark per channel, so a restart resumes where it stopped. Event bodies are
 structured records by default; set `raw: true` to keep the original XML instead. The receiver builds only on Windows,
-so validate this configuration on a Windows host.
+so validate this configuration on a Windows host. See the pinned upstream
+[windowseventlog receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/windowseventlogreceiver)
+for remote collection, XML queries, and the complete option set.
 
 ## Kubernetes and containers
 
@@ -347,7 +349,10 @@ receivers:
 ```
 
 Mount `/var/log/pods` and `/var/lib/otelcol` from the node into the Collector pod, and grant the service account the
-read permissions the `k8sattributes` processor needs (pods, namespaces, and replica sets across the cluster).
+read permissions the `k8sattributes` processor needs (pods, namespaces, and replica sets across the cluster). See the
+upstream [opentelemetry-collector Helm chart documentation](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
+and the pinned [k8sattributes processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/processor/k8sattributesprocessor)
+for every preset and association option.
 
 ## macOS unified log
 
@@ -379,7 +384,10 @@ service:
 ```
 
 `max_log_age` bounds how far back the receiver reads on its first start. Run the Collector as a `launchd` service
-with permission to read system logs. The receiver builds only on macOS, so validate this configuration on a Mac.
+with permission to read system logs. The receiver builds only on macOS, so validate this configuration on a Mac. See
+the pinned upstream
+[macOS unified logging receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/macosunifiedloggingreceiver)
+for archive mode, predicates, and the complete option set.
 
 ## Syslog
 

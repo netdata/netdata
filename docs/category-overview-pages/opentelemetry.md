@@ -27,12 +27,11 @@ source are in [Logs Collection](/docs/opentelemetry/logs-collection.md), and ret
 ## Traces
 
 The endpoint accepts and stores OTLP traces, but a traces view is not yet available in the dashboards and the traces
-workflow is not yet documented.
+workflow is not yet documented. Stay tuned.
 
 ## Requirements
 
-- Official Linux and macOS builds include the plugin. Linux source builds need a Rust toolchain and
-  `--enable-plugin-otel`; on macOS the installer enables it when it finds a Rust toolchain.
+- Official Linux and macOS builds include the plugin.
 - Viewing logs requires signing in with Netdata Cloud, free for community use.
 - The examples on these pages are validated with OpenTelemetry Collector Contrib 0.157.0.
 

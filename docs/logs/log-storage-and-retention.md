@@ -173,6 +173,28 @@ read cache when offloading is enabled. Queries are bounded only by their time ra
 default window and narrow it further before running a full-text search; see
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).
 
+## Command-line access
+
+The Netdata Agent ships a command-line query tool for its log store: `otel-plugin logs`, a subcommand of the plugin
+binary (`/usr/libexec/netdata/plugins.d/otel-plugin` on most installs). It reads the store's files directly — offline,
+without a running Agent — which makes it usable for forensics: a stopped node, or a disk mounted on another machine.
+
+```bash
+sudo /usr/libexec/netdata/plugins.d/otel-plugin logs \
+  --config /etc/netdata/otel.yaml --tenant default \
+  --name checkout --since -1h --filter 'level=error'
+```
+
+- Select the window with `--since`/`--until` (epoch seconds, relative values such as `-1h`, or UTC datetimes), the
+  stream with `--name`/`--namespace`, rows with `--filter 'field=value,field~regex'` and `--query REGEX`, and the
+  output fields with `--fields`.
+- Output is NDJSON on stdout, one object per row, ready for `jq`; a `matched=/returned=` summary and any warnings go
+  to stderr.
+- It reads local files only: records offloaded to object storage and already evicted locally are not visible to it,
+  and the newest records of an actively written stream may be missing. The Logs tab is authoritative for live data.
+- It runs read-only, takes no locks, and does not disturb ingestion; it needs read access to the store's directory
+  (run it as root or the `netdata` user). Exit code 0 means the query ran; check stderr for skipped files.
+
 ## Where to next
 
 - [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) — choose which sources
