@@ -18,21 +18,25 @@ import (
 )
 
 func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.Engine, error) {
-	j, err := journal.New(c.journalRoot, agentID, c.Name, c.ownershipFingerprint())
+	config, err := c.selectedModeConfig()
+	if err != nil {
+		return nil, fmt.Errorf("resolve selected mode config: %w", err)
+	}
+	j, err := journal.New(c.journalRoot, agentID, c.Name, config.ownershipFingerprint())
 	if err != nil {
 		return nil, fmt.Errorf("create ownership journal: %w", err)
 	}
-	source, err := c.newS3Client(ctx, c.Source.clientConfig())
+	source, err := c.newS3Client(ctx, config.Source.clientConfig())
 	if err != nil {
 		return nil, fmt.Errorf("create source S3 client: %w", err)
 	}
-	if !modeUsesDestination(c.Mode) {
+	if config.Mode == contract.ModeLifecycle {
 		engine, engineErr := lifecycle.New(lifecycle.Options{
 			Client:         source,
-			Bucket:         c.Source.Bucket,
+			Bucket:         config.Source.Bucket,
 			Journal:        j,
-			Generator:      newProbeGenerator(c.Prefix, j.OwnerID()),
-			RequestTimeout: c.Source.Timeout.Duration(),
+			Generator:      newProbeGenerator(config.Prefix, j.OwnerID()),
+			RequestTimeout: config.Source.Timeout.Duration(),
 			UpdateEvery:    time.Duration(c.UpdateEvery) * time.Second,
 		})
 		if engineErr != nil {
@@ -42,35 +46,35 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 		return engine, nil
 	}
 
-	destination, err := c.newS3Client(ctx, c.Destination.clientConfig())
+	destination, err := c.newS3Client(ctx, config.Destination.clientConfig())
 	if err != nil {
 		source.CloseIdleConnections()
 		return nil, fmt.Errorf("create destination S3 client: %w", err)
 	}
-	generator := newProbeGenerator(c.Prefix, j.OwnerID())
+	generator := newProbeGenerator(config.Prefix, j.OwnerID())
 	var engine contract.Engine
-	switch contract.Mode(c.Mode) {
+	switch config.Mode {
 	case contract.ModeCephMultisite:
 		engine, err = ceph.New(ceph.Options{
 			Source: source, Destination: destination,
-			SourceBucket: c.Source.Bucket, DestinationBucket: c.Destination.Bucket,
+			SourceBucket: config.Source.Bucket, DestinationBucket: config.Destination.Bucket,
 			Journal: j, Generator: generator,
-			SourceRequestTimeout: c.Source.Timeout.Duration(), DestinationRequestTimeout: c.Destination.Timeout.Duration(),
-			WriteObjective: c.WriteObjective.Duration(), WriteTimeout: c.WriteTimeout.Duration(),
-			DeleteObjective: c.DeleteObjective.Duration(), DeleteTimeout: c.DeleteTimeout.Duration(),
+			SourceRequestTimeout: config.Source.Timeout.Duration(), DestinationRequestTimeout: config.Destination.Timeout.Duration(),
+			WriteObjective: config.WriteObjective.Duration(), WriteTimeout: config.WriteTimeout.Duration(),
+			DeleteObjective: config.DeleteObjective.Duration(), DeleteTimeout: config.DeleteTimeout.Duration(),
 		})
 	case contract.ModeAWSReplication:
 		engine, err = aws.New(aws.Options{
 			Source: source, Destination: destination,
-			SourceBucket: c.Source.Bucket, DestinationBucket: c.Destination.Bucket,
-			ProbePrefix: c.Prefix, Journal: j, Generator: generator,
-			SourceRequestTimeout: c.Source.Timeout.Duration(), DestinationRequestTimeout: c.Destination.Timeout.Duration(),
+			SourceBucket: config.Source.Bucket, DestinationBucket: config.Destination.Bucket,
+			ProbePrefix: config.Prefix, Journal: j, Generator: generator,
+			SourceRequestTimeout: config.Source.Timeout.Duration(), DestinationRequestTimeout: config.Destination.Timeout.Duration(),
 			UpdateEvery:    time.Duration(c.UpdateEvery) * time.Second,
-			WriteObjective: c.WriteObjective.Duration(), WriteTimeout: c.WriteTimeout.Duration(),
-			DeleteObjective: c.DeleteObjective.Duration(), DeleteTimeout: c.DeleteTimeout.Duration(),
+			WriteObjective: config.WriteObjective.Duration(), WriteTimeout: config.WriteTimeout.Duration(),
+			DeleteObjective: config.DeleteObjective.Duration(), DeleteTimeout: config.DeleteTimeout.Duration(),
 		})
 	default:
-		err = fmt.Errorf("unsupported s3check mode %q", c.Mode)
+		err = fmt.Errorf("unsupported s3check mode %q", config.Mode)
 	}
 	if err != nil {
 		source.CloseIdleConnections()

@@ -105,8 +105,8 @@ func TestCollectorUsesIndependentLogicalCallTimeouts(t *testing.T) {
 
 	c := New()
 	c.Config = validConfig(contract.ModeCephMultisite)
-	c.Source.Timeout = confopt.LongDuration(100 * time.Millisecond)
-	c.Destination.Timeout = confopt.LongDuration(500 * time.Millisecond)
+	c.ModeCephMultisite.Source.Timeout = confopt.LongDuration(100 * time.Millisecond)
+	c.ModeCephMultisite.Destination.Timeout = confopt.LongDuration(500 * time.Millisecond)
 	c.registryUniqueID = func() string { return "agent-id" }
 	c.journalRoot = t.TempDir()
 	c.newS3Client = clientSequence(source, destination)

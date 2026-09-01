@@ -39,16 +39,38 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every,omitempty"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
 
-	Mode   string   `yaml:"mode" json:"mode"`
+	Mode               string                 `yaml:"mode" json:"mode"`
+	ModeLifecycle      *LifecycleModeConfig   `yaml:"mode_lifecycle,omitempty" json:"mode_lifecycle,omitempty"`
+	ModeCephMultisite  *ReplicationModeConfig `yaml:"mode_ceph_multisite,omitempty" json:"mode_ceph_multisite,omitempty"`
+	ModeAWSReplication *ReplicationModeConfig `yaml:"mode_aws_replication,omitempty" json:"mode_aws_replication,omitempty"`
+}
+
+type LifecycleModeConfig struct {
 	Prefix string   `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 	Source S3Config `yaml:"source" json:"source"`
+}
 
-	Destination *S3Config `yaml:"destination,omitempty" json:"destination,omitempty"`
+type ReplicationModeConfig struct {
+	Prefix      string   `yaml:"prefix,omitempty" json:"prefix,omitempty"`
+	Source      S3Config `yaml:"source" json:"source"`
+	Destination S3Config `yaml:"destination" json:"destination"`
 
 	WriteObjective  confopt.LongDuration `yaml:"write_objective,omitempty" json:"write_objective,omitempty"`
 	WriteTimeout    confopt.LongDuration `yaml:"write_timeout,omitempty" json:"write_timeout,omitempty"`
 	DeleteObjective confopt.LongDuration `yaml:"delete_objective,omitempty" json:"delete_objective,omitempty"`
 	DeleteTimeout   confopt.LongDuration `yaml:"delete_timeout,omitempty" json:"delete_timeout,omitempty"`
+}
+
+type selectedModeConfig struct {
+	Mode        contract.Mode
+	Prefix      string
+	Source      S3Config
+	Destination *S3Config
+
+	WriteObjective  confopt.LongDuration
+	WriteTimeout    confopt.LongDuration
+	DeleteObjective confopt.LongDuration
+	DeleteTimeout   confopt.LongDuration
 }
 
 // S3Config describes one source or destination connection. Name is presentation-only.
@@ -74,13 +96,38 @@ func (c *Config) applyDefaults() {
 	if c.Mode == "" {
 		c.Mode = string(contract.ModeLifecycle)
 	}
+	switch contract.Mode(c.Mode) {
+	case contract.ModeLifecycle:
+		if c.ModeLifecycle == nil {
+			c.ModeLifecycle = &LifecycleModeConfig{}
+		}
+		c.ModeLifecycle.applyDefaults()
+	case contract.ModeCephMultisite:
+		if c.ModeCephMultisite == nil {
+			c.ModeCephMultisite = &ReplicationModeConfig{}
+		}
+		c.ModeCephMultisite.applyDefaults()
+	case contract.ModeAWSReplication:
+		if c.ModeAWSReplication == nil {
+			c.ModeAWSReplication = &ReplicationModeConfig{}
+		}
+		c.ModeAWSReplication.applyDefaults()
+	}
+}
+
+func (c *LifecycleModeConfig) applyDefaults() {
 	if c.Prefix == "" {
 		c.Prefix = defaultPrefix
 	}
 	c.Source.applyDefaults("source")
-	if c.Destination != nil {
-		c.Destination.applyDefaults("destination")
+}
+
+func (c *ReplicationModeConfig) applyDefaults() {
+	if c.Prefix == "" {
+		c.Prefix = defaultPrefix
 	}
+	c.Source.applyDefaults("source")
+	c.Destination.applyDefaults("destination")
 	if c.WriteObjective.Duration() == 0 {
 		c.WriteObjective = confopt.LongDuration(defaultWriteObjective)
 	}
@@ -120,7 +167,8 @@ func (c *Config) validate() error {
 	if c.UpdateEvery <= 0 {
 		errs = append(errs, errors.New("update_every must be positive"))
 	}
-	switch contract.Mode(c.Mode) {
+	mode := contract.Mode(c.Mode)
+	switch mode {
 	case contract.ModeLifecycle, contract.ModeCephMultisite, contract.ModeAWSReplication:
 	default:
 		errs = append(errs, fmt.Errorf(
@@ -128,39 +176,46 @@ func (c *Config) validate() error {
 			c.Mode, contract.ModeLifecycle, contract.ModeCephMultisite, contract.ModeAWSReplication,
 		))
 	}
+	selected, err := c.selectedModeConfig()
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if selected != nil {
+		if err := selected.validate(c.UpdateEvery); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (c *selectedModeConfig) validate(updateEvery int) error {
+	var errs []error
 	if err := validatePrefix(c.Prefix); err != nil {
 		errs = append(errs, err)
 	}
 	if err := c.Source.validate("source"); err != nil {
 		errs = append(errs, err)
 	}
-
-	if modeUsesDestination(c.Mode) {
-		if c.Destination == nil {
-			errs = append(errs, errors.New("destination is required for replication modes"))
-		} else {
-			if err := c.Destination.validate("destination"); err != nil {
-				errs = append(errs, err)
-			}
-			if sameS3Location(c.Source, *c.Destination) {
-				errs = append(errs, errors.New("source and destination must identify different S3 locations"))
-			}
-		}
-		if err := c.validateObjectives(); err != nil {
+	if c.Destination != nil {
+		if err := c.Destination.validate("destination"); err != nil {
 			errs = append(errs, err)
 		}
-	} else if c.Destination != nil {
-		errs = append(errs, errors.New("destination is only valid in replication modes"))
+		if sameS3Location(c.Source, *c.Destination) {
+			errs = append(errs, errors.New("source and destination must identify different S3 locations"))
+		}
+		if err := c.validateObjectives(updateEvery); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	return errors.Join(errs...)
 }
 
-func (c Config) validateObjectives() error {
+func (c selectedModeConfig) validateObjectives(updateEvery int) error {
 	writeObjective := c.WriteObjective.Duration()
 	writeTimeout := c.WriteTimeout.Duration()
 	deleteObjective := c.DeleteObjective.Duration()
 	deleteTimeout := c.DeleteTimeout.Duration()
-	interval := time.Duration(c.UpdateEvery) * time.Second
+	interval := time.Duration(updateEvery) * time.Second
 	var errs []error
 	if writeObjective < interval || writeObjective > maxProbeHorizon {
 		errs = append(errs, fmt.Errorf("write_objective must be between update_every and %s", maxProbeHorizon))
@@ -175,6 +230,54 @@ func (c Config) validateObjectives() error {
 		errs = append(errs, fmt.Errorf("delete_timeout must be between delete_objective and %s", maxProbeHorizon))
 	}
 	return errors.Join(errs...)
+}
+
+func (c *Config) selectedModeConfig() (*selectedModeConfig, error) {
+	var errs []error
+	reject := func(name string, configured bool) {
+		if configured {
+			errs = append(errs, fmt.Errorf("%s is only valid when mode is %s", name, strings.TrimPrefix(name, "mode_")))
+		}
+	}
+
+	var selected *selectedModeConfig
+	switch contract.Mode(c.Mode) {
+	case contract.ModeLifecycle:
+		if c.ModeLifecycle == nil {
+			errs = append(errs, errors.New("mode_lifecycle is required when mode is lifecycle"))
+		} else {
+			selected = &selectedModeConfig{
+				Mode: contract.ModeLifecycle, Prefix: c.ModeLifecycle.Prefix, Source: c.ModeLifecycle.Source,
+			}
+		}
+		reject("mode_ceph_multisite", c.ModeCephMultisite != nil)
+		reject("mode_aws_replication", c.ModeAWSReplication != nil)
+	case contract.ModeCephMultisite:
+		if c.ModeCephMultisite == nil {
+			errs = append(errs, errors.New("mode_ceph_multisite is required when mode is ceph_multisite"))
+		} else {
+			selected = selectedReplicationConfig(contract.ModeCephMultisite, c.ModeCephMultisite)
+		}
+		reject("mode_lifecycle", c.ModeLifecycle != nil)
+		reject("mode_aws_replication", c.ModeAWSReplication != nil)
+	case contract.ModeAWSReplication:
+		if c.ModeAWSReplication == nil {
+			errs = append(errs, errors.New("mode_aws_replication is required when mode is aws_replication"))
+		} else {
+			selected = selectedReplicationConfig(contract.ModeAWSReplication, c.ModeAWSReplication)
+		}
+		reject("mode_lifecycle", c.ModeLifecycle != nil)
+		reject("mode_ceph_multisite", c.ModeCephMultisite != nil)
+	}
+	return selected, errors.Join(errs...)
+}
+
+func selectedReplicationConfig(mode contract.Mode, config *ReplicationModeConfig) *selectedModeConfig {
+	return &selectedModeConfig{
+		Mode: mode, Prefix: config.Prefix, Source: config.Source, Destination: &config.Destination,
+		WriteObjective: config.WriteObjective, WriteTimeout: config.WriteTimeout,
+		DeleteObjective: config.DeleteObjective, DeleteTimeout: config.DeleteTimeout,
+	}
 }
 
 func (c *S3Config) validate(path string) error {
@@ -269,10 +372,6 @@ func validateAssumeRole(role *awsauth.AssumeRoleConfig, path string) error {
 	return errors.Join(errs...)
 }
 
-func modeUsesDestination(mode string) bool {
-	return mode == string(contract.ModeCephMultisite) || mode == string(contract.ModeAWSReplication)
-}
-
 func sameS3Location(left, right S3Config) bool {
 	return s3LocationKey(left, true) == s3LocationKey(right, true)
 }
@@ -336,9 +435,9 @@ func canonicalHostname(host string, resolveZone bool) string {
 	return strings.ToLower(host)
 }
 
-func (c Config) ownershipFingerprint() string {
+func (c *selectedModeConfig) ownershipFingerprint() string {
 	parts := []string{
-		c.Mode,
+		string(c.Mode),
 		s3LocationKey(c.Source, false),
 		c.Prefix,
 	}

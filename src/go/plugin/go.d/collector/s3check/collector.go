@@ -12,13 +12,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/awsauth"
 )
 
 const cleanupBudget = 5 * time.Second
@@ -42,22 +40,9 @@ func init() {
 }
 
 func New() *Collector {
+	config := Config{UpdateEvery: defaultUpdateEvery, Mode: string(contract.ModeLifecycle)}
 	c := &Collector{
-		Config: Config{
-			UpdateEvery: defaultUpdateEvery,
-			Mode:        string(contract.ModeLifecycle),
-			Prefix:      defaultPrefix,
-			Source: S3Config{
-				Name:        "source",
-				Credentials: defaultCredentials(),
-				PathStyle:   new(true),
-				Timeout:     confopt.LongDuration(defaultTimeout),
-			},
-			WriteObjective:  confopt.LongDuration(defaultWriteObjective),
-			WriteTimeout:    confopt.LongDuration(defaultWriteTimeout),
-			DeleteObjective: confopt.LongDuration(defaultDeleteObjective),
-			DeleteTimeout:   confopt.LongDuration(defaultDeleteTimeout),
-		},
+		Config:           config,
 		store:            metrix.NewCollectorStore(),
 		newS3Client:      s3client.New,
 		registryUniqueID: pluginconfig.RegistryUniqueID,
@@ -106,7 +91,11 @@ func (c *Collector) Init(ctx context.Context) error {
 		return err
 	}
 	c.engine = engine
-	c.metrics.reset(c.Source.Name, destinationName(c.Destination))
+	selected, err := c.selectedModeConfig()
+	if err != nil {
+		return fmt.Errorf("resolve selected mode config: %w", err)
+	}
+	c.metrics.reset(selected.Source.Name, destinationName(selected.Destination))
 	return nil
 }
 
@@ -150,10 +139,6 @@ func (c *Collector) Cleanup(context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
-
-func defaultCredentials() awsauth.CredentialConfig {
-	return awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}
-}
 
 func destinationName(destination *S3Config) string {
 	if destination == nil {

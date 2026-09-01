@@ -134,40 +134,42 @@ be unversioned. The collector writes one small object at the source, reads the i
 verifies its SHA-256 digest, deletes the source key, and measures when the destination current object becomes unreadable.
 The replication policy must preserve the full key; destination-prefix rewriting is unsupported.
 
-Use one job for each direction you need to verify—for example site-a to site-b and site-b to site-a. Set `source.name`
-and `destination.name` to stable site labels. Configure readable `write_objective`, `write_timeout`,
-`delete_objective`, and `delete_timeout` durations; each objective must be at least one collection interval.
+Use one job for each direction you need to verify—for example site-a to site-b and site-b to site-a. Under
+`mode_ceph_multisite`, set `source.name` and `destination.name` to stable site labels. Configure readable
+`write_objective`, `write_timeout`, `delete_objective`, and `delete_timeout` durations; each objective must be at least
+one collection interval.
 
 ```yaml
 jobs:
   - name: ceph_site_a_to_site_b
     mode: ceph_multisite
-    prefix: netdata-s3check/
     update_every: 120
-    source:
-      name: site-a
-      endpoint: https://rgw-site-a.example.net
-      region: us-east-1
-      bucket: netdata-s3check
-      credentials:
-        type: static
-        type_static:
-          access_key_id: ${env:NETDATA_S3CHECK_SOURCE_ACCESS_KEY_ID}
-          secret_access_key: ${env:NETDATA_S3CHECK_SOURCE_SECRET_ACCESS_KEY}
-    destination:
-      name: site-b
-      endpoint: https://rgw-site-b.example.net
-      region: us-east-1
-      bucket: netdata-s3check
-      credentials:
-        type: static
-        type_static:
-          access_key_id: ${env:NETDATA_S3CHECK_DESTINATION_ACCESS_KEY_ID}
-          secret_access_key: ${env:NETDATA_S3CHECK_DESTINATION_SECRET_ACCESS_KEY}
-    write_objective: 15m
-    write_timeout: 30m
-    delete_objective: 5m
-    delete_timeout: 15m
+    mode_ceph_multisite:
+      prefix: netdata-s3check/
+      source:
+        name: site-a
+        endpoint: https://rgw-site-a.example.net
+        region: us-east-1
+        bucket: netdata-s3check
+        credentials:
+          type: static
+          type_static:
+            access_key_id: ${env:NETDATA_S3CHECK_SOURCE_ACCESS_KEY_ID}
+            secret_access_key: ${env:NETDATA_S3CHECK_SOURCE_SECRET_ACCESS_KEY}
+      destination:
+        name: site-b
+        endpoint: https://rgw-site-b.example.net
+        region: us-east-1
+        bucket: netdata-s3check
+        credentials:
+          type: static
+          type_static:
+            access_key_id: ${env:NETDATA_S3CHECK_DESTINATION_ACCESS_KEY_ID}
+            secret_access_key: ${env:NETDATA_S3CHECK_DESTINATION_SECRET_ACCESS_KEY}
+      write_objective: 15m
+      write_timeout: 30m
+      delete_objective: 5m
+      delete_timeout: 15m
 ```
 
 The collector persists a bounded, sanitized journal of exact owned keys before mutation. Cleanup operates only on those

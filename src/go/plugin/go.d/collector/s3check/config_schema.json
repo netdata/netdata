@@ -3,6 +3,18 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "S3 check collector configuration",
     "type": "object",
+    "propertyNames": {
+      "enum": [
+        "name",
+        "vnode",
+        "update_every",
+        "autodetection_retry",
+        "mode",
+        "mode_lifecycle",
+        "mode_ceph_multisite",
+        "mode_aws_replication"
+      ]
+    },
     "definitions": {
       "credentials": {
         "title": "Authentication",
@@ -161,6 +173,82 @@
           "tls_cert": ["tls_key"],
           "tls_key": ["tls_cert"]
         }
+      },
+      "lifecycle_mode": {
+        "title": "Lifecycle configuration",
+        "description": "Create, read, and delete owned probe objects through one S3 endpoint.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "title": "Owned object prefix",
+            "description": "Prefix reserved for this collector. It must end with a slash.",
+            "type": "string",
+            "default": "netdata-s3check/",
+            "minLength": 2,
+            "maxLength": 900,
+            "pattern": "^[^/].*/$"
+          },
+          "source": {
+            "title": "S3 connection",
+            "allOf": [{"$ref": "#/definitions/connection"}]
+          }
+        },
+        "required": ["source"]
+      },
+      "replication_mode": {
+        "title": "Replication configuration",
+        "description": "Create and delete owned probe objects at the source and verify their visibility at the destination.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "title": "Owned object prefix",
+            "description": "Prefix reserved for this collector. It must end with a slash.",
+            "type": "string",
+            "default": "netdata-s3check/",
+            "minLength": 2,
+            "maxLength": 900,
+            "pattern": "^[^/].*/$"
+          },
+          "source": {
+            "title": "Source connection",
+            "allOf": [{"$ref": "#/definitions/connection"}]
+          },
+          "destination": {
+            "title": "Destination connection",
+            "allOf": [{"$ref": "#/definitions/connection"}]
+          },
+          "write_objective": {
+            "title": "Write visibility objective",
+            "description": "Source PUT to verified destination visibility objective, for example 15m.",
+            "type": "string",
+            "default": "15m",
+            "minLength": 2
+          },
+          "write_timeout": {
+            "title": "Write visibility timeout",
+            "description": "Maximum time to wait for destination visibility, for example 30m.",
+            "type": "string",
+            "default": "30m",
+            "minLength": 2
+          },
+          "delete_objective": {
+            "title": "Delete visibility objective",
+            "description": "Source delete to destination current-object invisibility objective, for example 5m.",
+            "type": "string",
+            "default": "5m",
+            "minLength": 2
+          },
+          "delete_timeout": {
+            "title": "Delete visibility timeout",
+            "description": "Maximum time to wait for destination current-object invisibility, for example 15m.",
+            "type": "string",
+            "default": "15m",
+            "minLength": 2
+          }
+        },
+        "required": ["source", "destination"]
       }
     },
     "properties": {
@@ -185,19 +273,6 @@
         "enum": ["lifecycle", "ceph_multisite", "aws_replication"],
         "default": "lifecycle"
       },
-      "prefix": {
-        "title": "Owned object prefix",
-        "description": "Prefix reserved for this collector. It must end with a slash.",
-        "type": "string",
-        "default": "netdata-s3check/",
-        "minLength": 2,
-        "maxLength": 900,
-        "pattern": "^[^/].*/$"
-      },
-      "source": {
-        "title": "Source connection",
-        "$ref": "#/definitions/connection"
-      },
       "vnode": {
         "title": "Virtual node",
         "description": "Optional Virtual Node associated with all charts from this job.",
@@ -210,52 +285,58 @@
           {
             "title": "Lifecycle",
             "properties": {
-              "mode": {"const": "lifecycle"}
+              "mode": {"const": "lifecycle"},
+              "mode_lifecycle": {
+                "title": "Lifecycle configuration",
+                "allOf": [{"$ref": "#/definitions/lifecycle_mode"}]
+              }
+            },
+            "required": ["mode_lifecycle"],
+            "not": {
+              "anyOf": [
+                {"required": ["mode_ceph_multisite"]},
+                {"required": ["mode_aws_replication"]}
+              ]
             }
           },
           {
-            "title": "Replication",
+            "title": "Ceph multisite",
             "properties": {
-              "mode": {"enum": ["ceph_multisite", "aws_replication"]},
-              "destination": {
-                "title": "Destination connection",
-                "$ref": "#/definitions/connection"
-              },
-              "write_objective": {
-                "title": "Write visibility objective",
-                "description": "Source PUT to verified destination visibility objective, for example 15m.",
-                "type": "string",
-                "default": "15m",
-                "minLength": 2
-              },
-              "write_timeout": {
-                "title": "Write visibility timeout",
-                "description": "Maximum time to wait for destination visibility, for example 30m.",
-                "type": "string",
-                "default": "30m",
-                "minLength": 2
-              },
-              "delete_objective": {
-                "title": "Delete visibility objective",
-                "description": "Source delete to destination current-object invisibility objective, for example 5m.",
-                "type": "string",
-                "default": "5m",
-                "minLength": 2
-              },
-              "delete_timeout": {
-                "title": "Delete visibility timeout",
-                "description": "Maximum time to wait for destination current-object invisibility, for example 15m.",
-                "type": "string",
-                "default": "15m",
-                "minLength": 2
+              "mode": {"const": "ceph_multisite"},
+              "mode_ceph_multisite": {
+                "title": "Ceph multisite configuration",
+                "allOf": [{"$ref": "#/definitions/replication_mode"}]
               }
             },
-            "required": ["destination"]
+            "required": ["mode_ceph_multisite"],
+            "not": {
+              "anyOf": [
+                {"required": ["mode_lifecycle"]},
+                {"required": ["mode_aws_replication"]}
+              ]
+            }
+          },
+          {
+            "title": "AWS replication",
+            "properties": {
+              "mode": {"const": "aws_replication"},
+              "mode_aws_replication": {
+                "title": "AWS replication configuration",
+                "allOf": [{"$ref": "#/definitions/replication_mode"}]
+              }
+            },
+            "required": ["mode_aws_replication"],
+            "not": {
+              "anyOf": [
+                {"required": ["mode_lifecycle"]},
+                {"required": ["mode_ceph_multisite"]}
+              ]
+            }
           }
         ]
       }
     },
-    "required": ["mode", "source"]
+    "required": ["mode"]
   },
   "uiSchema": {
     "uiOptions": {"fullPage": true},
@@ -263,68 +344,134 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Probe",
-          "fields": ["mode", "prefix", "update_every", "autodetection_retry"]
+          "title": "Mode",
+          "fields": ["mode", "mode_lifecycle", "mode_ceph_multisite", "mode_aws_replication"]
         },
         {
-          "title": "Source",
-          "fields": ["source"]
+          "title": "Collection",
+          "fields": ["update_every", "autodetection_retry"]
         },
         {
-          "title": "Destination",
-          "fields": ["destination"]
-        },
-        {
-          "title": "Objectives",
-          "fields": ["write_objective", "write_timeout", "delete_objective", "delete_timeout"]
-        },
-        {
-          "title": "Virtual node",
+          "title": "Virtual Node",
           "fields": ["vnode"]
         }
       ]
     },
-    "source": {
-      "ui:flavour": "tabs",
-      "ui:options": {
-        "tabs": [
-          {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-          {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-          {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-          {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-          {"title": "Labels", "fields": ["name"]}
-        ]
-      },
-      "endpoint": {"ui:placeholder": "https://s3.example.net"},
-      "credentials": {
-        "type_static": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
-        }
-      },
-      "tls_key": {"ui:widget": "password"}
+    "mode": {
+      "ui:help": "Choose the check to run. Lifecycle checks one endpoint; Ceph multisite and AWS replication check one source-to-destination direction.",
+      "ui:widget": "radio",
+      "ui:options": {"inline": true}
     },
-    "destination": {
-      "ui:flavour": "tabs",
-      "ui:options": {
-        "tabs": [
-          {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-          {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-          {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-          {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-          {"title": "Labels", "fields": ["name"]}
-        ]
+    "mode_lifecycle": {
+      "source": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
+            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
+            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
+            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
+            {"title": "Labels", "fields": ["name"]}
+          ]
+        },
+        "endpoint": {"ui:placeholder": "https://s3.example.net"},
+        "credentials": {
+          "type_static": {
+            "access_key_id": {"ui:widget": "password"},
+            "secret_access_key": {"ui:widget": "password"},
+            "session_token": {"ui:widget": "password"}
+          }
+        },
+        "tls_key": {"ui:widget": "password"}
+      }
+    },
+    "mode_ceph_multisite": {
+      "source": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
+            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
+            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
+            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
+            {"title": "Labels", "fields": ["name"]}
+          ]
+        },
+        "endpoint": {"ui:placeholder": "https://zone-a.example.net"},
+        "credentials": {
+          "type_static": {
+            "access_key_id": {"ui:widget": "password"},
+            "secret_access_key": {"ui:widget": "password"},
+            "session_token": {"ui:widget": "password"}
+          }
+        },
+        "tls_key": {"ui:widget": "password"}
       },
-      "endpoint": {"ui:placeholder": "https://s3.example.net"},
-      "credentials": {
-        "type_static": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
-        }
+      "destination": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
+            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
+            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
+            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
+            {"title": "Labels", "fields": ["name"]}
+          ]
+        },
+        "endpoint": {"ui:placeholder": "https://zone-b.example.net"},
+        "credentials": {
+          "type_static": {
+            "access_key_id": {"ui:widget": "password"},
+            "secret_access_key": {"ui:widget": "password"},
+            "session_token": {"ui:widget": "password"}
+          }
+        },
+        "tls_key": {"ui:widget": "password"}
+      }
+    },
+    "mode_aws_replication": {
+      "source": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
+            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
+            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
+            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
+            {"title": "Labels", "fields": ["name"]}
+          ]
+        },
+        "endpoint": {"ui:placeholder": "Leave empty for the AWS SDK endpoint"},
+        "credentials": {
+          "type_static": {
+            "access_key_id": {"ui:widget": "password"},
+            "secret_access_key": {"ui:widget": "password"},
+            "session_token": {"ui:widget": "password"}
+          }
+        },
+        "tls_key": {"ui:widget": "password"}
       },
-      "tls_key": {"ui:widget": "password"}
+      "destination": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
+            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
+            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
+            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
+            {"title": "Labels", "fields": ["name"]}
+          ]
+        },
+        "endpoint": {"ui:placeholder": "Leave empty for the AWS SDK endpoint"},
+        "credentials": {
+          "type_static": {
+            "access_key_id": {"ui:widget": "password"},
+            "secret_access_key": {"ui:widget": "password"},
+            "session_token": {"ui:widget": "password"}
+          }
+        },
+        "tls_key": {"ui:widget": "password"}
+      }
     },
     "vnode": {
       "ui:placeholder": "Create a Virtual Node first, then reference its name here."

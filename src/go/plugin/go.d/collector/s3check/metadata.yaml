@@ -92,267 +92,627 @@ modules:
           name: go.d/s3check.conf
         options:
           description: |
-            Durations use readable values such as `10s`, `5m`, or `30m`. Destination and objective fields apply only to
-            `ceph_multisite` and `aws_replication`.
+            Select `mode`, then configure only its matching `mode_*` object. Durations use readable values such as `10s`,
+            `5m`, or `30m`.
           folding:
             title: Config options
             enabled: true
           list:
-            - name: mode
-              description: Select `lifecycle`, `ceph_multisite`, or `aws_replication`.
-              default_value: lifecycle
+            - name: "mode"
+              description: "Check mode. Select `lifecycle`, `ceph_multisite`, or `aws_replication`."
+              default_value: "lifecycle"
               required: false
-              group: Probe
-            - name: prefix
-              description: Reserved object-key prefix ending with a slash.
-              default_value: netdata-s3check/
+              group: "Mode"
+            - name: "mode_lifecycle"
+              description: "Configuration for the single-endpoint lifecycle check. Required when `mode` selects this check."
+              default_value: ""
               required: false
-              group: Probe
-            - name: update_every
-              description: Probe polling interval in seconds.
+              group: "Mode / Lifecycle"
+            - name: "mode_lifecycle.prefix"
+              description: "Reserved object-key prefix ending with a slash."
+              default_value: "netdata-s3check/"
+              required: false
+              group: "Mode / Lifecycle"
+            - name: "mode_lifecycle.source"
+              description: "Source S3 connection and authentication. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.name"
+              description: "Presentation-only source label."
+              default_value: "source"
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.endpoint"
+              description: "Optional HTTP(S) source endpoint. Empty uses the AWS SDK regional endpoint."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.region"
+              description: "Source signing region. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.bucket"
+              description: "Source probe bucket. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.path_style"
+              description: "Put the source bucket in the request path. This is common for Ceph RGW."
+              default_value: true
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.credentials"
+              description: "Source base-credential configuration."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.credentials.type"
+              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
+              default_value: "default"
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.credentials.type_static"
+              description: "Static source credential fields, used only when credential type is `static`."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.credentials.type_static.access_key_id"
+              description: "Source access key ID. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.credentials.type_static.secret_access_key"
+              description: "Source secret access key. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.credentials.type_static.session_token"
+              description: "Optional source session token."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.assume_role"
+              description: "Optional role assumed from the source base credentials."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.assume_role.role_arn"
+              description: "Source role ARN."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.assume_role.external_id"
+              description: "Optional source role external ID."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.timeout"
+              description: "Timeout for one logical source S3 call."
+              default_value: "10s"
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.proxy_url"
+              description: "Optional source HTTP proxy URL."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.tls_skip_verify"
+              description: "Skip source TLS verification. This is insecure."
+              default_value: false
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.tls_ca"
+              description: "Absolute path to the source CA bundle."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.tls_cert"
+              description: "Absolute path to the source client certificate."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_lifecycle.source.tls_key"
+              description: "Absolute path to the source client key."
+              default_value: ""
+              required: false
+              group: "Mode / Lifecycle connection"
+            - name: "mode_ceph_multisite"
+              description: "Configuration for one Ceph RGW source-to-destination direction. Required when `mode` selects this check."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite"
+            - name: "mode_ceph_multisite.prefix"
+              description: "Reserved object-key prefix ending with a slash."
+              default_value: "netdata-s3check/"
+              required: false
+              group: "Mode / Ceph multisite"
+            - name: "mode_ceph_multisite.source"
+              description: "Source S3 connection and authentication. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.name"
+              description: "Presentation-only source label."
+              default_value: "source"
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.endpoint"
+              description: "Optional HTTP(S) source endpoint. Empty uses the AWS SDK regional endpoint."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.region"
+              description: "Source signing region. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.bucket"
+              description: "Source probe bucket. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.path_style"
+              description: "Put the source bucket in the request path. This is common for Ceph RGW."
+              default_value: true
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.credentials"
+              description: "Source base-credential configuration."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.credentials.type"
+              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
+              default_value: "default"
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.credentials.type_static"
+              description: "Static source credential fields, used only when credential type is `static`."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.credentials.type_static.access_key_id"
+              description: "Source access key ID. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.credentials.type_static.secret_access_key"
+              description: "Source secret access key. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.credentials.type_static.session_token"
+              description: "Optional source session token."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.assume_role"
+              description: "Optional role assumed from the source base credentials."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.assume_role.role_arn"
+              description: "Source role ARN."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.assume_role.external_id"
+              description: "Optional source role external ID."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.timeout"
+              description: "Timeout for one logical source S3 call."
+              default_value: "10s"
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.proxy_url"
+              description: "Optional source HTTP proxy URL."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.tls_skip_verify"
+              description: "Skip source TLS verification. This is insecure."
+              default_value: false
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.tls_ca"
+              description: "Absolute path to the source CA bundle."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.tls_cert"
+              description: "Absolute path to the source client certificate."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.source.tls_key"
+              description: "Absolute path to the source client key."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite source"
+            - name: "mode_ceph_multisite.destination"
+              description: "Destination S3 connection and authentication. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.name"
+              description: "Presentation-only destination label."
+              default_value: "destination"
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.endpoint"
+              description: "Optional HTTP(S) destination endpoint. Empty uses the AWS SDK regional endpoint."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.region"
+              description: "Destination signing region. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.bucket"
+              description: "Destination probe bucket. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.path_style"
+              description: "Put the destination bucket in the request path. This is common for Ceph RGW."
+              default_value: true
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.credentials"
+              description: "Destination base-credential configuration."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.credentials.type"
+              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
+              default_value: "default"
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.credentials.type_static"
+              description: "Static destination credential fields, used only when credential type is `static`."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.credentials.type_static.access_key_id"
+              description: "Destination access key ID. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.credentials.type_static.secret_access_key"
+              description: "Destination secret access key. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.credentials.type_static.session_token"
+              description: "Optional destination session token."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.assume_role"
+              description: "Optional role assumed from the destination base credentials."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.assume_role.role_arn"
+              description: "Destination role ARN."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.assume_role.external_id"
+              description: "Optional destination role external ID."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.timeout"
+              description: "Timeout for one logical destination S3 call."
+              default_value: "10s"
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.proxy_url"
+              description: "Optional destination HTTP proxy URL."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.tls_skip_verify"
+              description: "Skip destination TLS verification. This is insecure."
+              default_value: false
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.tls_ca"
+              description: "Absolute path to the destination CA bundle."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.tls_cert"
+              description: "Absolute path to the destination client certificate."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.destination.tls_key"
+              description: "Absolute path to the destination client key."
+              default_value: ""
+              required: false
+              group: "Mode / Ceph multisite destination"
+            - name: "mode_ceph_multisite.write_objective"
+              description: "Source PUT to verified destination visibility objective."
+              default_value: "15m"
+              required: false
+              group: "Mode / Ceph multisite objectives"
+            - name: "mode_ceph_multisite.write_timeout"
+              description: "Maximum source PUT to destination visibility wait."
+              default_value: "30m"
+              required: false
+              group: "Mode / Ceph multisite objectives"
+            - name: "mode_ceph_multisite.delete_objective"
+              description: "Source delete to destination current-object invisibility objective."
+              default_value: "5m"
+              required: false
+              group: "Mode / Ceph multisite objectives"
+            - name: "mode_ceph_multisite.delete_timeout"
+              description: "Maximum source delete to destination current-object invisibility wait."
+              default_value: "15m"
+              required: false
+              group: "Mode / Ceph multisite objectives"
+            - name: "mode_aws_replication"
+              description: "Configuration for one AWS S3 source-to-destination replication direction. Required when `mode` selects this check."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication"
+            - name: "mode_aws_replication.prefix"
+              description: "Reserved object-key prefix ending with a slash."
+              default_value: "netdata-s3check/"
+              required: false
+              group: "Mode / AWS replication"
+            - name: "mode_aws_replication.source"
+              description: "Source S3 connection and authentication. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.name"
+              description: "Presentation-only source label."
+              default_value: "source"
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.endpoint"
+              description: "Optional HTTP(S) source endpoint. Empty uses the AWS SDK regional endpoint."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.region"
+              description: "Source signing region. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.bucket"
+              description: "Source probe bucket. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.path_style"
+              description: "Put the source bucket in the request path. This is common for Ceph RGW."
+              default_value: true
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.credentials"
+              description: "Source base-credential configuration."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.credentials.type"
+              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
+              default_value: "default"
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.credentials.type_static"
+              description: "Static source credential fields, used only when credential type is `static`."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.credentials.type_static.access_key_id"
+              description: "Source access key ID. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.credentials.type_static.secret_access_key"
+              description: "Source secret access key. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.credentials.type_static.session_token"
+              description: "Optional source session token."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.assume_role"
+              description: "Optional role assumed from the source base credentials."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.assume_role.role_arn"
+              description: "Source role ARN."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.assume_role.external_id"
+              description: "Optional source role external ID."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.timeout"
+              description: "Timeout for one logical source S3 call."
+              default_value: "10s"
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.proxy_url"
+              description: "Optional source HTTP proxy URL."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.tls_skip_verify"
+              description: "Skip source TLS verification. This is insecure."
+              default_value: false
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.tls_ca"
+              description: "Absolute path to the source CA bundle."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.tls_cert"
+              description: "Absolute path to the source client certificate."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.source.tls_key"
+              description: "Absolute path to the source client key."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication source"
+            - name: "mode_aws_replication.destination"
+              description: "Destination S3 connection and authentication. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.name"
+              description: "Presentation-only destination label."
+              default_value: "destination"
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.endpoint"
+              description: "Optional HTTP(S) destination endpoint. Empty uses the AWS SDK regional endpoint."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.region"
+              description: "Destination signing region. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.bucket"
+              description: "Destination probe bucket. Required when this mode is selected."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.path_style"
+              description: "Put the destination bucket in the request path. This is common for Ceph RGW."
+              default_value: true
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.credentials"
+              description: "Destination base-credential configuration."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.credentials.type"
+              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
+              default_value: "default"
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.credentials.type_static"
+              description: "Static destination credential fields, used only when credential type is `static`."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.credentials.type_static.access_key_id"
+              description: "Destination access key ID. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.credentials.type_static.secret_access_key"
+              description: "Destination secret access key. Use a go.d secret reference."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.credentials.type_static.session_token"
+              description: "Optional destination session token."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.assume_role"
+              description: "Optional role assumed from the destination base credentials."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.assume_role.role_arn"
+              description: "Destination role ARN."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.assume_role.external_id"
+              description: "Optional destination role external ID."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.timeout"
+              description: "Timeout for one logical destination S3 call."
+              default_value: "10s"
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.proxy_url"
+              description: "Optional destination HTTP proxy URL."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.tls_skip_verify"
+              description: "Skip destination TLS verification. This is insecure."
+              default_value: false
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.tls_ca"
+              description: "Absolute path to the destination CA bundle."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.tls_cert"
+              description: "Absolute path to the destination client certificate."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.destination.tls_key"
+              description: "Absolute path to the destination client key."
+              default_value: ""
+              required: false
+              group: "Mode / AWS replication destination"
+            - name: "mode_aws_replication.write_objective"
+              description: "Source PUT to verified destination visibility objective."
+              default_value: "15m"
+              required: false
+              group: "Mode / AWS replication objectives"
+            - name: "mode_aws_replication.write_timeout"
+              description: "Maximum source PUT to destination visibility wait."
+              default_value: "30m"
+              required: false
+              group: "Mode / AWS replication objectives"
+            - name: "mode_aws_replication.delete_objective"
+              description: "Source delete to destination current-object invisibility objective."
+              default_value: "5m"
+              required: false
+              group: "Mode / AWS replication objectives"
+            - name: "mode_aws_replication.delete_timeout"
+              description: "Maximum source delete to destination current-object invisibility wait."
+              default_value: "15m"
+              required: false
+              group: "Mode / AWS replication objectives"
+            - name: "update_every"
+              description: "Probe polling interval in seconds."
               default_value: 120
               required: false
-              group: Probe
-            - name: autodetection_retry
-              description: Seconds between retries after the initial provider check fails; zero disables retries.
+              group: "Collection"
+            - name: "autodetection_retry"
+              description: "Seconds between retries after the initial provider check fails. Zero disables retries."
               default_value: 0
               required: false
-              group: Probe
-            - name: source
-              description: Source S3 connection and authentication.
-              default_value: ""
-              required: true
-              group: Source
-            - name: source.name
-              description: Presentation-only source label.
-              default_value: source
-              required: false
-              group: Source / Labels
-            - name: source.endpoint
-              description: Optional HTTP(S) S3 endpoint; empty uses the AWS SDK regional endpoint.
+              group: "Collection"
+            - name: "vnode"
+              description: "Associates all charts with a configured Virtual Node."
               default_value: ""
               required: false
-              group: Source / Connection
-            - name: source.region
-              description: Source signing region.
-              default_value: ""
-              required: true
-              group: Source / Connection
-            - name: source.bucket
-              description: Source probe bucket.
-              default_value: ""
-              required: true
-              group: Source / Connection
-            - name: source.path_style
-              description: Put the source bucket in the request path; common for Ceph RGW.
-              default_value: true
-              required: false
-              group: Source / Connection
-            - name: source.credentials
-              description: Source base-credential configuration.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.credentials.type
-              description: Use `default` for the AWS SDK chain or `static` for explicit credentials.
-              default_value: default
-              required: false
-              group: Source / Authentication
-            - name: source.credentials.type_static
-              description: Static source credential fields, used only when type is `static`.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.credentials.type_static.access_key_id
-              description: Source access key ID; use a go.d secret reference.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.credentials.type_static.secret_access_key
-              description: Source secret access key; use a go.d secret reference.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.credentials.type_static.session_token
-              description: Optional source session token.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.assume_role
-              description: Optional role assumed from the source base credentials.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.assume_role.role_arn
-              description: Source role ARN.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.assume_role.external_id
-              description: Optional source role external ID.
-              default_value: ""
-              required: false
-              group: Source / Authentication
-            - name: source.timeout
-              description: Timeout for one logical source S3 call.
-              default_value: 10s
-              required: false
-              group: Source / HTTP
-            - name: source.proxy_url
-              description: Optional source HTTP proxy URL.
-              default_value: ""
-              required: false
-              group: Source / HTTP
-            - name: source.tls_skip_verify
-              description: Skip source TLS verification. This is insecure.
-              default_value: false
-              required: false
-              group: Source / TLS
-            - name: source.tls_ca
-              description: Absolute path to the source CA bundle.
-              default_value: ""
-              required: false
-              group: Source / TLS
-            - name: source.tls_cert
-              description: Absolute path to the source client certificate.
-              default_value: ""
-              required: false
-              group: Source / TLS
-            - name: source.tls_key
-              description: Absolute path to the source client key.
-              default_value: ""
-              required: false
-              group: Source / TLS
-            - name: destination
-              description: Destination S3 connection and authentication; required in replication modes.
-              default_value: ""
-              required: false
-              group: Destination
-            - name: destination.name
-              description: Presentation-only destination label.
-              default_value: destination
-              required: false
-              group: Destination / Labels
-            - name: destination.endpoint
-              description: Optional HTTP(S) destination endpoint; empty uses the AWS SDK regional endpoint.
-              default_value: ""
-              required: false
-              group: Destination / Connection
-            - name: destination.region
-              description: Destination signing region.
-              default_value: ""
-              required: false
-              group: Destination / Connection
-            - name: destination.bucket
-              description: Destination probe bucket.
-              default_value: ""
-              required: false
-              group: Destination / Connection
-            - name: destination.path_style
-              description: Put the destination bucket in the request path; common for Ceph RGW.
-              default_value: true
-              required: false
-              group: Destination / Connection
-            - name: destination.credentials
-              description: Destination base-credential configuration.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.credentials.type
-              description: Use `default` for the AWS SDK chain or `static` for explicit credentials.
-              default_value: default
-              required: false
-              group: Destination / Authentication
-            - name: destination.credentials.type_static
-              description: Static destination credential fields, used only when type is `static`.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.credentials.type_static.access_key_id
-              description: Destination access key ID; use a go.d secret reference.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.credentials.type_static.secret_access_key
-              description: Destination secret access key; use a go.d secret reference.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.credentials.type_static.session_token
-              description: Optional destination session token.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.assume_role
-              description: Optional role assumed from the destination base credentials.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.assume_role.role_arn
-              description: Destination role ARN.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.assume_role.external_id
-              description: Optional destination role external ID.
-              default_value: ""
-              required: false
-              group: Destination / Authentication
-            - name: destination.timeout
-              description: Timeout for one logical destination S3 call.
-              default_value: 10s
-              required: false
-              group: Destination / HTTP
-            - name: destination.proxy_url
-              description: Optional destination HTTP proxy URL.
-              default_value: ""
-              required: false
-              group: Destination / HTTP
-            - name: destination.tls_skip_verify
-              description: Skip destination TLS verification. This is insecure.
-              default_value: false
-              required: false
-              group: Destination / TLS
-            - name: destination.tls_ca
-              description: Absolute path to the destination CA bundle.
-              default_value: ""
-              required: false
-              group: Destination / TLS
-            - name: destination.tls_cert
-              description: Absolute path to the destination client certificate.
-              default_value: ""
-              required: false
-              group: Destination / TLS
-            - name: destination.tls_key
-              description: Absolute path to the destination client key.
-              default_value: ""
-              required: false
-              group: Destination / TLS
-            - name: write_objective
-              description: Source PUT to verified destination visibility objective.
-              default_value: 15m
-              required: false
-              group: Objectives
-            - name: write_timeout
-              description: Maximum source PUT to destination visibility wait.
-              default_value: 30m
-              required: false
-              group: Objectives
-            - name: delete_objective
-              description: Source delete to destination current-object invisibility objective.
-              default_value: 5m
-              required: false
-              group: Objectives
-            - name: delete_timeout
-              description: Maximum source delete to destination current-object invisibility wait.
-              default_value: 15m
-              required: false
-              group: Objectives
-            - name: vnode
-              description: Associates all charts with a configured Virtual Node.
-              default_value: ""
-              required: false
-              group: Virtual node
+              group: "Virtual Node"
         examples:
           folding:
             title: Config
@@ -364,62 +724,65 @@ modules:
                 jobs:
                   - name: s3_lifecycle
                     mode: lifecycle
-                    source:
-                      endpoint: https://s3.example.net
-                      region: us-east-1
-                      bucket: netdata-s3check
-                      credentials:
-                        type: static
-                        type_static:
-                          access_key_id: ${env:NETDATA_S3CHECK_ACCESS_KEY_ID}
-                          secret_access_key: ${env:NETDATA_S3CHECK_SECRET_ACCESS_KEY}
-                      path_style: yes
+                    mode_lifecycle:
+                      source:
+                        endpoint: https://s3.example.net
+                        region: us-east-1
+                        bucket: netdata-s3check
+                        credentials:
+                          type: static
+                          type_static:
+                            access_key_id: ${env:NETDATA_S3CHECK_ACCESS_KEY_ID}
+                            secret_access_key: ${env:NETDATA_S3CHECK_SECRET_ACCESS_KEY}
+                        path_style: yes
             - name: Ceph RGW multisite direction
               description: Use one job per source-to-destination direction; both buckets must be unversioned.
               config: |
                 jobs:
                   - name: ceph_site_a_to_site_b
                     mode: ceph_multisite
-                    source:
-                      name: site-a
-                      endpoint: https://rgw-site-a.example.net
-                      region: us-east-1
-                      bucket: netdata-s3check
-                      credentials:
-                        type: default
-                    destination:
-                      name: site-b
-                      endpoint: https://rgw-site-b.example.net
-                      region: us-east-1
-                      bucket: netdata-s3check
-                      credentials:
-                        type: default
-                    write_objective: 15m
-                    write_timeout: 30m
-                    delete_objective: 5m
-                    delete_timeout: 15m
+                    mode_ceph_multisite:
+                      source:
+                        name: site-a
+                        endpoint: https://rgw-site-a.example.net
+                        region: us-east-1
+                        bucket: netdata-s3check
+                        credentials:
+                          type: default
+                      destination:
+                        name: site-b
+                        endpoint: https://rgw-site-b.example.net
+                        region: us-east-1
+                        bucket: netdata-s3check
+                        credentials:
+                          type: default
+                      write_objective: 15m
+                      write_timeout: 30m
+                      delete_objective: 5m
+                      delete_timeout: 15m
             - name: AWS replication with independent roles
               description: Both buckets must be versioned and the applicable source rule must replicate delete markers.
               config: |
                 jobs:
                   - name: aws_replication
                     mode: aws_replication
-                    source:
-                      name: us-east-1
-                      region: us-east-1
-                      bucket: source-bucket
-                      credentials:
-                        type: default
-                      assume_role:
-                        role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-source
-                    destination:
-                      name: us-west-2
-                      region: us-west-2
-                      bucket: destination-bucket
-                      credentials:
-                        type: default
-                      assume_role:
-                        role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-destination
+                    mode_aws_replication:
+                      source:
+                        name: us-east-1
+                        region: us-east-1
+                        bucket: source-bucket
+                        credentials:
+                          type: default
+                        assume_role:
+                          role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-source
+                      destination:
+                        name: us-west-2
+                        region: us-west-2
+                        bucket: destination-bucket
+                        credentials:
+                          type: default
+                        assume_role:
+                          role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-destination
     troubleshooting:
       problems:
         list:
