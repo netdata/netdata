@@ -6,18 +6,15 @@
 struct terminal_services_sessions {
     COUNTER_DATA active;
     COUNTER_DATA inactive;
-    COUNTER_DATA total;
 
     RRDSET *st;
     RRDDIM *rd_active;
     RRDDIM *rd_inactive;
-    RRDDIM *rd_total;
 };
 
 static struct terminal_services_sessions sessions = {
     .active = {.key = "Active Sessions"},
     .inactive = {.key = "Inactive Sessions"},
-    .total = {.key = "Total Sessions"},
 };
 
 static bool do_terminal_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -28,9 +25,8 @@ static bool do_terminal_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
     bool has_active = perflibGetObjectCounter(pDataBlock, pObjectType, &sessions.active);
     bool has_inactive = perflibGetObjectCounter(pDataBlock, pObjectType, &sessions.inactive);
-    bool has_total = perflibGetObjectCounter(pDataBlock, pObjectType, &sessions.total);
 
-    if (!sessions.st && (!has_active || !has_inactive || !has_total))
+    if (!sessions.st && (!has_active || !has_inactive))
         return false;
 
     if (unlikely(!sessions.st)) {
@@ -50,15 +46,12 @@ static bool do_terminal_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         sessions.rd_active = perflib_rrddim_add(sessions.st, "active", NULL, 1, 1, &sessions.active);
         sessions.rd_inactive = perflib_rrddim_add(sessions.st, "inactive", NULL, 1, 1, &sessions.inactive);
-        sessions.rd_total = perflib_rrddim_add(sessions.st, "total", NULL, 1, 1, &sessions.total);
     }
 
     if (has_active)
         perflib_rrddim_set_by_pointer(sessions.st, sessions.rd_active, &sessions.active);
     if (has_inactive)
         perflib_rrddim_set_by_pointer(sessions.st, sessions.rd_inactive, &sessions.inactive);
-    if (has_total)
-        perflib_rrddim_set_by_pointer(sessions.st, sessions.rd_total, &sessions.total);
     rrdset_done(sessions.st);
 
     return true;

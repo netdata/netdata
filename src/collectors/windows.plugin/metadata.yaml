@@ -1025,8 +1025,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor aggregate Terminal Services session capacity on Windows hosts, including active, inactive, and total
-          sessions.
+          Monitor aggregate active and inactive Terminal Services sessions on Windows hosts.
         method_description: |
           It queries the `Terminal Services` object from Perflib. These are aggregate Remote Desktop Services session
           states, not a per-user inventory or a count of TCP connections.
@@ -1091,7 +1090,6 @@ modules:
               dimensions:
                 - name: active
                 - name: inactive
-                - name: total
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibObjects
