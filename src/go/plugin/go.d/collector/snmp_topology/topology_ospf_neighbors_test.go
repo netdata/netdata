@@ -85,6 +85,43 @@ func TestTopologyCache_OSPFSnapshotAllocationsDoNotScaleWithPrefixNeighborCrossP
 	require.LessOrEqual(t, many, one+512, "prefix matching must not reparse every interface for every neighbor")
 }
 
+func TestTopologyCache_AddresslessOSPFSnapshotDoesNotBuildPrefixIndex(t *testing.T) {
+	allocsForNeighbors := func(neighbors int) float64 {
+		cache := newTopologyBuilder()
+		cache.localDevice.ChassisID = "02:00:00:00:00:01"
+		cache.localDevice.ChassisIDType = "macAddress"
+		cache.localDevice.SysName = "addressless-router"
+		for i := range 256 {
+			ip := fmt.Sprintf("10.0.%d.%d", i>>8, i&255)
+			ifIndex := fmt.Sprintf("%d", i+1)
+			cache.updateIfIndexByIP(modernIPv4Tags(
+				ip,
+				ifIndex,
+				fmt.Sprintf("%s.%s.1.4.%s.32", ipAddressPrefixOriginOID, ifIndex, ip),
+			))
+		}
+		for i := range neighbors {
+			cache.updateOSPFNeighbor(map[string]string{
+				tagOSPFNeighborRouterID: fmt.Sprintf("192.0.2.%d", i+1),
+				tagOSPFNeighborIP:       "0.0.0.0",
+				tagOSPFNeighborState:    "full",
+			})
+		}
+		cache.finalize()
+
+		return testing.AllocsPerRun(10, func() {
+			snapshot, ok := cache.buildObservationSnapshot()
+			runtime.KeepAlive(snapshot)
+			runtime.KeepAlive(ok)
+		})
+	}
+
+	withoutNeighbors := allocsForNeighbors(0)
+	addresslessNeighbors := allocsForNeighbors(32)
+	require.LessOrEqual(t, addresslessNeighbors, withoutNeighbors+512,
+		"addressless neighbors must not trigger prefix-index construction")
+}
+
 func TestTopologyCache_MatchOSPFNeighborLocalInterfaceUsesLongestPrefix(t *testing.T) {
 	cache := newTopologyBuilder()
 	cache.ipAddressesByIP = map[string]resolvedIPAddress{
@@ -118,33 +155,7 @@ func TestTopologyCache_MatchOSPFNeighborLocalInterfaceKeepsFirstSortedEqualPrefi
 func BenchmarkTopologyCacheOSPFSnapshotWithoutPrefixes(b *testing.B) {
 	for _, addressRows := range []int{4096, 65536} {
 		b.Run(fmt.Sprintf("addresses=%d/neighbors=100", addressRows), func(b *testing.B) {
-			cache := newTopologyBuilder()
-			cache.localDevice.ChassisID = "02:00:00:00:00:01"
-			cache.localDevice.ChassisIDType = "macAddress"
-			cache.localDevice.SysName = "benchmark-router"
-			for i := range addressRows {
-				cache.updateIfIndexByIP(modernIPv4Tags(
-					fmt.Sprintf("169.254.%d.%d", (i>>8)&255, i&255),
-					fmt.Sprintf("%d", i+1),
-					"0.0",
-				))
-			}
-			for i := range 100 {
-				cache.updateOSPFNeighbor(map[string]string{
-					tagOSPFNeighborRouterID: fmt.Sprintf("192.0.2.%d", i+1),
-					tagOSPFNeighborIP:       fmt.Sprintf("198.51.100.%d", i+1),
-					tagOSPFNeighborState:    "full",
-				})
-			}
-			cache.finalize()
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for b.Loop() {
-				snapshot, ok := cache.buildObservationSnapshot()
-				runtime.KeepAlive(snapshot)
-				runtime.KeepAlive(ok)
-			}
+			benchmarkTopologyCacheOSPFSnapshot(b, addressRows, false, false)
 		})
 	}
 }
@@ -152,35 +163,54 @@ func BenchmarkTopologyCacheOSPFSnapshotWithoutPrefixes(b *testing.B) {
 func BenchmarkTopologyCacheOSPFSnapshotWithPrefixes(b *testing.B) {
 	for _, addressRows := range []int{4096, 65536} {
 		b.Run(fmt.Sprintf("addresses=%d/neighbors=100", addressRows), func(b *testing.B) {
-			cache := newTopologyBuilder()
-			cache.localDevice.ChassisID = "02:00:00:00:00:01"
-			cache.localDevice.ChassisIDType = "macAddress"
-			cache.localDevice.SysName = "benchmark-router"
-			for i := range addressRows {
-				ip := fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255)
-				ifIndex := fmt.Sprintf("%d", i+1)
-				cache.updateIfIndexByIP(modernIPv4Tags(
-					ip,
-					ifIndex,
-					fmt.Sprintf("%s.%s.1.4.%s.32", ipAddressPrefixOriginOID, ifIndex, ip),
-				))
-			}
-			for i := range 100 {
-				cache.updateOSPFNeighbor(map[string]string{
-					tagOSPFNeighborRouterID: fmt.Sprintf("192.0.2.%d", i+1),
-					tagOSPFNeighborIP:       fmt.Sprintf("198.51.100.%d", i+1),
-					tagOSPFNeighborState:    "full",
-				})
-			}
-			cache.finalize()
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for b.Loop() {
-				snapshot, ok := cache.buildObservationSnapshot()
-				runtime.KeepAlive(snapshot)
-				runtime.KeepAlive(ok)
-			}
+			benchmarkTopologyCacheOSPFSnapshot(b, addressRows, true, false)
 		})
+	}
+}
+
+func BenchmarkTopologyCacheOSPFSnapshotAddresslessNeighbors(b *testing.B) {
+	for _, addressRows := range []int{4096, 65536} {
+		b.Run(fmt.Sprintf("addresses=%d/neighbors=100", addressRows), func(b *testing.B) {
+			benchmarkTopologyCacheOSPFSnapshot(b, addressRows, true, true)
+		})
+	}
+}
+
+func benchmarkTopologyCacheOSPFSnapshot(b *testing.B, addressRows int, withPrefixes, addressless bool) {
+	cache := newTopologyBuilder()
+	cache.localDevice.ChassisID = "02:00:00:00:00:01"
+	cache.localDevice.ChassisIDType = "macAddress"
+	cache.localDevice.SysName = "benchmark-router"
+	for i := range addressRows {
+		ip := fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255)
+		if !withPrefixes {
+			ip = fmt.Sprintf("169.254.%d.%d", (i>>8)&255, i&255)
+		}
+		ifIndex := fmt.Sprintf("%d", i+1)
+		pointer := "0.0"
+		if withPrefixes {
+			pointer = fmt.Sprintf("%s.%s.1.4.%s.32", ipAddressPrefixOriginOID, ifIndex, ip)
+		}
+		cache.updateIfIndexByIP(modernIPv4Tags(ip, ifIndex, pointer))
+	}
+	for i := range 100 {
+		neighborIP := fmt.Sprintf("198.51.100.%d", i+1)
+		if addressless {
+			neighborIP = "0.0.0.0"
+		}
+		cache.updateOSPFNeighbor(map[string]string{
+			tagOSPFNeighborRouterID: fmt.Sprintf("192.0.2.%d", i+1),
+			tagOSPFNeighborIP:       neighborIP,
+			tagOSPFNeighborState:    "full",
+		})
+	}
+	cache.finalize()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		snapshot, ok := cache.buildObservationSnapshot()
+		runtime.KeepAlive(snapshot)
+		runtime.KeepAlive(ok)
 	}
 }

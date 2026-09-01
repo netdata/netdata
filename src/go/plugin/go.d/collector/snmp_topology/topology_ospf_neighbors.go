@@ -49,7 +49,8 @@ func (c *topologyBuilder) snapshotOSPFNeighbors(
 		return nil
 	}
 
-	localInterfaces := newTopologyOSPFLocalInterfaceIndex(l3Interfaces)
+	var localInterfaces topologyOSPFLocalInterfaceIndex
+	localInterfacesBuilt := false
 	keys := topologyutil.SortedMapKeys(c.ospfNeighborsByKey)
 	rows := make([]topologymodel.OSPFNeighbor, 0, len(keys))
 	for _, key := range keys {
@@ -58,12 +59,18 @@ func (c *topologyBuilder) snapshotOSPFNeighbors(
 		if row.LocalRouterID == "" {
 			row.LocalRouterID = topologyutil.NormalizeTopologyRouterID(c.localDevice.OSPFRouterID)
 		}
-		if iface, ok := localInterfaces.match(row.NeighborIP); ok {
-			row.LocalIP = iface.IP
-			row.Network = iface.Network
-			row.Netmask = iface.Netmask
-			row.Subnet = iface.Subnet
-			row.Prefix = iface.Prefix
+		if neighbor, matchable := parseOSPFNeighborIPv4(row.NeighborIP); matchable {
+			if !localInterfacesBuilt {
+				localInterfaces = newTopologyOSPFLocalInterfaceIndex(l3Interfaces)
+				localInterfacesBuilt = true
+			}
+			if iface, ok := localInterfaces.matchAddress(neighbor); ok {
+				row.LocalIP = iface.IP
+				row.Network = iface.Network
+				row.Netmask = iface.Netmask
+				row.Subnet = iface.Subnet
+				row.Prefix = iface.Prefix
+			}
 		}
 		if row.DeviceID == "" || (row.NeighborRouterID == "" && row.NeighborIP == "") {
 			continue
@@ -115,17 +122,22 @@ func newTopologyOSPFLocalInterfaceIndex(l3Interfaces []topologymodel.L3Interface
 }
 
 func (index topologyOSPFLocalInterfaceIndex) match(neighborIP string) (topologyOSPFLocalInterfaceMatch, bool) {
+	neighbor, ok := parseOSPFNeighborIPv4(neighborIP)
+	if !ok {
+		return topologyOSPFLocalInterfaceMatch{}, false
+	}
+	return index.matchAddress(neighbor)
+}
+
+func parseOSPFNeighborIPv4(value string) (netip.Addr, bool) {
+	neighbor, ok := topologyutil.ParseIPAddress(value)
+	return neighbor, ok && neighbor.Is4() && !neighbor.IsUnspecified()
+}
+
+func (index topologyOSPFLocalInterfaceIndex) matchAddress(neighbor netip.Addr) (topologyOSPFLocalInterfaceMatch, bool) {
 	if len(index) == 0 {
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
-	neighbor, ok := topologyutil.ParseIPAddress(neighborIP)
-	if !ok || !neighbor.Is4() {
-		return topologyOSPFLocalInterfaceMatch{}, false
-	}
-	if neighbor.IsUnspecified() {
-		return topologyOSPFLocalInterfaceMatch{}, false
-	}
-
 	for bits := 32; bits >= 0; bits-- {
 		entry, found := index[netip.PrefixFrom(neighbor, bits).Masked()]
 		if found {
