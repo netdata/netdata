@@ -444,7 +444,7 @@ fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
             bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
             duration_bins: DURATION_BIN_LABELS.to_vec(),
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
-            errors: data.bucket_errors,
+            error_cells: data.error_cells.iter().map(|row| row.to_vec()).collect(),
             duration_percentiles_ns: to_percentiles(&data.bucket_percentiles),
         },
         totals: OverviewTotals {

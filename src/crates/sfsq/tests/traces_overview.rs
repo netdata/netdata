@@ -102,39 +102,44 @@ fn sealed_grid_counts_traces_by_merged_envelope() {
     assert_eq!(cell_sum, data.total_traces, "cells count traces");
 }
 
-/// Per-bucket errors are STORED ERROR-SPAN rows — the statistic
-/// `total_errors` reports, not "traces that failed": the bucket that
+/// Error counts are index-parallel to `cells` — per time bucket AND per
+/// duration bin — and they count STORED ERROR-SPAN rows, the statistic
+/// `total_errors` reports, not "traces that failed": the cell that
 /// binned ONE trace with two failed spans reads 2.
 #[test]
-fn per_bucket_errors_count_error_spans_and_sum_to_the_total() {
+fn error_cells_count_error_spans_per_bucket_and_duration_bin() {
     let dir = tempfile::tempdir().unwrap();
+    // D: two failed spans, 3us envelope → bucket 7, bin 0.
     let mut d1 = tspan(0xD, 6, 7_000_000_000, 7_000_001_000, "d-1");
     d1.status = Some((2, "boom"));
     let mut d2 = tspan(0xD, 7, 7_000_002_000, 7_000_003_000, "d-2");
     d2.status = Some((2, "boom"));
+    // F: one failed span in D's BUCKET but a 5s envelope → bin 4, so the
+    // two failures never share a cell.
+    let mut f = tspan(0xF, 9, 7_000_000_000, 12_000_000_000, "f-slow");
+    f.status = Some((2, "boom"));
     // Past the grid's end: the envelope-start clipping drops E from the
-    // cells, the totals AND the per-bucket errors.
+    // cells, the totals AND the error cells.
     let mut e = tspan(0xE, 8, 12_000_000_000, 12_000_001_000, "e-clipped");
     e.status = Some((2, "boom"));
     let mut spans = corpus();
-    spans.extend([d1, d2, e]);
+    spans.extend([d1, d2, f, e]);
     let wal = write_wal(dir.path(), vec![req(&spans)], "errs");
     let data = run(
         vec![sealed_source(dir.path(), &wal, "a")],
         OverviewQuery::new(grid()),
     );
-    // B: one failed span in bucket 3; D: two in bucket 7.
-    let mut expected = vec![0u64; 10];
-    expected[3] = 1;
-    expected[7] = 2;
-    assert_eq!(data.bucket_errors, expected);
-    assert_eq!(data.total_errors, 3, "E never reached the totals");
-    assert_eq!(data.bucket_errors.iter().sum::<u64>(), data.total_errors);
+    let mut expected = vec![[0u64; DURATION_BIN_COUNT]; 10];
+    expected[3][0] = 1; // B: one failed span, 500ns
+    expected[7][0] = 2; // D: two failed spans, 3us
+    expected[7][4] = 1; // F: one failed span, 5s
+    assert_eq!(data.error_cells, expected);
+    assert_eq!(data.total_errors, 4, "E never reached the totals");
     assert_eq!(
-        data.cells[7].iter().sum::<u64>(),
-        1,
-        "one trace, two failed spans"
+        data.error_cells.iter().flatten().sum::<u64>(),
+        data.total_errors
     );
+    assert_eq!(data.cells[7][0], 1, "one trace, two failed spans");
 }
 
 #[test]

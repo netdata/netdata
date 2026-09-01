@@ -903,9 +903,12 @@
                 "items": { "type": "integer", "minimum": 0 }
               }
             },
-            "errors": {
+            "error_cells": {
               "type": "array",
-              "items": { "type": "integer", "minimum": 0 }
+              "items": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0 }
+              }
             },
             "duration_percentiles_ns": {
               "type": "object",
