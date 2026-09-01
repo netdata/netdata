@@ -53,8 +53,8 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 		State:           "established",
 	}
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	options := defaultTopologyQueryOptionsForTest()
 	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
@@ -179,7 +179,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 
 func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocolKeys(t *testing.T) {
 	registry := newTopologyRegistry()
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Date(2026, time.June, 20, 12, 0, 0, 0, time.UTC)
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -189,7 +189,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 		SysName:       "switch-a",
 		ManagementIP:  "10.0.0.1",
 	}
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	options := defaultTopologyQueryOptionsForTest()
 	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
@@ -240,10 +240,10 @@ func TestTopologyStatsToV1_OmitsFocusKeysWhenFocusFilterReturnsEarly(t *testing.
 	require.NotContains(t, stats, "links_focus_depth_filtered")
 }
 
-func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managementIP, routerID, ifIP, ifIndex string) *topologyCache {
+func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managementIP, routerID, ifIP, ifIndex string) *topologyBuilder {
 	t.Helper()
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Date(2026, time.June, 20, 12, 0, 0, 0, time.UTC)
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -266,7 +266,7 @@ func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managem
 	return cache
 }
 
-func addTopologyStatsCensusLLDP(cache *topologyCache, localPortID, remoteChassis, remoteSysName, remoteMgmtIP, remotePortID string) {
+func addTopologyStatsCensusLLDP(cache *topologyBuilder, localPortID, remoteChassis, remoteSysName, remoteMgmtIP, remotePortID string) {
 	cache.lldpLocPorts["1"] = &lldpLocPort{
 		portNum:       "1",
 		portID:        localPortID,

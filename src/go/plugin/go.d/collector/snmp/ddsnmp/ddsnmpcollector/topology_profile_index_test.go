@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
@@ -248,6 +249,206 @@ func TestTopologyProfile_LLDPManagementAddressUsesIndexFields(t *testing.T) {
 			TopologyKind: ddsnmp.KindLldpLocManAddr,
 		},
 	}, actual)
+}
+
+func TestTopologyProfile_LLDPRemoteManagementAddressUsesIndexFields(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.7", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.8", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.4.1", nil)
+
+	ipv4Index := "0.17.42.1.4.192.0.2.2"
+	ipv6Index := "0.18.43.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.2"
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.4.2", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.0.8802.1.1.2.1.4.2.1.3."+ipv4Index, 2),
+		createIntegerPDU("1.0.8802.1.1.2.1.4.2.1.4."+ipv4Index, 12),
+		createPDU("1.0.8802.1.1.2.1.4.2.1.5."+ipv4Index, gosnmp.ObjectIdentifier, "0.0"),
+		createIntegerPDU("1.0.8802.1.1.2.1.4.2.1.3."+ipv6Index, 2),
+		createIntegerPDU("1.0.8802.1.1.2.1.4.2.1.4."+ipv6Index, 13),
+		createPDU("1.0.8802.1.1.2.1.4.2.1.5."+ipv6Index, gosnmp.ObjectIdentifier, "0.0"),
+	})
+
+	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-lldp-mib")
+
+	assertTableMetricsEqual(t, []ddsnmp.Metric{
+		{
+			Name:         "lldp_rem_man_addr",
+			Value:        0,
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "42", "lldp_rem_mgmt_addr_subtype": "1", "lldp_rem_mgmt_addr": "c0000202", "lldp_rem_mgmt_addr_len": "4", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "12", "lldp_rem_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpRemManAddrTable",
+			TopologyKind: ddsnmp.KindLldpRemManAddr,
+		},
+		{
+			Name:         "lldp_rem_man_addr",
+			Value:        0,
+			Tags:         map[string]string{"lldp_loc_port_num": "18", "lldp_rem_index": "43", "lldp_rem_mgmt_addr_subtype": "2", "lldp_rem_mgmt_addr": "20010db8000000000000000000000002", "lldp_rem_mgmt_addr_len": "16", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "13", "lldp_rem_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpRemManAddrTable",
+			TopologyKind: ddsnmp.KindLldpRemManAddr,
+		},
+	}, actual)
+}
+
+func TestTopologyProfile_LLDPRemoteManagementAddressOmitsMalformedIndexTag(t *testing.T) {
+	tests := map[string]struct {
+		index string
+	}{
+		"missing address":       {index: "0.17.42.1.0"},
+		"invalid address octet": {index: "0.17.42.1.1.999"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl, mockHandler := setupMockHandler(t)
+			defer ctrl.Finish()
+
+			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.7", nil)
+			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.8", nil)
+			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.4.1", nil)
+			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.4.2", []gosnmp.SnmpPDU{
+				createIntegerPDU("1.0.8802.1.1.2.1.4.2.1.3."+tc.index, 2),
+			})
+
+			actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-lldp-mib")
+			require.Len(t, actual, 1)
+			require.NotContains(t, actual[0].Tags, "lldp_rem_mgmt_addr")
+		})
+	}
+}
+
+func TestTopologyProfile_LLDPV2UsesAccessibleColumnsAndStableIndexes(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.111.2.802.1.1.13.1.3.7", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.7.1.2.17", 5),
+		createStringPDU("1.3.111.2.802.1.1.13.1.3.7.1.3.17", "ethernet1/1"),
+		createStringPDU("1.3.111.2.802.1.1.13.1.3.7.1.4.17", "fixture uplink"),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.111.2.802.1.1.13.1.3.8", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.8.1.3.1.4.192.0.2.17", 5),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.8.1.4.1.4.192.0.2.17", 2),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.8.1.5.1.4.192.0.2.17", 17),
+		createPDU("1.3.111.2.802.1.1.13.1.3.8.1.6.1.4.192.0.2.17", gosnmp.ObjectIdentifier, "0.0"),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.8.1.3.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.17", 17),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.8.1.4.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.17", 2),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.3.8.1.5.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.17", 18),
+		createPDU("1.3.111.2.802.1.1.13.1.3.8.1.6.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.17", gosnmp.ObjectIdentifier, "0.0"),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.111.2.802.1.1.13.1.4.1", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.1.1.5.0.17.1.1", 4),
+		createStringPDU("1.3.111.2.802.1.1.13.1.4.1.1.6.0.17.1.1", "02:00:00:00:00:01"),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.1.1.7.0.17.1.1", 5),
+		createStringPDU("1.3.111.2.802.1.1.13.1.4.1.1.8.0.17.1.1", "ethernet1/1"),
+		createStringPDU("1.3.111.2.802.1.1.13.1.4.1.1.10.0.17.1.1", "fixture-neighbor-a"),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.1.1.5.0.17.2.1", 4),
+		createStringPDU("1.3.111.2.802.1.1.13.1.4.1.1.6.0.17.2.1", "02:00:00:00:00:02"),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.1.1.7.0.17.2.1", 5),
+		createStringPDU("1.3.111.2.802.1.1.13.1.4.1.1.8.0.17.2.1", "ethernet1/2"),
+		createStringPDU("1.3.111.2.802.1.1.13.1.4.1.1.10.0.17.2.1", "fixture-neighbor-b"),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.111.2.802.1.1.13.1.4.2", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.2.1.3.0.17.1.1.1.4.192.0.2.21", 2),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.2.1.4.0.17.1.1.1.4.192.0.2.21", 17),
+		createPDU("1.3.111.2.802.1.1.13.1.4.2.1.5.0.17.1.1.1.4.192.0.2.21", gosnmp.ObjectIdentifier, "0.0"),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.2.1.3.0.17.2.1.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.33", 2),
+		createIntegerPDU("1.3.111.2.802.1.1.13.1.4.2.1.4.0.17.2.1.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.33", 18),
+		createPDU("1.3.111.2.802.1.1.13.1.4.2.1.5.0.17.2.1.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.33", gosnmp.ObjectIdentifier, "0.0"),
+	})
+
+	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-lldp-v2-mib")
+
+	assertTableMetricsEqual(t, []ddsnmp.Metric{
+		{
+			Name:         "lldp_loc_port",
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_loc_port_id": "ethernet1/1", "lldp_loc_port_id_subtype": "interfaceName", "lldp_loc_port_desc": "fixture uplink"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2LocPortTable",
+			TopologyKind: ddsnmp.KindLldpLocPort,
+		},
+		{
+			Name:         "lldp_loc_man_addr",
+			Tags:         map[string]string{"lldp_loc_mgmt_addr_subtype": "1", "lldp_loc_mgmt_addr": "c0000211", "lldp_loc_mgmt_addr_if_subtype": "2", "lldp_loc_mgmt_addr_if_id": "17", "lldp_loc_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2LocManAddrTable",
+			TopologyKind: ddsnmp.KindLldpLocManAddr,
+		},
+		{
+			Name:         "lldp_loc_man_addr",
+			Tags:         map[string]string{"lldp_loc_mgmt_addr_subtype": "2", "lldp_loc_mgmt_addr": "20010db8000000000000000000000011", "lldp_loc_mgmt_addr_if_subtype": "2", "lldp_loc_mgmt_addr_if_id": "18", "lldp_loc_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2LocManAddrTable",
+			TopologyKind: ddsnmp.KindLldpLocManAddr,
+		},
+		{
+			Name:         "lldp_rem",
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "1.1", "lldp_rem_chassis_id_subtype": "macAddress", "lldp_rem_chassis_id": "02:00:00:00:00:01", "lldp_rem_port_id_subtype": "interfaceName", "lldp_rem_port_id": "ethernet1/1", "lldp_rem_sys_name": "fixture-neighbor-a"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2RemTable",
+			TopologyKind: ddsnmp.KindLldpRem,
+		},
+		{
+			Name:         "lldp_rem",
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "2.1", "lldp_rem_chassis_id_subtype": "macAddress", "lldp_rem_chassis_id": "02:00:00:00:00:02", "lldp_rem_port_id_subtype": "interfaceName", "lldp_rem_port_id": "ethernet1/2", "lldp_rem_sys_name": "fixture-neighbor-b"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2RemTable",
+			TopologyKind: ddsnmp.KindLldpRem,
+		},
+		{
+			Name:         "lldp_rem_man_addr",
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "1.1", "lldp_rem_mgmt_addr_subtype": "1", "lldp_rem_mgmt_addr_len": "4", "lldp_rem_mgmt_addr": "c0000215", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "17", "lldp_rem_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2RemManAddrTable",
+			TopologyKind: ddsnmp.KindLldpRemManAddr,
+		},
+		{
+			Name:         "lldp_rem_man_addr",
+			Tags:         map[string]string{"lldp_loc_port_num": "17", "lldp_rem_index": "2.1", "lldp_rem_mgmt_addr_subtype": "2", "lldp_rem_mgmt_addr_len": "16", "lldp_rem_mgmt_addr": "20010db8000000000000000000000021", "lldp_rem_mgmt_addr_if_subtype": "2", "lldp_rem_mgmt_addr_if_id": "18", "lldp_rem_mgmt_addr_oid": "0.0"},
+			MetricType:   "gauge",
+			IsTable:      true,
+			Table:        "lldpV2RemManAddrTable",
+			TopologyKind: ddsnmp.KindLldpRemManAddr,
+		},
+	}, actual)
+}
+
+func TestTopologyProfile_MikroTikRB750Gr3OverridesLLDPRemoteManagementAddressRow(t *testing.T) {
+	profile, err := ddsnmp.LoadProfileByName("topology-role-mikrotik-rb750gr3")
+	require.NoError(t, err)
+
+	var rows []ddprofiledefinition.TopologyConfig
+	for _, row := range profile.Definition.Topology {
+		if row.Table.Name == "lldpRemManAddrTable" {
+			rows = append(rows, row)
+		}
+	}
+	require.Len(t, rows, 1)
+
+	row := rows[0]
+	require.Equal(t, ddsnmp.KindLldpRemManAddr, row.Kind)
+	require.Len(t, row.Symbols, 1)
+	require.Equal(t, "lldp_rem_man_addr", row.Symbols[0].Name)
+	require.Equal(t, "1.0.8802.1.1.2.1.4.2.1.1", row.Symbols[0].OID)
+
+	tags := make(map[string]ddprofiledefinition.MetricTagConfig, len(row.MetricTags))
+	for _, tag := range row.MetricTags {
+		tags[tag.Tag] = tag
+	}
+	require.Equal(t, "1.0.8802.1.1.2.1.4.2.1.1", tags["lldp_rem_mgmt_addr_subtype"].Symbol.OID)
+	require.Equal(t, "1.0.8802.1.1.2.1.4.2.1.2", tags["lldp_rem_mgmt_addr"].Symbol.OID)
+	require.Equal(t, uint(5), tags["lldp_rem_mgmt_addr_len"].Index)
+	require.Empty(t, tags["lldp_rem_mgmt_addr"].IndexTransform)
 }
 
 func TestTopologyProfile_OSPFNeighborUsesNeighborTags(t *testing.T) {

@@ -112,6 +112,10 @@ Metrics:
 | app.ebpf_cachestat_dirty_pages | Number of dirty pages | pages | page/s |
 | app.ebpf_cachestat_access | Number of accessed files | hits | hits/s |
 | app.ebpf_cachestat_misses | Files out of page cache | misses | misses/s |
+| app.ebpf_dc_hit | Percentage of directory lookups resolved by the cache. | ratio | % |
+| app.ebpf_dc_reference | Count file access. | files | files |
+| app.ebpf_dc_not_cache | Files not present inside directory cache. | files | files |
+| app.ebpf_dc_not_found | Files not found. | files | files |
 | app.swap_usage | Apps swap usage | swap | MiB |
 | app.disk_physical_io | Apps disk physical IO | reads, writes | KiB/s |
 | app.disk_logical_io | Apps disk logical IO | reads, writes | KiB/s |

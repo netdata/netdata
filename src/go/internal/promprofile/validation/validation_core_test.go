@@ -64,11 +64,6 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if result.report.AuthoredMapping[2].Dimensions[0].NameFromLabel != "le" {
 		t.Fatalf("authored mapping lost dynamic naming mechanism: %#v", result.report.AuthoredMapping[2].Dimensions)
 	}
-	for _, chart := range result.report.AuthoredMapping {
-		if chart.Priority != 0 {
-			t.Fatalf("authored chart unexpectedly declares priority: %#v", chart)
-		}
-	}
 	if !hasFinding(result.report, "default_validation_job", "warning") {
 		t.Fatalf("missing warning that the deployable job policy was not validated: %#v", result.report.Findings)
 	}

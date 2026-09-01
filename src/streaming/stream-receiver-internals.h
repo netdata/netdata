@@ -90,6 +90,7 @@ struct receiver_state {
         nd_poll_event_t wanted;
         usec_t last_traffic_ut;
         size_t bytes_received;          // raw socket bytes received on this connection (diagnostics)
+        bool keepalive_initialized;
         struct pollfd_meta meta;
     } thread;
 
@@ -107,6 +108,7 @@ struct receiver_state {
     } exit;
 
     struct stream_receiver_config config;
+    int handshake_update_every;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     struct {
@@ -130,6 +132,7 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, STR
 
 void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason);
+void stream_receiver_reconcile_keepalive(struct receiver_state *rpt);
 
 void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcode msg);
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg);

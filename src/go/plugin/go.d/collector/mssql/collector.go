@@ -38,8 +38,9 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			DSN:     "sqlserver://localhost:1433",
-			Timeout: confopt.Duration(time.Second * 5),
+			DSN:                 "sqlserver://localhost:1433",
+			Timeout:             confopt.Duration(time.Second * 5),
+			CollectDisabledJobs: false,
 			Functions: FunctionsConfig{
 				TopQueries: TopQueriesConfig{
 					Limit:          500,
@@ -55,7 +56,8 @@ func New() *Collector {
 		seenWaitTypes:        make(map[string]bool),
 		seenLockTypes:        make(map[string]bool),
 		seenLockStatsTypes:   make(map[string]bool),
-		seenJobs:             make(map[string]string),
+		jobChartIDs:          make(map[string]string),
+		activeJobs:           make(map[string]string),
 		seenReplications:     make(map[string]bool),
 
 		seenAGs:                make(map[string]bool),
@@ -67,12 +69,13 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode       string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	DSN         string           `yaml:"dsn" json:"dsn"`
-	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CloudAuth   cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
-	Functions   FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+	Vnode               string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery         int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN                 string           `yaml:"dsn" json:"dsn"`
+	Timeout             confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CollectDisabledJobs bool             `yaml:"collect_disabled_jobs" json:"collect_disabled_jobs"`
+	CloudAuth           cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
+	Functions           FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 }
 
 type FunctionsConfig struct {
@@ -154,19 +157,23 @@ type Collector struct {
 
 	db *sql.DB
 
-	version string
+	serverPropertiesMu     sync.RWMutex
+	serverPropertiesLoaded bool
+	version                string
+	majorVersion           int // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+	engineEdition          int
 
 	seenDatabases        map[string]bool
 	seenDatabasesWithLog map[string]bool
 	seenWaitTypes        map[string]bool
 	seenLockTypes        map[string]bool
 	seenLockStatsTypes   map[string]bool
-	seenJobs             map[string]string
+	jobChartIDs          map[string]string
+	activeJobs           map[string]string
 	seenReplications     map[string]bool
 
-	hadrEnabled  bool // true if Always On AG is enabled on this instance
-	hadrChecked  bool // true after the HADR check has been performed
-	majorVersion int  // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+	hadrEnabled bool // true if Always On AG is enabled on this instance
+	hadrChecked bool // true after the HADR check has been performed
 
 	seenAGs                map[string]bool // key: ag_name
 	seenAGReplicas         map[string]bool // key: ag_name + "_" + replica_server_name
@@ -175,11 +182,87 @@ type Collector struct {
 	seenAGPageRepairDBs    map[string]bool // key: database_name
 	agClusterChartAdded    bool            // true after cluster quorum chart has been added
 
-	// Query Store column cache (per-instance to handle different SQL Server versions)
-	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
-	queryStoreCols   map[string]bool
+	// Query Store discovery caches (per-instance to handle different SQL Server versions).
+	// Capability and column discovery use separate locks so their database probes cannot block each other.
+	queryStoreColsMu      sync.RWMutex
+	queryStoreCols        map[string]bool
+	queryStoreSupportedMu sync.RWMutex
+	queryStoreSupported   *bool // nil until the capability probe has run
 
 	funcRouter *funcRouter
+}
+
+const (
+	engineEditionAzureSQLDatabase = 5
+	engineEditionAzureSQLMI       = 8
+)
+
+func (c *Collector) currentEngineEdition() int {
+	c.serverPropertiesMu.RLock()
+	edition := c.engineEdition
+	c.serverPropertiesMu.RUnlock()
+	return edition
+}
+
+func (c *Collector) currentMajorVersion() int {
+	c.serverPropertiesMu.RLock()
+	major := c.majorVersion
+	c.serverPropertiesMu.RUnlock()
+	return major
+}
+
+func (c *Collector) serverProperties() (string, int, int, bool) {
+	c.serverPropertiesMu.RLock()
+	version := c.version
+	major := c.majorVersion
+	edition := c.engineEdition
+	loaded := c.serverPropertiesLoaded
+	c.serverPropertiesMu.RUnlock()
+	return version, major, edition, loaded
+}
+
+func (c *Collector) setServerProperties(version string, edition int) {
+	c.serverPropertiesMu.Lock()
+	c.serverPropertiesLoaded = true
+	c.version = version
+	c.majorVersion = parseMajorVersion(version)
+	c.engineEdition = edition
+	c.serverPropertiesMu.Unlock()
+}
+
+func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
+	if _, _, edition, loaded := c.serverProperties(); loaded {
+		return edition, nil
+	}
+
+	version, edition, err := c.queryServerProperties(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	c.serverPropertiesMu.Lock()
+	if !c.serverPropertiesLoaded {
+		c.serverPropertiesLoaded = true
+		c.version = version
+		c.majorVersion = parseMajorVersion(version)
+		c.engineEdition = edition
+	}
+	edition = c.engineEdition
+	c.serverPropertiesMu.Unlock()
+	return edition, nil
+}
+
+func (c *Collector) queryServerProperties(ctx context.Context) (string, int, error) {
+	var version string
+	var edition int
+	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+		return "", 0, err
+	}
+	return version, edition, nil
+}
+
+func (c *Collector) isAzureSQLDatabase() bool {
+	return c.currentEngineEdition() == engineEditionAzureSQLDatabase
 }
 
 func (c *Collector) Configuration() any {

@@ -107,13 +107,19 @@ Children with retained data appear as **Stale** (or **Live** if actively streami
 
 **Parent detects child disconnection:**
 
-| Event                             | Detection Time  | Mechanism                                      |
-|-----------------------------------|-----------------|------------------------------------------------|
-| Child shuts down gracefully       | **Immediate**   | Socket close detected                          |
-| Child crashes or network drops    | **~60 seconds** | TCP keepalive probes (30s idle + 3×10s probes) |
-| Child silently stops sending data | **10 minutes**  | Idle activity timeout                          |
+| Event                             | Detection Time                         | Mechanism                                     |
+|-----------------------------------|----------------------------------------|-----------------------------------------------|
+| Child shuts down gracefully       | **Immediate**                          | Socket close detected                         |
+| Child crashes or network drops    | **Cadence/configuration-dependent**    | TCP keepalive idle plus unanswered probes     |
+| Child silently stops sending data | **At least 10 minutes; cadence-aware** | Per-host idle activity timeout                |
 
-These timings are hardcoded and not user-configurable.
+On platforms with per-socket keepalive tuning, the Parent's default keepalive idle is half of the fastest chart cadence observed on the
+connection, bounded to 30 seconds through 1 hour. The receiving `[API_KEY]` or `[MACHINE_GUID]` section can override it with
+`tcp keepalive idle`; `off`, `0`, or `never` disables keepalive. The Parent sends up to three probes 10 seconds apart after the idle
+period. Other platforms retain `SO_KEEPALIVE` with the operating system's default idle, interval, and probe count.
+
+The silent-child timeout is `max(10 minutes, 2 × fastest observed chart cadence)`. The handshake cadence is provisional until the
+first chart arrives. The observed cadence resets on reconnect and can only decrease while connected.
 
 ### Standalone Agent Transitions
 
@@ -131,13 +137,13 @@ A standalone Agent connects directly to Cloud without a Parent.
 
 A child streams metrics to a Parent, which connects to Cloud.
 
-| Event                                | From           | To          | Timing                                         |
-|--------------------------------------|----------------|-------------|------------------------------------------------|
-| Child connects to Parent             | Unseen/Offline | **Live**    | Immediate                                      |
-| Child stops streaming                | Live           | **Stale**   | Immediate to ~60 seconds (see Detection Speed) |
-| Child restarts streaming             | Stale          | **Live**    | Immediate                                      |
-| All Parents go offline               | Live/Stale     | **Offline** | Immediate to ~60 seconds                       |
-| Parent reconnects (child still down) | Offline        | **Stale**   | Immediate (if data retained)                   |
+| Event                                | From           | To          | Timing                                      |
+|--------------------------------------|----------------|-------------|---------------------------------------------|
+| Child connects to Parent             | Unseen/Offline | **Live**    | Immediate                                   |
+| Child stops streaming                | Live           | **Stale**   | Failure-mode-dependent (see Detection Speed) |
+| Child restarts streaming             | Stale          | **Live**    | Immediate                                   |
+| All Parents go offline               | Live/Stale     | **Offline** | Immediate to ~60 seconds                    |
+| Parent reconnects (child still down) | Offline        | **Stale**   | Immediate (if data retained)                |
 
 ### First Connection
 

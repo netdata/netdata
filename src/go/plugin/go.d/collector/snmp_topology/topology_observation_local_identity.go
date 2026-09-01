@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func (c *topologyCache) resolveLocalBaseBridgeAddress(localManagementIP string) string {
+func (c *topologyBuilder) resolveLocalBaseBridgeAddress(localManagementIP string) string {
 	baseBridgeAddress := strings.TrimSpace(c.bridgeBaseAddress)
 	if baseBridgeAddress == "" {
 		baseBridgeAddress = c.deriveLocalBridgeMACFromFDBSelfEntries()
@@ -20,7 +20,7 @@ func (c *topologyCache) resolveLocalBaseBridgeAddress(localManagementIP string) 
 	return baseBridgeAddress
 }
 
-func (c *topologyCache) deriveLocalBridgeMACFromFDBSelfEntries() string {
+func (c *topologyBuilder) deriveLocalBridgeMACFromFDBSelfEntries() string {
 	if len(c.fdbEntries) == 0 {
 		return ""
 	}
@@ -46,7 +46,7 @@ func (c *topologyCache) deriveLocalBridgeMACFromFDBSelfEntries() string {
 	return ""
 }
 
-func (c *topologyCache) deriveLocalBridgeMACFromInterfacePhysAddress(localManagementIP string) string {
+func (c *topologyBuilder) deriveLocalBridgeMACFromInterfacePhysAddress(localManagementIP string) string {
 	if len(c.ifStatusByIndex) == 0 {
 		return ""
 	}

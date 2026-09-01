@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
@@ -68,6 +69,11 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 	})
 }
 
+func TestSNMPTopologyDiagnosticArchivePublicationFollowsTerminalMode(t *testing.T) {
+	coll := New(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	require.Equal(t, !terminal.IsTerminal(), coll.publishDiagnosticArchive)
+}
+
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
 	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	methods := creator.SharedFunctions()
@@ -77,13 +83,40 @@ func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
 	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	coll.topologyRegistry.register(cache)
-
-	coll.updateFunctionAvailability()
+	publishTestTopologyBuilder(coll.topologyRegistry, cache)
 
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
+}
+
+func TestSNMPTopologyFunctionAvailabilityChangesOnlyWithPublishedGeneration(t *testing.T) {
+	coll := newTestSNMPTopologyCollector()
+	publishedAt := time.Now()
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	builder.updateTime = publishedAt
+	builder.lastUpdate = publishedAt
+	builder.staleAfter = 20 * time.Millisecond
+	const registrationID ddsnmp.DeviceRegistrationID = 1
+	device := freezeTestTopologyBuilderAt(registrationID, publishedAt, builder)
+	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(1, publishedAt, coll.topologyRegistry.producerScope(), states))
+
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
+	require.True(t, device.freshAt(publishedAt.Add(10*time.Millisecond)))
+	require.False(t, device.freshAt(publishedAt.Add(21*time.Millisecond)))
+	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID),
+		"one published generation must not decay between completed sweeps")
+
+	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
+		2,
+		publishedAt.Add(21*time.Millisecond),
+		coll.topologyRegistry.producerScope(),
+		states,
+	))
+	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID),
+		"the next completed sweep must remove an expired retained generation from renderable membership")
 }
 
 func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
@@ -94,7 +127,10 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
-	coll.functionAvailability.Store(true)
+	coll.publishDiagnosticArchiveFile = func(string, topologyDiagnostics) error { return nil }
+	builder := newTopologyBuilder()
+	seedPublishedEndpointSnapshot(builder)
+	publishTestTopologyBuilder(coll.topologyRegistry, builder)
 	require.True(t, coll.FunctionAvailable(snmptopologyfunc.MethodID))
 
 	ctx, cancel := context.WithCancel(context.Background())

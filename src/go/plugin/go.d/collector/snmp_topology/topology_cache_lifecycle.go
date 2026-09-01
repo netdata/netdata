@@ -4,14 +4,13 @@ package snmptopology
 
 import (
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func newTopologyCache() *topologyCache {
-	return &topologyCache{
+func newTopologyBuilder() *topologyBuilder {
+	return &topologyBuilder{
 		lldpLocPorts:       make(map[string]*lldpLocPort),
 		lldpRemotes:        make(map[string]*lldpRemote),
 		cdpRemotes:         make(map[string]*cdpRemote),
@@ -31,74 +30,8 @@ func newTopologyCache() *topologyCache {
 	}
 }
 
-func (c *topologyCache) replaceWith(src *topologyCache) {
-	if c == nil || src == nil {
-		return
-	}
-
-	c.lastUpdate = src.lastUpdate
-	c.updateTime = src.updateTime
-	c.staleAfter = src.staleAfter
-	c.preparedSnapshot = src.preparedSnapshot
-	c.hasPreparedSnapshot = src.hasPreparedSnapshot
-	c.agentID = src.agentID
-	c.localDevice = src.localDevice
-	c.lldpLocPorts = src.lldpLocPorts
-	c.lldpRemotes = src.lldpRemotes
-	c.cdpRemotes = src.cdpRemotes
-	c.ifNamesByIndex = src.ifNamesByIndex
-	c.ifStatusByIndex = src.ifStatusByIndex
-	c.ifIndexByIP = src.ifIndexByIP
-	c.ifNetmaskByIP = src.ifNetmaskByIP
-	c.l3InterfacesByIP = src.l3InterfacesByIP
-	c.trapMatchMethodByIP = src.trapMatchMethodByIP
-	c.bridgePortToIf = src.bridgePortToIf
-	c.fdbEntries = src.fdbEntries
-	c.vlanByFDBID = src.vlanByFDBID
-	c.vlanNameByID = src.vlanNameByID
-	c.fdbRowsDroppedNoMAC = src.fdbRowsDroppedNoMAC
-	c.fdbRowsUnmappedPort = src.fdbRowsUnmappedPort
-	c.bridgeBaseAddress = src.bridgeBaseAddress
-	c.stpPorts = src.stpPorts
-	c.arpEntries = src.arpEntries
-	c.ospfNeighborsByKey = src.ospfNeighborsByKey
-	c.bgpPeersByKey = src.bgpPeersByKey
-}
-
-func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {
-	if c == nil || c.lastUpdate.IsZero() {
-		return false
-	}
-	if c.staleAfter > 0 && now.After(c.lastUpdate.Add(c.staleAfter)) {
-		return false
-	}
-	return true
-}
-
-func (c *topologyCache) hasRenderableObservationAt(now time.Time) bool {
-	if c == nil {
-		return false
-	}
-
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if !c.hasFreshSnapshotAt(now) {
-		return false
-	}
-
-	local := normalizeTopologyDevice(c.localDevice)
-	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
-	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
-	return strings.TrimSpace(ensureTopologyObservationDeviceID(local, baseBridgeAddress)) != ""
-}
-
-func (c *Collector) finalizeTopologyCache(cache *topologyCache) {
-	if cache == nil {
-		return
-	}
-
-	stats := cache.finalizeTopologyCache()
+func (c *Collector) freezeTopologyBuilder(cache *topologyBuilder) *topologyDeviceSnapshot {
+	snapshot, stats := freezeTopologyBuilder(cache)
 
 	if stats.droppedNoMAC > 0 {
 		c.Warningf("device '%s': dropped %d topology FDB row(s) with empty MAC", stats.agentID, stats.droppedNoMAC)
@@ -106,38 +39,38 @@ func (c *Collector) finalizeTopologyCache(cache *topologyCache) {
 	if stats.unmappedPort > 0 {
 		c.Warningf("device '%s': observed %d topology FDB row(s) with bridge ports missing ifIndex mapping", stats.agentID, stats.unmappedPort)
 	}
+	return snapshot
 }
 
-type topologyCacheFinalizeStats struct {
+type topologyBuilderFinalizeStats struct {
 	agentID      string
 	droppedNoMAC int
 	unmappedPort int
 }
 
-func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
+func (c *topologyBuilder) finalize() topologyBuilderFinalizeStats {
 	if c == nil {
-		return topologyCacheFinalizeStats{}
+		return topologyBuilderFinalizeStats{}
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
 	c.localManagementAddressKeys = nil
 	c.rebuildTrapSourceMatchMethods()
 	c.finalizeFDBVLANs()
 	c.updateFDBDiagnostics()
-	stats := topologyCacheFinalizeStats{
+	stats := topologyBuilderFinalizeStats{
 		agentID:      c.agentID,
 		droppedNoMAC: c.fdbRowsDroppedNoMAC,
 		unmappedPort: c.fdbRowsUnmappedPort,
 	}
-	c.lastUpdate = c.updateTime
-	c.preparedSnapshot, c.hasPreparedSnapshot = c.buildObservationSnapshotLocked()
+	if !c.updateTime.IsZero() {
+		c.lastUpdate = c.updateTime
+	}
+	c.preparedSnapshot, c.hasPreparedSnapshot = c.buildObservationSnapshot()
 	return stats
 }
 
-func (c *topologyCache) rebuildTrapSourceMatchMethods() {
+func (c *topologyBuilder) rebuildTrapSourceMatchMethods() {
 	methods := make(map[string]string, len(c.ifIndexByIP)+len(c.localDevice.ManagementAddresses)+1)
 	for value := range c.ifIndexByIP {
 		if addr, ok := topologyutil.ParseIPAddress(value); ok {
@@ -155,7 +88,7 @@ func (c *topologyCache) rebuildTrapSourceMatchMethods() {
 	c.trapMatchMethodByIP = methods
 }
 
-func (c *topologyCache) updateFDBDiagnostics() {
+func (c *topologyBuilder) updateFDBDiagnostics() {
 	c.fdbRowsUnmappedPort = 0
 	for _, entry := range c.fdbEntries {
 		if entry == nil || strings.TrimSpace(entry.mac) == "" {

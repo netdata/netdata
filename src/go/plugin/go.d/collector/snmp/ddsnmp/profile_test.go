@@ -45,6 +45,7 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 func Test_FindProfiles(t *testing.T) {
 	test := map[string]struct {
 		sysObjOId      string
+		sysDescr       string
 		manualProfiles []string
 		wanProfiles    []string
 	}{
@@ -52,9 +53,28 @@ func Test_FindProfiles(t *testing.T) {
 			sysObjOId:   "1.3.6.1.4.1.14988.1",
 			wanProfiles: []string{"mikrotik-router", "generic-device"},
 		},
+		"MikroTik RouterOS RB750Gr3": {
+			sysObjOId:   "1.3.6.1.4.1.14988.1",
+			sysDescr:    "RouterOS RB750Gr3",
+			wanProfiles: []string{"topology-role-mikrotik-rb750gr3", "mikrotik-router", "generic-device"},
+		},
+		"MikroTik SwOS": {
+			sysObjOId:   "1.3.6.1.4.1.14988.2",
+			sysDescr:    "CSS610-8G-2S+ SwOS",
+			wanProfiles: []string{"mikrotik-swos", "generic-device"},
+		},
 		"net-snmp linux": {
 			sysObjOId:   "1.3.6.1.4.1.8072.3.2.10",
 			wanProfiles: []string{"net-snmp", "generic-device"},
+		},
+		"Synology NAS using generic net-snmp identity": {
+			sysObjOId:   "1.3.6.1.4.1.8072.3.2.10",
+			sysDescr:    "Linux Synology appliance",
+			wanProfiles: []string{"synology-disk-station", "net-snmp", "generic-device"},
+		},
+		"Synology NAS using enterprise identity": {
+			sysObjOId:   "1.3.6.1.4.1.6574.1",
+			wanProfiles: []string{"synology-disk-station", "generic-device"},
 		},
 		"Kyocera printer": {
 			sysObjOId:   "1.3.6.1.4.1.1347.41",
@@ -162,7 +182,7 @@ func Test_FindProfiles(t *testing.T) {
 
 	for name, test := range test {
 		t.Run(name, func(t *testing.T) {
-			profiles := FindProfiles(test.sysObjOId, "", test.manualProfiles)
+			profiles := FindProfiles(test.sysObjOId, test.sysDescr, test.manualProfiles)
 
 			var names []string
 			for _, p := range profiles {

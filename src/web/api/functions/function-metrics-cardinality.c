@@ -27,7 +27,7 @@ int function_metrics_cardinality(BUFFER *wb, const char *function __maybe_unused
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 10);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_METRICS_CARDINALITY_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_METRICS_CARDINALITY_HELP);
 
     // Add parameter definition similar to network-viewer
     buffer_json_member_add_array(wb, "accepted_params");

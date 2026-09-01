@@ -1091,7 +1091,6 @@ set(CPACK_RPM_PLUGIN-PYTHOND_USER_FILELIST
     "%attr(0755,root,netdata) %dir /usr/lib/netdata/conf.d/python.d"
     "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/am2320.conf"
     "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/go_expvar.conf"
-    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/haproxy.conf"
     "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/pandas.conf"
     "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/traefik.conf")
 

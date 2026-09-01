@@ -25,6 +25,11 @@ c_unit_tests() {
   "$HOME"/netdata/usr/sbin/netdata -W unittest
 }
 
+system_info_unit_test() {
+  echo "Running system-info shell tests"
+  /bin/sh "$(dirname "$0")/system-info-test.sh"
+}
+
 spawn_server_unit_tests() {
   echo "Running spawn-server unit tests"
 
@@ -43,5 +48,7 @@ spawn_server_unit_tests() {
 install_netdata || exit 1
 
 c_unit_tests || exit 1
+
+system_info_unit_test || exit 1
 
 spawn_server_unit_tests || exit 1

@@ -443,7 +443,6 @@ lldp_loc_port
 lldp_loc_man_addr
 lldp_rem
 lldp_rem_man_addr
-lldp_rem_man_addr_compat
 cdp_cache
 if_name
 if_status
@@ -492,7 +491,10 @@ manual_profiles:
 
 #### Scalar symbol fallbacks
 
-You can express “try this OID, otherwise try that OID” by declaring **multiple scalar metrics with the same** `symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, marks missing ones, and **emits** the metric from whichever OID returns data. Missing OIDs are skipped cleanly.
+You can express “try this OID, otherwise try that OID” by declaring **multiple scalar metrics with the same**
+`symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, processes them
+in declaration order, and **emits only the first successfully processed metric**. Missing or unusable earlier OIDs fall
+through to the next declaration.
 
 ```yaml
 metrics:
@@ -1363,9 +1365,15 @@ Rules:
 
 - `read-only`, `read-write`, and `read-create` objects can be read as
   `symbol.OID` values.
-- `not-accessible` objects must not be read as `symbol.OID` values.
+- `not-accessible` objects must not be read as `symbol.OID` values in generic standards profiles.
 - A `not-accessible` object that is part of a table `INDEX` can be derived from
   the row OID index using `index` or `index_transform`.
+- A selector-scoped device or topology-role profile may override a generic row to read a
+  `not-accessible` object only when a checked fixture or repeatable device
+  capture proves that the device returns the object as a column and omits the
+  standards-readable row anchor. Keep the exception in the narrowest matching
+  profile, document it, and pin both profile resolution and fixture-backed
+  collection.
 - Keep SNMP index slicing in the profile YAML; keep format conversion in
   `symbol.format`.
 
@@ -1415,16 +1423,24 @@ Examples:
   `lldpLocManAddrLen`, then derive subtype and address from the row index. Use
   `format: hex` for the address bytes so non-IP management-address subtypes are
   preserved; topology normalization converts IP-compatible bytes later.
+- `LLDP-MIB::lldpRemManAddrSubtype` and `LLDP-MIB::lldpRemManAddr` are also
+  `not-accessible` index components. Anchor the generic row on readable
+  `lldpRemManAddrIfSubtype`; derive subtype with `index: 4`, retain the declared
+  address length with `index: 5`, and derive address bytes with
+  `index_transform: [{start: 5}]` plus `format: hex`. The topology consumer
+  rejects a row when the declared length is outside the MIB's `1..31` range or
+  does not match the encoded byte count.
 
 Audit recipe:
 
 ```bash
 rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
-rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
 Any profile hit for a `not-accessible` object is valid only when the tag is
-index-derived and does not declare a `symbol.OID` for that object.
+index-derived without a `symbol.OID`, or when it satisfies the proof-gated,
+selector-scoped device exception above.
 
 ## Tag Transformation
 

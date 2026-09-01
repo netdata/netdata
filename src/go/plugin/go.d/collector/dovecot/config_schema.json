@@ -20,7 +20,7 @@
       },
       "address": {
         "title": "Address",
-        "description": "The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections.",
+        "description": "The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections.",
         "type": "string",
         "default": "127.0.0.1:24242"
       },

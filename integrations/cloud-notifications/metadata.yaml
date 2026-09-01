@@ -264,10 +264,10 @@
 
       1. In RocketChat, Navigate to Administration > Workspace > Integrations
       2. Click **+New** at the top right corner
-      3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook)
+      3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/docs/integrations#create-an-incoming-integration)
       4. You will end up with a webhook endpoint that looks like `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`, copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
-      For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
+      For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/docs/integrations).
 
       ### Netdata Configuration
 
@@ -465,7 +465,7 @@
       - A Netdata Cloud account
       - Access to the Space as an **Admin**
       - The Space needs to be on a paid plan
-      - The Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
+      - The Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [Splunk On-Call documentation](https://help.splunk.com/en/splunk-cloud-platform/alert-and-respond/splunk-on-call/integrations-with-splunk-on-call/rest-endpoint-integration-for-splunk-on-call) for detailed instructions.
 
       ### Netdata Configuration
 
@@ -564,6 +564,17 @@
       | status           | object  | An object with the status information.                                                                                        |
       | status.reachable | boolean | `true` if host is reachable, `false` otherwise                                                                                |
       | status.text      | string  | Can be `reachable` or `unreachable`                                                                                           |
+
+      #### Source IP addresses
+
+      Netdata Cloud connects to your webhook URL from the currently published set of IP addresses. The set can change, so
+      refresh your allowlist periodically. If your endpoint sits behind a firewall,
+      a WAF, or an IP allowlist, see
+      [Netdata Cloud Outbound IP Addresses](/docs/netdata-cloud/netdata-cloud-outbound-ips.md) for the published list and
+      how to consume it.
+
+      An IP allowlist is a network control, not an identity control — keep one of the authentication mechanisms below in
+      place as well.
 
       #### Extra headers
 

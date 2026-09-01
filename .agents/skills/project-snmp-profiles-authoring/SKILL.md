@@ -16,7 +16,8 @@ Use this skill before editing files under:
 
 1. Identify the source MIB object for every profile field being added or changed.
 2. Check the object's `MAX-ACCESS`.
-3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID`.
+3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
+   device-scoped MIB-deviation requirement below.
 4. If a `not-accessible` object appears in the table `INDEX`, derive it from the row OID index using `index` or `index_transform`.
 5. Keep index extraction and value formatting separate:
    - use `index` for one index component;
@@ -51,6 +52,22 @@ Use this skill before editing files under:
    row-index selector: `index`, `index_from_end`, or `index_transform`. Use
    `index_from_end` for trailing AFI/SAFI-like components after variable-length
    indexes such as `InetAddress`.
+
+## Device-Scoped MIB Deviations
+
+A vendor profile MAY poll an object that the source MIB marks `not-accessible` only when all of these requirements hold:
+
+- **Scope:** The polling row is declared in a selector-matched device or topology-role profile. A generic standards
+  profile MUST NOT carry the deviation.
+- **Proof:** A checked repository fixture or repeatable live capture proves that the matched device returns the object as
+  a readable column and omits the standards-readable anchor needed to obtain the row otherwise.
+- **Isolation:** The device row overrides the generic row identity instead of adding a second generic fallback or a second
+  topology kind.
+- **Documentation:** A short profile comment explains the vendor deviation and why index-only decoding cannot be used.
+- **Regression:** Tests pin both the selector-scoped override and real fixture collection through the profile parser and
+  consumer path.
+
+Do not generalize a device deviation to related models or vendors without equivalent evidence.
 
 ## Index Rules
 
@@ -110,10 +127,11 @@ rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+n
 For known topology-sensitive symbols, scan profile YAMLs before committing:
 
 ```bash
-rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
-Any hit must be reviewed. It is valid only when the tag is index-derived and does not declare `symbol.OID` for a `not-accessible` object.
+Any hit must be reviewed. It is valid only when the tag is index-derived without a `symbol.OID`, or when it satisfies every
+device-scoped MIB-deviation requirement above.
 
 When adding a new topology kind, update all three parts together:
 

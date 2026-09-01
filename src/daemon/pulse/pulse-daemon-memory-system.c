@@ -8,6 +8,13 @@
 #include <malloc.h>
 #endif
 
+// glibc mallinfo2() is not a counter read: to compute fordblks it walks all 10 fastbins
+// and all 127 regular bins, following every free chunk. The cost is O(free chunks) and
+// unbounded. On a parent with multi-GB of fragmented arena space a single call has been
+// measured at hundreds of milliseconds, i.e. a permanently busy thread just to draw one
+// chart. So it runs on its own, slower interval instead of once per pulse step.
+#define PULSE_GLIBC_MALLINFO_UPDATE_EVERY 30
+
 #ifdef HAVE_C_MALLOC_INFO
 // Helper function to find the last occurrence of a substring in a string
 static char *find_last(const char *haystack, const char *needle, size_t *found) {
@@ -112,58 +119,113 @@ cleanup:
 void pulse_daemon_memory_system_do(bool extended) {
     if(!extended) return;
 
-    size_t glibc_mmaps = 0;
-    bool have_mallinfo = false; (void)have_mallinfo;
+    // last observed glibc mmap count. static because mallinfo2() below may be skipped on
+    // this call while netdata.memory_maps (which consumes it) still updates every step;
+    // it is therefore a last-known value, at most PULSE_GLIBC_MALLINFO_UPDATE_EVERY stale.
+    static size_t glibc_mmaps = 0;
+
+    bool have_mallinfo = false;
 
 #ifdef HAVE_C_MALLINFO2
-    struct mallinfo2 mi = mallinfo2();
-    glibc_mmaps = mi.hblks;
-    if(mi.hblkhd || mi.fordblks) {
-        static RRDSET *st_mallinfo = NULL;
-        static RRDDIM *rd_used_mmap = NULL;
-        static RRDDIM *rd_used_arena = NULL;
-        static RRDDIM *rd_unused_fragments = NULL;
-        static RRDDIM *rd_unused_releasable = NULL;
+    // latched on the first call: whether mallinfo2() gives us usable numbers. This must
+    // NOT be recomputed per call - when mallinfo2() is skipped by the interval gate,
+    // a false value here would divert us to the parse_malloc_info() fallback below,
+    // which walks the same bins AND formats XML, i.e. costs strictly more.
+    static bool mallinfo_usable = false;
 
-        if (unlikely(!st_mallinfo)) {
-            st_mallinfo = rrdset_create_localhost(
-                "netdata",
-                "glibc_mallinfo2",
-                NULL,
-                "Memory Usage",
-                NULL,
-                "Glibc Mallinfo2 Memory Distribution",
-                "bytes",
-                "netdata",
-                "pulse",
-                130130,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_STACKED);
+    static int mallinfo_every = 0;
+    if(unlikely(!mallinfo_every)) {
+        // our thread wakes up every [pulse].update every seconds, so that is the finest
+        // cadence we can achieve, and our own interval has to be a multiple of it -
+        // otherwise the chart would declare one update_every and be fed at another,
+        // which shows up as gaps.
+        int pulse_every = (int)inicfg_get_duration_seconds(
+            &netdata_config, CONFIG_SECTION_PULSE,
+            "update every", localhost->rrd_update_every);
 
-            rd_unused_releasable = rrddim_add(st_mallinfo, "unused releasable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_unused_fragments = rrddim_add(st_mallinfo, "unused fragments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_used_arena = rrddim_add(st_mallinfo, "used arena", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_used_mmap = rrddim_add(st_mallinfo, "used mmap", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
+        if(pulse_every < localhost->rrd_update_every)
+            pulse_every = localhost->rrd_update_every;
 
-        // size_t total = mi.uordblks;
-        size_t used_mmap = mi.hblkhd;
-        size_t used_arena = (mi.arena > mi.fordblks) ? mi.arena - mi.fordblks : 0;
+        mallinfo_every = (int)inicfg_get_duration_seconds(
+            &netdata_config, CONFIG_SECTION_PULSE,
+            "glibc mallinfo update every", PULSE_GLIBC_MALLINFO_UPDATE_EVERY);
 
-        size_t unused_total = mi.fordblks;
-        size_t unused_releasable = mi.keepcost;
-        // size_t unused_fast = mi.fsmblks;
-        size_t unused_fragments = (unused_total > unused_releasable) ? unused_total - unused_releasable : 0;
+        if(mallinfo_every < pulse_every)
+            mallinfo_every = pulse_every;
+        else
+            // round up to the next multiple of our thread's step
+            mallinfo_every = ((mallinfo_every + pulse_every - 1) / pulse_every) * pulse_every;
 
-        rrddim_set_by_pointer(st_mallinfo, rd_unused_releasable, (collected_number)unused_releasable);
-        rrddim_set_by_pointer(st_mallinfo, rd_unused_fragments, (collected_number)unused_fragments);
-        rrddim_set_by_pointer(st_mallinfo, rd_used_arena, (collected_number)used_arena);
-        rrddim_set_by_pointer(st_mallinfo, rd_used_mmap, (collected_number)used_mmap);
-
-        rrdset_done(st_mallinfo);
-        have_mallinfo = true;
+        inicfg_set_duration_seconds(
+            &netdata_config, CONFIG_SECTION_PULSE,
+            "glibc mallinfo update every", mallinfo_every);
     }
+
+    static usec_t mallinfo_last_ut = 0;
+    usec_t mallinfo_now_ut = now_monotonic_usec();
+
+    // half a second of slack: our heartbeat ticks on absolute second boundaries, so the
+    // elapsed time at the tick we want can land a few usec short of the interval. Without
+    // the slack we would skip to the next tick and the chart would miss a sample.
+    usec_t mallinfo_step_ut = (usec_t)mallinfo_every * USEC_PER_SEC - USEC_PER_SEC / 2;
+
+    if(!mallinfo_last_ut || mallinfo_now_ut - mallinfo_last_ut >= mallinfo_step_ut) {
+        mallinfo_last_ut = mallinfo_now_ut;
+
+        struct mallinfo2 mi = mallinfo2();
+        glibc_mmaps = mi.hblks;
+        if(mi.hblkhd || mi.fordblks) {
+            static RRDSET *st_mallinfo = NULL;
+            static RRDDIM *rd_used_mmap = NULL;
+            static RRDDIM *rd_used_arena = NULL;
+            static RRDDIM *rd_unused_fragments = NULL;
+            static RRDDIM *rd_unused_releasable = NULL;
+
+            if (unlikely(!st_mallinfo)) {
+                st_mallinfo = rrdset_create_localhost(
+                    "netdata",
+                    "glibc_mallinfo2",
+                    NULL,
+                    "Memory Usage",
+                    NULL,
+                    "Glibc Mallinfo2 Memory Distribution",
+                    "bytes",
+                    "netdata",
+                    "pulse",
+                    130130,
+                    mallinfo_every,
+                    RRDSET_TYPE_STACKED);
+
+                rd_unused_releasable = rrddim_add(st_mallinfo, "unused releasable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_unused_fragments = rrddim_add(st_mallinfo, "unused fragments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_used_arena = rrddim_add(st_mallinfo, "used arena", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_used_mmap = rrddim_add(st_mallinfo, "used mmap", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            // size_t total = mi.uordblks;
+            size_t used_mmap = mi.hblkhd;
+            size_t used_arena = (mi.arena > mi.fordblks) ? mi.arena - mi.fordblks : 0;
+
+            size_t unused_total = mi.fordblks;
+            size_t unused_releasable = mi.keepcost;
+            // size_t unused_fast = mi.fsmblks;
+            size_t unused_fragments = (unused_total > unused_releasable) ? unused_total - unused_releasable : 0;
+
+            rrddim_set_by_pointer(st_mallinfo, rd_unused_releasable, (collected_number)unused_releasable);
+            rrddim_set_by_pointer(st_mallinfo, rd_unused_fragments, (collected_number)unused_fragments);
+            rrddim_set_by_pointer(st_mallinfo, rd_used_arena, (collected_number)used_arena);
+            rrddim_set_by_pointer(st_mallinfo, rd_used_mmap, (collected_number)used_mmap);
+
+            rrdset_done(st_mallinfo);
+            mallinfo_usable = true;
+        }
+    }
+    have_mallinfo = mallinfo_usable;
 #endif // HAVE_C_MALLINFO2
+
+    // read only under HAVE_C_MALLOC_INFO below; keep the cast here, after the last
+    // assignment, so builds without that macro do not report an unread store.
+    (void)have_mallinfo;
 
 #ifdef HAVE_C_MALLOC_INFO
     size_t glibc_arenas, glibc_allocated_arenas, glibc_unused_fast, glibc_unused_rest, glibc_allocated_mmap;

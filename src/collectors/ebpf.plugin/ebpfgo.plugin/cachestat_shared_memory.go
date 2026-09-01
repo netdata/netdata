@@ -1,117 +1,14 @@
 package main
 
 import (
-	"sort"
-	"sync"
+	"slices"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-// cachestatStaleCycles is the debouncer window before a PID is flagged as a
-// stale candidate and the caller performs the authoritative liveness check
-// (libbpfloader.PidIsAlive).  Without this debouncer we would run kill() on
-// every PID every cycle, which is too expensive.
-const cachestatStaleCycles = 3
-
-type cachestatSharedMemoryStore struct {
-	mu                 sync.RWMutex
-	entries            []ebpfPidStat
-	nextEntries        []ebpfPidStat
-	prev               map[uint32]netdataCachestat
-	prevCt             map[uint32]uint64 // last observed BPF timestamp per PID
-	missCount          map[uint32]int    // consecutive cycles where ct did not advance
-	nextPrev           map[uint32]netdataCachestat
-	nextPrevCt         map[uint32]uint64
-	nextMiss           map[uint32]int
-	stalePIDs          []uint32
-	socketData         map[uint32]ebpfSocketPublishApps // per-interval deltas written to SHM this cycle
-	prevSocketData     map[uint32]ebpfSocketPublishApps // raw cumulative counters from the previous cycle
-	nextPrevSocketData map[uint32]ebpfSocketPublishApps // scratch buffer for the next prevSocketData
-	activeModules      uint32                           // EBPFGO_SHM_FLAG_* bits set when a module writes data
-	// cachestatOwnsEntries is true when UpdateApps last populated s.entries.
-	// When false (socket is the sole publisher), UpdateSocketApps must rebuild
-	// s.entries from scratch each cycle rather than merging in-place, so
-	// exited PIDs are evicted instead of accumulating indefinitely.
-	cachestatOwnsEntries bool
-}
-
-func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
-	return &cachestatSharedMemoryStore{
-		prev:               make(map[uint32]netdataCachestat),
-		prevCt:             make(map[uint32]uint64),
-		missCount:          make(map[uint32]int),
-		nextPrev:           make(map[uint32]netdataCachestat),
-		nextPrevCt:         make(map[uint32]uint64),
-		nextMiss:           make(map[uint32]int),
-		socketData:         make(map[uint32]ebpfSocketPublishApps),
-		prevSocketData:     make(map[uint32]ebpfSocketPublishApps),
-		nextPrevSocketData: make(map[uint32]ebpfSocketPublishApps),
-	}
-}
-
-// Snapshot returns a copy of the current in-memory entries.
-// Used only by tests to inspect store state; production code reads via Publish.
-func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	// s.entries is always sorted ascending by pid before Publish() is called:
-	// UpdateApps sorts when BPF input is unordered, and applySocketDataLocked /
-	// buildEntriesFromSocketLocked sort after appending socket-only PIDs.
-	copied := make([]ebpfPidStat, len(s.entries))
-	copy(copied, s.entries)
-	return copied
-}
-
-// ebpfgoSHM* mirrors the EBPFGO_SHM_FLAG_* C constants so Go callers
-// do not need to import "C" just to set a flag value.
-const (
-	ebpfgoSHMFlagCachestat uint32 = 0x01
-	ebpfgoSHMFlagSocket    uint32 = 0x02
-)
-
-// Production POSIX names for the shared-memory segment and its semaphore.
-// Must match NETDATA_EBPFGO_INTEGRATION_NAME / NETDATA_EBPFGO_SHM_INTEGRATION_NAME
-// in apps_ebpf_shared_pid_row.h, which is what all consumer plugins open.
-const (
-	productionSHMName = "/netdata_shm_integration_ebpfgo_v4"
-	productionSEMName = "/netdata_sem_integration_ebpfgo_v4"
-)
-
-// Publish writes the current entries to the shared-memory segment and stamps
-// the per-module validity flags.  Only the CACHESTAT bit is cleared after
-// each publish; the SOCKET bit persists across cachestat cycles so the C
-// consumer does not see socket_ok flap when socket runs at a slower cadence
-// than cachestat.  The SOCKET bit is cleared by MarkSocketInactive on goroutine
-// exit or per-cycle when collection fails.
-//
-// The lock is held for the duration of the C memcpy because
-// applySocketDataLocked writes s.entries[i].socket in place on the same
-// backing array that the C side reads; releasing the lock would expose a
-// data race where socket's goroutine could mutate the entries slice while
-// publisher.Publish is still reading it.
-func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	flags := s.activeModules
-	s.activeModules &^= ebpfgoSHMFlagCachestat // socket bit persists until MarkSocketInactive
-
-	if publisher == nil {
-		return nil
-	}
-	return publisher.Publish(s.entries, flags)
-}
-
-// MarkSocketInactive clears the SOCKET flag from activeModules.  Called via
-// defer when the socket goroutine exits (permanent shutdown) and also per-cycle
-// when Snapshot or SnapshotPerPID fails so the consumer does not see
-// socket_ok = true with zero data arrays.
-func (s *cachestatSharedMemoryStore) MarkSocketInactive() {
-	s.mu.Lock()
-	s.activeModules &^= ebpfgoSHMFlagSocket
-	s.mu.Unlock()
-}
+// cachestatStaleCycles is the cachestat-facing name of the shared ct-stagnation
+// debouncer window (see ebpfStaleCycles).
+const cachestatStaleCycles = ebpfStaleCycles
 
 func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPrevious bool) netdataPublishCachestat {
 	publish := netdataPublishCachestat{
@@ -159,278 +56,123 @@ func copyCommFromSnapshot(dst *[EBPF_MAX_COMPARE_NAME + 1]byte, src [libbpfloade
 	copy(dst[:], src[:])
 }
 
-func buildCachestatPidStat(app libbpfloader.CachestatAppSnapshot, previous netdataCachestat, hasPrevious bool) (ebpfPidStat, netdataCachestat) {
-	current := netdataCachestat{
-		AddToPageCacheLru:  app.AddToPageCacheLru,
-		MarkPageAccessed:   app.MarkPageAccessed,
-		AccountPageDirtied: app.AccountPageDirtied,
-		MarkBufferDirty:    app.MarkBufferDirty,
-	}
-
-	var comm [EBPF_MAX_COMPARE_NAME + 1]byte
-	copyCommFromSnapshot(&comm, app.Comm)
-
-	return ebpfPidStat{
-		pid:       app.Pid,
-		comm:      comm,
-		ppid:      app.Ppid,
-		cachestat: buildCachestatPublish(current, previous, app.Ct, hasPrevious),
-	}, current
-}
-
-// UpdateApps updates the in-memory snapshot from the latest BPF snapshot.
-// It returns the PIDs whose ct has not advanced for cachestatStaleCycles
-// consecutive cycles; the caller is responsible for the authoritative
-// liveness check (libbpfloader.PidIsAlive) before removing them from the
-// kernel BPF map.
+// UpdateApps updates the in-memory snapshot from the latest cachestat BPF
+// snapshot.  It returns the PIDs whose ct has not advanced for
+// cachestatStaleCycles consecutive cycles; the caller is responsible for the
+// authoritative liveness check (libbpfloader.PidIsAlive) before removing them
+// from the kernel BPF map.
 //
 // The store itself is liveness-agnostic so it can be unit-tested without a
 // running /proc and without pulling libbpf into the test binary.
-func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnapshot) []uint32 {
+func (s *ebpfSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnapshot) []uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	nextEntries := s.nextEntries[:0]
-	if cap(nextEntries) < len(apps) {
-		nextEntries = make([]ebpfPidStat, 0, len(apps))
-	}
-	clear(s.nextPrev)
-	clear(s.nextPrevCt)
-	clear(s.nextMiss)
-	stalePIDs := s.stalePIDs[:0]
+	clear(s.cachestatData)
+	clear(s.cachestatIdent)
+	clear(s.nextCachestat)
+	clear(s.nextCachestatCt)
+	clear(s.nextCachestatMs)
+	pids := s.cachestatPIDs[:0]
+	stalePIDs := s.cachestatStale[:0]
 	ordered := true
-	seenPID := false
-	var previousPID uint32
 
 	for _, app := range apps {
-		if seenPID && app.Pid < previousPID {
-			ordered = false
-		}
-		seenPID = true
-		previousPID = app.Pid
-
-		lastCt, seen := s.prevCt[app.Pid]
+		lastCt, seen := s.cachestatPrevCt[app.Pid]
+		stale := false
 		if seen && app.Ct == lastCt {
-			miss := s.missCount[app.Pid] + 1
+			miss := s.cachestatMiss[app.Pid] + 1
 			if miss >= cachestatStaleCycles {
-				// ct stagnation threshold reached.  The caller will
-				// confirm liveness via libbpfloader.PidIsAlive and
-				// delete from the BPF map only if the process is gone.
+				// ct stagnation threshold reached.  The caller will confirm
+				// liveness via libbpfloader.PidIsAlive and delete from the BPF
+				// map only if the process is gone.
+				stale = true
 				stalePIDs = append(stalePIDs, app.Pid)
-				continue
+			} else {
+				s.nextCachestatMs[app.Pid] = miss
 			}
-			s.nextMiss[app.Pid] = miss
 		}
-		// New PID or ct advanced: miss count stays 0 (Go zero-value).
+		// New PID or ct advanced: miss count stays 0 (Go zero-value).  A stale
+		// candidate also resets it, so it is re-flagged every cachestatStaleCycles
+		// instead of forcing a kill() probe on every cycle.
 
-		s.nextPrevCt[app.Pid] = app.Ct
+		current := netdataCachestat{
+			AddToPageCacheLru:  app.AddToPageCacheLru,
+			MarkPageAccessed:   app.MarkPageAccessed,
+			AccountPageDirtied: app.AccountPageDirtied,
+			MarkBufferDirty:    app.MarkBufferDirty,
+		}
+		previous, hasPrevious := s.cachestatPrev[app.Pid]
 
-		previous, hasPrevious := s.prev[app.Pid]
-		stat, current := buildCachestatPidStat(app, previous, hasPrevious)
-		nextEntries = append(nextEntries, stat)
-		s.nextPrev[app.Pid] = current
+		// Carry the ct and counter baselines forward even for a stale candidate,
+		// exactly as UpdateDCStatApps does.  Most stale candidates are idle-but-
+		// alive processes that the caller's PidIsAlive check keeps: dropping their
+		// baseline here would make the next burst of activity look like a first
+		// sample, so one interval of deltas would be lost and the hit ratio for
+		// that interval would be wrong.  The state is bounded by the BPF map
+		// contents, so it disappears once the PID is confirmed dead and deleted.
+		s.nextCachestatCt[app.Pid] = app.Ct
+		s.nextCachestat[app.Pid] = current
+
+		if stale {
+			// No row this cycle: the caller decides whether the PID is dead.
+			continue
+		}
+
+		var ident ebpfModuleIdentity
+		copyCommFromSnapshot(&ident.comm, app.Comm)
+		ident.ppid = app.Ppid
+
+		s.cachestatData[app.Pid] = buildCachestatPublish(current, previous, app.Ct, hasPrevious)
+		s.cachestatIdent[app.Pid] = ident
+		pids, ordered = appendAscending(pids, app.Pid, ordered)
 	}
 
-	// Ensure entries are sorted by pid so Snapshot() callers always see a
-	// consistent ordering. The native snapshot path already sorts by pid, so
-	// only pay for sort when a test or fallback caller provides unordered input.
+	// The native snapshot path already sorts by pid; only a test or fallback
+	// caller supplying unordered input pays for the sort.
 	if !ordered {
-		sort.Slice(nextEntries, func(i, j int) bool {
-			return nextEntries[i].pid < nextEntries[j].pid
-		})
+		slices.Sort(pids)
 	}
 
-	s.entries, s.nextEntries = nextEntries, s.entries
-	s.prev, s.nextPrev = s.nextPrev, s.prev
-	s.prevCt, s.nextPrevCt = s.nextPrevCt, s.prevCt
-	s.missCount, s.nextMiss = s.nextMiss, s.missCount
-	s.stalePIDs = stalePIDs
+	s.cachestatPIDs = pids
+	// See UpdateDCStatApps: an empty snapshot must not rotate the empty baseline
+	// map in, or the next active cycle loses one interval of deltas.
+	if len(s.nextCachestat) > 0 {
+		s.cachestatPrev, s.nextCachestat = s.nextCachestat, s.cachestatPrev
+		s.cachestatPrevCt, s.nextCachestatCt = s.nextCachestatCt, s.cachestatPrevCt
+		s.cachestatMiss, s.nextCachestatMs = s.nextCachestatMs, s.cachestatMiss
+	}
+	s.cachestatStale = stalePIDs
 	s.activeModules |= ebpfgoSHMFlagCachestat // mark cachestat as an active producer
-	// Track ownership so UpdateSocketApps knows to merge rather than rebuild.
-	s.cachestatOwnsEntries = len(s.entries) > 0
-	s.applySocketDataLocked()
+	s.rebuildEntriesLocked()
 	return stalePIDs
 }
 
-// applySocketDataLocked merges the latest socket snapshot into s.entries.
-// Existing entries' socket field is updated from s.socketData.  PIDs present
-// in s.socketData but absent from s.entries are appended and the slice is
-// re-sorted, so that services with socket activity but no page-cache activity
-// (absent from the cachestat snapshot) are still visible to the C consumer.
-// Must be called with s.mu held for writing.
-func (s *cachestatSharedMemoryStore) applySocketDataLocked() {
-	for i := range s.entries {
-		if data, ok := s.socketData[s.entries[i].pid]; ok {
-			s.entries[i].socket = data
-		} else {
-			// PID absent from the latest socket snapshot: reset to zero so
-			// consumers never see values from a prior cycle.
-			s.entries[i].socket = ebpfSocketPublishApps{}
-		}
-	}
-
-	if len(s.socketData) == 0 {
-		return
-	}
-
-	// Append socket-only PIDs not already covered by a cachestat entry.
-	// s.entries is sorted ascending so binary search is O(log n) per PID.
-	prevLen := len(s.entries)
-	for pid, data := range s.socketData {
-		if !sortedEntriesContainPID(s.entries[:prevLen], pid) {
-			s.entries = append(s.entries, ebpfPidStat{pid: pid, socket: data})
-		}
-	}
-
-	if len(s.entries) > prevLen {
-		sort.Slice(s.entries, func(i, j int) bool {
-			return s.entries[i].pid < s.entries[j].pid
-		})
-	}
-}
-
-// sortedEntriesContainPID reports whether the sorted entries slice contains pid.
-func sortedEntriesContainPID(entries []ebpfPidStat, pid uint32) bool {
-	lo, hi := 0, len(entries)
-	for lo < hi {
-		mid := int(uint(lo+hi) >> 1)
-		if entries[mid].pid < pid {
-			lo = mid + 1
-		} else if entries[mid].pid > pid {
-			hi = mid
-		} else {
-			return true
-		}
-	}
-	return false
-}
-
-// socketIntervalDelta returns the per-field difference between consecutive raw
-// BPF counter readings.  Counter resets (current < prev) are clamped to zero.
-func socketIntervalDelta(curr, prev ebpfSocketPublishApps) ebpfSocketPublishApps {
-	clamp := func(c, p uint64) uint64 {
-		if c >= p {
-			return c - p
-		}
-		return 0
-	}
-	return ebpfSocketPublishApps{
-		BytesSent:           clamp(curr.BytesSent, prev.BytesSent),
-		BytesReceived:       clamp(curr.BytesReceived, prev.BytesReceived),
-		CallTCPSent:         clamp(curr.CallTCPSent, prev.CallTCPSent),
-		CallTCPReceived:     clamp(curr.CallTCPReceived, prev.CallTCPReceived),
-		Retransmit:          clamp(curr.Retransmit, prev.Retransmit),
-		CallUDPSent:         clamp(curr.CallUDPSent, prev.CallUDPSent),
-		CallUDPReceived:     clamp(curr.CallUDPReceived, prev.CallUDPReceived),
-		CallClose:           clamp(curr.CallClose, prev.CallClose),
-		CallTCPV4Connection: clamp(curr.CallTCPV4Connection, prev.CallTCPV4Connection),
-		CallTCPV6Connection: clamp(curr.CallTCPV6Connection, prev.CallTCPV6Connection),
-		UpdateEverySec:      curr.UpdateEverySec,
-	}
-}
-
-// UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
-// the current entries.  Called by the socket collector each cycle.
-//
-// On the success path (entries != nil) this function computes per-interval
-// deltas (raw BPF counter - previous raw BPF counter) before writing to
-// socketData.  New PIDs emit zero on their first cycle to suppress the initial
-// spike that would otherwise appear when they first enter the BPF map.  Exited
-// PIDs are absent from entries and therefore absent from socketData; the apply
-// path zeroes their SHM row automatically.
-//
-// When cachestat is also running as publisher (cachestatOwnsEntries == true),
-// socket data is merged into the cachestat-populated entries via
-// applySocketDataLocked so both modules' data appear on the same rows.
-//
-// When socket is the sole publisher (cachestat disabled or has no apps/cgroups
-// consumers), s.entries is rebuilt from scratch each cycle via
-// buildEntriesFromSocketLocked.  This mirrors the double-buffer pattern used
-// by UpdateApps and ensures that exited PIDs are evicted automatically — if we
-// merged in-place the way the co-publisher path does, entries would accumulate
-// every PID that ever had socket activity and never shrink, eventually exceeding
-// the 32768-row SHM capacity and silently dropping high-PID processes.
-func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.SocketPIDEntry, updateEverySec uint32) {
+// ClearCachestatApps invalidates cachestat's contribution after a failed app
+// snapshot so consumers cannot continue treating a previous payload as current.
+func (s *ebpfSharedMemoryStore) ClearCachestatApps() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for k := range s.socketData {
-		delete(s.socketData, k)
-	}
-	// Set the SOCKET flag only on the success path (entries != nil).
-	// clearSocketApps() passes nil to signal a failed collection cycle;
-	// the caller clears the flag via MarkSocketInactive() before calling here.
-	if entries != nil {
-		s.activeModules |= ebpfgoSHMFlagSocket
-		clear(s.nextPrevSocketData)
-		for _, e := range entries {
-			raw := ebpfSocketPublishApps{
-				BytesSent:           e.BytesSent,
-				BytesReceived:       e.BytesReceived,
-				CallTCPSent:         e.CallTCPSent,
-				CallTCPReceived:     e.CallTCPReceived,
-				Retransmit:          e.Retransmit,
-				CallUDPSent:         e.CallUDPSent,
-				CallUDPReceived:     e.CallUDPReceived,
-				CallClose:           e.CallClose,
-				CallTCPV4Connection: e.CallTCPV4Connection,
-				CallTCPV6Connection: e.CallTCPV6Connection,
-				UpdateEverySec:      updateEverySec,
-			}
-			s.nextPrevSocketData[e.PID] = raw
-			if prev, ok := s.prevSocketData[e.PID]; ok {
-				s.socketData[e.PID] = socketIntervalDelta(raw, prev)
-			} else {
-				// New PID: emit zero this cycle; first-cycle spike suppressed.
-				s.socketData[e.PID] = ebpfSocketPublishApps{}
-			}
-		}
-		s.prevSocketData, s.nextPrevSocketData = s.nextPrevSocketData, s.prevSocketData
-	}
-	if len(s.socketData) == 0 {
-		s.clearSocketDataFromEntriesLocked()
-		return
-	}
-	if s.cachestatOwnsEntries {
-		s.applySocketDataLocked()
-	} else {
-		s.buildEntriesFromSocketLocked()
-	}
+	clear(s.cachestatData)
+	clear(s.cachestatIdent)
+	s.cachestatPIDs = s.cachestatPIDs[:0]
+	s.activeModules &^= ebpfgoSHMFlagCachestat
+	s.rebuildEntriesLocked()
 }
 
-// clearSocketDataFromEntriesLocked removes the socket contribution from the
-// current snapshot while preserving real cachestat rows.
-func (s *cachestatSharedMemoryStore) clearSocketDataFromEntriesLocked() {
-	nextEntries := s.entries[:0]
-	for i := range s.entries {
-		s.entries[i].socket = ebpfSocketPublishApps{}
-		if entryHasCachestatData(s.entries[i]) {
-			nextEntries = append(nextEntries, s.entries[i])
-		}
-	}
-	s.entries = nextEntries
-}
+// RemoveCachestatPIDs drops baseline state after successful runtime deletion so
+// a reused PID cannot inherit an exited process's counters.
+func (s *ebpfSharedMemoryStore) RemoveCachestatPIDs(pids []uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-func entryHasCachestatData(entry ebpfPidStat) bool {
-	if entry.ppid != 0 || entry.cachestat != (netdataPublishCachestat{}) {
-		return true
+	for _, pid := range pids {
+		delete(s.cachestatData, pid)
+		delete(s.cachestatIdent, pid)
+		delete(s.cachestatPrev, pid)
+		delete(s.cachestatPrevCt, pid)
+		delete(s.cachestatMiss, pid)
 	}
-	return entry.comm != ([EBPF_MAX_COMPARE_NAME + 1]byte{})
-}
-
-// buildEntriesFromSocketLocked populates s.entries from the latest socket
-// snapshot when cachestat has no entries to merge into.  Must be called with
-// s.mu held for writing.
-func (s *cachestatSharedMemoryStore) buildEntriesFromSocketLocked() {
-	nextEntries := s.nextEntries[:0]
-	if cap(nextEntries) < len(s.socketData) {
-		nextEntries = make([]ebpfPidStat, 0, len(s.socketData))
-	}
-	for pid, data := range s.socketData {
-		nextEntries = append(nextEntries, ebpfPidStat{pid: pid, socket: data})
-	}
-	sort.Slice(nextEntries, func(i, j int) bool {
-		return nextEntries[i].pid < nextEntries[j].pid
-	})
-	s.entries, s.nextEntries = nextEntries, s.entries
+	s.rebuildEntriesLocked()
 }

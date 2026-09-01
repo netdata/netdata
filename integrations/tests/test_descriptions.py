@@ -51,6 +51,8 @@ from gen_npm_catalog import (  # noqa: E402
     build_device_modules,
     is_device_catalog_profile,
     load_profiles,
+    make_entry,
+    profile_display_name,
 )
 
 
@@ -81,6 +83,30 @@ class NPMCatalogProfileVisibilityTest(unittest.TestCase):
             for module in modules
         ]
         self.assertFalse(any("topology-role-" in value for value in method_descriptions))
+
+    def test_mikrotik_profile_names_preserve_product_capitalization(self):
+        self.assertEqual(profile_display_name("mikrotik-router.yaml", "MikroTik", "Router"), "MikroTik Router")
+        self.assertEqual(profile_display_name("mikrotik-swos.yaml", "MikroTik", "Switch"), "MikroTik Switch")
+
+    def test_snmp_support_collection_is_not_attached_to_unrelated_catalog_entries(self):
+        common = {
+            "name": "Test",
+            "link": "",
+            "categories": ["data-collection.networking"],
+            "icon": "netdata.png",
+            "keywords": ["test"],
+            "ov": {},
+        }
+        snmp = make_entry(**common)
+        topology = make_entry(**common, module_name="snmp_topology")
+        traps = make_entry(**common, module_name="snmp_traps")
+        non_snmp = make_entry(**common, plugin_name="netdata", module_name="streaming")
+
+        self.assertTrue(snmp["troubleshooting"]["problems"]["list"])
+        self.assertTrue(topology["troubleshooting"]["problems"]["list"])
+        self.assertFalse(traps["troubleshooting"]["problems"]["list"])
+        self.assertFalse(non_snmp["troubleshooting"]["problems"]["list"])
+
 
 MARKDOWN_SPECIAL_CHARACTERS = "*_[]<>#`~"
 yaml = YAML(typ="safe")

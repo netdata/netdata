@@ -38,8 +38,8 @@ The cheapest way to verify your `map.yaml` change works:
 cd ${NETDATA_REPOS_DIR}/learn
 
 # Set up venv once.
-python3 -m venv venv && . venv/bin/activate
-pip install -r .learn_environment/ingest-requirements.txt
+python3.13 -m venv venv && . venv/bin/activate
+python -m pip install --require-hashes -r .learn_environment/ingest-requirements.txt
 
 # Test against your local netdata clone.
 python3 ingest/ingest.py --local-repo netdata:<repo> \

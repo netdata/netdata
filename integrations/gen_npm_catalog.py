@@ -558,7 +558,20 @@ SNMP_TRAPS_SETUP = setup_block(
     }],
 )
 
-TROUBLESHOOTING = {'problems': {'list': []}}
+TROUBLESHOOTING = {
+    'problems': {
+        'list': [{
+            'name': 'Collect Live Data for Netdata Support',
+            'description':
+                'For missing SNMP metrics or incomplete SNMP-derived topology, follow '
+                "[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) "
+                "to create "
+                'a raw SNMP data archive that omits credentials and attach it to a '
+                'restricted Freshdesk ticket.',
+        }],
+    },
+}
+EMPTY_TROUBLESHOOTING = {'problems': {'list': []}}
 METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '', 'availability': [], 'scopes': []}
 
 
@@ -579,7 +592,7 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO
         },
         'overview': ov,
         'setup': setup if setup is not None else SETUP,
-        'troubleshooting': TROUBLESHOOTING,
+        'troubleshooting': TROUBLESHOOTING if module_name in ('snmp', 'snmp_topology') else EMPTY_TROUBLESHOOTING,
         'alerts': [],
         'metrics': metrics if metrics is not None else METRICS,
     }
@@ -604,6 +617,9 @@ GENERIC_NAMES = {
     'net-snmp.yaml': 'Net-SNMP Host',
     'generic-ups.yaml': 'Generic UPS (UPS-MIB)',
     'meraki-cloud-controller.yaml': 'Cisco Meraki (Cloud Controller)',
+    'ubiquiti-net-snmp.yaml': 'Ubiquiti Net-SNMP Devices',
+    'mikrotik-router.yaml': 'MikroTik Router',
+    'mikrotik-swos.yaml': 'MikroTik Switch',
 }
 
 
@@ -825,10 +841,12 @@ def build_topology_modules():
          'reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system '
          'name, '
          'and management address.',
-         'Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the '
+         'Netdata reads the LLDP-MIB or LLDP-V2-MIB local and remote neighbor tables over SNMP and stitches the links '
+         'into the '
          '`topology:snmp` '
          'view.',
-         'Discovered automatically on devices that expose the LLDP-MIB.'),
+         'Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently '
+         'enabled for Palo Alto firewalls.'),
         ('CDP Topology', ['cdp', 'cisco', 'topology', 'l2', 'snmp', 'npm'],
          'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache '
          'table '
@@ -873,10 +891,11 @@ def build_topology_modules():
          'Discovered automatically on routers that expose the OSPF neighbor table.'),
     ]
 
-    # network-viewer.plugin builds topology:network-connections only where network-viewer.c
-    # is compiled — Linux, FreeBSD and macOS (CMakeLists.txt). Windows builds
-    # network-viewer-windows.c, which registers network-connections and network-protocols
-    # but NOT the topology Function. Container/Kubernetes/systemd enrichment needs the
+    # network-viewer.plugin builds topology:network-connections on Linux, FreeBSD,
+    # macOS, and Windows: network-viewer-topology.c provides the shared v1 renderer;
+    # network-viewer.c provides the Linux/macOS/FreeBSD entry point and socket
+    # backend, while network-viewer-windows.c registers the same Function on Windows.
+    # Container/Kubernetes/systemd enrichment needs the
     # APPS_LOOKUP client, which is Linux-only (network-viewer-apps-lookup-client.h).
     other = [
         ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', 'network.svg',
@@ -888,10 +907,11 @@ def build_topology_modules():
          'as far as the APPS_LOOKUP data allows — attribution is best effort, and a process it cannot resolve is still '
          'drawn.',
          'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live '
-         'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container '
-         'and Kubernetes attribution is Linux-only.',
+         'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, macOS, and Windows; '
+         'container and Kubernetes attribution is Linux-only, and Windows UDP rows are listener-only because the '
+         'IP Helper API does not expose remote endpoints.',
          'Always on; observes the host\'s live network connections.',
-         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS'], False,
+         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS', 'Windows'], False,
          'A single response is capped at 64 MiB. On a host with enough connections to exceed that, the request is '
          'aborted rather than truncated — group the map (by process name or container) to bring it back under the cap.',
          'Sockets are enumerated when the Function is called, not continuously in the background, so the cost is paid '
@@ -899,7 +919,9 @@ def build_topology_modules():
          'The plugin needs privileged access to enumerate the sockets of every process; standard installations grant '
          'it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for '
          'sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or '
-         'TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. The '
+         'TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. '
+         'On Windows it uses the IP Helper API, so UDP rows are listener-only because it does not expose remote '
+         'endpoints. The '
          'Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive '
          'data — it is not available anonymously.'),
         ('Netdata Streaming Topology', 'netdata', 'streaming', 'netdata.png',

@@ -303,8 +303,8 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 			mustBeProofSupport: true,
 		},
 		"haproxy": {
-			metadataPath:  "../../haproxy/metadata.yaml",
-			integrationID: "collector-go.d.plugin-haproxy",
+			metadataPath:  "../metadata.yaml",
+			integrationID: "collector-go.d.plugin-prometheus-haproxy",
 		},
 		"litellm": {
 			metadataPath:  "../metadata.yaml",

@@ -22,6 +22,7 @@ func cloneChartDefaults(in *ChartDefaults) *ChartDefaults {
 		return nil
 	}
 	return &ChartDefaults{
+		Priority:      in.Priority,
 		LabelPromoted: slices.Clone(in.LabelPromoted),
 		Instances:     cloneInstances(in.Instances),
 	}

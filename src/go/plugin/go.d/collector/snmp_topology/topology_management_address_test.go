@@ -128,16 +128,6 @@ func TestNormalizeManagementAddressHonorsProtocolFamilies(t *testing.T) {
 	}
 }
 
-func TestReconstructLldpRemMgmtAddrHex_FromOctets(t *testing.T) {
-	require.Equal(t, "0a14043c", reconstructLldpRemMgmtAddrHex(map[string]string{
-		tagLldpRemMgmtAddrLen:             "4",
-		tagLldpRemMgmtAddrOctetPref + "1": "10",
-		tagLldpRemMgmtAddrOctetPref + "2": "20",
-		tagLldpRemMgmtAddrOctetPref + "3": "4",
-		tagLldpRemMgmtAddrOctetPref + "4": "60",
-	}))
-}
-
 func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testing.T) {
 	var addrs []topologymodel.ManagementAddress
 	for _, address := range []string{
@@ -167,7 +157,7 @@ func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testi
 }
 
 func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{
 		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
@@ -214,7 +204,7 @@ func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *
 		{Address: "198.51.100.20", AddressType: "ipv4", Source: "ip_mib"},
 	}, cache.localDevice.ManagementAddresses)
 
-	cache.finalizeTopologyCache()
+	cache.finalize()
 	require.Nil(t, cache.localManagementAddressKeys)
 }
 
@@ -236,7 +226,7 @@ func BenchmarkTopologyCacheIPManagementAddressIngest(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				cache := newTopologyCache()
+				cache := newTopologyBuilder()
 				cache.ingestTopologyProfileMetrics(pms)
 				runtime.KeepAlive(cache)
 			}

@@ -15,10 +15,10 @@ import (
 )
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindOSPFNeighbor, (*topologyCache).updateOSPFNeighbor)
+	registerTopologyMetricHandler(ddsnmp.KindOSPFNeighbor, (*topologyBuilder).updateOSPFNeighbor)
 }
 
-func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
+func (c *topologyBuilder) updateOSPFNeighbor(tags map[string]string) {
 	neighborRouterID := topologyutil.NormalizeTopologyRouterID(tags[tagOSPFNeighborRouterID])
 	neighborIP := topologyutil.NormalizeNonUnspecifiedIPAddress(tags[tagOSPFNeighborIP])
 	if neighborRouterID == "" && neighborIP == "" {
@@ -42,7 +42,7 @@ func (c *topologyCache) updateOSPFNeighbor(tags map[string]string) {
 	c.ospfNeighborsByKey[topologyOSPFNeighborCacheKey(row)] = row
 }
 
-func (c *topologyCache) snapshotOSPFNeighbors(localDeviceID string) []topologymodel.OSPFNeighbor {
+func (c *topologyBuilder) snapshotOSPFNeighbors(localDeviceID string) []topologymodel.OSPFNeighbor {
 	if c == nil || len(c.ospfNeighborsByKey) == 0 {
 		return nil
 	}
@@ -78,7 +78,7 @@ type topologyOSPFLocalInterfaceMatch struct {
 	Prefix  int
 }
 
-func (c *topologyCache) matchOSPFNeighborLocalInterface(neighborIP string) (topologyOSPFLocalInterfaceMatch, bool) {
+func (c *topologyBuilder) matchOSPFNeighborLocalInterface(neighborIP string) (topologyOSPFLocalInterfaceMatch, bool) {
 	neighbor, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(neighborIP))
 	if err != nil || !neighbor.Is4() {
 		return topologyOSPFLocalInterfaceMatch{}, false

@@ -285,7 +285,7 @@ functions:
 | **Labels** | static_labels | A map of static labels added to every chart created by this job. Useful for tagging charts with environment, region, or role. | {} | no |
 | **Queries & Metrics** | queries | A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details. | [] | no |
 |  | metrics | A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more charts. See [Configuration Structure](#configuration) for details. | [] | no |
-| **Functions** | functions | A list of SQL functions exposed as interactive table views in Netdata's Live tab. Each function runs a SQL query and displays results in a filterable, sortable table. See [Functions](#functions) for details. | [] | no |
+| **Functions** | functions | A list of SQL functions exposed as interactive table views in Netdata's Live tab. Each function runs a SQL query and displays results in a filterable, sortable table. See [Live Data](#live-data) for details. | [] | no |
 |  | functions[].id | Unique identifier for this function. |  | yes |
 |  | functions[].name | Display name shown in the UI. Auto-derived from ID if not set. |  | no |
 |  | functions[].description | Help text shown in the UI. |  | no |

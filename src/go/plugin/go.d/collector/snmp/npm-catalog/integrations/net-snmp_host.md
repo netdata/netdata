@@ -178,3 +178,9 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_ucd_memoryTotal` | `By` | device | The total amount of real/physical memory installed on this host |
 | `snmp.device_prof_ucd_ssRawSwapIn` | `By/s` | device | Amount of memory swapped in from disk |
 | `snmp.device_prof_ucd_ssRawSwapOut` | `By/s` | device | Amount of memory swapped out to disk |
+
+
+
+### Collect Live Data for Netdata Support
+
+For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.

@@ -1451,9 +1451,9 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
 }
 
 /**
- * Directory Cache thread
+ * File descriptor thread
  *
- * Thread used to make dcstat thread
+ * Thread used to generate file descriptor charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *

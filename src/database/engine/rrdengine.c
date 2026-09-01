@@ -708,6 +708,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
             pgc_open_add_hot_page(
                 (Word_t)ctx,
                 descr->metric_id,
+                descr->uuid_id,
                 (time_t)(descr->start_time_ut / USEC_PER_SEC),
                 (time_t)(descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,
@@ -941,7 +942,12 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     }
 
     if (!count) {
-        __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+        // No decrement here. The only caller does `if (!xt_io_descr) goto done;` and `done:`
+        // decrements extents_currently_being_flushed, so decrementing here too would take the
+        // unsigned counter below zero and wrap it, and both waiters on it - shutdown's
+        // ctx_shutdown_tp_worker() (rrdengine.c) and finalize_data_files() (datafile.c) - would
+        // spin forever. Not reachable today (the only EXTENT_WRITE producer returns early on an
+        // empty batch), but the accounting must not depend on that.
         return NULL;
     }
 
@@ -1275,7 +1281,10 @@ static time_t find_uuid_first_time(
         if (no_signal_received) {
             time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
 
-            if (journal_start_time_s < global_first_time_s)
+            // same as journalfile_v2_populate_retention_to_mrg(): a zero header
+            // start time means the journal has no metrics, not that its
+            // retention starts at the epoch
+            if (journal_start_time_s > 0 && journal_start_time_s < global_first_time_s)
                 global_first_time_s = journal_start_time_s;
 
             size_t metric_offset = j2_header->metric_offset;

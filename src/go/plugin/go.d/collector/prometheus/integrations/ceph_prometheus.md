@@ -26,34 +26,47 @@ Monitor Ceph through its official Prometheus surfaces without narrowing the expo
 different Dashboard REST API.
 
 The built-in profile separates cluster-wide MGR health, quorum, capacity, placement groups, pools, and OSD metadata
-from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
+from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. You can monitor
 CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
 scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
-and Tentacle 20.2.2. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
+and Tentacle 20.2.3. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
 exposes cephadm node-proxy CPU, memory, storage, cooling, temperature, and per-component health metrics. Firmware
-remains source metadata and is not charted because Ceph exposes it as an info family. PG state flags and RGW
-global/user/bucket views are overlapping diagnostic populations and are not additive totals. Profile relabeling
-turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB cache, Finisher, Throttle, KernelDevice,
-mClock, messenger, RDMA, DPDK, and service-identity family names into stable profile inputs while preserving their
-source keys as identity labels. The source-complete profile materializes the entire declared release/producer union
-with zero generic fallback. Unknown future Ceph families remain visible through generic fallback until their source
-semantics can be curated; generic visibility is a forward-compatibility guard, not evidence that a known source
-family was fully modeled. The profile drops only the source-proven raw MGR RGW source-zone aliases because the stable
-normalized family is already charted.
+inventory remains available as metadata. PG state flags and RGW global/user/bucket views provide diagnostic detail
+rather than additive totals. The profile gives dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter,
+RocksDB cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity families stable
+chart identities while preserving their source keys.
 
-The chart model follows the producer's source lifecycle rather than relying on Prometheus wire type alone. Current
-populations that Ceph increments and decrements remain absolute, while cumulative work published through gauges is
-rendered incrementally so Netdata performs rate calculation and reset detection. Shared charts compare only the same
-counted or measured population: requests, objects, bytes, reservations, state transitions, and other unlike units
-remain separate even when their wire type or numeric scale is similar.
+Charts follow each producer's lifecycle. Current populations that Ceph increments and decrements remain absolute,
+while cumulative work published through gauges is rendered incrementally so Netdata performs rate calculation and
+reset detection. Shared charts compare only the same counted or measured population, keeping requests, objects,
+bytes, reservations, and state transitions separate even when their numeric scales are similar.
 
 The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
 `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
-NVMe-oF gateway's Python process runtime surface.
+NVMe-oF gateway's Python process runtime surface. On Tentacle, the optional MGR node-proxy hardware surface is
+charted per reported component and temperature sensor with its hostname, category, component, or sensor identity.
+These families are absent on Reef and Squid; their absence creates no chart or alert there.
+
+Configure one logical MGR job per Ceph cluster for cluster-health alerts and one native Ceph Dashboard job for
+API component integrity. The generic Prometheus collection alert reports a configured MGR job that cannot scrape;
+the native collector reports Dashboard API component failures. Monitor and OSD cluster-summary charts represent
+one cluster job or virtual node. Use one stable endpoint or failover target that follows the active MGR, and keep
+one stable job or virtual-node identity per cluster.
+
+Cluster-summary alerts evaluate the latest stored dimensions on each Netdata health beat. A failed scrape does not
+obsolete the chart or fabricate new values, so the data-state alert may continue evaluating the last stored state;
+the generic collection alert owns that scrape failure. When the collector knows the chart has disappeared and
+obsoletes it, its instance alerts are removed.
+
+Netdata's per-filesystem and per-interface host alerts monitor root-filesystem usage and packet drops on each Ceph
+node. These host-wide policies use Netdata's thresholds, windows, directionality, hysteresis, and routing.
 
 
 Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
-built-in `ceph` profile.
+built-in `ceph` profile. The MGR module refreshes its enabled metric cache every 15 seconds by default, and standalone
+`ceph-exporter` refreshes daemon metrics every 5 seconds by default. Scrapes read those producer caches; choosing a
+5-, 10-, 15-, or 60-second Netdata interval does not schedule Ceph producer refresh. Match the interval to the
+configured producer cache period to avoid redundant samples, unless the MGR cache is deliberately disabled.
 
 
 This collector is supported on all platforms.
@@ -97,8 +110,9 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable an official Ceph Prometheus endpoint
 
-Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics or
-deploy the official `ceph-exporter` for host-local daemon performance metrics. The stock profile supports the
+Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics,
+deploy the official `ceph-exporter` for host-local daemon performance metrics, or enable the Ceph NVMe-oF
+gateway exporter on each gateway endpoint. The stock profile supports the
 default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
 counters are required and size the job limits for the resulting series count. When cephadm node-proxy hardware
 reporting is enabled, hardware series scale with the cluster-wide component inventory; size both
@@ -308,55 +322,2091 @@ sudo ./edit-config go.d/prometheus.conf
 
 ###### Ceph MGR and ceph-exporter
 
-Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the automatically
-matched Ceph and process-runtime profiles. Repeat the exporter job for every exporter endpoint. The Ceph
-profile preserves source labels that collide with Netdata's Prometheus re-export labels under a `ceph_`
-prefix, retains opaque dynamic group keys, and normalizes only source families whose suffix grammar is
-unambiguous.
+Collect one logical MGR endpoint per Ceph cluster and each local official ceph-exporter endpoint with the
+automatically matched Ceph and process-runtime profiles. Configure one MGR job per cluster and do not scrape
+multiple active MGR endpoints into the same job. Repeat the exporter job for every exporter endpoint, using
+each host's own scope. The Ceph profile preserves source labels that collide with Netdata's Prometheus
+re-export labels under a `ceph_` prefix, retains opaque dynamic group keys, and normalizes only source families
+whose suffix grammar is unambiguous.
 
 
 ```yaml
 jobs:
-  - &ceph_job
-    name: ceph-mgr
+  - name: ceph-mgr
     url: http://127.0.0.1:9283/metrics
+    update_every: 15
     expected_prefix: ceph_
     max_time_series: 20000
     max_time_series_per_metric: 4000
-  - <<: *ceph_job
-    name: ceph-exporter
+  - name: ceph-exporter
     url: http://127.0.0.1:9926/metrics
+    update_every: 5
+    expected_prefix: ceph_
+    max_time_series: 20000
+    max_time_series_per_metric: 4000
 
 ```
+###### Ceph NVMe-oF gateway exporter
+
+Collect one local gateway endpoint per Ceph NVMe-oF gateway whose local state is required. The gateway
+exporter is independent of the MGR endpoint and normally listens on port 10008. Preserve one stable job
+identity for each gateway and size the local series limits independently.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph-nvmeof-gateway-a
+    url: http://127.0.0.1:10008/metrics
+    update_every: 5
+    expected_prefix: ceph_
+    max_time_series: 10000
+    max_time_series_per_metric: 2000
+
+```
+</details>
+
+###### Ceph MGR with virtual node
+
+Use a virtual node when the cluster identity should remain independent of the Agent currently scraping its
+active MGR. First define the vnode in `/etc/netdata/vnodes/vnodes.conf`:
+
+```yaml
+- hostname: ceph-cluster
+  guid: <your-uuid-here>
+```
+
+Then reference that exact hostname in the MGR job. An undefined vnode makes the job fail to start. Keep one
+logical MGR job and one stable vnode identity per Ceph cluster.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph-mgr-vnode
+    vnode: ceph-cluster
+    url: http://127.0.0.1:9283/metrics
+    update_every: 15
+    expected_prefix: ceph_
+    max_time_series: 20000
+    max_time_series_per_metric: 4000
+
+```
+</details>
+
 
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ceph_nvmeof_subsystem_open_security ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.state_metadata | Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security. |
+| [ ceph_nvmeof_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.time_accumulation | The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent. |
+| [ ceph_nvmeof_high_read_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read. |
+| [ ceph_nvmeof_high_write_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute write service-time ratio exceeds 20 milliseconds per completed write. |
+| [ ceph_nvmeof_host_keepalive_timeout ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.hosts.keepalive_timeout_state | The gateway exporter currently reports host ${label:host_nqn} disconnected from subsystem ${label:nqn}. Inspect the initiator link and reconnect behavior. Exporter refresh reads and clears this one-shot state. |
+| [ ceph_nvmeof_subsystem_namespace_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.namespace_capacity | The current subsystem namespace count is at or above its configured limit. |
+| [ ceph_nvmeof_too_many_namespaces ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.namespace_count | The current local exporter namespace inventory is at or above the supported maximum of 4096. |
+| [ rgw_notification_event_lost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.events | One or more final notification-event losses occurred in the 1-minute observation window. Inspect the affected RGW instance and notification endpoint. |
+| [ rgw_notification_missing_configuration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.missing_configurations | One or more notifications were rejected for missing configuration in the 1-minute observation window. Inspect the affected RGW instance and notification configuration. |
+| [ rgw_lua_script_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.lua.script_executions | One or more configured Lua request scripts failed in the 1-minute observation window. Inspect the affected RGW instance and script error logs. |
+| [ rgw_failed_request_rate_fallback ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.failed_requests | Every available sample in the 5-minute observation window reports a non-zero aborted-request rate. This is a fallback signal and does not identify HTTP 5xx responses. |
+| [ rgw_notification_push_or_store_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.failure_outcomes | Every available sample in the 5-minute observation window reports non-zero retryable notification push or store failures. |
+| [ rgw_notification_inflight_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.pending_events | Every available sample in the 5-minute observation window reports at least 1000 notification events pending endpoint reply. Tune this policy threshold for the endpoint. |
+| [ rgw_notification_store_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.event_state | Every available sample in the 5-minute observation window reports at least 1000 events stored in the persistent notification store. Tune this policy threshold for the workload. |
+| [ rgw_request_queue_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.current_requests | Every available sample in the 5-minute observation window reports at least 1000 queued requests. Tune this policy threshold for the RGW instance. |
+| [ rgw_multisite_fetch_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.object_work | Every available sample in the 5-minute observation window reports a non-zero multisite data-fetch error rate. |
+| [ rgw_multisite_poll_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.replication_log_request_errors | Every available sample in the 5-minute observation window reports a non-zero replication-log poll error rate. |
+| [ ceph_health_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.cluster_status.state | Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR. Review active cause-specific Ceph alerts and use `ceph health detail` for the current cause. |
+| [ ceph_health_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.cluster_status.state | Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN. Use `ceph health detail` for the current cause. |
+| [ ceph_daemon_crash ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a recent daemon crash. Use `ceph health detail` for the affected daemon and crash details. |
+| [ ceph_mgr_module_crash ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports a recent manager-module crash. Use `ceph health detail` for the affected module and crash details. |
+| [ ceph_daemon_slow_ops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.daemon_health.item_count | Every available sample in the 30-second observation window reports one or more slow operations for this daemon. |
+| [ ceph_slow_ops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.slow_operations.current_operations | Every available sample in the 30-second observation window reports one or more cluster slow operations. Use `ceph health detail` to identify the cause. |
+| [ cephadm_daemon_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a failed cephadm daemon. Use `ceph health detail` for the affected daemon and failure details. |
+| [ cephadm_paused ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports that cephadm is paused. Resume cephadm or use `ceph health detail` to determine why it was paused. |
+| [ cephadm_upgrade_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a cephadm upgrade exception. Use `ceph health detail` for the failed upgrade step. |
+| [ ceph_device_failure_predicted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a device predicted to fail. Use `ceph health detail` and `ceph device ls` to identify it. |
+| [ ceph_device_failure_prediction_too_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports that removing all predicted failures would compromise availability. Add capacity before relocating data. |
+| [ ceph_device_failure_relocation_incomplete ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure. Check free capacity and the balancer. |
+| [ ceph_cooling_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log. |
+| [ ceph_cooling_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log. |
+| [ ceph_dimm_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized DIMM temperature sensor above 80°C. |
+| [ ceph_hardware_fan_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph fan hardware error. |
+| [ ceph_hardware_memory_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph memory hardware error. |
+| [ ceph_hardware_network_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph network hardware error. |
+| [ ceph_hardware_power_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph power hardware error. |
+| [ ceph_hardware_processor_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph processor hardware error. |
+| [ ceph_hardware_storage_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph storage hardware error. |
+| [ ceph_memory_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors. |
+| [ ceph_memory_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors. |
+| [ ceph_motherboard_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized motherboard temperature sensor above 60°C. |
+| [ ceph_nvme_drive_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs. |
+| [ ceph_nvme_drive_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs. |
+| [ ceph_nvme_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized NVMe temperature sensor above 70°C. |
+| [ ceph_network_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors. |
+| [ ceph_network_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors. |
+| [ ceph_power_supply_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log. |
+| [ ceph_power_supply_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log. |
+| [ ceph_processor_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect processor health and thermals. |
+| [ ceph_processor_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect processor health and thermals. |
+| [ ceph_processor_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized processor temperature sensor above 80°C. |
+| [ ceph_filesystem_damaged ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports filesystem metadata damage. |
+| [ ceph_filesystem_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a degraded Ceph filesystem. |
+| [ ceph_filesystem_failure_no_standby ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a failed MDS rank with no standby. |
+| [ ceph_filesystem_insufficient_standby ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports insufficient CephFS standby daemons. |
+| [ ceph_filesystem_mds_ranks_low ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports fewer active MDS ranks than configured. |
+| [ ceph_filesystem_offline ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports all MDS ranks unavailable. |
+| [ ceph_filesystem_read_only ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a Ceph filesystem forced read-only. |
+| [ ceph_rbd_mirror_images_not_in_sync ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.rbd_mirror.snapshot_replication.timestamp | The current local and remote snapshot timestamps differ for this mirrored image. |
+| [ ceph_object_missing ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | The current unfound condition is active while every configured OSD is up; client I/O for affected objects can block. |
+| [ ceph_pg_backfill_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports placement-group backfill blocked by fullness. |
+| [ ceph_pg_not_deep_scrubbed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports placement groups overdue for deep scrub. |
+| [ ceph_pg_not_scrubbed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports placement groups overdue for scrub. |
+| [ ceph_pg_recovery_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports recovery blocked by OSD fullness. |
+| [ ceph_pg_unavailable_blocking_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | The current PG-unavailable condition is active while the separate OSD-down condition is not. |
+| [ ceph_pgs_damaged ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports damaged placement-group data. |
+| [ ceph_pgs_high_per_osd ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports excessive placement groups per OSD. |
+| [ ceph_pgs_inactive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state | The current per-pool count reports fewer active placement groups than the pool total. |
+| [ ceph_pgs_unclean ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state | The current per-pool count reports fewer clean placement groups than the pool total. |
+| [ ceph_pool_backfill_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 10-second observation window reports a pool at its backfill-full threshold. |
+| [ ceph_pool_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a full pool. |
+| [ ceph_pool_near_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports a near-full pool. |
+| [ ceph_mon_clock_skew ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports monitor clock skew. Use `ceph time-sync-status` and inspect the monitors' time synchronization services. |
+| [ ceph_mon_diskspace_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports critically low monitor-store space. Use `ceph health detail` to identify the affected monitor. |
+| [ ceph_mon_diskspace_low ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports low monitor-store space. Use `ceph health detail` to identify the affected monitor. |
+| [ ceph_mon_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.control_plane.monitor.cluster_summary | The current MGR cluster summary reports fewer monitors in quorum than configured, while a majority still remains. |
+| [ ceph_mon_quorum_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.control_plane.monitor.cluster_summary | The current MGR cluster summary reports exactly the minimum surviving monitor majority; one more monitor loss would remove quorum. |
+| [ ceph_osd_backfill_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports that an OSD has reached its backfill-full threshold and rebalance cannot complete. |
+| [ ceph_osd_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports a down OSD. Use `ceph health detail` to identify affected OSDs and hosts. |
+| [ ceph_osd_down_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary | The current MGR cluster summary reports that at least 10% of configured OSDs are down. |
+| [ ceph_osd_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports an OSD at its full threshold. Use `ceph health detail` and `ceph osd df` to identify it. |
+| [ ceph_osd_host_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports an offline OSD host. Use `ceph health detail` to identify the host and its OSDs. |
+| [ ceph_osd_internal_disk_size_mismatch ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a BlueStore device-size mismatch that can cause the affected OSD to crash. |
+| [ ceph_osd_near_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports an OSD at its near-full threshold. Use `ceph health detail` and `ceph osd df` to identify it. |
+| [ ceph_osd_read_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports BlueStore read errors that succeeded only after retries. Inspect the affected hardware and kernel. |
+| [ ceph_osd_timeouts_cluster_network ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports slow backend OSD heartbeats. Inspect the cluster network for latency or loss. |
+| [ ceph_osd_timeouts_public_network ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports slow frontend OSD heartbeats. Inspect the public network for latency or loss. |
+| [ ceph_osd_too_many_repairs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports excessive repaired reads, which may indicate a failing drive. |
+| [ ceph_unknown_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports the unclassified health check ${label:name}. Use `ceph health detail` for its recorded explanation. |
 
 
 
 ## Metrics
 
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+The built-in Prometheus profiles on this page map Prometheus metrics into
+569 curated Netdata charts across the primary and applicable supporting profiles.
+The tables are generated from the same profile design and runtime chart contracts used by the Agent.
 
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
 
-Untyped metrics (have no '# TYPE') processing:
+### Ceph
 
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
+Curated cluster, daemon, service, storage, client, and protocol metrics from Ceph Prometheus endpoints.
 
-**The rest are ignored**.
+
+#### Capacity
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_num_objects_degraded</code> | Capacity / Object Health — Objects | <code>degraded</code> | <code>objects</code> | Ceph cluster endpoint |
+| <code>ceph_num_objects_misplaced</code> | Capacity / Object Health — Objects | <code>misplaced</code> | <code>objects</code> | Ceph cluster endpoint |
+| <code>ceph_num_objects_unfound</code> | Capacity / Object Health — Objects | <code>unfound</code> | <code>objects</code> | Ceph cluster endpoint |
+| <code>ceph_cluster_total_bytes</code> | Capacity / Overall Cluster Space — Space and Memory | <code>bytes</code> | <code>bytes</code> | Ceph cluster endpoint |
+| <code>ceph_cluster_total_used_bytes</code> | Capacity / Overall Cluster Space — Space and Memory | <code>used_bytes</code> | <code>bytes</code> | Ceph cluster endpoint |
+| <code>ceph_cluster_total_used_raw_bytes</code> | Capacity / Overall Cluster Space — Space and Memory | <code>used_raw_bytes</code> | <code>bytes</code> | Ceph cluster endpoint |
+| <code>ceph_cluster_by_class_total_bytes</code> | Capacity / Space by Device Class — Space and Memory | <code>bytes</code> | <code>bytes</code> | Ceph device class |
+| <code>ceph_cluster_by_class_total_used_bytes</code> | Capacity / Space by Device Class — Space and Memory | <code>used_bytes</code> | <code>bytes</code> | Ceph device class |
+| <code>ceph_cluster_by_class_total_used_raw_bytes</code> | Capacity / Space by Device Class — Space and Memory | <code>used_raw_bytes</code> | <code>bytes</code> | Ceph device class |
+
+#### CephFS
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_fs_metadata</code> | CephFS / Metadata / Filesystem Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph data pools and fs id and metadata pool and name |
+| <code>ceph_mds_metadata</code> | CephFS / Metadata / MDS Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and ceph version and fs id and hostname and public addr and rank |
+| <code>ceph_smb_metadata</code> | CephFS / SMB / Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph netbiosname and share and smb version and subvolume and subvolume group and volume |
+| <code>ceph_mds_server_req_rmxattr_latency_count</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Latency Measurements | <code>rmxattr_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setattr_latency_count</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Latency Measurements | <code>setattr_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setdirlayout_latency_count</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Latency Measurements | <code>setdirlayout_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setfilelock_latency_count</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Latency Measurements | <code>setfilelock_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setlayout_latency_count</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Latency Measurements | <code>setlayout_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setxattr_latency_count</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Latency Measurements | <code>setxattr_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rmxattr_latency_sum</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Accumulated Latency | <code>rmxattr_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setattr_latency_sum</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Accumulated Latency | <code>setattr_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setdirlayout_latency_sum</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Accumulated Latency | <code>setdirlayout_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setfilelock_latency_sum</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Accumulated Latency | <code>setfilelock_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setlayout_latency_sum</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Accumulated Latency | <code>setlayout_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_setxattr_latency_sum</code> | CephFS / MDS / Attribute and Layout Mutation Latency — Accumulated Latency | <code>setxattr_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_caps</code> | CephFS / MDS / Capabilities — Capabilities | <code>value</code> | <code>capabilities</code> | Ceph ceph daemon |
+| <code>ceph_mds_handle_client_cap_release</code> | CephFS / MDS / Capabilities — Capability Messages | <code>handle_client_cap_release</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_handle_client_caps</code> | CephFS / MDS / Capabilities — Capability Messages | <code>handle_client_caps</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_handle_client_caps_dirty</code> | CephFS / MDS / Capabilities — Capability Messages | <code>handle_client_caps_dirty</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_cap_acquisition_throttle</code> | CephFS / MDS / Capabilities — Capability-Throttled Requests | <code>server_cap_acquisition_throttle</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_cap_revoke_eviction</code> | CephFS / MDS / Capabilities — Capability-Revoke Evictions | <code>server_cap_revoke_eviction</code> | <code>clients/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes_with_caps</code> | CephFS / MDS / Capabilities — Inodes | <code>value</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_handle_inode_file_caps</code> | CephFS / MDS / Capabilities — Inode Work | <code>value</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_ceph_cap_op_flush_ack</code> | CephFS / MDS / Capabilities — Operations | <code>ceph_cap_op_flush_ack</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_ceph_cap_op_flushsnap_ack</code> | CephFS / MDS / Capabilities — Operations | <code>ceph_cap_op_flushsnap_ack</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_ceph_cap_op_grant</code> | CephFS / MDS / Capabilities — Operations | <code>ceph_cap_op_grant</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_ceph_cap_op_revoke</code> | CephFS / MDS / Capabilities — Operations | <code>ceph_cap_op_revoke</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_ceph_cap_op_trunc</code> | CephFS / MDS / Capabilities — Operations | <code>ceph_cap_op_trunc</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_process_request_cap_release</code> | CephFS / MDS / Capabilities — Operations | <code>process_request_cap_release</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_jlat_count</code> | CephFS / MDS / Journal — Latency Measurements | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_jlat_sum</code> | CephFS / MDS / Journal — Accumulated Latency | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_ev</code> | CephFS / MDS / Journal — Current Journal Events | <code>ev</code> | <code>events</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_evexd</code> | CephFS / MDS / Journal — Current Journal Events | <code>evexd</code> | <code>events</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_evexg</code> | CephFS / MDS / Journal — Current Journal Events | <code>evexg</code> | <code>events</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_evlrg</code> | CephFS / MDS / Journal — Large Journal Events | <code>evlrg</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_evadd</code> | CephFS / MDS / Journal — Journal Events | <code>evadd</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_evex</code> | CephFS / MDS / Journal — Journal Events | <code>evex</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_evtrm</code> | CephFS / MDS / Journal — Journal Events | <code>evtrm</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_replayed</code> | CephFS / MDS / Journal — Journal Events | <code>replayed</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_expos</code> | CephFS / MDS / Journal — Journal Positions | <code>expos</code> | <code>position</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_rdpos</code> | CephFS / MDS / Journal — Journal Positions | <code>rdpos</code> | <code>position</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_wrpos</code> | CephFS / MDS / Journal — Journal Positions | <code>wrpos</code> | <code>position</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_segadd</code> | CephFS / MDS / Journal — Journal Segments | <code>segadd</code> | <code>segments/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_segex</code> | CephFS / MDS / Journal — Journal Segments | <code>segex</code> | <code>segments/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_segtrm</code> | CephFS / MDS / Journal — Journal Segments | <code>segtrm</code> | <code>segments/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_seg</code> | CephFS / MDS / Journal — Journal Segments | <code>seg</code> | <code>segments</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_segexd</code> | CephFS / MDS / Journal — Journal Segments | <code>segexd</code> | <code>segments</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_segexg</code> | CephFS / MDS / Journal — Journal Segments | <code>segexg</code> | <code>segments</code> | Ceph ceph daemon |
+| <code>ceph_mds_log_segmjr</code> | CephFS / MDS / Journal — Journal Segments | <code>segmjr</code> | <code>segments</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_dir_handle_discover</code> | CephFS / MDS / Metadata Cache Directory — Discovery Messages | <code>handle_discover</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_dir_send_discover</code> | CephFS / MDS / Metadata Cache Directory — Discovery Messages | <code>send_discover</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_dir_try_discover</code> | CephFS / MDS / Metadata Cache Directory — Discovery Attempts | <code>try_discover</code> | <code>attempts/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_dir_update</code> | CephFS / MDS / Metadata Cache Directory — Replication Directives | <code>update</code> | <code>directives/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_dir_update_receipt</code> | CephFS / MDS / Metadata Cache Directory — Replication Directives | <code>update_receipt</code> | <code>directives/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_inodestats</code> | CephFS / MDS / Metadata Cache Internal Requests — Inode Work | <code>inodestats</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_quiesce_inode</code> | CephFS / MDS / Metadata Cache Internal Requests — Inode Work | <code>quiesce_inode</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_exportdir</code> | CephFS / MDS / Metadata Cache Internal Requests — Operations | <code>exportdir</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_flush</code> | CephFS / MDS / Metadata Cache Internal Requests — Operations | <code>flush</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_fragmentdir</code> | CephFS / MDS / Metadata Cache Internal Requests — Operations | <code>fragmentdir</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_fragstats</code> | CephFS / MDS / Metadata Cache Internal Requests — Operations | <code>fragstats</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_quiesce_path</code> | CephFS / MDS / Metadata Cache Internal Requests — Operations | <code>quiesce_path</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_ireq_enqueue_scrub</code> | CephFS / MDS / Metadata Cache Internal Requests — Scrub Work | <code>value</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_num_strays</code> | CephFS / MDS / Metadata Cache Recovery — Current Work | <code>strays</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_num_strays_delayed</code> | CephFS / MDS / Metadata Cache Recovery — Current Work | <code>delayed</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_num_strays_enqueuing</code> | CephFS / MDS / Metadata Cache Recovery — Current Work | <code>enqueuing</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_strays_created</code> | CephFS / MDS / Metadata Cache Recovery — Events | <code>created</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_strays_enqueued</code> | CephFS / MDS / Metadata Cache Recovery — Events | <code>enqueued</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_strays_migrated</code> | CephFS / MDS / Metadata Cache Recovery — Events | <code>migrated</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_strays_reintegrated</code> | CephFS / MDS / Metadata Cache Recovery — Events | <code>reintegrated</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_num_recovering_enqueued</code> | CephFS / MDS / Metadata Cache Recovery — Files | <code>enqueued</code> | <code>files</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_num_recovering_prioritized</code> | CephFS / MDS / Metadata Cache Recovery — Files | <code>prioritized</code> | <code>files</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_num_recovering_processing</code> | CephFS / MDS / Metadata Cache Recovery — Files | <code>processing</code> | <code>files</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_recovery_completed</code> | CephFS / MDS / Metadata Cache Recovery — File Work | <code>completed</code> | <code>files/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_recovery_started</code> | CephFS / MDS / Metadata Cache Recovery — File Work | <code>started</code> | <code>files/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_uninline_started</code> | CephFS / MDS / Metadata Cache Uninline — Events | <code>started</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_uninline_succeeded</code> | CephFS / MDS / Metadata Cache Uninline — Events | <code>succeeded</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_cache_uninline_write_failed</code> | CephFS / MDS / Metadata Cache Uninline — Failure and Delay Outcomes | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_create_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>create_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_link_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>link_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_mkdir_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>mkdir_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_mknod_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>mknod_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rename_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>rename_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rmdir_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>rmdir_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_symlink_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>symlink_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_unlink_latency_count</code> | CephFS / MDS / Namespace Mutation Latency — Latency Measurements | <code>unlink_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_create_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>create_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_link_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>link_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_mkdir_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>mkdir_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_mknod_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>mknod_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rename_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>rename_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rmdir_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>rmdir_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_symlink_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>symlink_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_unlink_latency_sum</code> | CephFS / MDS / Namespace Mutation Latency — Accumulated Latency | <code>unlink_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_dir_fetch_complete</code> | CephFS / MDS / Namespace Traversal — Directory-Fragment Lifecycle | <code>dir_fetch_complete</code> | <code>dirfrags/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_dir_merge</code> | CephFS / MDS / Namespace Traversal — Directory-Fragment Lifecycle | <code>dir_merge</code> | <code>dirfrags/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_dir_split</code> | CephFS / MDS / Namespace Traversal — Directory-Fragment Lifecycle | <code>dir_split</code> | <code>dirfrags/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse</code> | CephFS / MDS / Namespace Traversal — Namespace Traversals | <code>traverse</code> | <code>traversals/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse_dir_fetch</code> | CephFS / MDS / Namespace Traversal — Namespace Traversals | <code>traverse_dir_fetch</code> | <code>traversals/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse_discover</code> | CephFS / MDS / Namespace Traversal — Namespace Traversals | <code>traverse_discover</code> | <code>traversals/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse_forward</code> | CephFS / MDS / Namespace Traversal — Namespace Traversals | <code>traverse_forward</code> | <code>traversals/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse_lock</code> | CephFS / MDS / Namespace Traversal — Namespace Traversals | <code>traverse_lock</code> | <code>traversals/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse_remote_ino</code> | CephFS / MDS / Namespace Traversal — Namespace Traversals | <code>traverse_remote_ino</code> | <code>traversals/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_openino_peer_discover</code> | CephFS / MDS / Namespace Traversal — Inode Work | <code>value</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_dir_fetch_keys</code> | CephFS / MDS / Namespace Traversal — Key Work | <code>value</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_traverse_hit</code> | CephFS / MDS / Namespace Traversal — Lookup Outcomes | <code>value</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_dir_commit</code> | CephFS / MDS / Namespace Traversal — Operations | <code>dir_commit</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_openino_backtrace_fetch</code> | CephFS / MDS / Namespace Traversal — Operations | <code>openino_backtrace_fetch</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_openino_dir_fetch</code> | CephFS / MDS / Namespace Traversal — Operations | <code>openino_dir_fetch</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_item_in_journal</code> | CephFS / MDS / Purge Queue — Current Work | <code>value</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_executed_ops</code> | CephFS / MDS / Purge Queue — Executed Purge Operations | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_executing_ops</code> | CephFS / MDS / Purge Queue — Purge Operations in Flight | <code>ops</code> | <code>operations</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_executing_ops_high_water</code> | CephFS / MDS / Purge Queue — Purge Operations in Flight | <code>high_water</code> | <code>operations</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_executed</code> | CephFS / MDS / Purge Queue — Executed Purge Tasks | <code>value</code> | <code>tasks/s</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_executing</code> | CephFS / MDS / Purge Queue — Purge Tasks in Flight | <code>executing</code> | <code>tasks</code> | Ceph ceph daemon |
+| <code>ceph_purge_queue_pq_executing_high_water</code> | CephFS / MDS / Purge Queue — Purge Tasks in Flight | <code>high_water</code> | <code>tasks</code> | Ceph ceph daemon |
+| <code>ceph_mds_exported</code> | CephFS / MDS / Rank Migration — Events | <code>exported</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_imported</code> | CephFS / MDS / Rank Migration — Events | <code>imported</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_exported_inodes</code> | CephFS / MDS / Rank Migration — Inode Work | <code>exported_inodes</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_imported_inodes</code> | CephFS / MDS / Rank Migration — Inode Work | <code>imported_inodes</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_blockdiff_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>blockdiff_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_getattr_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>getattr_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_getfilelock_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>getfilelock_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_getvxattr_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>getvxattr_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookup_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>lookup_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookuphash_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>lookuphash_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupino_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>lookupino_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupname_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>lookupname_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupparent_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>lookupparent_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupsnap_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>lookupsnap_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_open_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>open_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_readdir_latency_count</code> | CephFS / MDS / Read Request Latency — Latency Measurements | <code>readdir_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_blockdiff_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>blockdiff_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_getattr_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>getattr_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_getfilelock_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>getfilelock_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_getvxattr_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>getvxattr_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookup_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>lookup_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookuphash_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>lookuphash_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupino_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>lookupino_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupname_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>lookupname_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupparent_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>lookupparent_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lookupsnap_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>lookupsnap_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_open_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>open_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_readdir_latency_sum</code> | CephFS / MDS / Read Request Latency — Accumulated Latency | <code>readdir_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_reply_latency_count</code> | CephFS / MDS / Request Handling and State — Latency Measurements | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_reply_latency_sum</code> | CephFS / MDS / Request Handling and State — Accumulated Latency | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_client_metrics_num_clients</code> | CephFS / MDS / Request Handling and State — Connected Clients | <code>client_metrics_num_clients</code> | <code>clients</code> | Ceph ceph daemon and fs name and id |
+| <code>ceph_mds_q</code> | CephFS / MDS / Request Handling and State — Queued Requests | <code>q</code> | <code>requests</code> | Ceph ceph daemon |
+| <code>ceph_mds_reply</code> | CephFS / MDS / Request Handling and State — Events | <code>reply</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_handle_client_session</code> | CephFS / MDS / Request Handling and State — Events | <code>server_handle_client_session</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_slow_reply</code> | CephFS / MDS / Request Handling and State — Failure and Delay Outcomes | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_root_rfiles</code> | CephFS / MDS / Request Handling and State — Files | <code>value</code> | <code>files</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes</code> | CephFS / MDS / Request Handling and State — Inodes | <code>inodes</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes_bottom</code> | CephFS / MDS / Request Handling and State — Inodes | <code>bottom</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes_pin_tail</code> | CephFS / MDS / Request Handling and State — Inodes | <code>pin_tail</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes_pinned</code> | CephFS / MDS / Request Handling and State — Inodes | <code>pinned</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes_top</code> | CephFS / MDS / Request Handling and State — Inodes | <code>top</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_inodes_expired</code> | CephFS / MDS / Request Handling and State — Expired Inodes | <code>expired</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_load_cent</code> | CephFS / MDS / Request Handling and State — Load | <code>value</code> | <code>load</code> | Ceph ceph daemon |
+| <code>ceph_mds_forward</code> | CephFS / MDS / Request Handling and State — Operations | <code>forward</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_request</code> | CephFS / MDS / Request Handling and State — Operations | <code>request</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_dispatch_client_request</code> | CephFS / MDS / Request Handling and State — Operations | <code>server_dispatch_client_request</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_dispatch_server_request</code> | CephFS / MDS / Request Handling and State — Operations | <code>server_dispatch_server_request</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_handle_client_request</code> | CephFS / MDS / Request Handling and State — Operations | <code>server_handle_client_request</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_handle_peer_request</code> | CephFS / MDS / Request Handling and State — Operations | <code>server_handle_peer_request</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_root_rsnaps</code> | CephFS / MDS / Request Handling and State — Snapshots | <code>value</code> | <code>snapshots</code> | Ceph ceph daemon |
+| <code>ceph_mds_root_rbytes</code> | CephFS / MDS / Request Handling and State — Space and Memory | <code>value</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mds_subtrees</code> | CephFS / MDS / Request Handling and State — Subtrees | <code>value</code> | <code>subtrees</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_dir_base_inodes</code> | CephFS / MDS / Scrubbing — Scrubbed Inodes | <code>dir_base_inodes</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_dir_inodes</code> | CephFS / MDS / Scrubbing — Scrubbed Inodes | <code>dir_inodes</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_file_inodes</code> | CephFS / MDS / Scrubbing — Scrubbed Inodes | <code>file_inodes</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_backtrace_fetch</code> | CephFS / MDS / Scrubbing — Backtrace Work | <code>backtrace_fetch</code> | <code>backtraces/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_backtrace_repaired</code> | CephFS / MDS / Scrubbing — Backtrace Work | <code>backtrace_repaired</code> | <code>backtraces/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_inotable_repaired</code> | CephFS / MDS / Scrubbing — Repaired Inotables | <code>inotable_repaired</code> | <code>inotables/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_set_tag</code> | CephFS / MDS / Scrubbing — Applied Scrub Tags | <code>set_tag</code> | <code>tags/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_scrub_dirfrag_rstats</code> | CephFS / MDS / Scrubbing — Directory-Fragment Recursive-Stat Updates | <code>value</code> | <code>dirfrags/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lssnap_latency_count</code> | CephFS / MDS / Snapshot Mutation Latency — Latency Measurements | <code>lssnap_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_mksnap_latency_count</code> | CephFS / MDS / Snapshot Mutation Latency — Latency Measurements | <code>mksnap_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_renamesnap_latency_count</code> | CephFS / MDS / Snapshot Mutation Latency — Latency Measurements | <code>renamesnap_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rmsnap_latency_count</code> | CephFS / MDS / Snapshot Mutation Latency — Latency Measurements | <code>rmsnap_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_snapdiff_latency_count</code> | CephFS / MDS / Snapshot Mutation Latency — Latency Measurements | <code>snapdiff_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_lssnap_latency_sum</code> | CephFS / MDS / Snapshot Mutation Latency — Accumulated Latency | <code>lssnap_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_mksnap_latency_sum</code> | CephFS / MDS / Snapshot Mutation Latency — Accumulated Latency | <code>mksnap_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_renamesnap_latency_sum</code> | CephFS / MDS / Snapshot Mutation Latency — Accumulated Latency | <code>renamesnap_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_rmsnap_latency_sum</code> | CephFS / MDS / Snapshot Mutation Latency — Accumulated Latency | <code>rmsnap_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_server_req_snapdiff_latency_sum</code> | CephFS / MDS / Snapshot Mutation Latency — Accumulated Latency | <code>snapdiff_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_cap</code> | CephFS / MDS / Memory — Capabilities | <code>value</code> | <code>capabilities</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_cap_minus</code> | CephFS / MDS / Memory — Capability Work | <code>minus</code> | <code>capabilities/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_cap_plus</code> | CephFS / MDS / Memory — Capability Work | <code>plus</code> | <code>capabilities/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_dn</code> | CephFS / MDS / Memory — Dentries | <code>value</code> | <code>dentries</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_dn_minus</code> | CephFS / MDS / Memory — Dentry Cache Churn | <code>minus</code> | <code>dentries/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_dn_plus</code> | CephFS / MDS / Memory — Dentry Cache Churn | <code>plus</code> | <code>dentries/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_dir</code> | CephFS / MDS / Memory — Directories | <code>value</code> | <code>directories</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_dir_minus</code> | CephFS / MDS / Memory — Directory Cache Churn | <code>minus</code> | <code>directories/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_dir_plus</code> | CephFS / MDS / Memory — Directory Cache Churn | <code>plus</code> | <code>directories/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_ino</code> | CephFS / MDS / Memory — Inodes | <code>value</code> | <code>inodes</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_ino_minus</code> | CephFS / MDS / Memory — Inode Work | <code>minus</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_ino_plus</code> | CephFS / MDS / Memory — Inode Work | <code>plus</code> | <code>inodes/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_heap</code> | CephFS / MDS / Memory — Space and Memory | <code>heap</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mds_mem_rss</code> | CephFS / MDS / Memory — Space and Memory | <code>rss</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_avg_session_uptime</code> | CephFS / MDS / Sessions — Duration and Time | <code>value</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_session_add</code> | CephFS / MDS / Sessions — Events | <code>add</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_session_remove</code> | CephFS / MDS / Sessions — Events | <code>remove</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_average_load</code> | CephFS / MDS / Sessions — Average Session Load | <code>average_load</code> | <code>load</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_total_load</code> | CephFS / MDS / Sessions — Total Session Load | <code>total_load</code> | <code>load</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_mdthresh_evicted</code> | CephFS / MDS / Sessions — Metadata-Threshold Evictions | <code>value</code> | <code>sessions/s</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_session_count</code> | CephFS / MDS / Sessions — Sessions | <code>session</code> | <code>sessions</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_sessions_open</code> | CephFS / MDS / Sessions — Sessions | <code>sessions_open</code> | <code>sessions</code> | Ceph ceph daemon |
+| <code>ceph_mds_sessions_sessions_stale</code> | CephFS / MDS / Sessions — Sessions | <code>sessions_stale</code> | <code>sessions</code> | Ceph ceph daemon |
+| <code>ceph_mds_per_client_cap_hits</code> | CephFS / MDS / Clients — Capability Access Outcomes | <code>hits</code> | <code>accesses/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_cap_miss</code> | CephFS / MDS / Clients — Capability Access Outcomes | <code>misses</code> | <code>accesses/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_dentry_lease_hits</code> | CephFS / MDS / Clients — Dentry Lease Lookup Outcomes | <code>hits</code> | <code>lookups/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_dentry_lease_miss</code> | CephFS / MDS / Clients — Dentry Lease Lookup Outcomes | <code>misses</code> | <code>lookups/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_avg_read_latency</code> | CephFS / MDS / Clients — Average Operation Latency | <code>read</code> | <code>seconds</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_avg_write_latency</code> | CephFS / MDS / Clients — Average Operation Latency | <code>write</code> | <code>seconds</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_avg_metadata_latency</code> | CephFS / MDS / Clients — Average Operation Latency | <code>metadata</code> | <code>seconds</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_opened_files</code> | CephFS / MDS / Clients — Open Files | <code>open</code> | <code>files</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_opened_inodes</code> | CephFS / MDS / Clients — Inode State | <code>open</code> | <code>inodes</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_total_inodes</code> | CephFS / MDS / Clients — Inode State | <code>total</code> | <code>inodes</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_pinned_icaps</code> | CephFS / MDS / Clients — Pinned Inode Capabilities | <code>pinned</code> | <code>capabilities</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_total_read_ops</code> | CephFS / MDS / Clients — Reported I/O Operations | <code>read</code> | <code>operations/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_total_write_ops</code> | CephFS / MDS / Clients — Reported I/O Operations | <code>write</code> | <code>operations/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_total_read_size</code> | CephFS / MDS / Clients — Reported I/O Volume | <code>read</code> | <code>bytes/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_mds_per_client_total_write_size</code> | CephFS / MDS / Clients — Reported I/O Volume | <code>write</code> | <code>bytes/s</code> | Ceph ceph daemon and client and rank and mds filesystem key |
+| <code>ceph_cephfs_mirror_mirrored_filesystems</code> | CephFS / Mirror / Service — Mirrored Filesystems | <code>mirrored</code> | <code>filesystems</code> | Ceph ceph daemon |
+| <code>ceph_cephfs_mirror_mirror_enable_failures</code> | CephFS / Mirror / Service — Mirroring Enable Failures | <code>failures</code> | <code>failures/s</code> | Ceph ceph daemon |
+| <code>ceph_cephfs_mirror_mirrored_filesystems_mirroring_peers</code> | CephFS / Mirror / Filesystems — Mirroring Peers | <code>peers</code> | <code>peers</code> | Ceph ceph daemon and filesystem |
+| <code>ceph_cephfs_mirror_mirrored_filesystems_directory_count</code> | CephFS / Mirror / Filesystems — Mirrored Directories | <code>directories</code> | <code>directories</code> | Ceph ceph daemon and filesystem |
+| <code>ceph_cephfs_mirror_peers_snaps_synced</code> | CephFS / Mirror / Peers — Snapshot Outcomes | <code>synced</code> | <code>snapshots/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_snaps_deleted</code> | CephFS / Mirror / Peers — Snapshot Outcomes | <code>deleted</code> | <code>snapshots/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_snaps_renamed</code> | CephFS / Mirror / Peers — Snapshot Outcomes | <code>renamed</code> | <code>snapshots/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_sync_failures</code> | CephFS / Mirror / Peers — Snapshot Outcomes | <code>failed</code> | <code>snapshots/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_avg_sync_time_count</code> | CephFS / Mirror / Peers — Sync-Time Measurements | <code>snapshots</code> | <code>snapshots/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_avg_sync_time_sum</code> | CephFS / Mirror / Peers — Accumulated Sync Time | <code>time</code> | <code>seconds/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_sync_bytes</code> | CephFS / Mirror / Peers — Sync Throughput | <code>bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_last_synced_start</code> | CephFS / Mirror / Peers — Last Sync Timestamps | <code>started</code> | <code>seconds since epoch</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_last_synced_end</code> | CephFS / Mirror / Peers — Last Sync Timestamps | <code>ended</code> | <code>seconds since epoch</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_last_synced_duration</code> | CephFS / Mirror / Peers — Last Sync Duration | <code>duration</code> | <code>seconds</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+| <code>ceph_cephfs_mirror_peers_last_synced_bytes</code> | CephFS / Mirror / Peers — Last Sync Size | <code>bytes</code> | <code>bytes</code> | Ceph ceph daemon and peer cluster filesystem and peer cluster name and source filesystem and source fscid |
+
+#### Cluster Overview
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_prometheus_collect_duration_seconds_count</code> | Cluster Overview — Latency Measurements | <code>value</code> | <code>operations/s</code> | Ceph method |
+| <code>ceph_prometheus_collect_duration_seconds_sum</code> | Cluster Overview — Accumulated Latency | <code>value</code> | <code>seconds/s</code> | Ceph method |
+| <code>ceph_cluster_osd_blocklist_count</code> | Cluster Overview — Current Work | <code>value</code> | <code>items</code> | Ceph cluster endpoint |
+| <code>ceph_disk_occupation</code> | Cluster Overview — State and Metadata — Occupation | <code>occupation</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and ceph instance and db device and device and device ids and devices and wal device |
+| <code>ceph_disk_occupation_human</code> | Cluster Overview — State and Metadata — Human | <code>human</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and ceph instance and device |
+
+#### Control Plane
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_cephadm_daemon_status</code> | Control Plane / Cephadm — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph daemon name and hostname and service name and service type |
+| <code>ceph_mgr_metadata</code> | Control Plane / Manager — State and Metadata — Metadata | <code>metadata</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and ceph version and hostname |
+| <code>ceph_mgr_status</code> | Control Plane / Manager — State and Metadata — Status | <code>status</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon |
+| <code>ceph_mgr_module_can_run</code> | Control Plane / Manager Modules — State and Metadata | <code>can_run</code> | <code>&#123;status&#125;</code> | Ceph name |
+| <code>ceph_mgr_module_status</code> | Control Plane / Manager Modules — State and Metadata | <code>status</code> | <code>&#123;status&#125;</code> | Ceph name |
+| <code>ceph_mon_metadata</code> | Control Plane / Monitor — Cluster Summary | <code>total</code> | <code>monitors</code> | Ceph cluster endpoint |
+| <code>ceph_mon_quorum_status</code> | Control Plane / Monitor — Cluster Summary | <code>in_quorum</code> | <code>monitors</code> | Ceph cluster endpoint |
+| <code>ceph_mon_metadata</code> | Control Plane / Monitor — State and Metadata — Metadata | <code>metadata</code> | <code>monitors</code> | Ceph ceph daemon and ceph version and hostname and public addr and rank |
+| <code>ceph_mon_quorum_status</code> | Control Plane / Monitor — State and Metadata — Quorum Status | <code>quorum_status</code> | <code>monitors</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin_bytes_count</code> | Control Plane / Paxos — Byte Measurement Measurements | <code>begin_bytes</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_bytes_count</code> | Control Plane / Paxos — Byte Measurement Measurements | <code>collect_bytes</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit_bytes_count</code> | Control Plane / Paxos — Byte Measurement Measurements | <code>commit_bytes</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_share_state_bytes_count</code> | Control Plane / Paxos — Byte Measurement Measurements | <code>share_state_bytes</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state_bytes_count</code> | Control Plane / Paxos — Byte Measurement Measurements | <code>store_state_bytes</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin_bytes_sum</code> | Control Plane / Paxos — Accumulated Byte Measurement | <code>begin_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_bytes_sum</code> | Control Plane / Paxos — Accumulated Byte Measurement | <code>collect_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit_bytes_sum</code> | Control Plane / Paxos — Accumulated Byte Measurement | <code>commit_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_share_state_bytes_sum</code> | Control Plane / Paxos — Accumulated Byte Measurement | <code>share_state_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state_bytes_sum</code> | Control Plane / Paxos — Accumulated Byte Measurement | <code>store_state_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin_keys_count</code> | Control Plane / Paxos — Key Measurement Measurements | <code>begin_keys</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_keys_count</code> | Control Plane / Paxos — Key Measurement Measurements | <code>collect_keys</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit_keys_count</code> | Control Plane / Paxos — Key Measurement Measurements | <code>commit_keys</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_share_state_keys_count</code> | Control Plane / Paxos — Key Measurement Measurements | <code>share_state_keys</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state_keys_count</code> | Control Plane / Paxos — Key Measurement Measurements | <code>store_state_keys</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin_keys_sum</code> | Control Plane / Paxos — Accumulated Key Measurement | <code>begin_keys</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_keys_sum</code> | Control Plane / Paxos — Accumulated Key Measurement | <code>collect_keys</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit_keys_sum</code> | Control Plane / Paxos — Accumulated Key Measurement | <code>commit_keys</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_share_state_keys_sum</code> | Control Plane / Paxos — Accumulated Key Measurement | <code>share_state_keys</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state_keys_sum</code> | Control Plane / Paxos — Accumulated Key Measurement | <code>store_state_keys</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin_latency_count</code> | Control Plane / Paxos — Latency Measurements | <code>begin_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_latency_count</code> | Control Plane / Paxos — Latency Measurements | <code>collect_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit_latency_count</code> | Control Plane / Paxos — Latency Measurements | <code>commit_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_new_pn_latency_count</code> | Control Plane / Paxos — Latency Measurements | <code>new_pn_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_refresh_latency_count</code> | Control Plane / Paxos — Latency Measurements | <code>refresh_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state_latency_count</code> | Control Plane / Paxos — Latency Measurements | <code>store_state_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin_latency_sum</code> | Control Plane / Paxos — Accumulated Latency | <code>begin_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_latency_sum</code> | Control Plane / Paxos — Accumulated Latency | <code>collect_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit_latency_sum</code> | Control Plane / Paxos — Accumulated Latency | <code>commit_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_new_pn_latency_sum</code> | Control Plane / Paxos — Accumulated Latency | <code>new_pn_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_refresh_latency_sum</code> | Control Plane / Paxos — Accumulated Latency | <code>refresh_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state_latency_sum</code> | Control Plane / Paxos — Accumulated Latency | <code>store_state_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_new_pn</code> | Control Plane / Paxos — Events | <code>new_pn</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_refresh</code> | Control Plane / Paxos — Events | <code>refresh</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_restart</code> | Control Plane / Paxos — Events | <code>restart</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_share_state</code> | Control Plane / Paxos — Events | <code>share_state</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_start_leader</code> | Control Plane / Paxos — Events | <code>start_leader</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_start_peon</code> | Control Plane / Paxos — Events | <code>start_peon</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_store_state</code> | Control Plane / Paxos — Events | <code>store_state</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_accept_timeout</code> | Control Plane / Paxos — Failure and Delay Outcomes | <code>accept_timeout</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_timeout</code> | Control Plane / Paxos — Failure and Delay Outcomes | <code>collect_timeout</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_lease_ack_timeout</code> | Control Plane / Paxos — Failure and Delay Outcomes | <code>lease_ack_timeout</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_lease_timeout</code> | Control Plane / Paxos — Failure and Delay Outcomes | <code>lease_timeout</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_begin</code> | Control Plane / Paxos — Paxos Operations | <code>begin</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect</code> | Control Plane / Paxos — Paxos Operations | <code>collect</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_commit</code> | Control Plane / Paxos — Paxos Operations | <code>commit</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_paxos_collect_uncommitted</code> | Control Plane / Paxos — Collected Uncommitted Values | <code>collect_uncommitted</code> | <code>values/s</code> | Ceph ceph daemon |
+
+#### Health
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_health_status</code> | Health / Cluster Status — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_daemon_health_metrics</code> | Health / Daemon Health — Health Metric Count | <code>value</code> | <code>items</code> | Ceph ceph daemon and type |
+| <code>ceph_health_detail</code> | Health / Health Checks — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph name |
+| <code>ceph_healthcheck_slow_ops</code> | Health / Slow Operations — Slow Operations | <code>value</code> | <code>operations</code> | Ceph cluster endpoint |
+
+#### OSDs
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_osd_flag_nodeep_scrub</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>nodeep_scrub</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_nodown</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>nodown</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_noin</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>noin</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_noout</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>noout</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_norebalance</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>norebalance</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_noscrub</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>noscrub</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_noup</code> | OSDs / Capacity and State / Cluster Flags — State and Metadata | <code>noup</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_full_ratio</code> | OSDs / Capacity and State / Fullness Thresholds — Ratios | <code>full_ratio</code> | <code>ratio</code> | Ceph cluster endpoint |
+| <code>ceph_osd_nearfull_ratio</code> | OSDs / Capacity and State / Fullness Thresholds — Ratios | <code>nearfull_ratio</code> | <code>ratio</code> | Ceph cluster endpoint |
+| <code>ceph_osd_metadata</code> | OSDs / Capacity and State / Metadata — State and Metadata | <code>value</code> | <code>OSDs</code> | Ceph back iface and ceph daemon and ceph version and cluster addr and device class and front iface and hostname and objectstore and public addr |
+| <code>ceph_osd_metadata</code> | OSDs / Capacity and State / OSD State — Cluster Summary | <code>total</code> | <code>OSDs</code> | Ceph cluster endpoint |
+| <code>ceph_osd_up</code> | OSDs / Capacity and State / OSD State — Cluster Summary | <code>up</code> | <code>OSDs</code> | Ceph cluster endpoint |
+| <code>ceph_osd_in</code> | OSDs / Capacity and State / OSD State — OSD State | <code>in</code> | <code>OSDs</code> | Ceph ceph daemon |
+| <code>ceph_osd_up</code> | OSDs / Capacity and State / OSD State — OSD State | <code>up</code> | <code>OSDs</code> | Ceph ceph daemon |
+| <code>ceph_osd_weight</code> | OSDs / Capacity and State / OSD State — OSD Weight | <code>weight</code> | <code>ratio</code> | Ceph ceph daemon |
+| <code>ceph_osd_apply_latency_ms</code> | OSDs / Overview — Latency | <code>apply_latency_ms</code> | <code>milliseconds</code> | Ceph ceph daemon |
+| <code>ceph_osd_commit_latency_ms</code> | OSDs / Overview — Latency | <code>commit_latency_ms</code> | <code>milliseconds</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_before_dequeue_op_lat_count</code> | OSDs / Client IO — Latency Measurements | <code>op_before_dequeue_op_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_before_queue_op_lat_count</code> | OSDs / Client IO — Latency Measurements | <code>op_before_queue_op_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_prepare_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_prepare_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_process_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_process_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_r_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_prepare_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_r_prepare_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_process_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_r_process_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_rw_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_prepare_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_rw_prepare_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_process_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_rw_process_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_w_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_prepare_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_w_prepare_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_process_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>op_w_process_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>subop_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_pull_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>subop_pull_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_push_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>subop_push_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_w_latency_count</code> | OSDs / Client IO — Latency Measurements | <code>subop_w_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_before_dequeue_op_lat_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_before_dequeue_op_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_before_queue_op_lat_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_before_queue_op_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_prepare_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_prepare_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_process_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_process_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_r_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_prepare_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_r_prepare_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_process_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_r_process_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_rw_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_prepare_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_rw_prepare_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_process_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_rw_process_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_w_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_prepare_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_w_prepare_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_process_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>op_w_process_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>subop_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_pull_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>subop_pull_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_push_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>subop_push_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_w_latency_sum</code> | OSDs / Client IO — Accumulated Latency | <code>subop_w_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_in_bytes</code> | OSDs / Client IO — Byte Throughput | <code>op_in_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_out_bytes</code> | OSDs / Client IO — Byte Throughput | <code>op_out_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r_out_bytes</code> | OSDs / Client IO — Byte Throughput | <code>op_r_out_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_in_bytes</code> | OSDs / Client IO — Byte Throughput | <code>op_rw_in_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw_out_bytes</code> | OSDs / Client IO — Byte Throughput | <code>op_rw_out_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w_in_bytes</code> | OSDs / Client IO — Byte Throughput | <code>op_w_in_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_in_bytes</code> | OSDs / Client IO — Byte Throughput | <code>subop_in_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_push_in_bytes</code> | OSDs / Client IO — Byte Throughput | <code>subop_push_in_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_w_in_bytes</code> | OSDs / Client IO — Byte Throughput | <code>subop_w_in_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_wip</code> | OSDs / Client IO — Operations in Progress | <code>value</code> | <code>operations</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_push</code> | OSDs / Client IO — Events | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_slow_ops_slow_ops_count</code> | OSDs / Client IO — Failure and Delay Outcomes | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_cache_hit</code> | OSDs / Client IO — Lookup Outcomes | <code>value</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_delayed_degraded</code> | OSDs / Client IO — Object Work | <code>op_delayed_degraded</code> | <code>objects/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_delayed_unreadable</code> | OSDs / Client IO — Object Work | <code>op_delayed_unreadable</code> | <code>objects/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_replica_read_redirect_missing</code> | OSDs / Client IO — Object Work | <code>replica_read_redirect_missing</code> | <code>objects/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op</code> | OSDs / Client IO — Operations | <code>op</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_r</code> | OSDs / Client IO — Operations | <code>op_r</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_rw</code> | OSDs / Client IO — Operations | <code>op_rw</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_op_w</code> | OSDs / Client IO — Operations | <code>op_w</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_replica_read</code> | OSDs / Client IO — Operations | <code>replica_read</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_replica_read_redirect_conflict</code> | OSDs / Client IO — Operations | <code>replica_read_redirect_conflict</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_replica_read_served</code> | OSDs / Client IO — Operations | <code>replica_read_served</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_pull</code> | OSDs / Client IO — Operations | <code>subop_pull</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop_w</code> | OSDs / Client IO — Operations | <code>subop_w</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_proxy_read</code> | OSDs / Client IO — Operations | <code>tier_proxy_read</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_proxy_write</code> | OSDs / Client IO — Operations | <code>tier_proxy_write</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_backfill_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>backfill_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_backfill_remove_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>backfill_remove_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_context_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>context_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_pull_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>pull_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_push_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>push_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_push_reply_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>push_reply_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_scan_queue_latency_count</code> | OSDs / Recovery — Latency Measurements | <code>scan_queue_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_backfill_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>backfill_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_backfill_remove_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>backfill_remove_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_context_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>context_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_pull_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>pull_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_push_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>push_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_push_reply_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>push_reply_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_l_osd_recovery_scan_queue_latency_sum</code> | OSDs / Recovery — Accumulated Latency | <code>scan_queue_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_recovery_bytes</code> | OSDs / Recovery — Byte Throughput | <code>value</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_recovery_ops</code> | OSDs / Recovery — Operations | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_pg_rebuild_duration_count</code> | OSDs / Recovery — PG Rebuild Duration Measurements | <code>value</code> | <code>duration measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_pg_rebuild_duration_sum</code> | OSDs / Recovery — PG Rebuild Accumulated Duration | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_pg_rebuild_max_secs</code> | OSDs / Recovery — PG Rebuild Duration Range | <code>maximum</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_pg_rebuild_min_secs</code> | OSDs / Recovery — PG Rebuild Duration Range | <code>minimum</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_tier_flush_lat_count</code> | OSDs / Runtime — Latency Measurements | <code>flush_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_tier_promote_lat_count</code> | OSDs / Runtime — Latency Measurements | <code>promote_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_tier_r_lat_count</code> | OSDs / Runtime — Latency Measurements | <code>r_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_tier_flush_lat_sum</code> | OSDs / Runtime — Accumulated Latency | <code>flush_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_tier_promote_lat_sum</code> | OSDs / Runtime — Accumulated Latency | <code>promote_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_tier_r_lat_sum</code> | OSDs / Runtime — Accumulated Latency | <code>r_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_cache_miss_low_avg_count</code> | OSDs / Runtime — Value Measurement Measurements | <code>value</code> | <code>measurements/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_cache_miss_low_avg_sum</code> | OSDs / Runtime — Accumulated Value Measurement | <code>value</code> | <code>value/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_push_out_bytes</code> | OSDs / Runtime — Byte Throughput | <code>value</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_cached_crc</code> | OSDs / Runtime — CRC Cache Lookup Outcomes | <code>cached_crc</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_cached_crc_adjusted</code> | OSDs / Runtime — CRC Cache Lookup Outcomes | <code>cached_crc_adjusted</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_missed_crc</code> | OSDs / Runtime — CRC Cache Lookup Outcomes | <code>missed_crc</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_agent_evict</code> | OSDs / Runtime — Tier-Agent Actions | <code>agent_evict</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_agent_wake</code> | OSDs / Runtime — Tier-Agent Actions | <code>agent_wake</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_clean</code> | OSDs / Runtime — Tier-Agent Actions | <code>tier_clean</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_delay</code> | OSDs / Runtime — Tier-Agent Actions | <code>tier_delay</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_dirty</code> | OSDs / Runtime — Tier-Agent Actions | <code>tier_dirty</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_evict</code> | OSDs / Runtime — Tier-Agent Actions | <code>tier_evict</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_promote</code> | OSDs / Runtime — Tier-Agent Actions | <code>tier_promote</code> | <code>actions/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_copyfrom</code> | OSDs / Runtime — Copy-From Operations | <code>copyfrom</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_map_messages</code> | OSDs / Runtime — OSD-Map Messages | <code>map_messages</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_messages_delayed_for_map</code> | OSDs / Runtime — OSD-Map Messages | <code>messages_delayed_for_map</code> | <code>messages/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_map_message_epochs</code> | OSDs / Runtime — OSD-Map Epochs | <code>map_message_epochs</code> | <code>epochs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_map_message_epoch_dups</code> | OSDs / Runtime — OSD-Map Epochs | <code>map_message_epoch_dups</code> | <code>epochs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_pg_biginfo</code> | OSDs / Runtime — Placement-Group Updates | <code>osd_pg_biginfo</code> | <code>updates/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_pg_fastinfo</code> | OSDs / Runtime — Placement-Group Updates | <code>osd_pg_fastinfo</code> | <code>updates/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_pg_info</code> | OSDs / Runtime — Total Placement-Group Updates | <code>total</code> | <code>placement group updates/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_push</code> | OSDs / Runtime — Pushes | <code>push</code> | <code>pushes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_subop</code> | OSDs / Runtime — Suboperations | <code>subop</code> | <code>suboperations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_flush_fail</code> | OSDs / Runtime — Failed Tier Flush Attempts | <code>tier_flush_fail</code> | <code>attempts/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_try_flush_fail</code> | OSDs / Runtime — Failed Tier Flush Attempts | <code>tier_try_flush_fail</code> | <code>attempts/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_watch_timeouts</code> | OSDs / Runtime — Watch Timeouts | <code>watch_timeouts</code> | <code>watches/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_bl_cache_hit</code> | OSDs / Runtime — OSD-Map Buffer-Cache Lookup Outcomes | <code>osd_map_bl_cache_hit</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_bl_cache_miss</code> | OSDs / Runtime — OSD-Map Buffer-Cache Lookup Outcomes | <code>osd_map_bl_cache_miss</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_cache_hit</code> | OSDs / Runtime — Decoded OSD-Map Cache Lookup Outcomes | <code>osd_map_cache_hit</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_cache_miss</code> | OSDs / Runtime — Decoded OSD-Map Cache Lookup Outcomes | <code>osd_map_cache_miss</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_osd_map_cache_miss_low</code> | OSDs / Runtime — Decoded OSD-Map Cache Lookup Outcomes | <code>osd_map_cache_miss_low</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_whiteout</code> | OSDs / Runtime — Tier Whiteouts | <code>tier_whiteout</code> | <code>whiteouts/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_agent_skip</code> | OSDs / Runtime — Skipped Objects | <code>agent_skip</code> | <code>objects/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_object_ctx_cache_hit</code> | OSDs / Runtime — Object-Context Cache Lookup Outcomes | <code>object_ctx_cache_hit</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_object_ctx_cache_total</code> | OSDs / Runtime — Object-Context Cache Lookup Outcomes | <code>object_ctx_cache</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_agent_flush</code> | OSDs / Runtime — Tier Flush Attempts | <code>agent_flush</code> | <code>attempts/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_flush</code> | OSDs / Runtime — Tier Flush Attempts | <code>tier_flush</code> | <code>attempts/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_tier_try_flush</code> | OSDs / Runtime — Tier Flush Attempts | <code>tier_try_flush</code> | <code>attempts/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_pull</code> | OSDs / Runtime — Pulls | <code>pull</code> | <code>pulls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_numpg</code> | OSDs / Runtime — Placement Groups | <code>numpg</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_osd_numpg_primary</code> | OSDs / Runtime — Placement Groups | <code>primary</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_osd_numpg_removing</code> | OSDs / Runtime — Placement Groups | <code>removing</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_osd_numpg_replica</code> | OSDs / Runtime — Placement Groups | <code>replica</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_osd_numpg_stray</code> | OSDs / Runtime — Placement Groups | <code>stray</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_osd_stat_bytes</code> | OSDs / Runtime — Space and Memory | <code>bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_osd_stat_bytes_avail</code> | OSDs / Runtime — Space and Memory | <code>avail</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_osd_stat_bytes_used</code> | OSDs / Runtime — Space and Memory | <code>used</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_osd_heartbeat_to_peers</code> | OSDs / Runtime — Heartbeat Peers | <code>heartbeat_to_peers</code> | <code>peers</code> | Ceph ceph daemon |
+| <code>ceph_osd_loadavg</code> | OSDs / Runtime — OSD Load Average | <code>loadavg</code> | <code>load</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_dp_ec_failed_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>dp_ec_failed_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_successful_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>dp_ec_successful_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_failed_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>dp_repl_failed_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_successful_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>dp_repl_successful_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_failed_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>sh_ec_failed_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_successful_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>sh_ec_successful_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_failed_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>sh_repl_failed_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_successful_scrubs_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>sh_repl_successful_scrubs_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_failed_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>dp_ec_failed_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_successful_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>dp_ec_successful_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_failed_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>dp_repl_failed_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_successful_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>dp_repl_successful_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_failed_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>sh_ec_failed_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_successful_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>sh_ec_successful_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_failed_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>sh_repl_failed_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_successful_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>sh_repl_successful_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_failed_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>dp_ec_failed_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_successful_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>dp_ec_successful_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_failed_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>dp_repl_failed_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_successful_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>dp_repl_successful_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_failed_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>sh_ec_failed_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_successful_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>sh_ec_successful_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_failed_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>sh_repl_failed_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_successful_scrubs_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>sh_repl_successful_scrubs_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_failed_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>dp_ec_failed_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_successful_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>dp_ec_successful_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_failed_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>dp_repl_failed_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_successful_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>dp_repl_successful_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_failed_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>sh_ec_failed_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_successful_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>sh_ec_successful_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_failed_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>sh_repl_failed_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_successful_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 19 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>sh_repl_successful_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_failed_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>dp_ec_failed_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_num_scrubs_started</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>dp_ec_num_scrubs_started</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_successful_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>dp_ec_successful_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_failed_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>dp_repl_failed_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_num_scrubs_started</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>dp_repl_num_scrubs_started</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_successful_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>dp_repl_successful_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_failed_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>sh_ec_failed_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_num_scrubs_started</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>sh_ec_num_scrubs_started</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_successful_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>sh_ec_successful_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_failed_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>sh_repl_failed_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_num_scrubs_started</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>sh_repl_num_scrubs_started</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_successful_scrubs</code> | OSDs / Scrubbing Ceph 19 / Outcomes — Scrub Work | <code>sh_repl_successful_scrubs</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_replicas_in_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Replicas in Reservation | <code>dp_ec_replicas_in_reservation</code> | <code>replicas</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_replicas_in_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Replicas in Reservation | <code>dp_repl_replicas_in_reservation</code> | <code>replicas</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_replicas_in_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Replicas in Reservation | <code>sh_ec_replicas_in_reservation</code> | <code>replicas</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_replicas_in_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Replicas in Reservation | <code>sh_repl_replicas_in_reservation</code> | <code>replicas</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_num_scrubs_past_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Scrubs Past Reservation | <code>dp_ec_num_scrubs_past_reservation</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_num_scrubs_past_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Scrubs Past Reservation | <code>dp_repl_num_scrubs_past_reservation</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_num_scrubs_past_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Scrubs Past Reservation | <code>sh_ec_num_scrubs_past_reservation</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_num_scrubs_past_reservation</code> | OSDs / Scrubbing Ceph 19 / Reservations — Scrubs Past Reservation | <code>sh_repl_num_scrubs_past_reservation</code> | <code>scrubs/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_reservation_process_aborted</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>dp_ec_reservation_process_aborted</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_reservation_process_failure</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>dp_ec_reservation_process_failure</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_reservation_process_skipped</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>dp_ec_reservation_process_skipped</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_reservation_process_aborted</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>dp_repl_reservation_process_aborted</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_reservation_process_failure</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>dp_repl_reservation_process_failure</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_reservation_process_skipped</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>dp_repl_reservation_process_skipped</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_reservation_process_aborted</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>sh_ec_reservation_process_aborted</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_reservation_process_failure</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>sh_ec_reservation_process_failure</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_reservation_process_skipped</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>sh_ec_reservation_process_skipped</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_reservation_process_aborted</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>sh_repl_reservation_process_aborted</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_reservation_process_failure</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>sh_repl_reservation_process_failure</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_reservation_process_skipped</code> | OSDs / Scrubbing Ceph 19 / Reservations — Reservation Process Outcomes | <code>sh_repl_reservation_process_skipped</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_failed_scrubs_ec_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>failed_scrubs_ec_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_failed_scrubs_replicated_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>failed_scrubs_replicated_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_successful_scrubs_ec_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>successful_scrubs_ec_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_successful_scrubs_replicated_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Scrub Elapsed-Time Measurements | <code>successful_scrubs_replicated_elapsed</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_failed_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>scrub_ec_failed_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_successful_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>scrub_ec_successful_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_failed_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>scrub_replicated_failed_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_successful_reservations_elapsed_count</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Reservation Elapsed-Time Measurements | <code>scrub_replicated_successful_reservations_elapsed</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_failed_scrubs_ec_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>failed_scrubs_ec_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_failed_scrubs_replicated_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>failed_scrubs_replicated_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_successful_scrubs_ec_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>successful_scrubs_ec_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_successful_scrubs_replicated_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Scrub Elapsed Time | <code>successful_scrubs_replicated_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_failed_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>scrub_ec_failed_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_successful_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>scrub_ec_successful_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_failed_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>scrub_replicated_failed_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_successful_reservations_elapsed_sum</code> | OSDs / Scrubbing Ceph 20 / Elapsed Time — Accumulated Reservation Elapsed Time | <code>scrub_replicated_successful_reservations_elapsed</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_io_blocked</code> | OSDs / Scrubbing Ceph 20 / Interference and Scheduling — Client Write Interference | <code>ec_io_blocked</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_io_intersects</code> | OSDs / Scrubbing Ceph 20 / Interference and Scheduling — Client Write Interference | <code>ec_io_intersects</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_io_blocked</code> | OSDs / Scrubbing Ceph 20 / Interference and Scheduling — Client Write Interference | <code>replicated_io_blocked</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_io_intersects</code> | OSDs / Scrubbing Ceph 20 / Interference and Scheduling — Client Write Interference | <code>replicated_io_intersects</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_failed_scrubs_ec</code> | OSDs / Scrubbing Ceph 20 / Outcomes — Scrub Work | <code>failed_scrubs_ec</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_failed_scrubs_replicated</code> | OSDs / Scrubbing Ceph 20 / Outcomes — Scrub Work | <code>failed_scrubs_replicated</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_num_scrubs_started_ec</code> | OSDs / Scrubbing Ceph 20 / Outcomes — Scrub Work | <code>num_scrubs_started_ec</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_num_scrubs_started_replicated</code> | OSDs / Scrubbing Ceph 20 / Outcomes — Scrub Work | <code>num_scrubs_started_replicated</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_successful_scrubs_ec</code> | OSDs / Scrubbing Ceph 20 / Outcomes — Scrub Work | <code>successful_scrubs_ec</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_successful_scrubs_replicated</code> | OSDs / Scrubbing Ceph 20 / Outcomes — Scrub Work | <code>successful_scrubs_replicated</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_replicas_in_reservation</code> | OSDs / Scrubbing Ceph 20 / Reservations — Replicas in Reservation | <code>ec_replicas_in_reservation</code> | <code>replicas</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_replicas_in_reservation</code> | OSDs / Scrubbing Ceph 20 / Reservations — Replicas in Reservation | <code>replicated_replicas_in_reservation</code> | <code>replicas</code> | Ceph ceph daemon |
+| <code>ceph_osd_num_scrubs_past_reservation_ec</code> | OSDs / Scrubbing Ceph 20 / Reservations — Scrubs Past Reservation | <code>num_scrubs_past_reservation_ec</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_num_scrubs_past_reservation_replicated</code> | OSDs / Scrubbing Ceph 20 / Reservations — Scrubs Past Reservation | <code>num_scrubs_past_reservation_replicated</code> | <code>scrubs/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_reservation_process_aborted</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_ec_reservation_process_aborted</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_reservation_process_failure</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_ec_reservation_process_failure</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_reservation_process_skipped</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_ec_reservation_process_skipped</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_reservations_completed</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_ec_reservations_completed</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_reservation_process_aborted</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_replicated_reservation_process_aborted</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_reservation_process_failure</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_replicated_reservation_process_failure</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_reservation_process_skipped</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_replicated_reservation_process_skipped</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_scrub_reservations_completed</code> | OSDs / Scrubbing Ceph 20 / Reservations — Reservation Process Outcomes | <code>scrub_replicated_scrub_reservations_completed</code> | <code>reservations/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_read_bytes</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Byte Throughput | <code>ec_read_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_read_bytes</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Byte Throughput | <code>replicated_read_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_getattr_cnt</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Scrub Calls | <code>ec_getattr_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_read_cnt</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Scrub Calls | <code>ec_read_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_ec_stats_cnt</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Scrub Calls | <code>ec_stats_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_getattr_cnt</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Scrub Calls | <code>replicated_getattr_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_read_cnt</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Scrub Calls | <code>replicated_read_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_replicated_stats_cnt</code> | OSDs / Scrubbing Ceph 20 / Scrub Work — Scrub Calls | <code>replicated_stats_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_dp_ec_locked_object</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Object-Lock Waits | <code>dp_ec_locked_object</code> | <code>waits/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_locked_object</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Object-Lock Waits | <code>dp_repl_locked_object</code> | <code>waits/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_locked_object</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Object-Lock Waits | <code>sh_ec_locked_object</code> | <code>waits/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_locked_object</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Object-Lock Waits | <code>sh_repl_locked_object</code> | <code>waits/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_chunk_busy</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>dp_ec_chunk_busy</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_chunk_selected</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>dp_ec_chunk_selected</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_chunk_busy</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>dp_repl_chunk_busy</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_chunk_selected</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>dp_repl_chunk_selected</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_chunk_busy</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>sh_ec_chunk_busy</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_chunk_selected</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>sh_ec_chunk_selected</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_chunk_busy</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>sh_repl_chunk_busy</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_chunk_selected</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Chunk Selection Outcomes | <code>sh_repl_chunk_selected</code> | <code>chunks/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_preemptions</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Scrub Preemptions | <code>dp_ec_preemptions</code> | <code>preemptions/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_preemptions</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Scrub Preemptions | <code>dp_repl_preemptions</code> | <code>preemptions/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_preemptions</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Scrub Preemptions | <code>sh_ec_preemptions</code> | <code>preemptions/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_preemptions</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Scrub Preemptions | <code>sh_repl_preemptions</code> | <code>preemptions/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_write_blocked_by_scrub</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Client Writes Blocked by Scrub | <code>dp_ec_write_blocked_by_scrub</code> | <code>writes/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_write_blocked_by_scrub</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Client Writes Blocked by Scrub | <code>dp_repl_write_blocked_by_scrub</code> | <code>writes/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_write_blocked_by_scrub</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Client Writes Blocked by Scrub | <code>sh_ec_write_blocked_by_scrub</code> | <code>writes/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_write_blocked_by_scrub</code> | OSDs / Scrubbing Common Work / Interference and Scheduling — Client Writes Blocked by Scrub | <code>sh_repl_write_blocked_by_scrub</code> | <code>writes/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_ec_scrub_reservations_completed</code> | OSDs / Scrubbing Common Work / Reservations — Completed Scrub Reservations | <code>dp_ec_scrub_reservations_completed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_dp_repl_scrub_reservations_completed</code> | OSDs / Scrubbing Common Work / Reservations — Completed Scrub Reservations | <code>dp_repl_scrub_reservations_completed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_ec_scrub_reservations_completed</code> | OSDs / Scrubbing Common Work / Reservations — Completed Scrub Reservations | <code>sh_ec_scrub_reservations_completed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_sh_repl_scrub_reservations_completed</code> | OSDs / Scrubbing Common Work / Reservations — Completed Scrub Reservations | <code>sh_repl_scrub_reservations_completed</code> | <code>reservations/s</code> | Ceph ceph daemon and level and pooltype |
+| <code>ceph_osd_scrub_omapget_bytes</code> | OSDs / Scrubbing Common Work / Scrub Work — Byte Throughput | <code>omapget_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_omapgetheader_bytes</code> | OSDs / Scrubbing Common Work / Scrub Work — Byte Throughput | <code>omapgetheader_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_omapget_cnt</code> | OSDs / Scrubbing Common Work / Scrub Work — OMAP Scrub Calls | <code>omapget_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_osd_scrub_omapgetheader_cnt</code> | OSDs / Scrubbing Common Work / Scrub Work — OMAP Scrub Calls | <code>omapgetheader_cnt</code> | <code>calls/s</code> | Ceph ceph daemon |
+
+#### Hardware
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_hardware_cpu_cores</code> | Hardware / Processors — CPU Cores | <code>value</code> | <code>cpu cores</code> | Ceph node CPU and processor inventory identity |
+| <code>ceph_hardware_fan_rpm</code> | Hardware / Cooling — Fan Speed | <code>value</code> | <code>fan revolutions per minute</code> | Ceph node fan |
+| <code>ceph_hardware_health</code> | Hardware / Health — Hardware Health | <code>value</code> | <code>&#123;status&#125;</code> | Ceph node hardware component |
+| <code>ceph_hardware_memory_capacity_bytes</code> | Hardware / Memory — Memory Module Capacity | <code>value</code> | <code>bytes</code> | Ceph node memory module and type |
+| <code>ceph_hardware_storage_capacity_bytes</code> | Hardware / Storage — Storage Device Capacity | <code>value</code> | <code>bytes</code> | Ceph node storage device and inventory identity |
+| <code>ceph_hardware_temperature_celsius</code> | Hardware / Temperature — Sensor Temperature | <code>value</code> | <code>Celsius</code> | Ceph node temperature sensor |
+
+#### Object Gateway
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_rgw_metadata</code> | Object Gateway / Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and ceph version and hostname and instance id |
+| <code>ceph_rgw_op_copy_obj_ops</code> | Object Gateway / Global Operations — Operations | <code>copy_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_bucket_ops</code> | Object Gateway / Global Operations — Operations | <code>del_bucket</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_obj_ops</code> | Object Gateway / Global Operations — Operations | <code>del_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_get_obj_ops</code> | Object Gateway / Global Operations — Operations | <code>get_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_list_buckets_ops</code> | Object Gateway / Global Operations — Operations | <code>list_buckets</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_list_obj_ops</code> | Object Gateway / Global Operations — Operations | <code>list_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_put_obj_ops</code> | Object Gateway / Global Operations — Operations | <code>put_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_copy_obj_bytes</code> | Object Gateway / Global Operations — Object Bytes | <code>copy_obj</code> | <code>bytes/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_obj_bytes</code> | Object Gateway / Global Operations — Object Bytes | <code>del_obj</code> | <code>bytes/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_get_obj_bytes</code> | Object Gateway / Global Operations — Object Bytes | <code>get_obj</code> | <code>bytes/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_put_obj_bytes</code> | Object Gateway / Global Operations — Object Bytes | <code>put_obj</code> | <code>bytes/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_copy_obj_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>copy_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_bucket_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>del_bucket</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_obj_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>del_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_get_obj_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>get_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_list_buckets_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>list_buckets</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_list_obj_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>list_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_put_obj_lat_count</code> | Object Gateway / Global Operations — Latency Measurements | <code>put_obj</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_copy_obj_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>copy_obj</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_bucket_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>del_bucket</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_del_obj_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>del_obj</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_get_obj_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>get_obj</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_list_buckets_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>list_buckets</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_list_obj_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>list_obj</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_put_obj_lat_sum</code> | Object Gateway / Global Operations — Accumulated Latency | <code>put_obj</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_op_per_user_copy_obj_ops</code> | Object Gateway / User Operations — Operations | <code>copy_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_bucket_ops</code> | Object Gateway / User Operations — Operations | <code>del_bucket</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_obj_ops</code> | Object Gateway / User Operations — Operations | <code>del_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_get_obj_ops</code> | Object Gateway / User Operations — Operations | <code>get_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_list_buckets_ops</code> | Object Gateway / User Operations — Operations | <code>list_buckets</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_list_obj_ops</code> | Object Gateway / User Operations — Operations | <code>list_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_put_obj_ops</code> | Object Gateway / User Operations — Operations | <code>put_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_copy_obj_bytes</code> | Object Gateway / User Operations — Object Bytes | <code>copy_obj</code> | <code>bytes/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_obj_bytes</code> | Object Gateway / User Operations — Object Bytes | <code>del_obj</code> | <code>bytes/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_get_obj_bytes</code> | Object Gateway / User Operations — Object Bytes | <code>get_obj</code> | <code>bytes/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_put_obj_bytes</code> | Object Gateway / User Operations — Object Bytes | <code>put_obj</code> | <code>bytes/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_copy_obj_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>copy_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_bucket_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>del_bucket</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_obj_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>del_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_get_obj_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>get_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_list_buckets_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>list_buckets</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_list_obj_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>list_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_put_obj_lat_count</code> | Object Gateway / User Operations — Latency Measurements | <code>put_obj</code> | <code>operations/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_copy_obj_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>copy_obj</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_bucket_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>del_bucket</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_del_obj_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>del_obj</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_get_obj_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>get_obj</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_list_buckets_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>list_buckets</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_list_obj_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>list_obj</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_user_put_obj_lat_sum</code> | Object Gateway / User Operations — Accumulated Latency | <code>put_obj</code> | <code>seconds/s</code> | Ceph instance id and user and tenant |
+| <code>ceph_rgw_op_per_bucket_copy_obj_ops</code> | Object Gateway / Bucket Operations — Operations | <code>copy_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_bucket_ops</code> | Object Gateway / Bucket Operations — Operations | <code>del_bucket</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_obj_ops</code> | Object Gateway / Bucket Operations — Operations | <code>del_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_get_obj_ops</code> | Object Gateway / Bucket Operations — Operations | <code>get_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_list_buckets_ops</code> | Object Gateway / Bucket Operations — Operations | <code>list_buckets</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_list_obj_ops</code> | Object Gateway / Bucket Operations — Operations | <code>list_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_put_obj_ops</code> | Object Gateway / Bucket Operations — Operations | <code>put_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_copy_obj_bytes</code> | Object Gateway / Bucket Operations — Object Bytes | <code>copy_obj</code> | <code>bytes/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_obj_bytes</code> | Object Gateway / Bucket Operations — Object Bytes | <code>del_obj</code> | <code>bytes/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_get_obj_bytes</code> | Object Gateway / Bucket Operations — Object Bytes | <code>get_obj</code> | <code>bytes/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_put_obj_bytes</code> | Object Gateway / Bucket Operations — Object Bytes | <code>put_obj</code> | <code>bytes/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_copy_obj_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>copy_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_bucket_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>del_bucket</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_obj_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>del_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_get_obj_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>get_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_list_buckets_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>list_buckets</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_list_obj_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>list_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_put_obj_lat_count</code> | Object Gateway / Bucket Operations — Latency Measurements | <code>put_obj</code> | <code>operations/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_copy_obj_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>copy_obj</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_bucket_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>del_bucket</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_del_obj_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>del_obj</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_get_obj_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>get_obj</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_list_buckets_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>list_buckets</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_list_obj_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>list_obj</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_op_per_bucket_put_obj_lat_sum</code> | Object Gateway / Bucket Operations — Accumulated Latency | <code>put_obj</code> | <code>seconds/s</code> | Ceph instance id and bucket and tenant |
+| <code>ceph_rgw_lc_expire_current</code> | Object Gateway / Lifecycle — Lifecycle Actions | <code>expire_current</code> | <code>actions/s</code> | Ceph instance id |
+| <code>ceph_rgw_lc_expire_dm</code> | Object Gateway / Lifecycle — Lifecycle Actions | <code>expire_dm</code> | <code>actions/s</code> | Ceph instance id |
+| <code>ceph_rgw_lc_expire_noncurrent</code> | Object Gateway / Lifecycle — Lifecycle Actions | <code>expire_noncurrent</code> | <code>actions/s</code> | Ceph instance id |
+| <code>ceph_rgw_lc_transition_current</code> | Object Gateway / Lifecycle — Lifecycle Actions | <code>transition_current</code> | <code>actions/s</code> | Ceph instance id |
+| <code>ceph_rgw_lc_transition_noncurrent</code> | Object Gateway / Lifecycle — Lifecycle Actions | <code>transition_noncurrent</code> | <code>actions/s</code> | Ceph instance id |
+| <code>ceph_rgw_lc_abort_mpu</code> | Object Gateway / Lifecycle — Aborted Multipart Uploads | <code>value</code> | <code>uploads/s</code> | Ceph instance id |
+| <code>ceph_rgw_lua_current_vms</code> | Object Gateway / Lua — Current Lua Virtual Machines | <code>value</code> | <code>VMs</code> | Ceph instance id |
+| <code>ceph_rgw_lua_script_ok</code> | Object Gateway / Lua — Lua Script Executions | <code>success</code> | <code>executions/s</code> | Ceph instance id |
+| <code>ceph_rgw_lua_script_fail</code> | Object Gateway / Lua — Lua Script Executions | <code>failure</code> | <code>executions/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_push_pending</code> | Object Gateway / Notifications — Pending Notification Events | <code>value</code> | <code>events</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_events</code> | Object Gateway / Notifications — Stored Events | <code>value</code> | <code>events</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_event_lost</code> | Object Gateway / Notifications — Events | <code>event_lost</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_event_triggered</code> | Object Gateway / Notifications — Events | <code>event_triggered</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_push_ok</code> | Object Gateway / Notifications — Events | <code>push_ok</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_store_ok</code> | Object Gateway / Notifications — Events | <code>store_ok</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_push_failed</code> | Object Gateway / Notifications — Failure and Delay Outcomes | <code>push_failed</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_store_fail</code> | Object Gateway / Notifications — Failure and Delay Outcomes | <code>store_fail</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_pubsub_missing_conf</code> | Object Gateway / Notifications — Missing Notification Configurations | <code>value</code> | <code>events/s</code> | Ceph instance id |
+| <code>ceph_rgw_topic_persistent_topic_len</code> | Object Gateway / Persistent Topics — Persistent Topic Queue Length | <code>entries</code> | <code>entries</code> | Ceph instance id and topic |
+| <code>ceph_rgw_topic_persistent_topic_size</code> | Object Gateway / Persistent Topics — Persistent Topic Queue Size | <code>bytes</code> | <code>bytes</code> | Ceph instance id and topic |
+| <code>ceph_rgw_get_initial_lat_count</code> | Object Gateway / Requests and Queue — Latency Measurements | <code>get_initial_lat</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_put_initial_lat_count</code> | Object Gateway / Requests and Queue — Latency Measurements | <code>put_initial_lat</code> | <code>operations/s</code> | Ceph instance id |
+| <code>ceph_rgw_get_initial_lat_sum</code> | Object Gateway / Requests and Queue — Accumulated Latency | <code>get_initial_lat</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_put_initial_lat_sum</code> | Object Gateway / Requests and Queue — Accumulated Latency | <code>put_initial_lat</code> | <code>seconds/s</code> | Ceph instance id |
+| <code>ceph_rgw_get_b</code> | Object Gateway / Requests and Queue — Byte Throughput | <code>get_b</code> | <code>bytes/s</code> | Ceph instance id |
+| <code>ceph_rgw_put_b</code> | Object Gateway / Requests and Queue — Byte Throughput | <code>put_b</code> | <code>bytes/s</code> | Ceph instance id |
+| <code>ceph_rgw_qactive</code> | Object Gateway / Requests and Queue — Queued and Active Requests | <code>qactive</code> | <code>requests</code> | Ceph instance id |
+| <code>ceph_rgw_qlen</code> | Object Gateway / Requests and Queue — Queued and Active Requests | <code>qlen</code> | <code>requests</code> | Ceph instance id |
+| <code>ceph_rgw_failed_req</code> | Object Gateway / Requests and Queue — Failed Requests | <code>value</code> | <code>requests/s</code> | Ceph instance id |
+| <code>ceph_rgw_gc_retire_object</code> | Object Gateway / Requests and Queue — Object Work | <code>value</code> | <code>objects/s</code> | Ceph instance id |
+| <code>ceph_rgw_get</code> | Object Gateway / Requests and Queue — Requests | <code>get</code> | <code>requests/s</code> | Ceph instance id |
+| <code>ceph_rgw_put</code> | Object Gateway / Requests and Queue — Requests | <code>put</code> | <code>requests/s</code> | Ceph instance id |
+| <code>ceph_rgw_req</code> | Object Gateway / Requests and Queue — Requests | <code>req</code> | <code>requests/s</code> | Ceph instance id |
+| <code>ceph_rgw_keystone_token_cache_hit</code> | Object Gateway / Cache — Keystone Token Cache Lookup Outcomes | <code>hit</code> | <code>lookups/s</code> | Ceph instance id |
+| <code>ceph_rgw_keystone_token_cache_miss</code> | Object Gateway / Cache — Keystone Token Cache Lookup Outcomes | <code>miss</code> | <code>lookups/s</code> | Ceph instance id |
+| <code>ceph_rgw_d4n_cache_hits</code> | Object Gateway / Cache — D4N Cache Lookup Outcomes | <code>hit</code> | <code>lookups/s</code> | Ceph instance id |
+| <code>ceph_rgw_d4n_cache_misses</code> | Object Gateway / Cache — D4N Cache Lookup Outcomes | <code>miss</code> | <code>lookups/s</code> | Ceph instance id |
+| <code>ceph_rgw_d4n_cache_evictions</code> | Object Gateway / Cache — D4N Cache Evictions | <code>eviction</code> | <code>evictions/s</code> | Ceph instance id |
+| <code>ceph_rgw_cache_hit</code> | Object Gateway / Cache — Lookup Outcomes | <code>cache_hit</code> | <code>lookups/s</code> | Ceph instance id |
+| <code>ceph_rgw_cache_miss</code> | Object Gateway / Cache — Lookup Outcomes | <code>cache_miss</code> | <code>lookups/s</code> | Ceph instance id |
+| <code>ceph_data_sync_from_zone_fetch_bytes_count</code> | Object Gateway / Multisite — Replicated Objects | <code>value</code> | <code>objects/s</code> | Ceph instance id and source zone |
+| <code>ceph_rgw_sync_delta_sync_delta</code> | Object Gateway / Multisite — Data Log Shard Delay | <code>sync_delta</code> | <code>seconds</code> | Ceph instance id, zone identities, shard id, and dynamic grammar identity |
+| <code>ceph_data_sync_from_zone_fetch_bytes_sum</code> | Object Gateway / Multisite — Accumulated Byte Measurement | <code>value</code> | <code>bytes/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_lock_latency_count</code> | Object Gateway / Multisite — Latency Measurements | <code>lock_latency</code> | <code>operations/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_poll_latency_count</code> | Object Gateway / Multisite — Latency Measurements | <code>poll_latency</code> | <code>operations/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_lock_latency_sum</code> | Object Gateway / Multisite — Accumulated Latency | <code>lock_latency</code> | <code>seconds/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_poll_latency_sum</code> | Object Gateway / Multisite — Accumulated Latency | <code>poll_latency</code> | <code>seconds/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_poll_errors</code> | Object Gateway / Multisite — Replication-Log Request Errors | <code>value</code> | <code>requests/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_fetch_errors</code> | Object Gateway / Multisite — Object Work | <code>errors</code> | <code>objects/s</code> | Ceph instance id and source zone |
+| <code>ceph_data_sync_from_zone_fetch_not_modified</code> | Object Gateway / Multisite — Object Work | <code>not_modified</code> | <code>objects/s</code> | Ceph instance id and source zone |
+| <code>ceph_dmclock_admin_qlen</code> | Object Gateway / Scheduling — Queue Depth | <code>admin</code> | <code>requests</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_qlen</code> | Object Gateway / Scheduling — Queue Depth | <code>auth</code> | <code>requests</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_qlen</code> | Object Gateway / Scheduling — Queue Depth | <code>data</code> | <code>requests</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_qlen</code> | Object Gateway / Scheduling — Queue Depth | <code>metadata</code> | <code>requests</code> | Ceph ceph daemon |
+| <code>ceph_simple_throttler_outstanding</code> | Object Gateway / Scheduling — Simple Throttler Outstanding Requests | <code>outstanding</code> | <code>requests</code> | Ceph instance id |
+| <code>ceph_simple_throttler_throttle</code> | Object Gateway / Scheduling — Simple Throttler Rejections | <code>throttled</code> | <code>requests/s</code> | Ceph instance id |
+| <code>ceph_dmclock_admin_cost</code> | Object Gateway / Scheduling — Queued Request Cost | <code>admin</code> | <code>cost</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_cost</code> | Object Gateway / Scheduling — Queued Request Cost | <code>auth</code> | <code>cost</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_cost</code> | Object Gateway / Scheduling — Queued Request Cost | <code>data</code> | <code>cost</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_cost</code> | Object Gateway / Scheduling — Queued Request Cost | <code>metadata</code> | <code>cost</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_res</code> | Object Gateway / Scheduling — Scheduled Requests | <code>admin_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_prio</code> | Object Gateway / Scheduling — Scheduled Requests | <code>admin_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_res</code> | Object Gateway / Scheduling — Scheduled Requests | <code>auth_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_prio</code> | Object Gateway / Scheduling — Scheduled Requests | <code>auth_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_res</code> | Object Gateway / Scheduling — Scheduled Requests | <code>data_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_prio</code> | Object Gateway / Scheduling — Scheduled Requests | <code>data_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_res</code> | Object Gateway / Scheduling — Scheduled Requests | <code>metadata_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_prio</code> | Object Gateway / Scheduling — Scheduled Requests | <code>metadata_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_limit</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>admin_limited</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_cancel</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>admin_cancelled</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_limit</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>auth_limited</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_cancel</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>auth_cancelled</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_limit</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>data_limited</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_cancel</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>data_cancelled</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_limit</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>metadata_limited</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_cancel</code> | Object Gateway / Scheduling — Rejected and Cancelled Requests | <code>metadata_cancelled</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_res_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>admin_reservation</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_prio_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>admin_priority</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_limit_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>admin_limited</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_cancel_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>admin_cancelled</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_res_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>auth_reservation</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_prio_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>auth_priority</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_limit_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>auth_limited</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_cancel_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>auth_cancelled</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_res_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>data_reservation</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_prio_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>data_priority</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_limit_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>data_limited</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_cancel_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>data_cancelled</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_res_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>metadata_reservation</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_prio_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>metadata_priority</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_limit_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>metadata_limited</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_cancel_cost</code> | Object Gateway / Scheduling — Scheduled and Rejected Cost | <code>metadata_cancelled</code> | <code>cost/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_res_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>admin_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_prio_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>admin_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_res_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>auth_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_prio_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>auth_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_res_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>data_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_prio_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>data_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_res_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>metadata_reservation</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_prio_latency_count</code> | Object Gateway / Scheduling — Scheduling-Latency Measurements | <code>metadata_priority</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_res_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>admin_reservation</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_admin_prio_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>admin_priority</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_res_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>auth_reservation</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_auth_prio_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>auth_priority</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_res_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>data_reservation</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_data_prio_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>data_priority</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_res_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>metadata_reservation</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_metadata_prio_latency_sum</code> | Object Gateway / Scheduling — Accumulated Scheduling Latency | <code>metadata_priority</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_scheduler_throttle</code> | Object Gateway / Scheduling — Throttled Requests | <code>throttled</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_dmclock_scheduler_outstanding</code> | Object Gateway / Scheduling — Outstanding Requests | <code>outstanding</code> | <code>requests</code> | Ceph ceph daemon |
+
+#### Placement Groups
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_pg_backfill_toofull</code> | Placement Groups / Backfill — Placement Groups | <code>backfill_toofull</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_backfill_unfound</code> | Placement Groups / Backfill — Placement Groups | <code>backfill_unfound</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_backfill_wait</code> | Placement Groups / Backfill — Placement Groups | <code>backfill_wait</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_backfilling</code> | Placement Groups / Backfill — Placement Groups | <code>backfilling</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_forced_backfill</code> | Placement Groups / Backfill — Placement Groups | <code>forced_backfill</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_remapped</code> | Placement Groups / Backfill — Placement Groups | <code>remapped</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_active</code> | Placement Groups / Healthy State — Placement Groups | <code>active</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_clean</code> | Placement Groups / Healthy State — Placement Groups | <code>clean</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_deep</code> | Placement Groups / Healthy State — Placement Groups | <code>deep</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_total</code> | Placement Groups / Healthy State — Placement Groups | <code>pg_total</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_activating</code> | Placement Groups / Peering and Availability — Placement Groups | <code>activating</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_creating</code> | Placement Groups / Peering and Availability — Placement Groups | <code>creating</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_down</code> | Placement Groups / Peering and Availability — Placement Groups | <code>down</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_incomplete</code> | Placement Groups / Peering and Availability — Placement Groups | <code>incomplete</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_laggy</code> | Placement Groups / Peering and Availability — Placement Groups | <code>laggy</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_peered</code> | Placement Groups / Peering and Availability — Placement Groups | <code>peered</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_peering</code> | Placement Groups / Peering and Availability — Placement Groups | <code>peering</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_premerge</code> | Placement Groups / Peering and Availability — Placement Groups | <code>premerge</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_stale</code> | Placement Groups / Peering and Availability — Placement Groups | <code>stale</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_unknown</code> | Placement Groups / Peering and Availability — Placement Groups | <code>unknown</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_wait</code> | Placement Groups / Peering and Availability — Placement Groups | <code>wait</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_osd_flag_nobackfill</code> | Placement Groups / Recovery Flags — State and Metadata | <code>nobackfill</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_osd_flag_norecover</code> | Placement Groups / Recovery Flags — State and Metadata | <code>norecover</code> | <code>&#123;status&#125;</code> | Ceph cluster endpoint |
+| <code>ceph_pg_degraded</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>degraded</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_forced_recovery</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>forced_recovery</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_recovering</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>recovering</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_recovery_toofull</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>recovery_toofull</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_recovery_unfound</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>recovery_unfound</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_recovery_wait</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>recovery_wait</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_undersized</code> | Placement Groups / Recovery and Degradation — Placement Groups | <code>undersized</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_failed_repair</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>failed_repair</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_inconsistent</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>inconsistent</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_repair</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>repair</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_scrubbing</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>scrubbing</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_snaptrim</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>snaptrim</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_snaptrim_error</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>snaptrim_error</code> | <code>PGs</code> | Ceph pool id |
+| <code>ceph_pg_snaptrim_wait</code> | Placement Groups / Scrub and Repair State — Placement Groups | <code>snaptrim_wait</code> | <code>PGs</code> | Ceph pool id |
+
+#### Pools
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_pool_quota_objects</code> | Pools / Capacity and Quotas — Objects | <code>value</code> | <code>objects</code> | Ceph pool id |
+| <code>ceph_pool_max_avail</code> | Pools / Capacity and Quotas — Logical Pool Capacity | <code>max_avail</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_quota_bytes</code> | Pools / Capacity and Quotas — Logical Pool Capacity | <code>quota_bytes</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_stored</code> | Pools / Capacity and Quotas — Logical Pool Capacity | <code>stored</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_avail_raw</code> | Pools / Capacity and Quotas — Raw Pool Capacity | <code>avail_raw</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_bytes_used</code> | Pools / Capacity and Quotas — Raw Pool Capacity | <code>bytes_used</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_stored_raw</code> | Pools / Capacity and Quotas — Raw Pool Capacity | <code>stored_raw</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_compress_bytes_used</code> | Pools / Capacity and Quotas — Compression Space | <code>compress_bytes_used</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_compress_under_bytes</code> | Pools / Capacity and Quotas — Compression Space | <code>compress_under_bytes</code> | <code>bytes</code> | Ceph pool id |
+| <code>ceph_pool_percent_used</code> | Pools / Capacity and Quotas — Utilization | <code>value</code> | <code>percentage</code> | Ceph pool id |
+| <code>ceph_pool_rd_bytes</code> | Pools / Client IO — Byte Throughput | <code>rd_bytes</code> | <code>bytes/s</code> | Ceph pool id |
+| <code>ceph_pool_wr_bytes</code> | Pools / Client IO — Byte Throughput | <code>wr_bytes</code> | <code>bytes/s</code> | Ceph pool id |
+| <code>ceph_pool_rd</code> | Pools / Client IO — Operations | <code>rd</code> | <code>operations/s</code> | Ceph pool id |
+| <code>ceph_pool_wr</code> | Pools / Client IO — Operations | <code>wr</code> | <code>operations/s</code> | Ceph pool id |
+| <code>ceph_pool_metadata</code> | Pools / Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph application and compression mode and description and name and pool id and type |
+| <code>ceph_pool_dirty</code> | Pools / Objects — Objects | <code>dirty</code> | <code>objects</code> | Ceph pool id |
+| <code>ceph_pool_objects</code> | Pools / Objects — Objects | <code>objects</code> | <code>objects</code> | Ceph pool id |
+| <code>ceph_pool_recovering_bytes_per_sec</code> | Pools / Recovery — Current Throughput | <code>value</code> | <code>bytes/s</code> | Ceph pool id |
+| <code>ceph_pool_recovering_keys_per_sec</code> | Pools / Recovery — Current Throughput | <code>value</code> | <code>keys/s</code> | Ceph pool id |
+| <code>ceph_pool_recovering_objects_per_sec</code> | Pools / Recovery — Current Throughput | <code>value</code> | <code>objects/s</code> | Ceph pool id |
+| <code>ceph_pool_num_objects_recovered</code> | Pools / Recovery — Objects | <code>value</code> | <code>objects</code> | Ceph pool id |
+| <code>ceph_pool_objects_repaired</code> | Pools / Recovery — Object Work | <code>value</code> | <code>objects/s</code> | Ceph pool id |
+| <code>ceph_pool_num_bytes_recovered</code> | Pools / Recovery — Pool Capacity and Data Volume | <code>value</code> | <code>bytes</code> | Ceph pool id |
+
+#### RBD Images
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_rbd_read_bytes</code> | RBD Images / IO — Byte Throughput | <code>read_bytes</code> | <code>bytes/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_write_bytes</code> | RBD Images / IO — Byte Throughput | <code>write_bytes</code> | <code>bytes/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_read_ops</code> | RBD Images / IO — Operations | <code>read_ops</code> | <code>operations/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_write_ops</code> | RBD Images / IO — Operations | <code>write_ops</code> | <code>operations/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_image_metadata</code> | RBD Images / Image Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph image name and pool id |
+| <code>ceph_rbd_read_latency_count</code> | RBD Images / Latency — Latency Measurements | <code>read_latency</code> | <code>operations/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_write_latency_count</code> | RBD Images / Latency — Latency Measurements | <code>write_latency</code> | <code>operations/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_read_latency_sum</code> | RBD Images / Latency — Accumulated Latency | <code>read_latency</code> | <code>seconds/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_write_latency_sum</code> | RBD Images / Latency — Accumulated Latency | <code>write_latency</code> | <code>seconds/s</code> | Ceph image and namespace and pool |
+| <code>ceph_rbd_mirror_metadata</code> | RBD Images / Mirror Metadata — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and ceph version and hostname and id and instance id |
+| <code>ceph_rbd_librbd_image_rd</code> | RBD Images / Client Images — I/O Operations | <code>read</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_wr</code> | RBD Images / Client Images — I/O Operations | <code>write</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_rd_bytes</code> | RBD Images / Client Images — I/O Byte Throughput | <code>read</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_wr_bytes</code> | RBD Images / Client Images — I/O Byte Throughput | <code>write</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_rd_latency_count</code> | RBD Images / Client Images — I/O Latency Measurements | <code>read</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_wr_latency_count</code> | RBD Images / Client Images — I/O Latency Measurements | <code>write</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_rd_latency_sum</code> | RBD Images / Client Images — Accumulated I/O Latency | <code>read</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_wr_latency_sum</code> | RBD Images / Client Images — Accumulated I/O Latency | <code>write</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_opened_time</code> | RBD Images / Client Images — Lifecycle Timestamps | <code>opened</code> | <code>seconds since epoch</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_lock_acquired_time</code> | RBD Images / Client Images — Lifecycle Timestamps | <code>lock_acquired</code> | <code>seconds since epoch</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_discard</code> | RBD Images / Client Images — Data Operations | <code>discard</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_ws</code> | RBD Images / Client Images — Data Operations | <code>write_same</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_cmp</code> | RBD Images / Client Images — Data Operations | <code>compare_and_write</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_discard_bytes</code> | RBD Images / Client Images — Data Operation Byte Throughput | <code>discard</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_ws_bytes</code> | RBD Images / Client Images — Data Operation Byte Throughput | <code>write_same</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_cmp_bytes</code> | RBD Images / Client Images — Data Operation Byte Throughput | <code>compare_and_write</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_discard_latency_count</code> | RBD Images / Client Images — Data Operation Latency Measurements | <code>discard</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_ws_latency_count</code> | RBD Images / Client Images — Data Operation Latency Measurements | <code>write_same</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_cmp_latency_count</code> | RBD Images / Client Images — Data Operation Latency Measurements | <code>compare_and_write</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_discard_latency_sum</code> | RBD Images / Client Images — Accumulated Data Operation Latency | <code>discard</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_ws_latency_sum</code> | RBD Images / Client Images — Accumulated Data Operation Latency | <code>write_same</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_cmp_latency_sum</code> | RBD Images / Client Images — Accumulated Data Operation Latency | <code>compare_and_write</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_flush</code> | RBD Images / Client Images — Flush Operations | <code>flush</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_flush_latency_count</code> | RBD Images / Client Images — Flush Latency Measurements | <code>flush</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_flush_latency_sum</code> | RBD Images / Client Images — Accumulated Flush Latency | <code>flush</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_snap_create</code> | RBD Images / Client Images — Snapshot Mutations | <code>create</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_snap_remove</code> | RBD Images / Client Images — Snapshot Mutations | <code>remove</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_snap_rollback</code> | RBD Images / Client Images — Snapshot Mutations | <code>rollback</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_snap_rename</code> | RBD Images / Client Images — Snapshot Mutations | <code>rename</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_notify</code> | RBD Images / Client Images — Maintenance Operations | <code>notify</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_resize</code> | RBD Images / Client Images — Maintenance Operations | <code>resize</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_readahead</code> | RBD Images / Client Images — Maintenance Operations | <code>readahead</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_invalidate_cache</code> | RBD Images / Client Images — Maintenance Operations | <code>invalidate_cache</code> | <code>operations/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_librbd_image_readahead_bytes</code> | RBD Images / Client Images — Readahead Byte Throughput | <code>readahead</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd image key |
+| <code>ceph_rbd_mirror_journal_replay_latency_count</code> | RBD Images / Mirror / Journal — Journal Replay Latency Measurements | <code>value</code> | <code>entries/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_image_replay_latency_count</code> | RBD Images / Mirror / Journal — Image Journal Replay Latency Measurements | <code>value</code> | <code>entries/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_replay_latency_sum</code> | RBD Images / Mirror / Journal — Accumulated Latency | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_image_replay_latency_sum</code> | RBD Images / Mirror / Journal — Accumulated Image Journal Replay Latency | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_replay_bytes</code> | RBD Images / Mirror / Journal — Byte Throughput | <code>value</code> | <code>bytes/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_image_replay_bytes</code> | RBD Images / Mirror / Journal — Image Journal Replay Byte Throughput | <code>value</code> | <code>bytes/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_entries</code> | RBD Images / Mirror / Journal — Journal Entries | <code>value</code> | <code>entries/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_journal_image_entries</code> | RBD Images / Mirror / Journal — Journal Entries Queued for Replay | <code>value</code> | <code>entries/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_image_sync_time_count</code> | RBD Images / Mirror / Snapshot Replication — Snapshot Sync Latency Measurements — Image Sync Time | <code>image_sync_time</code> | <code>snapshots/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_sync_time_count</code> | RBD Images / Mirror / Snapshot Replication — Snapshot Sync Latency Measurements — Sync Time | <code>sync_time</code> | <code>snapshots/s</code> | Ceph ceph daemon |
+| <code>ceph_rbd_mirror_snapshot_image_sync_time_sum</code> | RBD Images / Mirror / Snapshot Replication — Accumulated Latency — Image Sync Time | <code>image_sync_time</code> | <code>seconds/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_sync_time_sum</code> | RBD Images / Mirror / Snapshot Replication — Accumulated Latency — Sync Time | <code>sync_time</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rbd_mirror_snapshot_image_sync_bytes</code> | RBD Images / Mirror / Snapshot Replication — Byte Throughput — Image Sync Bytes | <code>image_sync_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_sync_bytes</code> | RBD Images / Mirror / Snapshot Replication — Byte Throughput — Sync Bytes | <code>sync_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_rbd_mirror_snapshot_image_last_sync_time</code> | RBD Images / Mirror / Snapshot Replication — Last Snapshot Sync Duration | <code>value</code> | <code>seconds</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_image_last_sync_bytes</code> | RBD Images / Mirror / Snapshot Replication — Last Snapshot Sync Size | <code>value</code> | <code>bytes</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_image_snapshots</code> | RBD Images / Mirror / Snapshot Replication — Snapshot Work — Image Snapshots | <code>image_snapshots</code> | <code>snapshots/s</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_snapshots</code> | RBD Images / Mirror / Snapshot Replication — Snapshot Work — Snapshots | <code>snapshots</code> | <code>snapshots/s</code> | Ceph ceph daemon |
+| <code>ceph_rbd_mirror_snapshot_image_local_timestamp</code> | RBD Images / Mirror / Snapshot Replication — Timestamps | <code>local_timestamp</code> | <code>seconds since epoch</code> | Ceph ceph daemon and image and namespace and pool |
+| <code>ceph_rbd_mirror_snapshot_image_remote_timestamp</code> | RBD Images / Mirror / Snapshot Replication — Timestamps | <code>remote_timestamp</code> | <code>seconds since epoch</code> | Ceph ceph daemon and image and namespace and pool |
+
+#### BlueFS
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_bluefs_db_alloc_lat_count</code> | BlueFS / Allocation — Latency Measurements | <code>db_alloc_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_slow_alloc_lat_count</code> | BlueFS / Allocation — Latency Measurements | <code>slow_alloc_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_wal_alloc_lat_count</code> | BlueFS / Allocation — Latency Measurements | <code>wal_alloc_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_db_alloc_lat_sum</code> | BlueFS / Allocation — Accumulated Latency | <code>db_alloc_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_slow_alloc_lat_sum</code> | BlueFS / Allocation — Accumulated Latency | <code>slow_alloc_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_wal_alloc_lat_sum</code> | BlueFS / Allocation — Accumulated Latency | <code>wal_alloc_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_unit_db</code> | BlueFS / Allocation — Allocation Sizes and High-Water Marks | <code>db</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_unit_slow</code> | BlueFS / Allocation — Allocation Sizes and High-Water Marks | <code>slow</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_unit_wal</code> | BlueFS / Allocation — Allocation Sizes and High-Water Marks | <code>wal</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_db_max_lat</code> | BlueFS / Allocation — Duration and Time | <code>db_max_lat</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_slow_max_lat</code> | BlueFS / Allocation — Duration and Time | <code>slow_max_lat</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_wal_max_lat</code> | BlueFS / Allocation — Duration and Time | <code>wal_max_lat</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_slow_fallback</code> | BlueFS / Allocation — Failure and Delay Outcomes | <code>fallback</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_alloc_slow_size_fallback</code> | BlueFS / Allocation — Failure and Delay Outcomes | <code>size_fallback</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_compact_lat_count</code> | BlueFS / Compaction — Latency Measurements | <code>lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_compact_lock_lat_count</code> | BlueFS / Compaction — Latency Measurements | <code>lock_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_compact_lat_sum</code> | BlueFS / Compaction — Accumulated Latency | <code>lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_compact_lock_lat_sum</code> | BlueFS / Compaction — Accumulated Latency | <code>lock_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_log_compactions</code> | BlueFS / Compaction — Events | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_flush_lat_count</code> | BlueFS / IO and Files — Latency Measurements | <code>flush_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_fsync_lat_count</code> | BlueFS / IO and Files — Latency Measurements | <code>fsync_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_lat_count</code> | BlueFS / IO and Files — Latency Measurements | <code>read_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_lat_count</code> | BlueFS / IO and Files — Latency Measurements | <code>read_random_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_truncate_lat_count</code> | BlueFS / IO and Files — Latency Measurements | <code>truncate_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_unlink_lat_count</code> | BlueFS / IO and Files — Latency Measurements | <code>unlink_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_flush_lat_sum</code> | BlueFS / IO and Files — Accumulated Latency | <code>flush_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_fsync_lat_sum</code> | BlueFS / IO and Files — Accumulated Latency | <code>fsync_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_lat_sum</code> | BlueFS / IO and Files — Accumulated Latency | <code>read_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_lat_sum</code> | BlueFS / IO and Files — Accumulated Latency | <code>read_random_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_truncate_lat_sum</code> | BlueFS / IO and Files — Accumulated Latency | <code>truncate_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_unlink_lat_sum</code> | BlueFS / IO and Files — Accumulated Latency | <code>unlink_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>read_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_disk_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>read_disk_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_disk_bytes_db</code> | BlueFS / IO and Files — Byte Throughput | <code>read_disk_bytes_db</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_disk_bytes_slow</code> | BlueFS / IO and Files — Byte Throughput | <code>read_disk_bytes_slow</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_disk_bytes_wal</code> | BlueFS / IO and Files — Byte Throughput | <code>read_disk_bytes_wal</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_prefetch_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>read_prefetch_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_buffer_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>read_random_buffer_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>read_random_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_disk_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>read_random_disk_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_disk_bytes_db</code> | BlueFS / IO and Files — Byte Throughput | <code>read_random_disk_bytes_db</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_disk_bytes_slow</code> | BlueFS / IO and Files — Byte Throughput | <code>read_random_disk_bytes_slow</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_disk_bytes_wal</code> | BlueFS / IO and Files — Byte Throughput | <code>read_random_disk_bytes_wal</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_write_bytes</code> | BlueFS / IO and Files — Byte Throughput | <code>write_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_log_write_count</code> | BlueFS / IO and Files — Operations | <code>log_write</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_count</code> | BlueFS / IO and Files — Operations | <code>read</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_disk_count</code> | BlueFS / IO and Files — Operations | <code>read_disk</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_prefetch_count</code> | BlueFS / IO and Files — Operations | <code>read_prefetch</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_buffer_count</code> | BlueFS / IO and Files — Operations | <code>read_random_buffer</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_count</code> | BlueFS / IO and Files — Operations | <code>read_random</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_random_disk_count</code> | BlueFS / IO and Files — Operations | <code>read_random_disk</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_write_count</code> | BlueFS / IO and Files — Operations | <code>write</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_write_count_sst</code> | BlueFS / IO and Files — Operations | <code>write_count_sst</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_write_count_wal</code> | BlueFS / IO and Files — Operations | <code>write_count_wal</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_write_disk_count</code> | BlueFS / IO and Files — Operations | <code>write_disk</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_zeros_candidate</code> | BlueFS / IO and Files — Zero-Read Outcomes | <code>candidate</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_read_zeros_errors</code> | BlueFS / IO and Files — Zero-Read Outcomes | <code>errors</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_max_bytes_db</code> | BlueFS / Space and Files — Allocation Sizes and High-Water Marks | <code>db</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_max_bytes_slow</code> | BlueFS / Space and Files — Allocation Sizes and High-Water Marks | <code>slow</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_max_bytes_wal</code> | BlueFS / Space and Files — Allocation Sizes and High-Water Marks | <code>wal</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_bytes_written_slow</code> | BlueFS / Space and Files — Byte Throughput | <code>bytes_written_slow</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_bytes_written_sst</code> | BlueFS / Space and Files — Byte Throughput | <code>bytes_written_sst</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_bytes_written_wal</code> | BlueFS / Space and Files — Byte Throughput | <code>bytes_written_wal</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_logged_bytes</code> | BlueFS / Space and Files — Byte Throughput | <code>logged_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_num_files</code> | BlueFS / Space and Files — Files | <code>value</code> | <code>files</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_files_written_sst</code> | BlueFS / Space and Files — File Work | <code>sst</code> | <code>files/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_files_written_wal</code> | BlueFS / Space and Files — File Work | <code>wal</code> | <code>files/s</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_db_total_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>db_total_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_db_used_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>db_used_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_log_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>log_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_slow_total_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>slow_total_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_slow_used_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>slow_used_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_wal_total_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>wal_total_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluefs_wal_used_bytes</code> | BlueFS / Space and Files — Space and Memory | <code>wal_used_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+
+#### BlueStore
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_bluestore_allocator_lat_count</code> | BlueStore / Allocation — Latency Measurements | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_allocator_lat_sum</code> | BlueStore / Allocation — Accumulated Latency | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_alloc_unit</code> | BlueStore / Allocation — Allocation Unit | <code>alloc_unit</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_allocated</code> | BlueStore / Allocation — Allocated Space | <code>allocated</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compress_lat_count</code> | BlueStore / Compression and Checksums — Latency Measurements | <code>compress_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_csum_lat_count</code> | BlueStore / Compression and Checksums — Latency Measurements | <code>csum_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_decompress_lat_count</code> | BlueStore / Compression and Checksums — Latency Measurements | <code>decompress_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compress_lat_sum</code> | BlueStore / Compression and Checksums — Accumulated Latency | <code>compress_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_csum_lat_sum</code> | BlueStore / Compression and Checksums — Accumulated Latency | <code>csum_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_decompress_lat_sum</code> | BlueStore / Compression and Checksums — Accumulated Latency | <code>decompress_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compress_rejected_count</code> | BlueStore / Compression and Checksums — Compression Operations | <code>compress_rejected</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compress_success_count</code> | BlueStore / Compression and Checksums — Compression Operations | <code>compress_success</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_extent_compress</code> | BlueStore / Compression and Checksums — Compressed Extents | <code>extent_compress</code> | <code>extents/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compressed</code> | BlueStore / Compression and Checksums — Space and Memory | <code>compressed</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compressed_allocated</code> | BlueStore / Compression and Checksums — Space and Memory | <code>allocated</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_compressed_original</code> | BlueStore / Compression and Checksums — Space and Memory | <code>original</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_lat_count</code> | BlueStore / IO — Latency Measurements | <code>read_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_onode_meta_lat_count</code> | BlueStore / IO — Latency Measurements | <code>read_onode_meta_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_wait_aio_lat_count</code> | BlueStore / IO — Latency Measurements | <code>read_wait_aio_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_remove_lat_count</code> | BlueStore / IO — Latency Measurements | <code>remove_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_truncate_lat_count</code> | BlueStore / IO — Latency Measurements | <code>truncate_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_lat_count</code> | BlueStore / IO — Latency Measurements | <code>write_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_lat_sum</code> | BlueStore / IO — Accumulated Latency | <code>read_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_onode_meta_lat_sum</code> | BlueStore / IO — Accumulated Latency | <code>read_onode_meta_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_wait_aio_lat_sum</code> | BlueStore / IO — Accumulated Latency | <code>read_wait_aio_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_remove_lat_sum</code> | BlueStore / IO — Accumulated Latency | <code>remove_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_truncate_lat_sum</code> | BlueStore / IO — Accumulated Latency | <code>truncate_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_lat_sum</code> | BlueStore / IO — Accumulated Latency | <code>write_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_issued_deferred_write_bytes</code> | BlueStore / IO — Byte Throughput | <code>issued_deferred_write_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_submitted_deferred_write_bytes</code> | BlueStore / IO — Byte Throughput | <code>submitted_deferred_write_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_big_bytes</code> | BlueStore / IO — Byte Throughput | <code>write_big_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_big_skipped_bytes</code> | BlueStore / IO — Byte Throughput | <code>write_big_skipped_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_pad_bytes</code> | BlueStore / IO — Byte Throughput | <code>write_pad_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_small_bytes</code> | BlueStore / IO — Byte Throughput | <code>write_small_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_small_skipped_bytes</code> | BlueStore / IO — Byte Throughput | <code>write_small_skipped_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_read_eio</code> | BlueStore / IO — Read Outcomes | <code>read_eio</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_reads_with_retries</code> | BlueStore / IO — Read Outcomes | <code>reads_with_retries</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_slow_read_onode_meta_count</code> | BlueStore / IO — Slow Reads | <code>slow_read_onode_meta</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_slow_read_wait_aio_count</code> | BlueStore / IO — Slow Reads | <code>slow_read_wait_aio</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_slow_aio_wait_count</code> | BlueStore / IO — Slow AIO Waits | <code>slow_aio_wait</code> | <code>waits/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_big_skipped_blobs</code> | BlueStore / IO — Skipped Blobs | <code>write_big_skipped_blobs</code> | <code>blobs/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_small_skipped</code> | BlueStore / IO — Skipped Writes | <code>write_small_skipped</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_issued_deferred_writes</code> | BlueStore / IO — Write Operations | <code>issued_deferred_writes</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_submitted_deferred_writes</code> | BlueStore / IO — Write Operations | <code>submitted_deferred_writes</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_big</code> | BlueStore / IO — Write Operations | <code>write_big</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_big_deferred</code> | BlueStore / IO — Write Operations | <code>write_big_deferred</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_new</code> | BlueStore / IO — Write Operations | <code>write_new</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_small</code> | BlueStore / IO — Write Operations | <code>write_small</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_small_pre_read</code> | BlueStore / IO — Write Operations | <code>write_small_pre_read</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_small_unused</code> | BlueStore / IO — Write Operations | <code>write_small_unused</code> | <code>writes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_big_blobs</code> | BlueStore / IO — Written Blobs | <code>write_big_blobs</code> | <code>blobs/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_write_penalty_read_ops</code> | BlueStore / IO — Penalty Reads | <code>write_penalty_read_ops</code> | <code>reads/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_clear_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>clear_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_get_keys_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>get_keys_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_get_values_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>get_values_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_lower_bound_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>lower_bound_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_next_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>next_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_seek_to_first_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>seek_to_first_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_upper_bound_lat_count</code> | BlueStore / OMAP — Latency Measurements | <code>upper_bound_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_clear_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>clear_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_get_keys_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>get_keys_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_get_values_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>get_values_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_lower_bound_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>lower_bound_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_next_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>next_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_seek_to_first_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>seek_to_first_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_upper_bound_lat_sum</code> | BlueStore / OMAP — Accumulated Latency | <code>upper_bound_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_setheader_bytes</code> | BlueStore / OMAP — Byte Throughput | <code>setheader_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_setkeys_bytes</code> | BlueStore / OMAP — Byte Throughput | <code>setkeys_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_iterator_count</code> | BlueStore / OMAP — Open Iterators | <code>iterator</code> | <code>iterators</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_setheader_count</code> | BlueStore / OMAP — Mutation Calls | <code>setheader</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_setkeys_count</code> | BlueStore / OMAP — Mutation Calls | <code>setkeys</code> | <code>calls/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_rmkey_range_count</code> | BlueStore / OMAP — Removed Key Ranges | <code>rmkey_range</code> | <code>ranges/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_rmkeys_count</code> | BlueStore / OMAP — Key Mutations | <code>rmkeys</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_omap_setkeys_records</code> | BlueStore / OMAP — Key Mutations | <code>setkeys_records</code> | <code>keys/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_blobs</code> | BlueStore / Onode Cache — Onode Blobs | <code>onode_blobs</code> | <code>blobs</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_spanning_blobs</code> | BlueStore / Onode Cache — Onode Blobs | <code>onode_spanning_blobs</code> | <code>blobs</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_extents</code> | BlueStore / Onode Cache — Onode Extents | <code>onode_extents</code> | <code>extents</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onodes</code> | BlueStore / Onode Cache — Onodes | <code>onodes</code> | <code>onodes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onodes_pinned</code> | BlueStore / Onode Cache — Onodes | <code>onodes_pinned</code> | <code>onodes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_reshard</code> | BlueStore / Onode Cache — Events | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_hits</code> | BlueStore / Onode Cache — Onode Lookup Outcomes | <code>hits</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_misses</code> | BlueStore / Onode Cache — Onode Lookup Outcomes | <code>misses</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_shard_hits</code> | BlueStore / Onode Cache — Onode Shard Lookup Outcomes | <code>shard_hits</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_onode_shard_misses</code> | BlueStore / Onode Cache — Onode Shard Lookup Outcomes | <code>shard_misses</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_committed_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri0_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri10_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri11_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri1_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri2_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri3_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri4_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri5_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri6_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri7_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri8_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_pri9_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:data_reserved_bytes</code> | BlueStore / Priority Cache Data — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_committed_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri0_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri10_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri11_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri1_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri2_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri3_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri4_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri5_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri6_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri7_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri8_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_pri9_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_reserved_bytes</code> | BlueStore / Priority Cache KV — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_committed_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri0_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri10_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri11_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri1_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri2_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri3_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri4_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri5_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri6_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri7_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri8_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_pri9_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:kv_onode_reserved_bytes</code> | BlueStore / Priority Cache KV Onode — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_committed_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri0_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri10_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri11_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri1_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri2_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri3_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri4_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri5_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri6_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri7_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri8_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_pri9_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache:meta_reserved_bytes</code> | BlueStore / Priority Cache Metadata — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache_cache_bytes</code> | BlueStore / Priority Cache Runtime — Space and Memory | <code>cache_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache_heap_bytes</code> | BlueStore / Priority Cache Runtime — Space and Memory | <code>heap_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache_mapped_bytes</code> | BlueStore / Priority Cache Runtime — Space and Memory | <code>mapped_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache_target_bytes</code> | BlueStore / Priority Cache Runtime — Space and Memory | <code>target_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_pricache_unmapped_bytes</code> | BlueStore / Priority Cache Runtime — Space and Memory | <code>unmapped_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_clist_lat_count</code> | BlueStore / Space and Core State — Latency Measurements | <code>clist_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_commit_lat_count</code> | BlueStore / Space and Core State — Latency Measurements | <code>kv_commit_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_final_lat_count</code> | BlueStore / Space and Core State — Latency Measurements | <code>kv_final_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_flush_lat_count</code> | BlueStore / Space and Core State — Latency Measurements | <code>kv_flush_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_sync_lat_count</code> | BlueStore / Space and Core State — Latency Measurements | <code>kv_sync_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_clist_lat_sum</code> | BlueStore / Space and Core State — Accumulated Latency | <code>clist_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_commit_lat_sum</code> | BlueStore / Space and Core State — Accumulated Latency | <code>kv_commit_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_final_lat_sum</code> | BlueStore / Space and Core State — Accumulated Latency | <code>kv_final_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_flush_lat_sum</code> | BlueStore / Space and Core State — Accumulated Latency | <code>kv_flush_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_kv_sync_lat_sum</code> | BlueStore / Space and Core State — Accumulated Latency | <code>kv_sync_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_buffer_hit_bytes</code> | BlueStore / Space and Core State — Byte Throughput | <code>hit_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_buffer_miss_bytes</code> | BlueStore / Space and Core State — Byte Throughput | <code>miss_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_buffers</code> | BlueStore / Space and Core State — Current Work | <code>value</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_blob_split</code> | BlueStore / Space and Core State — Blob Splits | <code>blob_split</code> | <code>blobs/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_gc_merged</code> | BlueStore / Space and Core State — Garbage-Collection Merge Throughput | <code>gc_merged</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_slow_committed_kv_count</code> | BlueStore / Space and Core State — Failure and Delay Outcomes | <code>value</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_fragmentation_micros</code> | BlueStore / Space and Core State — Fragmentation | <code>value</code> | <code>per mille</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_buffer_bytes</code> | BlueStore / Space and Core State — Buffer Cache Residency | <code>buffer_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_stored</code> | BlueStore / Space and Core State — Logical Stored Data | <code>stored</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_aio_wait_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_aio_wait_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_deferred_aio_wait_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_deferred_aio_wait_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_deferred_cleanup_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_deferred_cleanup_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_deferred_queued_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_deferred_queued_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_done_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_done_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_finishing_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_finishing_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_io_done_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_io_done_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_kv_commiting_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_kv_commiting_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_kv_done_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_kv_done_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_kv_queued_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_kv_queued_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_prepare_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>state_prepare_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_commit_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>txc_commit_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_submit_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>txc_submit_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_throttle_lat_count</code> | BlueStore / Transaction Pipeline — Latency Measurements | <code>txc_throttle_lat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_aio_wait_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_aio_wait_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_deferred_aio_wait_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_deferred_aio_wait_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_deferred_cleanup_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_deferred_cleanup_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_deferred_queued_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_deferred_queued_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_done_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_done_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_finishing_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_finishing_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_io_done_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_io_done_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_kv_commiting_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_kv_commiting_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_kv_done_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_kv_done_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_kv_queued_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_kv_queued_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_state_prepare_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>state_prepare_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_commit_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>txc_commit_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_submit_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>txc_submit_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_throttle_lat_sum</code> | BlueStore / Transaction Pipeline — Accumulated Latency | <code>txc_throttle_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_bluestore_txc_count</code> | BlueStore / Transaction Pipeline — Operations | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+
+#### Exporter and Process
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_exporter_scrape_time</code> | Exporter and Process / Collection — Collection Duration | <code>duration</code> | <code>seconds</code> | Ceph function and host |
+| <code>ceph_daemon_socket_up</code> | Exporter and Process / Daemon Availability — Daemon Socket State | <code>reachable</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon and hostname |
+| <code>ceph_exporter_minflt_total</code> | Exporter and Process / Daemon Processes — Page Faults | <code>minor</code> | <code>faults/s</code> | Ceph ceph daemon |
+| <code>ceph_exporter_majflt_total</code> | Exporter and Process / Daemon Processes — Page Faults | <code>major</code> | <code>faults/s</code> | Ceph ceph daemon |
+| <code>ceph_exporter_num_threads</code> | Exporter and Process / Daemon Processes — Threads | <code>threads</code> | <code>threads</code> | Ceph ceph daemon |
+| <code>ceph_exporter_cpu_usage</code> | Exporter and Process / Daemon Processes — CPU Utilization | <code>utilization</code> | <code>percentage</code> | Ceph ceph daemon |
+| <code>ceph_exporter_cpu_total</code> | Exporter and Process / Daemon Processes — CPU Time | <code>values of label mode</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_exporter_vm_size</code> | Exporter and Process / Daemon Processes — Memory | <code>virtual</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_exporter_resident_size</code> | Exporter and Process / Daemon Processes — Memory | <code>resident</code> | <code>bytes</code> | Ceph ceph daemon |
+
+#### Managers
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_mgr_cache_hit</code> | Managers / Daemons — Lookup Outcomes | <code>hit</code> | <code>lookups/s</code> | Ceph ceph daemon |
+| <code>ceph_mgr_cache_miss</code> | Managers / Daemons — Lookup Outcomes | <code>miss</code> | <code>lookups/s</code> | Ceph ceph daemon |
+
+#### Messenger
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_AsyncMessenger_RDMADispatcher_handshake_errors</code> | Messenger — RDMA Errors | <code>rdmadispatcher_handshake_errors</code> | <code>errors/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_rx_total_wc_errors</code> | Messenger — RDMA Errors | <code>rdmadispatcher_rx_total_wc_errors</code> | <code>errors/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_tx_retry_errors</code> | Messenger — RDMA Errors | <code>rdmadispatcher_tx_retry_errors</code> | <code>errors/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_tx_total_wc_errors</code> | Messenger — RDMA Errors | <code>rdmadispatcher_tx_total_wc_errors</code> | <code>errors/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_tx_wr_flush_errors</code> | Messenger — RDMA Errors | <code>rdmadispatcher_tx_wr_flush_errors</code> | <code>errors/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_Worker_msgr_connection_idle_timeouts</code> | Messenger — Connection Timeouts | <code>worker_msgr_connection_idle_timeouts</code> | <code>connections/s</code> | Ceph labeled worker ID with exactly one daemon-owner identity |
+| <code>ceph_AsyncMessenger_Worker_msgr_connection_ready_timeouts</code> | Messenger — Connection Timeouts | <code>worker_msgr_connection_ready_timeouts</code> | <code>connections/s</code> | Ceph labeled worker ID with exactly one daemon-owner identity |
+| <code>ceph_AsyncMessenger_RDMADispatcher_active_queue_pair</code> | Messenger — Active Queue Pairs | <code>active_queue_pair</code> | <code>queue pairs</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_created_queue_pair</code> | Messenger — Created Queue Pairs | <code>created_queue_pair</code> | <code>queue pairs/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_inflight_tx_chunks</code> | Messenger — In-Flight Transmit Chunks | <code>inflight_tx_chunks</code> | <code>chunks</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_polling</code> | Messenger — Polling State | <code>polling</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_rx_bufs_in_use</code> | Messenger — Receive Buffers | <code>rx_bufs_in_use</code> | <code>buffers</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_rx_bufs_total</code> | Messenger — Receive Buffers | <code>rx_bufs</code> | <code>buffers</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_async_last_wqe_events</code> | Messenger — Asynchronous Events | <code>async_last_wqe_events</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_total_async_events</code> | Messenger — Asynchronous Events | <code>total_async_events</code> | <code>events/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_rx_total_wc</code> | Messenger — Work Completions | <code>rx_total_wc</code> | <code>completions/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_tx_total_wc</code> | Messenger — Work Completions | <code>tx_total_wc</code> | <code>completions/s</code> | Ceph ceph daemon |
+| <code>ceph_AsyncMessenger_RDMADispatcher_rx_fin</code> | Messenger — Received FIN Messages | <code>rx_fin</code> | <code>messages/s</code> | Ceph ceph daemon |
+
+#### Monitors
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_mon_election_call</code> | Monitors / Daemons — Elections | <code>election_call</code> | <code>elections/s</code> | Ceph ceph daemon |
+| <code>ceph_mon_election_lose</code> | Monitors / Daemons — Elections | <code>election_lose</code> | <code>elections/s</code> | Ceph ceph daemon |
+| <code>ceph_mon_election_win</code> | Monitors / Daemons — Elections | <code>election_win</code> | <code>elections/s</code> | Ceph ceph daemon |
+| <code>ceph_mon_num_elections</code> | Monitors / Daemons — Elections | <code>num_elections</code> | <code>elections/s</code> | Ceph ceph daemon |
+| <code>ceph_mon_num_sessions</code> | Monitors / Daemons — Sessions | <code>value</code> | <code>sessions</code> | Ceph ceph daemon |
+| <code>ceph_mon_session_add</code> | Monitors / Daemons — Session Churn | <code>add</code> | <code>sessions/s</code> | Ceph ceph daemon |
+| <code>ceph_mon_session_rm</code> | Monitors / Daemons — Session Churn | <code>rm</code> | <code>sessions/s</code> | Ceph ceph daemon |
+| <code>ceph_mon_session_trim</code> | Monitors / Daemons — Session Churn | <code>trim</code> | <code>sessions/s</code> | Ceph ceph daemon |
+
+#### Runtime and Clients
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_objecter_op_latency_count</code> | Runtime and Clients / Objecter — Latency Measurements | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_latency_sum</code> | Runtime and Clients / Objecter — Accumulated Latency | <code>value</code> | <code>seconds/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_oplen_avg_count</code> | Runtime and Clients / Objecter — Submitted Top-Level Operations | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_oplen_avg_sum</code> | Runtime and Clients / Objecter — Operation-Vector Entries | <code>value</code> | <code>entries/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_send_bytes</code> | Runtime and Clients / Objecter — Byte Throughput | <code>value</code> | <code>bytes/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_command_active</code> | Runtime and Clients / Objecter — Active Commands | <code>command_active</code> | <code>commands</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_linger_active</code> | Runtime and Clients / Objecter — Active Lingering Operations | <code>linger_active</code> | <code>operations</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_map_epoch</code> | Runtime and Clients / Objecter — OSD-Map Epoch | <code>map_epoch</code> | <code>epoch</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_active</code> | Runtime and Clients / Objecter — Objecter Operations | <code>op_active</code> | <code>operations</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_inflight</code> | Runtime and Clients / Objecter — Objecter Operations | <code>op_inflight</code> | <code>operations</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_laggy</code> | Runtime and Clients / Objecter — Objecter Operations | <code>op_laggy</code> | <code>operations</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_poolop_active</code> | Runtime and Clients / Objecter — Active Pool Operations | <code>poolop_active</code> | <code>operations</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_poolstat_active</code> | Runtime and Clients / Objecter — Active Pool-Stat Requests | <code>poolstat_active</code> | <code>requests</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_statfs_active</code> | Runtime and Clients / Objecter — Active StatFS Requests | <code>statfs_active</code> | <code>requests</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_command_resend</code> | Runtime and Clients / Objecter — Commands | <code>command_resend</code> | <code>commands/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_command_send</code> | Runtime and Clients / Objecter — Commands | <code>command_send</code> | <code>commands/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_linger_ping</code> | Runtime and Clients / Objecter — Lingering Operations | <code>linger_ping</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_linger_resend</code> | Runtime and Clients / Objecter — Lingering Operations | <code>linger_resend</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_linger_send</code> | Runtime and Clients / Objecter — Lingering Operations | <code>linger_send</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_map_full</code> | Runtime and Clients / Objecter — OSD Maps | <code>map_full</code> | <code>maps/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_map_inc</code> | Runtime and Clients / Objecter — OSD Maps | <code>map_inc</code> | <code>maps/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_omap_del</code> | Runtime and Clients / Objecter — Object Operations | <code>omap_del</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_omap_rd</code> | Runtime and Clients / Objecter — Object Operations | <code>omap_rd</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_omap_wr</code> | Runtime and Clients / Objecter — Object Operations | <code>omap_wr</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op</code> | Runtime and Clients / Objecter — Object Operations | <code>op</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_pg</code> | Runtime and Clients / Objecter — Object Operations | <code>op_pg</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_r</code> | Runtime and Clients / Objecter — Object Operations | <code>op_r</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_reply</code> | Runtime and Clients / Objecter — Object Operations | <code>op_reply</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_resend</code> | Runtime and Clients / Objecter — Object Operations | <code>op_resend</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_rmw</code> | Runtime and Clients / Objecter — Object Operations | <code>op_rmw</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_send</code> | Runtime and Clients / Objecter — Object Operations | <code>op_send</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_op_w</code> | Runtime and Clients / Objecter — Object Operations | <code>op_w</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_append</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_append</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_call</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_call</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_clonerange</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_clonerange</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_cmpxattr</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_cmpxattr</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_create</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_create</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_delete</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_delete</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_getxattr</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_getxattr</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_mapext</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_mapext</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_notify</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_notify</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_other</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_other</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_pgls</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_pgls</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_pgls_filter</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_pgls_filter</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_read</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_read</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_resetxattrs</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_resetxattrs</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_rmxattr</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_rmxattr</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_setxattr</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_setxattr</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_sparse_read</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_sparse_read</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_src_cmpxattr</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_src_cmpxattr</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_stat</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_stat</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_truncate</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_truncate</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_watch</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_watch</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_write</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_write</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_writefull</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_writefull</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_writesame</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_writesame</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osdop_zero</code> | Runtime and Clients / Objecter — Object Operations | <code>osdop_zero</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_replica_read_sent</code> | Runtime and Clients / Objecter — Replica Reads | <code>replica_read_sent</code> | <code>reads/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_replica_read_bounced</code> | Runtime and Clients / Objecter — Replica Reads | <code>replica_read_bounced</code> | <code>reads/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_replica_read_completed</code> | Runtime and Clients / Objecter — Replica Reads | <code>replica_read_completed</code> | <code>reads/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osd_session_close</code> | Runtime and Clients / Objecter — OSD Sessions | <code>osd_session_close</code> | <code>sessions/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osd_session_open</code> | Runtime and Clients / Objecter — OSD Sessions | <code>osd_session_open</code> | <code>sessions/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_poolop_resend</code> | Runtime and Clients / Objecter — Pool Operations | <code>poolop_resend</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_poolop_send</code> | Runtime and Clients / Objecter — Pool Operations | <code>poolop_send</code> | <code>operations/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_poolstat_resend</code> | Runtime and Clients / Objecter — Pool-Stat and StatFS Requests | <code>poolstat_resend</code> | <code>requests/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_poolstat_send</code> | Runtime and Clients / Objecter — Pool-Stat and StatFS Requests | <code>poolstat_send</code> | <code>requests/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_statfs_resend</code> | Runtime and Clients / Objecter — Pool-Stat and StatFS Requests | <code>statfs_resend</code> | <code>requests/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_statfs_send</code> | Runtime and Clients / Objecter — Pool-Stat and StatFS Requests | <code>statfs_send</code> | <code>requests/s</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osd_laggy</code> | Runtime and Clients / Objecter — Sessions | <code>laggy</code> | <code>sessions</code> | Ceph ceph daemon and instance id |
+| <code>ceph_objecter_osd_sessions</code> | Runtime and Clients / Objecter — Sessions | <code>sessions</code> | <code>sessions</code> | Ceph ceph daemon and instance id |
+| <code>ceph_rbd_librbd_pwl_rd</code> | Runtime and Clients / RBD Persistent Write Log — Reads | <code>rd</code> | <code>reads/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_hit_rd</code> | Runtime and Clients / RBD Persistent Write Log — Reads | <code>hit_rd</code> | <code>reads/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_part_hit_rd</code> | Runtime and Clients / RBD Persistent Write Log — Reads | <code>part_hit_rd</code> | <code>reads/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_def</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr_def</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_def_lanes</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr_def_lanes</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_def_log</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr_def_log</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_def_buf</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr_def_buf</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_overlap</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr_overlap</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_q_barrier</code> | Runtime and Clients / RBD Persistent Write Log — Writes | <code>wr_q_barrier</code> | <code>writes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_log_ops</code> | Runtime and Clients / RBD Persistent Write Log — Log Appends | <code>log_ops</code> | <code>appends/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_discard</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>discard</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_aio_flush</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>aio_flush</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_aio_flush_def</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>aio_flush_def</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_ws</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>ws</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_cmp</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>cmp</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_cmp_fails</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>cmp_fails</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_internal_flush</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>internal_flush</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_invalidate</code> | Runtime and Clients / RBD Persistent Write Log — Cache and Image Operations | <code>invalidate</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_rd_bytes</code> | Runtime and Clients / RBD Persistent Write Log — Read Throughput | <code>rd_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_rd_hit_bytes</code> | Runtime and Clients / RBD Persistent Write Log — Read Throughput | <code>rd_hit_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_bytes</code> | Runtime and Clients / RBD Persistent Write Log — Write Throughput | <code>wr_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_discard_bytes</code> | Runtime and Clients / RBD Persistent Write Log — Data-Operation Throughput | <code>discard_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_ws_bytes</code> | Runtime and Clients / RBD Persistent Write Log — Data-Operation Throughput | <code>ws_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_cmp_bytes</code> | Runtime and Clients / RBD Persistent Write Log — Data-Operation Throughput | <code>cmp_bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_log_op_bytes_sum</code> | Runtime and Clients / RBD Persistent Write Log — Log-Append Throughput | <code>log_op_bytes_sum</code> | <code>bytes/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_rd_latency_count</code> | Runtime and Clients / RBD Persistent Write Log — Read Request Latency Measurements | <code>rd_latency_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_hit_rd_latency_count</code> | Runtime and Clients / RBD Persistent Write Log — Read Request Latency Measurements | <code>hit_rd_latency_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_log_op_bytes_count</code> | Runtime and Clients / RBD Persistent Write Log — Log-Append Size Measurements | <code>log_op_bytes_count</code> | <code>appends/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_all_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>req_arr_to_all_t_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_dis_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>req_arr_to_dis_t_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_all_to_dis_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>req_all_to_dis_t_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_latency_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>wr_latency_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_caller_wr_latency_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>caller_wr_latency_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_all_nw_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>req_arr_to_all_nw_t_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_dis_nw_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>req_arr_to_dis_nw_t_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_all_to_dis_nw_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>req_all_to_dis_nw_t_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_latency_nw_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>wr_latency_nw_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_caller_wr_latency_nw_count</code> | Runtime and Clients / RBD Persistent Write Log — Write Request Latency Measurements | <code>caller_wr_latency_nw_count</code> | <code>requests/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_alloc_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_alloc_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_dis_to_buf_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_dis_to_buf_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_dis_to_app_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_dis_to_app_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_dis_to_cmp_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_dis_to_cmp_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_buf_to_app_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_buf_to_app_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_buf_to_bufc_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_buf_to_bufc_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_app_to_cmp_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_app_to_cmp_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_app_to_appc_t_count</code> | Runtime and Clients / RBD Persistent Write Log — Log Operation Latency Measurements | <code>op_app_to_appc_t_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_discard_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Data Operation Latency Measurements | <code>discard_lat_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_aio_flush_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Data Operation Latency Measurements | <code>aio_flush_lat_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_ws_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Data Operation Latency Measurements | <code>ws_lat_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_cmp_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Data Operation Latency Measurements | <code>cmp_lat_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_writeback_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Data Operation Latency Measurements | <code>writeback_lat_count</code> | <code>operations/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_append_tx_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Transaction Latency Measurements | <code>append_tx_lat_count</code> | <code>transactions/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_retire_tx_lat_count</code> | Runtime and Clients / RBD Persistent Write Log — Transaction Latency Measurements | <code>retire_tx_lat_count</code> | <code>transactions/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_rd_latency_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Read Request Latency | <code>rd_latency_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_hit_rd_latency_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Read Request Latency | <code>hit_rd_latency_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_all_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>req_arr_to_all_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_dis_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>req_arr_to_dis_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_all_to_dis_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>req_all_to_dis_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_latency_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>wr_latency_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_caller_wr_latency_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>caller_wr_latency_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_all_nw_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>req_arr_to_all_nw_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_arr_to_dis_nw_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>req_arr_to_dis_nw_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_req_all_to_dis_nw_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>req_all_to_dis_nw_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_wr_latency_nw_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>wr_latency_nw_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_caller_wr_latency_nw_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Write Request Latency | <code>caller_wr_latency_nw_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_alloc_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_alloc_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_dis_to_buf_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_dis_to_buf_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_dis_to_app_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_dis_to_app_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_dis_to_cmp_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_dis_to_cmp_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_buf_to_app_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_buf_to_app_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_buf_to_bufc_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_buf_to_bufc_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_app_to_cmp_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_app_to_cmp_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_op_app_to_appc_t_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Log Operation Latency | <code>op_app_to_appc_t_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_discard_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Data Operation Latency | <code>discard_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_aio_flush_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Data Operation Latency | <code>aio_flush_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_ws_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Data Operation Latency | <code>ws_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_cmp_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Data Operation Latency | <code>cmp_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_writeback_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Data Operation Latency | <code>writeback_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_append_tx_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Transaction Latency | <code>append_tx_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_rbd_librbd_pwl_retire_tx_lat_sum</code> | Runtime and Clients / RBD Persistent Write Log — Accumulated Transaction Latency | <code>retire_tx_lat_sum</code> | <code>seconds/s</code> | Ceph ceph daemon and librbd pwl key |
+| <code>ceph_objectcacher_cache_ops_hit</code> | Runtime and Clients / Object Caches — Cache Outcomes | <code>hit</code> | <code>operations/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_cache_ops_miss</code> | Runtime and Clients / Object Caches — Cache Outcomes | <code>miss</code> | <code>operations/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_cache_bytes_hit</code> | Runtime and Clients / Object Caches — Cache Byte Outcomes | <code>hit</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_cache_bytes_miss</code> | Runtime and Clients / Object Caches — Cache Byte Outcomes | <code>miss</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_data_read</code> | Runtime and Clients / Object Caches — Data Throughput | <code>read</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_data_written</code> | Runtime and Clients / Object Caches — Data Throughput | <code>written</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_data_flushed</code> | Runtime and Clients / Object Caches — Data Throughput | <code>flushed</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_data_overwritten_while_flushing</code> | Runtime and Clients / Object Caches — Data Throughput | <code>overwritten_while_flushing</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_write_ops_blocked</code> | Runtime and Clients / Object Caches — Blocked Writes | <code>operations</code> | <code>operations/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_write_bytes_blocked</code> | Runtime and Clients / Object Caches — Blocked Write Throughput | <code>bytes</code> | <code>bytes/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_objectcacher_write_time_blocked</code> | Runtime and Clients / Object Caches — Blocked Write Time | <code>time</code> | <code>seconds/s</code> | Ceph ceph daemon and objectcacher key |
+| <code>ceph_finisher_queue_len</code> | Runtime and Clients / Finishers — Queued Callbacks | <code>queued</code> | <code>callbacks</code> | Ceph ceph daemon and finisher key |
+| <code>ceph_finisher_complete_latency_count</code> | Runtime and Clients / Finishers — Drained Completion Batches | <code>completed</code> | <code>batches/s</code> | Ceph ceph daemon and finisher key |
+| <code>ceph_finisher_complete_latency_sum</code> | Runtime and Clients / Finishers — Accumulated Completion Latency | <code>latency</code> | <code>seconds/s</code> | Ceph ceph daemon and finisher key |
+| <code>ceph_throttle_val</code> | Runtime and Clients / Throttles — Utilization | <code>val</code> | <code>slots</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_max</code> | Runtime and Clients / Throttles — Utilization | <code>max</code> | <code>slots</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_get_started</code> | Runtime and Clients / Throttles — Operations | <code>get_started</code> | <code>operations/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_get</code> | Runtime and Clients / Throttles — Operations | <code>get</code> | <code>operations/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_get_or_fail_fail</code> | Runtime and Clients / Throttles — Operations | <code>get_or_fail_fail</code> | <code>operations/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_get_or_fail_success</code> | Runtime and Clients / Throttles — Operations | <code>get_or_fail_success</code> | <code>operations/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_take</code> | Runtime and Clients / Throttles — Operations | <code>take</code> | <code>operations/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_put</code> | Runtime and Clients / Throttles — Operations | <code>put</code> | <code>operations/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_get_sum</code> | Runtime and Clients / Throttles — Slot Throughput | <code>get_sum</code> | <code>slots/s</code> | Ceph throttle key |
+| <code>ceph_throttle_take_sum</code> | Runtime and Clients / Throttles — Slot Throughput | <code>take_sum</code> | <code>slots/s</code> | Ceph throttle key |
+| <code>ceph_throttle_put_sum</code> | Runtime and Clients / Throttles — Slot Throughput | <code>put_sum</code> | <code>slots/s</code> | Ceph throttle key |
+| <code>ceph_throttle_wait_count</code> | Runtime and Clients / Throttles — Waits | <code>waits</code> | <code>waits/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_throttle_wait_sum</code> | Runtime and Clients / Throttles — Accumulated Wait Time | <code>wait</code> | <code>seconds/s</code> | Ceph ceph daemon and throttle key |
+| <code>ceph_kernel_device_discard_op</code> | Runtime and Clients / Kernel Devices — Discard Operations | <code>discard</code> | <code>operations/s</code> | Ceph ceph daemon and kernel device key |
+| <code>ceph_kernel_device_discard_threads</code> | Runtime and Clients / Kernel Devices — Discard Threads | <code>threads</code> | <code>threads</code> | Ceph ceph daemon and kernel device key |
+| <code>ceph_mclock_shard_mclock_immediate_queue_len</code> | Runtime and Clients / mClock Shards — Queue Depth | <code>immediate</code> | <code>operations</code> | Ceph ceph daemon and mclock shard |
+| <code>ceph_mclock_shard_mclock_client_queue_len</code> | Runtime and Clients / mClock Shards — Queue Depth | <code>client</code> | <code>operations</code> | Ceph ceph daemon and mclock shard |
+| <code>ceph_mclock_shard_mclock_recovery_queue_len</code> | Runtime and Clients / mClock Shards — Queue Depth | <code>recovery</code> | <code>operations</code> | Ceph ceph daemon and mclock shard |
+| <code>ceph_mclock_shard_mclock_best_effort_queue_len</code> | Runtime and Clients / mClock Shards — Queue Depth | <code>best_effort</code> | <code>operations</code> | Ceph ceph daemon and mclock shard |
+| <code>ceph_mclock_shard_mclock_all_type_queue_len</code> | Runtime and Clients / mClock Shards — Queue Depth | <code>all_type</code> | <code>operations</code> | Ceph ceph daemon and mclock shard |
+| <code>ceph_async_messenger_worker_msgr_recv_messages</code> | Runtime and Clients / Messenger Workers — Messages | <code>recv</code> | <code>messages/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_send_messages</code> | Runtime and Clients / Messenger Workers — Messages | <code>send</code> | <code>messages/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_recv_bytes</code> | Runtime and Clients / Messenger Workers — Byte Throughput | <code>recv</code> | <code>bytes/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_send_bytes</code> | Runtime and Clients / Messenger Workers — Byte Throughput | <code>send</code> | <code>bytes/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_recv_encrypted_bytes</code> | Runtime and Clients / Messenger Workers — Byte Throughput | <code>recv_encrypted</code> | <code>bytes/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_send_encrypted_bytes</code> | Runtime and Clients / Messenger Workers — Byte Throughput | <code>send_encrypted</code> | <code>bytes/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_active_connections</code> | Runtime and Clients / Messenger Workers — Connections | <code>active</code> | <code>connections</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_created_connections</code> | Runtime and Clients / Messenger Workers — Created Connections | <code>created</code> | <code>connections/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_running_total_time</code> | Runtime and Clients / Messenger Workers — Accumulated Worker Time | <code>total</code> | <code>seconds/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_running_send_time</code> | Runtime and Clients / Messenger Workers — Accumulated Worker Time | <code>send</code> | <code>seconds/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_running_recv_time</code> | Runtime and Clients / Messenger Workers — Accumulated Worker Time | <code>recv</code> | <code>seconds/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_running_fast_dispatch_time</code> | Runtime and Clients / Messenger Workers — Accumulated Worker Time | <code>fast_dispatch</code> | <code>seconds/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_send_messages_queue_lat_count</code> | Runtime and Clients / Messenger Workers — Send-Queue Latency Measurements | <code>send_messages_queue</code> | <code>messages/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_handle_ack_lat_count</code> | Runtime and Clients / Messenger Workers — Acknowledgement Latency Measurements | <code>handle_ack</code> | <code>acknowledgements/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_send_messages_queue_lat_sum</code> | Runtime and Clients / Messenger Workers — Accumulated Send-Queue Latency | <code>send_messages_queue</code> | <code>seconds/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_worker_msgr_handle_ack_lat_sum</code> | Runtime and Clients / Messenger Workers — Accumulated Acknowledgement Latency | <code>handle_ack</code> | <code>seconds/s</code> | Ceph ceph daemon and messenger worker |
+| <code>ceph_async_messenger_rdma_worker_tx_no_mem</code> | Runtime and Clients / RDMA Workers — RDMA Transfer Errors | <code>tx_no_mem</code> | <code>errors/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_tx_parital_mem</code> | Runtime and Clients / RDMA Workers — RDMA Transfer Errors | <code>tx_parital_mem</code> | <code>errors/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_tx_failed_post</code> | Runtime and Clients / RDMA Workers — RDMA Transfer Errors | <code>tx_failed_post</code> | <code>errors/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_tx_chunks</code> | Runtime and Clients / RDMA Workers — Chunk Throughput | <code>tx</code> | <code>chunks/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_rx_chunks</code> | Runtime and Clients / RDMA Workers — Chunk Throughput | <code>rx</code> | <code>chunks/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_tx_bytes</code> | Runtime and Clients / RDMA Workers — Byte Throughput | <code>tx</code> | <code>bytes/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_rx_bytes</code> | Runtime and Clients / RDMA Workers — Byte Throughput | <code>rx</code> | <code>bytes/s</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_async_messenger_rdma_worker_pending_sent_conns</code> | Runtime and Clients / RDMA Workers — Pending Connections | <code>pending</code> | <code>connections</code> | Ceph ceph daemon and rdma worker |
+| <code>ceph_dpdk_queue_dpdk_receive_packets</code> | Runtime and Clients / DPDK Queues — Packets | <code>receive</code> | <code>packets/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_packets</code> | Runtime and Clients / DPDK Queues — Packets | <code>send</code> | <code>packets/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_bytes</code> | Runtime and Clients / DPDK Queues — Byte Throughput | <code>receive</code> | <code>bytes/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_bytes</code> | Runtime and Clients / DPDK Queues — Byte Throughput | <code>send</code> | <code>bytes/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_copy_bytes</code> | Runtime and Clients / DPDK Queues — Byte Throughput | <code>receive_copy</code> | <code>bytes/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_copy_bytes</code> | Runtime and Clients / DPDK Queues — Byte Throughput | <code>send_copy</code> | <code>bytes/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_fragments</code> | Runtime and Clients / DPDK Queues — Packet Fragments | <code>receive_fragments</code> | <code>fragments/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_fragments</code> | Runtime and Clients / DPDK Queues — Packet Fragments | <code>send_fragments</code> | <code>fragments/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_copy_ops</code> | Runtime and Clients / DPDK Queues — Copy and Linearize Operations | <code>receive_copy_ops</code> | <code>operations/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_copy_ops</code> | Runtime and Clients / DPDK Queues — Copy and Linearize Operations | <code>send_copy_ops</code> | <code>operations/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_linearize_ops</code> | Runtime and Clients / DPDK Queues — Copy and Linearize Operations | <code>receive_linearize_ops</code> | <code>operations/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_linearize_ops</code> | Runtime and Clients / DPDK Queues — Copy and Linearize Operations | <code>send_linearize_ops</code> | <code>operations/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_bad_checksum_errors</code> | Runtime and Clients / DPDK Queues — Receive Errors | <code>bad_checksum</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_no_memory_errors</code> | Runtime and Clients / DPDK Queues — Receive Errors | <code>no_memory</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_receive_last_bunch</code> | Runtime and Clients / DPDK Queues — Last Batch Size | <code>receive</code> | <code>packets</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_last_bunch</code> | Runtime and Clients / DPDK Queues — Last Batch Size | <code>send</code> | <code>packets</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_queue_dpdk_send_queue_length</code> | Runtime and Clients / DPDK Queues — Send Queue Depth | <code>queued</code> | <code>packets</code> | Ceph ceph daemon and dpdk queue |
+| <code>ceph_dpdk_port_dpdk_device_receive_multicast_packets</code> | Runtime and Clients / DPDK Ports — Multicast Packets | <code>received</code> | <code>packets/s</code> | Ceph ceph daemon and dpdk port |
+| <code>ceph_dpdk_port_dpdk_device_receive_badcrc_errors</code> | Runtime and Clients / DPDK Ports — Receive Errors | <code>badcrc</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk port |
+| <code>ceph_dpdk_port_dpdk_device_receive_total_errors</code> | Runtime and Clients / DPDK Ports — Receive Errors | <code>total</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk port |
+| <code>ceph_dpdk_port_dpdk_device_receive_dropped_errors</code> | Runtime and Clients / DPDK Ports — Receive Errors | <code>dropped</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk port |
+| <code>ceph_dpdk_port_dpdk_device_receive_nombuf_errors</code> | Runtime and Clients / DPDK Ports — Receive Errors | <code>nombuf</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk port |
+| <code>ceph_dpdk_port_dpdk_device_send_total_errors</code> | Runtime and Clients / DPDK Ports — Send Errors | <code>total</code> | <code>errors/s</code> | Ceph ceph daemon and dpdk port |
+| <code>ceph_service_unique_id</code> | Runtime and Clients / Service Identity — Service Identity Metadata Sentinel | <code>present</code> | <code>identifier</code> | Ceph ceph daemon and service unique id |
+| <code>ceph_libcephsqlite_striper_update_metadata</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>update_metadata</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_update_allocated</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>update_allocated</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_update_size</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>update_size</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_update_version</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>update_version</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_shrink</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>shrink</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_lock</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>lock</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_unlock</code> | Runtime and Clients / RADOS Striper — Metadata and Lock Work | <code>unlock</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_striper_shrink_bytes</code> | Runtime and Clients / RADOS Striper — Shrink Throughput | <code>bytes</code> | <code>bytes/s</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bloom_filter_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bloom_filter</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_alloc_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_alloc</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_data_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_cache_data</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_onode_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_cache_onode</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_meta_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_cache_meta</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_other_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_cache_other</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_buffer_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_cache_buffer</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_extent_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_extent</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_blob_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_blob</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_shared_blob_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_shared_blob</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_inline_bl_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_inline_bl</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_fsck_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_fsck</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_txc_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_txc</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_writing_deferred_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_writing_deferred</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_writing_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluestore_writing</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluefs_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluefs</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluefs_file_reader_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluefs_file_reader</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluefs_file_writer_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>bluefs_file_writer</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_buffer_anon_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>buffer_anon</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_buffer_meta_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>buffer_meta</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osd_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>osd</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osd_mapbl_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>osd_mapbl</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osd_pglog_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>osd_pglog</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osdmap_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>osdmap</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osdmap_mapping_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>osdmap_mapping</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_pgmap_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>pgmap</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_mds_co_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>mds_co</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_unittest_1_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>unittest_1</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_unittest_2_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>unittest_2</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_ec_extent_cache_bytes</code> | Runtime and Clients / Memory Pools — Memory Use | <code>ec_extent_cache</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bloom_filter_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bloom_filter</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_alloc_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_alloc</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_data_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_cache_data</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_onode_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_cache_onode</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_meta_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_cache_meta</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_other_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_cache_other</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_cache_buffer_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_cache_buffer</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_extent_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_extent</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_blob_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_blob</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_shared_blob_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_shared_blob</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_inline_bl_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_inline_bl</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_fsck_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_fsck</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_txc_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_txc</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_writing_deferred_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_writing_deferred</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluestore_writing_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluestore_writing</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluefs_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluefs</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluefs_file_reader_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluefs_file_reader</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_bluefs_file_writer_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>bluefs_file_writer</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_buffer_anon_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>buffer_anon</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_buffer_meta_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>buffer_meta</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osd_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>osd</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osd_mapbl_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>osd_mapbl</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osd_pglog_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>osd_pglog</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osdmap_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>osdmap</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_osdmap_mapping_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>osdmap_mapping</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_pgmap_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>pgmap</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_mds_co_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>mds_co</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_unittest_1_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>unittest_1</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_unittest_2_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>unittest_2</code> | <code>items</code> | Ceph ceph daemon |
+| <code>ceph_mempool_ec_extent_cache_items</code> | Runtime and Clients / Memory Pools — Item Count | <code>ec_extent_cache</code> | <code>items</code> | Ceph ceph daemon |
+
+#### Runtime
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_KStore_state_done_lat_count</code> | Runtime / Shared Daemon — KStore Transaction Latency Measurements | <code>kstore_state_done_lat</code> | <code>transactions/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_finishing_lat_count</code> | Runtime / Shared Daemon — KStore Transaction Latency Measurements | <code>kstore_state_finishing_lat</code> | <code>transactions/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_kv_done_lat_count</code> | Runtime / Shared Daemon — KStore Transaction Latency Measurements | <code>kstore_state_kv_done_lat</code> | <code>transactions/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_kv_queued_lat_count</code> | Runtime / Shared Daemon — KStore Transaction Latency Measurements | <code>kstore_state_kv_queued_lat</code> | <code>transactions/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_prepare_lat_count</code> | Runtime / Shared Daemon — KStore Transaction Latency Measurements | <code>kstore_state_prepare_lat</code> | <code>transactions/s</code> | Ceph ceph daemon |
+| <code>ceph_client_lat_count</code> | Runtime / Shared Daemon — Client Request Latency Measurements | <code>client_lat</code> | <code>requests/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_activating_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_activating_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_active_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_active_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_backfilling_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_backfilling_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_clean_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_clean_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_down_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_down_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_getinfo_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_getinfo_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_getlog_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_getlog_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_getmissing_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_getmissing_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_incomplete_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_incomplete_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_initial_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_initial_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_notbackfilling_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_notbackfilling_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_notrecovering_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_notrecovering_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_peering_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_peering_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_primary_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_primary_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_recovered_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_recovered_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_recovering_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_recovering_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_replicaactive_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_replicaactive_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_repnotrecovering_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_repnotrecovering_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_reprecovering_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_reprecovering_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_repwaitbackfillreserved_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_repwaitbackfillreserved_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_repwaitrecoveryreserved_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_repwaitrecoveryreserved_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_reset_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_reset_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_start_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_start_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_started_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_started_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_stray_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_stray_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitactingchange_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_waitactingchange_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitlocalbackfillreserved_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_waitlocalbackfillreserved_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitlocalrecoveryreserved_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_waitlocalrecoveryreserved_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitremotebackfillreserved_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_waitremotebackfillreserved_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitremoterecoveryreserved_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_waitremoterecoveryreserved_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitupthru_latency_count</code> | Runtime / Shared Daemon — Recovery-State Transition Latency Measurements | <code>recoverystate_perf_waitupthru_latency</code> | <code>state transitions/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_done_lat_sum</code> | Runtime / Shared Daemon — Accumulated KStore Transaction Latency | <code>kstore_state_done_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_finishing_lat_sum</code> | Runtime / Shared Daemon — Accumulated KStore Transaction Latency | <code>kstore_state_finishing_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_kv_done_lat_sum</code> | Runtime / Shared Daemon — Accumulated KStore Transaction Latency | <code>kstore_state_kv_done_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_kv_queued_lat_sum</code> | Runtime / Shared Daemon — Accumulated KStore Transaction Latency | <code>kstore_state_kv_queued_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_KStore_state_prepare_lat_sum</code> | Runtime / Shared Daemon — Accumulated KStore Transaction Latency | <code>kstore_state_prepare_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_client_lat_sum</code> | Runtime / Shared Daemon — Accumulated Client Request Latency | <code>client_lat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_activating_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_activating_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_active_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_active_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_backfilling_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_backfilling_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_clean_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_clean_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_down_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_down_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_getinfo_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_getinfo_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_getlog_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_getlog_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_getmissing_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_getmissing_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_incomplete_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_incomplete_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_initial_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_initial_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_notbackfilling_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_notbackfilling_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_notrecovering_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_notrecovering_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_peering_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_peering_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_primary_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_primary_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_recovered_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_recovered_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_recovering_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_recovering_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_replicaactive_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_replicaactive_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_repnotrecovering_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_repnotrecovering_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_reprecovering_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_reprecovering_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_repwaitbackfillreserved_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_repwaitbackfillreserved_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_repwaitrecoveryreserved_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_repwaitrecoveryreserved_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_reset_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_reset_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_start_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_start_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_started_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_started_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_stray_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_stray_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitactingchange_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_waitactingchange_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitlocalbackfillreserved_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_waitlocalbackfillreserved_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitlocalrecoveryreserved_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_waitlocalrecoveryreserved_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitremotebackfillreserved_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_waitremotebackfillreserved_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitremoterecoveryreserved_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_waitremoterecoveryreserved_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_waitupthru_latency_sum</code> | Runtime / Shared Daemon — Accumulated Recovery-State Transition Latency | <code>recoverystate_perf_waitupthru_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_client_fsync_count</code> | Runtime / Shared Daemon — Client Operation Latency Measurements | <code>client_fsync</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_client_rdlat_count</code> | Runtime / Shared Daemon — Client Operation Latency Measurements | <code>client_rdlat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_client_reply_count</code> | Runtime / Shared Daemon — Client Operation Latency Measurements | <code>client_reply</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_client_wrlat_count</code> | Runtime / Shared Daemon — Client Operation Latency Measurements | <code>client_wrlat</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_access_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_op_access</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_currenttime_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_op_currenttime</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_delete_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_op_delete</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_fullpathname_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_op_fullpathname</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_open_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_op_open</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_checkreservedlock_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_checkreservedlock</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_close_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_close</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_devicecharacteristics_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_devicecharacteristics</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_filecontrol_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_filecontrol</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_filesize_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_filesize</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_lock_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_lock</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_read_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_read</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_sectorsize_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_sectorsize</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_sync_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_sync</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_truncate_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_truncate</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_unlock_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_unlock</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_write_count</code> | Runtime / Shared Daemon — SQLite VFS Operation Latency Measurements | <code>libcephsqlite_vfs_opf_write</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_client_fsync_sum</code> | Runtime / Shared Daemon — Accumulated Client Operation Latency | <code>client_fsync</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_client_rdlat_sum</code> | Runtime / Shared Daemon — Accumulated Client Operation Latency | <code>client_rdlat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_client_reply_sum</code> | Runtime / Shared Daemon — Accumulated Client Operation Latency | <code>client_reply</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_client_wrlat_sum</code> | Runtime / Shared Daemon — Accumulated Client Operation Latency | <code>client_wrlat</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_access_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_op_access</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_currenttime_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_op_currenttime</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_delete_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_op_delete</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_fullpathname_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_op_fullpathname</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_op_open_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_op_open</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_checkreservedlock_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_checkreservedlock</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_close_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_close</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_devicecharacteristics_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_devicecharacteristics</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_filecontrol_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_filecontrol</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_filesize_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_filesize</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_lock_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_lock</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_read_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_read</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_sectorsize_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_sectorsize</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_sync_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_sync</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_truncate_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_truncate</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_unlock_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_unlock</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_libcephsqlite_vfs_opf_write_sum</code> | Runtime / Shared Daemon — Accumulated SQLite VFS Operation Latency | <code>libcephsqlite_vfs_opf_write</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_mon</code> | Runtime / Shared Daemon — Monitors | <code>num_mon</code> | <code>monitors</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_mon_quorum</code> | Runtime / Shared Daemon — Monitors | <code>cluster_num_mon_quorum</code> | <code>monitors</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_osd</code> | Runtime / Shared Daemon — OSDs | <code>num_osd</code> | <code>OSDs</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_osd_in</code> | Runtime / Shared Daemon — OSDs | <code>cluster_num_osd_in</code> | <code>OSDs</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_osd_up</code> | Runtime / Shared Daemon — OSDs | <code>cluster_num_osd_up</code> | <code>OSDs</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_pool</code> | Runtime / Shared Daemon — Pools | <code>num_pool</code> | <code>pools</code> | Ceph ceph daemon |
+| <code>ceph_cluster_osd_epoch</code> | Runtime / Shared Daemon — OSD-Map Epoch | <code>osd_epoch</code> | <code>epoch</code> | Ceph ceph daemon |
+| <code>ceph_client_mdavg</code> | Runtime / Shared Daemon — Duration and Time | <code>mdavg</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_client_readavg</code> | Runtime / Shared Daemon — Duration and Time | <code>readavg</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_client_writeavg</code> | Runtime / Shared Daemon — Duration and Time | <code>writeavg</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_recoverystate_perf_stats_invalidated</code> | Runtime / Shared Daemon — Invalidated Recovery Statistics | <code>value</code> | <code>invalidations/s</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_object</code> | Runtime / Shared Daemon — Objects | <code>object</code> | <code>objects</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_object_degraded</code> | Runtime / Shared Daemon — Objects | <code>degraded</code> | <code>objects</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_object_misplaced</code> | Runtime / Shared Daemon — Objects | <code>misplaced</code> | <code>objects</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_object_unfound</code> | Runtime / Shared Daemon — Objects | <code>unfound</code> | <code>objects</code> | Ceph ceph daemon |
+| <code>ceph_ipv4_dpdk_ip_linearize_operations</code> | Runtime / Shared Daemon — Operations | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_bytes</code> | Runtime / Shared Daemon — Space and Memory | <code>num_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_cluster_osd_bytes</code> | Runtime / Shared Daemon — Space and Memory | <code>osd_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_cluster_osd_bytes_avail</code> | Runtime / Shared Daemon — Space and Memory | <code>osd_bytes_avail</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_cluster_osd_bytes_used</code> | Runtime / Shared Daemon — Space and Memory | <code>osd_bytes_used</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_pg</code> | Runtime / Shared Daemon — Placement Groups | <code>cluster_num_pg</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_pg_active</code> | Runtime / Shared Daemon — Placement Groups | <code>cluster_num_pg_active</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_pg_active_clean</code> | Runtime / Shared Daemon — Placement Groups | <code>cluster_num_pg_active_clean</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_cluster_num_pg_peering</code> | Runtime / Shared Daemon — Placement Groups | <code>cluster_num_pg_peering</code> | <code>PGs</code> | Ceph ceph daemon |
+| <code>ceph_client_mdsqsum</code> | Runtime / Shared Daemon — Client Latency Squared-Deviation Accumulators | <code>client_mdsqsum</code> | <code>microseconds²/s</code> | Ceph ceph daemon |
+| <code>ceph_client_readsqsum</code> | Runtime / Shared Daemon — Client Latency Squared-Deviation Accumulators | <code>client_readsqsum</code> | <code>microseconds²/s</code> | Ceph ceph daemon |
+| <code>ceph_client_writesqsum</code> | Runtime / Shared Daemon — Client Latency Squared-Deviation Accumulators | <code>client_writesqsum</code> | <code>microseconds²/s</code> | Ceph ceph daemon |
+| <code>ceph_oft_omap_total_updates</code> | Runtime / Shared Daemon — OpenFileTable OMAP Mutations | <code>oft_omap_total_updates</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_oft_omap_total_removes</code> | Runtime / Shared Daemon — OpenFileTable OMAP Mutations | <code>oft_omap_total_removes</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_cct_total_workers</code> | Runtime / Shared Daemon — Context Workers | <code>cct_total_workers</code> | <code>workers</code> | Ceph ceph daemon |
+| <code>ceph_cct_unhealthy_workers</code> | Runtime / Shared Daemon — Context Workers | <code>cct_unhealthy_workers</code> | <code>workers</code> | Ceph ceph daemon |
+| <code>ceph_oft_omap_total_objs</code> | Runtime / Shared Daemon — OpenFileTable Objects | <code>oft_omap_total_objs</code> | <code>objects</code> | Ceph ceph daemon |
+| <code>ceph_oft_omap_total_kv_pairs</code> | Runtime / Shared Daemon — OpenFileTable Key-Value Pairs | <code>oft_omap_total_kv_pairs</code> | <code>entries</code> | Ceph ceph daemon |
+| <code>ceph_trackedop_slow_ops_count</code> | Runtime / Slow Operations — Slow Operations | <code>value</code> | <code>operations/s</code> | Ceph ceph daemon |
+
+#### Storage Engine
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_prioritycache:full_committed_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri0_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri10_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri11_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri1_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri2_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri3_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri4_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri5_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri6_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri7_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri8_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_pri9_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:full_reserved_bytes</code> | Storage Engine / Priority Cache Full — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_committed_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri0_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri10_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri11_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri1_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri2_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri3_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri4_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri5_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri6_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri7_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri8_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_pri9_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:inc_reserved_bytes</code> | Storage Engine / Priority Cache Incremental — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_committed_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>committed_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri0_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri0_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri10_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri10_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri11_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri11_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri1_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri1_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri2_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri2_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri3_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri3_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri4_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri4_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri5_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri5_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri6_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri6_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri7_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri7_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri8_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri8_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_pri9_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>pri9_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache:kv_reserved_bytes</code> | Storage Engine / Priority Cache KV — Space and Memory | <code>reserved_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache_cache_bytes</code> | Storage Engine / Priority Cache Runtime — Space and Memory | <code>cache_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache_heap_bytes</code> | Storage Engine / Priority Cache Runtime — Space and Memory | <code>heap_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache_mapped_bytes</code> | Storage Engine / Priority Cache Runtime — Space and Memory | <code>mapped_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache_target_bytes</code> | Storage Engine / Priority Cache Runtime — Space and Memory | <code>target_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_prioritycache_unmapped_bytes</code> | Storage Engine / Priority Cache Runtime — Space and Memory | <code>unmapped_bytes</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_compact_queue_len</code> | Storage Engine / RocksDB Compaction — Compaction Work | <code>queue_len</code> | <code>compactions</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_compact_running</code> | Storage Engine / RocksDB Compaction — Compaction Work | <code>running</code> | <code>compactions</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_compact_lasted</code> | Storage Engine / RocksDB Compaction — Duration and Time | <code>value</code> | <code>seconds</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_compact</code> | Storage Engine / RocksDB Compaction — Compactions | <code>compact</code> | <code>compactions/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_compact_completed</code> | Storage Engine / RocksDB Compaction — Compactions | <code>completed</code> | <code>compactions/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_compact_queue_merge</code> | Storage Engine / RocksDB Compaction — Compaction Queue Merges | <code>queue_merge</code> | <code>merges/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_get_latency_count</code> | Storage Engine / RocksDB Requests — Latency Measurements | <code>get_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_submit_latency_count</code> | Storage Engine / RocksDB Requests — Latency Measurements | <code>submit_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_submit_sync_latency_count</code> | Storage Engine / RocksDB Requests — Latency Measurements | <code>submit_sync_latency</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_get_latency_sum</code> | Storage Engine / RocksDB Requests — Accumulated Latency | <code>get_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_submit_latency_sum</code> | Storage Engine / RocksDB Requests — Accumulated Latency | <code>submit_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_submit_sync_latency_sum</code> | Storage Engine / RocksDB Requests — Accumulated Latency | <code>submit_sync_latency</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_delay_time_count</code> | Storage Engine / RocksDB Write Path — Latency Measurements | <code>delay_time</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_memtable_time_count</code> | Storage Engine / RocksDB Write Path — Latency Measurements | <code>memtable_time</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_pre_and_post_time_count</code> | Storage Engine / RocksDB Write Path — Latency Measurements | <code>pre_and_post_time</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_wal_time_count</code> | Storage Engine / RocksDB Write Path — Latency Measurements | <code>wal_time</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_delay_time_sum</code> | Storage Engine / RocksDB Write Path — Accumulated Latency | <code>delay_time</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_memtable_time_sum</code> | Storage Engine / RocksDB Write Path — Accumulated Latency | <code>memtable_time</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_pre_and_post_time_sum</code> | Storage Engine / RocksDB Write Path — Accumulated Latency | <code>pre_and_post_time</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_rocksdb_write_wal_time_sum</code> | Storage Engine / RocksDB Write Path — Accumulated Latency | <code>wal_time</code> | <code>seconds/s</code> | Ceph ceph daemon |
+| <code>ceph_rocksdb_binned_cache_capacity</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Memory | <code>capacity</code> | <code>bytes</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_usage</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Memory | <code>used</code> | <code>bytes</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_pinned</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Memory | <code>pinned</code> | <code>bytes</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_elems</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Entries | <code>items</code> | <code>entries</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_inserts</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Insertions | <code>insertions</code> | <code>insertions/s</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_lookups</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Lookups | <code>lookups</code> | <code>lookups/s</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_hits</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Lookup Outcomes | <code>hits</code> | <code>lookups/s</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_rocksdb_binned_cache_misses</code> | Storage Engine / Extensions / RocksDB Binned Cache — Cache Lookup Outcomes | <code>misses</code> | <code>lookups/s</code> | Ceph ceph daemon and rocksdb cache key |
+| <code>ceph_extblkdev_fcm</code> | Storage Engine / Extensions / External Block Devices — FCM Plugin State | <code>fcm</code> | <code>&#123;status&#125;</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_dev_phy_size</code> | Storage Engine / Extensions / External Block Devices — Device Size | <code>physical</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_dev_log_size</code> | Storage Engine / Extensions / External Block Devices — Device Size | <code>logical</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_dev_phy_util</code> | Storage Engine / Extensions / External Block Devices — Device Utilization | <code>physical</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_dev_log_util</code> | Storage Engine / Extensions / External Block Devices — Device Utilization | <code>logical</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_part_phy_size</code> | Storage Engine / Extensions / External Block Devices — Partition Space | <code>physical_size</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_part_log_size</code> | Storage Engine / Extensions / External Block Devices — Partition Space | <code>logical_size</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_part_phy_avail</code> | Storage Engine / Extensions / External Block Devices — Partition Space | <code>physical_available</code> | <code>bytes</code> | Ceph ceph daemon |
+| <code>ceph_extblkdev_part_log_avail</code> | Storage Engine / Extensions / External Block Devices — Partition Space | <code>logical_available</code> | <code>bytes</code> | Ceph ceph daemon |
+
+#### Clients
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_client_mdops</code> | Clients — Client I/O Operations | <code>metadata</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_client_rdops</code> | Clients — Client I/O Operations | <code>read</code> | <code>operations/s</code> | Ceph ceph daemon |
+| <code>ceph_client_wrops</code> | Clients — Client I/O Operations | <code>write</code> | <code>operations/s</code> | Ceph ceph daemon |
+
+#### NVMe-oF
+
+| Prometheus metric | Netdata chart | Dimension | Unit | Scope |
+|:------------------|:--------------|:----------|:-----|:------|
+| <code>ceph_nvmeof_bdev_read_bytes_total</code> | NVMe-oF / Block Devices — Byte Throughput | <code>read_bytes</code> | <code>bytes/s</code> | Ceph bdev name |
+| <code>ceph_nvmeof_bdev_written_bytes_total</code> | NVMe-oF / Block Devices — Byte Throughput | <code>written_bytes</code> | <code>bytes/s</code> | Ceph bdev name |
+| <code>ceph_nvmeof_bdev_reads_completed_total</code> | NVMe-oF / Block Devices — Operations | <code>reads_completed</code> | <code>operations/s</code> | Ceph bdev name |
+| <code>ceph_nvmeof_bdev_writes_completed_total</code> | NVMe-oF / Block Devices — Operations | <code>writes_completed</code> | <code>operations/s</code> | Ceph bdev name |
+| <code>ceph_nvmeof_bdev_capacity_bytes</code> | NVMe-oF / Block Devices — Space and Memory | <code>value</code> | <code>bytes</code> | Ceph bdev name |
+| <code>ceph_nvmeof_bdev_metadata</code> | NVMe-oF / Block Devices — State and Metadata | <code>value</code> | <code>&#123;status&#125;</code> | Ceph NVMe-oF bdev name, block size, namespace, pool name, and RBD name |
+| <code>ceph_nvmeof_bdev_read_seconds_total</code> | NVMe-oF / Block Devices — Accumulated Time | <code>read_seconds</code> | <code>seconds/s</code> | Ceph bdev name |
+| <code>ceph_nvmeof_bdev_write_seconds_total</code> | NVMe-oF / Block Devices — Accumulated Time | <code>write_seconds</code> | <code>seconds/s</code> | Ceph bdev name |
+| <code>ceph_nvmeof_rpc_method_seconds</code> | NVMe-oF / Gateways — Collection Duration | <code>value</code> | <code>seconds</code> | Ceph method |
+| <code>ceph_nvmeof_reactor_seconds_total</code> | NVMe-oF / Gateways — Accumulated Time | <code>values of label mode</code> | <code>seconds/s</code> | Ceph name |
+| <code>ceph_nvmeof_subsystem_namespace_count</code> | NVMe-oF / Gateways — Namespace Count | <code>namespace_count</code> | <code>namespaces</code> | One direct NVMe-oF exporter endpoint selected by the collector job |
+| <code>ceph_nvmeof_host_connection_state</code> | NVMe-oF / Hosts — Host Connection State | <code>value</code> | <code>&#123;status&#125;</code> | Ceph gw name and host addr and host nqn and nqn |
+| <code>ceph_nvmeof_host_keepalive_timeout</code> | NVMe-oF / Hosts — Keepalive Timeout State | <code>value</code> | <code>&#123;status&#125;</code> | Ceph NVMe-oF gateway name, host NQN, and subsystem NQN |
+| <code>ceph_nvmeof_subsystem_host_count</code> | NVMe-oF / Subsystems — Configured Hosts | <code>value</code> | <code>hosts</code> | Ceph nqn |
+| <code>ceph_nvmeof_subsystem_listener_iface_speed_bytes</code> | NVMe-oF / Subsystems — Listener Interface Link Speed | <code>value</code> | <code>Mbps</code> | Ceph device |
+| <code>ceph_nvmeof_subsystem_listener_count</code> | NVMe-oF / Subsystems — Listener Addresses | <code>value</code> | <code>listeners</code> | Ceph nqn |
+| <code>ceph_nvmeof_subsystem_namespace_count</code> | NVMe-oF / Subsystems — Namespaces | <code>nvmeof_subsystem_namespace_count</code> | <code>namespaces</code> | Ceph nqn |
+| <code>ceph_nvmeof_subsystem_namespace_count</code> | NVMe-oF / Subsystems — Namespace Capacity | <code>count</code> | <code>namespaces</code> | Ceph nqn |
+| <code>ceph_nvmeof_subsystem_namespace_limit</code> | NVMe-oF / Subsystems — Namespace Capacity | <code>limit</code> | <code>namespaces</code> | Ceph nqn |
+| <code>ceph_nvmeof_subsystem_metadata</code> | NVMe-oF / Subsystems — State and Metadata — Metadata | <code>metadata</code> | <code>&#123;status&#125;</code> | Ceph NVMe-oF subsystem security/group/HA/model/NQN/serial metadata |
+| <code>ceph_nvmeof_subsystem_namespace_metadata</code> | NVMe-oF / Subsystems — State and Metadata — Namespace Metadata | <code>namespace_metadata</code> | <code>&#123;status&#125;</code> | Ceph NVMe-oF namespace metadata identity |
 
 
 
@@ -429,4 +2479,9 @@ docker logs netdata 2>&1 | grep prometheus
 
 ### Disappearing or sparse metrics not clearing alerts
 
-When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+alert to detect that separate condition.

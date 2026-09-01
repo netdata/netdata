@@ -53,9 +53,9 @@ git -C "${LEARN_COPY}" rev-parse HEAD
 Install ingest dependencies in the isolated preview:
 
 ```bash
-python3 -m venv "${PREVIEW_ROOT}/venv"
-"${PREVIEW_ROOT}/venv/bin/python" -m pip install --upgrade pip
+python3.13 -m venv "${PREVIEW_ROOT}/venv"
 "${PREVIEW_ROOT}/venv/bin/python" -m pip install \
+  --require-hashes \
   -r "${LEARN_COPY}/.learn_environment/ingest-requirements.txt"
 ```
 

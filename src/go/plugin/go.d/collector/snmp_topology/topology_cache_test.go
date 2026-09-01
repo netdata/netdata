@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestTopologyCache(dev ddsnmp.DeviceConnectionInfo) *topologyCache {
-	cache := newTopologyCache()
+func newTestTopologyCache(dev ddsnmp.DeviceConnectionInfo) *topologyBuilder {
+	cache := newTopologyBuilder()
 	cache.localDevice = buildLocalTopologyDevice(dev)
 	cache.agentID = dev.Hostname
 	cache.updateTime = time.Now()
@@ -35,25 +35,24 @@ func TestTopologyMetricHandlersRegisteredForRowKinds(t *testing.T) {
 	tests := map[string]struct {
 		kind ddsnmp.TopologyKind
 	}{
-		"lldp_loc_port":            {kind: ddsnmp.KindLldpLocPort},
-		"lldp_loc_man_addr":        {kind: ddsnmp.KindLldpLocManAddr},
-		"lldp_rem":                 {kind: ddsnmp.KindLldpRem},
-		"lldp_rem_man_addr":        {kind: ddsnmp.KindLldpRemManAddr},
-		"lldp_rem_man_addr_compat": {kind: ddsnmp.KindLldpRemManAddrCompat},
-		"cdp_cache":                {kind: ddsnmp.KindCdpCache},
-		"if_name":                  {kind: ddsnmp.KindIfName},
-		"if_status":                {kind: ddsnmp.KindIfStatus},
-		"if_duplex":                {kind: ddsnmp.KindIfDuplex},
-		"ip_if_index":              {kind: ddsnmp.KindIpIfIndex},
-		"bridge_port_if_index":     {kind: ddsnmp.KindBridgePortIfIndex},
-		"fdb_entry":                {kind: ddsnmp.KindFdbEntry},
-		"qbridge_fdb_entry":        {kind: ddsnmp.KindQbridgeFdbEntry},
-		"qbridge_vlan_entry":       {kind: ddsnmp.KindQbridgeVlanEntry},
-		"stp_port":                 {kind: ddsnmp.KindStpPort},
-		"vtp_vlan":                 {kind: ddsnmp.KindVtpVlan},
-		"arp_entry":                {kind: ddsnmp.KindArpEntry},
-		"arp_legacy_entry":         {kind: ddsnmp.KindArpLegacyEntry},
-		"ospf_neighbor":            {kind: ddsnmp.KindOSPFNeighbor},
+		"lldp_loc_port":        {kind: ddsnmp.KindLldpLocPort},
+		"lldp_loc_man_addr":    {kind: ddsnmp.KindLldpLocManAddr},
+		"lldp_rem":             {kind: ddsnmp.KindLldpRem},
+		"lldp_rem_man_addr":    {kind: ddsnmp.KindLldpRemManAddr},
+		"cdp_cache":            {kind: ddsnmp.KindCdpCache},
+		"if_name":              {kind: ddsnmp.KindIfName},
+		"if_status":            {kind: ddsnmp.KindIfStatus},
+		"if_duplex":            {kind: ddsnmp.KindIfDuplex},
+		"ip_if_index":          {kind: ddsnmp.KindIpIfIndex},
+		"bridge_port_if_index": {kind: ddsnmp.KindBridgePortIfIndex},
+		"fdb_entry":            {kind: ddsnmp.KindFdbEntry},
+		"qbridge_fdb_entry":    {kind: ddsnmp.KindQbridgeFdbEntry},
+		"qbridge_vlan_entry":   {kind: ddsnmp.KindQbridgeVlanEntry},
+		"stp_port":             {kind: ddsnmp.KindStpPort},
+		"vtp_vlan":             {kind: ddsnmp.KindVtpVlan},
+		"arp_entry":            {kind: ddsnmp.KindArpEntry},
+		"arp_legacy_entry":     {kind: ddsnmp.KindArpLegacyEntry},
+		"ospf_neighbor":        {kind: ddsnmp.KindOSPFNeighbor},
 	}
 
 	for name, tc := range tests {
@@ -100,7 +99,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 		},
 	})
 
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	data, ok := snapshotTopologyCacheForTest(cache)
 
@@ -117,7 +116,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 }
 
 func TestTopologyCache_CdpSnapshot(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -163,8 +162,90 @@ func TestTopologyCache_UpdateTopologyProfileTags_BridgeAddressSetsSNMPIdentity(t
 	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
 }
 
+func TestTopologyCache_UpdateTopologyProfileTagsResolvesDeviceMetadata(t *testing.T) {
+	tests := map[string]struct {
+		device     ddsnmp.DeviceConnectionInfo
+		metrics    []*ddsnmp.ProfileMetrics
+		wantVendor string
+		wantModel  string
+	}{
+		"exact profile metadata replaces stale static values": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Vendor: "static-vendor",
+				Model:  "static-model",
+			},
+			metrics: []*ddsnmp.ProfileMetrics{
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "wildcard-vendor"},
+						"model":  {Value: "wildcard-model"},
+					},
+				},
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "profile-vendor", IsExactMatch: true},
+						"model":  {Value: "profile-model", IsExactMatch: true},
+					},
+					Tags: map[string]string{
+						"vendor": "generic-tag-vendor",
+						"model":  "generic-tag-model",
+					},
+				},
+			},
+			wantVendor: "profile-vendor",
+			wantModel:  "profile-model",
+		},
+		"non-exact profile metadata preserves non-empty static values": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Vendor: "static-vendor",
+				Model:  "static-model",
+			},
+			metrics: []*ddsnmp.ProfileMetrics{
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "wildcard-vendor"},
+						"model":  {Value: "wildcard-model"},
+					},
+				},
+			},
+			wantVendor: "static-vendor",
+			wantModel:  "static-model",
+		},
+		"final vnode labels remain authoritative": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Vendor: "static-vendor",
+				Model:  "static-model",
+				VnodeLabels: map[string]string{
+					"vendor": "vnode-vendor",
+					"model":  "vnode-model",
+				},
+			},
+			metrics: []*ddsnmp.ProfileMetrics{
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "profile-vendor", IsExactMatch: true},
+						"model":  {Value: "profile-model", IsExactMatch: true},
+					},
+				},
+			},
+			wantVendor: "vnode-vendor",
+			wantModel:  "vnode-model",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTestTopologyCache(tc.device)
+			cache.updateTopologyProfileTags(tc.metrics)
+
+			assert.Equal(t, tc.wantVendor, cache.localDevice.Vendor)
+			assert.Equal(t, tc.wantModel, cache.localDevice.Model)
+		})
+	}
+}
+
 func TestTopologyCache_UpdateFdbEntry_DoesNotSetBridgeIdentityFromRowTags(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.localDevice = topologymodel.Device{
 		ChassisID:     "10.20.4.2",
 		ChassisIDType: "management_ip",
@@ -183,7 +264,7 @@ func TestTopologyCache_UpdateFdbEntry_DoesNotSetBridgeIdentityFromRowTags(t *tes
 }
 
 func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfacePhysAddress(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -209,7 +290,7 @@ func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfaceP
 }
 
 func TestTopologyCache_UpdateIfIndexByIP_PreservesInventoryAndFiltersManagementCandidates(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	rows := []map[string]string{
 		{tagTopoIfIndex: "1", tagTopoIPAddr: "10.20.4.1", tagTopoIPMask: "255.255.255.0"},
@@ -283,7 +364,7 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cache := newTopologyCache()
+			cache := newTopologyBuilder()
 			cache.localDevice.ManagementIP = "192.0.2.0"
 			addLLDP := func() {
 				cache.updateLldpLocManAddr(map[string]string{
@@ -311,7 +392,7 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 				addIPMIB()
 				addLLDP()
 			}
-			cache.finalizeTopologyCache()
+			cache.finalize()
 
 			require.Equal(t, "1", cache.ifIndexByIP["192.0.2.0"])
 			require.Contains(t, cache.l3InterfacesByIP, "192.0.2.0")
@@ -329,7 +410,7 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 }
 
 func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
@@ -344,9 +425,9 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testi
 		tagLldpLocMgmtAddrSubtype: "16",
 		tagLldpLocMgmtAddr:        "636f7265", // IANA AFN 16 (DNS), bytes "core".
 	})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
-	snapshot, ok := cache.snapshotEngineObservations()
+	snapshot, ok := snapshotTestTopologyBuilder(cache)
 	require.True(t, ok)
 	require.Len(t, snapshot.L2Observations, 1)
 	require.Equal(t, "192.0.2.10", snapshot.L2Observations[0].ManagementIP)
@@ -358,7 +439,7 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testi
 }
 
 func TestTopologyCacheFinalizePreparesStableObservationSnapshot(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.staleAfter = time.Hour
 	cache.agentID = "agent-test"
@@ -379,17 +460,17 @@ func TestTopologyCacheFinalizePreparesStableObservationSnapshot(t *testing.T) {
 		tagTopoIPAddr:  "192.0.2.1",
 		tagTopoIPMask:  "255.255.255.255",
 	})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	require.True(t, cache.hasPreparedSnapshot)
 	prepared := cache.preparedSnapshot
-	rebuilt, ok := cache.buildObservationSnapshotLocked()
+	rebuilt, ok := cache.buildObservationSnapshot()
 	require.True(t, ok)
 	require.Equal(t, rebuilt, prepared)
 
-	first, ok := cache.snapshotEngineObservations()
+	first, ok := snapshotTestTopologyBuilder(cache)
 	require.True(t, ok)
-	second, ok := cache.snapshotEngineObservations()
+	second, ok := snapshotTestTopologyBuilder(cache)
 	require.True(t, ok)
 	require.Equal(t, prepared, first)
 	require.Equal(t, first, second)
@@ -397,22 +478,22 @@ func TestTopologyCacheFinalizePreparesStableObservationSnapshot(t *testing.T) {
 
 func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testing.T) {
 	tests := map[string]struct {
-		update func(*topologyCache)
-		addrs  func(*topologyCache) []topologymodel.ManagementAddress
+		update func(*topologyBuilder)
+		addrs  func(*topologyBuilder) []topologymodel.ManagementAddress
 	}{
 		"local management table": {
-			update: func(cache *topologyCache) {
+			update: func(cache *topologyBuilder) {
 				cache.updateLldpLocManAddr(map[string]string{
 					tagLldpLocMgmtAddrSubtype: "16",
 					tagLldpLocMgmtAddr:        "636f7265",
 				})
 			},
-			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+			addrs: func(cache *topologyBuilder) []topologymodel.ManagementAddress {
 				return cache.localDevice.ManagementAddresses
 			},
 		},
 		"inline remote": {
-			update: func(cache *topologyCache) {
+			update: func(cache *topologyBuilder) {
 				cache.updateLldpRemote(map[string]string{
 					tagLldpLocPortNum:         "1",
 					tagLldpRemIndex:           "1",
@@ -420,12 +501,12 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 					tagLldpRemMgmtAddr:        "636f7265",
 				})
 			},
-			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+			addrs: func(cache *topologyBuilder) []topologymodel.ManagementAddress {
 				return cache.lldpRemotes["1:1"].managementAddrs
 			},
 		},
 		"remote management table": {
-			update: func(cache *topologyCache) {
+			update: func(cache *topologyBuilder) {
 				cache.updateLldpRemManAddr(map[string]string{
 					tagLldpLocPortNum:         "1",
 					tagLldpRemIndex:           "1",
@@ -433,24 +514,7 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 					tagLldpRemMgmtAddr:        "636f7265",
 				})
 			},
-			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
-				return cache.lldpRemotes["1:1"].managementAddrs
-			},
-		},
-		"reconstructed remote index": {
-			update: func(cache *topologyCache) {
-				cache.updateLldpRemManAddr(map[string]string{
-					tagLldpLocPortNum:                 "1",
-					tagLldpRemIndex:                   "1",
-					tagLldpRemMgmtAddrSubtype:         "16",
-					tagLldpRemMgmtAddrLen:             "4",
-					tagLldpRemMgmtAddrOctetPref + "1": "99",
-					tagLldpRemMgmtAddrOctetPref + "2": "111",
-					tagLldpRemMgmtAddrOctetPref + "3": "114",
-					tagLldpRemMgmtAddrOctetPref + "4": "101",
-				})
-			},
-			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+			addrs: func(cache *topologyBuilder) []topologymodel.ManagementAddress {
 				return cache.lldpRemotes["1:1"].managementAddrs
 			},
 		},
@@ -458,7 +522,7 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cache := newTopologyCache()
+			cache := newTopologyBuilder()
 			tc.update(cache)
 			addrs := tc.addrs(cache)
 			require.Len(t, addrs, 1)
@@ -469,13 +533,60 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testi
 	}
 }
 
+func TestTopologyCache_LLDPRemoteManagementAddressValidatesDeclaredLength(t *testing.T) {
+	tests := map[string]struct {
+		addrHex string
+		length  string
+		subtype string
+		want    string
+	}{
+		"matching length":     {length: "4", want: "192.0.2.2"},
+		"mismatched length":   {length: "3"},
+		"invalid length":      {length: "invalid"},
+		"missing length":      {want: "192.0.2.2"},
+		"maximum MIB length":  {addrHex: strings.Repeat("00", 31), length: "31", subtype: "16", want: strings.Repeat("00", 31)},
+		"exceeds MIB maximum": {addrHex: strings.Repeat("00", 32), length: "32", subtype: "16"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			addrHex := tc.addrHex
+			if addrHex == "" {
+				addrHex = "c0000202"
+			}
+			subtype := tc.subtype
+			if subtype == "" {
+				subtype = "1"
+			}
+
+			cache := newTopologyBuilder()
+			cache.updateLldpRemManAddr(map[string]string{
+				tagLldpLocPortNum:         "1",
+				tagLldpRemIndex:           "1",
+				tagLldpRemMgmtAddrSubtype: subtype,
+				tagLldpRemMgmtAddr:        addrHex,
+				tagLldpRemMgmtAddrLen:     tc.length,
+			})
+
+			remote := cache.lldpRemotes["1:1"]
+			require.NotNil(t, remote)
+			if tc.want == "" {
+				require.Empty(t, remote.managementAddrs)
+			} else {
+				require.Len(t, remote.managementAddrs, 1)
+				require.Equal(t, tc.want, remote.managementAddrs[0].Address)
+			}
+		})
+	}
+}
+
 func TestTopologyCache_CDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testing.T) {
 	for name, raw := range map[string]string{
 		"four encoded bytes": "0a000003",
 		"IP-looking text":    "10.0.0.3",
 	} {
 		t.Run(name, func(t *testing.T) {
-			cache := newTopologyCache()
+			cache := newTopologyBuilder()
 			cache.updateCdpRemote(map[string]string{
 				tagCdpIfIndex:             "2",
 				tagCdpDeviceIndex:         "1",
@@ -494,7 +605,7 @@ func TestTopologyCache_CDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testin
 }
 
 func TestTopologyCache_CDPManagementAddressFamiliesAcrossSources(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateCdpRemote(map[string]string{
 		tagCdpIfIndex:               "2",
 		tagCdpDeviceIndex:           "1",
@@ -537,7 +648,7 @@ func TestTopologyCache_UpdateTopologyProfileTags_LLDPDoesNotOverrideExistingSNMP
 }
 
 func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -558,7 +669,7 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 		tagCdpAddressType: "1",
 		tagCdpAddress:     "0A000003",
 	})
-	observations, observationsOK := cache.snapshotEngineObservations()
+	observations, observationsOK := snapshotTestTopologyBuilder(cache)
 	require.True(t, observationsOK)
 	require.Len(t, observations.L2Observations, 1)
 	require.Len(t, observations.L2Observations[0].CDPRemotes, 1)
@@ -579,7 +690,7 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 }
 
 func TestTopologyCache_UpdateLldpRemote_IgnoresRowsWithoutRemoteIndex(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.updateLldpRemote(map[string]string{
 		tagLldpLocPortNum: "7",
@@ -590,7 +701,7 @@ func TestTopologyCache_UpdateLldpRemote_IgnoresRowsWithoutRemoteIndex(t *testing
 }
 
 func TestTopologyCache_CdpSnapshotIgnoresRawAddressWithoutIP(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -611,7 +722,7 @@ func TestTopologyCache_CdpSnapshotIgnoresRawAddressWithoutIP(t *testing.T) {
 		tagCdpAddressType: "2",
 		tagCdpAddress:     "edge-sw3.mgmt.local",
 	})
-	observations, observationsOK := cache.snapshotEngineObservations()
+	observations, observationsOK := snapshotTestTopologyBuilder(cache)
 	require.True(t, observationsOK)
 	require.Len(t, observations.L2Observations, 1)
 	require.Len(t, observations.L2Observations[0].CDPRemotes, 1)
@@ -630,7 +741,7 @@ func TestTopologyCache_CdpSnapshotIgnoresRawAddressWithoutIP(t *testing.T) {
 }
 
 func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -660,7 +771,7 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 		},
 	}
 
-	remoteCache := newTopologyCache()
+	remoteCache := newTopologyBuilder()
 	remoteCache.updateTime = cache.updateTime
 	remoteCache.lastUpdate = cache.lastUpdate
 	remoteCache.agentID = "agent2"
@@ -691,8 +802,8 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 	}
 
 	registry := newTopologyRegistry()
-	registry.register(cache)
-	registry.register(remoteCache)
+	publishTestTopologyBuilder(registry, cache)
+	publishTestTopologyBuilder(registry, remoteCache)
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
 	require.True(t, ok)
@@ -707,7 +818,7 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 }
 
 func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -815,19 +926,6 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	cache.updateTopologyCacheEntry(ddsnmp.Metric{
-		TopologyKind: ddsnmp.KindLldpRemManAddr,
-		Tags: map[string]string{
-			tagLldpLocPortNum:                 "1",
-			tagLldpRemIndex:                   "1",
-			tagLldpRemMgmtAddrSubtype:         "1",
-			tagLldpRemMgmtAddrLen:             "4",
-			tagLldpRemMgmtAddrOctetPref + "1": "10",
-			tagLldpRemMgmtAddrOctetPref + "2": "20",
-			tagLldpRemMgmtAddrOctetPref + "3": "4",
-			tagLldpRemMgmtAddrOctetPref + "4": "21",
-		},
-	})
-	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpRem,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
@@ -839,7 +937,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	data, ok := snapshotTopologyCacheForTest(cache)
 
@@ -849,7 +947,6 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	require.True(t, actorHasCapabilitiesEnabled(data))
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{
 		"10.0.0.2":              {},
-		"10.20.4.21":            {},
 		"10.20.4.84":            {},
 		"fc00:f853:ccd:e793::1": {},
 	}))
@@ -883,7 +980,7 @@ func TestTopologyCache_LLDPCapabilitiesDriveLocalActorType(t *testing.T) {
 					},
 				}})
 			}
-			cache.finalizeTopologyCache()
+			cache.finalize()
 
 			data, ok := snapshotTopologyCacheForTest(cache)
 			require.True(t, ok)
@@ -896,7 +993,7 @@ func TestTopologyCache_LLDPCapabilitiesDriveLocalActorType(t *testing.T) {
 }
 
 func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -923,7 +1020,7 @@ func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
 }
 
 func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -975,7 +1072,7 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 }
 
 func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -999,7 +1096,7 @@ func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
 		tagDot1qVlanID:    "200",
 		tagDot1qVlanFdbID: "100",
 	})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1009,7 +1106,7 @@ func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
 }
 
 func TestTopologyCache_Dot1qUnmappedFDBKeepsDomainWithoutFalseVLAN(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1029,7 +1126,7 @@ func TestTopologyCache_Dot1qUnmappedFDBKeepsDomainWithoutFalseVLAN(t *testing.T)
 		tagDot1qFdbPort:   "7",
 		tagDot1qFdbStatus: "learned",
 	})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1038,7 +1135,7 @@ func TestTopologyCache_Dot1qUnmappedFDBKeepsDomainWithoutFalseVLAN(t *testing.T)
 }
 
 func TestTopologyCache_Dot1qAmbiguousFDBMappingKeepsDomainWithoutFalseVLAN(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateFdbEntry(map[string]string{
 		tagDot1qFdbID:     "100",
 		tagDot1qFdbMac:    "7049a26572cd",
@@ -1050,8 +1147,8 @@ func TestTopologyCache_Dot1qAmbiguousFDBMappingKeepsDomainWithoutFalseVLAN(t *te
 	cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
 	cache.vlanNameByID["20"] = vlanNameMapping{name: "servers"}
 
-	cache.finalizeTopologyCache()
-	cache.finalizeTopologyCache()
+	cache.finalize()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1061,7 +1158,7 @@ func TestTopologyCache_Dot1qAmbiguousFDBMappingKeepsDomainWithoutFalseVLAN(t *te
 }
 
 func TestTopologyCache_Dot1qRepeatedTimeMarkRowsKeepUniqueMapping(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateFdbEntry(map[string]string{
 		tagDot1qFdbID:     "100",
 		tagDot1qFdbMac:    "7049a26572cd",
@@ -1078,7 +1175,7 @@ func TestTopologyCache_Dot1qRepeatedTimeMarkRowsKeepUniqueMapping(t *testing.T) 
 		tagDot1qVlanID:    "200",
 		tagDot1qVlanFdbID: "100",
 	})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1086,8 +1183,8 @@ func TestTopologyCache_Dot1qRepeatedTimeMarkRowsKeepUniqueMapping(t *testing.T) 
 }
 
 func TestTopologyCache_FDBVLANFinalizationIsCollectionOrderIndependent(t *testing.T) {
-	operations := []func(*topologyCache){
-		func(cache *topologyCache) {
+	operations := []func(*topologyBuilder){
+		func(cache *topologyBuilder) {
 			cache.updateFdbEntry(map[string]string{
 				tagDot1qFdbID:     "100",
 				tagDot1qFdbMac:    "7049a26572cd",
@@ -1095,13 +1192,13 @@ func TestTopologyCache_FDBVLANFinalizationIsCollectionOrderIndependent(t *testin
 				tagDot1qFdbStatus: "learned",
 			})
 		},
-		func(cache *topologyCache) {
+		func(cache *topologyBuilder) {
 			cache.updateDot1qVlanMap(map[string]string{
 				tagDot1qVlanID:    "200",
 				tagDot1qVlanFdbID: "100",
 			})
 		},
-		func(cache *topologyCache) {
+		func(cache *topologyBuilder) {
 			cache.updateVtpVlanEntry(map[string]string{
 				tagVtpVlanIndex: "200",
 				tagVtpVlanState: "operational",
@@ -1118,12 +1215,12 @@ func TestTopologyCache_FDBVLANFinalizationIsCollectionOrderIndependent(t *testin
 
 	for _, order := range orders {
 		t.Run(strconv.Itoa(order[0])+strconv.Itoa(order[1])+strconv.Itoa(order[2]), func(t *testing.T) {
-			cache := newTopologyCache()
+			cache := newTopologyBuilder()
 			for _, index := range order {
 				operations[index](cache)
 			}
-			cache.finalizeTopologyCache()
-			cache.finalizeTopologyCache()
+			cache.finalize()
+			cache.finalize()
 
 			obs := cache.buildEngineObservation(cache.localDevice)
 			require.Len(t, obs.FDBEntries, 1)
@@ -1135,7 +1232,7 @@ func TestTopologyCache_FDBVLANFinalizationIsCollectionOrderIndependent(t *testin
 }
 
 func TestTopologyCache_FDBVLANFinalizationPreservesExplicitContext(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateDot1qVlanMap(map[string]string{
 		tagDot1qVlanID:    "200",
 		tagDot1qVlanFdbID: "100",
@@ -1153,7 +1250,7 @@ func TestTopologyCache_FDBVLANFinalizationPreservesExplicitContext(t *testing.T)
 		tagTopologyContextVLANName: "explicit-name",
 	})
 
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1163,7 +1260,7 @@ func TestTopologyCache_FDBVLANFinalizationPreservesExplicitContext(t *testing.T)
 }
 
 func TestTopologyCache_VTPVLANNameConflictRemainsUnresolved(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateDot1qVlanMap(map[string]string{
 		tagDot1qVlanID:    "200",
 		tagDot1qVlanFdbID: "100",
@@ -1187,7 +1284,7 @@ func TestTopologyCache_VTPVLANNameConflictRemainsUnresolved(t *testing.T) {
 		tagDot1qFdbStatus: "learned",
 	})
 
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1207,12 +1304,12 @@ func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
 		{vlans: 4095, fdbEntries: 4095},
 	} {
 		b.Run(fmt.Sprintf("vlans=%d/fdb_entries=%d", tc.vlans, tc.fdbEntries), func(b *testing.B) {
-			published := newTopologyCache()
+			published := newTopologyBuilder()
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
 				b.StopTimer()
-				cache := newTopologyCache()
+				cache := newTopologyBuilder()
 				for index := 1; index <= tc.fdbEntries; index++ {
 					cache.updateFdbEntry(map[string]string{
 						tagDot1qFdbID:     strconv.Itoa((index-1)%tc.vlans + 1),
@@ -1228,11 +1325,9 @@ func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
 					})
 				}
 				b.StartTimer()
-				cache.finalizeTopologyCache()
+				cache.finalize()
 				b.StopTimer()
-				published.mu.Lock()
-				published.replaceWith(cache)
-				published.mu.Unlock()
+				published = cache
 				b.StartTimer()
 			}
 			b.StopTimer()
@@ -1242,7 +1337,7 @@ func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
 }
 
 func TestTopologyCache_FDBDiagnostics(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.updateFdbEntry(map[string]string{
 		tagDot1qFdbID:     "100",
@@ -1269,7 +1364,7 @@ func TestTopologyCache_FDBDiagnostics(t *testing.T) {
 }
 
 func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1299,7 +1394,7 @@ func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
 		tagDot1qFdbPort:   "7",
 		tagDot1qFdbStatus: "learned",
 	})
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1308,7 +1403,7 @@ func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
 }
 
 func TestTopologyCache_STPObservation(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1345,7 +1440,7 @@ func TestTopologyCache_STPObservation(t *testing.T) {
 }
 
 func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromFDBSelfEntries(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1367,7 +1462,7 @@ func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromFDBSelfEnt
 }
 
 func TestTopologyCache_InterfaceStatusObservation(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1392,7 +1487,7 @@ func TestTopologyCache_InterfaceStatusObservation(t *testing.T) {
 }
 
 func TestTopologyCache_InterfaceStatusObservation_FallsBackToIfIndexWhenIfNameMissing(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1473,7 +1568,7 @@ func TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels(t *testing.T) {
 }
 
 func TestTopologyCache_VTPVLANContexts_SortedAndValidated(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.vlanNameByID["200"] = vlanNameMapping{name: "servers"}
 	cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
 	cache.vlanNameByID["abc"] = vlanNameMapping{name: "invalid"}
@@ -1488,7 +1583,7 @@ func TestTopologyCache_VTPVLANContexts_SortedAndValidated(t *testing.T) {
 }
 
 func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateBridgePortMap(map[string]string{
 		tagBridgeBasePort: "7",
 		tagBridgeIfIndex:  "3",
@@ -1523,10 +1618,10 @@ func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
 
 func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.T) {
 	tests := map[string]struct {
-		addOverlap func(*topologyCache)
+		addOverlap func(*topologyBuilder)
 	}{
 		"bridge and q-bridge": {
-			addOverlap: func(cache *topologyCache) {
+			addOverlap: func(cache *topologyBuilder) {
 				cache.updateFdbEntry(map[string]string{
 					tagFdbMac:        "020000000101",
 					tagFdbBridgePort: "7",
@@ -1535,7 +1630,7 @@ func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.
 			},
 		},
 		"q-bridge and vlan context": {
-			addOverlap: func(cache *topologyCache) {
+			addOverlap: func(cache *topologyBuilder) {
 				cache.ingestTopologyVLANContextMetrics("100", "users", []*ddsnmp.ProfileMetrics{{
 					TopologyMetrics: []ddsnmp.Metric{{
 						TopologyKind: ddsnmp.KindFdbEntry,
@@ -1552,7 +1647,7 @@ func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			cache := newTopologyCache()
+			cache := newTopologyBuilder()
 			cache.localDevice = topologymodel.Device{
 				ChassisID:     "02:00:00:00:00:01",
 				ChassisIDType: "macAddress",
@@ -1577,7 +1672,7 @@ func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.
 				tagDot1qVlanFdbID: "500",
 			})
 			tt.addOverlap(cache)
-			cache.finalizeTopologyCache()
+			cache.finalize()
 
 			local := cache.buildEngineObservation(cache.localDevice)
 			require.Len(t, local.FDBEntries, 2)
@@ -1634,7 +1729,7 @@ func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {
 }
 
 func TestTopologyCache_ObservedNeighborsUseCommonManagementSelection(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.lldpRemotes["1:1"] = &lldpRemote{
 		localPortNum: "1",
 		remIndex:     "1",
@@ -1661,7 +1756,7 @@ func TestTopologyCache_ObservedNeighborsUseCommonManagementSelection(t *testing.
 }
 
 func TestTopologyCache_SnapshotDeterministicEndpointIPSelection(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1713,7 +1808,7 @@ func TestTopologyCache_SnapshotDeterministicEndpointIPSelection(t *testing.T) {
 }
 
 func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
@@ -1850,7 +1945,7 @@ func TestNormalizeInterfaceTypeAcceptsEnumStrings(t *testing.T) {
 }
 
 func TestTopologyCache_UpdateIfNameByIndex_StoresStatusWithoutIfName(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "7",
@@ -1869,7 +1964,7 @@ func TestTopologyCache_UpdateIfNameByIndex_StoresStatusWithoutIfName(t *testing.
 }
 
 func TestTopologyCache_UpdateIfNameByIndex_StoresExtendedInterfaceFields(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex:  "9",
@@ -1930,7 +2025,7 @@ func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T)
 }
 
 func TestTopologyCache_UpdateTopologySysUptime_StoresSysUptime(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.localDevice = topologymodel.Device{}
 
 	cache.updateTopologySysUptime(4321)
@@ -1940,7 +2035,7 @@ func TestTopologyCache_UpdateTopologySysUptime_StoresSysUptime(t *testing.T) {
 }
 
 func TestTopologyCache_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{
 		{
@@ -1981,7 +2076,7 @@ func TestTopologyCache_IngestTopologyProfileMetrics_IncludesTopologyMetrics(t *t
 
 func TestTopologyCache_IngestTopologyBGPPeers_IncludesOnlyPeerRows(t *testing.T) {
 	established := int64(300)
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.ingestTopologyBGPPeers([]*ddsnmp.ProfileMetrics{
 		{

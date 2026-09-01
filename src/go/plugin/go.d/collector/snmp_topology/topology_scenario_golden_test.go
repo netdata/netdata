@@ -144,6 +144,14 @@ func TestSNMPTopologyScenarioSemantics(t *testing.T) {
 	}
 }
 
+func TestSNMPTopologyScenarioCountsAllManagedDevicesAsDiscovered(t *testing.T) {
+	scenario := newLLDPDirectScenario()
+	data := topologyv1test.NormalizeData(t, scenario.render(t))
+
+	assertScenarioStatEquals(t, data, "devices_total", len(scenario.devs))
+	assertScenarioStatEquals(t, data, "devices_discovered", len(scenario.devs))
+}
+
 func TestSNMPTopologyScenarioGoldens(t *testing.T) {
 	dir, ok := topologyScenarioGoldenDir(t)
 	if !ok {

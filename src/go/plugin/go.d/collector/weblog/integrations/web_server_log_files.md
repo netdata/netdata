@@ -130,7 +130,19 @@ Notes:
 |  | [ltsv_config.mapping](#option-parser-ltsv-config-mapping) | LTSV fields mapping to **known fields**. |  | yes |
 |  | json_config | JSON log parser config. |  | no |
 |  | [json_config.mapping](#option-parser-json-config-mapping) | JSON fields mapping to **known fields**. |  | yes |
-|  | regexp_config | RegExp log parser config. |  | no |
+| **Custom fields** | custom_fields | List of custom text fields to collect per request. | [] | no |
+|  | custom_fields.name | Field name used for lookup in the parsed log and chart dimensions. |  | yes |
+|  | custom_fields.patterns.name | Dimension name for a custom-field pattern. |  | yes |
+|  | custom_fields.patterns.match | Pattern matched against the custom-field value. Match syntax in [matcher](https://github.com/netdata/netdata/blob/master/src/go/pkg/matcher/README.md#supported-format). |  | yes |
+|  | custom_time_fields | List of custom duration fields to collect per request. | [] | no |
+|  | custom_time_fields.name | Field name used for lookup in the parsed log. |  | yes |
+|  | custom_time_fields.histogram | Histogram buckets, in seconds. Summary charts always render milliseconds. | [] | no |
+|  | custom_numeric_fields | List of custom numeric fields to collect per request. | [] | no |
+|  | custom_numeric_fields.name | Field name used for lookup in the parsed log. |  | yes |
+|  | custom_numeric_fields.units | Units rendered on the custom numeric-field charts. |  | yes |
+|  | custom_numeric_fields.multiplier | Multiplier applied to the custom numeric field. | 1 | no |
+|  | custom_numeric_fields.divisor | Divisor applied to the custom numeric field. | 1 | no |
+| **Parser** | regexp_config | RegExp log parser config. |  | no |
 |  | [regexp_config.pattern](#option-parser-regexp-config-pattern) | RegExp pattern with named groups. |  | yes |
 
 <a id="option-customization-url-patterns"></a>
@@ -302,7 +314,31 @@ sudo ./edit-config go.d/web_log.conf
 ```
 
 ##### Examples
-There are no configuration examples.
+
+###### Ceph RGW access log
+
+Parse a Ceph RGW access log and expose its numeric total_time field explicitly as milliseconds.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph_rgw_access_log
+    path: /var/log/ceph/rgw/access.log
+    log_type: json
+    json_config:
+      mapping:
+        remote_addr: remote_addr
+        uri: request
+        http_status: status
+        bytes_sent: bytes_sent
+        total_time: total_time
+    custom_numeric_fields:
+      - name: total_time
+        units: milliseconds
+
+```
+</details>
 
 
 

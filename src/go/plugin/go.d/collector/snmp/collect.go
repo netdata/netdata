@@ -95,18 +95,14 @@ func (c *Collector) ensureInitialized() error {
 		return errors.New("snmp client not initialized")
 	}
 
-	if c.sysInfo != nil {
+	if c.initialized {
 		return nil
 	}
 
-	si, err := snmputils.GetSysInfo(c.snmpClient)
-	if err != nil {
+	if err := c.ensureDeviceProfile(); err != nil {
 		return err
 	}
-
-	if c.snmpProfiles == nil {
-		c.snmpProfiles = c.setupProfiles(si)
-	}
+	si := c.sysInfo
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
@@ -116,10 +112,6 @@ func (c *Collector) ensureInitialized() error {
 			SysObjectID:     si.SysObjectID,
 			DisableBulkWalk: c.disableBulkWalk,
 		})
-	}
-
-	if c.ddSnmpColl == nil && !c.PingOnly && !c.Ping.Enabled {
-		return errors.New("no profiles found and ping disabled")
 	}
 
 	if c.CreateVnode {
@@ -134,13 +126,12 @@ func (c *Collector) ensureInitialized() error {
 		}
 	}
 
-	c.sysInfo = si
-
 	if c.PingOnly || c.Ping.Enabled {
 		c.addPingCharts()
 	}
 
-	c.registerDeviceState(si)
+	c.registerDeviceState(si, nil)
+	c.initialized = true
 
 	return nil
 }
@@ -187,13 +178,7 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 		labels["model"] = si.Model
 	}
 
-	for k, val := range deviceMeta {
-		if v, ok := labels[k]; !ok || v == "" || val.IsExactMatch {
-			labels[k] = val.Value
-		}
-	}
-
-	maps.Copy(labels, c.Vnode.Labels)
+	labels = ddsnmp.ResolveDeviceMetadata(labels, deviceMeta, c.Vnode.Labels)
 
 	return &vnodes.VirtualNode{
 		GUID:     c.Vnode.GUID,

@@ -281,9 +281,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cluster_name | Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name). |
-| node_name | Human-readable identifier for the node. Based on the [Node name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#node-name). |
-| host | Network host for the node, based on the [Network host setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#network.host). |
+| cluster_name | Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#_cluster_name_setting). |
+| node_name | Human-readable identifier for the node. Based on the [Node name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#node-name). |
+| host | Network host for the node, based on the [Network host setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#network.host). |
 
 Metrics:
 
@@ -330,7 +330,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cluster_name | Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name). |
+| cluster_name | Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#_cluster_name_setting). |
 
 Metrics:
 
@@ -357,7 +357,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cluster_name | Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name). |
+| cluster_name | Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#_cluster_name_setting). |
 | index | Name of the index. |
 
 Metrics:

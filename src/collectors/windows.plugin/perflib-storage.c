@@ -9,6 +9,8 @@
 #include "../common-contexts/common-contexts.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
+#define CONFIG_SECTION_PERFLIB_STORAGE "plugin:windows:PerflibStorage"
+
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
@@ -185,7 +187,6 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
 static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL;
 static usec_t mountPointsRefreshedUT = 0;
-
 static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
 
 static inline bool logical_disk_is_excluded(const char *mount_point)
@@ -603,40 +604,112 @@ static void logical_disk_chart(struct logical_disk *d, const char *name, int upd
     rrdset_done(d->st_disk_space);
 }
 
-static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
+struct logical_disk_collection_ops {
+    PERF_OBJECT_TYPE *(*find_object)(PERF_DATA_BLOCK *pDataBlock, const char *name);
+    PERF_INSTANCE_DEFINITION *(*next_instance)(
+        PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance);
+    BOOL (*get_instance_name)(
+        PERF_DATA_BLOCK *pDataBlock,
+        PERF_OBJECT_TYPE *pObjectType,
+        PERF_INSTANCE_DEFINITION *pInstance,
+        char *buffer,
+        size_t bufferLen);
+    void (*collect_instance)(
+        PERF_DATA_BLOCK *pDataBlock,
+        PERF_OBJECT_TYPE *pObjectType,
+        PERF_INSTANCE_DEFINITION *pInstance,
+        const char *name,
+        int update_every,
+        usec_t now_ut);
+};
+
+static void logical_disk_collect_instance(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    const char *name,
+    int update_every,
+    usec_t now_ut)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "LogicalDisk");
+    DICTIONARY *dict = logicalDisks;
+
+    char resolved_name[ND_MOUNT_PATH_MAX];
+    logical_disk_resolve_name(name, resolved_name, sizeof(resolved_name));
+    if (logical_disk_is_excluded(resolved_name))
+        return;
+
+    struct logical_disk *d = dictionary_set(dict, resolved_name, NULL, sizeof(*d));
+    d->last_collected = now_ut;
+
+    if (!d->collected_metadata) {
+        d->filesystem = getFileSystemType(d, resolved_name);
+        d->collected_metadata = true;
+    }
+
+    logical_disk_set_space(pDataBlock, pObjectType, pi, d, resolved_name);
+
+    if (!d->st_disk_space) {
+        d->st_disk_space = rrdset_create_localhost(
+            "disk_space",
+            resolved_name,
+            NULL,
+            name,
+            "disk.space",
+            "Disk Space Usage",
+            "GiB",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibStorage",
+            NETDATA_CHART_PRIO_DISKSPACE_SPACE,
+            update_every,
+            RRDSET_TYPE_STACKED);
+
+        rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", resolved_name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            d->st_disk_space->rrdlabels,
+            "filesystem",
+            d->filesystem ? string2str(d->filesystem) : "unknown",
+            RRDLABEL_SRC_AUTO);
+        rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
+
+        {
+            char buf[UINT64_HEX_MAX_LENGTH];
+            print_uint64_hex(buf, d->SerialNumber);
+            rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
+        }
+
+        d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+        d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    logical_disk_chart(d, resolved_name, update_every);
+}
+
+static bool do_logical_disk_with_ops(
+    PERF_DATA_BLOCK *pDataBlock,
+    int update_every,
+    usec_t now_ut,
+    const struct logical_disk_collection_ops *ops,
+    char *instance_name,
+    size_t instance_name_size)
+{
+    PERF_OBJECT_TYPE *pObjectType = ops->find_object(pDataBlock, "LogicalDisk");
     if (!pObjectType)
         return false;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        pi = ops->next_instance(pDataBlock, pObjectType, pi);
         if (!pi)
             break;
 
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        if (!ops->get_instance_name(pDataBlock, pObjectType, pi, instance_name, instance_name_size))
+            strncpyz(instance_name, "[unknown]", instance_name_size - 1);
 
-        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(instance_name, "_Total") == 0 || logical_disk_is_excluded(instance_name))
             continue;
 
-        char name[ND_MOUNT_PATH_MAX];
-        logical_disk_resolve_name(windows_shared_buffer, name, sizeof(name));
-
-        if (logical_disk_is_excluded(name))
-            continue;
-
-        struct logical_disk *d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
-        d->last_collected = now_ut;
-
-        if (!d->collected_metadata) {
-            d->filesystem = getFileSystemType(d, name);
-            d->collected_metadata = true;
-        }
-
-        logical_disk_set_space(pDataBlock, pObjectType, pi, d, name);
-        logical_disk_chart(d, name, update_every);
+        ops->collect_instance(pDataBlock, pObjectType, pi, instance_name, update_every, now_ut);
     }
 
     return true;
@@ -693,6 +766,157 @@ static void logical_disk_evict_stale(usec_t now_ut)
     }
     dfe_done(d);
     dictionary_garbage_collect(logicalDisks);
+}
+
+static const struct logical_disk_collection_ops logical_disk_production_ops = {
+    .find_object = perflibFindObjectTypeByName,
+    .next_instance = perflibForEachInstance,
+    .get_instance_name = getInstanceName,
+    .collect_instance = logical_disk_collect_instance,
+};
+
+static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
+{
+    bool collected = do_logical_disk_with_ops(
+        pDataBlock,
+        update_every,
+        now_ut,
+        &logical_disk_production_ops,
+        windows_shared_buffer,
+        sizeof(windows_shared_buffer));
+
+    if (!collected)
+        return false;
+
+    // cleanup - delete callback will handle resource cleanup
+    logical_disk_evict_stale(now_ut);
+    return collected;
+}
+
+struct logical_disk_unittest_fixture {
+    PERF_OBJECT_TYPE object;
+    PERF_INSTANCE_DEFINITION instances[3];
+    const char *names[3];
+    const char *requested_object;
+    char collected[3][128];
+    size_t collected_count;
+};
+
+static struct logical_disk_unittest_fixture *logical_disk_unittest_fixture = NULL;
+
+static PERF_OBJECT_TYPE *logical_disk_unittest_find_object(PERF_DATA_BLOCK *pDataBlock __maybe_unused, const char *name)
+{
+    logical_disk_unittest_fixture->requested_object = name;
+    return strcmp(name, "LogicalDisk") == 0 ? &logical_disk_unittest_fixture->object : NULL;
+}
+
+static PERF_INSTANCE_DEFINITION *logical_disk_unittest_next_instance(
+    PERF_DATA_BLOCK *pDataBlock __maybe_unused,
+    PERF_OBJECT_TYPE *pObjectType __maybe_unused,
+    PERF_INSTANCE_DEFINITION *lastInstance)
+{
+    size_t index = lastInstance ? (size_t)(lastInstance - logical_disk_unittest_fixture->instances) + 1 : 0;
+    return index < (size_t)logical_disk_unittest_fixture->object.NumInstances ?
+               &logical_disk_unittest_fixture->instances[index] :
+               NULL;
+}
+
+static BOOL logical_disk_unittest_get_instance_name(
+    PERF_DATA_BLOCK *pDataBlock __maybe_unused,
+    PERF_OBJECT_TYPE *pObjectType __maybe_unused,
+    PERF_INSTANCE_DEFINITION *pInstance,
+    char *buffer,
+    size_t bufferLen)
+{
+    size_t index = (size_t)(pInstance - logical_disk_unittest_fixture->instances);
+    strncpyz(buffer, logical_disk_unittest_fixture->names[index], bufferLen - 1);
+    return TRUE;
+}
+
+static void logical_disk_unittest_collect_instance(
+    PERF_DATA_BLOCK *pDataBlock __maybe_unused,
+    PERF_OBJECT_TYPE *pObjectType __maybe_unused,
+    PERF_INSTANCE_DEFINITION *pInstance __maybe_unused,
+    const char *name,
+    int update_every __maybe_unused,
+    usec_t now_ut __maybe_unused)
+{
+    size_t index = logical_disk_unittest_fixture->collected_count++;
+    strncpyz(
+        logical_disk_unittest_fixture->collected[index],
+        name,
+        sizeof(logical_disk_unittest_fixture->collected[index]) - 1);
+}
+
+static const struct logical_disk_collection_ops logical_disk_unittest_ops = {
+    .find_object = logical_disk_unittest_find_object,
+    .next_instance = logical_disk_unittest_next_instance,
+    .get_instance_name = logical_disk_unittest_get_instance_name,
+    .collect_instance = logical_disk_unittest_collect_instance,
+};
+
+static int logical_disk_unittest_run(
+    const char *pattern,
+    size_t expected_collected,
+    const char *expected_first,
+    const char *expected_second)
+{
+    struct logical_disk_unittest_fixture fixture = {
+        .object = {.NumInstances = 3},
+        .names = {"_Total", "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume"},
+    };
+    char instance_name[128];
+    SIMPLE_PATTERN *previous_pattern = excluded_logical_disk_paths;
+    int errors = 0;
+
+    excluded_logical_disk_paths = simple_pattern_create(pattern, NULL, SIMPLE_PATTERN_EXACT, false);
+    logical_disk_unittest_fixture = &fixture;
+
+    if (!do_logical_disk_with_ops(
+            (PERF_DATA_BLOCK *)&fixture,
+            1,
+            1,
+            &logical_disk_unittest_ops,
+            instance_name,
+            sizeof(instance_name))) {
+        fprintf(stderr, "perflib storage unittest: failed to find LogicalDisk\n");
+        errors++;
+    }
+
+    if (!fixture.requested_object || strcmp(fixture.requested_object, "LogicalDisk") != 0) {
+        fprintf(stderr, "perflib storage unittest: queried the wrong Perflib object\n");
+        errors++;
+    }
+
+    if (fixture.collected_count != expected_collected ||
+        (expected_first && (!fixture.collected_count || strcmp(fixture.collected[0], expected_first) != 0)) ||
+        (expected_second && (fixture.collected_count < 2 || strcmp(fixture.collected[1], expected_second) != 0))) {
+        fprintf(stderr,
+                "perflib storage unittest: expected %zu collected instances, got %zu\n",
+                expected_collected,
+                fixture.collected_count);
+        errors++;
+    }
+
+    logical_disk_unittest_fixture = NULL;
+    simple_pattern_free(excluded_logical_disk_paths);
+    excluded_logical_disk_paths = previous_pattern;
+    return errors;
+}
+
+int perflib_storage_unittest(void)
+{
+    int errors = 0;
+
+    errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
+    errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
+
+    if (errors)
+        fprintf(stderr, "perflib storage unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "perflib storage unittest: OK\n");
+
+    return errors;
 }
 
 static void physical_disk_labels(RRDSET *st, void *data)

@@ -55,7 +55,7 @@ func TestBuildCachestatPublishIdleRatioIs100(t *testing.T) {
 }
 
 func TestCachestatSharedMemoryStoreFlagsStaleAfterStaleCycles(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	app := libbpfloader.CachestatAppSnapshot{Pid: 42, Ppid: 1, Ct: 100, MarkPageAccessed: 10}
 
 	// First call establishes the ct baseline — no stale PIDs yet.
@@ -86,7 +86,7 @@ func TestCachestatSharedMemoryStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 }
 
 func TestCachestatSharedMemoryStoreNoFlagWhenCtAdvances(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	app := libbpfloader.CachestatAppSnapshot{Pid: 7, Ct: 100}
 
 	// Drive the miss count to cachestatStaleCycles-1 (one cycle before the flag).
@@ -118,8 +118,41 @@ func TestCachestatSharedMemoryStoreNoFlagWhenCtAdvances(t *testing.T) {
 	}
 }
 
+func TestCachestatStoreRemovesDeletedPIDBaseline(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ct: 10, MarkPageAccessed: 100}})
+	store.RemoveCachestatPIDs([]uint32{10})
+
+	// A reused PID starts with lower counters and must not inherit the exited
+	// process's baseline.
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ct: 1, MarkPageAccessed: 5}})
+	snap := store.Snapshot()
+	if len(snap) != 1 || snap[0].cachestat.Prev != (netdataCachestat{}) {
+		t.Fatalf("reused PID did not start from a fresh cachestat baseline: %+v", snap)
+	}
+}
+
+func TestClearCachestatAppsDropsRowsAndFlag(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ct: 10, MarkPageAccessed: 100}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 10, CacheAccess: 10}}, 10)
+
+	store.ClearCachestatApps()
+
+	if store.activeModules&ebpfgoSHMFlagCachestat != 0 {
+		t.Fatal("ClearCachestatApps did not clear the CACHESTAT flag")
+	}
+	if store.activeModules&ebpfgoSHMFlagDCStat == 0 {
+		t.Fatal("ClearCachestatApps cleared another module's flag")
+	}
+	snap := store.Snapshot()
+	if len(snap) != 1 || snap[0].cachestat != (netdataPublishCachestat{}) || snap[0].dc.Curr.CacheAccess != 10 {
+		t.Fatalf("ClearCachestatApps preserved stale data or removed dcstat: %+v", snap)
+	}
+}
+
 func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
 		{
 			Pid:                20,
@@ -170,7 +203,7 @@ func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 }
 
 func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsMergedSocketData(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
 		{Pid: 10, Ppid: 1, Ct: 100},
 		{Pid: 20, Ppid: 1, Ct: 200},
@@ -209,7 +242,7 @@ func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsMergedSocketData(t *tes
 }
 
 func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsSocketOnlyEntries(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 30, BytesSent: 3000, CallUDPSent: 4},
 		{PID: 10, BytesReceived: 1000, CallTCPReceived: 2},
@@ -242,7 +275,7 @@ func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsSocketOnlyEntries(t *te
 // Regression: the old "len(s.entries) == 0" guard took the merge path from
 // cycle 2 onward, causing exited PIDs to remain in s.entries forever.
 func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 
 	// Cycle 1: PIDs 10 and 20 are active.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
@@ -285,7 +318,7 @@ func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
 }
 
 func TestCachestatSharedMemoryStoreEmptySocketSnapshotPreservesBaseline(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 10, BytesSent: 100}}, 5)
 	store.UpdateSocketApps(nil, 0)
@@ -318,7 +351,7 @@ func BenchmarkCachestatSharedMemoryStoreUpdateAppsSorted(b *testing.B) {
 		}
 	}
 
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateApps(apps)
 
 	b.ReportAllocs()

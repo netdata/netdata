@@ -34,8 +34,8 @@ func TestFindTopologyProfiles_IPBaselineBoundaries(t *testing.T) {
 			device: ddsnmp.DeviceConnectionInfo{
 				ManualProfiles: []string{"palo-alto", "generic-device"},
 			},
-			// Projection drops the vendor profile after its OSPF topology symbol is
-			// deduplicated against generic-device; the explicit IP baseline remains.
+			// The generic profile owns the deduplicated IP/OSPF baseline. The vendor
+			// metrics profile does not become a topology owner through composition.
 			wantProfiles: []string{"generic-device.yaml"},
 			wantIPKinds:  1,
 		},
