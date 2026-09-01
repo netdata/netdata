@@ -483,37 +483,6 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md
           description: Monitor containers and virtual machines via Linux cgroups, with friendly name resolution for Docker, Kubernetes, Podman, LXC, libvirt, Proxmox, and more.
       - meta:
-          label: OpenTelemetry
-          edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
-          description: Ingest OpenTelemetry metrics and logs with the Netdata Agent.
-          path: OpenTelemetry
-        items:
-          - meta:
-              label: OTLP Ingestion
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
-              description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
-              keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
-          - meta:
-              label: Metrics Collection
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md
-              description: Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers
-              keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
-          - meta:
-              label: Logs Collection
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md
-              description: Collect systemd journal, application file, Windows event channel, Kubernetes container, macOS unified log, and syslog records through OpenTelemetry Collector receivers
-              keywords: [opentelemetry, otel, journald, filelog, windows event log, kubernetes, macos, syslog, logs, receivers]
-          - meta:
-              label: Transformations
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md
-              description: Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata
-              keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
-          - meta:
-              label: Logs-to-Metrics
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
-              description: Count matching OpenTelemetry log records and chart their rate in Netdata
-              keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
-      - meta:
           label: Secrets Management
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SECRETS.md
           description: Use secret references to avoid storing credentials in plain text. Supports environment variables, files, commands, and secretstore backends.
@@ -884,6 +853,42 @@ sidebar:
         items:
           - type: integration_placeholder
             integration_kind: logs
+  # OpenTelemetry
+  - meta:
+      label: OpenTelemetry
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/opentelemetry.md
+      description: The Netdata Agent as an OTLP/gRPC receiver — metrics become charts, logs land in Netdata's indexed log store, with TLS, tenants, and Collector recipes.
+      keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector, tenant]
+    items:
+      - meta:
+          label: OTLP Ingestion
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
+          description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
+          keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
+      - meta:
+          label: Metrics Collection
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md
+          description: Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers
+          keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
+      - meta:
+          label: Logs Collection
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md
+          description: Collect systemd journal, application file, Windows event channel, Kubernetes container, macOS unified log, and syslog records through OpenTelemetry Collector receivers
+          keywords: [opentelemetry, otel, journald, filelog, windows event log, kubernetes, macos, syslog, logs, receivers]
+      - meta:
+          label: Transformations
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md
+          description: Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata
+          keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
+      - meta:
+          label: Logs-to-Metrics
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
+          description: Count matching OpenTelemetry log records and chart their rate in Netdata
+          keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
+      - meta:
+          label: OpenTelemetry Plugin Reference
+          edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
+          description: Ingest OpenTelemetry metrics and logs with the Netdata Agent.
   # Live
   - meta:
       label: Live View
