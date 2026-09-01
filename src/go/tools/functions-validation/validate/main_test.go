@@ -95,7 +95,12 @@ func TestFunctionUISchemaAcceptsTracesResponseWithWindowOverview(t *testing.T) {
 					"bucket_width_s": 15,
 					"duration_bins": ["<1ms", "1-10ms", "10-100ms", "100ms-1s", "1-10s", ">10s"],
 					"cells": [[0, 0, 0, 0, 0, 0], [2, 1, 0, 0, 0, 0]],
-					"errors": [0, 4]
+					"errors": [0, 4],
+					"duration_percentiles_ns": {
+						"p50": [null, 2400000],
+						"p95": [null, 91000000],
+						"p99": [null, 91000000]
+					}
 				},
 				"totals": {"traces": 691, "spans": 1070, "errors": 4},
 				"top_root_services": {

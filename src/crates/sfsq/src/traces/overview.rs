@@ -20,6 +20,12 @@
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
 //!   leak into trace-level numbers.
+//! - **Exact percentiles, not interpolated bins**: the per-bucket
+//!   p50/p95/p99 are nearest-rank selections over that bucket's binned
+//!   durations, so every value is an OBSERVED duration. The duration
+//!   bins are decade-wide and stay that way — they serve cell-click
+//!   narrowing, and interpolating a percentile from them would carry up
+//!   to an order-of-magnitude error.
 //! - **Bin-by-envelope-start**: a trace whose MERGED envelope starts
 //!   outside the grid is clipped — excluded from the cells AND the
 //!   totals (the same start-clipping rule spans followed in v1). A
@@ -84,6 +90,36 @@ pub const FACET_TOP_K: usize = 10;
 /// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
+}
+
+/// One time bucket's envelope-duration percentiles, nanoseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DurationPercentiles {
+    pub p50: i64,
+    pub p95: i64,
+    pub p99: i64,
+}
+
+/// Exact nearest-rank percentiles over one bucket's envelope durations:
+/// rank `ceil(p/100 x n)`, 1-based, so every answer is an observed
+/// duration and a one-trace bucket answers that duration at every rank.
+/// `None` for a bucket that binned nothing — zero would read as an
+/// instantaneous trace.
+///
+/// Selects the ranks from the top down, each within the prefix the
+/// previous selection bounded: O(n) per rank with no full sort, and the
+/// caller's scratch buffer is reordered in place.
+fn percentiles(durations: &mut [i64]) -> Option<DurationPercentiles> {
+    let n = durations.len();
+    if n == 0 {
+        return None;
+    }
+    let rank = |p: usize| (p * n).div_ceil(100) - 1;
+    let (r50, r95, r99) = (rank(50), rank(95), rank(99));
+    let p99 = *durations.select_nth_unstable(r99).1;
+    let p95 = *durations[..=r99].select_nth_unstable(r95).1;
+    let p50 = *durations[..=r95].select_nth_unstable(r50).1;
+    Some(DurationPercentiles { p50, p95, p99 })
 }
 
 /// An overview request: the exact time grid (the CONSUMER owns bucket
@@ -180,6 +216,11 @@ pub struct OverviewData {
     pub total_spans: u64,
     /// Of those spans, ERROR-status ones.
     pub total_errors: u64,
+    /// Per time bucket, the EXACT nearest-rank envelope-duration
+    /// percentiles over the traces binned there — index-parallel to
+    /// `cells`'s outer index, `None` where nothing binned. Not derived
+    /// from `cells`: the duration bins are decade-wide.
+    pub bucket_percentiles: Vec<Option<DurationPercentiles>>,
     /// The top-root facet lists over the SAME binned population —
     /// `None` unless the query requested them.
     pub root_facets: Option<RootFacets>,
@@ -194,6 +235,7 @@ impl OverviewData {
             total_traces: 0,
             total_spans: 0,
             total_errors: 0,
+            bucket_percentiles: vec![None; num_buckets],
             // A requested facet section stays PRESENT (empty lists) even
             // on the all-or-empty paths — the response shape follows the
             // request, not the outcome.
@@ -256,6 +298,10 @@ pub fn overview(
     let mut total_traces = 0u64;
     let mut total_spans = 0u64;
     let mut total_errors = 0u64;
+    // The percentiles' only real cost: 8 bytes per binned trace held
+    // until the fold ends, atop a merge map already costing several
+    // times that per trace.
+    let mut bucket_durations: Vec<Vec<i64>> = vec![Vec::new(); grid.num_buckets];
     let mut facets = query.root_facets.then(FacetCounts::default);
     for m in merged.values() {
         if m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
@@ -268,6 +314,7 @@ pub fn overview(
         total_traces = total_traces.saturating_add(1);
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
+        bucket_durations[bucket].push(duration);
         if let Some(f) = facets.as_mut() {
             f.count(m.root.as_ref());
         }
@@ -279,6 +326,10 @@ pub fn overview(
         total_traces,
         total_spans,
         total_errors,
+        bucket_percentiles: bucket_durations
+            .iter_mut()
+            .map(|d| percentiles(d))
+            .collect(),
         root_facets: facets.map(FacetCounts::finish),
         status: status.finish(),
     })

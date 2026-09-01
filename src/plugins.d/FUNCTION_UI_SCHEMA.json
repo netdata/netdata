@@ -873,6 +873,10 @@
       },
       "additionalProperties": true
     },
+    "traces_percentile_series": {
+      "type": "array",
+      "items": { "type": ["integer", "null"], "minimum": 0 }
+    },
     "traces_overview": {
       "type": "object",
       "required": ["version", "unit", "status", "coverage", "scope", "grid", "totals"],
@@ -902,6 +906,16 @@
             "errors": {
               "type": "array",
               "items": { "type": "integer", "minimum": 0 }
+            },
+            "duration_percentiles_ns": {
+              "type": "object",
+              "required": ["p50", "p95", "p99"],
+              "properties": {
+                "p50": { "$ref": "#/definitions/traces_percentile_series" },
+                "p95": { "$ref": "#/definitions/traces_percentile_series" },
+                "p99": { "$ref": "#/definitions/traces_percentile_series" }
+              },
+              "additionalProperties": true
             }
           },
           "additionalProperties": true

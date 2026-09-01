@@ -16,8 +16,8 @@ use tokio_util::sync::CancellationToken;
 
 use common::{req, sp, sealed_source, tail_source, write_wal};
 use sfsq::traces::{
-    DURATION_BIN_COUNT, FACET_TOP_K, OverviewData, OverviewQuery, PartialReason, QueryStatus,
-    TraceQuery, TraceSource, overview, trace_by_id,
+    DURATION_BIN_COUNT, DurationPercentiles, FACET_TOP_K, OverviewData, OverviewQuery,
+    PartialReason, QueryStatus, TraceQuery, TraceSource, overview, trace_by_id,
 };
 
 /// One second-wide bucket per second, 10 buckets from t=0.
@@ -320,6 +320,79 @@ fn empty_grid_is_a_request_error() {
     )
     .unwrap_err();
     assert!(err.to_string().contains("empty"), "{err}");
+}
+
+// ── Per-bucket duration percentiles ─────────────────────────────────
+
+/// Ten traces in ONE bucket with durations 1ms..10ms, plus a single
+/// 42ms trace in another — a population whose nearest-rank answers are
+/// hand-checkable.
+fn percentile_corpus() -> Vec<common::SpanSpec> {
+    let mut spans: Vec<common::SpanSpec> = (1..=10u8)
+        .map(|i| {
+            tspan(
+                0x20 + i,
+                i,
+                2_000_000_000,
+                2_000_000_000 + u64::from(i) * 1_000_000,
+                "p",
+            )
+        })
+        .collect();
+    spans.push(tspan(0x40, 11, 5_000_000_000, 5_042_000_000, "q"));
+    spans
+}
+
+#[test]
+fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&percentile_corpus())], "pct");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "a")],
+        OverviewQuery::new(grid()),
+    );
+    assert_eq!(data.total_traces, 11);
+    assert_eq!(data.bucket_percentiles.len(), 10, "one per time bucket");
+    // n=10, nearest rank ceil(p/100 x n) - 1: p50 is the 5th smallest,
+    // p95 and p99 the largest. Every answer is an OBSERVED duration —
+    // no interpolation over the decade-wide "1-10ms" bin could name 5ms.
+    assert_eq!(
+        data.bucket_percentiles[2],
+        Some(DurationPercentiles {
+            p50: 5_000_000,
+            p95: 10_000_000,
+            p99: 10_000_000,
+        })
+    );
+    // A one-trace bucket answers that trace's duration at every rank.
+    assert_eq!(
+        data.bucket_percentiles[5],
+        Some(DurationPercentiles {
+            p50: 42_000_000,
+            p95: 42_000_000,
+            p99: 42_000_000,
+        })
+    );
+    // Every other bucket binned nothing: absent, never zero.
+    for (i, p) in data.bucket_percentiles.iter().enumerate() {
+        assert_eq!(p.is_some(), i == 2 || i == 5, "bucket {i}");
+    }
+}
+
+/// The all-or-empty paths keep the array at the grid's shape, so a
+/// consumer walking it beside `cells` never runs off its end.
+#[test]
+fn a_cancelled_call_keeps_the_percentile_array_at_the_grid_shape() {
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let data = overview(
+        vec![],
+        OverviewQuery::new(grid()),
+        cancel,
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert_eq!(data.bucket_percentiles, vec![None; 10]);
 }
 
 // ── Root facets ─────────────────────────────────────────────────────

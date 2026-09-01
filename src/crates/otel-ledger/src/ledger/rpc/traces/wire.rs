@@ -651,6 +651,23 @@ pub struct OverviewGridWire {
     /// bucket: a bucket holding one trace with three failed spans
     /// reads 3, not 1.
     pub errors: Vec<u64>,
+    /// Per time bucket, the binned traces' EXACT envelope-duration
+    /// percentiles, nanoseconds.
+    pub duration_percentiles_ns: OverviewPercentilesWire,
+}
+
+/// The grid's per-bucket duration percentiles: one array per rank, each
+/// index-parallel to `cells`, `null` where the bucket binned no trace
+/// (zero would render as an instantaneous trace).
+///
+/// Exact nearest-rank values over each bucket's population — NEVER
+/// interpolate these from `duration_bins`, whose decade-wide edges
+/// cannot resolve better than an order of magnitude.
+#[derive(Debug, Serialize)]
+pub struct OverviewPercentilesWire {
+    pub p50: Vec<Option<i64>>,
+    pub p95: Vec<Option<i64>>,
+    pub p99: Vec<Option<i64>>,
 }
 
 /// Totals are trace-envelope-aligned, not span-window-aligned: a trace
