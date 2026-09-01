@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/fairqueue"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
@@ -233,21 +232,15 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 
 	if e.state.ActiveKey != "" {
 		result.Probe = e.advanceActive(ctx, &result.Operations)
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	if len(e.state.Entries) >= e.queueCapacity {
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.Cleanup.Backpressure = true
 		return result
 	}
 
 	object, err := e.generator.Next()
 	if err != nil {
 		result.Probe = e.setTerminal(contract.FailedProbe(contract.ReasonInternal))
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	now := e.now().UTC()
@@ -262,7 +255,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		e.state.Entries = e.state.Entries[:len(e.state.Entries)-1]
 		e.state.ActiveKey = ""
 		result.Probe = e.setTerminal(contract.FailedProbe(contract.ReasonOwnership))
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -278,8 +270,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	); err != nil {
 		owned := e.active()
 		result.Probe = e.retireWithResult(owned, contract.FailedProbe(contract.ReasonRequest))
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	owned := e.active()
@@ -288,15 +278,10 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	if err := e.persist(); err != nil {
 		owned.PutAt = nil
 		result.Probe = e.retireWithResult(owned, contract.FailedProbe(contract.ReasonOwnership))
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
 	result.Probe = e.advanceActive(ctx, &result.Operations)
-	result.Cleanup.Pending = len(e.state.Entries)
-	result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-	result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	return result
 }
 
@@ -313,76 +298,94 @@ func (e *Engine) advanceActive(
 	}
 
 	if owned.Phase == phaseWriteVisibility {
-		var got s3client.GetResult
-		_, err := e.call(
-			ctx,
-			operations,
-			contract.EndpointDestination,
-			contract.OperationWriteVisibility,
-			func(callCtx context.Context) error {
-				var callErr error
-				got, callErr = e.destination.Get(
-					callCtx,
-					e.destinationBucket,
-					owned.Key,
-					"",
-					probe.PayloadBytes,
-				)
-				return callErr
-			},
-		)
-		now := e.now().UTC()
-		lag := now.Sub(*owned.PutAt)
-		write := contract.ObjectiveResultFor(lag, e.writeObjective)
-		switch {
-		case errors.Is(err, s3client.ErrObjectNotFound):
-			if lag < e.writeTimeout {
-				return &contract.ProbeResult{
-					Status:          contract.StatusWaiting,
-					Reason:          contract.ReasonNone,
-					WriteVisibility: write,
-				}
-			}
-			result := contract.FailedProbe(contract.ReasonVisibilityTimeout)
-			result.WriteVisibility = write
-			return e.retireWithResult(owned, result)
-		case err != nil:
-			return e.retireWithResult(owned, contract.FailedProbe(contract.ReasonRequest))
-		case probe.Digest(got.Payload) != owned.Digest:
-			result := contract.FailedProbe(contract.ReasonPayloadMismatch)
-			result.PayloadCompared = true
-			result.PayloadMismatch = true
-			result.WriteVisibility = write
-			return e.retireWithResult(owned, result)
-		}
-
-		visibleAt := now
-		owned.VisibleAt = &visibleAt
-		if _, err := e.call(
-			ctx,
-			operations,
-			contract.EndpointSource,
-			contract.OperationDelete,
-			func(callCtx context.Context) error {
-				_, callErr := e.source.Delete(callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{})
-				return callErr
-			},
-		); err != nil {
-			result := contract.FailedProbe(contract.ReasonRequest)
-			result.PayloadCompared = true
-			result.WriteVisibility = write
-			return e.retireWithResult(owned, result)
-		}
-		deletedAt := e.now().UTC()
-		owned.DeleteAt = &deletedAt
-		owned.Phase = phaseDeleteVisibility
-		if err := e.persist(); err != nil {
-			result := contract.FailedProbe(contract.ReasonOwnership)
-			result.PayloadCompared = true
-			return e.retireWithResult(owned, result)
+		if result := e.advanceWriteVisibility(ctx, operations, owned); result != nil {
+			return result
 		}
 	}
+	return e.advanceDeleteVisibility(ctx, operations, owned)
+}
 
+func (e *Engine) advanceWriteVisibility(
+	ctx context.Context,
+	operations *[]contract.OperationResult,
+	owned *entry,
+) *contract.ProbeResult {
+	var got s3client.GetResult
+	_, err := e.call(
+		ctx,
+		operations,
+		contract.EndpointDestination,
+		contract.OperationWriteVisibility,
+		func(callCtx context.Context) error {
+			var callErr error
+			got, callErr = e.destination.Get(
+				callCtx,
+				e.destinationBucket,
+				owned.Key,
+				"",
+				probe.PayloadBytes,
+			)
+			return callErr
+		},
+	)
+	now := e.now().UTC()
+	lag := now.Sub(*owned.PutAt)
+	write := contract.ObjectiveResultFor(lag, e.writeObjective)
+	switch {
+	case errors.Is(err, s3client.ErrObjectNotFound):
+		if lag < e.writeTimeout {
+			return &contract.ProbeResult{
+				Status:          contract.StatusWaiting,
+				Reason:          contract.ReasonNone,
+				WriteVisibility: write,
+			}
+		}
+		result := contract.FailedProbe(contract.ReasonVisibilityTimeout)
+		result.WriteVisibility = write
+		return e.retireWithResult(owned, result)
+	case err != nil:
+		return e.retireWithResult(owned, contract.FailedProbe(contract.ReasonRequest))
+	case probe.Digest(got.Payload) != owned.Digest:
+		result := contract.FailedProbe(contract.ReasonPayloadMismatch)
+		result.PayloadCompared = true
+		result.PayloadMismatch = true
+		result.WriteVisibility = write
+		return e.retireWithResult(owned, result)
+	}
+
+	visibleAt := now
+	owned.VisibleAt = &visibleAt
+	if _, err := e.call(
+		ctx,
+		operations,
+		contract.EndpointSource,
+		contract.OperationDelete,
+		func(callCtx context.Context) error {
+			_, callErr := e.source.Delete(callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{})
+			return callErr
+		},
+	); err != nil {
+		result := contract.FailedProbe(contract.ReasonRequest)
+		result.PayloadCompared = true
+		result.WriteVisibility = write
+		return e.retireWithResult(owned, result)
+	}
+	deletedAt := e.now().UTC()
+	owned.DeleteAt = &deletedAt
+	owned.Phase = phaseDeleteVisibility
+	if err := e.persist(); err != nil {
+		result := contract.FailedProbe(contract.ReasonOwnership)
+		result.PayloadCompared = true
+		return e.retireWithResult(owned, result)
+	}
+	return nil
+}
+
+func (e *Engine) advanceDeleteVisibility(
+	ctx context.Context,
+	operations *[]contract.OperationResult,
+	owned *entry,
+) *contract.ProbeResult {
 	if owned.Phase != phaseDeleteVisibility || owned.VisibleAt == nil || owned.DeleteAt == nil {
 		result := contract.FailedProbe(contract.ReasonOwnership)
 		result.PayloadCompared = owned.VisibleAt != nil
@@ -465,125 +468,6 @@ func (e *Engine) Cleanup(ctx context.Context) {
 	e.destination.CloseIdleConnections()
 }
 
-func (e *Engine) cleanupBacklog(
-	ctx context.Context,
-	limit int,
-	operations *[]contract.OperationResult,
-) (contract.CleanupResult, error) {
-	result := contract.CleanupResult{}
-	keys := make([]string, 0, len(e.state.Entries))
-	for _, owned := range e.state.Entries {
-		keys = append(keys, owned.Key)
-	}
-	selected, next := fairqueue.Select(keys, e.state.ActiveKey, e.state.CleanupCursor, limit)
-	e.state.CleanupCursor = next
-	for _, key := range selected {
-		index := e.entryIndex(key)
-		if index < 0 {
-			continue
-		}
-		owned := &e.state.Entries[index]
-		if owned.Phase != phaseCleanup {
-			continue
-		}
-		now := e.now().UTC()
-
-		_, sourceDeleteErr := e.call(
-			ctx,
-			operations,
-			contract.EndpointSource,
-			contract.OperationCleanup,
-			func(callCtx context.Context) error {
-				_, err := e.source.Delete(callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{})
-				return err
-			},
-		)
-		if sourceDeleteErr == nil && owned.DeleteAt == nil {
-			owned.DeleteAt = &now
-			if deadline := now.Add(e.deleteTimeout); deadline.After(owned.CleanupAfter) {
-				owned.CleanupAfter = deadline
-			}
-			if err := e.persist(); err != nil {
-				return result, err
-			}
-		}
-		_, destinationDeleteErr := e.call(
-			ctx,
-			operations,
-			contract.EndpointDestination,
-			contract.OperationCleanup,
-			func(callCtx context.Context) error {
-				_, err := e.destination.Delete(callCtx, e.destinationBucket, owned.Key, s3client.DeleteOptions{})
-				return err
-			},
-		)
-		if sourceDeleteErr != nil || destinationDeleteErr != nil {
-			continue
-		}
-
-		sourceAbsent, sourceErr := e.absent(
-			ctx,
-			operations,
-			e.source,
-			e.sourceBucket,
-			contract.EndpointSource,
-			owned.Key,
-		)
-		destinationAbsent, destinationErr := e.absent(
-			ctx,
-			operations,
-			e.destination,
-			e.destinationBucket,
-			contract.EndpointDestination,
-			owned.Key,
-		)
-		if sourceErr != nil || destinationErr != nil {
-			continue
-		}
-		if !sourceAbsent || !destinationAbsent || now.Before(owned.CleanupAfter) {
-			continue
-		}
-
-		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
-		if err := e.persist(); err != nil {
-			return result, err
-		}
-	}
-	if len(e.state.Entries) == 0 {
-		e.state.CleanupCursor = 0
-	} else {
-		e.state.CleanupCursor %= len(e.state.Entries)
-		if len(selected) > 0 {
-			if err := e.persist(); err != nil {
-				return result, err
-			}
-		}
-	}
-	result.Pending = len(e.state.Entries)
-	result.Backpressure = result.Pending >= e.queueCapacity
-	return result, nil
-}
-
-func (e *Engine) absent(
-	ctx context.Context,
-	operations *[]contract.OperationResult,
-	client s3client.Client,
-	bucket string,
-	endpoint contract.Endpoint,
-	key string,
-) (bool, error) {
-	absent := false
-	_, err := e.call(ctx, operations, endpoint, contract.OperationCleanup, func(callCtx context.Context) error {
-		_, callErr := client.Get(callCtx, bucket, key, "", probe.PayloadBytes)
-		if errors.Is(callErr, s3client.ErrObjectNotFound) {
-			absent = true
-			return nil
-		}
-		return callErr
-	})
-	return absent, err
-}
-
 func (e *Engine) call(
 	parent context.Context,
 	operations *[]contract.OperationResult,
@@ -617,173 +501,4 @@ func (e *Engine) call(
 		})
 	}
 	return duration, err
-}
-
-func (e *Engine) takeover() error {
-	if e.locked {
-		return nil
-	}
-	var authoritative state
-	locked, found, err := e.journal.TryTakeover(&authoritative)
-	if err != nil {
-		return fmt.Errorf("take over Ceph ownership: %w", err)
-	}
-	if !locked {
-		return errors.New("Ceph ownership is held by another runtime")
-	}
-	if found {
-		e.state = authoritative
-	} else {
-		e.state = state{}
-	}
-	if err := e.validateState(); err != nil {
-		e.journal.Unlock()
-		return fmt.Errorf("validate authoritative Ceph ownership: %w", err)
-	}
-	e.locked = true
-	return nil
-}
-
-func (e *Engine) entryIndex(key string) int {
-	for index := range e.state.Entries {
-		if e.state.Entries[index].Key == key {
-			return index
-		}
-	}
-	return -1
-}
-
-func (e *Engine) active() *entry {
-	if e.state.ActiveKey == "" {
-		return nil
-	}
-	for index := range e.state.Entries {
-		if e.state.Entries[index].Key == e.state.ActiveKey {
-			return &e.state.Entries[index]
-		}
-	}
-	return nil
-}
-
-func (e *Engine) removeActive() {
-	for index := range e.state.Entries {
-		if e.state.Entries[index].Key == e.state.ActiveKey {
-			e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
-			break
-		}
-	}
-	e.state.ActiveKey = ""
-}
-
-func (e *Engine) moveToCleanup(owned *entry) {
-	if owned == nil {
-		e.state.ActiveKey = ""
-		return
-	}
-	owned.Phase = phaseCleanup
-	base := owned.CreatedAt
-	if owned.PutAt != nil {
-		base = *owned.PutAt
-	}
-	owned.CleanupAfter = base.Add(e.writeTimeout)
-	if owned.PutAt == nil {
-		deadline := e.now().UTC().Add(e.sourceRequestTimeout).Add(e.writeTimeout)
-		if deadline.After(owned.CleanupAfter) {
-			owned.CleanupAfter = deadline
-		}
-	}
-	if owned.DeleteAt != nil {
-		if deadline := owned.DeleteAt.Add(e.deleteTimeout); deadline.After(owned.CleanupAfter) {
-			owned.CleanupAfter = deadline
-		}
-	}
-	e.state.ActiveKey = ""
-}
-
-func (e *Engine) retire(owned *entry) error {
-	previous := cloneState(e.state)
-	e.moveToCleanup(owned)
-	if err := e.persist(); err != nil {
-		e.state = previous
-		return err
-	}
-	return nil
-}
-
-func (e *Engine) retireWithResult(owned *entry, result *contract.ProbeResult) *contract.ProbeResult {
-	previous := cloneState(e.state)
-	e.moveToCleanup(owned)
-	e.state.LastTerminal = contract.CloneProbe(result)
-	if err := e.persist(); err != nil {
-		e.state = previous
-	}
-	return contract.CloneProbe(result)
-}
-
-func (e *Engine) setTerminal(result *contract.ProbeResult) *contract.ProbeResult {
-	e.state.LastTerminal = contract.CloneProbe(result)
-	return contract.CloneProbe(result)
-}
-
-func (e *Engine) persist() error {
-	var err error
-	if len(e.state.Entries) == 0 {
-		err = e.journal.Clear()
-	} else {
-		err = e.journal.Save(e.state)
-	}
-	if err == nil {
-		return nil
-	}
-	err = fmt.Errorf("persist Ceph ownership: %w", err)
-	e.diagnostic = errors.Join(e.diagnostic, err)
-	return err
-}
-
-func (e *Engine) validateState() error {
-	if len(e.state.Entries) > e.queueCapacity {
-		return fmt.Errorf("journal has %d entries, capacity is %d", len(e.state.Entries), e.queueCapacity)
-	}
-	if e.state.CleanupCursor < 0 {
-		return errors.New("journal cleanup cursor is negative")
-	}
-	seen := make(map[string]struct{}, len(e.state.Entries))
-	activeFound := e.state.ActiveKey == ""
-	for _, owned := range e.state.Entries {
-		switch {
-		case !strings.HasPrefix(owned.Key, e.namespace):
-			return errors.New("journal entry is outside the owner namespace")
-		case owned.CreatedAt.IsZero():
-			return errors.New("journal entry has no creation time")
-		case !probe.ValidDigest(owned.Digest):
-			return errors.New("journal entry has invalid payload digest")
-		case owned.Phase != phaseWriteVisibility &&
-			owned.Phase != phaseDeleteVisibility &&
-			owned.Phase != phaseCleanup:
-			return fmt.Errorf("journal entry has invalid phase %q", owned.Phase)
-		}
-		if _, ok := seen[owned.Key]; ok {
-			return errors.New("journal contains a duplicate key")
-		}
-		seen[owned.Key] = struct{}{}
-		if owned.Key == e.state.ActiveKey {
-			if owned.Phase == phaseCleanup {
-				return errors.New("active journal entry is in cleanup")
-			}
-			activeFound = true
-		} else if owned.Phase != phaseCleanup {
-			return errors.New("non-active journal entry is outside cleanup")
-		}
-	}
-	if !activeFound {
-		return errors.New("active journal key is missing")
-	}
-	return nil
-}
-
-func cloneState(value state) state {
-	cloned := value
-	cloned.Entries = append([]entry(nil), value.Entries...)
-	cloned.LastTerminal = contract.CloneProbe(value.LastTerminal)
-	return cloned
 }

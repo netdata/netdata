@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/fairqueue"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
@@ -32,8 +31,6 @@ type Options struct {
 
 type entry struct {
 	Key              string     `json:"key"`
-	Digest           string     `json:"digest"`
-	CreatedAt        time.Time  `json:"created_at"`
 	PutConfirmed     bool       `json:"put_confirmed"`
 	AbsentObservedAt *time.Time `json:"absent_observed_at,omitempty"`
 }
@@ -183,28 +180,19 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		return result
 	}
 	if len(e.state.Entries) >= e.queueCapacity {
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.Cleanup.Backpressure = true
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
 	object, err := e.generator.Next()
 	if err != nil {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonInternal))
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
-	owned := entry{
-		Key:       object.Key,
-		Digest:    object.Digest,
-		CreatedAt: e.now().UTC(),
-	}
+	owned := entry{Key: object.Key}
 	e.state.Entries = append(e.state.Entries, owned)
 	if err := e.persist(); err != nil {
 		e.state.Entries = e.state.Entries[:len(e.state.Entries)-1]
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonOwnership))
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	index := len(e.state.Entries) - 1
@@ -215,15 +203,11 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}); err != nil {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
 		_ = e.persist()
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	e.state.Entries[index].PutConfirmed = true
 	if err := e.persist(); err != nil {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonOwnership))
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -235,8 +219,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}); err != nil {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
 		_ = e.persist()
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	if probe.Digest(got.Payload) != object.Digest {
@@ -245,8 +227,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		probeResult.PayloadMismatch = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -260,8 +240,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -273,8 +251,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	absent := false
@@ -290,8 +266,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -305,8 +279,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 	}
-	result.Cleanup.Pending = len(e.state.Entries)
-	result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	return result
 }
 
@@ -324,86 +296,6 @@ func (e *Engine) Cleanup(ctx context.Context) {
 		e.locked = false
 	}
 	e.client.CloseIdleConnections()
-}
-
-func (e *Engine) cleanupBacklog(
-	ctx context.Context,
-	limit int,
-	operations *[]contract.OperationResult,
-) (contract.CleanupResult, error) {
-	result := contract.CleanupResult{}
-	keys := make([]string, 0, len(e.state.Entries))
-	for _, owned := range e.state.Entries {
-		keys = append(keys, owned.Key)
-	}
-	selected, next := fairqueue.Select(keys, "", e.state.CleanupCursor, limit)
-	e.state.CleanupCursor = next
-	for _, key := range selected {
-		index := e.entryIndex(key)
-		if index < 0 {
-			continue
-		}
-		owned := &e.state.Entries[index]
-		_, deleteErr := e.call(ctx, operations, contract.OperationCleanup, func(callCtx context.Context) error {
-			_, err := e.client.Delete(callCtx, e.bucket, owned.Key, s3client.DeleteOptions{})
-			return err
-		})
-		if deleteErr != nil {
-			continue
-		}
-
-		absent := false
-		_, getErr := e.call(ctx, operations, contract.OperationCleanup, func(callCtx context.Context) error {
-			_, err := e.client.Get(callCtx, e.bucket, owned.Key, "", probe.PayloadBytes)
-			if errors.Is(err, s3client.ErrObjectNotFound) {
-				absent = true
-				return nil
-			}
-			return err
-		})
-		if getErr != nil {
-			continue
-		}
-		if !absent {
-			owned.AbsentObservedAt = nil
-			if err := e.persist(); err != nil {
-				return result, err
-			}
-			continue
-		}
-		if !owned.PutConfirmed {
-			now := e.now().UTC()
-			if owned.AbsentObservedAt == nil {
-				owned.AbsentObservedAt = &now
-				if err := e.persist(); err != nil {
-					return result, err
-				}
-				continue
-			}
-			quietFor := max(e.updateEvery, e.requestTimeout)
-			if now.Sub(*owned.AbsentObservedAt) < quietFor {
-				continue
-			}
-		}
-
-		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
-		if err := e.persist(); err != nil {
-			return result, err
-		}
-	}
-	if len(e.state.Entries) == 0 {
-		e.state.CleanupCursor = 0
-	} else {
-		e.state.CleanupCursor %= len(e.state.Entries)
-		if len(selected) > 0 {
-			if err := e.persist(); err != nil {
-				return result, err
-			}
-		}
-	}
-	result.Pending = len(e.state.Entries)
-	result.Backpressure = result.Pending >= e.queueCapacity
-	return result, nil
 }
 
 func (e *Engine) call(
@@ -434,83 +326,4 @@ func (e *Engine) call(
 		})
 	}
 	return duration, err
-}
-
-func (e *Engine) takeover() error {
-	if e.locked {
-		return nil
-	}
-	var authoritative state
-	locked, found, err := e.journal.TryTakeover(&authoritative)
-	if err != nil {
-		return fmt.Errorf("take over lifecycle ownership: %w", err)
-	}
-	if !locked {
-		return errors.New("lifecycle ownership is held by another runtime")
-	}
-	if found {
-		e.state = authoritative
-	} else {
-		e.state = state{}
-	}
-	if err := e.validateState(); err != nil {
-		e.journal.Unlock()
-		return fmt.Errorf("validate authoritative lifecycle ownership: %w", err)
-	}
-	e.locked = true
-	return nil
-}
-
-func (e *Engine) entryIndex(key string) int {
-	for index := range e.state.Entries {
-		if e.state.Entries[index].Key == key {
-			return index
-		}
-	}
-	return -1
-}
-
-func (e *Engine) finish(result *contract.ProbeResult) *contract.ProbeResult {
-	e.state.LastTerminal = contract.CloneProbe(result)
-	return contract.CloneProbe(result)
-}
-
-func (e *Engine) persist() error {
-	var err error
-	if len(e.state.Entries) == 0 {
-		err = e.journal.Clear()
-	} else {
-		err = e.journal.Save(e.state)
-	}
-	if err == nil {
-		return nil
-	}
-	err = fmt.Errorf("persist lifecycle ownership: %w", err)
-	e.diagnostic = errors.Join(e.diagnostic, err)
-	return err
-}
-
-func (e *Engine) validateState() error {
-	if len(e.state.Entries) > e.queueCapacity {
-		return fmt.Errorf("journal has %d entries, capacity is %d", len(e.state.Entries), e.queueCapacity)
-	}
-	if e.state.CleanupCursor < 0 {
-		return errors.New("journal cleanup cursor is negative")
-	}
-	seen := make(map[string]struct{}, len(e.state.Entries))
-	for _, owned := range e.state.Entries {
-		switch {
-		case !strings.HasPrefix(owned.Key, e.namespace):
-			return errors.New("journal entry is outside the owner namespace")
-		case owned.CreatedAt.IsZero():
-			return errors.New("journal entry has no creation time")
-		case !probe.ValidDigest(owned.Digest):
-			return errors.New("journal entry has invalid payload digest")
-		}
-		if _, ok := seen[owned.Key]; ok {
-			return errors.New("journal contains a duplicate key")
-		}
-		seen[owned.Key] = struct{}{}
-	}
-	return nil
 }
