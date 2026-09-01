@@ -120,6 +120,10 @@ _Static_assert(offsetof(struct pgd, gorilla.freed_mark) >= offsetof(struct pgd, 
 // The guard must stay free on the platform that carries the fleet: it has to fit in
 // padding struct pgd already had, so PGD does not change aral size class.
 _Static_assert(sizeof(PGD) == 24, "struct pgd grew on LP64 - the freed mark is no longer free");
+#elif UINTPTR_MAX == 0xFFFFFFFFu
+// Same requirement on ILP32, where the comments above claim 16 - assert it instead of
+// only documenting it, so a layout change cannot move PGD's aral size class unnoticed.
+_Static_assert(sizeof(PGD) == 16, "struct pgd grew on ILP32 - the freed mark is no longer free");
 #endif
 
 static ALWAYS_INLINE bool pgd_mark_is_freed(uint16_t mark) {
@@ -154,14 +158,48 @@ static const char *pgd_free_site_name(PGD_FREE_SITE site) {
 // check tripped, and `type/used/slots/partition` are ARAL_FREE{size_t,pointer}. Reading it
 // as a page-state bug sends the investigation to the collector, not to the freer.
 //
-// So: check the mark on ENTRY to every PGD entry point, BEFORE reading any other field,
-// and name the site that freed it. Same mark, same cost as the double-free check - one
-// 16-bit relaxed load on a cacheline the caller is about to touch anyway.
+// So: check the mark BEFORE any other field is read, and name the site that freed it. Same
+// mark, same cost as the double-free check - one 16-bit relaxed load on a cacheline the
+// caller is about to touch anyway.
 //
-// Unlike `states`, the mark cannot be a benign shutdown race: nothing but pgd_free() ever
-// writes it. That is why this check does NOT honour exit_initiated_get() the way its
-// neighbours in pgd_append_point() do - those tolerate a state mismatch during exit
-// because a state mismatch can be a race; writing into freed memory cannot.
+// Guarded: pgd_append_point(), pgd_disk_footprint(), pgd_buffer_memory_footprint(),
+// pgd_copy_to_extent(), pgdc_reset(). pgd_fatal() reports the verdict for everything else.
+// NOT guarded, deliberately: pgd_type(), pgd_is_empty(), pgd_slots_used(), pgd_capacity(),
+// pgd_memory_footprint() and pgdc_get_next_point(). The first five only read scalars that
+// pgd_fatal() already labels; the last is per-point in the query hot path, and pgdc_reset()
+// guards the cursor at setup. A freed PGD reaching pgdc_get_next_point() still derefs
+// raw.data (== ARAL's free-list `next` on LP64) and SIGSEGVs without a story - a known gap,
+// not a regression: nothing here removes a check that existed before.
+//
+// Two more boundaries this detector cannot cross, both inherent to an in-object mark:
+//
+//   Recycling (ABA). pgd_alloc() clears the mark, so once ARAL hands the slot to a new PGD
+//   a stale pointer to the old one reads as live and the operation silently proceeds
+//   against the new page. The mark catches a use-after-free only while the slot is still
+//   free; it cannot catch one after reuse.
+//
+//   Unmapping. aral_freez_internal() deletes a fully-freed ARAL page at runtime when
+//   another page still has free slots (aral.c:1265 -> aral_del_page___no_lock_needed() ->
+//   nd_munmap()/freez()). If that happens between the free and the guarded use, the mark
+//   load itself faults. Strictly no worse than before - the old code dereferenced the same
+//   unmapped page - but "fatal with a story" is best-effort, not a guarantee.
+//
+// On exit: this check does NOT honour exit_initiated_get(), unlike its neighbours in
+// pgd_append_point(). Be precise about what that trades, because it differs by ABI. `states`
+// sits at offset 7 of struct pgd, and ARAL_FREE{size_t,pointer} covers bytes 0..15 on LP64
+// and 0..7 on ILP32:
+//
+//   LP64  offset 7 is the TOP byte of ARAL_FREE.size, so it always reads 0 for any real
+//         element size. The old code therefore always reached the
+//         !(states & CREATED_FROM_COLLECTOR) check below and returned 0 during exit - it
+//         never wrote into the freed PGD. Here we trade a clean shutdown for detection.
+//   ILP32 offset 7 is the TOP byte of ARAL_FREE.next, which is not reliably 0. The old code
+//         could pass the state checks and write into freed memory. Here we prevent that.
+//
+// So the honest claim is narrower than "writing into freed memory cannot be a race": on the
+// ABI that carries the fleet this converts a silent, harmless exit into a reported fatal.
+// That is the intended trade - a latent eviction/collector lifetime race is worth a crash
+// event - but it is a deliberate behaviour change, not a free win.
 
 static void pgd_fatal_use_after_free(const PGD *pg, uint16_t mark, const char *what, const char *func) {
     fatal("DBENGINE: PGD use after free - %s on pgd %p in '%s', but that PGD was already "
@@ -990,8 +1028,10 @@ uint32_t pgd_buffer_memory_footprint(PGD *pg)
 
 uint32_t pgd_disk_footprint(PGD *pg)
 {
-    // before pgd_aral_unmark() below dereferences pg->gorilla.writer, which sits at
-    // offset 0 and is therefore clobbered on every freed PGD, on every ABI
+    // before pgd_aral_unmark() below dereferences pg->gorilla.writer, which sits at offset 8
+    // and is therefore clobbered on a freed PGD on LP64 (ARAL_FREE covers bytes 0..15). On
+    // ILP32 it covers only 0..7, so writer survives there and the deref hits the real, freed
+    // gorilla writer instead - equally fatal, differently shaped.
     pgd_check_alive(pg, "disk footprint (flush)");
 
     if (!pgd_slots_used(pg))
@@ -1371,7 +1411,10 @@ int pgd_unittest(void) {
 
     pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 
-    // Reading pg back is deliberate: the aral page is still mapped. Everything below
+    // Reading pg back is deliberate. It is safe HERE - not in general - because this aral
+    // has a single page and aral_freez_internal() keeps the last page with free items
+    // (aral.c:1275) instead of unmapping it. In production a fully-freed page CAN be
+    // unmapped; see the "Unmapping" boundary noted with the guard above. Everything below
     // 2*sizeof(void*) now belongs to aral's free-list header.
     //
     // This is the detector's own contract: a second free must see the FIRST freer's site.
@@ -1389,17 +1432,13 @@ int pgd_unittest(void) {
         errors++;
     }
 
-    // The use-after-free guard reads the SAME mark the double-free guard writes, so what
-    // has to be pinned here is that it agrees with it on a freed PGD, and stays quiet on
-    // the two sentinels every PGD entry point already tolerates. Calling a real entry
-    // point (pgd_append_point() etc.) is not an option - it would fatal by design and take
-    // this process down; so drive the predicate the guard is built on.
-    if(!pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
-        fprintf(stderr, "PGD: the use-after-free guard cannot see the freed mark that "
-                        "pgd_free() left - the use paths are unguarded\n");
-        errors++;
-    }
-
+    // The use-after-free guard reads the SAME mark the double-free guard writes, and the
+    // exchange above already proved pgd_free() left it set with the right site - so there is
+    // nothing further to assert about a freed PGD here. What is left to pin is the guard's
+    // behaviour on the inputs it must NOT flag. Calling a real entry point
+    // (pgd_append_point() etc.) is not an option - it would fatal by design and take this
+    // process down.
+    //
     // NULL and PGD_EMPTY must never be reported as freed: pgd_check_alive() returns early
     // for both, and callers rely on that. If this ever regressed it would fatal on every
     // empty page in the fleet, so it is worth a test even though it looks trivial.
