@@ -1412,9 +1412,10 @@ int pgd_unittest(void) {
     // This runs unconditionally. The PGD-level checks further down depend on winning an
     // allocation race for two co-located slots and may be skipped; this one never is.
     {
-        struct aral_statistics selftest_stats = { 0 };
+        // stats = NULL so the aral allocates and owns them, and aral_destroy() frees them.
+        // Passing a local would store a pointer to this frame inside a heap object.
         ARAL *ar = aral_create("pgd-lifetime-selftest", sizeof(PGD), 0, 0,
-                               &selftest_stats, NULL, NULL, false, false, true);
+                               NULL, NULL, NULL, false, false, true);
         if(!ar) {
             fprintf(stderr, "PGD: cannot create the selftest aral\n");
             errors++;
@@ -1452,6 +1453,11 @@ int pgd_unittest(void) {
 
             aral_freez(ar, keep);
         }
+
+        // both elements are back, so no page is in use - tear the aral down rather than
+        // leaking it and its page on every invocation
+        if(ar)
+            aral_destroy(ar);
     }
 
     // This test deliberately reads `pg` back AFTER freeing it, so its page must not be
