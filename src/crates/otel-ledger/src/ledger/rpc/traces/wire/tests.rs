@@ -48,6 +48,23 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
 }
 
 #[test]
+fn the_functions_view_forwards_the_minimum_trace_duration() {
+    let TracesMode::Functions(p) = req(json!({"min_trace_duration_ns": 250_000_000})).mode else {
+        panic!("Functions mode expected");
+    };
+    assert_eq!(
+        p.search_params(10_000).unwrap().min_trace_duration_ns,
+        Some(250_000_000)
+    );
+
+    // Omitted stays unset — existing callers keep their behaviour.
+    let TracesMode::Functions(p) = req(json!({})).mode else {
+        panic!("Functions mode expected");
+    };
+    assert_eq!(p.search_params(10_000).unwrap().min_trace_duration_ns, None);
+}
+
+#[test]
 fn info_is_the_strict_empty_object() {
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
     // Both of the old wire's boolean forms, junk scalars, null, and
@@ -147,6 +164,7 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
         json!({"search": {}, "after": 1, "before": 2}),
         json!({"search": {}, "last": 5}),
         json!({"search": {}, "timeout": 30}),
+        json!({"search": {}, "min_trace_duration_ns": 1}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
     ] {
         let err = req_err(body.clone());
@@ -321,7 +339,8 @@ fn info_response_shape_is_pinned() {
             "v": 3,
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
-                "slowest", "search", "tenant", "after", "before", "last", "anchor"
+                "slowest", "search", "tenant", "after", "before", "last", "anchor",
+                "min_trace_duration_ns"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",

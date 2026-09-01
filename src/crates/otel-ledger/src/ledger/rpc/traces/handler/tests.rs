@@ -51,7 +51,8 @@ async fn info_returns_the_descriptor() {
         v["accepted_params"],
         json!([
             "info", "trace", "attributes", "attribute_values", "overview",
-            "slowest", "search", "tenant", "after", "before", "last", "anchor"
+            "slowest", "search", "tenant", "after", "before", "last", "anchor",
+            "min_trace_duration_ns"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
