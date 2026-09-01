@@ -44,7 +44,7 @@ func GetSysUptime(client gosnmp.Handler) (int64, error) {
 	var lastErr error
 	for _, source := range sysUptimeSources {
 		pdu, ok := pdusByOID[source.oid]
-		if !ok || !isSysUptimePduWithData(pdu) {
+		if !ok || !isPduWithData(pdu) {
 			continue
 		}
 
@@ -79,7 +79,7 @@ func sysUptimePduValue(pdu gosnmp.SnmpPDU) (int64, error) {
 	return gosnmp.ToBigInt(pdu.Value).Int64(), nil
 }
 
-func isSysUptimePduWithData(pdu gosnmp.SnmpPDU) bool {
+func isPduWithData(pdu gosnmp.SnmpPDU) bool {
 	switch pdu.Type {
 	case gosnmp.NoSuchObject,
 		gosnmp.NoSuchInstance,
