@@ -28,12 +28,20 @@ type Object struct {
 	Digest  string
 }
 
-func (g Generator) Next() (Object, error) {
+func (g Generator) Namespace() (string, error) {
 	switch {
 	case g.Prefix == "" || !strings.HasSuffix(g.Prefix, "/"):
-		return Object{}, errors.New("probe prefix must end with '/'")
+		return "", errors.New("probe prefix must end with '/'")
 	case len(g.OwnerID) < 16:
-		return Object{}, errors.New("probe owner identity is invalid")
+		return "", errors.New("probe owner identity is invalid")
+	}
+	return g.Prefix + g.OwnerID[:16] + "/", nil
+}
+
+func (g Generator) Next() (Object, error) {
+	namespace, err := g.Namespace()
+	if err != nil {
+		return Object{}, err
 	}
 	now := time.Now
 	if g.Now != nil {
@@ -53,9 +61,8 @@ func (g Generator) Next() (Object, error) {
 	}
 	sum := sha256.Sum256(payload)
 	key := fmt.Sprintf(
-		"%s%s/probe-%d-%s.bin",
-		g.Prefix,
-		g.OwnerID[:16],
+		"%sprobe-%d-%s.bin",
+		namespace,
 		now().UTC().UnixNano(),
 		hex.EncodeToString(nonce),
 	)

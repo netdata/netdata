@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,6 +64,17 @@ func TestConvertReplicationRule(t *testing.T) {
 			},
 			want: ReplicationRule{DestinationBucket: "destination", Prefix: "prefix/", TagFiltered: true},
 		},
+		"V1 rule implicitly replicates user delete markers": {
+			rule: types.ReplicationRule{
+				Status:      types.ReplicationRuleStatusEnabled,
+				Destination: &types.Destination{Bucket: aws.String("destination")},
+				Prefix:      aws.String("netdata/"),
+			},
+			want: ReplicationRule{
+				Enabled: true, DestinationBucket: "destination", Prefix: "netdata/",
+				DeleteMarkerReplication: true,
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -70,6 +82,12 @@ func TestConvertReplicationRule(t *testing.T) {
 			assert.Equal(t, tc.want, convertReplicationRule(tc.rule))
 		})
 	}
+}
+
+func TestObjectAbsenceRejectsGenericNotFound(t *testing.T) {
+	assert.True(t, isObjectNotFound(&types.NoSuchKey{}))
+	assert.True(t, isObjectNotFound(&smithy.GenericAPIError{Code: "NoSuchKey"}))
+	assert.False(t, isObjectNotFound(&smithy.GenericAPIError{Code: "NotFound"}))
 }
 
 func TestBucketFromARN(t *testing.T) {

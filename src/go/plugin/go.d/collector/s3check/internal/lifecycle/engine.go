@@ -56,6 +56,7 @@ type Engine struct {
 	bucket    string
 	journal   *journal.Journal
 	generator probe.Generator
+	namespace string
 
 	requestTimeout time.Duration
 	updateEvery    time.Duration
@@ -87,6 +88,10 @@ func New(opts Options) (*Engine, error) {
 	if opts.UpdateEvery <= 0 {
 		return nil, errors.New("lifecycle update interval must be positive")
 	}
+	namespace, err := opts.Generator.Namespace()
+	if err != nil {
+		return nil, fmt.Errorf("lifecycle probe namespace: %w", err)
+	}
 	if opts.QueueCapacity == 0 {
 		opts.QueueCapacity = defaultQueueCapacity
 	}
@@ -108,6 +113,7 @@ func New(opts Options) (*Engine, error) {
 		bucket:         opts.Bucket,
 		journal:        opts.Journal,
 		generator:      opts.Generator,
+		namespace:      namespace,
 		requestTimeout: opts.RequestTimeout,
 		updateEvery:    opts.UpdateEvery,
 		queueCapacity:  opts.QueueCapacity,
@@ -127,7 +133,16 @@ func New(opts Options) (*Engine, error) {
 }
 
 func (e *Engine) Check(ctx context.Context) error {
-	versioning, err := e.client.BucketVersioning(ctx, e.bucket)
+	return e.validateProvider(ctx, nil)
+}
+
+func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.OperationResult) error {
+	var versioning s3client.BucketVersioningResult
+	_, err := e.call(ctx, operations, contract.OperationSetup, func(callCtx context.Context) error {
+		var callErr error
+		versioning, callErr = e.client.BucketVersioning(callCtx, e.bucket)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("check lifecycle bucket versioning: %w", err)
 	}
@@ -155,6 +170,10 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
 	}()
+	if err := e.validateProvider(ctx, &result.Operations); err != nil {
+		result.Err = fmt.Errorf("validate lifecycle provider safety: %w", err)
+		return result
+	}
 
 	cleanup, cleanupErr := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
 	result.Cleanup = cleanup
@@ -461,11 +480,10 @@ func (e *Engine) validateState() error {
 	if e.state.CleanupCursor < 0 {
 		return errors.New("journal cleanup cursor is negative")
 	}
-	namespace := e.generator.Prefix + e.journal.OwnerID()[:16] + "/"
 	seen := make(map[string]struct{}, len(e.state.Entries))
 	for _, owned := range e.state.Entries {
 		switch {
-		case !strings.HasPrefix(owned.Key, namespace):
+		case !strings.HasPrefix(owned.Key, e.namespace):
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")

@@ -48,6 +48,29 @@ func TestCheckReadsBothUnversionedBucketsWithoutMutation(t *testing.T) {
 	assert.Zero(t, destination.Count("put"))
 }
 
+func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
+	j := newCephJournal(t, t.TempDir())
+	source, destination, _ := newCephClients()
+	engine, err := New(Options{
+		Source: source, Destination: destination,
+		SourceBucket: "source", DestinationBucket: "destination",
+		Journal: j, Generator: newCephGenerator(j.OwnerID()), RequestTimeout: time.Second,
+		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
+		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
+	})
+	require.NoError(t, err)
+	require.NoError(t, engine.Check(context.Background()))
+	destination.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+	}
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Nil(t, result.Probe)
+	assert.Zero(t, source.Count("put"))
+	engine.Cleanup(context.Background())
+}
+
 func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing.T) {
 	j := newCephJournal(t, t.TempDir())
 	source, destination, model := newCephClients()

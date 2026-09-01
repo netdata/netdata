@@ -18,6 +18,10 @@ func TestGeneratorNext(t *testing.T) {
 		Now:     func() time.Time { return time.Unix(123, 456) },
 		Random:  bytes.NewReader(make([]byte, 16+PayloadBytes)),
 	}
+	namespace, err := g.Namespace()
+	require.NoError(t, err)
+	assert.Equal(t, "netdata-s3check/0123456789abcdef/", namespace)
+
 	object, err := g.Next()
 	require.NoError(t, err)
 	assert.Equal(

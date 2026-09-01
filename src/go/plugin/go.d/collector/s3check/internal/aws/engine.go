@@ -110,9 +110,9 @@ type Engine struct {
 
 	sourceBucket      string
 	destinationBucket string
-	probePrefix       string
 	journal           *journal.Journal
 	generator         probe.Generator
+	namespace         string
 
 	requestTimeout  time.Duration
 	updateEvery     time.Duration
@@ -156,6 +156,10 @@ func New(opts Options) (*Engine, error) {
 	case opts.DeleteObjective <= 0 || opts.DeleteTimeout <= 0 || opts.DeleteObjective > opts.DeleteTimeout:
 		return nil, errors.New("AWS delete objective must be positive and not exceed its timeout")
 	}
+	namespace, err := opts.Generator.Namespace()
+	if err != nil {
+		return nil, fmt.Errorf("AWS probe namespace: %w", err)
+	}
 	if opts.QueueCapacity == 0 {
 		opts.QueueCapacity = defaultQueueCapacity
 	}
@@ -178,7 +182,7 @@ func New(opts Options) (*Engine, error) {
 	engine := &Engine{
 		source: opts.Source, destination: opts.Destination,
 		sourceBucket: opts.SourceBucket, destinationBucket: opts.DestinationBucket,
-		probePrefix: opts.ProbePrefix, journal: opts.Journal, generator: opts.Generator,
+		journal: opts.Journal, generator: opts.Generator, namespace: namespace,
 		requestTimeout: opts.RequestTimeout, updateEvery: opts.UpdateEvery,
 		writeObjective: opts.WriteObjective, writeTimeout: opts.WriteTimeout,
 		deleteObjective: opts.DeleteObjective, deleteTimeout: opts.DeleteTimeout,
@@ -197,19 +201,28 @@ func New(opts Options) (*Engine, error) {
 }
 
 func (e *Engine) Check(ctx context.Context) error {
-	if err := e.checkVersioning(ctx, e.source, e.sourceBucket, "source"); err != nil {
+	return e.validateProvider(ctx, nil)
+}
+
+func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.OperationResult) error {
+	if err := e.checkVersioning(ctx, operations, e.source, e.sourceBucket, contract.EndpointSource); err != nil {
 		return err
 	}
-	if err := e.checkVersioning(ctx, e.destination, e.destinationBucket, "destination"); err != nil {
+	if err := e.checkVersioning(ctx, operations, e.destination, e.destinationBucket, contract.EndpointDestination); err != nil {
 		return err
 	}
-	rules, err := e.source.BucketReplication(ctx, e.sourceBucket)
+	var rules []s3client.ReplicationRule
+	_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationSetup, func(callCtx context.Context) error {
+		var callErr error
+		rules, callErr = e.source.BucketReplication(callCtx, e.sourceBucket)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("check AWS source replication policy: %w", err)
 	}
 	var effective *s3client.ReplicationRule
 	for _, rule := range rules {
-		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(e.probePrefix, rule.Prefix) {
+		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(e.namespace, rule.Prefix) {
 			continue
 		}
 		if rule.DestinationBucket != e.destinationBucket {
@@ -234,10 +247,17 @@ func (e *Engine) Check(ctx context.Context) error {
 
 func (e *Engine) checkVersioning(
 	ctx context.Context,
+	operations *[]contract.OperationResult,
 	client s3client.Client,
-	bucket, endpoint string,
+	bucket string,
+	endpoint contract.Endpoint,
 ) error {
-	versioning, err := client.BucketVersioning(ctx, bucket)
+	var versioning s3client.BucketVersioningResult
+	_, err := e.call(ctx, operations, endpoint, contract.OperationSetup, func(callCtx context.Context) error {
+		var callErr error
+		versioning, callErr = client.BucketVersioning(callCtx, bucket)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("check AWS %s bucket versioning: %w", endpoint, err)
 	}
@@ -250,8 +270,8 @@ func (e *Engine) checkVersioning(
 	return nil
 }
 
-func (e *Engine) Collect(ctx context.Context) contract.Result {
-	result := contract.Result{
+func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
+	result = contract.Result{
 		Mode: contract.ModeAWSReplication, LastTerminal: cloneProbeResult(e.state.LastTerminal),
 	}
 	if e.closed {
@@ -262,6 +282,15 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		result.Probe = failedProbe(contract.ReasonOwnership)
 		return result
 	}
+	defer func() {
+		result.Cleanup.Pending = len(e.state.Entries)
+		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
+		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+	}()
+	if err := e.validateProvider(ctx, &result.Operations); err != nil {
+		result.Err = fmt.Errorf("validate AWS provider safety: %w", err)
+		return result
+	}
 
 	result.Cleanup = e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
 	if active := e.active(); active != nil {
@@ -269,9 +298,6 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 	} else if len(e.state.Entries) < e.queueCapacity {
 		result.Probe = e.startProbe(ctx, &result.Operations)
 	}
-	result.Cleanup.Pending = len(e.state.Entries)
-	result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-	result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
 	return result
 }
 
@@ -369,12 +395,11 @@ func (e *Engine) validateState() error {
 	if e.state.CleanupCursor < 0 {
 		return errors.New("journal cleanup cursor is negative")
 	}
-	namespace := e.generator.Prefix + e.journal.OwnerID()[:16] + "/"
 	seen := make(map[string]struct{}, len(e.state.Entries))
 	activeFound := e.state.ActiveKey == ""
 	for _, owned := range e.state.Entries {
 		switch {
-		case !strings.HasPrefix(owned.Key, namespace):
+		case !strings.HasPrefix(owned.Key, e.namespace):
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")

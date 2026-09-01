@@ -102,6 +102,7 @@ func convertReplicationRule(rule types.ReplicationRule) ReplicationRule {
 	if rule.Destination != nil && rule.Destination.Bucket != nil {
 		converted.DestinationBucket = bucketFromARN(*rule.Destination.Bucket)
 	}
+	converted.DeleteMarkerReplication = rule.Filter == nil
 	if rule.DeleteMarkerReplication != nil {
 		converted.DeleteMarkerReplication =
 			rule.DeleteMarkerReplication.Status == types.DeleteMarkerReplicationStatusEnabled
@@ -269,7 +270,7 @@ func (c *awsClient) Delete(
 	}
 	out, err := c.client.DeleteObject(ctx, input)
 	if err != nil {
-		if isObjectNotFound(err) {
+		if isObjectNotFound(err) || opts.VersionID != "" && hasErrorCode(err, "NoSuchVersion") {
 			return DeleteResult{}, nil
 		}
 		return DeleteResult{}, err
@@ -291,11 +292,7 @@ func isObjectNotFound(err error) bool {
 	if errors.As(err, &noSuchKey) {
 		return true
 	}
-	var notFound *types.NotFound
-	if errors.As(err, &notFound) {
-		return true
-	}
-	return hasErrorCode(err, "NoSuchKey", "NotFound", "NoSuchVersion")
+	return hasErrorCode(err, "NoSuchKey")
 }
 
 func hasErrorCode(err error, codes ...string) bool {

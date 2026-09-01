@@ -76,6 +76,7 @@ type Engine struct {
 	destinationBucket string
 	journal           *journal.Journal
 	generator         probe.Generator
+	namespace         string
 
 	requestTimeout  time.Duration
 	writeObjective  time.Duration
@@ -112,6 +113,10 @@ func New(opts Options) (*Engine, error) {
 	case opts.DeleteObjective <= 0 || opts.DeleteTimeout <= 0 || opts.DeleteObjective > opts.DeleteTimeout:
 		return nil, errors.New("Ceph delete objective must be positive and not exceed its timeout")
 	}
+	namespace, err := opts.Generator.Namespace()
+	if err != nil {
+		return nil, fmt.Errorf("Ceph probe namespace: %w", err)
+	}
 	if opts.QueueCapacity == 0 {
 		opts.QueueCapacity = defaultQueueCapacity
 	}
@@ -135,6 +140,7 @@ func New(opts Options) (*Engine, error) {
 		destinationBucket: opts.DestinationBucket,
 		journal:           opts.Journal,
 		generator:         opts.Generator,
+		namespace:         namespace,
 		requestTimeout:    opts.RequestTimeout,
 		writeObjective:    opts.WriteObjective,
 		writeTimeout:      opts.WriteTimeout,
@@ -157,19 +163,34 @@ func New(opts Options) (*Engine, error) {
 }
 
 func (e *Engine) Check(ctx context.Context) error {
-	if err := checkUnversioned(ctx, e.source, e.sourceBucket, "source"); err != nil {
-		return err
-	}
-	return checkUnversioned(ctx, e.destination, e.destinationBucket, "destination")
+	return e.validateProvider(ctx, nil)
 }
 
-func checkUnversioned(ctx context.Context, client s3client.Client, bucket, name string) error {
-	versioning, err := client.BucketVersioning(ctx, bucket)
+func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.OperationResult) error {
+	if err := e.checkUnversioned(ctx, operations, e.source, e.sourceBucket, contract.EndpointSource); err != nil {
+		return err
+	}
+	return e.checkUnversioned(ctx, operations, e.destination, e.destinationBucket, contract.EndpointDestination)
+}
+
+func (e *Engine) checkUnversioned(
+	ctx context.Context,
+	operations *[]contract.OperationResult,
+	client s3client.Client,
+	bucket string,
+	endpoint contract.Endpoint,
+) error {
+	var versioning s3client.BucketVersioningResult
+	_, err := e.call(ctx, operations, endpoint, contract.OperationSetup, func(callCtx context.Context) error {
+		var callErr error
+		versioning, callErr = client.BucketVersioning(callCtx, bucket)
+		return callErr
+	})
 	if err != nil {
-		return fmt.Errorf("check Ceph %s bucket versioning: %w", name, err)
+		return fmt.Errorf("check Ceph %s bucket versioning: %w", endpoint, err)
 	}
 	if versioning.Status != s3client.VersioningDisabled {
-		return fmt.Errorf("Ceph %s bucket must be unversioned, got %q", name, versioning.Status)
+		return fmt.Errorf("Ceph %s bucket must be unversioned, got %q", endpoint, versioning.Status)
 	}
 	return nil
 }
@@ -192,6 +213,10 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
 	}()
+	if err := e.validateProvider(ctx, &result.Operations); err != nil {
+		result.Err = fmt.Errorf("validate Ceph provider safety: %w", err)
+		return result
+	}
 
 	cleanup, err := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
 	result.Cleanup = cleanup
@@ -695,12 +720,11 @@ func (e *Engine) validateState() error {
 	if e.state.CleanupCursor < 0 {
 		return errors.New("journal cleanup cursor is negative")
 	}
-	namespace := e.generator.Prefix + e.journal.OwnerID()[:16] + "/"
 	seen := make(map[string]struct{}, len(e.state.Entries))
 	activeFound := e.state.ActiveKey == ""
 	for _, owned := range e.state.Entries {
 		switch {
-		case !strings.HasPrefix(owned.Key, namespace):
+		case !strings.HasPrefix(owned.Key, e.namespace):
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")

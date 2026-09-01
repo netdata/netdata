@@ -43,6 +43,26 @@ func TestCheckIsReadOnly(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
+func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client := newLifecycleClient()
+	engine, err := New(Options{
+		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second, UpdateEvery: time.Minute,
+	})
+	require.NoError(t, err)
+	require.NoError(t, engine.Check(context.Background()))
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+	}
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Nil(t, result.Probe)
+	assert.Zero(t, client.Count("put"))
+	engine.Cleanup(context.Background())
+}
+
 func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client := newLifecycleClient()

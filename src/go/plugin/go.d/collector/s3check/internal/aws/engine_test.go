@@ -34,6 +34,62 @@ func TestCheckValidatesVersioningAndApplicableDeleteMarkerRuleWithoutMutation(t 
 	assert.Zero(t, destination.Count("put"))
 }
 
+func TestCheckUsesGeneratedOwnerNamespaceForRuleApplicability(t *testing.T) {
+	t.Run("rejects narrower additional destination", func(t *testing.T) {
+		source, destination, _ := newAWSClients()
+		engine := newAWSEngine(t, source, destination, nil)
+		namespace, err := engine.generator.Namespace()
+		require.NoError(t, err)
+		source.BucketReplicationFunc = replicationRules(
+			s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+				DeleteMarkerReplication: true, Priority: 10,
+			},
+			s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "unowned-destination", Prefix: namespace,
+				DeleteMarkerReplication: true, Priority: 20,
+			},
+		)
+
+		require.Error(t, engine.Check(context.Background()))
+	})
+
+	t.Run("accepts narrower configured destination", func(t *testing.T) {
+		source, destination, _ := newAWSClients()
+		engine := newAWSEngine(t, source, destination, nil)
+		namespace, err := engine.generator.Namespace()
+		require.NoError(t, err)
+		source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "destination", Prefix: namespace,
+			DeleteMarkerReplication: true, Priority: 10,
+		})
+
+		require.NoError(t, engine.Check(context.Background()))
+	})
+}
+
+func TestCollectRevalidatesReplicationPolicyBeforeMutation(t *testing.T) {
+	source, destination, _ := newAWSClients()
+	engine := newAWSEngine(t, source, destination, nil)
+	require.NoError(t, engine.Check(context.Background()))
+	source.BucketReplicationFunc = replicationRules(
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+			DeleteMarkerReplication: true, Priority: 10,
+		},
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "unowned-destination", Prefix: "netdata-s3check/",
+			DeleteMarkerReplication: true, Priority: 20,
+		},
+	)
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Nil(t, result.Probe)
+	assert.Zero(t, source.Count("put"))
+	engine.Cleanup(context.Background())
+}
+
 func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
 	tests := map[string]func(*testutil.S3, *testutil.S3){
 		"source versioning disabled": func(source, _ *testutil.S3) {
@@ -330,9 +386,15 @@ func TestRetiredReconciliationReportsProviderFailureAndDiagnostic(t *testing.T) 
 
 	assert.Equal(t, 1, result.Cleanup.Failed)
 	assert.Equal(t, 1, result.Cleanup.Pending)
-	require.NotEmpty(t, result.Operations)
-	assert.ErrorIs(t, result.Operations[0].Err, wantErr)
-	assert.Equal(t, contract.ReasonRequest, result.Operations[0].Reason)
+	var failed *contract.OperationResult
+	for index := range result.Operations {
+		if errors.Is(result.Operations[index].Err, wantErr) {
+			failed = &result.Operations[index]
+			break
+		}
+	}
+	require.NotNil(t, failed)
+	assert.Equal(t, contract.ReasonRequest, failed.Reason)
 	engine.Cleanup(context.Background())
 }
 
