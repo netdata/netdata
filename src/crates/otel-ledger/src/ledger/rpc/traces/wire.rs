@@ -26,7 +26,8 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// Request param names accepted by this function, advertised to the UI
 /// in [`InfoResponse::accepted_params`]. The list's rule: it carries
 /// exactly the TOP-LEVEL keys — the seven mode selectors, `tenant`,
-/// and the standard Functions fields supported by the implicit view.
+/// and the fields the implicit view reads, both the standard Functions
+/// ones and its own `min_trace_duration_ns` filter.
 /// Per-mode body fields (windows, `limit`, `selections`, …) live inside
 /// their mode objects and are documented on the param structs.
 pub const ACCEPTED_PARAMS: &[&str] = &[
@@ -42,6 +43,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "before",
     "last",
     "anchor",
+    "min_trace_duration_ns",
 ];
 
 /// The raw top-level shape: the seven mode selectors and supported
@@ -85,6 +87,8 @@ struct RawOtelTracesRequest {
     last: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     anchor: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    min_trace_duration_ns: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     selections: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
@@ -181,6 +185,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.before.is_some()
             || raw.last.is_some()
             || raw.anchor.is_some()
+            || raw.min_trace_duration_ns.is_some()
             || raw.selections.is_some()
             || raw.timeout.is_some();
 
@@ -215,6 +220,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("before", raw.before.as_ref()),
                 ("last", raw.last.as_ref()),
                 ("anchor", raw.anchor.as_ref()),
+                ("min_trace_duration_ns", raw.min_trace_duration_ns.as_ref()),
                 ("selections", raw.selections.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
             ] {
@@ -265,6 +271,14 @@ pub struct FunctionsParams {
     pub anchor: Option<String>,
     #[serde(default)]
     pub selections: std::collections::HashMap<String, Vec<String>>,
+    /// Inclusive lower bound on the TRACE envelope duration,
+    /// nanoseconds — the "min duration" filter of the Functions view.
+    /// Trace-envelope, not span, so it narrows the same quantity the
+    /// overview grid bins by. Forwarded verbatim to
+    /// [`SearchParams::min_trace_duration_ns`]; the upper bound stays
+    /// the native mode's alone.
+    #[serde(default)]
+    pub min_trace_duration_ns: Option<i64>,
     /// Accepted for parity with the Functions protocol. Execution
     /// deadlines remain owned by the bridge call context.
     #[serde(default)]
@@ -309,7 +323,7 @@ impl FunctionsParams {
             selections: self.selections.clone(),
             min_duration_ns: None,
             max_duration_ns: None,
-            min_trace_duration_ns: None,
+            min_trace_duration_ns: self.min_trace_duration_ns,
             max_trace_duration_ns: None,
             anchor: self.anchor.clone(),
         })
