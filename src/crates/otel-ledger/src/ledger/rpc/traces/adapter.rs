@@ -9,16 +9,16 @@ use std::collections::HashMap;
 
 use sfsq::traces::{
     AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField,
-    CompareOp, Condition, DURATION_BIN_LABELS, FieldKinds, OverviewData, Predicate,
-    PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
+    CompareOp, Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData,
+    Predicate, PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
 };
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
     EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OVERVIEW_SCOPE_WINDOW,
-    OverviewGridWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems, SearchResult,
-    SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems, TraceResult,
-    TraceSummaryWire,
+    OverviewGridWire, OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals,
+    SearchItems, SearchResult, SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems,
+    TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -445,6 +445,7 @@ fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
             duration_bins: DURATION_BIN_LABELS.to_vec(),
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
             errors: data.bucket_errors,
+            duration_percentiles_ns: to_percentiles(&data.bucket_percentiles),
         },
         totals: OverviewTotals {
             traces: data.total_traces,
@@ -453,6 +454,16 @@ fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
         },
         top_root_services,
         top_root_operations,
+    }
+}
+
+/// Transpose the engine's per-bucket percentile triples into one array
+/// per rank — the shape a per-rank series is drawn from.
+fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentilesWire {
+    OverviewPercentilesWire {
+        p50: buckets.iter().map(|b| b.map(|p| p.p50)).collect(),
+        p95: buckets.iter().map(|b| b.map(|p| p.p95)).collect(),
+        p99: buckets.iter().map(|b| b.map(|p| p.p99)).collect(),
     }
 }
 

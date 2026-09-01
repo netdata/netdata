@@ -1020,6 +1020,36 @@ async fn the_grid_carries_per_bucket_error_spans() {
 }
 
 #[tokio::test]
+async fn the_grid_carries_exact_per_bucket_duration_percentiles() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    merge(&mut body, json!({}));
+    let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
+    let p = &v["grid"]["duration_percentiles_ns"];
+    for rank in ["p50", "p95", "p99"] {
+        let a = p[rank].as_array().unwrap_or_else(|| panic!("{rank} array"));
+        assert_eq!(a.len(), 100, "{rank} is index-parallel to the cell rows");
+    }
+    // The corpus's envelopes: A 500ns at second 10, B 1500ns at 20, the
+    // C/D pair 500ns each at 30, E 2500ns at 40.
+    assert_eq!(p["p50"][10], 500);
+    assert_eq!(p["p50"][20], 1500);
+    assert_eq!(p["p50"][30], 500);
+    assert_eq!(p["p99"][30], 500);
+    assert_eq!(p["p50"][40], 2500);
+    assert_eq!(p["p99"][40], 2500);
+    // A bucket that binned nothing is null, never 0 — 0 would render as
+    // an instantaneous trace.
+    for rank in ["p50", "p95", "p99"] {
+        assert!(p[rank][0].is_null(), "{rank} of an empty bucket");
+    }
+
+    // The Functions view's embedded section reports the same arrays.
+    let s = serde_json::to_value(call_on(&h, functions_body(20)).await.unwrap()).unwrap();
+    assert_eq!(s["data"]["overview"]["grid"]["duration_percentiles_ns"], *p);
+}
+
+#[tokio::test]
 async fn overview_invalid_selectors_are_clean_client_errors() {
     let h = handler_with_search_corpus().await;
     // Shape errors are wire-test territory; the inverted window is the
