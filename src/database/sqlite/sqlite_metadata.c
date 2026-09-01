@@ -202,6 +202,7 @@ sqlite3 *db_meta = NULL;
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_MAINTENANCE_CTX_CLEAN_REPEAT (300) // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
+#define METADATA_HEALTH_LOG_REPEAT (60)             // Repeat if the last health log cleanup left work behind
 #define METADATA_LABEL_CHECK_INTERVAL (3600)        // Repeat maintenance for labels
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
@@ -1643,27 +1644,47 @@ static void cleanup_health_log(struct meta_config_s *config)
     if (next_execution_t && next_execution_t > now)
         return;
 
-    next_execution_t = nd_time_t_add_saturating(now, METADATA_HEALTH_LOG_INTERVAL);
-
     RRDHOST *host;
     worker_is_busy(UV_EVENT_HEALTH_LOG_CLEANUP);
 
+    // One runtime budget for the whole pass, not one per host: otherwise a parent with many
+    // children could hold the metadata event loop for hosts x METADATA_RUNTIME_THRESHOLD seconds.
+    time_t started = now_monotonic_sec();
+    bool more_work = false;
+
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        sql_health_alarm_log_cleanup(host);
+        if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
+            more_work = true;
+            break;
+        }
+
+        if (sql_health_alarm_log_cleanup(host, started))
+            more_work = true;
+
         if (unlikely(SHUTDOWN_REQUESTED(config)))
             break;
     }
     dfe_done(host);
+
+    // A pass that stopped on the WAL gate or the runtime budget left rows behind. Retry soon
+    // instead of deferring them for a full interval - the WAL can stay over its limit for hours
+    // on a busy parent, and health_log_detail would grow unbounded in the meantime.
+    next_execution_t = nd_time_t_add_saturating(
+        now, more_work ? METADATA_HEALTH_LOG_REPEAT : METADATA_HEALTH_LOG_INTERVAL);
 
     if (unlikely(SHUTDOWN_REQUESTED(config))) {
         worker_is_idle();
         return;
     }
 
-    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
-    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
-    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
+    // The orphan sweeps are unbounded deletes, so run them only on a pass that completed - a
+    // retry pass is already fighting for the same disk.
+    if (!more_work) {
+        (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
+        (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
+        (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
+    }
     worker_is_idle();
 }
 

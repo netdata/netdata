@@ -374,24 +374,28 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
     "   (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"                                    \
     "  LIMIT @batch)"
 
-void sql_health_alarm_log_cleanup(RRDHOST *host)
+// Returns true when rows may still be eligible for this host - the caller's runtime budget
+// expired or the WAL grew too large - so the caller can retry sooner than its normal interval.
+// "started" is the caller's pass start, so the budget bounds the whole pass, not each host.
+bool sql_health_alarm_log_cleanup(RRDHOST *host, time_t started)
 {
     sqlite3_stmt *res = NULL;
     int rc;
     int param = 0;
+    bool more_work = false;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res))
-        return;
-
-    time_t started = now_monotonic_sec();
+        return false;
 
     // Each iteration is its own transaction, so the WAL can be checkpointed and other writers
     // can make progress between batches. We stop early on the same two conditions the other
     // cleanups in run_metadata_cleanup() respect - an oversized WAL and a runtime budget - and
     // whatever is left is picked up by the next cleanup cycle.
     while (true) {
-        if (!sql_metadata_wal_size_acceptable())
+        if (!sql_metadata_wal_size_acceptable()) {
+            more_work = true;
             break;
+        }
 
         param = 0;
         SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -405,12 +409,19 @@ void sql_health_alarm_log_cleanup(RRDHOST *host)
             break;
         }
 
-        // a short batch means the eligible set for this host is exhausted
-        if (sqlite3_changes(db_meta) < HEALTH_LOG_CLEANUP_BATCH_SIZE)
+        // sqlite3_changes() counts the last statement completed on the connection, not on our
+        // statement, and db_meta is shared with the health and ACLK threads. A concurrent write
+        // landing between the step above and this read can only clobber the count downwards to
+        // something below the batch size, so only a zero proves the eligible set is exhausted.
+        // Any other value keeps us looping, bounded by the WAL gate and the budget below, at
+        // the cost of one delete that matches nothing per host per pass.
+        if (sqlite3_changes(db_meta) == 0)
             break;
 
-        if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD)
+        if (now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
+            more_work = true;
             break;
+        }
 
         SQLITE_RESET(res);
     }
@@ -421,6 +432,8 @@ done:
 
     // After cleaning up SQLite entries, also clean up in-memory entries
     health_alarm_log_cleanup(host);
+
+    return more_work;
 }
 
 #define SQL_UPDATE_TRANSITION_IN_HEALTH_LOG                                                                            \
