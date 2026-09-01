@@ -80,8 +80,8 @@ type S3Config struct {
 	Region   string `yaml:"region" json:"region"`
 	Bucket   string `yaml:"bucket" json:"bucket"`
 
-	Credentials awsauth.CredentialConfig  `yaml:"credentials" json:"credentials"`
-	AssumeRole  *awsauth.AssumeRoleConfig `yaml:"assume_role,omitempty" json:"assume_role,omitempty"`
+	Credentials *awsauth.StaticCredentialConfig `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+	AssumeRole  *awsauth.AssumeRoleConfig       `yaml:"assume_role,omitempty" json:"assume_role,omitempty"`
 
 	PathStyle        *bool                `yaml:"path_style,omitempty" json:"path_style,omitempty"`
 	Timeout          confopt.LongDuration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
@@ -115,6 +115,24 @@ func (c *Config) applyDefaults() {
 	}
 }
 
+func (c Config) withDefaults() Config {
+	result := c
+	if c.ModeLifecycle != nil {
+		mode := *c.ModeLifecycle
+		result.ModeLifecycle = &mode
+	}
+	if c.ModeCephMultisite != nil {
+		mode := *c.ModeCephMultisite
+		result.ModeCephMultisite = &mode
+	}
+	if c.ModeAWSReplication != nil {
+		mode := *c.ModeAWSReplication
+		result.ModeAWSReplication = &mode
+	}
+	result.applyDefaults()
+	return result
+}
+
 func (c *LifecycleModeConfig) applyDefaults() {
 	if c.Prefix == "" {
 		c.Prefix = defaultPrefix
@@ -145,9 +163,6 @@ func (c *ReplicationModeConfig) applyDefaults() {
 func (c *S3Config) applyDefaults(name string) {
 	if c.Name == "" {
 		c.Name = name
-	}
-	if c.Credentials.Type == "" {
-		c.Credentials.Type = awsauth.CredentialTypeDefault
 	}
 	if c.PathStyle == nil {
 		c.PathStyle = new(true)
@@ -300,8 +315,10 @@ func (c *S3Config) validate(path string) error {
 	if err := validateProxyURL(c.ProxyURL, path+".proxy_url"); err != nil {
 		errs = append(errs, err)
 	}
-	if err := c.Credentials.ValidateWithPath(path + ".credentials"); err != nil {
-		errs = append(errs, err)
+	if c.Credentials != nil {
+		if err := c.Credentials.ValidateWithPath(path + ".credentials"); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if err := validateAssumeRole(c.AssumeRole, path+".assume_role"); err != nil {
 		errs = append(errs, err)
@@ -310,6 +327,16 @@ func (c *S3Config) validate(path string) error {
 		errs = append(errs, fmt.Errorf("%s.tls_cert and %s.tls_key must be configured together", path, path))
 	}
 	return errors.Join(errs...)
+}
+
+func (c S3Config) credentialConfig() awsauth.CredentialConfig {
+	if c.Credentials == nil {
+		return awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}
+	}
+	return awsauth.CredentialConfig{
+		Type:       awsauth.CredentialTypeStatic,
+		TypeStatic: c.Credentials,
+	}
 }
 
 func validatePrefix(prefix string) error {

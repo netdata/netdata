@@ -66,6 +66,14 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 	}
 }
 
+func TestStaticCredentialConfig_ValidateWithPath(t *testing.T) {
+	cfg := StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE"}
+
+	err := cfg.ValidateWithPath("credentials")
+	assert.ErrorContains(t, err, "credentials.secret_access_key is required")
+	assert.NotContains(t, err.Error(), "type_static")
+}
+
 func TestIdentity_NewConfig(t *testing.T) {
 	ctx := context.Background()
 

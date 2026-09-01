@@ -39,6 +39,39 @@ func TestCollectorConfigurationDecodesIntoNew(t *testing.T) {
 	require.NotNil(t, c.ModeAWSReplication)
 }
 
+func TestCollectorConfigurationReturnsEffectiveSelectedMode(t *testing.T) {
+	c := New()
+	require.NoError(t, yaml.Unmarshal([]byte(`
+name: aws-replication
+mode: aws_replication
+mode_aws_replication:
+  source:
+    region: us-east-1
+    bucket: source-bucket
+  destination:
+    region: us-west-2
+    bucket: destination-bucket
+`), c))
+
+	config, ok := c.Configuration().(Config)
+	require.True(t, ok)
+	assert.Nil(t, config.ModeLifecycle)
+	assert.Nil(t, config.ModeCephMultisite)
+	require.NotNil(t, config.ModeAWSReplication)
+	assert.Equal(t, defaultPrefix, config.ModeAWSReplication.Prefix)
+	assert.Equal(t, defaultWriteObjective, config.ModeAWSReplication.WriteObjective.Duration())
+	assert.Equal(t, defaultWriteTimeout, config.ModeAWSReplication.WriteTimeout.Duration())
+	assert.Equal(t, defaultDeleteObjective, config.ModeAWSReplication.DeleteObjective.Duration())
+	assert.Equal(t, defaultDeleteTimeout, config.ModeAWSReplication.DeleteTimeout.Duration())
+	assert.Equal(t, "source", config.ModeAWSReplication.Source.Name)
+	assert.Equal(t, "destination", config.ModeAWSReplication.Destination.Name)
+	assert.Nil(t, config.ModeAWSReplication.Source.Credentials)
+	assert.True(t, boolValue(config.ModeAWSReplication.Source.PathStyle))
+	assert.Equal(t, defaultTimeout, config.ModeAWSReplication.Source.Timeout.Duration())
+
+	assert.Empty(t, c.ModeAWSReplication.Prefix, "rendering effective config must not mutate the collector")
+}
+
 func TestConfigSchemaMatchesMetadataGroups(t *testing.T) {
 	collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")
 }
@@ -61,6 +94,10 @@ func TestConfigSchemaModeBranches(t *testing.T) {
 			"source": map[string]any{
 				"region": "us-east-1",
 				"bucket": "probe-bucket",
+				"credentials": map[string]any{
+					"access_key_id":     "key",
+					"secret_access_key": "secret",
+				},
 			},
 		},
 	}))
@@ -89,6 +126,53 @@ func TestConfigSchemaModeBranches(t *testing.T) {
 			"destination": map[string]any{"region": "us-west-2", "bucket": "destination-bucket"},
 		},
 	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"mode": "lifecycle",
+		"mode_lifecycle": map[string]any{
+			"source": map[string]any{
+				"region":      "us-east-1",
+				"bucket":      "probe-bucket",
+				"credentials": map[string]any{"type": "default"},
+			},
+		},
+	}))
+}
+
+func TestConfigSchemaSensitiveFieldsUsePasswordWidgets(t *testing.T) {
+	var document map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &document))
+
+	modeEndpoints := map[string][]string{
+		"mode_lifecycle":       {"source"},
+		"mode_ceph_multisite":  {"source", "destination"},
+		"mode_aws_replication": {"source", "destination"},
+	}
+	for mode, endpoints := range modeEndpoints {
+		for _, endpoint := range endpoints {
+			t.Run(mode+"/"+endpoint, func(t *testing.T) {
+				for _, field := range []string{"access_key_id", "secret_access_key", "session_token"} {
+					assert.Equal(t, "password", configSchemaValueAt(t, document,
+						"uiSchema", mode, endpoint, "credentials", field, "ui:widget"))
+				}
+				assert.Equal(t, "password", configSchemaValueAt(t, document,
+					"uiSchema", mode, endpoint, "assume_role", "external_id", "ui:widget"))
+				assert.Equal(t, "password", configSchemaValueAt(t, document,
+					"uiSchema", mode, endpoint, "proxy_url", "ui:widget"))
+			})
+		}
+	}
+}
+
+func configSchemaValueAt(t *testing.T, root map[string]any, path ...string) any {
+	t.Helper()
+	var value any = root
+	for _, key := range path {
+		object, ok := value.(map[string]any)
+		require.Truef(t, ok, "%q is not an object", key)
+		value, ok = object[key]
+		require.Truef(t, ok, "missing schema path component %q", key)
+	}
+	return value
 }
 
 func TestConfigDefaultsUseHumanDurations(t *testing.T) {
@@ -98,7 +182,7 @@ func TestConfigDefaultsUseHumanDurations(t *testing.T) {
 	require.NotNil(t, lifecycle.ModeLifecycle)
 	assert.Equal(t, string(contract.ModeLifecycle), lifecycle.Mode)
 	assert.Equal(t, defaultPrefix, lifecycle.ModeLifecycle.Prefix)
-	assert.Equal(t, awsauth.CredentialTypeDefault, lifecycle.ModeLifecycle.Source.Credentials.Type)
+	assert.Nil(t, lifecycle.ModeLifecycle.Source.Credentials)
 	assert.True(t, boolValue(lifecycle.ModeLifecycle.Source.PathStyle))
 
 	replication := Config{Name: "job", Mode: string(contract.ModeCephMultisite)}
@@ -109,7 +193,29 @@ func TestConfigDefaultsUseHumanDurations(t *testing.T) {
 	assert.Equal(t, defaultWriteTimeout, replication.ModeCephMultisite.WriteTimeout.Duration())
 	assert.Equal(t, defaultDeleteObjective, replication.ModeCephMultisite.DeleteObjective.Duration())
 	assert.Equal(t, defaultDeleteTimeout, replication.ModeCephMultisite.DeleteTimeout.Duration())
-	assert.Equal(t, awsauth.CredentialTypeDefault, replication.ModeCephMultisite.Destination.Credentials.Type)
+	assert.Nil(t, replication.ModeCephMultisite.Destination.Credentials)
+}
+
+func TestS3ConfigCredentialSelection(t *testing.T) {
+	defaultChain := S3Config{}.credentialConfig()
+	assert.Equal(t, awsauth.CredentialTypeDefault, defaultChain.Type)
+	assert.Nil(t, defaultChain.TypeStatic)
+
+	static := &awsauth.StaticCredentialConfig{
+		AccessKeyID: "key", SecretAccessKey: "secret", SessionToken: "token",
+	}
+	explicit := S3Config{Credentials: static}.credentialConfig()
+	assert.Equal(t, awsauth.CredentialTypeStatic, explicit.Type)
+	assert.Same(t, static, explicit.TypeStatic)
+}
+
+func TestS3ConfigStaticCredentialValidationUsesPublicPath(t *testing.T) {
+	cfg := validConfig(contract.ModeLifecycle)
+	cfg.ModeLifecycle.Source.Credentials = &awsauth.StaticCredentialConfig{AccessKeyID: "key"}
+
+	err := cfg.validate()
+	assert.ErrorContains(t, err, "source.credentials.secret_access_key is required")
+	assert.NotContains(t, err.Error(), "type_static")
 }
 
 func TestConfigValidationModeBoundaries(t *testing.T) {
@@ -203,11 +309,8 @@ func TestOwnershipFingerprintContract(t *testing.T) {
 	presentationAndTransport := cloneConfig(cfg)
 	presentationAndTransport.ModeAWSReplication.Source.Name = "renamed source"
 	presentationAndTransport.ModeAWSReplication.Source.Region = "eu-west-1"
-	presentationAndTransport.ModeAWSReplication.Source.Credentials = awsauth.CredentialConfig{
-		Type: awsauth.CredentialTypeStatic,
-		TypeStatic: &awsauth.StaticCredentialConfig{
-			AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret",
-		},
+	presentationAndTransport.ModeAWSReplication.Source.Credentials = &awsauth.StaticCredentialConfig{
+		AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret",
 	}
 	presentationAndTransport.ModeAWSReplication.Source.Timeout = confopt.LongDuration(20 * time.Second)
 	presentationAndTransport.ModeAWSReplication.Source.ProxyURL = "http://proxy.example"

@@ -82,8 +82,8 @@ modules:
               enable delete-marker replication on the applicable source rule.
           - title: Create restricted credentials
             description: |
-              Use the AWS SDK default chain or static credentials, optionally with an independently configured assume-role
-              step for each endpoint. Prefer go.d secret references over plaintext static credentials.
+              Omit `credentials` to use the AWS SDK default chain, or provide static credentials directly in that object.
+              Assume-role is configured independently for each endpoint. Prefer go.d secret references over plaintext.
           - title: Choose the client vantage
             description: |
               Run each directional job on the Agent whose network path represents the client-visible behavior to measure.
@@ -144,31 +144,21 @@ modules:
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials"
-              description: "Source base-credential configuration."
+              description: "Optional static source credentials. Omit to use the AWS SDK default chain."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
-            - name: "mode_lifecycle.source.credentials.type"
-              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
-              default_value: "default"
-              required: false
-              group: "Mode / Lifecycle connection"
-            - name: "mode_lifecycle.source.credentials.type_static"
-              description: "Static source credential fields, used only when credential type is `static`."
-              default_value: ""
-              required: false
-              group: "Mode / Lifecycle connection"
-            - name: "mode_lifecycle.source.credentials.type_static.access_key_id"
+            - name: "mode_lifecycle.source.credentials.access_key_id"
               description: "Source access key ID. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
-            - name: "mode_lifecycle.source.credentials.type_static.secret_access_key"
+            - name: "mode_lifecycle.source.credentials.secret_access_key"
               description: "Source secret access key. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
-            - name: "mode_lifecycle.source.credentials.type_static.session_token"
+            - name: "mode_lifecycle.source.credentials.session_token"
               description: "Optional source session token."
               default_value: ""
               required: false
@@ -259,31 +249,21 @@ modules:
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials"
-              description: "Source base-credential configuration."
+              description: "Optional static source credentials. Omit to use the AWS SDK default chain."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
-            - name: "mode_ceph_multisite.source.credentials.type"
-              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
-              default_value: "default"
-              required: false
-              group: "Mode / Ceph multisite source"
-            - name: "mode_ceph_multisite.source.credentials.type_static"
-              description: "Static source credential fields, used only when credential type is `static`."
-              default_value: ""
-              required: false
-              group: "Mode / Ceph multisite source"
-            - name: "mode_ceph_multisite.source.credentials.type_static.access_key_id"
+            - name: "mode_ceph_multisite.source.credentials.access_key_id"
               description: "Source access key ID. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
-            - name: "mode_ceph_multisite.source.credentials.type_static.secret_access_key"
+            - name: "mode_ceph_multisite.source.credentials.secret_access_key"
               description: "Source secret access key. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
-            - name: "mode_ceph_multisite.source.credentials.type_static.session_token"
+            - name: "mode_ceph_multisite.source.credentials.session_token"
               description: "Optional source session token."
               default_value: ""
               required: false
@@ -364,31 +344,21 @@ modules:
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials"
-              description: "Destination base-credential configuration."
+              description: "Optional static destination credentials. Omit to use the AWS SDK default chain."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
-            - name: "mode_ceph_multisite.destination.credentials.type"
-              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
-              default_value: "default"
-              required: false
-              group: "Mode / Ceph multisite destination"
-            - name: "mode_ceph_multisite.destination.credentials.type_static"
-              description: "Static destination credential fields, used only when credential type is `static`."
-              default_value: ""
-              required: false
-              group: "Mode / Ceph multisite destination"
-            - name: "mode_ceph_multisite.destination.credentials.type_static.access_key_id"
+            - name: "mode_ceph_multisite.destination.credentials.access_key_id"
               description: "Destination access key ID. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
-            - name: "mode_ceph_multisite.destination.credentials.type_static.secret_access_key"
+            - name: "mode_ceph_multisite.destination.credentials.secret_access_key"
               description: "Destination secret access key. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
-            - name: "mode_ceph_multisite.destination.credentials.type_static.session_token"
+            - name: "mode_ceph_multisite.destination.credentials.session_token"
               description: "Optional destination session token."
               default_value: ""
               required: false
@@ -499,31 +469,21 @@ modules:
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials"
-              description: "Source base-credential configuration."
+              description: "Optional static source credentials. Omit to use the AWS SDK default chain."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
-            - name: "mode_aws_replication.source.credentials.type"
-              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
-              default_value: "default"
-              required: false
-              group: "Mode / AWS replication source"
-            - name: "mode_aws_replication.source.credentials.type_static"
-              description: "Static source credential fields, used only when credential type is `static`."
-              default_value: ""
-              required: false
-              group: "Mode / AWS replication source"
-            - name: "mode_aws_replication.source.credentials.type_static.access_key_id"
+            - name: "mode_aws_replication.source.credentials.access_key_id"
               description: "Source access key ID. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
-            - name: "mode_aws_replication.source.credentials.type_static.secret_access_key"
+            - name: "mode_aws_replication.source.credentials.secret_access_key"
               description: "Source secret access key. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
-            - name: "mode_aws_replication.source.credentials.type_static.session_token"
+            - name: "mode_aws_replication.source.credentials.session_token"
               description: "Optional source session token."
               default_value: ""
               required: false
@@ -604,31 +564,21 @@ modules:
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials"
-              description: "Destination base-credential configuration."
+              description: "Optional static destination credentials. Omit to use the AWS SDK default chain."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
-            - name: "mode_aws_replication.destination.credentials.type"
-              description: "Use `default` for the AWS SDK chain or `static` for explicit credentials."
-              default_value: "default"
-              required: false
-              group: "Mode / AWS replication destination"
-            - name: "mode_aws_replication.destination.credentials.type_static"
-              description: "Static destination credential fields, used only when credential type is `static`."
-              default_value: ""
-              required: false
-              group: "Mode / AWS replication destination"
-            - name: "mode_aws_replication.destination.credentials.type_static.access_key_id"
+            - name: "mode_aws_replication.destination.credentials.access_key_id"
               description: "Destination access key ID. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
-            - name: "mode_aws_replication.destination.credentials.type_static.secret_access_key"
+            - name: "mode_aws_replication.destination.credentials.secret_access_key"
               description: "Destination secret access key. Use a go.d secret reference."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
-            - name: "mode_aws_replication.destination.credentials.type_static.session_token"
+            - name: "mode_aws_replication.destination.credentials.session_token"
               description: "Optional destination session token."
               default_value: ""
               required: false
@@ -730,10 +680,8 @@ modules:
                         region: us-east-1
                         bucket: netdata-s3check
                         credentials:
-                          type: static
-                          type_static:
-                            access_key_id: ${env:NETDATA_S3CHECK_ACCESS_KEY_ID}
-                            secret_access_key: ${env:NETDATA_S3CHECK_SECRET_ACCESS_KEY}
+                          access_key_id: ${env:NETDATA_S3CHECK_ACCESS_KEY_ID}
+                          secret_access_key: ${env:NETDATA_S3CHECK_SECRET_ACCESS_KEY}
                         path_style: yes
             - name: Ceph RGW multisite direction
               description: Use one job per source-to-destination direction; both buckets must be unversioned.
@@ -747,15 +695,11 @@ modules:
                         endpoint: https://rgw-site-a.example.net
                         region: us-east-1
                         bucket: netdata-s3check
-                        credentials:
-                          type: default
                       destination:
                         name: site-b
                         endpoint: https://rgw-site-b.example.net
                         region: us-east-1
                         bucket: netdata-s3check
-                        credentials:
-                          type: default
                       write_objective: 15m
                       write_timeout: 30m
                       delete_objective: 5m
@@ -771,16 +715,12 @@ modules:
                         name: us-east-1
                         region: us-east-1
                         bucket: source-bucket
-                        credentials:
-                          type: default
                         assume_role:
                           role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-source
                       destination:
                         name: us-west-2
                         region: us-west-2
                         bucket: destination-bucket
-                        credentials:
-                          type: default
                         assume_role:
                           role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-destination
     troubleshooting:

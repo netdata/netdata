@@ -10,11 +10,9 @@ mode_aws_replication:
     region: us-east-1
     bucket: source-bucket
     credentials:
-      type: static
-      type_static:
-        access_key_id: AKIAEXAMPLE
-        secret_access_key: secret
-        session_token: session
+      access_key_id: AKIAEXAMPLE
+      secret_access_key: secret
+      session_token: session
     assume_role:
       role_arn: arn:aws:iam::000000000000:role/netdata
       external_id: external
@@ -29,8 +27,6 @@ mode_aws_replication:
     endpoint: https://s3.us-west-2.amazonaws.com
     region: us-west-2
     bucket: destination-bucket
-    credentials:
-      type: default
     path_style: false
     timeout: 15s
   write_objective: 15m

@@ -70,18 +70,20 @@ func (c CredentialConfig) ValidateWithPath(path string) error {
 		if c.TypeStatic == nil {
 			return errors.New(fieldPath(path, "type_static") + " is required")
 		}
-		staticPath := fieldPath(path, "type_static")
-		errs := []error{
-			validateCredentialValue(fieldPath(staticPath, "access_key_id"), c.TypeStatic.AccessKeyID, true),
-			validateCredentialValue(fieldPath(staticPath, "secret_access_key"), c.TypeStatic.SecretAccessKey, true),
-			validateCredentialValue(fieldPath(staticPath, "session_token"), c.TypeStatic.SessionToken, false),
-		}
-		return errors.Join(errs...)
+		return c.TypeStatic.ValidateWithPath(fieldPath(path, "type_static"))
 	default:
 		return fmt.Errorf("%s %q is invalid: expected one of %q, %q",
 			typeField, c.Type, CredentialTypeDefault, CredentialTypeStatic)
 	}
 	return nil
+}
+
+func (c StaticCredentialConfig) ValidateWithPath(path string) error {
+	return errors.Join(
+		validateCredentialValue(fieldPath(path, "access_key_id"), c.AccessKeyID, true),
+		validateCredentialValue(fieldPath(path, "secret_access_key"), c.SecretAccessKey, true),
+		validateCredentialValue(fieldPath(path, "session_token"), c.SessionToken, false),
+	)
 }
 
 func validateCredentialValue(path, value string, required bool) error {

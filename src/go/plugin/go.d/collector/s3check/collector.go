@@ -69,7 +69,7 @@ type Collector struct {
 	journalRoot      string
 }
 
-func (c *Collector) Configuration() any { return c.Config }
+func (c *Collector) Configuration() any { return c.Config.withDefaults() }
 
 func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()

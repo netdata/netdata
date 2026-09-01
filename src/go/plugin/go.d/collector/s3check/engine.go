@@ -86,7 +86,7 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 
 func (c S3Config) clientConfig() s3client.Config {
 	return s3client.Config{
-		Identity:  awsauth.NewIdentity(c.Name, c.Credentials, c.AssumeRole),
+		Identity:  awsauth.NewIdentity(c.Name, c.credentialConfig(), c.AssumeRole),
 		Region:    c.Region,
 		Endpoint:  c.Endpoint,
 		PathStyle: boolValue(c.PathStyle),
