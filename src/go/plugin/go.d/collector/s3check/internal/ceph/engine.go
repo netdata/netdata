@@ -174,8 +174,8 @@ func checkUnversioned(ctx context.Context, client s3client.Client, bucket, name 
 	return nil
 }
 
-func (e *Engine) Collect(ctx context.Context) contract.Result {
-	result := contract.Result{
+func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
+	result = contract.Result{
 		Mode:         contract.ModeCephMultisite,
 		LastTerminal: cloneProbeResult(e.state.LastTerminal),
 	}
@@ -187,12 +187,16 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		result.Probe = failedProbe(contract.ReasonOwnership)
 		return result
 	}
+	defer func() {
+		result.Cleanup.Pending = len(e.state.Entries)
+		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
+		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+	}()
 
 	cleanup, err := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
 	result.Cleanup = cleanup
 	if err != nil {
-		result.Probe = e.finishTerminal(failedProbe(contract.ReasonCleanup))
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.Err = fmt.Errorf("cleanup Ceph ownership: %w", err)
 		return result
 	}
 

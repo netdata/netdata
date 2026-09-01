@@ -105,6 +105,7 @@ type Result struct {
 	Cleanup      CleanupResult
 	Probe        *ProbeResult
 	LastTerminal *ProbeResult
+	Err          error
 }
 
 type Engine interface {

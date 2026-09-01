@@ -137,8 +137,8 @@ func (e *Engine) Check(ctx context.Context) error {
 	return nil
 }
 
-func (e *Engine) Collect(ctx context.Context) contract.Result {
-	result := contract.Result{
+func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
+	result = contract.Result{
 		Mode:         contract.ModeLifecycle,
 		LastTerminal: cloneProbeResult(e.state.LastTerminal),
 	}
@@ -150,12 +150,16 @@ func (e *Engine) Collect(ctx context.Context) contract.Result {
 		result.Probe = failedProbe(contract.ReasonOwnership)
 		return result
 	}
+	defer func() {
+		result.Cleanup.Pending = len(e.state.Entries)
+		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
+		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+	}()
 
 	cleanup, cleanupErr := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
 	result.Cleanup = cleanup
 	if cleanupErr != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonCleanup))
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.Err = fmt.Errorf("cleanup lifecycle ownership: %w", cleanupErr)
 		return result
 	}
 	if len(e.state.Entries) >= e.queueCapacity {

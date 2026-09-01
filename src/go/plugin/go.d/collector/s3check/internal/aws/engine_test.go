@@ -72,6 +72,29 @@ func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
 				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
 			})
 		},
+		"additional applicable destination": func(source, _ *testutil.S3) {
+			source.BucketReplicationFunc = replicationRules(
+				s3client.ReplicationRule{
+					Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+					DeleteMarkerReplication: true, Priority: 10,
+				},
+				s3client.ReplicationRule{
+					Enabled: true, DestinationBucket: "unowned-destination", Prefix: "netdata-s3check/",
+					DeleteMarkerReplication: true, Priority: 20,
+				},
+			)
+		},
+		"higher priority rule disables delete markers": func(source, _ *testutil.S3) {
+			source.BucketReplicationFunc = replicationRules(
+				s3client.ReplicationRule{
+					Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+					DeleteMarkerReplication: true, Priority: 10,
+				},
+				s3client.ReplicationRule{
+					Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/", Priority: 20,
+				},
+			)
+		},
 	}
 
 	for name, mutate := range tests {

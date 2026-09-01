@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -133,6 +135,38 @@ func TestWriteTimeoutMovesProbeToCleanupWithoutBlockingNewActiveSlot(t *testing.
 	assert.Equal(t, contract.StatusWaiting, next.Probe.Status)
 	assert.Equal(t, 2, source.Count("put"))
 	assert.GreaterOrEqual(t, next.Cleanup.Pending, 1)
+	engine.Cleanup(context.Background())
+}
+
+func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "state")
+	j := newCephJournal(t, root)
+	source, destination, _ := newCephClients()
+	now := time.Unix(100, 0)
+	engine, err := New(Options{
+		Source: source, Destination: destination,
+		SourceBucket: "source", DestinationBucket: "destination",
+		Journal: j, Generator: newCephGenerator(j.OwnerID()), RequestTimeout: time.Second,
+		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
+		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
+		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+	})
+	require.NoError(t, err)
+
+	engine.Collect(context.Background())
+	now = now.Add(2*time.Minute + time.Second)
+	terminal := engine.Collect(context.Background())
+	require.NotNil(t, terminal.LastTerminal)
+	require.NoError(t, os.Rename(root, root+".moved"))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Nil(t, result.Probe)
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	assert.True(t, result.Cleanup.Backpressure)
+	assert.Equal(t, terminal.LastTerminal, result.LastTerminal)
 	engine.Cleanup(context.Background())
 }
 

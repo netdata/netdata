@@ -113,6 +113,40 @@ func TestBackpressureNeverEvictsUnresolvedOwnership(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "state")
+	j := newTestJournal(t, root)
+	client := newLifecycleClient()
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		clientModel(client).put(bucket, key, payload)
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	client.DeleteFunc = func(context.Context, string, string, s3client.DeleteOptions) (s3client.DeleteResult, error) {
+		return s3client.DeleteResult{}, errors.New("cleanup unavailable")
+	}
+	engine, err := New(Options{
+		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second, UpdateEvery: time.Minute, QueueCapacity: 1, CleanupBatch: 1,
+	})
+	require.NoError(t, err)
+
+	terminal := engine.Collect(context.Background())
+	require.NotNil(t, terminal.LastTerminal)
+	require.NoError(t, os.Rename(root, root+".moved"))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Nil(t, result.Probe)
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	assert.True(t, result.Cleanup.Backpressure)
+	assert.Equal(t, terminal.LastTerminal, result.LastTerminal)
+	engine.Cleanup(context.Background())
+}
+
 func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client := newLifecycleClient()

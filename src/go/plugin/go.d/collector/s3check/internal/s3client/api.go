@@ -85,6 +85,7 @@ type ReplicationRule struct {
 	Prefix                  string
 	TagFiltered             bool
 	DeleteMarkerReplication bool
+	Priority                int32
 }
 
 // Client exposes only the S3 operations needed by the three probe engines.

@@ -28,7 +28,8 @@ func TestConvertReplicationRule(t *testing.T) {
 	}{
 		"enabled prefix rule with delete markers": {
 			rule: types.ReplicationRule{
-				Status: types.ReplicationRuleStatusEnabled,
+				Status:   types.ReplicationRuleStatusEnabled,
+				Priority: aws.Int32(17),
 				Destination: &types.Destination{
 					Bucket: aws.String("arn:aws:s3:::destination"),
 				},
@@ -42,6 +43,7 @@ func TestConvertReplicationRule(t *testing.T) {
 				DestinationBucket:       "destination",
 				Prefix:                  "netdata/",
 				DeleteMarkerReplication: true,
+				Priority:                17,
 			},
 		},
 		"tag filtered rule": {

@@ -207,16 +207,29 @@ func (e *Engine) Check(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("check AWS source replication policy: %w", err)
 	}
+	var effective *s3client.ReplicationRule
 	for _, rule := range rules {
-		if rule.Enabled &&
-			rule.DestinationBucket == e.destinationBucket &&
-			strings.HasPrefix(e.probePrefix, rule.Prefix) &&
-			!rule.TagFiltered &&
-			rule.DeleteMarkerReplication {
-			return nil
+		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(e.probePrefix, rule.Prefix) {
+			continue
+		}
+		if rule.DestinationBucket != e.destinationBucket {
+			return fmt.Errorf(
+				"AWS source has an additional applicable replication destination %q outside collector ownership",
+				rule.DestinationBucket,
+			)
+		}
+		if effective == nil || rule.Priority > effective.Priority {
+			candidate := rule
+			effective = &candidate
 		}
 	}
-	return errors.New("AWS source has no enabled applicable replication rule with delete-marker replication")
+	if effective == nil {
+		return errors.New("AWS source has no enabled applicable replication rule for the configured destination")
+	}
+	if !effective.DeleteMarkerReplication {
+		return errors.New("AWS effective replication rule for the configured destination does not replicate delete markers")
+	}
+	return nil
 }
 
 func (e *Engine) checkVersioning(

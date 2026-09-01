@@ -96,7 +96,8 @@ func (c *awsClient) BucketReplication(ctx context.Context, bucket string) ([]Rep
 
 func convertReplicationRule(rule types.ReplicationRule) ReplicationRule {
 	converted := ReplicationRule{
-		Enabled: rule.Status == types.ReplicationRuleStatusEnabled,
+		Enabled:  rule.Status == types.ReplicationRuleStatusEnabled,
+		Priority: aws.ToInt32(rule.Priority),
 	}
 	if rule.Destination != nil && rule.Destination.Bucket != nil {
 		converted.DestinationBucket = bucketFromARN(*rule.Destination.Bucket)
