@@ -89,7 +89,7 @@ type CleanupResult struct {
 	Failed       int
 }
 
-type TerminalResult struct {
+type ProbeResult struct {
 	Status           Status
 	Reason           Reason
 	PayloadMismatch  bool
@@ -99,10 +99,11 @@ type TerminalResult struct {
 
 // Result is the provider-neutral snapshot consumed by the root metric renderer.
 type Result struct {
-	Mode       Mode
-	Operations []OperationResult
-	Cleanup    CleanupResult
-	Terminal   *TerminalResult
+	Mode         Mode
+	Operations   []OperationResult
+	Cleanup      CleanupResult
+	Probe        *ProbeResult
+	LastTerminal *ProbeResult
 }
 
 type Engine interface {
