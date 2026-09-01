@@ -158,10 +158,11 @@ func prepareMockSnmpHandler(t *testing.T) (*mockSnmpHandler, func()) {
 
 func (m *mockSnmpHandler) setExpectInit() {
 	var ip string
+	var version gosnmp.SnmpVersion
 	m.EXPECT().Target().DoAndReturn(func() string { return ip }).AnyTimes()
 	m.EXPECT().SetTarget(gomock.Any()).Do(func(target string) { ip = target }).AnyTimes()
 	m.EXPECT().Port().AnyTimes()
-	m.EXPECT().Version().AnyTimes()
+	m.EXPECT().Version().DoAndReturn(func() gosnmp.SnmpVersion { return version }).AnyTimes()
 	m.EXPECT().Community().AnyTimes()
 	m.EXPECT().SetPort(gomock.Any()).AnyTimes()
 	m.EXPECT().SetRetries(gomock.Any()).AnyTimes()
@@ -170,7 +171,7 @@ func (m *mockSnmpHandler) setExpectInit() {
 	m.EXPECT().SetLogger(gomock.Any()).AnyTimes()
 	m.EXPECT().SetTimeout(gomock.Any()).AnyTimes()
 	m.EXPECT().SetCommunity(gomock.Any()).AnyTimes()
-	m.EXPECT().SetVersion(gomock.Any()).AnyTimes()
+	m.EXPECT().SetVersion(gomock.Any()).Do(func(v gosnmp.SnmpVersion) { version = v }).AnyTimes()
 	m.EXPECT().SetSecurityModel(gomock.Any()).AnyTimes()
 	m.EXPECT().SetMsgFlags(gomock.Any()).AnyTimes()
 	m.EXPECT().SetSecurityParameters(gomock.Any()).AnyTimes()
@@ -188,13 +189,17 @@ const (
 
 func (m *mockSnmpHandler) setExpectSysInfo() {
 	m.EXPECT().MaxOids().Return(60).AnyTimes()
-	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-		{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
-		{Name: snmputils.OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
-	}}, nil).AnyTimes()
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
+		Version: gosnmp.Version2c,
+		PDUType: gosnmp.GetResponse,
+		Variables: []gosnmp.SnmpPDU{
+			{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
+			{Name: snmputils.OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
+		},
+	}, nil).AnyTimes()
 }
 
 func sysInfoOIDsForTest() []string {

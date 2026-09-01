@@ -128,11 +128,12 @@ func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
 	if maxOids < 1 {
 		return nil, fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids)
 	}
+	version := client.Version()
 
 	oids := sysInfoOIDs()
 	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
 	for chunk := range slices.Chunk(oids, maxOids) {
-		chunkPDUs, err := getSysInfoChunkPDUs(client, chunk)
+		chunkPDUs, err := getSysInfoChunkPDUs(client, version, chunk)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +142,7 @@ func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
 	return pdus, nil
 }
 
-func getSysInfoChunkPDUs(client gosnmp.Handler, oids []string) ([]gosnmp.SnmpPDU, error) {
+func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids []string) ([]gosnmp.SnmpPDU, error) {
 	for len(oids) > 0 {
 		packet, err := client.Get(oids)
 		if err != nil {
@@ -149,6 +150,16 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, oids []string) ([]gosnmp.SnmpPDU
 		}
 		if packet == nil {
 			return nil, fmt.Errorf("get SNMP system scalars: nil response")
+		}
+		if packet.PDUType != gosnmp.GetResponse {
+			return nil, fmt.Errorf("get SNMP system scalars: unexpected response PDU type %s", packet.PDUType)
+		}
+		if packet.Version != version {
+			return nil, fmt.Errorf(
+				"get SNMP system scalars: response SNMP version %s does not match requested version %s",
+				packet.Version,
+				version,
+			)
 		}
 
 		switch packet.Error {
@@ -159,6 +170,9 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, oids []string) ([]gosnmp.SnmpPDU
 					packet.Error,
 					packet.ErrorIndex,
 				)
+			}
+			if err := validateSysInfoResponsePDUs(oids, packet.Variables); err != nil {
+				return nil, err
 			}
 			return packet.Variables, nil
 		case gosnmp.NoSuchName:
@@ -194,6 +208,21 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, oids []string) ([]gosnmp.SnmpPDU
 	}
 
 	return nil, nil
+}
+
+func validateSysInfoResponsePDUs(requestedOIDs []string, pdus []gosnmp.SnmpPDU) error {
+	seen := make(map[string]struct{}, len(pdus))
+	for _, pdu := range pdus {
+		oid := strings.TrimPrefix(pdu.Name, ".")
+		if !slices.Contains(requestedOIDs, oid) {
+			return fmt.Errorf("get SNMP system scalars: response contains unrequested OID %q", pdu.Name)
+		}
+		if _, ok := seen[oid]; ok {
+			return fmt.Errorf("get SNMP system scalars: response contains duplicate OID %q", pdu.Name)
+		}
+		seen[oid] = struct{}{}
+	}
+	return nil
 }
 
 var valueSanitizer = strings.NewReplacer(

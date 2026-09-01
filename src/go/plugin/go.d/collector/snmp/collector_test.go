@@ -384,6 +384,7 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		collr.Config = prepareV2Config()
 		mockSNMP := snmpmock.NewMockHandler(ctrl)
 		mockSNMP.EXPECT().MaxOids().Return(20)
+		mockSNMP.EXPECT().Version().Return(gosnmp.Version2c)
 		mockSNMP.EXPECT().Get(gomock.Any()).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
 			panic("check panic")
 		})
@@ -611,23 +612,23 @@ func TestCollector_Check(t *testing.T) {
 				gomock.InOrder(
 					m.EXPECT().MaxOids().Return(2),
 					m.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
-						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+						sysInfoResponseForTest(gosnmp.Version1, []gosnmp.SnmpPDU{
 							{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
 							{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
-						}},
+						}),
 						nil,
 					),
 					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
-						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+						sysInfoResponseForTest(gosnmp.Version1, []gosnmp.SnmpPDU{
 							{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
 							{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
-						}},
+						}),
 						nil,
 					),
 					m.EXPECT().Get([]string{snmputils.OidSysLocation}).Return(
-						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+						sysInfoResponseForTest(gosnmp.Version1, []gosnmp.SnmpPDU{
 							{Name: snmputils.OidSysLocation, Value: []byte("mock sysLocation"), Type: gosnmp.OctetString},
-						}},
+						}),
 						nil,
 					),
 				)
@@ -809,7 +810,8 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 
 			client := snmpmock.NewMockHandler(ctrl)
 			client.EXPECT().MaxOids().Return(20)
-			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
+			client.EXPECT().Version().Return(gosnmp.Version2c)
+			client.EXPECT().Get(sysInfoOIDsForTest()).Return(sysInfoResponseForTest(gosnmp.Version2c, tc.pdus), nil)
 
 			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
@@ -839,9 +841,10 @@ func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
 
 	client := snmpmock.NewMockHandler(ctrl)
 	client.EXPECT().MaxOids().Return(20)
-	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDsForTest()).Return(sysInfoResponseForTest(gosnmp.Version2c, []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
-	}}, nil).Times(1)
+	}), nil).Times(1)
 
 	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
@@ -1608,13 +1611,17 @@ func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().MaxOids().Return(20).MinTimes(1)
-	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(sysInfoResponseForTest(gosnmp.Version1, []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
 		{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
-	}}, nil).MinTimes(1)
+	}), nil).MinTimes(1)
+}
+
+func sysInfoResponseForTest(version gosnmp.SnmpVersion, pdus []gosnmp.SnmpPDU) *gosnmp.SnmpPacket {
+	return &gosnmp.SnmpPacket{Version: version, PDUType: gosnmp.GetResponse, Variables: pdus}
 }
 
 func sysInfoOIDsForTest() []string {
