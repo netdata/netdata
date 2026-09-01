@@ -102,6 +102,10 @@ func (g *tableRouteGraph) dependencies(req *tableCollectionRequest) []*tableColl
 	return g.dependenciesByRequest[req]
 }
 
+func (g *tableRouteGraph) hasDependents(route *tableCollectionRoute) bool {
+	return len(g.dependentsByRoute[route]) > 0
+}
+
 func (g *tableRouteGraph) dependents(route *tableCollectionRoute) []*tableCollectionRoute {
 	byOID := g.dependentsByRoute[route]
 	if len(byOID) == 0 {
@@ -335,7 +339,7 @@ func (s *tableCollectionSession) routeNeedsFresh(route *tableCollectionRoute) bo
 }
 
 func (s *tableCollectionSession) isDependencyOnlyTopologyRoute(route *tableCollectionRoute) bool {
-	if len(s.graph.dependents(route)) == 0 {
+	if !s.graph.hasDependents(route) {
 		return false
 	}
 	for _, req := range route.requests {

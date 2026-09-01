@@ -15,7 +15,17 @@ func (c *topologyBuilder) snapshotL3Interfaces(localDeviceID string) []topologym
 		return nil
 	}
 
-	ips := make([]string, 0, len(c.ipAddressesByIP))
+	count := 0
+	for _, resolved := range c.ipAddressesByIP {
+		if resolved.netmask != "" {
+			count++
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+
+	ips := make([]string, 0, count)
 	for ip, resolved := range c.ipAddressesByIP {
 		if resolved.netmask != "" {
 			ips = append(ips, ip)

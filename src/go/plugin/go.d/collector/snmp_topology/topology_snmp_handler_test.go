@@ -13,6 +13,7 @@ type topologySNMPRecHandler struct {
 	entries           []gosnmp.SnmpPDU
 	byOID             map[string]gosnmp.SnmpPDU
 	hiddenOIDPrefixes []string
+	walkRoots         []string
 }
 
 func newTopologySNMPHandler(entries []gosnmp.SnmpPDU) *topologySNMPRecHandler {
@@ -54,6 +55,7 @@ func (h *topologySNMPRecHandler) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, err
 
 func (h *topologySNMPRecHandler) walkAll(root string) []gosnmp.SnmpPDU {
 	root = strings.TrimPrefix(strings.TrimSpace(root), ".")
+	h.walkRoots = append(h.walkRoots, root)
 	prefix := root + "."
 	var out []gosnmp.SnmpPDU
 	for _, pdu := range h.entries {

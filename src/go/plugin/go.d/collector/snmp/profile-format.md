@@ -1455,7 +1455,7 @@ Audit recipe:
 
 ```bash
 rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
-rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipAddressAddr|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
 Any profile hit for a `not-accessible` object is valid only when the tag is

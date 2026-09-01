@@ -26,6 +26,7 @@ import (
 func TestTopologyProductionPath_CatalogFixtureReconcilesLegacyAndModernIPRows(t *testing.T) {
 	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "iosxe_c9800.snmprec"))
 	dev, profileMetrics := collectCatalogFixtureTopology(t, fixture)
+	requireModernIPAddressWalkEnvelope(t, fixture.walkRoots)
 
 	type sourceRows struct {
 		legacy map[string]string
@@ -78,6 +79,23 @@ func TestTopologyProductionPath_CatalogFixtureReconcilesLegacyAndModernIPRows(t 
 		Address: ip, AddressType: "ipv4", Source: "ip_mib",
 	})
 	require.Equal(t, "management_address", cache.trapMatchMethodByIP[ip])
+}
+
+func requireModernIPAddressWalkEnvelope(t testing.TB, walkRoots []string) {
+	t.Helper()
+	const entryOID = "1.3.6.1.2.1.4.34.1"
+	var modernRoots []string
+	for _, root := range walkRoots {
+		if root == entryOID || strings.HasPrefix(root, entryOID+".") {
+			modernRoots = append(modernRoots, root)
+		}
+	}
+	require.Len(t, modernRoots, 5, "modern IPv4 inventory must stay within the five-field wire envelope")
+	for _, root := range modernRoots {
+		parts := strings.Split(strings.TrimPrefix(root, entryOID+"."), ".")
+		require.Len(t, parts, 2, "modern route must be a narrow column root with a structural address-family suffix: %s", root)
+		require.Equal(t, "1", parts[1], "modern route must be constrained to the IPv4 InetAddressType index: %s", root)
+	}
 }
 
 func TestTopologyProductionPath_CatalogFixtureKeepsModernInventoryWithoutPrefix(t *testing.T) {

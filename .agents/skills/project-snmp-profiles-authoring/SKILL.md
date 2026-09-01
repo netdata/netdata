@@ -54,10 +54,11 @@ Use this skill before editing files under:
    indexes such as `InetAddress`.
 15. To constrain a topology table to a fixed structural index prefix, use one
     readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
-    Simple same-index cross-table dependencies inherit that prefix and are
-    anchor-gated. Do not rely on propagation for ordinary metrics, multiple
-    anchors, `lookup_symbol`, `index_transform`, or conflicting dependency
-    scopes.
+    A simple same-index cross-table dependency inherits that prefix and is
+    anchor-gated only when its target table has no symbol-bearing producer.
+    A target route with a real symbol owner remains eager. Do not rely on
+    propagation for ordinary metrics, multiple anchors, `lookup_symbol`,
+    `index_transform`, or conflicting dependency scopes.
 
 ## Device-Scoped MIB Deviations
 
@@ -152,7 +153,7 @@ rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+n
 For known topology-sensitive symbols, scan profile YAMLs before committing:
 
 ```bash
-rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
+rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipAddressAddr|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
 Any hit must be reviewed. It is valid only when the tag is index-derived without a `symbol.OID`, or when it satisfies every

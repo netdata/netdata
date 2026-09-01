@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"net/netip"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -42,7 +41,10 @@ func (c *topologyBuilder) updateOSPFNeighbor(tags map[string]string) {
 	c.ospfNeighborsByKey[topologyOSPFNeighborCacheKey(row)] = row
 }
 
-func (c *topologyBuilder) snapshotOSPFNeighbors(localDeviceID string) []topologymodel.OSPFNeighbor {
+func (c *topologyBuilder) snapshotOSPFNeighbors(
+	localDeviceID string,
+	l3Interfaces []topologymodel.L3Interface,
+) []topologymodel.OSPFNeighbor {
 	if c == nil || len(c.ospfNeighborsByKey) == 0 {
 		return nil
 	}
@@ -55,7 +57,7 @@ func (c *topologyBuilder) snapshotOSPFNeighbors(localDeviceID string) []topology
 		if row.LocalRouterID == "" {
 			row.LocalRouterID = topologyutil.NormalizeTopologyRouterID(c.localDevice.OSPFRouterID)
 		}
-		if iface, ok := c.matchOSPFNeighborLocalInterface(row.NeighborIP); ok {
+		if iface, ok := matchOSPFNeighborLocalInterface(row.NeighborIP, l3Interfaces); ok {
 			row.LocalIP = iface.IP
 			row.Network = iface.Network
 			row.Netmask = iface.Netmask
@@ -78,31 +80,21 @@ type topologyOSPFLocalInterfaceMatch struct {
 	Prefix  int
 }
 
-func (c *topologyBuilder) matchOSPFNeighborLocalInterface(neighborIP string) (topologyOSPFLocalInterfaceMatch, bool) {
-	neighbor, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(neighborIP))
-	if err != nil || !neighbor.Is4() {
+func matchOSPFNeighborLocalInterface(
+	neighborIP string,
+	l3Interfaces []topologymodel.L3Interface,
+) (topologyOSPFLocalInterfaceMatch, bool) {
+	neighbor, ok := topologyutil.ParseIPAddress(neighborIP)
+	if !ok || !neighbor.Is4() {
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
 	if neighbor.IsUnspecified() {
 		return topologyOSPFLocalInterfaceMatch{}, false
 	}
 
-	ips := make([]string, 0, len(c.ipAddressesByIP))
-	for ip, resolved := range c.ipAddressesByIP {
-		if resolved.netmask != "" {
-			ips = append(ips, ip)
-		}
-	}
-	sort.Strings(ips)
-
 	var best topologyOSPFLocalInterfaceMatch
 	found := false
-	for _, ip := range ips {
-		row, ok := c.ipL3Interface(ip)
-		if !ok {
-			continue
-		}
-		row.DeviceID = "local"
+	for _, row := range l3Interfaces {
 		subnet, ok := topologymodel.L3SubnetForInterface(row)
 		if !ok {
 			continue
