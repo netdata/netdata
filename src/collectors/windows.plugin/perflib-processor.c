@@ -469,7 +469,7 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
 
     common_interrupts(totalIPC, update_every, NULL);
 
-    return true;
+    return !topology_mapping_failed;
 }
 
 int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused)
