@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
@@ -28,9 +29,10 @@ const (
 	defaultDeleteObjective = 5 * time.Minute
 	defaultDeleteTimeout   = 15 * time.Minute
 
-	maxRequestTimeout = time.Minute
-	maxProbeHorizon   = 24 * time.Hour
-	maxPrefixBytes    = 900
+	maxRequestTimeout       = time.Minute
+	maxProbeHorizon         = 24 * time.Hour
+	maxPrefixBytes          = 900
+	maxConnectionNameLength = 64
 )
 
 type Config struct {
@@ -299,6 +301,8 @@ func (c *S3Config) validate(path string) error {
 	var errs []error
 	if strings.TrimSpace(c.Name) == "" || c.Name != strings.TrimSpace(c.Name) {
 		errs = append(errs, fmt.Errorf("%s.name must be non-empty and have no surrounding whitespace", path))
+	} else if utf8.RuneCountInString(c.Name) > maxConnectionNameLength {
+		errs = append(errs, fmt.Errorf("%s.name must not exceed %d characters", path, maxConnectionNameLength))
 	}
 	if strings.TrimSpace(c.Region) == "" || c.Region != strings.TrimSpace(c.Region) {
 		errs = append(errs, fmt.Errorf("%s.region must be non-empty and have no surrounding whitespace", path))

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -219,6 +220,12 @@ func TestS3ConfigStaticCredentialValidationUsesPublicPath(t *testing.T) {
 }
 
 func TestConfigValidationModeBoundaries(t *testing.T) {
+	t.Run("connection name matches schema limit", func(t *testing.T) {
+		cfg := validConfig(contract.ModeLifecycle)
+		cfg.ModeLifecycle.Source.Name = strings.Repeat("x", 65)
+		assert.ErrorContains(t, cfg.validate(), "source.name must not exceed 64 characters")
+	})
+
 	t.Run("lifecycle rejects non-selected mode config", func(t *testing.T) {
 		cfg := validConfig(contract.ModeLifecycle)
 		cfg.ModeCephMultisite = &ReplicationModeConfig{}
