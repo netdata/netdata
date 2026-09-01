@@ -1879,7 +1879,7 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02", "RGW-M-08", "RGW-M-09", "RGW-M-10",
 		"RGW-S-04", "RGW-S-12", "RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20", "RGW-S-20",
 		"RGW-M-03", "RGW-M-04", "RGW-S-01", "RGW-S-02", "RGW-S-03", "RGW-S-09", "RGW-S-13", "RGW-S-14",
-		"RGW-S-15", "RGW-M-05", "RGW-M-05", "RGW-S-11", "RGW-M-11", "RGW-S-24", "RGW-S-25",
+		"RGW-S-15", "RGW-M-05", "RGW-M-05", "RGW-M-05", "RGW-M-11", "RGW-S-24", "RGW-S-25",
 	}, cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
 	for name, extension := range manifest.NetdataExtensions {
 		require.NotEmptyf(t, extension.Reason, "%s has no extension rationale", name)
@@ -2140,29 +2140,29 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	expected := map[string]cephNetdataExtension{
-		"s3check_stage_failed": {
-			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.stage_status",
+		"s3check_runtime_failed": {
+			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.runtime_status",
 			Calc: "$failed", Units: "status", Recipient: "sysadmin",
 		},
-		"s3check_stage_latency": {
-			SOWID: "RGW-S-11", Owner: "s3check", Context: "s3check.stage_latency_status",
-			Calc: "$exceeded", Units: "status", Recipient: "silent",
-		},
-		"s3check_multisite_phase_failed": {
-			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.multisite_phase_failure",
+		"s3check_probe_failed": {
+			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.probe_status",
 			Calc: "$failed", Units: "status", Recipient: "sysadmin",
 		},
-		"s3check_multisite_payload_mismatch": {
-			SOWID: "RGW-M-11", Owner: "s3check", Context: "s3check.multisite_payload_mismatch",
+		"s3check_payload_mismatch": {
+			SOWID: "RGW-M-11", Owner: "s3check", Context: "s3check.payload_mismatch",
 			Calc: "$mismatch", Units: "status", Recipient: "sysadmin",
 		},
-		"s3check_multisite_replication_rpo_breach": {
-			SOWID: "RGW-S-24", Owner: "s3check", Context: "s3check.multisite_rpo_status",
+		"s3check_write_visibility_objective": {
+			SOWID: "RGW-S-24", Owner: "s3check", Context: "s3check.write_visibility_objective",
 			Calc: "$breached", Units: "status", Recipient: "silent",
 		},
-		"s3check_multisite_delete_propagation_breach": {
-			SOWID: "RGW-S-25", Owner: "s3check", Context: "s3check.multisite_delete_status",
+		"s3check_delete_visibility_objective": {
+			SOWID: "RGW-S-25", Owner: "s3check", Context: "s3check.delete_visibility_objective",
 			Calc: "$breached", Units: "status", Recipient: "silent",
+		},
+		"s3check_mutation_backpressure": {
+			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.mutation_backpressure",
+			Calc: "$active", Units: "status", Recipient: "sysadmin",
 		},
 	}
 	for name, want := range expected {
@@ -2197,12 +2197,12 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 		info[alert.Name] = alert.Info
 	}
 	require.Equal(t, map[string]string{
-		"s3check_stage_failed":                        "s3check.stage_status",
-		"s3check_stage_latency":                       "s3check.stage_latency_status",
-		"s3check_multisite_phase_failed":              "s3check.multisite_phase_failure",
-		"s3check_multisite_payload_mismatch":          "s3check.multisite_payload_mismatch",
-		"s3check_multisite_replication_rpo_breach":    "s3check.multisite_rpo_status",
-		"s3check_multisite_delete_propagation_breach": "s3check.multisite_delete_status",
+		"s3check_runtime_failed":              "s3check.runtime_status",
+		"s3check_probe_failed":                "s3check.probe_status",
+		"s3check_payload_mismatch":            "s3check.payload_mismatch",
+		"s3check_write_visibility_objective":  "s3check.write_visibility_objective",
+		"s3check_delete_visibility_objective": "s3check.delete_visibility_objective",
+		"s3check_mutation_backpressure":       "s3check.mutation_backpressure",
 	}, actual)
 
 	templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",
@@ -2250,7 +2250,7 @@ func TestCollector_CephDeliveredAlertMatrixComplete(t *testing.T) {
 		"RGW-S-03", "RGW-S-04", "RGW-S-09", "RGW-S-12", "RGW-S-13", "RGW-S-14", "RGW-S-15",
 		"RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20",
 		// P2-M01/P2-M02
-		"RGW-M-05", "RGW-S-11", "RGW-M-11", "RGW-S-24", "RGW-S-25",
+		"RGW-M-05", "RGW-M-11", "RGW-S-24", "RGW-S-25",
 	}
 
 	require.ElementsMatch(t, want, slices.Compact(slices.Sorted(slices.Values(got))))
