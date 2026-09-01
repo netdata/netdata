@@ -180,6 +180,17 @@
     group: "include"
     distro: "opensuse"
   quick_start: -1
+- <<: *linux
+  id: deploy-almalinux
+  meta:
+    <<: *linux_meta
+    name: AlmaLinux
+    link: https://almalinux.org/
+    icon_filename: "almalinux.svg"
+  platform_info:
+    group: "include"
+    distro: "almalinux"
+  quick_start: -1
 - id: deploy-macos
   meta:
     name: macOS
