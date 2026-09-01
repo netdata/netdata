@@ -494,7 +494,7 @@ int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused)
         return -1;
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock || do_processors(pDataBlock, object_name, processor_information, update_every))
+    if (pDataBlock && do_processors(pDataBlock, object_name, processor_information, update_every))
         return 0;
 
     if (!processor_information)
