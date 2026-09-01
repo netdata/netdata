@@ -1404,15 +1404,16 @@ int pgd_unittest(void) {
     // after test_dbengine() has exercised these same arals, so "there is only one page"
     // does NOT hold here - it only holds for a standalone -W pgdtest.
     //
-    // pgd_alloc() picks its aral by gettid_cached() % partitions, so two allocations on this
-    // thread come from the same aral, and aral fills a page's slots consecutively. Keeping
-    // `pin` alive therefore keeps that page's used_elements > 0 for as long as we read `pg`,
-    // which makes the page undeletable rather than merely unlikely to be deleted.
+    // pgd_alloc() picks its aral by gettid_cached() % partitions, so both allocations on this
+    // thread come from the same aral. But same aral does NOT mean same page: if `pin` takes
+    // the last free slot of the current page, the next allocation starts a fresh one, and a
+    // pin on a different page holds nothing. So the pin is not sufficient on its own - it is
+    // verified below, and the read-back is skipped when it cannot be proven.
     //
     // Worth being precise about the hazard: these arals are created with mmap=false
-    // (page.c:518), so a deleted page is freez()'d, not nd_munmap()'d - the stale read would
-    // be a heap use-after-free, not a fault. Still UB, and invisible here because ASAN skips
-    // this test, which is exactly why the pin is structural instead of probabilistic.
+    // (page.c:518), so a deleted page is freez()'d, not nd_munmap()'d - a stale read would be
+    // a heap use-after-free, not a fault. Still UB, and invisible here because ASAN skips
+    // this test - which is why it is proven rather than assumed.
     PGD *pin = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
 
     PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
@@ -1429,24 +1430,42 @@ int pgd_unittest(void) {
         errors++;
     }
 
+    // Prove `pin` shares pg's page before trusting it. aral hands out consecutive slots
+    // within a page, so if the two elements are exactly one slot apart they are on the same
+    // page - and `pin` then keeps that page's used_elements > 0, which is what makes it
+    // undeletable (the delete at aral.c:1265 requires used_elements == 0). Distinct pages are
+    // separate mallocs with their own headers, so they cannot be exactly one slot apart.
+    size_t slot = aral_actual_element_size(pgd_alloc_globals.aral_pgd[pg->partition]);
+    uintptr_t a = (uintptr_t)pg, b = (uintptr_t)pin;
+    bool pinned = (a > b ? a - b : b - a) == (uintptr_t)slot;
+
     pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 
-    // Reading pg back is deliberate, and safe only because `pin` above holds the page.
-    // Everything below 2*sizeof(void*) now belongs to aral's free-list header.
-    //
-    // This is the detector's own contract: a second free must see the FIRST freer's site.
-    // We exercise the exact claim the fatal path reads, rather than calling pgd_free()
-    // again - that would fatal and take this process down with it.
-    uint16_t previous = pgd_claim_freed(pg, PGD_FREE_SITE_CREATE_BAD_TYPE);
-    if(!pgd_mark_is_freed(previous)) {
-        fprintf(stderr, "PGD: a freed PGD does not carry the freed mark - the guard is disarmed\n");
-        errors++;
+    if(!pinned) {
+        // Rare: pin landed on the previous page's last slot. Reading pg back would be a
+        // genuine use-after-free, so skip it rather than commit the UB this test exists to
+        // reason about. Not an error - the coverage is simply unavailable this run.
+        fprintf(stderr, "PGD: skipping the freed-slot read-back - the pin is on another aral "
+                        "page, so the freed page could be deleted under us\n");
     }
-    else if((PGD_FREE_SITE)(previous & 0xFFU) != PGD_FREE_SITE_UNITTEST) {
-        fprintf(stderr, "PGD: the freed mark reports the wrong first-free site (%s) - "
-                        "the site is the whole point of the mark\n",
-                pgd_free_site_name((PGD_FREE_SITE)(previous & 0xFFU)));
-        errors++;
+    else {
+        // Reading pg back is deliberate, and safe because `pin` provably holds the page.
+        // Everything below 2*sizeof(void*) now belongs to aral's free-list header.
+        //
+        // This is the detector's own contract: a second free must see the FIRST freer's site.
+        // We exercise the exact claim the fatal path reads, rather than calling pgd_free()
+        // again - that would fatal and take this process down with it.
+        uint16_t previous = pgd_claim_freed(pg, PGD_FREE_SITE_CREATE_BAD_TYPE);
+        if(!pgd_mark_is_freed(previous)) {
+            fprintf(stderr, "PGD: a freed PGD does not carry the freed mark - the guard is disarmed\n");
+            errors++;
+        }
+        else if((PGD_FREE_SITE)(previous & 0xFFU) != PGD_FREE_SITE_UNITTEST) {
+            fprintf(stderr, "PGD: the freed mark reports the wrong first-free site (%s) - "
+                            "the site is the whole point of the mark\n",
+                    pgd_free_site_name((PGD_FREE_SITE)(previous & 0xFFU)));
+            errors++;
+        }
     }
 
     // The use-after-free guard reads the SAME mark the double-free guard writes, and the
@@ -1462,32 +1481,36 @@ int pgd_unittest(void) {
     pgd_check_alive(NULL, "unittest: NULL must be accepted");
     pgd_check_alive(PGD_EMPTY, "unittest: PGD_EMPTY must be accepted");
 
-    // pgd_alloc() must clear the mark, or every FIRST free of a recycled slot would be
-    // misreported as a double free, AND every first USE of it as a use-after-free. Test the
-    // clear directly - which slot aral hands back next is not ours to predict.
-    pgd_clear_freed(pg);
+    // Everything below reads or writes the freed `pg`, so it runs only while the pin
+    // provably holds its page.
+    if(pinned) {
+        // pgd_alloc() must clear the mark, or every FIRST free of a recycled slot would be
+        // misreported as a double free, AND every first USE of it as a use-after-free. Test
+        // the clear directly - which slot aral hands back next is not ours to predict.
+        pgd_clear_freed(pg);
 
-    // a cleared mark must make the use guard quiet again
-    pgd_check_alive(pg, "unittest: a cleared mark must read as live");
-    if(pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
-        fprintf(stderr, "PGD: clearing the freed mark did not clear it\n");
-        errors++;
-    }
+        // a cleared mark must make the use guard quiet again
+        pgd_check_alive(pg, "unittest: a cleared mark must read as live");
+        if(pgd_mark_is_freed(__atomic_load_n(&pg->raw.freed_mark, __ATOMIC_RELAXED))) {
+            fprintf(stderr, "PGD: clearing the freed mark did not clear it\n");
+            errors++;
+        }
 
 #if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
-    // Pin the LP64 mechanism this guard exists to describe: aral's 16-byte free-list header
-    // makes a freed PGD read back as ARRAY_32BIT in partition 0, which is what lets a
-    // second pgd_free() misroute silently. The guard is correct either way, but if this
-    // stops holding, the comments in this file and the fatal's wording are stale.
-    if(pg->type != RRDENG_PAGE_TYPE_ARRAY_32BIT || pg->partition != 0) {
-        fprintf(stderr,
-                "PGD: aral's free-list header no longer makes a freed PGD read back as "
-                "ARRAY_32BIT/partition 0 (type %u, partition %u) - re-check ARAL_FREE in "
-                "aral.c against struct pgd\n",
-                (unsigned)pg->type, (unsigned)pg->partition);
-        errors++;
-    }
+        // Pin the LP64 mechanism this guard exists to describe: aral's 16-byte free-list
+        // header makes a freed PGD read back as ARRAY_32BIT in partition 0, which is what
+        // lets a second pgd_free() misroute silently. The guard is correct either way, but
+        // if this stops holding, the comments in this file and the fatal's wording are stale.
+        if(pg->type != RRDENG_PAGE_TYPE_ARRAY_32BIT || pg->partition != 0) {
+            fprintf(stderr,
+                    "PGD: aral's free-list header no longer makes a freed PGD read back as "
+                    "ARRAY_32BIT/partition 0 (type %u, partition %u) - re-check ARAL_FREE in "
+                    "aral.c against struct pgd\n",
+                    (unsigned)pg->type, (unsigned)pg->partition);
+            errors++;
+        }
 #endif
+    }
 
     // every read of the freed `pg` is done - the page may be released now
     pgd_free(pin, PGD_FREE_SITE_UNITTEST);
