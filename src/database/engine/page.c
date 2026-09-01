@@ -1397,9 +1397,29 @@ int pgd_unittest(void) {
     if(!pgd_alloc_globals.partitions)
         pgd_init_arals();
 
+    // Pin the aral page before allocating the PGD under test. This test deliberately reads
+    // `pg` back AFTER freeing it, and aral_freez_internal() deletes a page that has become
+    // FULLY free whenever another page still has free items (aral.c:1265; the delete is
+    // gated on used_elements == 0). pgd_unittest() runs at position 33 of -W unittest, well
+    // after test_dbengine() has exercised these same arals, so "there is only one page"
+    // does NOT hold here - it only holds for a standalone -W pgdtest.
+    //
+    // pgd_alloc() picks its aral by gettid_cached() % partitions, so two allocations on this
+    // thread come from the same aral, and aral fills a page's slots consecutively. Keeping
+    // `pin` alive therefore keeps that page's used_elements > 0 for as long as we read `pg`,
+    // which makes the page undeletable rather than merely unlikely to be deleted.
+    //
+    // Worth being precise about the hazard: these arals are created with mmap=false
+    // (page.c:518), so a deleted page is freez()'d, not nd_munmap()'d - the stale read would
+    // be a heap use-after-free, not a fault. Still UB, and invisible here because ASAN skips
+    // this test, which is exactly why the pin is structural instead of probabilistic.
+    PGD *pin = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
+
     PGD *pg = pgd_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 16);
-    if(!pg || pg == PGD_EMPTY) {
+    if(!pg || pg == PGD_EMPTY || !pin || pin == PGD_EMPTY) {
         fprintf(stderr, "PGD: cannot create a page to test with\n");
+        if(pin && pin != PGD_EMPTY) pgd_free(pin, PGD_FREE_SITE_UNITTEST);
+        if(pg && pg != PGD_EMPTY) pgd_free(pg, PGD_FREE_SITE_UNITTEST);
         return 1;
     }
 
@@ -1411,11 +1431,8 @@ int pgd_unittest(void) {
 
     pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 
-    // Reading pg back is deliberate. It is safe HERE - not in general - because this aral
-    // has a single page and aral_freez_internal() keeps the last page with free items
-    // (aral.c:1275) instead of unmapping it. In production a fully-freed page CAN be
-    // unmapped; see the "Unmapping" boundary noted with the guard above. Everything below
-    // 2*sizeof(void*) now belongs to aral's free-list header.
+    // Reading pg back is deliberate, and safe only because `pin` above holds the page.
+    // Everything below 2*sizeof(void*) now belongs to aral's free-list header.
     //
     // This is the detector's own contract: a second free must see the FIRST freer's site.
     // We exercise the exact claim the fatal path reads, rather than calling pgd_free()
@@ -1471,6 +1488,9 @@ int pgd_unittest(void) {
         errors++;
     }
 #endif
+
+    // every read of the freed `pg` is done - the page may be released now
+    pgd_free(pin, PGD_FREE_SITE_UNITTEST);
 
     if(errors)
         fprintf(stderr, "PGD: lifetime-guard test FAILED with %d error(s)\n", errors);
