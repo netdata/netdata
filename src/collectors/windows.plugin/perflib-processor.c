@@ -173,13 +173,13 @@ static bool processor_topology_from_extended_api(struct processor_topology *topo
     BYTE *end = (BYTE *)buffer + buffer_length;
     for (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX entry = buffer; (BYTE *)entry < end;
          entry = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)((BYTE *)entry + entry->Size)) {
+        if (entry->Relationship != RelationGroup)
+            continue;
+
         size_t group_header_size =
             offsetof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, Group) + offsetof(GROUP_RELATIONSHIP, GroupInfo);
         if (entry->Size < group_header_size || (BYTE *)entry + entry->Size > end)
             goto cleanup;
-
-        if (entry->Relationship != RelationGroup)
-            continue;
 
         group_count = entry->Group.ActiveGroupCount;
         if (!group_count || (size_t)(entry->Size - group_header_size) / sizeof(*entry->Group.GroupInfo) < group_count)
@@ -197,13 +197,13 @@ static bool processor_topology_from_extended_api(struct processor_topology *topo
 
     for (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX entry = buffer; (BYTE *)entry < end;
          entry = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)((BYTE *)entry + entry->Size)) {
+        if (entry->Relationship != RelationNumaNode)
+            continue;
+
         size_t numa_header_size = offsetof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, NumaNode) +
                                   offsetof(struct processor_numa_node_relationship, group_masks);
         if (entry->Size < numa_header_size || (BYTE *)entry + entry->Size > end)
             goto cleanup;
-
-        if (entry->Relationship != RelationNumaNode)
-            continue;
 
         const struct processor_numa_node_relationship *numa = (const void *)&entry->NumaNode;
         WORD node_group_count = numa->group_count;
