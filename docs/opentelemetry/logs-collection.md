@@ -1,6 +1,6 @@
 # Collect Logs with OpenTelemetry Collector
 
-Use these recipes to send systemd journal entries and application log files through an OpenTelemetry Collector to Netdata. For network-device syslog, use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md).
+Use these recipes to send systemd journal entries, application log files, Windows event channels, Kubernetes container logs, and the macOS unified log through an OpenTelemetry Collector to Netdata. For network-device syslog, use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md). For when to centralize a source at all, see [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
 Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
@@ -15,6 +15,35 @@ exporters:
     tls:
       insecure: true
 ```
+
+When the Collector sends to a remote Netdata Agent, use TLS, select the tenant, and give the exporter a persistent
+queue so a Collector restart or a network outage does not lose records:
+
+```yaml
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol/netdata
+    create_directory: true
+
+exporters:
+  otlp_grpc/netdata:
+    endpoint: "logs.example.com:4317"
+    tls:
+      ca_file: /etc/otelcol/netdata-ca.pem
+      # For mutual TLS, add the client certificate and key:
+      # cert_file: /etc/otelcol/client-cert.pem
+      # key_file: /etc/otelcol/client-key.pem
+    headers:
+      X-Scope-OrgID: production
+    sending_queue:
+      storage: file_storage
+
+service:
+  extensions: [file_storage]
+```
+
+The receiving Agent's endpoint, TLS, and tenant settings are described in
+[Accept remote senders securely](/docs/opentelemetry/otlp-ingestion.md#accept-remote-senders-securely).
 
 Set `service.name` and, when useful, `service.namespace` as resource attributes so operators can identify each stream consistently in the Netdata Logs tab.
 
@@ -182,6 +211,176 @@ Configure exactly one of `line_start_pattern` or `line_end_pattern`. Test the ex
 
 See the pinned upstream [file log receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/filelogreceiver) for rotation behavior, retry settings, maximum record size, supported encodings, and the complete operator set.
 
+## Windows event channels
+
+Install the Collector as a Windows service and use one `windowseventlog` receiver per channel. The service account
+needs read access to each channel; the Security channel in particular requires it explicitly.
+
+```yaml
+extensions:
+  file_storage:
+    directory: C:\ProgramData\otelcol\netdata
+    create_directory: true
+
+receivers:
+  windowseventlog/application:
+    channel: Application
+    start_at: end
+    storage: file_storage
+  windowseventlog/system:
+    channel: System
+    start_at: end
+    storage: file_storage
+  windowseventlog/security:
+    channel: Security
+    start_at: end
+    storage: file_storage
+
+processors:
+  resource/windows:
+    attributes:
+      - key: service.namespace
+        value: windows
+        action: upsert
+      - key: service.name
+        value: event-log
+        action: upsert
+
+service:
+  extensions: [file_storage]
+  pipelines:
+    logs:
+      receivers: [windowseventlog/application, windowseventlog/system, windowseventlog/security]
+      processors: [resource/windows]
+      exporters: [otlp_grpc/netdata]
+```
+
+On a Windows Event Collector, add a receiver for the `ForwardedEvents` channel to centralize what the forwarders send.
+The `storage` extension keeps a bookmark per channel, so a restart resumes where it stopped. Event bodies are
+structured records by default; set `raw: true` to keep the original XML instead. The receiver builds only on Windows,
+so validate this configuration on a Windows host.
+
+## Kubernetes and containers
+
+Container logs are files under `/var/log/pods` on each node, not journal entries. Run the Collector as a DaemonSet with
+the OpenTelemetry Collector Helm chart, whose `logsCollection` preset configures the file receiver and the container
+log parser, and whose `kubernetesAttributes` preset adds pod, namespace, and workload metadata:
+
+```yaml
+mode: daemonset
+
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+
+presets:
+  logsCollection:
+    enabled: true
+    includeCollectorLogs: false
+    storeCheckpoints: true
+  kubernetesAttributes:
+    enabled: true
+
+extraVolumes:
+  - name: netdata-ca
+    secret:
+      secretName: netdata-ca
+extraVolumeMounts:
+  - name: netdata-ca
+    mountPath: /etc/otelcol/netdata-ca.pem
+    subPath: ca.pem
+    readOnly: true
+
+config:
+  processors:
+    k8sattributes:
+      extract:
+        metadata:
+          - k8s.namespace.name
+          - k8s.pod.name
+          - k8s.container.name
+          - k8s.deployment.name
+          - k8s.node.name
+          - service.namespace
+          - service.name
+  exporters:
+    otlp_grpc/netdata:
+      endpoint: "logs.example.com:4317"
+      tls:
+        ca_file: /etc/otelcol/netdata-ca.pem
+      headers:
+        X-Scope-OrgID: kubernetes
+  service:
+    pipelines:
+      logs:
+        exporters: [otlp_grpc/netdata]
+```
+
+```bash
+kubectl create namespace otel-logs
+kubectl -n otel-logs create secret generic netdata-ca --from-file=ca.pem=/path/to/netdata-ca.pem
+helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+helm install otel-logs open-telemetry/opentelemetry-collector -n otel-logs -f values.yaml
+```
+
+The `k8sattributes` processor derives `service.namespace` and `service.name` from the pod's labels and annotations
+following the OpenTelemetry semantic conventions, so each workload appears as its own service in the Logs tab; the
+container parser adds the pod, namespace, and container from the file path. `storeCheckpoints` keeps file offsets in
+`/var/lib/otelcol` on the node so a Collector restart does not replay or skip lines. The values above are validated
+by rendering them with the `opentelemetry-collector` Helm chart 0.172.0 and validating the resulting Collector
+configuration with Contrib 0.157.0.
+
+Without Helm, the receiver the preset generates is:
+
+```yaml
+receivers:
+  filelog:
+    include: [/var/log/pods/*/*/*.log]
+    start_at: end
+    include_file_path: true
+    include_file_name: false
+    retry_on_failure:
+      enabled: true
+    storage: file_storage
+    operators:
+      - type: container
+        id: container-parser
+```
+
+Mount `/var/log/pods` and `/var/lib/otelcol` from the node into the Collector pod, and grant the service account the
+read permissions the `k8sattributes` processor needs (pods, namespaces, and replica sets across the cluster).
+
+## macOS unified log
+
+macOS has no OS-native log forwarding. The Collector Contrib `macos_unified_logging` receiver, at alpha stability,
+runs the macOS `log` command and streams the unified log:
+
+```yaml
+receivers:
+  macos_unified_logging:
+    max_log_age: 1h
+    max_poll_interval: 30s
+
+processors:
+  resource/macos:
+    attributes:
+      - key: service.namespace
+        value: macos
+        action: upsert
+      - key: service.name
+        value: unified-log
+        action: upsert
+
+service:
+  pipelines:
+    logs:
+      receivers: [macos_unified_logging]
+      processors: [resource/macos]
+      exporters: [otlp_grpc/netdata]
+```
+
+`max_log_age` bounds how far back the receiver reads on its first start. Run the Collector as a `launchd` service
+with permission to read system logs. The receiver builds only on macOS, so validate this configuration on a Mac.
+
 ## Syslog
 
 The Collector Contrib `syslog` receiver can listen over TCP or UDP and parse RFC 3164 or RFC 5424 records. Netdata maintains a separate end-to-end guide because durable network ingestion also requires listener exposure, firewall rules, transport choices, and persistent Collector queues. Follow [Collect syslog with the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md) instead of duplicating that configuration here.
@@ -193,3 +392,6 @@ The Collector Contrib `syslog` receiver can listen over TCP or UDP and parse RFC
 - If existing file lines are absent, check `start_at` and whether a saved cursor or offset already exists. Do not delete storage state casually; doing so can replay data.
 - If the Collector reports successful export but records are absent, inspect their timestamps. Netdata accepts records from up to 24 hours in the past through 10 minutes in the future and reports rejected records through OTLP `partial_success`.
 - If records are duplicated after restart, enable a `file_storage` extension and reference it from the receiver. Confirm that its directory survives service and container restarts.
+- On Windows, if a channel is missing, check that the Collector service account can read it; the Security channel needs explicit permission.
+- On Kubernetes, if pods show no logs, check the DaemonSet pods with `kubectl logs` for file permission errors on `/var/log/pods` and for RBAC errors from the `k8sattributes` processor.
+- On macOS, if the receiver reports permission errors, run the Collector with an account allowed to read system logs with the `log` command.

@@ -34,10 +34,10 @@ an OS log store, such as Kubernetes.
 | Servers and VMs whose logs you need for troubleshooting | In place. Retention follows the node's own log policy, and the logs live as long as the node does. |
 | Logs that must outlive the node: audit trails, forensics, retention mandates | [Centralize these sources with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) into Netdata's log store; leave everything else in place. |
 | You already aggregate journals or Windows events with `systemd-journal-remote` or Windows Event Forwarding | Install Netdata on the aggregation point. The aggregated logs stay in native format for your existing tooling. |
-| Kubernetes and containers | Run the [OpenTelemetry Collector in the cluster](/docs/logs/centralizing-logs-with-opentelemetry.md#kubernetes-and-containers) and ship container logs to Netdata's log store. |
+| Kubernetes and containers | Run the [OpenTelemetry Collector in the cluster](/docs/opentelemetry/logs-collection.md#kubernetes-and-containers) and ship container logs to Netdata's log store. |
 | Application text files | Convert them to journal entries with `log2journal` to keep using `journalctl` and your SIEM on them, or ship them with an OpenTelemetry Collector. |
 | Network devices sending syslog | An OpenTelemetry Collector syslog receiver forwarding to Netdata. |
-| Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Network Flows](/docs/npm/network-flows/README.md). |
+| Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md). |
 | macOS | In place. macOS has no OS-native log forwarding; to centralize, use the OpenTelemetry Collector's macOS receiver. |
 
 Any mix works. Centralization points do not need to be infrastructure-wide: run one per team, environment, or
@@ -54,8 +54,8 @@ centralization point in one dashboard with one role-based access model.
 | [OpenTelemetry logs](/src/crates/otel-plugin/README.md) | Any, via OTLP | Netdata's indexed log store | Logs tab, `otel-logs` |
 | Text log files | Any | A journal, through [log2journal](/src/collectors/log2journal/README.md); or Netdata's log store, through an [OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md) | Logs tab, `systemd-journal` or `otel-logs` |
 | [Network device syslog](/docs/npm/syslog/README.md) | Network devices | Netdata's log store, through an OpenTelemetry Collector | Logs tab, `otel-logs` |
-| [SNMP traps](/docs/npm/snmp-traps/README.md) | Network devices | Journal-compatible files written by Netdata under its log directory | Logs tab, `snmp:traps` (SNMP Trap Logs) |
-| [Network flows](/docs/npm/network-flows/README.md) (NetFlow, sFlow, IPFIX) | Network devices | Journal-compatible files written by Netdata under its cache directory, in four time tiers | The Network Flows view |
+| [SNMP traps](/docs/logs/snmp-trap-logs.md) | Network devices | Journal-compatible files written by Netdata under its log directory | Logs tab, `snmp:traps` (SNMP Trap Logs) |
+| [Network flows](/docs/logs/network-flows.md) (NetFlow, sFlow, IPFIX) | Network devices | Journal-compatible files written by Netdata under its cache directory, in four time tiers | The Network Flows view |
 
 ## One interface for every source
 
@@ -94,11 +94,11 @@ runs the same service inside your own infrastructure.
   [log2journal](/src/collectors/log2journal/README.md) and
   [systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md).
 - [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) — which sources to
-  centralize and the Collector recipes for each.
+  centralize and what to set up; the Collector recipes live in the OpenTelemetry pages.
 - [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) — retention settings per tier, offloading to
   object storage, and sizing.
-- [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Network Flows](/docs/npm/network-flows/README.md) — the journals
-  Netdata writes for network devices, documented under Network Performance Monitoring.
+- [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md) — the journals
+  Netdata writes for network devices.
 - Integrations — the per-source integration cards.
 - OpenTelemetry — [OTLP ingestion](/docs/opentelemetry/otlp-ingestion.md),
   [logs collection](/docs/opentelemetry/logs-collection.md),

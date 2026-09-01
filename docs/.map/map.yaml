@@ -501,8 +501,8 @@ sidebar:
           - meta:
               label: Logs Collection
               edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md
-              description: Collect systemd journal, application file, and syslog records through OpenTelemetry Collector receivers
-              keywords: [opentelemetry, otel, journald, filelog, syslog, logs, receivers]
+              description: Collect systemd journal, application file, Windows event channel, Kubernetes container, macOS unified log, and syslog records through OpenTelemetry Collector receivers
+              keywords: [opentelemetry, otel, journald, filelog, windows event log, kubernetes, macos, syslog, logs, receivers]
           - meta:
               label: Transformations
               edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md
@@ -847,6 +847,16 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/macos-logs.plugin/README.md
           path: macOS Unified Logs
       - meta:
+          label: SNMP Trap Logs
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/snmp-trap-logs.md
+          description: SNMP traps as journal-compatible files written by Netdata — where they are stored, how they are queried in the Logs tab and with journalctl, and where the collector is documented.
+          keywords: [snmp traps, logs, journal, journalctl, network devices]
+      - meta:
+          label: Network Flows
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/network-flows.md
+          description: NetFlow, sFlow, and IPFIX flows as journal-compatible files written by Netdata — the four storage tiers, retention, journalctl access, and where the plugin is documented.
+          keywords: [netflow, sflow, ipfix, network flows, logs, journal, journalctl]
+      - meta:
           label: Text Files to Journals
           edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/text-files-to-journals.md
           description: Bring application text log files under Netdata logs management — convert them to structured journal entries with log2journal, or ship them as OpenTelemetry logs, and when each path is the right one.
@@ -862,8 +872,8 @@ sidebar:
       - meta:
           label: Centralizing Logs with OpenTelemetry
           edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/centralizing-logs-with-opentelemetry.md
-          description: Centralize selected log sources into Netdata's log store with an OpenTelemetry Collector — Linux journals, Windows event channels, Kubernetes containers, macOS, text files, and syslog.
-          keywords: [logs, centralization, opentelemetry, otlp, collector, kubernetes, journald, windows event log, macos, syslog]
+          description: When to centralize a log source into Netdata's log store with OpenTelemetry, and the two things to set up — the receiving Agent and the Collector recipes per source.
+          keywords: [logs, centralization, opentelemetry, otlp, collector, tenant, object storage]
       - meta:
           label: Log Storage and Retention
           edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/log-storage-and-retention.md

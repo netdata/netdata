@@ -7,7 +7,7 @@ Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry
 | Situation                                                                           | Recommended path                                                                             |
 |:------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------|
 | Netdata is the only consumer of host or application metrics                         | Use Netdata's [native collectors](/src/collectors/COLLECTORS.md)                             |
-| An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata with this guide                                                  |
+| An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata as described below                                               |
 | Network devices send syslog                                                         | Use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) |
 
 The Netdata Agent receives OTLP metrics and logs. It does not currently expose a public trace-ingestion workflow.
@@ -128,7 +128,7 @@ The default loopback endpoint is the safe choice for a same-host Collector. To r
 4. Restart the Netdata Agent to apply the `otel.yaml` changes.
 5. Configure matching CA and, for mutual TLS, client certificate settings in the sender.
 
-Do not expose a plaintext `0.0.0.0:4317` listener. The optional `auth.enabled` setting requires an `X-Scope-OrgID` header for log tenant selection, but it does not authenticate the sender. See the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for the full public endpoint, tenant, retention, mapping, and remote-storage configuration.
+Do not expose a plaintext `0.0.0.0:4317` listener. The optional `auth.enabled` setting requires an `X-Scope-OrgID` header for log tenant selection, but it does not authenticate the sender. Each tenant has its own retention policy and storage tree; see [Log Storage and Retention](/docs/logs/log-storage-and-retention.md). See the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for the full public endpoint, tenant, retention, mapping, and remote-storage configuration.
 
 ## Troubleshoot the pipeline
 
