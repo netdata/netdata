@@ -604,6 +604,44 @@ func TestCollector_Check(t *testing.T) {
 			},
 		},
 
+		"success: chunks sysInfo by configured max OIDs": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpectWithMaxOids(m, 2)
+				gomock.InOrder(
+					m.EXPECT().MaxOids().Return(2),
+					m.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
+							{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
+						}},
+						nil,
+					),
+					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
+							{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
+						}},
+						nil,
+					),
+					m.EXPECT().Get([]string{snmputils.OidSysLocation}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysLocation, Value: []byte("mock sysLocation"), Type: gosnmp.OctetString},
+						}},
+						nil,
+					),
+				)
+
+				c := newTestSNMPCollector()
+				c.Config = prepareV2Config()
+				c.Options.MaxOIDs = 2
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
+			},
+		},
+
 		"failure: SNMP connect error": {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
@@ -1537,7 +1575,18 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().Connect().Return(nil).AnyTimes()
 }
 
+func setMockClientInitExpectWithMaxOids(m *snmpmock.MockHandler, maxOids int) {
+	setMockClientSetterExpectWithoutMaxOids(m)
+	m.EXPECT().SetMaxOids(maxOids).Times(2)
+	m.EXPECT().Connect().Return(nil).AnyTimes()
+}
+
 func setMockClientSetterExpect(m *snmpmock.MockHandler) {
+	setMockClientSetterExpectWithoutMaxOids(m)
+	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
+}
+
+func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
@@ -1546,7 +1595,6 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().SetPort(gomock.Any()).AnyTimes()
 	m.EXPECT().SetRetries(gomock.Any()).AnyTimes()
 	m.EXPECT().SetMaxRepetitions(gomock.Any()).AnyTimes()
-	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
 	m.EXPECT().SetLogger(gomock.Any()).AnyTimes()
 	m.EXPECT().SetTimeout(gomock.Any()).AnyTimes()
 	m.EXPECT().SetCommunity(gomock.Any()).AnyTimes()

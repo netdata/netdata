@@ -153,8 +153,23 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, oids []string) ([]gosnmp.SnmpPDU
 
 		switch packet.Error {
 		case gosnmp.NoError:
+			if packet.ErrorIndex != 0 {
+				return nil, fmt.Errorf(
+					"get SNMP system scalars: response error %s with nonzero error index %d",
+					packet.Error,
+					packet.ErrorIndex,
+				)
+			}
 			return packet.Variables, nil
 		case gosnmp.NoSuchName:
+			if packet.Version != gosnmp.Version1 {
+				return nil, fmt.Errorf(
+					"get SNMP system scalars: unexpected response error %s for SNMP version %s (index %d)",
+					packet.Error,
+					packet.Version,
+					packet.ErrorIndex,
+				)
+			}
 			idx := int(packet.ErrorIndex)
 			if idx < 1 || idx > len(oids) {
 				return nil, fmt.Errorf(

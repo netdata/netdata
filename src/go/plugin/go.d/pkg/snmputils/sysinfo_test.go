@@ -90,7 +90,7 @@ func TestGetSysInfoReturnsPartialProbeWithoutIdentityError(t *testing.T) {
 
 	client := snmpmock.NewMockHandler(ctrl)
 	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
-	client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+	client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{Version: gosnmp.Version2c, Variables: []gosnmp.SnmpPDU{
 		{Name: OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
 		{Name: OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
 	}}, nil)
@@ -171,6 +171,7 @@ func TestGetSysInfoReturnsErrorForNilResponse(t *testing.T) {
 
 func TestGetSysInfoReturnsPacketErrors(t *testing.T) {
 	tests := map[string]struct {
+		version    gosnmp.SnmpVersion
 		status     gosnmp.SNMPError
 		errorIndex uint8
 		wantError  string
@@ -194,6 +195,17 @@ func TestGetSysInfoReturnsPacketErrors(t *testing.T) {
 			errorIndex: 6,
 			wantError:  "invalid error index 6",
 		},
+		"no such name from v2c response": {
+			version:    gosnmp.Version2c,
+			status:     gosnmp.NoSuchName,
+			errorIndex: 2,
+			wantError:  "unexpected response error NoSuchName for SNMP version 2c",
+		},
+		"no error with nonzero index": {
+			status:     gosnmp.NoError,
+			errorIndex: 1,
+			wantError:  "response error NoError with nonzero error index 1",
+		},
 	}
 
 	for name, test := range tests {
@@ -204,6 +216,7 @@ func TestGetSysInfoReturnsPacketErrors(t *testing.T) {
 			client := snmpmock.NewMockHandler(ctrl)
 			client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
 			client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{
+				Version:    test.version,
 				Error:      test.status,
 				ErrorIndex: test.errorIndex,
 			}, nil)
@@ -222,7 +235,7 @@ func TestGetSysInfoReturnsPartialResultForExceptionPDUs(t *testing.T) {
 
 	client := snmpmock.NewMockHandler(ctrl)
 	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
-	client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+	client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{Version: gosnmp.Version2c, Variables: []gosnmp.SnmpPDU{
 		{Name: OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
 		{Name: OidSysObject, Type: gosnmp.NoSuchInstance},
 		{Name: OidSysContact, Type: gosnmp.NoSuchObject},
@@ -253,6 +266,7 @@ func TestGetSysInfoRetriesIndexedNoSuchName(t *testing.T) {
 			{Name: OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1166"},
 		}}, nil),
 		client.EXPECT().Get([]string{OidSysContact, OidSysName}).Return(&gosnmp.SnmpPacket{
+			Version:    gosnmp.Version1,
 			Error:      gosnmp.NoSuchName,
 			ErrorIndex: 1,
 		}, nil),
@@ -282,7 +296,7 @@ func TestGetSysInfoNoSuchNameRetriesAreBounded(t *testing.T) {
 	client.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
 		requestCount++
 		assert.Len(t, oids, 6-requestCount)
-		return &gosnmp.SnmpPacket{Error: gosnmp.NoSuchName, ErrorIndex: 1}, nil
+		return &gosnmp.SnmpPacket{Version: gosnmp.Version1, Error: gosnmp.NoSuchName, ErrorIndex: 1}, nil
 	}).Times(5)
 
 	si, err := GetSysInfo(client)
