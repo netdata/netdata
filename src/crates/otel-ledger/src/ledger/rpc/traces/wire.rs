@@ -56,6 +56,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "anchor",
     "selections",
     "min_trace_duration_ns",
+    "max_trace_duration_ns",
     "overview_facets",
 ];
 
@@ -102,6 +103,8 @@ struct RawOtelTracesRequest {
     anchor: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     min_trace_duration_ns: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    max_trace_duration_ns: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     selections: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
@@ -205,6 +208,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.last.is_some()
             || raw.anchor.is_some()
             || raw.min_trace_duration_ns.is_some()
+            || raw.max_trace_duration_ns.is_some()
             || raw.selections.is_some()
             || raw.timeout.is_some()
             || raw.overview_facets.is_some();
@@ -241,6 +245,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("last", raw.last.as_ref()),
                 ("anchor", raw.anchor.as_ref()),
                 ("min_trace_duration_ns", raw.min_trace_duration_ns.as_ref()),
+                ("max_trace_duration_ns", raw.max_trace_duration_ns.as_ref()),
                 ("selections", raw.selections.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
                 ("overview_facets", raw.overview_facets.as_ref()),
@@ -300,6 +305,12 @@ pub struct FunctionsParams {
     /// the native mode's alone.
     #[serde(default)]
     pub min_trace_duration_ns: Option<i64>,
+    /// Inclusive upper bound on the TRACE envelope duration,
+    /// nanoseconds — the "max duration" filter of the Functions view,
+    /// paired with [`Self::min_trace_duration_ns`]. Forwarded verbatim
+    /// to [`SearchParams::max_trace_duration_ns`].
+    #[serde(default)]
+    pub max_trace_duration_ns: Option<i64>,
     /// Accepted for parity with the Functions protocol. Execution
     /// deadlines remain owned by the bridge call context.
     #[serde(default)]
@@ -354,7 +365,7 @@ impl FunctionsParams {
             min_duration_ns: None,
             max_duration_ns: None,
             min_trace_duration_ns: self.min_trace_duration_ns,
-            max_trace_duration_ns: None,
+            max_trace_duration_ns: self.max_trace_duration_ns,
             anchor: self.anchor.clone(),
         })
     }

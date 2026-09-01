@@ -65,6 +65,23 @@ fn the_functions_view_forwards_the_minimum_trace_duration() {
 }
 
 #[test]
+fn the_functions_view_forwards_the_maximum_trace_duration() {
+    let TracesMode::Functions(p) = req(json!({"max_trace_duration_ns": 250_000_000})).mode else {
+        panic!("Functions mode expected");
+    };
+    assert_eq!(
+        p.search_params(10_000).unwrap().max_trace_duration_ns,
+        Some(250_000_000)
+    );
+
+    // Omitted stays unset — existing callers keep their behaviour.
+    let TracesMode::Functions(p) = req(json!({})).mode else {
+        panic!("Functions mode expected");
+    };
+    assert_eq!(p.search_params(10_000).unwrap().max_trace_duration_ns, None);
+}
+
+#[test]
 fn overview_facets_rides_with_the_functions_parameters() {
     // The aggregate's facet opt-in is a Functions parameter: it selects
     // the Functions view like the others, and it cannot ride with a
@@ -182,6 +199,7 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
         json!({"search": {}, "last": 5}),
         json!({"search": {}, "timeout": 30}),
         json!({"search": {}, "min_trace_duration_ns": 1}),
+        json!({"search": {}, "max_trace_duration_ns": 1}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
     ] {
         let err = req_err(body.clone());
@@ -357,7 +375,7 @@ fn info_response_shape_is_pinned() {
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
                 "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
-                "min_trace_duration_ns", "overview_facets"
+                "min_trace_duration_ns", "max_trace_duration_ns", "overview_facets"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
