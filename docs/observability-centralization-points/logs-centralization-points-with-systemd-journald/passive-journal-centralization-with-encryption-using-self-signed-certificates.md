@@ -1,6 +1,7 @@
 # Passive journal centralization with encryption using self-signed certificates
 
-This page will guide you through creating a **passive** journal centralization setup using **self-signed certificates** for encryption and authorization.
+A **passive** journal centralization point receives the journals its clients push to it. In this setup the traffic is
+encrypted and both sides are authorized with **self-signed certificates** issued by a certificate authority you control.
 
 Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources. With the setup described in this document, on recent systemd versions, Netdata will automatically name all remote sources using the names of the clients, as they’re described at their certificates (on older versions, the names will be IPs or reverse DNS lookups of the IPs).
 
@@ -64,13 +65,13 @@ You can copy and paste (or `scp`) these scripts on your server and each of your 
 sudo scp /etc/ssl/systemd-journal/runme-on-XXX.sh XXX:/tmp/
 ```
 
-For the rest of this guide, we assume that you’ve copied the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you issued certificates.
+From here on, we assume that you’ve copied the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you issued certificates.
 
 ### note about certificates file permissions
 
 It is worth noting that `systemd-journal` certificates need to be owned by `systemd-journal-remote:systemd-journal`.
 
-Both the user `systemd-journal-remote` and the group `systemd-journal` are automatically added by the `systemd-journal-remote` package. However, `systemd-journal-upload` (and `systemd-journal-gatewayd` - that is not used in this guide) use dynamic users. Thankfully they’re added to the `systemd-journal` remote group.
+Both the user `systemd-journal-remote` and the group `systemd-journal` are automatically added by the `systemd-journal-remote` package. However, `systemd-journal-upload` (and `systemd-journal-gatewayd` - not used here) use dynamic users. Thankfully they’re added to the `systemd-journal` remote group.
 
 So, by having the certificates owned by `systemd-journal-remote:systemd-journal`, satisfies both `systemd-journal-remote` which is not in the `systemd-journal` group, and `systemd-journal-upload` (and `systemd-journal-gatewayd`) which use dynamic users.
 

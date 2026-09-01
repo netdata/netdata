@@ -1,113 +1,147 @@
 # Managing Logs
 
-Netdata manages logs across your infrastructure — ingestion, storage, indexing, querying, and visualization — and the Logs tab is where you work with them. Every log source is managed and queried the same way, so the workflow you learn on one operating system or pipeline applies to all of them.
-
-This page covers how logs are organized (sources), how they are queried and explored, and how queries behave at scale. For the deployment architecture — where logs can live and how to centralize them — see [Logs Management](/docs/category-overview-pages/working-with-logs.md).
+With Netdata you query the logs of any node or centralization point from the Logs tab of its dashboard: filter by
+field, search the full text, see how log volume changes over time, follow new entries live, and read an event next to
+the per-second metrics of the same node. Every log source works the same way, so the workflow you learn on one
+operating system applies to all of them. For where logs are stored and how to centralize them, see
+[Logs Management](/docs/category-overview-pages/working-with-logs.md).
 
 ## Log sources
 
-The Logs tab displays entries from the following sources, depending on the node's operating system and configuration:
+The Logs tab shows entries from the sources available on the node:
 
 | Source | Platform | What it reads | Reference |
 |:-------|:---------|:--------------|:----------|
-| `systemd-journal` | Linux | systemd journal files — system, user, namespace, and remote journals, merged by default | [Systemd Journal Plugin Reference](/src/collectors/systemd-journal.plugin/README.md) |
-| `windows-events` | Windows | Windows event channels, auto-detected and aggregated | [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) |
-| `macos-logs` | macOS | The native macOS unified log store through Apple's OSLog framework | [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) |
-| `otel-logs` | Any, via OTLP | Logs ingested by the OpenTelemetry plugin and stored in Netdata's indexed log store | [OpenTelemetry Logs](/integrations/logs/integrations/opentelemetry_logs.md) and the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) |
+| `systemd-journal` | Linux | systemd journal files: system, user, namespace, and remote journals, merged by default | [Systemd Journal Plugin Reference](/src/collectors/systemd-journal.plugin/README.md) |
+| `windows-events` | Windows | Windows event channels, auto-detected and aggregated, including forwarded-events channels on a Windows Event Collector | [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) |
+| `macos-logs` | macOS | The native unified log store, through Apple's OSLog framework | [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) |
+| `otel-logs` | Any, via OTLP | Logs received by the OpenTelemetry plugin and stored in Netdata's indexed log store | [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) |
+
+Application text files appear under `systemd-journal` when converted with log2journal, or under `otel-logs` when
+shipped through an OpenTelemetry Collector; see [Text Files to Journals](/docs/logs/text-files-to-journals.md).
 
 :::note
 
-On Linux systems without systemd (such as Alpine Linux), the `systemd-journal` source is unavailable. You can still make logs explorable by forwarding them to a remote `systemd-journal-remote` with [`systemd-cat-native --url`](/src/libnetdata/log/systemd-cat-native.md), or by using [OpenTelemetry log ingestion](/docs/opentelemetry/otlp-ingestion.md). See [Logs Management](/docs/category-overview-pages/working-with-logs.md) for the deployment options.
+On Linux systems without systemd, such as Alpine Linux, the `systemd-journal` source is unavailable. Convert and push
+logs to a remote `systemd-journal-remote` with [`systemd-cat-native --url`](/src/libnetdata/log/systemd-cat-native.md),
+or send them through [OpenTelemetry](/docs/opentelemetry/otlp-ingestion.md).
 
 :::
 
-Custom application logs from text files can appear under the journal or OpenTelemetry sources — see [Text Files to Journals](/docs/logs/text-files-to-journals.md).
+## Selecting what to query
 
-## Querying and exploring logs
+The **Sources** selector on the right sidebar narrows a query to part of a source:
 
-### Sources and services
+- `systemd-journal` offers the detected journals: `system`, `user`, each `LogNamespace=` namespace, and the `remote`
+  journals received from other machines. On a journal centralization point, each sending machine is a selectable
+  source.
+- `windows-events` offers the detected event channels.
+- `macos-logs` offers the unified log store.
+- `otel-logs` offers a **Services** selector built from the `service.namespace` and `service.name` resource attributes
+  of the ingested streams.
 
-Use the **Sources** selector on the right sidebar to choose what to query. The available values depend on the source:
+All sources are queried together by default. Selecting a specific source before a deep analysis makes queries faster.
 
-- `systemd-journal` offers the detected journal namespaces: `system`, `user`, any `LogNamespace=` namespaces, and `remote` journals received from other machines. On a journal centralization server, each sending machine's logs are part of the view.
-- `windows-events` offers the detected event channels, aggregated by default.
-- `macos-logs` exposes the local unified log store.
-- `otel-logs` offers a **Services** selector driven by the `service.namespace` and `service.name` resource attributes of the ingested streams.
+## Filtering by field
 
-All sources are merged into one view by default. Selecting a specific source before a deep analysis improves query performance.
+The filter panel offers a set of fields, each with a live counter of matching entries per value:
 
-### Field filters with live counters
+- Select several values of one field (any of them) and several fields at once (all of them).
+- Toggle a value between inclusion and exclusion.
+- Selections persist across page reloads.
 
-Every field of every log entry is indexed. Select fields are offered as filters — the facet panel — each with a real-time counter of matching entries:
+Which fields are offered as filters depends on the source. The OS-native sources offer a curated set of fields chosen
+to keep queries fast; for OpenTelemetry logs, every field with a bounded set of values is offered, and fields with very
+many distinct values stay searchable but are not offered as filters. Each plugin reference lists its filter fields. A
+"full data queries" mode enables negative and empty matches at the cost of slower queries.
 
-- Multi-select values within a field (OR) and across fields (AND).
-- Toggle values between inclusion and exclusion.
-- Filter selections persist across page reloads.
+## Full-text search
 
-Field allowlists and blocklists protect query performance. A "full data queries" mode enables negative and empty matches at the cost of slower queries.
-
-### Full-text search
-
-Full-text search applies across all fields of every entry:
+Full-text search matches against every field of every entry:
 
 | Pattern | Matches |
 |:--------|:--------|
-| `error` | Entries containing `error` in any field (default: substring match) |
-| `a*b` | Wildcard match — `acb`, `a_long_b`, ... |
-| `error\|warning` | Entries containing either pattern (OR) |
-| `!systemd` | Entries that do not contain the pattern (negation) |
+| `error` | Entries containing `error` in any field (substring match) |
+| `a*b` | Wildcard match: `acb`, `a_long_b`, ... |
+| `error\|warning` | Entries containing either pattern |
+| `!systemd` | Entries that do not contain the pattern |
 
-Combine full-text search with field filters for precise results.
+Full-text search is the most expensive query type. Combine it with a short time range and field filters.
 
-### Table and entry details
+## Reading entries
 
-- Scrollable, time-ordered entries (newest first by default) with pagination for large datasets.
-- Customizable columns — use the ⚙️ icon to select which fields the table displays.
-- Severity color coding for quick identification of errors and warnings.
-- Click any entry to open the info panel with every field of that entry, raw and enriched values, copyable text, and one-click filtering on any field value.
+- Entries are listed newest first, with pagination for large results.
+- Choose the columns with the ⚙️ icon.
+- Severity is color-coded.
+- Click an entry to open its details: every field, raw and enriched values, copyable text, and one-click filtering on
+  any field value.
 
-Enrichment improves readability — priorities, facilities, UIDs/GIDs, errno values, capabilities, and well-known message IDs are displayed in human-readable form. Enrichments are visual only and are not searchable.
+Enrichment renders priorities, facilities, UIDs and GIDs, errno values, capabilities, and well-known message IDs in
+human-readable form. Enrichments are visual only and are not searchable.
 
-### Histograms
+## Histograms
 
-Histograms visualize log frequency per field value over time, color-coded by value:
+The histogram shows log volume over time per value of a selected field, color-coded by value. Zoom and pan follow the
+main timeline; clicking a bar segment filters the view to that value.
 
-- Zoom, pan, and click-to-navigate.
-- Click a bar segment to filter the view to that field value.
-- Time-correlated with the main timeline.
+## Live tail
 
-### PLAY mode — live tail
+Click ▶️ (PLAY) to stream new entries as they arrive, on single nodes and centralization points alike. Live tail works
+for every source.
 
-Click ▶️ to stream newly received entries continuously, on single nodes and centralization servers alike — the visual equivalent of `journalctl -f`, for every source.
+## Query behavior at scale
 
-### Sampling at scale
+The OS-native sources and the OpenTelemetry log store use different query engines.
 
-To stay responsive on very large datasets, the query engine samples:
+### OS-native sources (systemd journal, Windows events, macOS logs)
 
-1. It fully evaluates the newest entries, up to a budget of 1,000,000 entries per query.
-2. Beyond the budget, entries are marked `[unsampled]` and counters become `[estimated]`.
-3. Where sequence numbers are available, estimates use them for precision.
+- Netdata reads the OS log store directly. Journal files are queried one file at a time with cached file metadata
+  lookups, so a query costs no more than the equivalent `journalctl` query on the same files.
+- Each query fully evaluates the newest entries up to a budget of 1,000,000 entries. Beyond the budget:
+  - the rows shown are always real entries;
+  - the histogram shows the remaining volume as `[unsampled]` and `[estimated]`;
+  - the filter counters stop counting beyond the budget, they are not extrapolated.
+- Where journal sequence numbers are available, estimates use them for precision. Because the budget is large, value
+  distributions stay tight even on multi-million-entry datasets. See
+  [Performance at scale](/src/collectors/systemd-journal.plugin/README.md#performance-at-scale) for the math.
 
-Because the evaluation budget is large, value distributions stay tight even on multi-million-entry datasets — for example, a 60% share in a 10M-entry window is estimated within roughly ±0.9% (95% confidence). See [Performance at scale](/src/collectors/systemd-journal.plugin/README.md#performance-at-scale) for the math and [Query performance](/src/collectors/systemd-journal.plugin/README.md#query-performance) for the factors that matter.
+### OpenTelemetry log store
 
-### Performance tips
+- Counts are exact; no sampling is applied.
+- The time range bounds the work of a query: the default window is the last 15 minutes, and there is no query timeout,
+  so on a large store narrow the window before adding a full-text search.
+- Files offloaded to object storage are fetched transparently when a query needs them; the first query over archived
+  data waits for the download.
+- Fields with very many distinct values are searchable and filterable but are not offered as filter facets.
 
-- Keep the visible timeframe short and apply filters early.
-- Select a specific source instead of querying across all sources.
+### Query tips
+
+- Keep the time range short and apply filters early.
+- Select a specific source instead of querying all of them.
 - Limit the number of displayed rows.
-- On busy centralization servers, prefer SSD/NVMe storage and compressed filesystems for journal files; the OS page cache makes repeated queries faster.
+- On busy centralization points, use SSD or NVMe storage for the log files; the OS page cache makes repeated queries
+  faster.
 
 ## Prerequisites
 
-- A free Netdata Cloud account is required to use the log functions. When you access an Agent directly, log content flows from the Agent to your browser and is not stored in Netdata Cloud.
-- Platform notes — package availability, container requirements, and build flags — are documented in each plugin's reference: [systemd journal](/src/collectors/systemd-journal.plugin/README.md#prerequisites), [Windows events](/src/collectors/windows-events.plugin/README.md#prerequisites), [macOS logs](/src/collectors/macos-logs.plugin/README.md#prerequisites), [OpenTelemetry](/src/crates/otel-plugin/README.md).
+- Sign in with Netdata Cloud, which is free for community use. Log content is transmitted encrypted to your browser
+  and is not stored in Netdata Cloud; for full data sovereignty, run
+  [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md).
+- Platform requirements, packages, and container settings are documented in each plugin's reference:
+  [systemd journal](/src/collectors/systemd-journal.plugin/README.md#prerequisites),
+  [Windows events](/src/collectors/windows-events.plugin/README.md#prerequisites),
+  [macOS logs](/src/collectors/macos-logs.plugin/README.md#prerequisites),
+  [OpenTelemetry](/src/crates/otel-plugin/README.md).
 
-## Query logs programmatically
+## Querying logs programmatically
 
-The same function API that powers the Logs tab is used by Netdata AI assistants and MCP clients to query log sources across your infrastructure. See [Netdata AI](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md).
+The Logs tab is built on the same function API that Netdata AI assistants and MCP clients use to query logs across
+your infrastructure. See [Netdata AI](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md).
 
 ## Where to next
 
-- [Logs Management](/docs/category-overview-pages/working-with-logs.md) — deployment architecture: where logs live, storage choices, centralization options, and current limitations.
+- [Logs Management](/docs/category-overview-pages/working-with-logs.md) — where logs are stored, how to decide per
+  source, and the current limitations.
 - [Text Files to Journals](/docs/logs/text-files-to-journals.md) — bring application log files into these sources.
-- [Logs Centralization Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md) — aggregate logs from many machines.
+- [Logs Centralization Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md)
+  — Netdata on journal aggregation points you already run.

@@ -1,6 +1,6 @@
 # Text Files to Journals
 
-Applications that write plain text log files — web servers, legacy services, cron jobs — can be brought under Netdata logs management, alongside the native OS logs. There are two bridges, and you can use both at the same time for different consumers.
+You bring applications that write plain text log files — web servers, legacy services, cron jobs — under Netdata logs management, alongside the native OS logs. Two bridges do this, and you can run both at the same time for different consumers.
 
 ## Choose a bridge
 

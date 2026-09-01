@@ -2,7 +2,8 @@
 
 [KEY FEATURES](#key-features) | [PREREQUISITES](#prerequisites) | [JOURNAL SOURCES](#journal-sources) | [JOURNAL FIELDS](#journal-fields) | [VISUALIZATION](#visualization-capabilities) | [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [QUERY PERFORMANCE](#query-performance) | [PERFORMANCE AT SCALE](#performance-at-scale) | [BEST PRACTICES](#best-practices-for-better-performance) | [CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq) | [HOW TO TROUBLESHOOT COMMON ISSUES](#how-to-troubleshoot-common-issues) | [HOW TO VERIFY SETUP](#how-to-verify-setup)
 
-The `systemd` journal plugin provides an efficient way to view, explore, and analyze `systemd` journal logs directly from the Netdata dashboard. It combines powerful filtering, real-time updates, and visual analysis tools to help you troubleshoot system issues effectively.
+You view, explore, and analyze `systemd` journal logs from the Netdata dashboard: filter on journal fields, follow new
+entries as they arrive, and break down log frequency per field value over time.
 
 ![Netdata systemd journal plugin interface](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
@@ -10,12 +11,12 @@ The `systemd` journal plugin provides an efficient way to view, explore, and ana
 
 - **Unified view of logs** from multiple sources (system, user, namespace, remote)
 - **Real-time streaming** with PLAY mode for continuous monitoring
-- **Powerful filtering** on all journal fields with counters showing matching entries
+- **Filtering** on a curated set of journal fields, with counters showing matching entries
 - **Full-text search** with wildcard and pattern matching
 - **Visual analysis** with interactive histograms showing log frequency
 - **Enriched field display** for improved readability (priorities, UIDs, timestamps)
-- **High performance** with intelligent sampling for large datasets
-- **Zero configuration** for immediate use on supported systems
+- **Sampling** that keeps queries responsive on large datasets
+- **No configuration** needed on supported systems
 - **Multi-node support** for centralized log analysis
 - **UI-based exploration** without needing to learn complex journalctl syntax
 - **Integrated with Netdata's dashboard** for correlation with metrics
@@ -108,7 +109,8 @@ Default journals on all `systemd`-based systems. Includes:
 
 ## Journal fields
 
-`systemd` journals support dynamic fields per log entry. All fields and values are indexed for fast querying.
+`systemd` journals support dynamic fields per log entry. The journal's own on-disk index covers every field of every
+entry.
 
 Fields are enriched for readability:
 
@@ -135,7 +137,7 @@ Use the ⚙️ icon above the table to select fields to display as columns.
 
 ![Table field customization interface](https://github.com/netdata/netdata/assets/2662304/cd75fb55-6821-43d4-a2aa-033792c7f7ac)
 
-The table view provides a powerful way to analyze logs with:
+The table view lets you analyze logs with:
 - Scrollable list of log entries with customizable columns
 - Color-coded PRIORITY levels for quick identification of issues
 - Clickable entries for detailed viewing
@@ -156,7 +158,9 @@ The sidebar shows:
 
 ### Fields as filters
 
-The plugin offers select fields as filters with counters. Field allowlists and blocklists protect performance.
+The plugin offers a curated allowlist of about 55 journal fields as filters, each with counters. Fields matching
+`*MESSAGE*`, `*TIMESTAMP*` and `__*` are never offered as filters. Full-text search is not limited to this list: it
+searches the full text of every field of every entry.
 
 :::tip
 
@@ -253,6 +257,15 @@ Full-text search applies across all fields. Combine with filters for precise res
 
 The plugin reads journal files directly using `libsystemd`, supporting concurrent readers and one writer.
 
+Two mechanisms shape how a query touches the files:
+
+- Each journal file is opened with its own journal handle and queried on its own, one file at a time, instead of merging
+  all files into a single interleaved handle.
+- `fstat64()` calls are cached inside the plugin process through an interposed function, so repeatedly checking the same
+  journal files during a query does not repeat the system calls.
+
+A Netdata query costs no more than the equivalent `journalctl` query on the same journal files.
+
 Query performance depends on several factors:
 
 | Factor | Impact on Performance |
@@ -283,39 +296,27 @@ The plugin handles large datasets efficiently using a sampling algorithm, ensuri
 | 5 | Uses sequence numbers (if available) for **precise estimation** |
 | 6 | **Continues responsive histogram generation** while managing performance |
 
-The plugin uses a sophisticated algorithm that prioritizes newer logs while maintaining reasonable estimates for historical data. This approach ensures that even with terabytes of journal data, the interface remains responsive and usable.
-
-At scale, this plugin achieves up to **25–30x faster query performance** compared to `journalctl`, especially on multi-journal queries.
+Sampling prioritizes newer logs: the newest entries are fully evaluated first, and only after the budget is exhausted
+does the plugin stop evaluating every entry.
 
 :::tip
 
-The sampling algorithm is designed to be resilient to large datasets. Even if you see `[unsampled]` or `[estimated]` indicators, the results remain statistically representative of the full dataset.
+Sampling never fabricates log entries. The rows shown in the table are always real journal entries.
 
 :::
 
-### Accuracy implications
+### What sampling changes in the results
 
-Netdata's sampling budget evaluates **up to 1,000,000 log entries** before it ever marks rows as `[unsampled]`. The proportion of the dataset we examine is:
+Once a query goes beyond its evaluation budget, three things happen:
 
-```
-evaluated_entries = min(total_entries, 1_000_000)
-evaluated_ratio   = evaluated_entries / total_entries
-```
+| Result | Behavior beyond the budget |
+|--------|----------------------------|
+| Rows in the table | Always real journal entries — nothing is synthesized |
+| Histogram | Skipped entries are added to dedicated `[unsampled]` and `[estimated]` buckets, so the bars still account for them |
+| Field filter counters | Stop counting: they reflect the evaluated entries only and are not extrapolated |
 
-Because the sampling set is so large, percentage breakdowns stay tight even on massive datasets. For a 10 M–entry window where 60 % of logs share a value, the 95 % confidence interval around that percentage is:
-
-```
-standard_error ≈ sqrt(p * (1 - p) / evaluated_entries)
-CI95 ≈ 1.96 * standard_error = 1.96 * sqrt(0.6 * 0.4 / 1_000_000) ≈ ±0.9 %
-```
-
-By contrast, evaluating only 5,000 entries (a small-sample approach typical of many log explorers when speed is prioritized) would yield:
-
-```
-CI95 ≈ 1.96 * sqrt(0.6 * 0.4 / 5_000) ≈ ±8.7 %
-```
-
-The result is that even at extreme scale, mainly because Netdata samples 200x more data, it can provide significantly more accurate estimations on value distributions, at comparable performance.
+So a filter counter is a lower bound once you see `[unsampled]` or `[estimated]` in the histogram. Narrow the timeframe,
+select fewer sources, or apply more filters to bring the query back inside the budget and get exact counters.
 
 ## Best practices for better performance
 
@@ -352,9 +353,15 @@ Journal data is cached by the operating system. The more RAM available for cachi
 | Limit the number of rows returned in the UI | Keeps response times fast and manageable |
 | Enable PLAY mode only when necessary | Reduces continuous query load on the system |
 
+### Retention and disk usage
+
+How long journals are kept, and how much disk they use, is controlled by `systemd-journald` itself, not by Netdata.
+See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for the `journald.conf` disk-usage and
+retention settings.
+
 ## Configuration and maintenance
 
-The Netdata `systemd` journal plugin is designed to work **out of the box** with minimal configuration.
+The `systemd` journal plugin needs no configuration on supported systems.
 
 ### Requirements
 
@@ -379,40 +386,53 @@ No additional configuration is required for this plugin to operate on supported 
 | **Verify** journal file **locations** | Confirms the plugin can access the intended sources |
 | **Review** source selections **periodically** | Adjusts scope as infrastructure changes |
 
-### Adding journal directories at runtime
+### Changing the journal directories at runtime
 
-By default, the plugin scans `/var/log/journal` and `/run/log/journal` recursively. You can add more directories at runtime — for example journal files mounted from other systems, backups, or container hosts — without restarting the Agent.
+By default, the plugin scans `/var/log/journal` and `/run/log/journal` recursively. You can change this list at runtime
+— for example to include journal files mounted from other systems, backups, or container hosts — without restarting the
+Agent. The list you set replaces the defaults, so keep `/var/log/journal` and `/run/log/journal` in it if you still want
+them scanned.
 
-The plugin exposes a Dynamic Configuration entry, `systemd-journal:monitored-directories` (path `/logs/systemd-journal`), manageable from the Dynamic Configuration Manager in the Netdata UI or through the configuration API:
+The plugin exposes a Dynamic Configuration entry with the id `systemd-journal:monitored-directories`, at the path
+`/logs/systemd-journal`. Edit it from the
+[Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) on the Netdata Cloud
+dashboard: open the node's configuration, go to `/logs/systemd-journal`, and set the list of directories.
 
-```bash
-# read the current list
-curl "http://NODE:19999/api/v3/config?action=get&id=systemd-journal:monitored-directories"
+Access rules for this entry:
 
-# set the additional directories (replaces the list)
-curl -X POST "http://NODE:19999/api/v3/config?action=update&id=systemd-journal:monitored-directories" \
-  -d '{"journalDirectories": ["/mnt/backup/journal", "/srv/container-journals"]}'
-```
+- Listing and reading it requires a signed-in Netdata Cloud user of the same Space.
+- Editing it additionally requires the permission to edit Agent configuration, and a Space on a paid plan.
 
-Rules:
+The underlying endpoint is `/api/v3/config`, which enforces the same rules — an unauthenticated `curl` against the Agent
+cannot read or change this setting.
 
-- Paths must be absolute. System directories (`/`, `/dev`, `/proc`, `/sys`, `/etc`, `/lib*`) are rejected.
-- Each update replaces the whole list, and the plugin rescans immediately — no Agent restart needed.
-- Directories that do not exist are accepted, with a warning in the API response. The directory watcher is `inotify`-based, so new journal files appearing in existing watched directories are detected automatically.
+Rules for the value:
 
-The configured directories are scanned recursively, the same way as the default locations, and their journals appear as additional sources.
+- Up to 100 directories. Paths must be absolute; `/`, `/dev`, `/proc`, `/sys`, `/etc` and `/lib*` (including `/lib32`
+  and `/lib64`) are rejected, as are paths containing `/./` or `/../`.
+- Each update replaces the whole list — the configured directories replace the defaults — and the journal watcher
+  restarts immediately, so no Agent restart is needed.
+- Directories that do not exist are accepted, with a warning in the response. The directory watcher is `inotify`-based,
+  so new journal files appearing in existing watched directories are detected automatically.
+
+The configured directories are scanned recursively, the same way as the default locations, and the journals found in
+them are offered as sources.
 
 ## FAQ
 
 <details>
 <summary><strong>Can I use this plugin on journal centralization servers?</strong></summary>
 
-Yes — you can centralize your logs using `systemd-journal-remote` and install Netdata on the centralization server to explore logs from your entire infrastructure.  
-The plugin provides **multi-node views** and allows you to combine logs from multiple servers.
+Yes. Where journals are already aggregated with `systemd-journal-remote`, install Netdata on the aggregation point and
+it manages the aggregated journals there, in their native format, combining the logs of all senders in one view.
 
 :::tip
 
-For details on configuring a journal centralization server, see the [journal centralization setup guide](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md).
+For details on configuring a journal centralization point, see
+[Logs Centralization Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md).
+
+To centralize logs into Netdata's own log store instead, use OpenTelemetry — see
+[Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
 :::
 
@@ -456,37 +476,27 @@ For more, check `man systemd-journald`.
 </details>
 
 <details>
-<summary><strong>I centralize my logs with Loki. Why use Netdata for journals?</strong></summary>
+<summary><strong>Which journal fields can I work with?</strong></summary>
 
-`systemd` journals support **dynamic, high-cardinality labels** with all fields indexed by default.  
-When sending logs to Loki, you must predefine which fields to include, reducing flexibility.
-
-Netdata reads journals directly, providing:
-
-| Feature | Netdata journal plugin | Loki |
-|---------|----------------------|------|
-| **Indexed on all fields** | ✔️ Yes | ❌ Only selected labels |
-| Supports **dynamic fields** | ✔️ Yes | ❌ Assumes fixed schema |
-| Requires **configuration** | ❌ No | ✔️ Yes (relabel rules, label selection) |
-
-:::tip
-
-Loki and `systemd` journals serve different use cases — they can complement, not replace, each other.
-
-:::
+The plugin reads the journal files directly, so every field each entry carries is available, including dynamic,
+high-cardinality fields. No schema or field selection has to be declared in advance: full-text search covers the full
+text of every field, and a curated set of fields is offered as filters with counters.
 
 </details>
 
 <details>
-<summary><strong>Is it worth setting up a `systemd` logs centralization server?</strong></summary>
+<summary><strong>Should I build a journal centralization point for Netdata?</strong></summary>
 
-Yes — the tools required are included in modern Linux systems, and setup is straightforward.  
-Centralized logs provide high visibility with minimal overhead.
+Not for Netdata's sake. Netdata reads the journals of each node where they already are, and fully supports aggregated
+journals where a centralization point already exists.
+
+To centralize logs into Netdata's own log store, use OpenTelemetry — see
+[Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
 </details>
 
 <details>
-<summary><strong>How do I configure a journal centralization server?</strong></summary>
+<summary><strong>How do I configure a journal centralization point?</strong></summary>
 
 Two main strategies:
 
@@ -498,7 +508,7 @@ Two main strategies:
 :::tip
 
 See the [passive journal centralization without encryption guide](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md)  
-or the [encrypted setup guide](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald).
+or the [encrypted setup guide](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md).
 
 :::
 
@@ -644,7 +654,7 @@ If sources are missing, check the journal file locations and verify symlinks if 
 
 ### How to test basic queries
 
-- Apply a **simple filter** (like `PRIORITY=3`) and confirm logs are returned
+- Apply a **single filter** (like `PRIORITY=3`) and confirm logs are returned
 - Use **full-text search** (e.g., search for `error`) and verify results populate correctly
 - Toggle **PLAY mode** to confirm live logs are streaming
 

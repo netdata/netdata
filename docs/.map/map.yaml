@@ -860,6 +860,16 @@ sidebar:
               label: systemd-cat-native
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md
       - meta:
+          label: Centralizing Logs with OpenTelemetry
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/centralizing-logs-with-opentelemetry.md
+          description: Centralize selected log sources into Netdata's log store with an OpenTelemetry Collector — Linux journals, Windows event channels, Kubernetes containers, macOS, text files, and syslog.
+          keywords: [logs, centralization, opentelemetry, otlp, collector, kubernetes, journald, windows event log, macos, syslog]
+      - meta:
+          label: Log Storage and Retention
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/log-storage-and-retention.md
+          description: Control what logs cost — journald disk limits and namespaces, Windows event channel sizing, Netdata's log store retention per tenant, and offloading to object storage.
+          keywords: [logs, retention, storage, journald, systemmaxuse, wevtutil, otel, tenant, s3, object storage, cost]
+      - meta:
           label: Integrations
         items:
           - type: integration_placeholder

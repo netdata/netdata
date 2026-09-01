@@ -7,7 +7,8 @@
 [PREREQUISITES](#prerequisites) | [FAQ](#faq) | [TROUBLESHOOTING](#how-to-troubleshoot-common-issues) |
 [HOW TO VERIFY SETUP](#how-to-verify-setup)
 
-The macOS Logs plugin by Netdata makes viewing, exploring, and analyzing macOS unified logs simple and efficient.
+You view, explore, and analyze the macOS unified log from the Netdata dashboard: filter on the OSLog fields, search
+their full text, and break down log frequency per field value over time.
 
 `macos-logs.plugin` is a native Netdata Function plugin. It queries Apple's OSLog framework directly and does not invoke
 `log show`, `log stream`, or other external log-query commands during normal query execution.
@@ -112,9 +113,10 @@ full-text search, per-field histograms, PLAY live tail, and sampling at scale. S
 <summary><strong>Can I centralize macOS logs?</strong></summary>
 
 macOS provides no OS-native forwarding transport for the unified log (no equivalent of `systemd-journal-remote` or
-Windows Event Forwarding). To centralize macOS logs, ship them through the OpenTelemetry Collector Contrib
-`macosunifiedloggingreceiver` (alpha stability), which reads the unified log via the native `log` command and can
-forward to Netdata's OTLP endpoint — see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md).
+Windows Event Forwarding). You centralize macOS logs with an OpenTelemetry Collector, using the Collector Contrib
+`macos_unified_logging` receiver (alpha stability), which reads the unified log by running the macOS `log` command.
+
+See [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) for the setup.
 
 </details>
 
@@ -171,6 +173,6 @@ ps aux | grep '[m]acos-logs.plugin'
 ### How to test basic queries
 
 1. Open the **Logs** tab in the Netdata UI and confirm the `macos-logs` source is offered.
-2. Apply a simple filter (for example `LEVEL = Error`) and confirm entries are returned.
+2. Apply a single filter (for example `LEVEL = Error`) and confirm entries are returned.
 3. Use full-text search for a common term and verify results.
 4. Toggle **PLAY** mode and confirm new entries stream in as they are logged.

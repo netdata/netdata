@@ -1,0 +1,161 @@
+# Log Storage and Retention
+
+You control what logs cost by setting, per source, where the logs are stored and for how long they are kept. Nothing
+has to be filtered or discarded to fit a budget: logs managed in place use the disk the node already has, under the
+operating system's own retention settings, and logs centralized with OpenTelemetry use Netdata's log store on the
+receiving node, with per-tenant retention and optional offloading to object storage. Netdata meters nothing by volume.
+
+| Tier | Where the bytes are | What sets the retention |
+|:-----|:--------------------|:------------------------|
+| In place on Linux nodes | systemd journal files on the node | `journald.conf`, per namespace |
+| In place on Windows nodes | Event log channels on the node | Per-channel maximum size and retention policy |
+| In place on macOS nodes | The unified log store on the node | Managed by macOS |
+| On an existing journal centralization point | Journal files written by `systemd-journal-remote` | `journal-remote.conf` |
+| On an existing Windows Event Collector | The forwarded-events channels of the collector | Per-channel maximum size and retention policy |
+| Centralized with OpenTelemetry | Netdata's log store on the receiving node, optionally offloaded to object storage | `otel.yaml`, per tenant |
+
+Netdata reads whatever each store retains. Changing a retention setting changes what is queryable from that moment on;
+it does not require any change in Netdata.
+
+## systemd journal
+
+`systemd-journald` keeps its files under `/var/log/journal` (persistent) or `/run/log/journal` (volatile, lost on
+reboot), as selected by `Storage=` in `/etc/systemd/journald.conf`. Set `Storage=persistent` on nodes whose logs must
+survive a reboot. The limits below are size-based first; time-based deletion is off by default.
+
+| Option | Default | Meaning |
+|:-------|:--------|:--------|
+| `SystemMaxUse=` | 10% of the file system, at most 4G | Total disk the journal may use under `/var/log/journal` |
+| `SystemKeepFree=` | 15% of the file system, at most 4G | Disk the journal leaves free for other uses; the smaller of the two limits wins |
+| `SystemMaxFileSize=` | One eighth of `SystemMaxUse=`, at most 128M | Size at which a journal file rotates |
+| `SystemMaxFiles=` | 100 | Maximum number of journal files kept |
+| `MaxRetentionSec=` | 0 (off) | Delete files whose entries are all older than this; use it to enforce a retention policy |
+| `MaxFileSec=` | 1 month | Rotate a file after this time even if it is not full; smaller values lose less data at once when old files are deleted |
+| `Compress=` | yes | Compress data objects larger than 512 bytes; small fields are stored as written |
+| `Seal=` | yes | Forward Secure Sealing; see [FSS](/src/collectors/systemd-journal.plugin/forward_secure_sealing.md) |
+
+The `Runtime*` variants apply the same limits to `/run/log/journal`. After editing, apply with
+`systemctl restart systemd-journald` (or `systemctl kill --signal=SIGUSR1 systemd-journald` to flush volatile entries
+to persistent storage first) and confirm the result with `journalctl --disk-usage`.
+
+Planning rule: journal files take roughly the size of the raw log text they hold. To keep everything a node produces,
+raise `SystemMaxUse=` above the node's daily log volume multiplied by the retention you need, and set
+`MaxRetentionSec=` to that retention so the policy is enforced by time as well as by size.
+
+### Journal namespaces
+
+Each journal namespace runs its own `systemd-journald` instance with its own files and its own limits, configured in
+`/etc/systemd/journald@NAMESPACE.conf`. Use a namespace to give an application its own retention budget, isolated from
+the system journal, and to make it a separate source in the Logs tab. Services opt in with `LogNamespace=` in their
+unit; converted text files can be written to a namespace with
+[systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md).
+
+### Journal centralization points
+
+On a node that receives journals with `systemd-journal-remote`, the received files are subject to
+`/etc/systemd/journal-remote.conf`, not to `journald.conf`. The `[Remote]` section provides `MaxUse=`, `KeepFree=`,
+`MaxFileSize=`, and `MaxFiles=`, analogous to the `System*` options above, and `SplitMode=` decides whether each
+sending host gets its own file. Size the receiving disk for the sum of the senders' volumes multiplied by the retention
+you need on the point.
+
+## Windows Event Log
+
+Every event channel has a maximum size and a policy for what happens when it is reached. Set both in Event Viewer
+(right-click a log, **Properties**) or with `wevtutil`:
+
+```powershell
+wevtutil sl Application /ms:1073741824 /rt:false
+```
+
+- `/ms:<bytes>` sets the maximum size in bytes. The minimum is 1048576 (1 MB) and sizes are rounded to a multiple of
+  64 KB.
+- `/rt:false` (the default) overwrites the oldest events when the channel is full. `/rt:true` keeps the existing events
+  and discards new ones, which is only useful together with auto-backup.
+- `/ab:true` archives the channel to a file when it is full instead of losing events; it requires `/rt:true`.
+
+On a Windows Event Collector, size the `ForwardedEvents` channel (or the custom channels your subscriptions target) for
+the combined volume of all forwarders multiplied by the retention you need.
+
+## macOS unified log
+
+macOS manages the retention of its unified log store itself. Netdata reads what the store holds; there is no
+Netdata-side retention setting. To keep macOS logs longer than the OS does, centralize them with OpenTelemetry (see
+[Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md)).
+
+## Netdata's log store
+
+Logs received over OpenTelemetry are stored by the receiving Netdata Agent under `base_dir`
+(default `/var/log/netdata/otel/v2`), in one directory tree per tenant. Incoming records are appended to a write-ahead
+log; when a write-ahead log reaches `max_file_size` (25 MB), `max_entries` (50000), or 15 minutes of age, it is sealed
+into an indexed file and the write-ahead log is deleted. Each indexed file stores every distinct field value once, in
+compressed dictionaries, and references it from every entry, so every field is indexed and the disk usage stays close to
+that of the compressed raw text.
+
+Retention applies to sealed indexed files, per tenant, oldest first, when any of three limits is exceeded:
+
+| Option | Default | Meaning |
+|:-------|:--------|:--------|
+| `logs.retention.default.max_files` | 100000 | Maximum number of indexed files kept |
+| `logs.retention.default.max_total_size` | 1GB | Maximum total size of indexed files kept |
+| `logs.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on its newest entry |
+
+`max_total_size` is not a cap on the plugin's disk usage: active write-ahead logs (up to `max_file_size` per stream),
+catalogs, and the remote read cache are additional. Retention runs when a file is sealed; a tenant that stops sending
+keeps its last files until it sends again or the Agent restarts.
+
+Per-tenant sections inherit every field they omit from `default`. The section name is the tenant, which is the
+`X-Scope-OrgID` header value when tenant selection is enabled:
+
+```yaml
+logs:
+  retention:
+    default:
+      max_total_size: "20GB"
+      max_age: "30 days"
+    audit:
+      max_total_size: "200GB"
+      max_age: "400 days"
+```
+
+Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and restart
+the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md).
+
+### Offloading to object storage
+
+With `remote_storage.enabled: true`, every sealed indexed file is also uploaded to `remote_storage.uri`, an `s3://` or
+`fs://` location. Uploading changes nothing locally: files stay under local retention, and a local file is not deleted
+by retention until its presence in the remote is confirmed. When a query needs an offloaded file that is no longer
+local, the Agent downloads it through a cache bounded by `remote_storage.read_cache_max_size` (1GB), and the query
+waits for the download. A query whose files exceed the cache fails with a message to narrow the time range.
+
+```yaml
+remote_storage:
+  enabled: true
+  uri: "s3://my-bucket/netdata-logs?region=us-east-1"
+  read_cache_max_size: "4GB"
+```
+
+- Never put credentials in the URI or in `otel.yaml`. For S3, use the AWS environment variables, credentials file, or
+  an instance role available to the Netdata service account; to pass environment variables to the `netdata` service,
+  use a root-only systemd `EnvironmentFile`. Non-secret backend options such as `region` and `endpoint` go in the query
+  string.
+- Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
+  a ceiling. Monitor free disk on the receiving node.
+- This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
+  storage, and query both from the same Logs tab.
+
+### Sizing the receiving node
+
+Run the pipeline for a full day, then measure `du -sh` on the tenant's `index` directory under `base_dir` and multiply
+by the retention you want locally. Add headroom for active write-ahead logs (`max_file_size` per stream) and for the
+read cache when offloading is enabled. Queries are bounded only by their time range, so on large stores keep the
+default window and narrow it further before running a full-text search; see
+[Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).
+
+## Where to next
+
+- [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) — choose which sources
+  to centralize and how to send them.
+- [Logs Centralization Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md)
+  — Netdata on journal aggregation points you already run.
+- [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) — every `otel.yaml` option.

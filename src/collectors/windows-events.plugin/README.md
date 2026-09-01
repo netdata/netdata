@@ -4,8 +4,8 @@
 [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
 [CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq)
 
-The Windows Events plugin by Netdata makes viewing, exploring and analyzing Windows Events simple and
-efficient.
+You view, explore and analyze Windows Events from the Netdata dashboard: filter on the System fields, search the full
+text of System and User fields, and break down event frequency per field value over time.
 
 ![image](https://github.com/user-attachments/assets/71a1ab1d-5b7b-477e-a4e6-a30275a5710b)
 
@@ -28,6 +28,9 @@ To protect your privacy, as with all Netdata Functions, a free Netdata Cloud use
 For more information check [this discussion](https://github.com/netdata/netdata/discussions/16136).
 
 ## Events Sources
+
+The plugin reads the local machine's event channels through the Windows Event Log API. It does not read saved `.evtx`
+files and does not query remote machines.
 
 The plugin automatically detects all the available channels and offers a list of "Event Channels".
 
@@ -199,12 +202,13 @@ on the system.
 
 ### Can I use this plugin on event centralization servers?
 
-Yes. You can centralize your Windows Events using Windows Event Forwarding (WEF) or other event collection
-mechanisms, and then install Netdata on this events centralization server to explore the events of all your
-infrastructure.
+Yes. Where a Windows Event Collector already exists, install Netdata on it: the plugin reads the forwarded-events
+channels like any other local channel, and groups them under the `All-Forwarded` shortcut, so you explore the events of
+all forwarders from that machine.
 
-This plugin will automatically provide multi-node views of your events and also give you the ability to
-combine the events of multiple servers, as you see fit.
+We do not recommend building Windows Event Forwarding just for Netdata. To centralize logs into Netdata's own log
+store, use OpenTelemetry — see
+[Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
 ### Can I use this plugin from a parent Netdata?
 
@@ -258,9 +262,12 @@ with extremely large event volumes.
 
 ### Can I use this plugin to analyze events from multiple servers?
 
-Yes, if you have set up Windows Event Forwarding (WEF) or another method of centralizing your Windows Events,
-you can use this plugin on the central server to analyze events from multiple sources. The plugin will
-automatically detect the available event sources.
+Yes, when the events of those servers are already collected into channels of the machine running Netdata — for example
+by a Windows Event Collector. The plugin detects those channels automatically. It cannot reach out to other machines on
+its own.
+
+For events that are not forwarded into a local channel, centralize them into Netdata's log store with OpenTelemetry —
+see [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
 ### How does the histogram feature work in this plugin?
 
