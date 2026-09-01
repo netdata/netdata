@@ -10,69 +10,71 @@
 // performed by cgroup_ebpfgo_cachestat_refresh() each tick.
 static bool cgroup_ebpfgo_fd_snapshot_ready = false;
 
-// Whether fd is publishing with `ebpf load mode = return`, i.e. whether the
-// error charts may be created.  Sticky: once a chart exists it must keep
-// receiving values, so a producer that later switches to `entry` mode does not
-// retract charts that are already on the dashboard.
-static bool cgroup_ebpfgo_fd_errors_ready = false;
+// Current producer mode controls creation; existing chart pointers control
+// whether an older error chart continues receiving values.
+static bool cgroup_ebpfgo_fd_errors_current = false;
 
-static size_t cgroup_ebpfgo_fd_token_index(const struct cgroup *cg, pid_t pid, bool *found)
+typedef struct {
+    pid_t pid;
+    uint64_t ct;
+    uint64_t last_seen;
+} cgroup_ebpfgo_fd_pid_token_t;
+
+static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_pid_tokens;
+static size_t cgroup_ebpfgo_fd_pid_tokens_count;
+static size_t cgroup_ebpfgo_fd_pid_tokens_capacity;
+static uint64_t cgroup_ebpfgo_fd_generation;
+
+static size_t cgroup_ebpfgo_fd_token_index(pid_t pid, bool *found)
 {
     size_t left = 0;
-    size_t right = cg->ebpf_fd_pid_tokens_count;
+    size_t right = cgroup_ebpfgo_fd_pid_tokens_count;
     while (left < right) {
         size_t mid = left + (right - left) / 2;
-        if (cg->ebpf_fd_pid_tokens[mid].pid < pid)
+        if (cgroup_ebpfgo_fd_pid_tokens[mid].pid < pid)
             left = mid + 1;
         else
             right = mid;
     }
-    *found = left < cg->ebpf_fd_pid_tokens_count && cg->ebpf_fd_pid_tokens[left].pid == pid;
+    *found = left < cgroup_ebpfgo_fd_pid_tokens_count && cgroup_ebpfgo_fd_pid_tokens[left].pid == pid;
     return left;
 }
 
-static uint64_t *cgroup_ebpfgo_fd_consumed_token(struct cgroup *cg, pid_t pid)
+static uint64_t *cgroup_ebpfgo_fd_consumed_token(pid_t pid)
 {
     bool found;
-    size_t index = cgroup_ebpfgo_fd_token_index(cg, pid, &found);
+    size_t index = cgroup_ebpfgo_fd_token_index(pid, &found);
     if (!found) {
-        if (cg->ebpf_fd_pid_tokens_count == cg->ebpf_fd_pid_tokens_capacity) {
-            size_t capacity = cg->ebpf_fd_pid_tokens_capacity ? cg->ebpf_fd_pid_tokens_capacity * 2 : 16;
-            cg->ebpf_fd_pid_tokens = reallocz(cg->ebpf_fd_pid_tokens,
-                                               capacity * sizeof(*cg->ebpf_fd_pid_tokens));
-            cg->ebpf_fd_pid_tokens_capacity = capacity;
+        if (cgroup_ebpfgo_fd_pid_tokens_count == cgroup_ebpfgo_fd_pid_tokens_capacity) {
+            size_t capacity = cgroup_ebpfgo_fd_pid_tokens_capacity ? cgroup_ebpfgo_fd_pid_tokens_capacity * 2 : 16;
+            cgroup_ebpfgo_fd_pid_tokens = reallocz(cgroup_ebpfgo_fd_pid_tokens,
+                                                   capacity * sizeof(*cgroup_ebpfgo_fd_pid_tokens));
+            cgroup_ebpfgo_fd_pid_tokens_capacity = capacity;
         }
-        memmove(&cg->ebpf_fd_pid_tokens[index + 1], &cg->ebpf_fd_pid_tokens[index],
-                (cg->ebpf_fd_pid_tokens_count - index) * sizeof(*cg->ebpf_fd_pid_tokens));
-        cg->ebpf_fd_pid_tokens[index] = (cgroup_ebpfgo_fd_pid_token_t){.pid = pid};
-        cg->ebpf_fd_pid_tokens_count++;
+        memmove(&cgroup_ebpfgo_fd_pid_tokens[index + 1], &cgroup_ebpfgo_fd_pid_tokens[index],
+                (cgroup_ebpfgo_fd_pid_tokens_count - index) * sizeof(*cgroup_ebpfgo_fd_pid_tokens));
+        cgroup_ebpfgo_fd_pid_tokens[index] = (cgroup_ebpfgo_fd_pid_token_t){.pid = pid};
+        cgroup_ebpfgo_fd_pid_tokens_count++;
     }
-    return &cg->ebpf_fd_pid_tokens[index].ct;
+    cgroup_ebpfgo_fd_pid_tokens[index].last_seen = cgroup_ebpfgo_fd_generation;
+    return &cgroup_ebpfgo_fd_pid_tokens[index].ct;
 }
 
-static void cgroup_ebpfgo_fd_prune_tokens(struct cgroup *cg)
+static void cgroup_ebpfgo_fd_prune_tokens(void)
 {
-    size_t token = 0, pid = 0;
-    while (token < cg->ebpf_fd_pid_tokens_count && pid < cg->ebpf_pids_count) {
-        if (cg->ebpf_fd_pid_tokens[token].pid < cg->ebpf_pids[pid]) {
-            memmove(&cg->ebpf_fd_pid_tokens[token], &cg->ebpf_fd_pid_tokens[token + 1],
-                    (cg->ebpf_fd_pid_tokens_count - token - 1) * sizeof(*cg->ebpf_fd_pid_tokens));
-            cg->ebpf_fd_pid_tokens_count--;
-        } else if (cg->ebpf_fd_pid_tokens[token].pid > cg->ebpf_pids[pid])
-            pid++;
-        else {
-            token++;
-            pid++;
-        }
+    size_t write = 0;
+    for (size_t read = 0; read < cgroup_ebpfgo_fd_pid_tokens_count; read++) {
+        if (cgroup_ebpfgo_fd_pid_tokens[read].last_seen + 2 < cgroup_ebpfgo_fd_generation)
+            continue;
+        cgroup_ebpfgo_fd_pid_tokens[write++] = cgroup_ebpfgo_fd_pid_tokens[read];
     }
-    cg->ebpf_fd_pid_tokens_count = token;
+    cgroup_ebpfgo_fd_pid_tokens_count = write;
 }
 
 void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors)
 {
     cgroup_ebpfgo_fd_snapshot_ready = ready;
-    if (ready && errors)
-        cgroup_ebpfgo_fd_errors_ready = true;
+    cgroup_ebpfgo_fd_errors_current = ready && errors;
 }
 
 /* Sums this interval's file-descriptor activity for one cgroup.
@@ -110,7 +112,7 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
 
         const struct ebpf_publish_fd_stat *fd = &item->fd;
 
-        uint64_t *consumed_ct = cgroup_ebpfgo_fd_consumed_token(cg, pid);
+        uint64_t *consumed_ct = cgroup_ebpfgo_fd_consumed_token(pid);
         if (fd->ct <= *consumed_ct)
             continue;
 
@@ -129,8 +131,6 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
         *consumed_ct = fd->ct;
     }
 
-    cgroup_ebpfgo_fd_prune_tokens(cg);
-
     cg->fd.open_call = open_call;
     cg->fd.close_call = close_call;
     cg->fd.open_err = open_err;
@@ -139,12 +139,14 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
 
 void cgroup_ebpfgo_fd_update_locked(void)
 {
+    cgroup_ebpfgo_fd_generation++;
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
         if (unlikely(!cg->enabled || cg->pending_renames))
             continue;
 
         cgroup_ebpfgo_fd_sum_pids(cg);
     }
+    cgroup_ebpfgo_fd_prune_tokens();
 }
 
 void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg)
@@ -205,34 +207,35 @@ void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg)
         divisor,
         (collected_number)cg->fd.close_call);
 
-    if (!cgroup_ebpfgo_fd_errors_ready)
-        return;
+    /* A mode change can leave one or both old charts alive.  In that case
+     * continue updating exactly those charts, but do not create new ones. */
+    if (cgroup_ebpfgo_fd_errors_current || cg->st_fd_open_error)
+        cgroup_ebpfgo_update_single_chart(
+            cg,
+            &cg->st_fd_open_error,
+            "fd_open_error",
+            "Fails to open files",
+            "file_access",
+            open_err_context,
+            "calls",
+            "calls/s",
+            prio + 1,
+            divisor,
+            (collected_number)cg->fd.open_err);
 
-    cgroup_ebpfgo_update_single_chart(
-        cg,
-        &cg->st_fd_open_error,
-        "fd_open_error",
-        "Fails to open files",
-        "file_access",
-        open_err_context,
-        "calls",
-        "calls/s",
-        prio + 1,
-        divisor,
-        (collected_number)cg->fd.open_err);
-
-    cgroup_ebpfgo_update_single_chart(
-        cg,
-        &cg->st_fd_close_error,
-        "fd_close_error",
-        "Fails to close files",
-        "file_access",
-        close_err_context,
-        "calls",
-        "calls/s",
-        prio + 3,
-        divisor,
-        (collected_number)cg->fd.close_err);
+    if (cgroup_ebpfgo_fd_errors_current || cg->st_fd_close_error)
+        cgroup_ebpfgo_update_single_chart(
+            cg,
+            &cg->st_fd_close_error,
+            "fd_close_error",
+            "Fails to close files",
+            "file_access",
+            close_err_context,
+            "calls",
+            "calls/s",
+            prio + 3,
+            divisor,
+            (collected_number)cg->fd.close_err);
 }
 
 #endif

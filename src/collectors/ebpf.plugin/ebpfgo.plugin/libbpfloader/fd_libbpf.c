@@ -731,6 +731,7 @@ int netdata_fd_runtime_snapshot_apps(
         map, fd, rt->percpu_entries_cap, values,
         sizeof(*values),
         offsetof(struct netdata_ebpf_fd_pid_entry, tgid),
+        offsetof(struct netdata_ebpf_fd_pid_entry, ct),
         (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
         fd_apps_snap_fold, fd_snapshot_merge_same_pid,
         &rt->pid_keys);
@@ -760,7 +761,7 @@ int netdata_fd_runtime_delete_pid(struct netdata_ebpf_fd_runtime *rt, uint32_t p
 
     bool map_missing = false;
     int rc = nd_ebpf_map_delete_tgids(
-        fd_runtime_object(rt), "tbl_fd_pid", &rt->pid_keys, &pid, 1, &map_missing);
+        fd_runtime_object(rt), "tbl_fd_pid", &rt->pid_keys, &pid, 1, rt->percpu_entries, sizeof(*rt->percpu_entries), offsetof(struct netdata_ebpf_fd_pid_entry, tgid), offsetof(struct netdata_ebpf_fd_pid_entry, ct), rt->percpu_entries_cap, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -782,7 +783,7 @@ int netdata_fd_runtime_delete_pids(
 
     bool map_missing = false;
     int rc = nd_ebpf_map_delete_tgids(
-        fd_runtime_object(rt), "tbl_fd_pid", &rt->pid_keys, pids, count, &map_missing);
+        fd_runtime_object(rt), "tbl_fd_pid", &rt->pid_keys, pids, count, rt->percpu_entries, sizeof(*rt->percpu_entries), offsetof(struct netdata_ebpf_fd_pid_entry, tgid), offsetof(struct netdata_ebpf_fd_pid_entry, ct), rt->percpu_entries_cap, &map_missing);
     if (!map_missing)
         return rc;
 

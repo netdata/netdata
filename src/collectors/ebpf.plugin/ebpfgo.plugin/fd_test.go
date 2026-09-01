@@ -222,7 +222,7 @@ func TestBuildFDFallbackPlansRHFKeepsReturnPrefix(t *testing.T) {
 // explicit exclusion.
 func TestSelectMaxIndexNeverReturnsTheMissingFDBaseSelector(t *testing.T) {
 	kernels := []uint32{
-		328448, // 5.2
+		328448, // 5.3
 		328704, // 5.4
 		330239, // just below 5.10
 		330240, // 5.10

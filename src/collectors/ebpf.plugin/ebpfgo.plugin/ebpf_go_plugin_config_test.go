@@ -82,6 +82,11 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			wantFlavor: new(""),
 			wantLoad:   new(LoadPlayDice),
 		},
+		"explicit object flavor survives later auto in the same file": {
+			content:    "[global]\nebpf object flavor = arena\nebpf type format = auto\n",
+			wantFlavor: new("arena"),
+			wantLoad:   new(LoadPlayDice),
+		},
 		"ebpf co-re tracing probe forces tracing flavor": {
 			content:    "[global]\nebpf co-re tracing = probe\n",
 			wantFlavor: new("tracing"),

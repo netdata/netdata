@@ -171,27 +171,16 @@ static inline void nd_ebpf_global_snap_aggregate(
     }
 }
 
-/* Resolves the TGID for one map entry.
- *
- * With ND_EBPF_APPS_LEVEL_ALL the BPF key is the thread ID and the process TGID
- * lives in the per-CPU values.  Shared memory must be keyed by TGID so
- * cgroup.procs lookups succeed.  Falls back to the map key only when every
- * per-CPU copy still reads 0, which is the race at entry creation — counters are
- * zero then, so the entry is harmless. */
-static inline uint32_t nd_ebpf_snapshot_tgid(
+static inline uint32_t nd_ebpf_snapshot_slot_tgid(
     const void *values,
-    int per_cpu_count,
     size_t value_size,
     size_t tgid_offset,
+    int slot,
     uint32_t fallback_key)
 {
-    for (int i = 0; i < per_cpu_count; i++) {
-        uint32_t tgid;
-        memcpy(&tgid, (const char *)values + (size_t)i * value_size + tgid_offset, sizeof(tgid));
-        if (tgid != 0)
-            return tgid;
-    }
-    return fallback_key;
+    uint32_t tgid;
+    memcpy(&tgid, (const char *)values + (size_t)slot * value_size + tgid_offset, sizeof(tgid));
+    return tgid ? tgid : fallback_key;
 }
 
 /* Ensures the persistent output buffer can hold one more item, doubling on
@@ -333,6 +322,7 @@ typedef void (*nd_ebpf_apps_snap_fold_fn)(void *dst, const void *values, int cpu
 struct nd_ebpf_key_tgid {
     uint32_t key;
     uint32_t tgid;
+    uint64_t ct;
 };
 
 /* Per-runtime, rebuilt on every apps snapshot and consumed by the eviction that
@@ -350,7 +340,7 @@ static inline void nd_ebpf_key_table_reset(struct nd_ebpf_key_table *t)
         t->count = 0;
 }
 
-static inline void nd_ebpf_key_table_add(struct nd_ebpf_key_table *t, uint32_t key, uint32_t tgid)
+static inline void nd_ebpf_key_table_add(struct nd_ebpf_key_table *t, uint32_t key, uint32_t tgid, uint64_t ct)
 {
     if (!t)
         return;
@@ -363,6 +353,7 @@ static inline void nd_ebpf_key_table_add(struct nd_ebpf_key_table *t, uint32_t k
 
     t->items[t->count].key = key;
     t->items[t->count].tgid = tgid;
+    t->items[t->count].ct = ct;
     t->count++;
 }
 
@@ -384,6 +375,7 @@ static inline size_t nd_ebpf_apps_snap_iterate(
     const void *values,
     size_t value_size,
     size_t tgid_offset,
+    size_t ct_offset,
     void **items_buf,
     size_t *items_cap,
     size_t item_size,
@@ -414,22 +406,27 @@ static inline size_t nd_ebpf_apps_snap_iterate(
             continue;
         }
 
-        nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
+        for (int i = 0; i < count; i++) {
+            uint32_t tgid = nd_ebpf_snapshot_slot_tgid(values, value_size, tgid_offset, i,
+                                                        count == 1 ? next_key : 0);
+            if (!tgid)
+                continue;
 
-        uint32_t tgid = nd_ebpf_snapshot_tgid(values, count, value_size, tgid_offset, next_key);
+            nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
 
-        /* Record the pair BEFORE the rows are merged: merging folds same-TGID
-         * buckets together and loses the individual keys that must be deleted. */
-        nd_ebpf_key_table_add(keys, next_key, tgid);
+            /* Record each key/TGID pair BEFORE rows are merged.  In a percpu map,
+             * different CPU slots under one parent key can belong to different
+             * processes and must not be represented by the first slot's TGID. */
+            uint64_t ct;
+            memcpy(&ct, (const char *)values + (size_t)i * value_size + ct_offset, sizeof(ct));
+            nd_ebpf_key_table_add(keys, next_key, tgid, ct);
 
-        void *dst = (char *)*items_buf + out_count * item_size;
-        memset(dst, 0, item_size);
-        *(uint32_t *)dst = tgid;
-
-        for (int i = 0; i < count; i++)
+            void *dst = (char *)*items_buf + out_count * item_size;
+            memset(dst, 0, item_size);
+            *(uint32_t *)dst = tgid;
             fold(dst, values, i);
-
-        out_count++;
+            out_count++;
+        }
         key = next_key;
         memset((void *)values, 0, (size_t)count * value_size);
     }
@@ -810,6 +807,11 @@ static inline int nd_ebpf_map_delete_tgids(
     const struct nd_ebpf_key_table *keys,
     const uint32_t *tgids,
     size_t count,
+    void *values,
+    size_t value_size,
+    size_t tgid_offset,
+    size_t ct_offset,
+    int percpu_entries_cap,
     bool *map_missing)
 {
     *map_missing = false;
@@ -836,7 +838,41 @@ static inline int nd_ebpf_map_delete_tgids(
             if (keys->items[k].tgid != tgids[i])
                 continue;
 
+            /* Zero is the uninitialized marker, not a process generation.  A
+             * zero-generation row cannot be distinguished from a newly reused
+             * PID, so leave it for a later snapshot with a real marker. */
+            if (!keys->items[k].ct)
+                continue;
+
             uint32_t map_key = keys->items[k].key;
+            if (!values || !value_size || bpf_map_lookup_elem(fd, &map_key, values) != 0)
+                continue;
+
+            enum bpf_map_type mtype = bpf_map__type(map);
+            int slots = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
+                        ? percpu_entries_cap : 1;
+            bool still_belongs_to_tgid = false;
+            bool belongs_to_another_tgid = false;
+            bool generation_matches = false;
+            for (int slot = 0; slot < slots; slot++) {
+                uint32_t current_tgid;
+                memcpy(&current_tgid, (char *)values + (size_t)slot * value_size + tgid_offset,
+                       sizeof(current_tgid));
+                if (!current_tgid)
+                    continue;
+                if (current_tgid == tgids[i])
+                    still_belongs_to_tgid = true;
+                else
+                    belongs_to_another_tgid = true;
+
+                uint64_t current_ct;
+                memcpy(&current_ct, (char *)values + (size_t)slot * value_size + ct_offset, sizeof(current_ct));
+                if (current_tgid == keys->items[k].tgid && current_ct == keys->items[k].ct)
+                    generation_matches = true;
+            }
+            if (!still_belongs_to_tgid || belongs_to_another_tgid || !generation_matches)
+                continue;
+
             int per = bpf_map_delete_elem(fd, &map_key);
             /* Treat "not found" as success: the BPF program may have removed the
              * bucket between snapshot and delete. */

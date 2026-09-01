@@ -31,6 +31,7 @@ type pluginConfigFile struct {
 	BTFPath                   *string
 	Lifetime                  *int
 	ObjectFlavor              *string
+	objectFlavorExplicit      bool
 	LoadMethod                *LoadMethod
 	CollectPidLevel           *int  // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
 	PerQueryTracking          *bool // "per query tracking" key → DNS per-query flow capture
@@ -278,6 +279,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf object flavor %q, using default\n", path, value)
 			} else {
 				cfg.ObjectFlavor = new(flavor)
+				cfg.objectFlavorExplicit = true
 			}
 			found = true
 		case "ebpf load mode":
@@ -317,7 +319,13 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				// unable to restore the normal family.  The empty string is the
 				// reset: applyCommonCollectorConfig skips a blank flavor, so the
 				// collector default applies.
-				cfg.ObjectFlavor = new("")
+				// Keep an explicit flavor from this same file. A blank is only a
+				// layer-level retraction for a legacy marker supplied by an earlier
+				// file; otherwise `object flavor = arena` followed by `type format =
+				// auto` would silently revert to the collector default.
+				if !cfg.objectFlavorExplicit {
+					cfg.ObjectFlavor = new("")
+				}
 				if strings.EqualFold(value, "co-re") {
 					cfg.LoadMethod = new(LoadCore)
 				} else {

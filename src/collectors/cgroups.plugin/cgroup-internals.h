@@ -64,8 +64,6 @@ typedef struct cgroup_ebpfgo_publish_dcstat {
 
 /* Per-second file-descriptor totals for one cgroup, in fixed-point units. */
 typedef struct cgroup_ebpfgo_publish_fd {
-    uint64_t ct;
-
     long long open_call;
     long long close_call;
     long long open_err;

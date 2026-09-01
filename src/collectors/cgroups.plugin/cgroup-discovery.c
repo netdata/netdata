@@ -129,11 +129,6 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->ebpf_pids);
     cg->ebpf_pids       = NULL;
     cg->ebpf_pids_count = 0;
-    freez(cg->ebpf_fd_pid_tokens);
-    cg->ebpf_fd_pid_tokens = NULL;
-    cg->ebpf_fd_pid_tokens_count = 0;
-    cg->ebpf_fd_pid_tokens_capacity = 0;
-
     freez(cg->filename_cpuset_cpus);
     freez(cg->filename_cpu_cfs_period);
     freez(cg->filename_cpu_cfs_quota);
