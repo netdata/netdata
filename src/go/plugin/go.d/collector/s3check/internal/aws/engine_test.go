@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -47,6 +50,25 @@ func TestCheckUsesGeneratedOwnerNamespaceForRuleApplicability(t *testing.T) {
 			},
 			s3client.ReplicationRule{
 				Enabled: true, DestinationBucket: "unowned-destination", Prefix: namespace,
+				DeleteMarkerReplication: true, Priority: 20,
+			},
+		)
+
+		require.Error(t, engine.Check(context.Background()))
+	})
+
+	t.Run("rejects fixed probe stem additional destination", func(t *testing.T) {
+		source, destination, _ := newAWSClients()
+		engine := newAWSEngine(t, source, destination, nil)
+		namespace, err := engine.generator.Namespace()
+		require.NoError(t, err)
+		source.BucketReplicationFunc = replicationRules(
+			s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+				DeleteMarkerReplication: true, Priority: 10,
+			},
+			s3client.ReplicationRule{
+				Enabled: true, DestinationBucket: "unowned-destination", Prefix: namespace + "probe-",
 				DeleteMarkerReplication: true, Priority: 20,
 			},
 		)
@@ -174,6 +196,7 @@ func TestProbeOwnsIndependentVersionsAndCleansExactIdentities(t *testing.T) {
 	wantObject := engine.Collect(context.Background())
 	require.NotNil(t, wantObject.Probe)
 	assert.Equal(t, contract.StatusWaiting, wantObject.Probe.Status)
+	assert.False(t, wantObject.Probe.PayloadCompared)
 	key, sourceObjectID := model.onlySourceObject(t)
 	require.True(t, model.lastPutConditional)
 
@@ -182,6 +205,7 @@ func TestProbeOwnsIndependentVersionsAndCleansExactIdentities(t *testing.T) {
 	wantMarker := engine.Collect(context.Background())
 	require.NotNil(t, wantMarker.Probe)
 	assert.Equal(t, contract.StatusWaiting, wantMarker.Probe.Status)
+	assert.True(t, wantMarker.Probe.PayloadCompared)
 	assert.Equal(t, 10*time.Second, wantMarker.Probe.WriteVisibility.Lag)
 	sourceMarkerID := model.onlySourceMarker(t, key)
 	require.NotEmpty(t, model.lastLogicalDeleteIfMatch)
@@ -191,6 +215,7 @@ func TestProbeOwnsIndependentVersionsAndCleansExactIdentities(t *testing.T) {
 	success := engine.Collect(context.Background())
 	require.NotNil(t, success.Probe)
 	assert.Equal(t, contract.StatusSuccess, success.Probe.Status)
+	assert.True(t, success.Probe.PayloadCompared)
 	assert.Equal(t, 10*time.Second, success.Probe.WriteVisibility.Lag)
 	assert.Equal(t, 5*time.Second, success.Probe.DeleteVisibility.Lag)
 	assert.Zero(t, success.Cleanup.Pending)
@@ -398,6 +423,40 @@ func TestRetiredReconciliationReportsProviderFailureAndDiagnostic(t *testing.T) 
 	engine.Cleanup(context.Background())
 }
 
+func TestCleanupJournalFailureReportsRuntimeError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX directory permissions are required")
+	}
+	source, destination, model := newAWSClients()
+	model.failPutAfterMutation = true
+	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
+		opts.QueueCapacity = 1
+	})
+
+	failed := engine.Collect(context.Background())
+	require.NotNil(t, failed.Probe)
+	require.Equal(t, contract.StatusFailed, failed.Probe.Status)
+	root := filepath.Dir(engine.journal.Path())
+	backup := root + "-backup"
+	require.NoError(t, os.Rename(root, backup))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_ = os.Remove(root)
+			_ = os.Rename(backup, root)
+		}
+		engine.Cleanup(context.Background())
+	})
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Positive(t, result.Cleanup.Failed)
+	require.NoError(t, os.Remove(root))
+	require.NoError(t, os.Rename(backup, root))
+	restored = true
+}
+
 func TestValidateEntryPhaseRejectsMutationWithoutRequiredProof(t *testing.T) {
 	err := validateEntryPhase(entry{
 		Phase:          phaseDeleteIntent,
@@ -438,7 +497,7 @@ func newAWSEngineWithOptions(
 			Prefix: "netdata-s3check/", OwnerID: j.OwnerID(), Now: time.Now,
 			Random: bytes.NewReader(bytes.Repeat([]byte{3}, 64*(16+probe.PayloadBytes))),
 		},
-		RequestTimeout: time.Second, UpdateEvery: time.Minute,
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second, UpdateEvery: time.Minute,
 		WriteObjective: 15 * time.Second, WriteTimeout: time.Minute,
 		DeleteObjective: 10 * time.Second, DeleteTimeout: time.Minute,
 	}

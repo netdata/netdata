@@ -53,12 +53,22 @@ func TestMetricRendererPreservesGapsAndCountsLogicalCalls(t *testing.T) {
 	assertMetricValue(t, reader, "write_visibility_lag_seconds", withReason(common, contract.ReasonNone), 3)
 	_, ok := reader.Value("delete_visibility_lag_seconds", withReason(common, contract.ReasonNone))
 	assert.False(t, ok, "unperformed delete visibility must remain a gap")
+	_, ok = reader.Value("payload_mismatch", withReason(common, contract.ReasonNone))
+	assert.False(t, ok, "unperformed payload comparison must remain a gap")
 	operationLabels := metrix.Labels{
 		"mode": string(contract.ModeCephMultisite), "source": "site-a", "destination": "site-b",
 		"endpoint": string(contract.EndpointDestination), "operation": string(contract.OperationRead),
 	}
 	assertMetricValue(t, reader, "operation_calls_total", operationLabels, 2)
 	assertMetricValue(t, reader, "operation_failures_total", operationLabels, 1)
+	failedStatusLabels := withReason(operationLabels, contract.ReasonRequest)
+	status, ok := reader.StateSet("operation_status", failedStatusLabels)
+	require.True(t, ok)
+	assert.True(t, status.States[string(contract.StatusFailed)])
+	assert.False(t, status.States[string(contract.StatusSuccess)])
+	successStatusLabels := withReason(operationLabels, contract.ReasonNone)
+	_, ok = reader.StateSet("operation_status", successStatusLabels)
+	assert.False(t, ok, "one logical operation must not report success and failure in the same cycle")
 }
 
 func TestMetricRendererUsesLastTerminalDuringBackpressure(t *testing.T) {
@@ -70,7 +80,8 @@ func TestMetricRendererUsesLastTerminalDuringBackpressure(t *testing.T) {
 		Mode:    contract.ModeAWSReplication,
 		Cleanup: contract.CleanupResult{Pending: 8, Backpressure: true},
 		LastTerminal: &contract.ProbeResult{
-			Status: contract.StatusFailed, Reason: contract.ReasonPayloadMismatch, PayloadMismatch: true,
+			Status: contract.StatusFailed, Reason: contract.ReasonPayloadMismatch,
+			PayloadCompared: true, PayloadMismatch: true,
 		},
 	}
 
@@ -95,7 +106,7 @@ func TestMetricChartCoverage(t *testing.T) {
 			Duration: time.Second, Calls: 1,
 		}},
 		Probe: &contract.ProbeResult{
-			Status: contract.StatusSuccess, Reason: contract.ReasonNone,
+			Status: contract.StatusSuccess, Reason: contract.ReasonNone, PayloadCompared: true,
 			WriteVisibility: contract.ObjectiveResult{
 				Performed: true, Status: contract.StatusSuccess, Lag: time.Second,
 			},

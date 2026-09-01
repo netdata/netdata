@@ -61,15 +61,16 @@ type Options struct {
 	Journal           *journal.Journal
 	Generator         probe.Generator
 
-	RequestTimeout  time.Duration
-	UpdateEvery     time.Duration
-	WriteObjective  time.Duration
-	WriteTimeout    time.Duration
-	DeleteObjective time.Duration
-	DeleteTimeout   time.Duration
-	QueueCapacity   int
-	CleanupBatch    int
-	Now             func() time.Time
+	SourceRequestTimeout      time.Duration
+	DestinationRequestTimeout time.Duration
+	UpdateEvery               time.Duration
+	WriteObjective            time.Duration
+	WriteTimeout              time.Duration
+	DeleteObjective           time.Duration
+	DeleteTimeout             time.Duration
+	QueueCapacity             int
+	CleanupBatch              int
+	Now                       func() time.Time
 }
 
 type entry struct {
@@ -112,21 +113,23 @@ type Engine struct {
 	destinationBucket string
 	journal           *journal.Journal
 	generator         probe.Generator
-	namespace         string
+	keyPrefix         string
 
-	requestTimeout  time.Duration
-	updateEvery     time.Duration
-	writeObjective  time.Duration
-	writeTimeout    time.Duration
-	deleteObjective time.Duration
-	deleteTimeout   time.Duration
-	queueCapacity   int
-	cleanupBatch    int
-	now             func() time.Time
+	sourceRequestTimeout      time.Duration
+	destinationRequestTimeout time.Duration
+	updateEvery               time.Duration
+	writeObjective            time.Duration
+	writeTimeout              time.Duration
+	deleteObjective           time.Duration
+	deleteTimeout             time.Duration
+	queueCapacity             int
+	cleanupBatch              int
+	now                       func() time.Time
 
-	state  state
-	locked bool
-	closed bool
+	state      state
+	diagnostic error
+	locked     bool
+	closed     bool
 }
 
 func New(opts Options) (*Engine, error) {
@@ -147,8 +150,10 @@ func New(opts Options) (*Engine, error) {
 		return nil, errors.New("AWS journal is required")
 	case opts.Generator.OwnerID != opts.Journal.OwnerID():
 		return nil, errors.New("AWS generator and journal owners differ")
-	case opts.RequestTimeout <= 0:
-		return nil, errors.New("AWS request timeout must be positive")
+	case opts.SourceRequestTimeout <= 0:
+		return nil, errors.New("AWS source request timeout must be positive")
+	case opts.DestinationRequestTimeout <= 0:
+		return nil, errors.New("AWS destination request timeout must be positive")
 	case opts.UpdateEvery <= 0:
 		return nil, errors.New("AWS update interval must be positive")
 	case opts.WriteObjective <= 0 || opts.WriteTimeout <= 0 || opts.WriteObjective > opts.WriteTimeout:
@@ -156,9 +161,9 @@ func New(opts Options) (*Engine, error) {
 	case opts.DeleteObjective <= 0 || opts.DeleteTimeout <= 0 || opts.DeleteObjective > opts.DeleteTimeout:
 		return nil, errors.New("AWS delete objective must be positive and not exceed its timeout")
 	}
-	namespace, err := opts.Generator.Namespace()
+	keyPrefix, err := opts.Generator.KeyPrefix()
 	if err != nil {
-		return nil, fmt.Errorf("AWS probe namespace: %w", err)
+		return nil, fmt.Errorf("AWS probe key prefix: %w", err)
 	}
 	if opts.QueueCapacity == 0 {
 		opts.QueueCapacity = defaultQueueCapacity
@@ -182,8 +187,9 @@ func New(opts Options) (*Engine, error) {
 	engine := &Engine{
 		source: opts.Source, destination: opts.Destination,
 		sourceBucket: opts.SourceBucket, destinationBucket: opts.DestinationBucket,
-		journal: opts.Journal, generator: opts.Generator, namespace: namespace,
-		requestTimeout: opts.RequestTimeout, updateEvery: opts.UpdateEvery,
+		journal: opts.Journal, generator: opts.Generator, keyPrefix: keyPrefix,
+		sourceRequestTimeout: opts.SourceRequestTimeout, destinationRequestTimeout: opts.DestinationRequestTimeout,
+		updateEvery:    opts.UpdateEvery,
 		writeObjective: opts.WriteObjective, writeTimeout: opts.WriteTimeout,
 		deleteObjective: opts.DeleteObjective, deleteTimeout: opts.DeleteTimeout,
 		queueCapacity: opts.QueueCapacity, cleanupBatch: opts.CleanupBatch, now: opts.Now,
@@ -222,7 +228,7 @@ func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.Op
 	}
 	var effective *s3client.ReplicationRule
 	for _, rule := range rules {
-		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(e.namespace, rule.Prefix) {
+		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(e.keyPrefix, rule.Prefix) {
 			continue
 		}
 		if rule.DestinationBucket != e.destinationBucket {
@@ -274,12 +280,19 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	result = contract.Result{
 		Mode: contract.ModeAWSReplication, LastTerminal: cloneProbeResult(e.state.LastTerminal),
 	}
+	e.diagnostic = nil
+	defer func() {
+		if result.Err == nil {
+			result.Err = e.diagnostic
+		}
+	}()
 	if e.closed {
 		result.Probe = failedProbe(contract.ReasonInternal)
 		return result
 	}
 	if err := e.takeover(); err != nil {
 		result.Probe = failedProbe(contract.ReasonOwnership)
+		result.Err = err
 		return result
 	}
 	defer func() {
@@ -346,10 +359,18 @@ func (e *Engine) takeover() error {
 }
 
 func (e *Engine) persist() error {
+	var err error
 	if len(e.state.Entries) == 0 {
-		return e.journal.Clear()
+		err = e.journal.Clear()
+	} else {
+		err = e.journal.Save(e.state)
 	}
-	return e.journal.Save(e.state)
+	if err == nil {
+		return nil
+	}
+	err = fmt.Errorf("persist AWS ownership: %w", err)
+	e.diagnostic = errors.Join(e.diagnostic, err)
+	return err
 }
 
 func (e *Engine) active() *entry {
@@ -399,7 +420,7 @@ func (e *Engine) validateState() error {
 	activeFound := e.state.ActiveKey == ""
 	for _, owned := range e.state.Entries {
 		switch {
-		case !strings.HasPrefix(owned.Key, e.namespace):
+		case !strings.HasPrefix(owned.Key, e.keyPrefix):
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")

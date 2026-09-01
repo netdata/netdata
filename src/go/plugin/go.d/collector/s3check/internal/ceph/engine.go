@@ -40,14 +40,15 @@ type Options struct {
 	Journal           *journal.Journal
 	Generator         probe.Generator
 
-	RequestTimeout  time.Duration
-	WriteObjective  time.Duration
-	WriteTimeout    time.Duration
-	DeleteObjective time.Duration
-	DeleteTimeout   time.Duration
-	QueueCapacity   int
-	CleanupBatch    int
-	Now             func() time.Time
+	SourceRequestTimeout      time.Duration
+	DestinationRequestTimeout time.Duration
+	WriteObjective            time.Duration
+	WriteTimeout              time.Duration
+	DeleteObjective           time.Duration
+	DeleteTimeout             time.Duration
+	QueueCapacity             int
+	CleanupBatch              int
+	Now                       func() time.Time
 }
 
 type entry struct {
@@ -78,18 +79,20 @@ type Engine struct {
 	generator         probe.Generator
 	namespace         string
 
-	requestTimeout  time.Duration
-	writeObjective  time.Duration
-	writeTimeout    time.Duration
-	deleteObjective time.Duration
-	deleteTimeout   time.Duration
-	queueCapacity   int
-	cleanupBatch    int
-	now             func() time.Time
+	sourceRequestTimeout      time.Duration
+	destinationRequestTimeout time.Duration
+	writeObjective            time.Duration
+	writeTimeout              time.Duration
+	deleteObjective           time.Duration
+	deleteTimeout             time.Duration
+	queueCapacity             int
+	cleanupBatch              int
+	now                       func() time.Time
 
-	state  state
-	locked bool
-	closed bool
+	state      state
+	diagnostic error
+	locked     bool
+	closed     bool
 }
 
 func New(opts Options) (*Engine, error) {
@@ -106,8 +109,10 @@ func New(opts Options) (*Engine, error) {
 		return nil, errors.New("Ceph journal is required")
 	case opts.Generator.OwnerID != opts.Journal.OwnerID():
 		return nil, errors.New("Ceph generator and journal owners differ")
-	case opts.RequestTimeout <= 0:
-		return nil, errors.New("Ceph request timeout must be positive")
+	case opts.SourceRequestTimeout <= 0:
+		return nil, errors.New("Ceph source request timeout must be positive")
+	case opts.DestinationRequestTimeout <= 0:
+		return nil, errors.New("Ceph destination request timeout must be positive")
 	case opts.WriteObjective <= 0 || opts.WriteTimeout <= 0 || opts.WriteObjective > opts.WriteTimeout:
 		return nil, errors.New("Ceph write objective must be positive and not exceed its timeout")
 	case opts.DeleteObjective <= 0 || opts.DeleteTimeout <= 0 || opts.DeleteObjective > opts.DeleteTimeout:
@@ -134,21 +139,22 @@ func New(opts Options) (*Engine, error) {
 	}
 
 	engine := &Engine{
-		source:            opts.Source,
-		destination:       opts.Destination,
-		sourceBucket:      opts.SourceBucket,
-		destinationBucket: opts.DestinationBucket,
-		journal:           opts.Journal,
-		generator:         opts.Generator,
-		namespace:         namespace,
-		requestTimeout:    opts.RequestTimeout,
-		writeObjective:    opts.WriteObjective,
-		writeTimeout:      opts.WriteTimeout,
-		deleteObjective:   opts.DeleteObjective,
-		deleteTimeout:     opts.DeleteTimeout,
-		queueCapacity:     opts.QueueCapacity,
-		cleanupBatch:      opts.CleanupBatch,
-		now:               opts.Now,
+		source:                    opts.Source,
+		destination:               opts.Destination,
+		sourceBucket:              opts.SourceBucket,
+		destinationBucket:         opts.DestinationBucket,
+		journal:                   opts.Journal,
+		generator:                 opts.Generator,
+		namespace:                 namespace,
+		sourceRequestTimeout:      opts.SourceRequestTimeout,
+		destinationRequestTimeout: opts.DestinationRequestTimeout,
+		writeObjective:            opts.WriteObjective,
+		writeTimeout:              opts.WriteTimeout,
+		deleteObjective:           opts.DeleteObjective,
+		deleteTimeout:             opts.DeleteTimeout,
+		queueCapacity:             opts.QueueCapacity,
+		cleanupBatch:              opts.CleanupBatch,
+		now:                       opts.Now,
 	}
 	found, err := engine.journal.Load(&engine.state)
 	if err != nil {
@@ -200,12 +206,19 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		Mode:         contract.ModeCephMultisite,
 		LastTerminal: cloneProbeResult(e.state.LastTerminal),
 	}
+	e.diagnostic = nil
+	defer func() {
+		if result.Err == nil {
+			result.Err = e.diagnostic
+		}
+	}()
 	if e.closed {
 		result.Probe = failedProbe(contract.ReasonInternal)
 		return result
 	}
 	if err := e.takeover(); err != nil {
 		result.Probe = failedProbe(contract.ReasonOwnership)
+		result.Err = err
 		return result
 	}
 	defer func() {
@@ -356,6 +369,7 @@ func (e *Engine) advanceActive(
 		case probe.Digest(got.Payload) != owned.Digest:
 			e.moveToCleanup(owned)
 			result := failedProbe(contract.ReasonPayloadMismatch)
+			result.PayloadCompared = true
 			result.PayloadMismatch = true
 			result.WriteVisibility = write
 			result = e.finishTerminal(result)
@@ -377,6 +391,7 @@ func (e *Engine) advanceActive(
 		); err != nil {
 			e.moveToCleanup(owned)
 			result := failedProbe(contract.ReasonRequest)
+			result.PayloadCompared = true
 			result.WriteVisibility = write
 			result = e.finishTerminal(result)
 			_ = e.persist()
@@ -387,13 +402,17 @@ func (e *Engine) advanceActive(
 		owned.Phase = phaseDeleteVisibility
 		if err := e.persist(); err != nil {
 			e.moveToCleanup(owned)
-			return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+			result := failedProbe(contract.ReasonOwnership)
+			result.PayloadCompared = true
+			return e.finishTerminal(result)
 		}
 	}
 
 	if owned.Phase != phaseDeleteVisibility || owned.VisibleAt == nil || owned.DeleteAt == nil {
 		e.moveToCleanup(owned)
-		result := e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		result := failedProbe(contract.ReasonOwnership)
+		result.PayloadCompared = owned.VisibleAt != nil
+		result = e.finishTerminal(result)
 		_ = e.persist()
 		return result
 	}
@@ -423,6 +442,7 @@ func (e *Engine) advanceActive(
 		result := &contract.ProbeResult{
 			Status:           contract.StatusSuccess,
 			Reason:           contract.ReasonNone,
+			PayloadCompared:  true,
 			WriteVisibility:  write,
 			DeleteVisibility: deletion,
 		}
@@ -433,6 +453,7 @@ func (e *Engine) advanceActive(
 	case err != nil:
 		e.moveToCleanup(owned)
 		result := failedProbe(contract.ReasonRequest)
+		result.PayloadCompared = true
 		result.WriteVisibility = write
 		result = e.finishTerminal(result)
 		_ = e.persist()
@@ -440,6 +461,7 @@ func (e *Engine) advanceActive(
 	case deleteLag >= e.deleteTimeout:
 		e.moveToCleanup(owned)
 		result := failedProbe(contract.ReasonDeleteTimeout)
+		result.PayloadCompared = true
 		result.WriteVisibility = write
 		result.DeleteVisibility = deletion
 		result = e.finishTerminal(result)
@@ -449,6 +471,7 @@ func (e *Engine) advanceActive(
 		return &contract.ProbeResult{
 			Status:           contract.StatusWaiting,
 			Reason:           contract.ReasonNone,
+			PayloadCompared:  true,
 			WriteVisibility:  write,
 			DeleteVisibility: deletion,
 		}
@@ -601,7 +624,11 @@ func (e *Engine) call(
 	name contract.Operation,
 	fn func(context.Context) error,
 ) (time.Duration, error) {
-	ctx, cancel := context.WithTimeout(parent, e.requestTimeout)
+	requestTimeout := e.sourceRequestTimeout
+	if endpoint == contract.EndpointDestination {
+		requestTimeout = e.destinationRequestTimeout
+	}
+	ctx, cancel := context.WithTimeout(parent, requestTimeout)
 	started := time.Now()
 	err := fn(ctx)
 	duration := time.Since(started)
@@ -707,10 +734,18 @@ func (e *Engine) finishTerminal(result *contract.ProbeResult) *contract.ProbeRes
 }
 
 func (e *Engine) persist() error {
+	var err error
 	if len(e.state.Entries) == 0 {
-		return e.journal.Clear()
+		err = e.journal.Clear()
+	} else {
+		err = e.journal.Save(e.state)
 	}
-	return e.journal.Save(e.state)
+	if err == nil {
+		return nil
+	}
+	err = fmt.Errorf("persist Ceph ownership: %w", err)
+	e.diagnostic = errors.Join(e.diagnostic, err)
+	return err
 }
 
 func (e *Engine) validateState() error {

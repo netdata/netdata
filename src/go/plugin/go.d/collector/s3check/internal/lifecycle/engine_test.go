@@ -79,6 +79,7 @@ func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 	first := engine.Collect(context.Background())
 	require.NotNil(t, first.Probe)
 	assert.Equal(t, contract.StatusSuccess, first.Probe.Status)
+	assert.True(t, first.Probe.PayloadCompared)
 	assert.Zero(t, first.Cleanup.Pending)
 	_, statErr := os.Stat(j.Path())
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
@@ -86,6 +87,7 @@ func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 	second := engine.Collect(context.Background())
 	require.NotNil(t, second.Probe)
 	assert.Equal(t, contract.StatusSuccess, second.Probe.Status)
+	assert.True(t, second.Probe.PayloadCompared)
 	assert.Equal(t, 2, client.Count("put"))
 	engine.Cleanup(context.Background())
 }

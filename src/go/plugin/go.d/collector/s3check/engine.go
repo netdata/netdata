@@ -47,7 +47,6 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 		source.CloseIdleConnections()
 		return nil, fmt.Errorf("create destination S3 client: %w", err)
 	}
-	requestTimeout := max(c.Source.Timeout.Duration(), c.Destination.Timeout.Duration())
 	generator := newProbeGenerator(c.Prefix, j.OwnerID())
 	var engine contract.Engine
 	switch contract.Mode(c.Mode) {
@@ -55,7 +54,8 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 		engine, err = ceph.New(ceph.Options{
 			Source: source, Destination: destination,
 			SourceBucket: c.Source.Bucket, DestinationBucket: c.Destination.Bucket,
-			Journal: j, Generator: generator, RequestTimeout: requestTimeout,
+			Journal: j, Generator: generator,
+			SourceRequestTimeout: c.Source.Timeout.Duration(), DestinationRequestTimeout: c.Destination.Timeout.Duration(),
 			WriteObjective: c.WriteObjective.Duration(), WriteTimeout: c.WriteTimeout.Duration(),
 			DeleteObjective: c.DeleteObjective.Duration(), DeleteTimeout: c.DeleteTimeout.Duration(),
 		})
@@ -63,7 +63,8 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 		engine, err = aws.New(aws.Options{
 			Source: source, Destination: destination,
 			SourceBucket: c.Source.Bucket, DestinationBucket: c.Destination.Bucket,
-			ProbePrefix: c.Prefix, Journal: j, Generator: generator, RequestTimeout: requestTimeout,
+			ProbePrefix: c.Prefix, Journal: j, Generator: generator,
+			SourceRequestTimeout: c.Source.Timeout.Duration(), DestinationRequestTimeout: c.Destination.Timeout.Duration(),
 			UpdateEvery:    time.Duration(c.UpdateEvery) * time.Second,
 			WriteObjective: c.WriteObjective.Duration(), WriteTimeout: c.WriteTimeout.Duration(),
 			DeleteObjective: c.DeleteObjective.Duration(), DeleteTimeout: c.DeleteTimeout.Duration(),

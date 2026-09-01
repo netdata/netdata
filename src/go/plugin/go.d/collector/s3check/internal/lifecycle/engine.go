@@ -64,9 +64,10 @@ type Engine struct {
 	cleanupBatch   int
 	now            func() time.Time
 
-	state  state
-	locked bool
-	closed bool
+	state      state
+	diagnostic error
+	locked     bool
+	closed     bool
 }
 
 func New(opts Options) (*Engine, error) {
@@ -157,12 +158,19 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		Mode:         contract.ModeLifecycle,
 		LastTerminal: cloneProbeResult(e.state.LastTerminal),
 	}
+	e.diagnostic = nil
+	defer func() {
+		if result.Err == nil {
+			result.Err = e.diagnostic
+		}
+	}()
 	if e.closed {
 		result.Probe = failedProbe(contract.ReasonInternal)
 		return result
 	}
 	if err := e.takeover(); err != nil {
 		result.Probe = failedProbe(contract.ReasonOwnership)
+		result.Err = err
 		return result
 	}
 	defer func() {
@@ -240,6 +248,7 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}
 	if probe.Digest(got.Payload) != object.Digest {
 		probeResult := failedProbe(contract.ReasonPayloadMismatch)
+		probeResult.PayloadCompared = true
 		probeResult.PayloadMismatch = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
@@ -254,7 +263,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		page, callErr = e.client.ListCurrent(callCtx, e.bucket, object.Key, 2)
 		return callErr
 	}); err != nil || page.Truncated || !slices.Contains(page.Keys, object.Key) {
-		result.Probe = e.finish(failedProbe(contract.ReasonRequest))
+		probeResult := failedProbe(contract.ReasonRequest)
+		probeResult.PayloadCompared = true
+		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
@@ -265,7 +276,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		_, callErr := e.client.Delete(callCtx, e.bucket, object.Key, s3client.DeleteOptions{})
 		return callErr
 	}); err != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonRequest))
+		probeResult := failedProbe(contract.ReasonRequest)
+		probeResult.PayloadCompared = true
+		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
@@ -280,7 +293,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		}
 		return callErr
 	}); err != nil || !absent {
-		result.Probe = e.finish(failedProbe(contract.ReasonCleanup))
+		probeResult := failedProbe(contract.ReasonCleanup)
+		probeResult.PayloadCompared = true
+		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
@@ -288,10 +303,14 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}
 
 	e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
-	success := &contract.ProbeResult{Status: contract.StatusSuccess, Reason: contract.ReasonNone}
+	success := &contract.ProbeResult{
+		Status: contract.StatusSuccess, Reason: contract.ReasonNone, PayloadCompared: true,
+	}
 	result.Probe = e.finish(success)
 	if err := e.persist(); err != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonOwnership))
+		probeResult := failedProbe(contract.ReasonOwnership)
+		probeResult.PayloadCompared = true
+		result.Probe = e.finish(probeResult)
 	}
 	result.Cleanup.Pending = len(e.state.Entries)
 	result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
@@ -467,10 +486,18 @@ func (e *Engine) finish(result *contract.ProbeResult) *contract.ProbeResult {
 }
 
 func (e *Engine) persist() error {
+	var err error
 	if len(e.state.Entries) == 0 {
-		return e.journal.Clear()
+		err = e.journal.Clear()
+	} else {
+		err = e.journal.Save(e.state)
 	}
-	return e.journal.Save(e.state)
+	if err == nil {
+		return nil
+	}
+	err = fmt.Errorf("persist lifecycle ownership: %w", err)
+	e.diagnostic = errors.Join(e.diagnostic, err)
+	return err
 }
 
 func (e *Engine) validateState() error {

@@ -21,6 +21,9 @@ func TestGeneratorNext(t *testing.T) {
 	namespace, err := g.Namespace()
 	require.NoError(t, err)
 	assert.Equal(t, "netdata-s3check/0123456789abcdef/", namespace)
+	keyPrefix, err := g.KeyPrefix()
+	require.NoError(t, err)
+	assert.Equal(t, namespace+"probe-", keyPrefix)
 
 	object, err := g.Next()
 	require.NoError(t, err)

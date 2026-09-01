@@ -15,6 +15,7 @@ func successProbe(owned *entry, writeObjective, deleteObjective time.Duration) *
 	end := *owned.MarkerAt
 	return &contract.ProbeResult{
 		Status: contract.StatusSuccess, Reason: contract.ReasonNone,
+		PayloadCompared:  owned.ObjectSeen,
 		WriteVisibility:  writeResult(owned, end, writeObjective),
 		DeleteVisibility: deleteResult(owned, end, deleteObjective),
 	}
@@ -23,6 +24,7 @@ func successProbe(owned *entry, writeObjective, deleteObjective time.Duration) *
 func waitingProbe(owned *entry, now time.Time, writeObjective, deleteObjective time.Duration) *contract.ProbeResult {
 	return &contract.ProbeResult{
 		Status: contract.StatusWaiting, Reason: contract.ReasonNone,
+		PayloadCompared:  owned.ObjectSeen,
 		WriteVisibility:  writeResult(owned, now, writeObjective),
 		DeleteVisibility: deleteResult(owned, now, deleteObjective),
 	}
@@ -62,6 +64,13 @@ func objectiveResult(lag, objective time.Duration) contract.ObjectiveResult {
 
 func failedProbe(reason contract.Reason) *contract.ProbeResult {
 	return &contract.ProbeResult{Status: contract.StatusFailed, Reason: reason}
+}
+
+func withPayloadComparison(owned *entry, result *contract.ProbeResult) *contract.ProbeResult {
+	if owned != nil && owned.ObjectSeen {
+		result.PayloadCompared = true
+	}
+	return result
 }
 
 func cloneProbeResult(value *contract.ProbeResult) *contract.ProbeResult {

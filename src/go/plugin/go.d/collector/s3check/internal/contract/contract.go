@@ -93,6 +93,7 @@ type CleanupResult struct {
 type ProbeResult struct {
 	Status           Status
 	Reason           Reason
+	PayloadCompared  bool
 	PayloadMismatch  bool
 	WriteVisibility  ObjectiveResult
 	DeleteVisibility ObjectiveResult

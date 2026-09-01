@@ -29,13 +29,9 @@ type operationTotals struct {
 	failures int64
 }
 
-type operationCycleKey struct {
-	operationKey
-	reason contract.Reason
-}
-
 type operationCycle struct {
 	status   contract.Status
+	reason   contract.Reason
 	duration time.Duration
 	calls    int64
 	failures int64
@@ -99,16 +95,19 @@ func (r *metricRenderer) writeRuntime(meter metrix.SnapshotMeter, result contrac
 }
 
 func (r *metricRenderer) writeOperations(meter metrix.SnapshotMeter, result contract.Result) {
-	cycles := make(map[operationCycleKey]operationCycle)
+	cycles := make(map[operationKey]operationCycle)
 	for _, operation := range result.Operations {
-		key := operationCycleKey{
-			operationKey: operationKey{mode: result.Mode, endpoint: operation.Endpoint, operation: operation.Name},
-			reason:       operation.Reason,
-		}
+		key := operationKey{mode: result.Mode, endpoint: operation.Endpoint, operation: operation.Name}
 		cycle := cycles[key]
-		cycle.status = contract.StatusSuccess
-		if operation.Status == contract.StatusFailed || cycle.failures > 0 {
+		if cycle.calls == 0 {
+			cycle.status = contract.StatusSuccess
+			cycle.reason = contract.ReasonNone
+		}
+		if operation.Status == contract.StatusFailed {
 			cycle.status = contract.StatusFailed
+			if cycle.failures == 0 {
+				cycle.reason = operation.Reason
+			}
 		}
 		cycle.duration += operation.Duration
 		cycle.calls += operation.Calls
@@ -122,7 +121,7 @@ func (r *metricRenderer) writeOperations(meter metrix.SnapshotMeter, result cont
 		labels := append(r.commonLabels(key.mode),
 			metrix.Label{Key: "endpoint", Value: string(key.endpoint)},
 			metrix.Label{Key: "operation", Value: string(key.operation)},
-			metrix.Label{Key: "reason", Value: string(key.reason)},
+			metrix.Label{Key: "reason", Value: string(cycle.reason)},
 		)
 		labelSet := meter.LabelSet(labels...)
 		meter.WithLabels(labels...).StateSet(
@@ -134,10 +133,10 @@ func (r *metricRenderer) writeOperations(meter metrix.SnapshotMeter, result cont
 			metrix.SampleValue(cycle.duration.Seconds()), labelSet,
 		)
 
-		totals := r.operations[key.operationKey]
+		totals := r.operations[key]
 		totals.calls += cycle.calls
 		totals.failures += cycle.failures
-		r.operations[key.operationKey] = totals
+		r.operations[key] = totals
 		counterLabels := meter.LabelSet(append(
 			r.commonLabels(key.mode),
 			metrix.Label{Key: "endpoint", Value: string(key.endpoint)},
@@ -164,11 +163,13 @@ func (r *metricRenderer) writeProbe(meter metrix.SnapshotMeter, result contract.
 		metrix.WithStateSetStates(probeStates...),
 	).Enable(string(probe.Status))
 
-	mismatch := int64(0)
-	if probe.PayloadMismatch {
-		mismatch = 1
+	if probe.PayloadCompared {
+		mismatch := int64(0)
+		if probe.PayloadMismatch {
+			mismatch = 1
+		}
+		meter.Gauge("payload_mismatch").Observe(metrix.SampleValue(mismatch), labelSet)
 	}
-	meter.Gauge("payload_mismatch").Observe(metrix.SampleValue(mismatch), labelSet)
 	r.writeObjective(meter, "write_visibility", probe.WriteVisibility, labelSet)
 	r.writeObjective(meter, "delete_visibility", probe.DeleteVisibility, labelSet)
 }

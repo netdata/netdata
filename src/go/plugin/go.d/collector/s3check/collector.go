@@ -61,7 +61,9 @@ func New() *Collector {
 		store:            metrix.NewCollectorStore(),
 		newS3Client:      s3client.New,
 		registryUniqueID: pluginconfig.RegistryUniqueID,
-		journalRoot:      filepath.Join(buildinfo.VarLibDir, "s3check"),
+		journalRoot: resolveJournalRoot(
+			pluginconfig.VarLibDir(), buildinfo.VarLibDir, buildinfo.DefaultVarLibDir,
+		),
 	}
 	c.metrics = newMetricRenderer(c.store)
 	return c
@@ -121,6 +123,15 @@ func (c *Collector) Collect(ctx context.Context) error {
 	}
 	result := c.engine.Collect(ctx)
 	c.metrics.write(result)
+	for _, operation := range result.Operations {
+		if operation.Status != contract.StatusFailed || operation.Err == nil {
+			continue
+		}
+		key := fmt.Sprintf("s3check:operation:%s:%s", operation.Endpoint, operation.Name)
+		c.Limit(key, 1, time.Minute).Warningf(
+			"s3check %s %s failed: %v", operation.Endpoint, operation.Name, operation.Err,
+		)
+	}
 	if result.Err != nil {
 		c.Limit("s3check:collection", 1, time.Minute).Warningf("s3check collection failed: %v", result.Err)
 	}
@@ -149,4 +160,15 @@ func destinationName(destination *S3Config) string {
 		return ""
 	}
 	return destination.Name
+}
+
+func resolveJournalRoot(runtimeVarLibDir, compiledVarLibDir, defaultVarLibDir string) string {
+	varLibDir := strings.TrimSpace(runtimeVarLibDir)
+	if varLibDir == "" {
+		varLibDir = strings.TrimSpace(compiledVarLibDir)
+	}
+	if varLibDir == "" {
+		varLibDir = strings.TrimSpace(defaultVarLibDir)
+	}
+	return filepath.Join(filepath.Clean(varLibDir), "s3check")
 }

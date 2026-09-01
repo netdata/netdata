@@ -15,6 +15,8 @@ import (
 
 const PayloadBytes = 4096
 
+const keyStem = "probe-"
+
 type Generator struct {
 	Prefix  string
 	OwnerID string
@@ -38,8 +40,16 @@ func (g Generator) Namespace() (string, error) {
 	return g.Prefix + g.OwnerID[:16] + "/", nil
 }
 
-func (g Generator) Next() (Object, error) {
+func (g Generator) KeyPrefix() (string, error) {
 	namespace, err := g.Namespace()
+	if err != nil {
+		return "", err
+	}
+	return namespace + keyStem, nil
+}
+
+func (g Generator) Next() (Object, error) {
+	keyPrefix, err := g.KeyPrefix()
 	if err != nil {
 		return Object{}, err
 	}
@@ -61,8 +71,8 @@ func (g Generator) Next() (Object, error) {
 	}
 	sum := sha256.Sum256(payload)
 	key := fmt.Sprintf(
-		"%sprobe-%d-%s.bin",
-		namespace,
+		"%s%d-%s.bin",
+		keyPrefix,
 		now().UTC().UnixNano(),
 		hex.EncodeToString(nonce),
 	)

@@ -3,11 +3,16 @@
 package s3check
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/testutil"
@@ -27,6 +32,12 @@ func TestCollectorInitRequiresPersistedAgentIdentityBeforeClientCreation(t *test
 
 	assert.ErrorContains(t, c.Init(context.Background()), "persisted Agent registry identity")
 	assert.False(t, created)
+}
+
+func TestResolveJournalRootPrefersRuntimeVarLib(t *testing.T) {
+	runtimeDir := filepath.Join(t.TempDir(), "runtime-varlib")
+	got := resolveJournalRoot(runtimeDir, "/compiled/varlib", "/default/varlib")
+	assert.Equal(t, filepath.Join(runtimeDir, "s3check"), got)
 }
 
 func TestCollectorCheckIsReadOnlyForEveryMode(t *testing.T) {
@@ -73,6 +84,62 @@ func TestCollectorClosesSourceWhenDestinationCreationFails(t *testing.T) {
 
 	assert.ErrorContains(t, c.Init(context.Background()), "create destination S3 client")
 	assert.Equal(t, 1, source.Closed)
+}
+
+func TestCollectorUsesIndependentLogicalCallTimeouts(t *testing.T) {
+	source := checkClient(s3client.VersioningDisabled)
+	destination := checkClient(s3client.VersioningDisabled)
+	var sourceDeadline, destinationDeadline time.Duration
+	source.BucketVersioningFunc = func(ctx context.Context, _ string) (s3client.BucketVersioningResult, error) {
+		deadline, ok := ctx.Deadline()
+		require.True(t, ok)
+		sourceDeadline = time.Until(deadline)
+		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+	}
+	destination.BucketVersioningFunc = func(ctx context.Context, _ string) (s3client.BucketVersioningResult, error) {
+		deadline, ok := ctx.Deadline()
+		require.True(t, ok)
+		destinationDeadline = time.Until(deadline)
+		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+	}
+
+	c := New()
+	c.Config = validConfig(contract.ModeCephMultisite)
+	c.Source.Timeout = confopt.LongDuration(100 * time.Millisecond)
+	c.Destination.Timeout = confopt.LongDuration(500 * time.Millisecond)
+	c.registryUniqueID = func() string { return "agent-id" }
+	c.journalRoot = t.TempDir()
+	c.newS3Client = clientSequence(source, destination)
+
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Check(context.Background()))
+	assert.Less(t, sourceDeadline, 250*time.Millisecond)
+	assert.Greater(t, destinationDeadline, 350*time.Millisecond)
+	c.Cleanup(context.Background())
+}
+
+func TestCollectorLogsRawOperationFailure(t *testing.T) {
+	wantErr := errors.New("provider access denied sentinel")
+	client := checkClient(s3client.VersioningDisabled)
+	client.PutFunc = func(context.Context, string, string, []byte, s3client.PutOptions) (s3client.PutResult, error) {
+		return s3client.PutResult{}, wantErr
+	}
+
+	var log bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&log)
+	c.Config = validConfig(contract.ModeLifecycle)
+	c.registryUniqueID = func() string { return "agent-id" }
+	c.journalRoot = t.TempDir()
+	c.newS3Client = clientSequence(client)
+
+	require.NoError(t, c.Init(context.Background()))
+	cc := mustCycleController(t, c.store)
+	cc.BeginCycle()
+	require.NoError(t, c.Collect(context.Background()))
+	cc.CommitCycleSuccess()
+	assert.Contains(t, log.String(), wantErr.Error())
+	c.Cleanup(context.Background())
 }
 
 func checkClients(mode contract.Mode) []*testutil.S3 {

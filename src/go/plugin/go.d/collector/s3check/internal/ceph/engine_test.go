@@ -27,17 +27,17 @@ func TestCheckReadsBothUnversionedBucketsWithoutMutation(t *testing.T) {
 	j := newCephJournal(t, root)
 	source, destination, _ := newCephClients()
 	engine, err := New(Options{
-		Source:            source,
-		Destination:       destination,
-		SourceBucket:      "source",
-		DestinationBucket: "destination",
-		Journal:           j,
-		Generator:         newCephGenerator(j.OwnerID()),
-		RequestTimeout:    time.Second,
-		WriteObjective:    10 * time.Minute,
-		WriteTimeout:      20 * time.Minute,
-		DeleteObjective:   5 * time.Minute,
-		DeleteTimeout:     10 * time.Minute,
+		Source:               source,
+		Destination:          destination,
+		SourceBucket:         "source",
+		DestinationBucket:    "destination",
+		Journal:              j,
+		Generator:            newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
+		WriteObjective:  10 * time.Minute,
+		WriteTimeout:    20 * time.Minute,
+		DeleteObjective: 5 * time.Minute,
+		DeleteTimeout:   10 * time.Minute,
 	})
 	require.NoError(t, err)
 
@@ -54,7 +54,8 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	engine, err := New(Options{
 		Source: source, Destination: destination,
 		SourceBucket: "source", DestinationBucket: "destination",
-		Journal: j, Generator: newCephGenerator(j.OwnerID()), RequestTimeout: time.Second,
+		Journal: j, Generator: newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
 		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
 		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
 	})
@@ -76,24 +77,25 @@ func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing
 	source, destination, model := newCephClients()
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Source:            source,
-		Destination:       destination,
-		SourceBucket:      "source",
-		DestinationBucket: "different-destination",
-		Journal:           j,
-		Generator:         newCephGenerator(j.OwnerID()),
-		RequestTimeout:    time.Second,
-		WriteObjective:    15 * time.Second,
-		WriteTimeout:      time.Minute,
-		DeleteObjective:   10 * time.Second,
-		DeleteTimeout:     time.Minute,
-		Now:               func() time.Time { return now },
+		Source:               source,
+		Destination:          destination,
+		SourceBucket:         "source",
+		DestinationBucket:    "different-destination",
+		Journal:              j,
+		Generator:            newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
+		WriteObjective:  15 * time.Second,
+		WriteTimeout:    time.Minute,
+		DeleteObjective: 10 * time.Second,
+		DeleteTimeout:   time.Minute,
+		Now:             func() time.Time { return now },
 	})
 	require.NoError(t, err)
 
 	waitingWrite := engine.Collect(context.Background())
 	require.NotNil(t, waitingWrite.Probe)
 	assert.Equal(t, contract.StatusWaiting, waitingWrite.Probe.Status)
+	assert.False(t, waitingWrite.Probe.PayloadCompared)
 	require.Len(t, model.source, 1)
 	var sourceKey string
 	for key := range model.source {
@@ -105,6 +107,7 @@ func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing
 	waitingDelete := engine.Collect(context.Background())
 	require.NotNil(t, waitingDelete.Probe)
 	assert.Equal(t, contract.StatusWaiting, waitingDelete.Probe.Status)
+	assert.True(t, waitingDelete.Probe.PayloadCompared)
 	assert.True(t, waitingDelete.Probe.WriteVisibility.Performed)
 	assert.Equal(t, 10*time.Second, waitingDelete.Probe.WriteVisibility.Lag)
 	assert.Contains(t, model.destination, sourceKey)
@@ -114,6 +117,7 @@ func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing
 	success := engine.Collect(context.Background())
 	require.NotNil(t, success.Probe)
 	assert.Equal(t, contract.StatusSuccess, success.Probe.Status)
+	assert.True(t, success.Probe.PayloadCompared)
 	assert.True(t, success.Probe.DeleteVisibility.Performed)
 	assert.Equal(t, 5*time.Second, success.Probe.DeleteVisibility.Lag)
 	assert.Equal(t, sourceKey, model.lastDestinationReadKey)
@@ -126,19 +130,19 @@ func TestWriteTimeoutMovesProbeToCleanupWithoutBlockingNewActiveSlot(t *testing.
 	source, destination, _ := newCephClients()
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Source:            source,
-		Destination:       destination,
-		SourceBucket:      "source",
-		DestinationBucket: "destination",
-		Journal:           j,
-		Generator:         newCephGenerator(j.OwnerID()),
-		RequestTimeout:    time.Second,
-		WriteObjective:    time.Minute,
-		WriteTimeout:      2 * time.Minute,
-		DeleteObjective:   time.Minute,
-		DeleteTimeout:     2 * time.Minute,
-		QueueCapacity:     3,
-		Now:               func() time.Time { return now },
+		Source:               source,
+		Destination:          destination,
+		SourceBucket:         "source",
+		DestinationBucket:    "destination",
+		Journal:              j,
+		Generator:            newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
+		WriteObjective:  time.Minute,
+		WriteTimeout:    2 * time.Minute,
+		DeleteObjective: time.Minute,
+		DeleteTimeout:   2 * time.Minute,
+		QueueCapacity:   3,
+		Now:             func() time.Time { return now },
 	})
 	require.NoError(t, err)
 
@@ -170,7 +174,8 @@ func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
 	engine, err := New(Options{
 		Source: source, Destination: destination,
 		SourceBucket: "source", DestinationBucket: "destination",
-		Journal: j, Generator: newCephGenerator(j.OwnerID()), RequestTimeout: time.Second,
+		Journal: j, Generator: newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
 		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
 		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
 		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
