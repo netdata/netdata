@@ -7,6 +7,7 @@
 #include "aclk_capas.h"
 #include "aclk_query.h"
 #include "mqtt_websockets/aclk_mqtt_workers.h"
+#include "web/server/web_client.h"
 
 #include "schema-wrappers/proto_2_json.h"
 
@@ -59,8 +60,8 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
                 if (likely(e->data.string)) {
                     size_t len = strlen(e->data.string);
                     data->payload = mallocz(len+1);
-                    if (!url_decode_r(data->payload, e->data.string, len + 1))
-                        strcpy(data->payload, e->data.string);
+                    if(url_decode_r_len(data->payload, len + 1, e->data.string, len, NULL) != URL_DECODE_OK)
+                        memcpy(data->payload, e->data.string, len + 1);
                 }
                 break;
             }
@@ -94,14 +95,49 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
     return 0;
 }
 
-static inline int aclk_extract_v2_data(char *payload, char **data)
+static inline int aclk_extract_v2_data(char *payload, char **data, bool *request_too_large)
 {
     char* ptr = strstr(payload, ACLK_V2_PAYLOAD_SEPARATOR);
     if(!ptr)
         return 1;
+
     ptr += strlen(ACLK_V2_PAYLOAD_SEPARATOR);
-    *data = strdupz(ptr);
+    size_t length = strnlen(ptr, NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    *request_too_large =
+        web_client_request_size_validation(length) == HTTP_VALIDATION_REQUEST_TOO_LARGE;
+    *data = mallocz(length + 1);
+    memcpy(*data, ptr, length);
+    (*data)[length] = '\0';
     return 0;
+}
+
+int aclk_rx_msgs_unittest(void) {
+    int errors = 0;
+    static const char envelope[] = "{}" ACLK_V2_PAYLOAD_SEPARATOR;
+    size_t envelope_length = sizeof(envelope) - 1;
+    CLEAN_CHAR_P *raw = mallocz(envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 2);
+    memcpy(raw, envelope, envelope_length);
+    memset(raw + envelope_length, 'a', NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    raw[envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1] = '\0';
+
+    char *request = NULL;
+    bool request_too_large = false;
+    raw[envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE] = '\0';
+    if(aclk_extract_v2_data(raw, &request, &request_too_large) || request_too_large ||
+       strlen(request) != NETDATA_WEB_REQUEST_MAX_SIZE)
+        errors++;
+    freez(request);
+
+    raw[envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE] = 'a';
+    if(aclk_extract_v2_data(raw, &request, &request_too_large) || !request_too_large ||
+       strlen(request) != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
+        errors++;
+    freez(request);
+
+    if(errors)
+        fprintf(stderr, "ACLK RX: %d test(s) failed\n", errors);
+
+    return errors;
 }
 
 static inline int aclk_v2_payload_get_query(const char *payload, char **query_url)
@@ -144,13 +180,15 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     }
 
     aclk_query_t *query = aclk_query_new(HTTP_API_V2);
+    bool request_too_large = false;
 
-    if (unlikely(aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload))) {
+    if (unlikely(aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload, &request_too_large))) {
         netdata_log_error("Error extracting payload expected after the JSON dictionary.");
         goto error;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
+    if (unlikely(!request_too_large &&
+                 aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
         netdata_log_error("Could not extract payload from query");
         goto error;
     }
@@ -190,12 +228,13 @@ int aclk_handle_cloud_cmd_message(char *payload)
         return 1;
     }
 
-    netdata_log_debug(D_ACLK, "ACLK incoming 'cmd' message (%s)", payload);
+    size_t payload_length = strlen(payload);
+    netdata_log_debug(D_ACLK, "ACLK incoming 'cmd' message of %zu bytes", payload_length);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
     if (unlikely(rc != JSON_OK)) {
-        error_report("Malformed json request (%s)", payload);
+        error_report("Malformed ACLK command message of %zu bytes", payload_length);
         goto err_cleanup;
     }
 

@@ -7,6 +7,9 @@
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 #include "web/mcp/mcp.h"
+#include "web/rtc/webrtc.h"
+#include "aclk/aclk_query.h"
+#include "aclk/aclk_rx_msgs.h"
 
 #include "database/engine/page_test.h"
 #include "database/rrdset-slots.h"
@@ -491,6 +494,11 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_graphite_unittest()) return 1;
                             if (exporting_opentsdb_http_unittest()) return 1;
                             if (exporting_opentsdb_telnet_unittest()) return 1;
+                            if (url_unittest()) return 1;
+                            if (web_client_request_unittest()) return 1;
+                            if (aclk_query_unittest()) return 1;
+                            if (aclk_rx_msgs_unittest()) return 1;
+                            if (webrtc_request_size_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
@@ -636,6 +644,14 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "ringbuffertest") == 0) {
                             unittest_running = true;
                             return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "webrequesttest") == 0) {
+                            unittest_running = true;
+                            if(url_unittest()) return 1;
+                            if(web_client_request_unittest()) return 1;
+                            if(aclk_query_unittest()) return 1;
+                            if(aclk_rx_msgs_unittest()) return 1;
+                            return webrtc_request_size_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;

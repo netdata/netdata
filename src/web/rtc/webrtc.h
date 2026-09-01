@@ -8,5 +8,6 @@
 int webrtc_new_connection(const char *sdp, BUFFER *wb);
 void webrtc_close_all_connections();
 void webrtc_initialize();
+int webrtc_request_size_unittest(void);
 
 #endif //NETDATA_WEBRTC_H

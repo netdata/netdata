@@ -39,6 +39,10 @@ info:
     - `/api/v3/claim` - Agent claiming
     - Additional management and streaming endpoints
 
+    ### Agent Request Limit
+
+    The Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes, including the request line, headers, and body. It returns HTTP `413 Payload Too Large` for a larger request. Intermediaries may enforce lower limits before the request reaches the Agent.
+
     **Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.
   version: "v1-rolling"
   contact:
@@ -5871,7 +5875,9 @@ paths:
         - MUST be valid JSON
         - MUST include `version` field with current file version
         - MAY include any additional fields
-        - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
+        - The complete encoded request, including the request line, headers, and JSON body, MUST fit within 1,048,576 bytes
+        - The maximum JSON body size is therefore smaller and varies with the request line and headers
+        - Larger complete requests return 413 Payload Too Large before the settings handler runs
 
         **Version Management:**
         - Client provides current version in payload
@@ -5930,7 +5936,10 @@ paths:
           - Any user-defined fields
 
           **Size Limit:**
-          Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
+          The complete encoded request, including the request line, headers, and JSON body,
+          must fit within 1,048,576 bytes. The maximum JSON body size is therefore smaller
+          and varies with the request line and headers. Larger complete requests return
+          413 Payload Too Large before the settings handler runs.
 
           **Version Rules:**
           - New file: version can be 0 or 1
@@ -6002,7 +6011,7 @@ paths:
                     type: string
                     example: "Payload version does not match the version of the stored object"
         "413":
-          description: Payload too large. The PUT payload exceeds the 20 MiB (20,971,520-byte) maximum.
+          description: The complete encoded request exceeds the 1,048,576-byte Agent request limit.
         "500":
           description: Internal server error during settings update.
   /api/v3/stream_info:
@@ -6264,7 +6273,8 @@ paths:
         - **Bi-directional communication:** Enable interactive control and monitoring in real-time
 
         **Connection Configuration:**
-        - Maximum message size: 5 MiB (local), negotiated with remote peer
+        - Maximum negotiated WebRTC transport message size: 5 MiB (local)
+        - API request messages larger than 1,048,576 bytes are rejected with 413 Payload Too Large
         - ICE transport policy: All (both UDP and TCP)
         - Automatic ICE candidate gathering
         - Support for STUN/TURN servers

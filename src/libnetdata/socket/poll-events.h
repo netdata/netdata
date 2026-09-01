@@ -10,6 +10,7 @@
 #define POLLINFO_FLAG_DONT_CLOSE        (1U << 2)
 #define POLLINFO_FLAG_REMOVED_FROM_POLL (1U << 3)
 #define POLLINFO_FLAG_FIRST_REQUEST_RECEIVED (1U << 4)
+#define POLLINFO_FLAG_REQUEST_INGRESS   (1U << 5)
 
 typedef struct poll POLLJOB;
 typedef struct pollinfo POLLINFO;
@@ -36,6 +37,7 @@ struct pollinfo {
     time_t connected_t;     // the time the socket connected
     time_t last_received_t; // the time the socket last received data
     time_t last_sent_t;     // the time the socket last sent data
+    time_t request_ingress_t; // the time the current keep-alive request started
 
     size_t recv_count;      // the number of times the socket was ready for inbound traffic
     size_t send_count;      // the number of times the socket was ready for outbound traffic
@@ -83,6 +85,7 @@ void poll_default_del_callback(POLLINFO *pi);
 void *poll_default_add_callback(POLLINFO *pi, nd_poll_event_t *events, void *data);
 
 void poll_process_remove_from_poll(POLLINFO *pi);
+int poll_events_unittest(void);
 
 POLLINFO *poll_add_fd(POLLJOB *p
                       , int fd
