@@ -406,7 +406,6 @@ func TestReconciliationIsBoundedAndRetainsStateOnPaginationOverflow(t *testing.T
 	engine.Collect(context.Background())
 	result := engine.Collect(context.Background())
 	assert.Nil(t, result.Probe)
-	assert.Equal(t, 1, result.Cleanup.Failed)
 	assert.LessOrEqual(t, source.Count("list_versions"), maxListPages)
 	assert.Equal(t, 1, result.Cleanup.Pending)
 	engine.Cleanup(context.Background())
@@ -478,7 +477,7 @@ func TestDeleteLagStartsAfterSuccessfulMarkerCreation(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
-func TestRetiredReconciliationReportsProviderFailureAndDiagnostic(t *testing.T) {
+func TestRetiredReconciliationReportsProviderOperationFailure(t *testing.T) {
 	source, destination, model := newAWSClients()
 	model.failPutAfterMutation = true
 	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
@@ -492,7 +491,6 @@ func TestRetiredReconciliationReportsProviderFailureAndDiagnostic(t *testing.T) 
 	}
 	result := engine.Collect(context.Background())
 
-	assert.Equal(t, 1, result.Cleanup.Failed)
 	assert.Equal(t, 1, result.Cleanup.Pending)
 	var failed *contract.OperationResult
 	for index := range result.Operations {
@@ -534,7 +532,7 @@ func TestCleanupJournalFailureReportsRuntimeError(t *testing.T) {
 
 	result := engine.Collect(context.Background())
 	assert.Error(t, result.Err)
-	assert.Positive(t, result.Cleanup.Failed)
+	assert.Equal(t, 1, result.Cleanup.Pending)
 	require.NoError(t, os.Remove(root))
 	require.NoError(t, os.Rename(backup, root))
 	restored = true

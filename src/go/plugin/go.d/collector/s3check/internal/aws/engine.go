@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,12 +16,9 @@ import (
 )
 
 const (
-	defaultQueueCapacity = 8
-	defaultCleanupBatch  = 2
-	maxQueueCapacity     = 32
-	maxListPages         = 4
-	maxListedVersions    = 32
-	listPageSize         = 16
+	maxListPages      = 4
+	maxListedVersions = 32
+	listPageSize      = 16
 )
 
 var errOwnershipInvariant = errors.New("AWS ownership invariant failed")
@@ -167,13 +163,13 @@ func New(opts Options) (*Engine, error) {
 		return nil, fmt.Errorf("AWS probe key prefix: %w", err)
 	}
 	if opts.QueueCapacity == 0 {
-		opts.QueueCapacity = defaultQueueCapacity
+		opts.QueueCapacity = contract.DefaultQueueCapacity
 	}
-	if opts.QueueCapacity < 1 || opts.QueueCapacity > maxQueueCapacity {
-		return nil, fmt.Errorf("AWS queue capacity must be between 1 and %d", maxQueueCapacity)
+	if opts.QueueCapacity < 1 || opts.QueueCapacity > contract.MaxQueueCapacity {
+		return nil, fmt.Errorf("AWS queue capacity must be between 1 and %d", contract.MaxQueueCapacity)
 	}
 	if opts.CleanupBatch == 0 {
-		opts.CleanupBatch = defaultCleanupBatch
+		opts.CleanupBatch = contract.DefaultCleanupBatch
 		if opts.CleanupBatch > opts.QueueCapacity {
 			opts.CleanupBatch = opts.QueueCapacity
 		}
@@ -294,7 +290,7 @@ func (e *Engine) checkVersioning(
 
 func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	result = contract.Result{
-		Mode: contract.ModeAWSReplication, LastTerminal: cloneProbeResult(e.state.LastTerminal),
+		Mode: contract.ModeAWSReplication, LastTerminal: contract.CloneProbe(e.state.LastTerminal),
 	}
 	e.diagnostic = nil
 	defer func() {
@@ -303,18 +299,18 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		}
 	}()
 	if e.closed {
-		result.Probe = failedProbe(contract.ReasonInternal)
+		result.Probe = contract.FailedProbe(contract.ReasonInternal)
 		return result
 	}
 	if err := e.takeover(); err != nil {
-		result.Probe = failedProbe(contract.ReasonOwnership)
+		result.Probe = contract.FailedProbe(contract.ReasonOwnership)
 		result.Err = err
 		return result
 	}
 	defer func() {
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	}()
 	keys := e.ownedKeys()
 	if len(keys) == 0 {
@@ -443,16 +439,16 @@ func (e *Engine) retire(owned *entry) {
 	}
 }
 
-func (e *Engine) finishTerminal(result *contract.ProbeResult) *contract.ProbeResult {
-	e.state.LastTerminal = cloneProbeResult(result)
+func (e *Engine) persistTerminal(result *contract.ProbeResult) *contract.ProbeResult {
+	e.state.LastTerminal = contract.CloneProbe(result)
 	_ = e.persist()
-	return cloneProbeResult(result)
+	return contract.CloneProbe(result)
 }
 
 func cloneState(value state) state {
 	cloned := value
 	cloned.Entries = append([]entry(nil), value.Entries...)
-	cloned.LastTerminal = cloneProbeResult(value.LastTerminal)
+	cloned.LastTerminal = contract.CloneProbe(value.LastTerminal)
 	return cloned
 }
 
@@ -471,7 +467,7 @@ func (e *Engine) validateState() error {
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")
-		case !validDigest(owned.Digest):
+		case !probe.ValidDigest(owned.Digest):
 			return errors.New("journal entry has invalid payload digest")
 		case !validPhase(owned.Phase):
 			return fmt.Errorf("journal entry has invalid phase %q", owned.Phase)
@@ -567,12 +563,4 @@ func validPhase(value phase) bool {
 	default:
 		return false
 	}
-}
-
-func validDigest(value string) bool {
-	if len(value) != 64 || strings.ToLower(value) != value {
-		return false
-	}
-	_, err := hex.DecodeString(value)
-	return err == nil
 }

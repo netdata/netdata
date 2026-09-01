@@ -15,7 +15,7 @@ import (
 func TestConfigureS3OptionsCanonicalizesEndpointAndPathStyle(t *testing.T) {
 	var options s3.Options
 	configureS3Options(&options, Config{
-		Endpoint: " https://s3.example ", PathStyle: true,
+		Endpoint: "https://s3.example", PathStyle: true,
 	})
 
 	assert.Equal(t, "https://s3.example", aws.ToString(options.BaseEndpoint))
@@ -88,9 +88,4 @@ func TestObjectAbsenceRejectsGenericNotFound(t *testing.T) {
 	assert.True(t, isObjectNotFound(&types.NoSuchKey{}))
 	assert.True(t, isObjectNotFound(&smithy.GenericAPIError{Code: "NoSuchKey"}))
 	assert.False(t, isObjectNotFound(&smithy.GenericAPIError{Code: "NotFound"}))
-}
-
-func TestBucketFromARN(t *testing.T) {
-	assert.Equal(t, "bucket", bucketFromARN("arn:aws:s3:::bucket"))
-	assert.Equal(t, "bucket", bucketFromARN("bucket"))
 }

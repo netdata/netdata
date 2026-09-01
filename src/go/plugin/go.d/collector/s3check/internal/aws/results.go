@@ -10,7 +10,7 @@ import (
 
 func successProbe(owned *entry, writeObjective, deleteObjective time.Duration) *contract.ProbeResult {
 	if owned.MarkerAt == nil {
-		return failedProbe(contract.ReasonOwnership)
+		return contract.FailedProbe(contract.ReasonOwnership)
 	}
 	end := *owned.MarkerAt
 	return &contract.ProbeResult{
@@ -38,7 +38,7 @@ func writeResult(owned *entry, now time.Time, objective time.Duration) contract.
 	if owned.VisibleAt != nil {
 		end = *owned.VisibleAt
 	}
-	return objectiveResult(end.Sub(*owned.PutAt), objective)
+	return contract.ObjectiveResultFor(end.Sub(*owned.PutAt), objective)
 }
 
 func deleteResult(owned *entry, now time.Time, objective time.Duration) contract.ObjectiveResult {
@@ -49,21 +49,7 @@ func deleteResult(owned *entry, now time.Time, objective time.Duration) contract
 	if owned.MarkerAt != nil {
 		end = *owned.MarkerAt
 	}
-	return objectiveResult(end.Sub(*owned.DeleteAt), objective)
-}
-
-func objectiveResult(lag, objective time.Duration) contract.ObjectiveResult {
-	status := contract.StatusSuccess
-	if lag >= objective {
-		status = contract.StatusFailed
-	}
-	return contract.ObjectiveResult{
-		Performed: true, Status: status, Reason: contract.ReasonNone, Lag: lag, Objective: objective,
-	}
-}
-
-func failedProbe(reason contract.Reason) *contract.ProbeResult {
-	return &contract.ProbeResult{Status: contract.StatusFailed, Reason: reason}
+	return contract.ObjectiveResultFor(end.Sub(*owned.DeleteAt), objective)
 }
 
 func withPayloadComparison(owned *entry, result *contract.ProbeResult) *contract.ProbeResult {
@@ -71,12 +57,4 @@ func withPayloadComparison(owned *entry, result *contract.ProbeResult) *contract
 		result.PayloadCompared = true
 	}
 	return result
-}
-
-func cloneProbeResult(value *contract.ProbeResult) *contract.ProbeResult {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }

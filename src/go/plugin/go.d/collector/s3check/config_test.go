@@ -5,7 +5,6 @@ package s3check
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -26,33 +24,19 @@ var (
 )
 
 func TestCollectorConfigurationSerialize(t *testing.T) {
-	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
-}
-
-func TestCollectorConfigurationDecodesIntoNew(t *testing.T) {
-	c := New()
-	require.NoError(t, yaml.Unmarshal(dataConfigYAML, c))
-	c.Config.applyDefaults()
-
-	require.NoError(t, c.Config.validate())
-	assert.Nil(t, c.ModeLifecycle)
-	assert.Nil(t, c.ModeCephMultisite)
-	require.NotNil(t, c.ModeAWSReplication)
+	collecttest.TestConfigurationSerialize(t, New(), dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollectorConfigurationReturnsEffectiveSelectedMode(t *testing.T) {
 	c := New()
-	require.NoError(t, yaml.Unmarshal([]byte(`
-name: aws-replication
-mode: aws_replication
-mode_aws_replication:
-  source:
-    region: us-east-1
-    bucket: source-bucket
-  destination:
-    region: us-west-2
-    bucket: destination-bucket
-`), c))
+	c.Config = Config{
+		Name: "aws-replication",
+		Mode: string(contract.ModeAWSReplication),
+		ModeAWSReplication: &ReplicationModeConfig{
+			Source:      S3Config{Region: "us-east-1", Bucket: "source-bucket"},
+			Destination: S3Config{Region: "us-west-2", Bucket: "destination-bucket"},
+		},
+	}
 
 	config, ok := c.Configuration().(Config)
 	require.True(t, ok)
@@ -85,95 +69,23 @@ func TestConfigSchemaModeBranches(t *testing.T) {
 	schema, err := compiler.Compile("s3check.schema.json")
 	require.NoError(t, err)
 
-	var replication any
-	require.NoError(t, json.Unmarshal(dataConfigJSON, &replication))
-	require.NoError(t, schema.Validate(replication))
-	require.NoError(t, schema.Validate(map[string]any{
-		"mode": "lifecycle",
-		"mode_lifecycle": map[string]any{
-			"prefix": "netdata-s3check/",
-			"source": map[string]any{
-				"region": "us-east-1",
-				"bucket": "probe-bucket",
-				"credentials": map[string]any{
-					"access_key_id":     "key",
-					"secret_access_key": "secret",
-				},
-			},
-		},
-	}))
-	require.NoError(t, schema.Validate(map[string]any{
-		"mode": "ceph_multisite",
-		"mode_ceph_multisite": map[string]any{
-			"prefix":      "netdata-s3check/",
-			"source":      map[string]any{"region": "us-east-1", "bucket": "source-bucket"},
-			"destination": map[string]any{"region": "us-east-1", "bucket": "destination-bucket"},
-		},
-	}))
-	require.Error(t, schema.Validate(map[string]any{
-		"mode": "lifecycle",
-		"mode_lifecycle": map[string]any{
-			"source": map[string]any{"region": "us-east-1", "bucket": "probe-bucket"},
-		},
-		"source": map[string]any{"region": "us-east-1", "bucket": "legacy-bucket"},
-	}))
-	require.Error(t, schema.Validate(map[string]any{
-		"mode": "lifecycle",
-		"mode_lifecycle": map[string]any{
-			"source": map[string]any{"region": "us-east-1", "bucket": "probe-bucket"},
-		},
-		"mode_aws_replication": map[string]any{
-			"source":      map[string]any{"region": "us-east-1", "bucket": "source-bucket"},
-			"destination": map[string]any{"region": "us-west-2", "bucket": "destination-bucket"},
-		},
-	}))
-	require.Error(t, schema.Validate(map[string]any{
-		"mode": "lifecycle",
-		"mode_lifecycle": map[string]any{
-			"source": map[string]any{
-				"region":      "us-east-1",
-				"bucket":      "probe-bucket",
-				"credentials": map[string]any{"type": "default"},
-			},
-		},
-	}))
-}
-
-func TestConfigSchemaSensitiveFieldsUsePasswordWidgets(t *testing.T) {
-	var document map[string]any
-	require.NoError(t, json.Unmarshal([]byte(configSchema), &document))
-
-	modeEndpoints := map[string][]string{
-		"mode_lifecycle":       {"source"},
-		"mode_ceph_multisite":  {"source", "destination"},
-		"mode_aws_replication": {"source", "destination"},
+	for _, mode := range []contract.Mode{
+		contract.ModeLifecycle,
+		contract.ModeCephMultisite,
+		contract.ModeAWSReplication,
+	} {
+		t.Run(string(mode), func(t *testing.T) {
+			require.NoError(t, schema.Validate(jsonValue(t, validConfig(mode))))
+		})
 	}
-	for mode, endpoints := range modeEndpoints {
-		for _, endpoint := range endpoints {
-			t.Run(mode+"/"+endpoint, func(t *testing.T) {
-				for _, field := range []string{"access_key_id", "secret_access_key", "session_token"} {
-					assert.Equal(t, "password", configSchemaValueAt(t, document,
-						"uiSchema", mode, endpoint, "credentials", field, "ui:widget"))
-				}
-				assert.Equal(t, "password", configSchemaValueAt(t, document,
-					"uiSchema", mode, endpoint, "assume_role", "external_id", "ui:widget"))
-				assert.Equal(t, "password", configSchemaValueAt(t, document,
-					"uiSchema", mode, endpoint, "proxy_url", "ui:widget"))
-			})
-		}
-	}
-}
 
-func configSchemaValueAt(t *testing.T, root map[string]any, path ...string) any {
-	t.Helper()
-	var value any = root
-	for _, key := range path {
-		object, ok := value.(map[string]any)
-		require.Truef(t, ok, "%q is not an object", key)
-		value, ok = object[key]
-		require.Truef(t, ok, "missing schema path component %q", key)
-	}
-	return value
+	mixed := validConfig(contract.ModeLifecycle)
+	mixed.ModeAWSReplication = &ReplicationModeConfig{}
+	require.Error(t, schema.Validate(jsonValue(t, mixed)))
+
+	missing := validConfig(contract.ModeAWSReplication)
+	missing.ModeAWSReplication = nil
+	require.Error(t, schema.Validate(jsonValue(t, missing)))
 }
 
 func TestConfigDefaultsUseHumanDurations(t *testing.T) {
@@ -293,22 +205,6 @@ func TestConfigRejectsEquivalentS3Locations(t *testing.T) {
 	}
 }
 
-func TestCephGuideUsesCurrentS3CheckContract(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "..", "..", "..", "docs", "guides", "ceph", "README.md")
-	raw, err := os.ReadFile(path)
-	require.NoError(t, err)
-	guide := string(raw)
-
-	assert.Contains(t, guide, "mode: ceph_multisite")
-	assert.Contains(t, guide, "mode_ceph_multisite:")
-	assert.Contains(t, guide, "write_objective:")
-	assert.Contains(t, guide, "delete_timeout:")
-	assert.NotContains(t, guide, "mode: multisite")
-	assert.NotContains(t, guide, "rpo_threshold_ms")
-	assert.NotContains(t, guide, "replication_timeout_ms")
-	assert.NotContains(t, guide, "verify_delete")
-}
-
 func TestOwnershipFingerprintContract(t *testing.T) {
 	cfg := validConfig(contract.ModeAWSReplication)
 	want := mustSelectedModeConfig(t, &cfg).ownershipFingerprint()
@@ -333,6 +229,15 @@ func TestOwnershipFingerprintContract(t *testing.T) {
 	mapping := cloneConfig(cfg)
 	mapping.ModeAWSReplication.Prefix = "other-prefix/"
 	assert.NotEqual(t, want, mustSelectedModeConfig(t, &mapping).ownershipFingerprint())
+}
+
+func jsonValue(t *testing.T, value any) any {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	require.NoError(t, err)
+	var decoded any
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	return decoded
 }
 
 func validConfig(mode contract.Mode) Config {

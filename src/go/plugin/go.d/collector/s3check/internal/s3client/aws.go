@@ -54,8 +54,8 @@ func New(ctx context.Context, cfg Config) (Client, error) {
 }
 
 func configureS3Options(options *s3.Options, cfg Config) {
-	if endpoint := strings.TrimSpace(cfg.Endpoint); endpoint != "" {
-		options.BaseEndpoint = aws.String(endpoint)
+	if cfg.Endpoint != "" {
+		options.BaseEndpoint = aws.String(cfg.Endpoint)
 	}
 	options.UsePathStyle = cfg.PathStyle
 }
@@ -182,10 +182,9 @@ func (c *awsClient) Get(
 		return GetResult{}, fmt.Errorf("S3 object exceeds %d-byte read limit", maxBytes)
 	}
 	return GetResult{
-		Payload:           payload,
-		VersionID:         aws.ToString(out.VersionId),
-		ETag:              aws.ToString(out.ETag),
-		ReplicationStatus: string(out.ReplicationStatus),
+		Payload:   payload,
+		VersionID: aws.ToString(out.VersionId),
+		ETag:      aws.ToString(out.ETag),
 	}, nil
 }
 
@@ -239,20 +238,18 @@ func (c *awsClient) ListVersions(
 	}
 	for _, version := range out.Versions {
 		page.Versions = append(page.Versions, Version{
-			Kind:         VersionObject,
-			Key:          aws.ToString(version.Key),
-			VersionID:    aws.ToString(version.VersionId),
-			IsLatest:     aws.ToBool(version.IsLatest),
-			LastModified: aws.ToTime(version.LastModified),
+			Kind:      VersionObject,
+			Key:       aws.ToString(version.Key),
+			VersionID: aws.ToString(version.VersionId),
+			IsLatest:  aws.ToBool(version.IsLatest),
 		})
 	}
 	for _, marker := range out.DeleteMarkers {
 		page.Versions = append(page.Versions, Version{
-			Kind:         VersionDeleteMarker,
-			Key:          aws.ToString(marker.Key),
-			VersionID:    aws.ToString(marker.VersionId),
-			IsLatest:     aws.ToBool(marker.IsLatest),
-			LastModified: aws.ToTime(marker.LastModified),
+			Kind:      VersionDeleteMarker,
+			Key:       aws.ToString(marker.Key),
+			VersionID: aws.ToString(marker.VersionId),
+			IsLatest:  aws.ToBool(marker.IsLatest),
 		})
 	}
 	return page, nil

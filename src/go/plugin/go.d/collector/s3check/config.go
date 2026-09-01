@@ -175,6 +175,11 @@ func (c *S3Config) applyDefaults(name string) {
 }
 
 func (c *Config) validate() error {
+	_, err := c.validatedModeConfig()
+	return err
+}
+
+func (c *Config) validatedModeConfig() (*selectedModeConfig, error) {
 	var errs []error
 	if strings.TrimSpace(c.Name) == "" {
 		errs = append(errs, errors.New("name is required"))
@@ -202,7 +207,7 @@ func (c *Config) validate() error {
 			errs = append(errs, err)
 		}
 	}
-	return errors.Join(errs...)
+	return selected, errors.Join(errs...)
 }
 
 func (c *selectedModeConfig) validate(updateEvery int) error {
@@ -393,14 +398,7 @@ func validateAssumeRole(role *awsauth.AssumeRoleConfig, path string) error {
 	if role == nil {
 		return nil
 	}
-	var errs []error
-	if strings.TrimSpace(role.RoleARN) == "" || role.RoleARN != strings.TrimSpace(role.RoleARN) {
-		errs = append(errs, errors.New(path+".role_arn must be non-empty and have no surrounding whitespace"))
-	}
-	if role.ExternalID != strings.TrimSpace(role.ExternalID) {
-		errs = append(errs, errors.New(path+".external_id must not contain surrounding whitespace"))
-	}
-	return errors.Join(errs...)
+	return role.ValidateWithPath(path)
 }
 
 func sameS3Location(left, right S3Config) bool {

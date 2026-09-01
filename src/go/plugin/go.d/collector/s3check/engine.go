@@ -17,11 +17,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/awsauth"
 )
 
-func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.Engine, error) {
-	config, err := c.selectedModeConfig()
-	if err != nil {
-		return nil, fmt.Errorf("resolve selected mode config: %w", err)
-	}
+func (c *Collector) buildEngine(
+	ctx context.Context,
+	agentID string,
+	config *selectedModeConfig,
+) (contract.Engine, error) {
 	j, err := journal.New(c.journalRoot, agentID, c.Name, config.ownershipFingerprint())
 	if err != nil {
 		return nil, fmt.Errorf("create ownership journal: %w", err)
@@ -30,12 +30,13 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 	if err != nil {
 		return nil, fmt.Errorf("create source S3 client: %w", err)
 	}
+	generator := probe.Generator{Prefix: config.Prefix, OwnerID: j.OwnerID()}
 	if config.Mode == contract.ModeLifecycle {
 		engine, engineErr := lifecycle.New(lifecycle.Options{
 			Client:         source,
 			Bucket:         config.Source.Bucket,
 			Journal:        j,
-			Generator:      newProbeGenerator(config.Prefix, j.OwnerID()),
+			Generator:      generator,
 			RequestTimeout: config.Source.Timeout.Duration(),
 			UpdateEvery:    time.Duration(c.UpdateEvery) * time.Second,
 		})
@@ -51,7 +52,6 @@ func (c *Collector) buildEngine(ctx context.Context, agentID string) (contract.E
 		source.CloseIdleConnections()
 		return nil, fmt.Errorf("create destination S3 client: %w", err)
 	}
-	generator := newProbeGenerator(config.Prefix, j.OwnerID())
 	var engine contract.Engine
 	switch config.Mode {
 	case contract.ModeCephMultisite:
@@ -94,8 +94,4 @@ func (c S3Config) clientConfig() s3client.Config {
 		ProxyURL:  c.ProxyURL,
 		TLS:       c.TLSConfig,
 	}
-}
-
-func newProbeGenerator(prefix, ownerID string) probe.Generator {
-	return probe.Generator{Prefix: prefix, OwnerID: ownerID}
 }

@@ -5,7 +5,6 @@ package s3client
 import (
 	"context"
 	"errors"
-	"time"
 )
 
 var (
@@ -36,10 +35,9 @@ type PutOptions struct {
 }
 
 type GetResult struct {
-	Payload           []byte
-	VersionID         string
-	ETag              string
-	ReplicationStatus string
+	Payload   []byte
+	VersionID string
+	ETag      string
 }
 
 type DeleteResult struct {
@@ -65,11 +63,10 @@ const (
 )
 
 type Version struct {
-	Kind         VersionKind
-	Key          string
-	VersionID    string
-	IsLatest     bool
-	LastModified time.Time
+	Kind      VersionKind
+	Key       string
+	VersionID string
+	IsLatest  bool
 }
 
 type VersionPage struct {

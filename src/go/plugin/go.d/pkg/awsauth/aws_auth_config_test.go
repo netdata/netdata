@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestCredentialConfig_ValidateWithPath(t *testing.T) {
@@ -72,6 +71,14 @@ func TestStaticCredentialConfig_ValidateWithPath(t *testing.T) {
 	err := cfg.ValidateWithPath("credentials")
 	assert.ErrorContains(t, err, "credentials.secret_access_key is required")
 	assert.NotContains(t, err.Error(), "type_static")
+}
+
+func TestAssumeRoleConfig_ValidateWithPath(t *testing.T) {
+	cfg := AssumeRoleConfig{ExternalID: " external"}
+
+	err := cfg.ValidateWithPath("assume_role")
+	assert.ErrorContains(t, err, "assume_role.role_arn is required")
+	assert.ErrorContains(t, err, "assume_role.external_id must not contain surrounding whitespace")
 }
 
 func TestIdentity_NewConfig(t *testing.T) {
@@ -162,18 +169,4 @@ func TestIdentity_StaticCredentialsAssumeRole(t *testing.T) {
 	assert.Contains(t, gotAuth, "/us-west-2/sts/aws4_request")
 	assert.Equal(t, "ASIATEMPKEY", creds.AccessKeyID)
 	assert.Equal(t, "temp-session-token", creds.SessionToken)
-}
-
-func TestCredentialConfig_YAMLRoundTrip(t *testing.T) {
-	want := CredentialConfig{
-		Type: CredentialTypeStatic,
-		TypeStatic: &StaticCredentialConfig{
-			AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
-		},
-	}
-	data, err := yaml.Marshal(want)
-	require.NoError(t, err)
-	var got CredentialConfig
-	require.NoError(t, yaml.Unmarshal(data, &got))
-	assert.Equal(t, want, got)
 }

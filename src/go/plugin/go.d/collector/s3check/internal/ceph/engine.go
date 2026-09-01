@@ -4,7 +4,6 @@ package ceph
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,12 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
-)
-
-const (
-	defaultQueueCapacity = 8
-	defaultCleanupBatch  = 2
-	maxQueueCapacity     = 32
 )
 
 type phase string
@@ -123,13 +116,13 @@ func New(opts Options) (*Engine, error) {
 		return nil, fmt.Errorf("Ceph probe namespace: %w", err)
 	}
 	if opts.QueueCapacity == 0 {
-		opts.QueueCapacity = defaultQueueCapacity
+		opts.QueueCapacity = contract.DefaultQueueCapacity
 	}
-	if opts.QueueCapacity < 1 || opts.QueueCapacity > maxQueueCapacity {
-		return nil, fmt.Errorf("Ceph queue capacity must be between 1 and %d", maxQueueCapacity)
+	if opts.QueueCapacity < 1 || opts.QueueCapacity > contract.MaxQueueCapacity {
+		return nil, fmt.Errorf("Ceph queue capacity must be between 1 and %d", contract.MaxQueueCapacity)
 	}
 	if opts.CleanupBatch == 0 {
-		opts.CleanupBatch = defaultCleanupBatch
+		opts.CleanupBatch = contract.DefaultCleanupBatch
 	}
 	if opts.CleanupBatch < 1 || opts.CleanupBatch > opts.QueueCapacity {
 		return nil, errors.New("Ceph cleanup batch must fit the queue capacity")
@@ -204,7 +197,7 @@ func (e *Engine) checkUnversioned(
 func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	result = contract.Result{
 		Mode:         contract.ModeCephMultisite,
-		LastTerminal: cloneProbeResult(e.state.LastTerminal),
+		LastTerminal: contract.CloneProbe(e.state.LastTerminal),
 	}
 	e.diagnostic = nil
 	defer func() {
@@ -213,18 +206,18 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		}
 	}()
 	if e.closed {
-		result.Probe = failedProbe(contract.ReasonInternal)
+		result.Probe = contract.FailedProbe(contract.ReasonInternal)
 		return result
 	}
 	if err := e.takeover(); err != nil {
-		result.Probe = failedProbe(contract.ReasonOwnership)
+		result.Probe = contract.FailedProbe(contract.ReasonOwnership)
 		result.Err = err
 		return result
 	}
 	defer func() {
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	}()
 	if err := e.validateProvider(ctx, &result.Operations); err != nil {
 		result.Err = fmt.Errorf("validate Ceph provider safety: %w", err)
@@ -242,7 +235,7 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Probe = e.advanceActive(ctx, &result.Operations)
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	if len(e.state.Entries) >= e.queueCapacity {
@@ -253,8 +246,8 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 
 	object, err := e.generator.Next()
 	if err != nil {
-		result.Probe = e.finishTerminal(failedProbe(contract.ReasonInternal))
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.Probe = e.setTerminal(contract.FailedProbe(contract.ReasonInternal))
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	now := e.now().UTC()
@@ -268,8 +261,8 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	if err := e.persist(); err != nil {
 		e.state.Entries = e.state.Entries[:len(e.state.Entries)-1]
 		e.state.ActiveKey = ""
-		result.Probe = e.finishTerminal(failedProbe(contract.ReasonOwnership))
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.Probe = e.setTerminal(contract.FailedProbe(contract.ReasonOwnership))
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -284,9 +277,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		},
 	); err != nil {
 		owned := e.active()
-		result.Probe = e.retireWithResult(owned, failedProbe(contract.ReasonRequest))
+		result.Probe = e.retireWithResult(owned, contract.FailedProbe(contract.ReasonRequest))
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	owned := e.active()
@@ -294,16 +287,16 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	owned.PutAt = &putAt
 	if err := e.persist(); err != nil {
 		owned.PutAt = nil
-		result.Probe = e.retireWithResult(owned, failedProbe(contract.ReasonOwnership))
+		result.Probe = e.retireWithResult(owned, contract.FailedProbe(contract.ReasonOwnership))
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
 	result.Probe = e.advanceActive(ctx, &result.Operations)
 	result.Cleanup.Pending = len(e.state.Entries)
 	result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-	result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+	result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	return result
 }
 
@@ -313,10 +306,10 @@ func (e *Engine) advanceActive(
 ) *contract.ProbeResult {
 	owned := e.active()
 	if owned == nil {
-		return failedProbe(contract.ReasonInternal)
+		return contract.FailedProbe(contract.ReasonInternal)
 	}
 	if owned.PutAt == nil {
-		return e.retireWithResult(owned, failedProbe(contract.ReasonOwnership))
+		return e.retireWithResult(owned, contract.FailedProbe(contract.ReasonOwnership))
 	}
 
 	if owned.Phase == phaseWriteVisibility {
@@ -340,7 +333,7 @@ func (e *Engine) advanceActive(
 		)
 		now := e.now().UTC()
 		lag := now.Sub(*owned.PutAt)
-		write := objectiveResult(lag, e.writeObjective)
+		write := contract.ObjectiveResultFor(lag, e.writeObjective)
 		switch {
 		case errors.Is(err, s3client.ErrObjectNotFound):
 			if lag < e.writeTimeout {
@@ -350,13 +343,13 @@ func (e *Engine) advanceActive(
 					WriteVisibility: write,
 				}
 			}
-			result := failedProbe(contract.ReasonVisibilityTimeout)
+			result := contract.FailedProbe(contract.ReasonVisibilityTimeout)
 			result.WriteVisibility = write
 			return e.retireWithResult(owned, result)
 		case err != nil:
-			return e.retireWithResult(owned, failedProbe(contract.ReasonRequest))
+			return e.retireWithResult(owned, contract.FailedProbe(contract.ReasonRequest))
 		case probe.Digest(got.Payload) != owned.Digest:
-			result := failedProbe(contract.ReasonPayloadMismatch)
+			result := contract.FailedProbe(contract.ReasonPayloadMismatch)
 			result.PayloadCompared = true
 			result.PayloadMismatch = true
 			result.WriteVisibility = write
@@ -375,7 +368,7 @@ func (e *Engine) advanceActive(
 				return callErr
 			},
 		); err != nil {
-			result := failedProbe(contract.ReasonRequest)
+			result := contract.FailedProbe(contract.ReasonRequest)
 			result.PayloadCompared = true
 			result.WriteVisibility = write
 			return e.retireWithResult(owned, result)
@@ -384,14 +377,14 @@ func (e *Engine) advanceActive(
 		owned.DeleteAt = &deletedAt
 		owned.Phase = phaseDeleteVisibility
 		if err := e.persist(); err != nil {
-			result := failedProbe(contract.ReasonOwnership)
+			result := contract.FailedProbe(contract.ReasonOwnership)
 			result.PayloadCompared = true
 			return e.retireWithResult(owned, result)
 		}
 	}
 
 	if owned.Phase != phaseDeleteVisibility || owned.VisibleAt == nil || owned.DeleteAt == nil {
-		result := failedProbe(contract.ReasonOwnership)
+		result := contract.FailedProbe(contract.ReasonOwnership)
 		result.PayloadCompared = owned.VisibleAt != nil
 		return e.retireWithResult(owned, result)
 	}
@@ -413,9 +406,9 @@ func (e *Engine) advanceActive(
 		},
 	)
 	now := e.now().UTC()
-	write := objectiveResult(owned.VisibleAt.Sub(*owned.PutAt), e.writeObjective)
+	write := contract.ObjectiveResultFor(owned.VisibleAt.Sub(*owned.PutAt), e.writeObjective)
 	deleteLag := now.Sub(*owned.DeleteAt)
-	deletion := objectiveResult(deleteLag, e.deleteObjective)
+	deletion := contract.ObjectiveResultFor(deleteLag, e.deleteObjective)
 	switch {
 	case errors.Is(err, s3client.ErrObjectNotFound):
 		result := &contract.ProbeResult{
@@ -426,16 +419,16 @@ func (e *Engine) advanceActive(
 			DeleteVisibility: deletion,
 		}
 		e.removeActive()
-		result = e.finishTerminal(result)
+		result = e.setTerminal(result)
 		_ = e.persist()
 		return result
 	case err != nil:
-		result := failedProbe(contract.ReasonRequest)
+		result := contract.FailedProbe(contract.ReasonRequest)
 		result.PayloadCompared = true
 		result.WriteVisibility = write
 		return e.retireWithResult(owned, result)
 	case deleteLag >= e.deleteTimeout:
-		result := failedProbe(contract.ReasonDeleteTimeout)
+		result := contract.FailedProbe(contract.ReasonDeleteTimeout)
 		result.PayloadCompared = true
 		result.WriteVisibility = write
 		result.DeleteVisibility = deletion
@@ -490,9 +483,7 @@ func (e *Engine) cleanupBacklog(
 			continue
 		}
 		owned := &e.state.Entries[index]
-		result.Attempted++
 		if owned.Phase != phaseCleanup {
-			result.Failed++
 			continue
 		}
 		now := e.now().UTC()
@@ -527,7 +518,6 @@ func (e *Engine) cleanupBacklog(
 			},
 		)
 		if sourceDeleteErr != nil || destinationDeleteErr != nil {
-			result.Failed++
 			continue
 		}
 
@@ -548,7 +538,6 @@ func (e *Engine) cleanupBacklog(
 			owned.Key,
 		)
 		if sourceErr != nil || destinationErr != nil {
-			result.Failed++
 			continue
 		}
 		if !sourceAbsent || !destinationAbsent || now.Before(owned.CleanupAfter) {
@@ -556,7 +545,6 @@ func (e *Engine) cleanupBacklog(
 		}
 
 		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
-		result.Removed++
 		if err := e.persist(); err != nil {
 			return result, err
 		}
@@ -625,7 +613,6 @@ func (e *Engine) call(
 			Status:   status,
 			Reason:   reason,
 			Duration: duration,
-			Calls:    1,
 			Err:      err,
 		})
 	}
@@ -726,16 +713,16 @@ func (e *Engine) retire(owned *entry) error {
 func (e *Engine) retireWithResult(owned *entry, result *contract.ProbeResult) *contract.ProbeResult {
 	previous := cloneState(e.state)
 	e.moveToCleanup(owned)
-	e.state.LastTerminal = cloneProbeResult(result)
+	e.state.LastTerminal = contract.CloneProbe(result)
 	if err := e.persist(); err != nil {
 		e.state = previous
 	}
-	return cloneProbeResult(result)
+	return contract.CloneProbe(result)
 }
 
-func (e *Engine) finishTerminal(result *contract.ProbeResult) *contract.ProbeResult {
-	e.state.LastTerminal = cloneProbeResult(result)
-	return cloneProbeResult(result)
+func (e *Engine) setTerminal(result *contract.ProbeResult) *contract.ProbeResult {
+	e.state.LastTerminal = contract.CloneProbe(result)
+	return contract.CloneProbe(result)
 }
 
 func (e *Engine) persist() error {
@@ -768,7 +755,7 @@ func (e *Engine) validateState() error {
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")
-		case !validDigest(owned.Digest):
+		case !probe.ValidDigest(owned.Digest):
 			return errors.New("journal entry has invalid payload digest")
 		case owned.Phase != phaseWriteVisibility &&
 			owned.Phase != phaseDeleteVisibility &&
@@ -797,40 +784,6 @@ func (e *Engine) validateState() error {
 func cloneState(value state) state {
 	cloned := value
 	cloned.Entries = append([]entry(nil), value.Entries...)
-	cloned.LastTerminal = cloneProbeResult(value.LastTerminal)
+	cloned.LastTerminal = contract.CloneProbe(value.LastTerminal)
 	return cloned
-}
-
-func objectiveResult(lag, objective time.Duration) contract.ObjectiveResult {
-	status := contract.StatusSuccess
-	if lag >= objective {
-		status = contract.StatusFailed
-	}
-	return contract.ObjectiveResult{
-		Performed: true,
-		Status:    status,
-		Reason:    contract.ReasonNone,
-		Lag:       lag,
-		Objective: objective,
-	}
-}
-
-func validDigest(value string) bool {
-	if len(value) != 64 || strings.ToLower(value) != value {
-		return false
-	}
-	_, err := hex.DecodeString(value)
-	return err == nil
-}
-
-func failedProbe(reason contract.Reason) *contract.ProbeResult {
-	return &contract.ProbeResult{Status: contract.StatusFailed, Reason: reason}
-}
-
-func cloneProbeResult(value *contract.ProbeResult) *contract.ProbeResult {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }

@@ -86,6 +86,13 @@ func (c StaticCredentialConfig) ValidateWithPath(path string) error {
 	)
 }
 
+func (c AssumeRoleConfig) ValidateWithPath(path string) error {
+	return errors.Join(
+		validateCredentialValue(fieldPath(path, "role_arn"), c.RoleARN, true),
+		validateCredentialValue(fieldPath(path, "external_id"), c.ExternalID, false),
+	)
+}
+
 func validateCredentialValue(path, value string, required bool) error {
 	canonical := strings.TrimSpace(value)
 	if canonical == "" {
@@ -135,14 +142,8 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 		return aws.Config{}, err
 	}
 	if id.role != nil {
-		if strings.TrimSpace(id.role.RoleARN) == "" {
-			return aws.Config{}, errors.New("assume_role.role_arn is required")
-		}
-		if id.role.RoleARN != strings.TrimSpace(id.role.RoleARN) {
-			return aws.Config{}, errors.New("assume_role.role_arn must not contain surrounding whitespace")
-		}
-		if id.role.ExternalID != strings.TrimSpace(id.role.ExternalID) {
-			return aws.Config{}, errors.New("assume_role.external_id must not contain surrounding whitespace")
+		if err := id.role.ValidateWithPath("assume_role"); err != nil {
+			return aws.Config{}, err
 		}
 	}
 

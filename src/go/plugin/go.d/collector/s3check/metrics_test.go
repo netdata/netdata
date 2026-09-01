@@ -24,12 +24,12 @@ func TestMetricRendererPreservesGapsAndCountsLogicalCalls(t *testing.T) {
 			{
 				Name: contract.OperationRead, Endpoint: contract.EndpointDestination,
 				Status: contract.StatusSuccess, Reason: contract.ReasonNone,
-				Duration: 2 * time.Second, Calls: 1,
+				Duration: 2 * time.Second,
 			},
 			{
 				Name: contract.OperationRead, Endpoint: contract.EndpointDestination,
 				Status: contract.StatusFailed, Reason: contract.ReasonRequest,
-				Duration: time.Second, Calls: 1,
+				Duration: time.Second,
 			},
 		},
 		Cleanup: contract.CleanupResult{Pending: 2, Backpressure: true},
@@ -103,7 +103,7 @@ func TestMetricChartCoverage(t *testing.T) {
 		Operations: []contract.OperationResult{{
 			Name: contract.OperationRead, Endpoint: contract.EndpointDestination,
 			Status: contract.StatusSuccess, Reason: contract.ReasonNone,
-			Duration: time.Second, Calls: 1,
+			Duration: time.Second,
 		}},
 		Probe: &contract.ProbeResult{
 			Status: contract.StatusSuccess, Reason: contract.ReasonNone, PayloadCompared: true,

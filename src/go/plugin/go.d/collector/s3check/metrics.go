@@ -110,7 +110,7 @@ func (r *metricRenderer) writeOperations(meter metrix.SnapshotMeter, result cont
 			}
 		}
 		cycle.duration += operation.Duration
-		cycle.calls += operation.Calls
+		cycle.calls++
 		if operation.Status == contract.StatusFailed {
 			cycle.failures++
 		}

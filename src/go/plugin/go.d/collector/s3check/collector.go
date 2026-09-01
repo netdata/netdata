@@ -73,7 +73,8 @@ func (c *Collector) Configuration() any { return c.Config.withDefaults() }
 
 func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()
-	if err := c.Config.validate(); err != nil {
+	selected, err := c.Config.validatedModeConfig()
+	if err != nil {
 		return fmt.Errorf("config validation: %w", err)
 	}
 	if c.newS3Client == nil {
@@ -86,16 +87,16 @@ func (c *Collector) Init(ctx context.Context) error {
 	if agentID == "" {
 		return errors.New("persisted Agent registry identity is unavailable")
 	}
-	engine, err := c.buildEngine(ctx, agentID)
+	engine, err := c.buildEngine(ctx, agentID, selected)
 	if err != nil {
 		return err
 	}
 	c.engine = engine
-	selected, err := c.selectedModeConfig()
-	if err != nil {
-		return fmt.Errorf("resolve selected mode config: %w", err)
+	destination := ""
+	if selected.Destination != nil {
+		destination = selected.Destination.Name
 	}
-	c.metrics.reset(selected.Source.Name, destinationName(selected.Destination))
+	c.metrics.reset(selected.Source.Name, destination)
 	return nil
 }
 
@@ -139,13 +140,6 @@ func (c *Collector) Cleanup(context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
-
-func destinationName(destination *S3Config) string {
-	if destination == nil {
-		return ""
-	}
-	return destination.Name
-}
 
 func resolveJournalRoot(runtimeVarLibDir, compiledVarLibDir, defaultVarLibDir string) string {
 	varLibDir := strings.TrimSpace(runtimeVarLibDir)

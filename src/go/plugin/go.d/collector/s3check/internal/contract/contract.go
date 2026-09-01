@@ -34,18 +34,12 @@ type Reason string
 
 const (
 	ReasonNone              Reason = "none"
-	ReasonAuthentication    Reason = "authentication"
-	ReasonAuthorization     Reason = "authorization"
-	ReasonBucket            Reason = "bucket"
-	ReasonBucketVersioning  Reason = "bucket_versioning"
-	ReasonReplicationPolicy Reason = "replication_policy"
 	ReasonRequest           Reason = "request"
 	ReasonPayloadMismatch   Reason = "payload_mismatch"
 	ReasonVisibilityTimeout Reason = "visibility_timeout"
 	ReasonDeleteTimeout     Reason = "delete_timeout"
 	ReasonCleanup           Reason = "cleanup"
 	ReasonOwnership         Reason = "ownership"
-	ReasonBackpressure      Reason = "backpressure"
 	ReasonInternal          Reason = "internal"
 )
 
@@ -70,24 +64,18 @@ type OperationResult struct {
 	Status   Status
 	Reason   Reason
 	Duration time.Duration
-	Calls    int64
 	Err      error
 }
 
 type ObjectiveResult struct {
 	Performed bool
 	Status    Status
-	Reason    Reason
 	Lag       time.Duration
-	Objective time.Duration
 }
 
 type CleanupResult struct {
 	Pending      int
 	Backpressure bool
-	Attempted    int
-	Removed      int
-	Failed       int
 }
 
 type ProbeResult struct {

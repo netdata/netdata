@@ -9,7 +9,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/fairqueue"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
 )
 
@@ -30,22 +29,16 @@ func (e *Engine) cleanupBacklog(
 		if owned == nil {
 			continue
 		}
-		result.Attempted++
-		removed, err := e.advanceRetired(ctx, owned, operations)
-		if err != nil {
-			result.Failed++
+		if err := e.advanceRetired(ctx, owned, operations); err != nil {
 			continue
-		}
-		if removed {
-			result.Removed++
 		}
 	}
 	if len(e.state.Entries) == 0 {
 		e.state.CleanupCursor = 0
 	} else {
 		e.state.CleanupCursor %= len(e.state.Entries)
-		if len(selected) > 0 && e.persist() != nil {
-			result.Failed++
+		if len(selected) > 0 {
+			_ = e.persist()
 		}
 	}
 	result.Pending = len(e.state.Entries)
@@ -57,33 +50,32 @@ func (e *Engine) advanceRetired(
 	ctx context.Context,
 	owned *entry,
 	operations *[]contract.OperationResult,
-) (bool, error) {
+) error {
 	for transitions := 0; transitions < 6; transitions++ {
 		switch owned.Phase {
 		case phasePutIntent, phaseReconcilePut:
-			key := owned.Key
 			owned.Phase = phaseReconcilePut
 			resolved, err := e.reconcilePut(ctx, owned, operations)
 			if err != nil {
-				return false, err
+				return err
 			}
 			if !resolved {
-				return e.find(key) == nil, nil
+				return nil
 			}
 		case phaseWaitObject:
 			proceed, _, err := e.observeObject(ctx, owned, operations, false)
 			if err != nil {
-				return false, err
+				return err
 			}
 			if !proceed {
-				return false, nil
+				return nil
 			}
 		case phaseDeleteIntent:
 			if owned.DeleteAttemptAt == nil {
 				now := e.now().UTC()
 				owned.DeleteAttemptAt = &now
 				if err := e.persist(); err != nil {
-					return false, err
+					return err
 				}
 			}
 			var deleted s3client.DeleteResult
@@ -97,46 +89,46 @@ func (e *Engine) advanceRetired(
 			if err != nil {
 				owned.Phase = phaseReconcileDelete
 				_ = e.persist()
-				return false, nil
+				return nil
 			}
 			if !deleted.DeleteMarker || deleted.VersionID == "" {
 				owned.Phase = phaseReconcileDelete
 				_ = e.persist()
-				return false, nil
+				return nil
 			}
 			owned.SourceMarkerID = deleted.VersionID
 			owned.MeasureDelete = false
 			owned.Phase = phaseWaitMarker
 			if err := e.persist(); err != nil {
-				return false, err
+				return err
 			}
 		case phaseReconcileDelete:
 			resolved, err := e.reconcileDelete(ctx, owned, operations)
 			if err != nil || !resolved {
-				return false, err
+				return err
 			}
 		case phaseWaitMarker:
 			proceed, _, err := e.observeMarker(ctx, owned, operations, false)
 			if err != nil {
-				return false, err
+				return err
 			}
 			if !proceed {
-				return false, nil
+				return nil
 			}
 		case phaseExactCleanup:
 			removed, err := e.cleanupExact(ctx, owned, operations)
 			if err != nil || !removed {
-				return false, err
+				return err
 			}
 			e.remove(owned.Key)
-			return true, e.persist()
+			return e.persist()
 		case phaseBlocked:
-			return false, nil
+			return nil
 		default:
-			return false, errors.New("invalid AWS cleanup phase")
+			return errors.New("invalid AWS cleanup phase")
 		}
 	}
-	return false, errors.New("AWS cleanup transition budget exhausted")
+	return errors.New("AWS cleanup transition budget exhausted")
 }
 
 func (e *Engine) cleanupExact(
@@ -253,8 +245,4 @@ func splitVersions(versions []s3client.Version) (objects, markers []s3client.Ver
 		}
 	}
 	return objects, markers
-}
-
-func payloadMatches(got s3client.GetResult, digest string) bool {
-	return probe.Digest(got.Payload) == digest
 }

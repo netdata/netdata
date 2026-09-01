@@ -25,7 +25,7 @@ import (
 func TestCheckIsReadOnly(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "missing", "journal")
 	j := newTestJournal(t, root)
-	client := newLifecycleClient()
+	client, _ := newLifecycleClient()
 	engine, err := New(Options{
 		Client:         client,
 		Bucket:         "bucket",
@@ -45,7 +45,7 @@ func TestCheckIsReadOnly(t *testing.T) {
 
 func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
-	client := newLifecycleClient()
+	client, _ := newLifecycleClient()
 	engine, err := New(Options{
 		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
 		RequestTimeout: time.Second, UpdateEvery: time.Minute,
@@ -65,11 +65,11 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 
 func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
-	client := newLifecycleClient()
+	client, model := newLifecycleClient()
 	client.PutFunc = func(
 		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
 	) (s3client.PutResult, error) {
-		clientModel(client).put(bucket, key, payload)
+		model.put(bucket, key, payload)
 		return s3client.PutResult{}, errors.New("ambiguous put")
 	}
 	engine, err := New(Options{
@@ -96,7 +96,7 @@ func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
 
 func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
-	client := newLifecycleClient()
+	client, _ := newLifecycleClient()
 	engine, err := New(Options{
 		Client:         client,
 		Bucket:         "bucket",
@@ -125,9 +125,9 @@ func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 
 func TestBackpressureNeverEvictsUnresolvedOwnership(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
-	client := newLifecycleClient()
+	client, model := newLifecycleClient()
 	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
-		clientModel(client).put(bucket, key, payload)
+		model.put(bucket, key, payload)
 		return s3client.PutResult{}, errors.New("ambiguous put")
 	}
 	client.DeleteFunc = func(context.Context, string, string, s3client.DeleteOptions) (s3client.DeleteResult, error) {
@@ -170,11 +170,11 @@ func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
 	parent := t.TempDir()
 	root := filepath.Join(parent, "state")
 	j := newTestJournal(t, root)
-	client := newLifecycleClient()
+	client, model := newLifecycleClient()
 	client.PutFunc = func(
 		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
 	) (s3client.PutResult, error) {
-		clientModel(client).put(bucket, key, payload)
+		model.put(bucket, key, payload)
 		return s3client.PutResult{}, errors.New("ambiguous put")
 	}
 	client.DeleteFunc = func(context.Context, string, string, s3client.DeleteOptions) (s3client.DeleteResult, error) {
@@ -202,8 +202,7 @@ func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
 
 func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
-	client := newLifecycleClient()
-	model := clientModel(client)
+	client, model := newLifecycleClient()
 	client.PutFunc = func(_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions) (s3client.PutResult, error) {
 		model.put(bucket, key, payload)
 		return s3client.PutResult{}, errors.New("ambiguous put")
@@ -245,8 +244,7 @@ func TestAmbiguousPutNeedsLaterAbsenceConfirmationThenResumes(t *testing.T) {
 
 func TestAmbiguousPutRetainsOwnershipForRequestUncertaintyWindow(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
-	client := newLifecycleClient()
-	model := clientModel(client)
+	client, model := newLifecycleClient()
 	var key string
 	var payload []byte
 	client.PutFunc = func(
@@ -297,8 +295,7 @@ func TestSameOwnerTakeoverReloadsIncumbentOwnership(t *testing.T) {
 	root := t.TempDir()
 	firstJournal := newTestJournal(t, root)
 	secondJournal := newTestJournal(t, root)
-	client := newLifecycleClient()
-	model := clientModel(client)
+	client, model := newLifecycleClient()
 	client.PutFunc = func(
 		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
 	) (s3client.PutResult, error) {
@@ -360,17 +357,6 @@ type objectModel struct {
 	objects map[string][]byte
 }
 
-var lifecycleModels sync.Map
-
-func clientModel(client *testutil.S3) *objectModel {
-	if value, ok := lifecycleModels.Load(client); ok {
-		return value.(*objectModel)
-	}
-	model := &objectModel{objects: make(map[string][]byte)}
-	actual, _ := lifecycleModels.LoadOrStore(client, model)
-	return actual.(*objectModel)
-}
-
 func (m *objectModel) objectKey(bucket, key string) string { return bucket + "\x00" + key }
 
 func (m *objectModel) put(bucket, key string, payload []byte) {
@@ -405,9 +391,9 @@ func (m *objectModel) keys(bucket, prefix string) []string {
 	return keys
 }
 
-func newLifecycleClient() *testutil.S3 {
+func newLifecycleClient() (*testutil.S3, *objectModel) {
 	client := &testutil.S3{}
-	model := clientModel(client)
+	model := &objectModel{objects: make(map[string][]byte)}
 	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
 		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
 	}
@@ -435,5 +421,5 @@ func newLifecycleClient() *testutil.S3 {
 		model.delete(bucket, key)
 		return s3client.DeleteResult{}, nil
 	}
-	return client
+	return client, model
 }

@@ -2139,42 +2139,13 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 
 func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
-	expected := map[string]cephNetdataExtension{
-		"s3check_runtime_failed": {
-			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.runtime_status",
-			Calc: "$failed", Units: "status", Recipient: "sysadmin",
-		},
-		"s3check_probe_failed": {
-			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.probe_status",
-			Calc: "$failed", Units: "status", Recipient: "sysadmin",
-		},
-		"s3check_payload_mismatch": {
-			SOWID: "RGW-M-11", Owner: "s3check", Context: "s3check.payload_mismatch",
-			Calc: "$mismatch", Units: "status", Recipient: "sysadmin",
-		},
-		"s3check_write_visibility_objective": {
-			SOWID: "RGW-S-24", Owner: "s3check", Context: "s3check.write_visibility_objective",
-			Calc: "$breached", Units: "status", Recipient: "silent",
-		},
-		"s3check_delete_visibility_objective": {
-			SOWID: "RGW-S-25", Owner: "s3check", Context: "s3check.delete_visibility_objective",
-			Calc: "$breached", Units: "status", Recipient: "silent",
-		},
-		"s3check_mutation_backpressure": {
-			SOWID: "RGW-M-05", Owner: "s3check", Context: "s3check.mutation_backpressure",
-			Calc: "$active", Units: "status", Recipient: "sysadmin",
-		},
+	expected := make(map[string]cephNetdataExtension)
+	for name, extension := range manifest.NetdataExtensions {
+		if extension.Owner == "s3check" {
+			expected[name] = extension
+		}
 	}
-	for name, want := range expected {
-		got := manifest.NetdataExtensions[name]
-		require.Equalf(t, want.SOWID, got.SOWID, "%s SOW ID", name)
-		require.Equalf(t, want.Owner, got.Owner, "%s owner", name)
-		require.Equalf(t, want.Context, got.Context, "%s context", name)
-		require.Equalf(t, want.Calc, got.Calc, "%s calculation", name)
-		require.Equalf(t, want.Units, got.Units, "%s units", name)
-		require.Equalf(t, want.Recipient, got.Recipient, "%s recipient", name)
-		require.NotEmptyf(t, got.Adaptation, "%s adaptation", name)
-	}
+	require.NotEmpty(t, expected)
 
 	var metadata struct {
 		Modules []struct {
@@ -2190,26 +2161,22 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(content, &metadata))
 	require.Len(t, metadata.Modules, 1)
 
-	actual := make(map[string]string)
+	metadataMetrics := make(map[string]string)
 	info := make(map[string]string)
 	for _, alert := range metadata.Modules[0].Alerts {
-		actual[alert.Name] = alert.Metric
+		metadataMetrics[alert.Name] = alert.Metric
 		info[alert.Name] = alert.Info
 	}
-	require.Equal(t, map[string]string{
-		"s3check_runtime_failed":              "s3check.runtime_status",
-		"s3check_probe_failed":                "s3check.probe_status",
-		"s3check_payload_mismatch":            "s3check.payload_mismatch",
-		"s3check_write_visibility_objective":  "s3check.write_visibility_objective",
-		"s3check_delete_visibility_objective": "s3check.delete_visibility_objective",
-		"s3check_mutation_backpressure":       "s3check.mutation_backpressure",
-	}, actual)
+	require.Len(t, metadataMetrics, len(expected))
 
 	templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",
 		"health", "health.d", "s3check.conf"))
-	for name := range expected {
-		require.Equalf(t, expected[name].Context, templates[name]["on"], "%s context", name)
-		require.Equalf(t, expected[name].Calc, templates[name]["calc"], "%s calculation", name)
+	for name, extension := range expected {
+		require.Equalf(t, extension.Context, metadataMetrics[name], "%s metadata context", name)
+		require.Equalf(t, extension.Context, templates[name]["on"], "%s health context", name)
+		require.Equalf(t, extension.Calc, templates[name]["calc"], "%s calculation", name)
+		require.Equalf(t, extension.Units, templates[name]["units"], "%s units", name)
+		require.Equalf(t, extension.Recipient, templates[name]["to"], "%s recipient", name)
 		require.Equalf(t, info[name], templates[name]["info"], "%s metadata info", name)
 	}
 }

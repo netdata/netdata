@@ -4,7 +4,6 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -16,12 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/probe"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/s3client"
-)
-
-const (
-	defaultQueueCapacity = 8
-	defaultCleanupBatch  = 2
-	maxQueueCapacity     = 32
 )
 
 type Options struct {
@@ -94,13 +87,13 @@ func New(opts Options) (*Engine, error) {
 		return nil, fmt.Errorf("lifecycle probe namespace: %w", err)
 	}
 	if opts.QueueCapacity == 0 {
-		opts.QueueCapacity = defaultQueueCapacity
+		opts.QueueCapacity = contract.DefaultQueueCapacity
 	}
-	if opts.QueueCapacity < 1 || opts.QueueCapacity > maxQueueCapacity {
-		return nil, fmt.Errorf("lifecycle queue capacity must be between 1 and %d", maxQueueCapacity)
+	if opts.QueueCapacity < 1 || opts.QueueCapacity > contract.MaxQueueCapacity {
+		return nil, fmt.Errorf("lifecycle queue capacity must be between 1 and %d", contract.MaxQueueCapacity)
 	}
 	if opts.CleanupBatch == 0 {
-		opts.CleanupBatch = defaultCleanupBatch
+		opts.CleanupBatch = contract.DefaultCleanupBatch
 	}
 	if opts.CleanupBatch < 1 || opts.CleanupBatch > opts.QueueCapacity {
 		return nil, errors.New("lifecycle cleanup batch must fit the queue capacity")
@@ -156,7 +149,7 @@ func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.Op
 func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	result = contract.Result{
 		Mode:         contract.ModeLifecycle,
-		LastTerminal: cloneProbeResult(e.state.LastTerminal),
+		LastTerminal: contract.CloneProbe(e.state.LastTerminal),
 	}
 	e.diagnostic = nil
 	defer func() {
@@ -165,18 +158,18 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		}
 	}()
 	if e.closed {
-		result.Probe = failedProbe(contract.ReasonInternal)
+		result.Probe = contract.FailedProbe(contract.ReasonInternal)
 		return result
 	}
 	if err := e.takeover(); err != nil {
-		result.Probe = failedProbe(contract.ReasonOwnership)
+		result.Probe = contract.FailedProbe(contract.ReasonOwnership)
 		result.Err = err
 		return result
 	}
 	defer func() {
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	}()
 	if err := e.validateProvider(ctx, &result.Operations); err != nil {
 		result.Err = fmt.Errorf("validate lifecycle provider safety: %w", err)
@@ -192,14 +185,14 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	if len(e.state.Entries) >= e.queueCapacity {
 		result.Cleanup.Pending = len(e.state.Entries)
 		result.Cleanup.Backpressure = true
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
 	object, err := e.generator.Next()
 	if err != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonInternal))
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.Probe = e.finish(contract.FailedProbe(contract.ReasonInternal))
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	owned := entry{
@@ -210,8 +203,8 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	e.state.Entries = append(e.state.Entries, owned)
 	if err := e.persist(); err != nil {
 		e.state.Entries = e.state.Entries[:len(e.state.Entries)-1]
-		result.Probe = e.finish(failedProbe(contract.ReasonOwnership))
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.Probe = e.finish(contract.FailedProbe(contract.ReasonOwnership))
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	index := len(e.state.Entries) - 1
@@ -220,17 +213,17 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		_, callErr := e.client.Put(callCtx, e.bucket, object.Key, object.Payload, s3client.PutOptions{IfNoneMatch: true})
 		return callErr
 	}); err != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonRequest))
+		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	e.state.Entries[index].PutConfirmed = true
 	if err := e.persist(); err != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonOwnership))
+		result.Probe = e.finish(contract.FailedProbe(contract.ReasonOwnership))
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -240,20 +233,20 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		got, callErr = e.client.Get(callCtx, e.bucket, object.Key, "", probe.PayloadBytes)
 		return callErr
 	}); err != nil {
-		result.Probe = e.finish(failedProbe(contract.ReasonRequest))
+		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	if probe.Digest(got.Payload) != object.Digest {
-		probeResult := failedProbe(contract.ReasonPayloadMismatch)
+		probeResult := contract.FailedProbe(contract.ReasonPayloadMismatch)
 		probeResult.PayloadCompared = true
 		probeResult.PayloadMismatch = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -263,12 +256,12 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		page, callErr = e.client.ListCurrent(callCtx, e.bucket, object.Key, 2)
 		return callErr
 	}); err != nil || page.Truncated || !slices.Contains(page.Keys, object.Key) {
-		probeResult := failedProbe(contract.ReasonRequest)
+		probeResult := contract.FailedProbe(contract.ReasonRequest)
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -276,12 +269,12 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		_, callErr := e.client.Delete(callCtx, e.bucket, object.Key, s3client.DeleteOptions{})
 		return callErr
 	}); err != nil {
-		probeResult := failedProbe(contract.ReasonRequest)
+		probeResult := contract.FailedProbe(contract.ReasonRequest)
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 	absent := false
@@ -293,12 +286,12 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		}
 		return callErr
 	}); err != nil || !absent {
-		probeResult := failedProbe(contract.ReasonCleanup)
+		probeResult := contract.FailedProbe(contract.ReasonCleanup)
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 		_ = e.persist()
 		result.Cleanup.Pending = len(e.state.Entries)
-		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 		return result
 	}
 
@@ -308,12 +301,12 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}
 	result.Probe = e.finish(success)
 	if err := e.persist(); err != nil {
-		probeResult := failedProbe(contract.ReasonOwnership)
+		probeResult := contract.FailedProbe(contract.ReasonOwnership)
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
 	}
 	result.Cleanup.Pending = len(e.state.Entries)
-	result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
+	result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
 	return result
 }
 
@@ -351,14 +344,11 @@ func (e *Engine) cleanupBacklog(
 			continue
 		}
 		owned := &e.state.Entries[index]
-		result.Attempted++
-
 		_, deleteErr := e.call(ctx, operations, contract.OperationCleanup, func(callCtx context.Context) error {
 			_, err := e.client.Delete(callCtx, e.bucket, owned.Key, s3client.DeleteOptions{})
 			return err
 		})
 		if deleteErr != nil {
-			result.Failed++
 			continue
 		}
 
@@ -372,7 +362,6 @@ func (e *Engine) cleanupBacklog(
 			return err
 		})
 		if getErr != nil {
-			result.Failed++
 			continue
 		}
 		if !absent {
@@ -398,7 +387,6 @@ func (e *Engine) cleanupBacklog(
 		}
 
 		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
-		result.Removed++
 		if err := e.persist(); err != nil {
 			return result, err
 		}
@@ -442,7 +430,6 @@ func (e *Engine) call(
 			Status:   status,
 			Reason:   reason,
 			Duration: duration,
-			Calls:    1,
 			Err:      err,
 		})
 	}
@@ -484,8 +471,8 @@ func (e *Engine) entryIndex(key string) int {
 }
 
 func (e *Engine) finish(result *contract.ProbeResult) *contract.ProbeResult {
-	e.state.LastTerminal = cloneProbeResult(result)
-	return cloneProbeResult(result)
+	e.state.LastTerminal = contract.CloneProbe(result)
+	return contract.CloneProbe(result)
 }
 
 func (e *Engine) persist() error {
@@ -517,7 +504,7 @@ func (e *Engine) validateState() error {
 			return errors.New("journal entry is outside the owner namespace")
 		case owned.CreatedAt.IsZero():
 			return errors.New("journal entry has no creation time")
-		case !validDigest(owned.Digest):
+		case !probe.ValidDigest(owned.Digest):
 			return errors.New("journal entry has invalid payload digest")
 		}
 		if _, ok := seen[owned.Key]; ok {
@@ -526,24 +513,4 @@ func (e *Engine) validateState() error {
 		seen[owned.Key] = struct{}{}
 	}
 	return nil
-}
-
-func validDigest(value string) bool {
-	if len(value) != 64 || strings.ToLower(value) != value {
-		return false
-	}
-	_, err := hex.DecodeString(value)
-	return err == nil
-}
-
-func failedProbe(reason contract.Reason) *contract.ProbeResult {
-	return &contract.ProbeResult{Status: contract.StatusFailed, Reason: reason}
-}
-
-func cloneProbeResult(value *contract.ProbeResult) *contract.ProbeResult {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }
