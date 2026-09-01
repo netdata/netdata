@@ -144,6 +144,7 @@ type (
 
 		sysInfo              *snmputils.SysInfo
 		snmpProfiles         []*ddsnmp.Profile
+		initialized          bool
 		deviceMetadataSynced bool
 
 		adjMaxRepetitions uint32
@@ -212,7 +213,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 		c.snmpClient = snmpClient
 	}
 
-	if _, err := snmputils.GetSysInfo(c.snmpClient); err != nil {
+	if err := c.ensureDeviceProfile(); err != nil {
 		return err
 	}
 

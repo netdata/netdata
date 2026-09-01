@@ -81,6 +81,32 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.Equal(t, 1, link.TypedLink.Membership.Candidates)
 	require.NotEmpty(t, link.Source.Contexts)
 	require.Equal(t, wantReplay.Stats, link.Stats)
+
+	linkAt, err := archive.InspectLinkAt(query, 0)
+	require.NoError(t, err)
+	directLinkAtReport, err := inspectTopologyLinkAt(diagnostics, scenario.opts, 0)
+	require.NoError(t, err)
+	directLinkAt, err := newDiagnosticLinkInspection(directLinkAtReport)
+	require.NoError(t, err)
+	require.Equal(t, directLinkAt, linkAt)
+	require.Equal(t, 0, linkAt.GraphLink.SelectedIndex)
+	require.Equal(t, 0, linkAt.TypedLink.Row)
+}
+
+func TestDiagnosticArchiveAPIRejectsInvalidExactLinkIndexes(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
+	archive, err := ReadDiagnosticArchive(bytes.NewReader(encoded.Bytes()), DefaultDiagnosticArchiveReadLimits())
+	require.NoError(t, err)
+
+	query := diagnosticQueryOptionsFromInternal(newLLDPDirectScenario().opts)
+	for _, index := range []int{-1, 1_000_000} {
+		_, err := archive.InspectLinkAt(query, index)
+		require.ErrorContains(t, err, "link index")
+	}
 }
 
 func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {

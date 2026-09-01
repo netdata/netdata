@@ -33,6 +33,7 @@ type diagnosticArchive interface {
 		snmptopology.DiagnosticQueryOptions,
 		snmptopology.DiagnosticLinkSubject,
 	) (snmptopology.DiagnosticLinkInspection, error)
+	InspectLinkAt(snmptopology.DiagnosticQueryOptions, int) (snmptopology.DiagnosticLinkInspection, error)
 }
 
 type archiveOpener func(io.Reader, snmptopology.DiagnosticReadLimits) (diagnosticArchive, error)
@@ -44,6 +45,8 @@ type commandOptions struct {
 	query             snmptopology.DiagnosticQueryOptions
 	registrationID    uint64
 	link              snmptopology.DiagnosticLinkSubject
+	linkIndex         int
+	linkIndexSet      bool
 }
 
 func main() {
@@ -142,6 +145,7 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 	case "inspect-device":
 		flags.Uint64Var(&options.registrationID, "registration-id", 0, "device registration ID")
 	case "inspect-link":
+		flags.IntVar(&options.linkIndex, "link-index", -1, "zero-based link index in this archive and query replay")
 		flags.StringVar(&options.link.SourceIdentity, "source-identity", "", "source actor identity key")
 		flags.StringVar(&options.link.DestinationIdentity, "destination-identity", "", "destination actor identity key")
 		flags.StringVar(&options.link.Family, "family", "", "link family")
@@ -154,6 +158,11 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		}
 		return commandOptions{}, 2
 	}
+	flags.Visit(func(value *flag.Flag) {
+		if value.Name == "link-index" {
+			options.linkIndexSet = true
+		}
+	})
 	if flags.NArg() != 0 {
 		fmt.Fprintf(stderr, "error: unexpected arguments: %v\n", flags.Args())
 		return commandOptions{}, 2
@@ -166,14 +175,27 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		fmt.Fprintln(stderr, "error: --registration-id must be greater than zero")
 		return commandOptions{}, 2
 	}
-	if operation == "inspect-link" &&
-		(options.link.SourceIdentity == "" || options.link.DestinationIdentity == "" ||
-			options.link.Family == "" || options.link.Direction == "") {
-		fmt.Fprintln(
-			stderr,
-			"error: --source-identity, --destination-identity, --family, and --direction are required",
-		)
-		return commandOptions{}, 2
+	if operation == "inspect-link" {
+		hasCompositeSelector := options.link.SourceIdentity != "" || options.link.DestinationIdentity != "" ||
+			options.link.Family != "" || options.link.Protocol != "" || options.link.Direction != ""
+		if options.linkIndexSet && hasCompositeSelector {
+			fmt.Fprintln(stderr, "error: --link-index and identity-based link selectors are mutually exclusive")
+			return commandOptions{}, 2
+		}
+		if options.linkIndexSet {
+			if options.linkIndex < 0 {
+				fmt.Fprintln(stderr, "error: --link-index must be zero or greater")
+				return commandOptions{}, 2
+			}
+		} else if options.link.SourceIdentity == "" || options.link.DestinationIdentity == "" ||
+			options.link.Family == "" || options.link.Direction == "" {
+			fmt.Fprintln(
+				stderr,
+				"error: a link selector is required: use --link-index or --source-identity, "+
+					"--destination-identity, --family, and --direction",
+			)
+			return commandOptions{}, 2
+		}
 	}
 	return options, -1
 }
@@ -218,6 +240,9 @@ func executeOperation(operation string, archive diagnosticArchive, options comma
 	case "inspect-device":
 		return archive.InspectDevice(options.query, options.registrationID)
 	case "inspect-link":
+		if options.linkIndexSet {
+			return archive.InspectLinkAt(options.query, options.linkIndex)
+		}
 		return archive.InspectLink(options.query, options.link)
 	default:
 		return nil, fmt.Errorf("unknown operation %q", operation)

@@ -53,6 +53,16 @@ func Test_FindProfiles(t *testing.T) {
 			sysObjOId:   "1.3.6.1.4.1.14988.1",
 			wanProfiles: []string{"mikrotik-router", "generic-device"},
 		},
+		"MikroTik RouterOS RB750Gr3": {
+			sysObjOId:   "1.3.6.1.4.1.14988.1",
+			sysDescr:    "RouterOS RB750Gr3",
+			wanProfiles: []string{"topology-role-mikrotik-rb750gr3", "mikrotik-router", "generic-device"},
+		},
+		"MikroTik SwOS": {
+			sysObjOId:   "1.3.6.1.4.1.14988.2",
+			sysDescr:    "CSS610-8G-2S+ SwOS",
+			wanProfiles: []string{"mikrotik-swos", "generic-device"},
+		},
 		"net-snmp linux": {
 			sysObjOId:   "1.3.6.1.4.1.8072.3.2.10",
 			wanProfiles: []string{"net-snmp", "generic-device"},

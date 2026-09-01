@@ -15,6 +15,7 @@ go run ./tools/snmp-topology-diagnostics validate --archive /path/to/archive.zst
 go run ./tools/snmp-topology-diagnostics summary --archive /path/to/archive.zst
 go run ./tools/snmp-topology-diagnostics replay --archive /path/to/archive.zst
 go run ./tools/snmp-topology-diagnostics inspect-device --archive /path/to/archive.zst --registration-id 7
+go run ./tools/snmp-topology-diagnostics inspect-link --archive /path/to/archive.zst --link-index 12
 go run ./tools/snmp-topology-diagnostics inspect-link --archive /path/to/archive.zst \
   --source-identity ip:192.0.2.10 \
   --destination-identity ip:192.0.2.20 \
@@ -28,10 +29,16 @@ production topology-v1 payload. The inspection operations report one device or l
 rendered topology stages. Link reports also include family-wide source context; that context is not causal provenance for
 the inspected link.
 
-Use `summary` to find a device registration ID. A device inspection reports its graph identity keys; one of those keys can
-be supplied as a link endpoint identity. Link families are `lldp`, `cdp`, `bridge`, `fdb`, `stp`, `arp`, `l3_subnet`,
-`l3_subnet_membership`, `ospf_adjacency`, and `bgp_adjacency`. Link direction is required and accepts `observed`,
-`unidirectional`, or `bidirectional`.
+Use `summary` to find a device registration ID. Use `--link-index` to inspect one existing link by its zero-based row in
+the `links` table emitted by `replay`. The index belongs to that archive and query option set; do not reuse it with a
+different archive or query. Exact selection also works when an actor identity cannot be carried in a command-line
+argument or when the identity selector would match multiple parallel links.
+
+The identity-based link selector remains useful for investigating a link that may be absent. A device inspection reports
+its graph identity keys; one of those keys can be supplied as a link endpoint identity. The exact and identity-based
+selector modes cannot be combined. Link families are `lldp`, `cdp`, `bridge`, `fdb`, `stp`, `arp`, `l3_subnet`,
+`l3_subnet_membership`, `ospf_adjacency`, and `bgp_adjacency`. Link direction is required for identity selection and
+accepts `observed`, `unidirectional`, or `bidirectional`.
 
 Replay and inspection accept the production scalar query options:
 

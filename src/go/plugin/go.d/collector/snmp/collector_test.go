@@ -383,7 +383,9 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		collr := New(store)
 		collr.Config = prepareV2Config()
 		mockSNMP := snmpmock.NewMockHandler(ctrl)
-		mockSNMP.EXPECT().WalkAll(gomock.Any()).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+		mockSNMP.EXPECT().MaxOids().Return(20)
+		mockSNMP.EXPECT().Version().Return(gosnmp.Version2c)
+		mockSNMP.EXPECT().Get(gomock.Any()).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
 			panic("check panic")
 		})
 		collr.snmpClient = mockSNMP
@@ -603,6 +605,44 @@ func TestCollector_Check(t *testing.T) {
 			},
 		},
 
+		"success: chunks sysInfo by configured max OIDs": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpectWithMaxOids(m, 2)
+				gomock.InOrder(
+					m.EXPECT().MaxOids().Return(2),
+					m.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
+							{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
+						}},
+						nil,
+					),
+					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
+							{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
+						}},
+						nil,
+					),
+					m.EXPECT().Get([]string{snmputils.OidSysLocation}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysLocation, Value: []byte("mock sysLocation"), Type: gosnmp.OctetString},
+						}},
+						nil,
+					),
+				)
+
+				c := newTestSNMPCollector()
+				c.Config = prepareV2Config()
+				c.Options.MaxOIDs = 2
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
+			},
+		},
+
 		"failure: SNMP connect error": {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
@@ -618,17 +658,14 @@ func TestCollector_Check(t *testing.T) {
 			},
 		},
 
-		"failure: sysInfo walk error": {
+		"failure: sysInfo query error": {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
-				// Normal init succeeds
 				setMockClientInitExpect(m)
-				// But sysInfo retrieval (WalkAll on system tree) fails
-				// If your helper is too opinionated, stub directly:
-				// The collector ultimately calls WalkAll on the system OID tree.
+				m.EXPECT().MaxOids().Return(20)
 				m.EXPECT().
-					WalkAll(gomock.Any()).
-					Return(nil, errors.New("walk failed"))
+					Get(sysInfoOIDsForTest()).
+					Return(nil, errors.New("query failed"))
 
 				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
@@ -713,6 +750,141 @@ func TestCollector_Check(t *testing.T) {
 				assert.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
+	tests := map[string]struct {
+		pdus           []gosnmp.SnmpPDU
+		pingEnabled    bool
+		pingOnly       bool
+		manualProfiles []string
+		wantErr        string
+		wantAbsent     []string
+	}{
+		"empty system query": {
+			wantErr: "SNMP system scalar query returned no PDUs",
+		},
+		"partial system query with ordinary ping enabled": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte("private description")},
+				{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("private hostname")},
+			},
+			pingEnabled: true,
+			wantErr:     "without sysObjectID",
+			wantAbsent:  []string{"private description", "private hostname"},
+		},
+		"unmatched system object": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.2.1.999"},
+			},
+			manualProfiles: []string{"generic-device"},
+			wantErr:        "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
+			wantAbsent:     []string{"manual_profiles"},
+		},
+		"invalid manual profile": {
+			manualProfiles: []string{"profile-that-does-not-exist"},
+			wantErr:        "SNMP system scalar query returned no PDUs",
+		},
+		"topology-only manual profile": {
+			manualProfiles: []string{"topology-role-qbridge"},
+			wantErr:        "SNMP system scalar query returned no PDUs",
+		},
+		"applicable manual metric profile": {
+			manualProfiles: []string{"generic-device"},
+		},
+		"reported Cisco ASR identity": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9.1.1166"},
+			},
+		},
+		"explicit ping only": {
+			pingOnly: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			client := snmpmock.NewMockHandler(ctrl)
+			client.EXPECT().MaxOids().Return(20)
+			client.EXPECT().Version().Return(gosnmp.Version2c)
+			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
+
+			collr := newTestSNMPCollector()
+			collr.Config = prepareV2Config()
+			collr.CreateVnode = false
+			collr.Ping.Enabled = tc.pingEnabled
+			collr.PingOnly = tc.pingOnly
+			collr.ManualProfiles = tc.manualProfiles
+			collr.snmpClient = client
+
+			err := collr.Check(context.Background())
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			for _, value := range tc.wantAbsent {
+				assert.NotContains(t, err.Error(), value)
+			}
+		})
+	}
+}
+
+func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(20)
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
+	}}, nil).Times(1)
+
+	collr := newTestSNMPCollector()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpClient = client
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return &mockDdSnmpCollector{} }
+
+	require.NoError(t, collr.Check(context.Background()))
+	require.NoError(t, collr.ensureInitialized())
+	assert.Equal(t, "1.3.6.1.4.1.14988.1", collr.sysInfo.SysObjectID)
+}
+
+func TestSysInfoDiagnosticOmitsRawSystemValues(t *testing.T) {
+	si := &snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.9.1.1166",
+		Descr:       "private description",
+		Contact:     "private contact",
+		Name:        "private hostname",
+		Location:    "private location",
+		Vendor:      "Cisco",
+		Category:    "Router",
+		Model:       "ASR 1000",
+		Probe: snmputils.SysInfoProbe{
+			PDUCount:        5,
+			SeenSysDescr:    true,
+			SeenSysObjectID: true,
+			SeenSysContact:  true,
+			SeenSysName:     true,
+			SeenSysLocation: true,
+		},
+	}
+
+	diagnostic := formatSysInfoDiagnostic(si)
+	assert.Contains(t, diagnostic, si.SysObjectID)
+	assert.Contains(t, diagnostic, "pdu_count=5")
+	assert.Contains(t, diagnostic, "sys_object_id=true")
+	for _, raw := range []string{si.Descr, si.Contact, si.Name, si.Location} {
+		assert.NotContains(t, diagnostic, raw)
 	}
 }
 
@@ -1406,7 +1578,18 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().Connect().Return(nil).AnyTimes()
 }
 
+func setMockClientInitExpectWithMaxOids(m *snmpmock.MockHandler, maxOids int) {
+	setMockClientSetterExpectWithoutMaxOids(m)
+	m.EXPECT().SetMaxOids(maxOids).Times(2)
+	m.EXPECT().Connect().Return(nil).AnyTimes()
+}
+
 func setMockClientSetterExpect(m *snmpmock.MockHandler) {
+	setMockClientSetterExpectWithoutMaxOids(m)
+	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
+}
+
+func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
@@ -1415,7 +1598,6 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().SetPort(gomock.Any()).AnyTimes()
 	m.EXPECT().SetRetries(gomock.Any()).AnyTimes()
 	m.EXPECT().SetMaxRepetitions(gomock.Any()).AnyTimes()
-	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
 	m.EXPECT().SetLogger(gomock.Any()).AnyTimes()
 	m.EXPECT().SetTimeout(gomock.Any()).AnyTimes()
 	m.EXPECT().SetCommunity(gomock.Any()).AnyTimes()
@@ -1428,11 +1610,22 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+	m.EXPECT().MaxOids().Return(20).MinTimes(1)
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
 		{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
-	}, nil).MinTimes(1)
+	}}, nil).MinTimes(1)
+}
+
+func sysInfoOIDsForTest() []string {
+	return []string{
+		snmputils.OidSysDescr,
+		snmputils.OidSysObject,
+		snmputils.OidSysContact,
+		snmputils.OidSysName,
+		snmputils.OidSysLocation,
+	}
 }

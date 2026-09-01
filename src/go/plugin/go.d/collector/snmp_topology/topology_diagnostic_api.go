@@ -132,6 +132,26 @@ func (a *DiagnosticArchive) InspectLink(
 	return newDiagnosticLinkInspection(report)
 }
 
+// InspectLinkAt inspects one existing link by its zero-based index in the
+// replay produced by the supplied query options.
+func (a *DiagnosticArchive) InspectLinkAt(
+	options DiagnosticQueryOptions,
+	index int,
+) (DiagnosticLinkInspection, error) {
+	if a == nil {
+		return DiagnosticLinkInspection{}, errors.New("inspect SNMP topology link: nil archive")
+	}
+	query, err := diagnosticQueryOptionsToInternal(options)
+	if err != nil {
+		return DiagnosticLinkInspection{}, err
+	}
+	report, err := inspectTopologyLinkAt(a.archive.diagnostics, query, index)
+	if err != nil {
+		return DiagnosticLinkInspection{}, err
+	}
+	return newDiagnosticLinkInspection(report)
+}
+
 func diagnosticQueryOptionsFromInternal(options topologyoptions.QueryOptions) DiagnosticQueryOptions {
 	depth := strconv.Itoa(options.Depth)
 	if options.Depth == topologyoptions.DepthAllInternal {

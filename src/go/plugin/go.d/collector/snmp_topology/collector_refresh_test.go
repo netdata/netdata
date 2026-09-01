@@ -1537,9 +1537,10 @@ func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
 			return []*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{{
 				TopologyKind: ddsnmp.KindIpIfIndex,
 				Tags: map[string]string{
-					tagTopoIfIndex: "1",
-					tagTopoIPAddr:  "10.0.0.1",
-					tagTopoIPMask:  "255.255.255.0",
+					tagTopoIPSource: topoIPSourceLegacy,
+					tagTopoIfIndex:  "1",
+					tagTopoIPAddr:   "10.0.0.1",
+					tagTopoIPMask:   "255.255.255.0",
 				},
 			}}}}, nil
 		})
@@ -1583,9 +1584,10 @@ func TestCollectorRefreshSelectsNextDNSTargetAfterMaskRejection(t *testing.T) {
 			return []*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{{
 				TopologyKind: ddsnmp.KindIpIfIndex,
 				Tags: map[string]string{
-					tagTopoIfIndex: "1",
-					tagTopoIPAddr:  "192.0.2.0",
-					tagTopoIPMask:  "255.255.255.0",
+					tagTopoIPSource: topoIPSourceLegacy,
+					tagTopoIfIndex:  "1",
+					tagTopoIPAddr:   "192.0.2.0",
+					tagTopoIPMask:   "255.255.255.0",
 				},
 			}}}}, nil
 		})

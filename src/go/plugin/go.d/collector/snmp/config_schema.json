@@ -225,7 +225,7 @@
             "title": "Enable ping",
             "type": "boolean",
             "default": true,
-            "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
+            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that."
           },
           "network": {
             "title": "Network",
