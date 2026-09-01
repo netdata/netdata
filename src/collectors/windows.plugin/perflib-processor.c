@@ -328,6 +328,33 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
     if (!pObjectType)
         return false;
 
+    if (processor_information) {
+        PERF_INSTANCE_DEFINITION *topology_pi = NULL;
+        bool topology_refresh_attempted = false;
+        for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+            topology_pi = perflibForEachInstance(pDataBlock, pObjectType, topology_pi);
+            if (!topology_pi)
+                return false;
+
+            if (!getInstanceName(pDataBlock, pObjectType, topology_pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+                strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+            if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+                continue;
+
+            int cpu_id;
+            if (!processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu_id)) {
+                if (!topology_refresh_attempted) {
+                    topology_refresh_attempted = true;
+                    processor_topology_refresh();
+                }
+
+                if (!processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu_id))
+                    return false;
+            }
+        }
+    }
+
     static const RRDVAR_ACQUIRED *cpus_var = NULL;
     int cores_found = 0;
     uint64_t totalIPC = 0;
