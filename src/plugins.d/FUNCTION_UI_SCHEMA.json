@@ -898,6 +898,10 @@
                 "type": "array",
                 "items": { "type": "integer", "minimum": 0 }
               }
+            },
+            "errors": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0 }
             }
           },
           "additionalProperties": true
