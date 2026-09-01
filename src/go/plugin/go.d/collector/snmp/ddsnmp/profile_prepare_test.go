@@ -101,6 +101,38 @@ func TestHandleCrossTableTagsWithoutMetrics(t *testing.T) {
 	assert.Equal(t, "1.3.6.1.2.1.17.1.4.1.2", profile.Definition.Topology[1].Table.OID)
 }
 
+func TestHandleCrossTableTagsWithoutMetrics_PropagatesNarrowAnchorIndexScope(t *testing.T) {
+	const (
+		anchorColumnOID     = "1.3.6.1.2.1.4.34.1.3"
+		dependencyColumnOID = "1.3.6.1.2.1.4.34.1.4"
+	)
+	profile := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind: ddprofiledefinition.KindIpIfIndex,
+				MetricsConfig: ddprofiledefinition.MetricsConfig{
+					Table:   ddprofiledefinition.SymbolConfig{OID: anchorColumnOID + ".1", Name: "ipAddressIfIndexIPv4"},
+					Symbols: []ddprofiledefinition.SymbolConfig{{OID: anchorColumnOID, Name: "ip_if_index"}},
+					MetricTags: []ddprofiledefinition.MetricTagConfig{{
+						Tag:   "ip_address_type",
+						Table: "ipAddressTypeIPv4",
+						Symbol: ddprofiledefinition.SymbolConfigCompat{
+							OID:  dependencyColumnOID,
+							Name: "ipAddressType",
+						},
+					}},
+				},
+			}},
+		},
+	}
+
+	handleCrossTableTagsWithoutMetrics(profile)
+
+	require.Len(t, profile.Definition.Topology, 2)
+	assert.Equal(t, "ipAddressTypeIPv4", profile.Definition.Topology[1].Table.Name)
+	assert.Equal(t, dependencyColumnOID+".1", profile.Definition.Topology[1].Table.OID)
+}
+
 func TestPrepareLoadedProfile_EnrichesTopologyMappingRefs(t *testing.T) {
 	profile := &Profile{
 		Definition: &ddprofiledefinition.ProfileDefinition{

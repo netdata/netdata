@@ -190,7 +190,7 @@ func (s *tableCollectionSession) resolve() {
 	routes := s.sortedRoutes()
 	var freshQueue []freshRouteWork
 	for _, route := range routes {
-		if routeNeedsFresh(route) {
+		if s.routeNeedsFresh(route) {
 			s.requireFresh(route, freshTriggerForRoute(route), &freshQueue)
 		}
 	}
@@ -322,6 +322,25 @@ func routeNeedsFresh(route *tableCollectionRoute) bool {
 		}
 	}
 	return !hasCacheOwner
+}
+
+func (s *tableCollectionSession) routeNeedsFresh(route *tableCollectionRoute) bool {
+	if s.isDependencyOnlyTopologyRoute(route) {
+		return false
+	}
+	return routeNeedsFresh(route)
+}
+
+func (s *tableCollectionSession) isDependencyOnlyTopologyRoute(route *tableCollectionRoute) bool {
+	if len(s.graph.dependents(route)) == 0 {
+		return false
+	}
+	for _, req := range route.requests {
+		if req.scope.mode != tableSymbolModePresence || len(req.config.Symbols) != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func freshTriggerForRoute(route *tableCollectionRoute) *tableCollectionRequest {

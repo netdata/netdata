@@ -4,7 +4,6 @@ package ddsnmp
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -21,8 +20,10 @@ func HandleCrossTableTagsWithoutMetrics(prof *Profile) {
 // are still walked during collection. Without this, if a table like ifXTable is used
 // only for cross-table tags (e.g., getting interface names) but has no metrics defined,
 // it won't be walked and the tags will be missing. This creates synthetic metric entries
-// for such tables using the longest common OID prefix of the referenced columns, including
-// lookup columns used by value-based joins.
+// for such tables. The walk root is normally the longest common OID prefix of the
+// referenced columns, including lookup columns used by value-based joins. A fixed
+// structural index prefix on a single readable anchor is also propagated to simple
+// same-index dependency columns so both sides retain the same narrowed row scope.
 func handleCrossTableTagsWithoutMetrics(prof *Profile) {
 	if prof.Definition == nil {
 		return
@@ -39,8 +40,8 @@ func handleCrossTableTagsWithoutMetricsForRows(metrics *[]ddprofiledefinition.Me
 	}
 
 	tagCrossTableOnlyOIDs := crossTableOnlyTagOIDs(*metrics, seenTableNames)
-	for tableName, oids := range tagCrossTableOnlyOIDs {
-		*metrics = append(*metrics, syntheticCrossTableMetric(tableName, oids))
+	for tableName, dependency := range tagCrossTableOnlyOIDs {
+		*metrics = append(*metrics, syntheticCrossTableMetric(tableName, dependency.walkOID()))
 	}
 }
 
@@ -53,48 +54,96 @@ func handleCrossTableTagsWithoutMetricsForTopologyRows(topology *[]ddprofiledefi
 	for i := range *topology {
 		topo := &(*topology)[i]
 		tagCrossTableOnlyOIDs := crossTableOnlyTagOIDs([]ddprofiledefinition.MetricsConfig{topo.MetricsConfig}, seenTableNames)
-		for tableName, oids := range tagCrossTableOnlyOIDs {
+		for tableName, dependency := range tagCrossTableOnlyOIDs {
 			*topology = append(*topology, ddprofiledefinition.TopologyConfig{
 				Kind:          topo.Kind,
-				MetricsConfig: syntheticCrossTableMetric(tableName, oids),
+				MetricsConfig: syntheticCrossTableMetric(tableName, dependency.walkOID()),
 			})
 			seenTableNames[tableName] = true
 		}
 	}
 }
 
-func crossTableOnlyTagOIDs(metrics []ddprofiledefinition.MetricsConfig, seenTableNames map[string]bool) map[string][]string {
-	tagCrossTableOnlyOIDs := make(map[string][]string)
+type crossTableDependency struct {
+	oids          []string
+	scopedWalkOID string
+	scopeConflict bool
+	seen          bool
+}
+
+func (d *crossTableDependency) add(tag ddprofiledefinition.MetricTagConfig, indexScope string) {
+	if tag.Symbol.OID != "" {
+		d.oids = append(d.oids, tag.Symbol.OID)
+	}
+	if tag.LookupSymbol.OID != "" {
+		d.oids = append(d.oids, tag.LookupSymbol.OID)
+	}
+
+	scopedWalkOID := ""
+	if indexScope != "" && tag.Symbol.OID != "" && tag.LookupSymbol.OID == "" {
+		scopedWalkOID = trimProfileOID(tag.Symbol.OID) + "." + indexScope
+	}
+	if d.seen && d.scopedWalkOID != scopedWalkOID {
+		d.scopeConflict = true
+	}
+	d.seen = true
+	d.scopedWalkOID = scopedWalkOID
+}
+
+func (d crossTableDependency) walkOID() string {
+	if !d.scopeConflict && d.scopedWalkOID != "" {
+		return d.scopedWalkOID
+	}
+	return longestCommonPrefix(d.oids)
+}
+
+func crossTableOnlyTagOIDs(metrics []ddprofiledefinition.MetricsConfig, seenTableNames map[string]bool) map[string]*crossTableDependency {
+	tagCrossTableOnlyOIDs := make(map[string]*crossTableDependency)
 	for _, m := range metrics {
 		if m.IsScalar() {
 			continue
 		}
+		indexScope := tableIndexScope(m)
 		for _, tag := range m.MetricTags {
 			if tag.Table == "" || seenTableNames[tag.Table] {
 				continue
 			}
-			if tag.Symbol.OID != "" {
-				tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], tag.Symbol.OID)
+			dependency := tagCrossTableOnlyOIDs[tag.Table]
+			if dependency == nil {
+				dependency = &crossTableDependency{}
+				tagCrossTableOnlyOIDs[tag.Table] = dependency
 			}
-			if tag.LookupSymbol.OID != "" {
-				tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], tag.LookupSymbol.OID)
-			}
+			dependency.add(tag, indexScope)
 		}
 	}
 	return tagCrossTableOnlyOIDs
 }
 
-func syntheticCrossTableMetric(tableName string, oids []string) ddprofiledefinition.MetricsConfig {
-	slices.Sort(oids)
-	oids = slices.Compact(oids)
-
+func syntheticCrossTableMetric(tableName, walkOID string) ddprofiledefinition.MetricsConfig {
 	return ddprofiledefinition.MetricsConfig{
 		MIB: fmt.Sprintf("synthetic-%s-MIB", tableName),
 		Table: ddprofiledefinition.SymbolConfig{
-			OID:  longestCommonPrefix(oids),
+			OID:  walkOID,
 			Name: tableName,
 		},
 	}
+}
+
+func tableIndexScope(metric ddprofiledefinition.MetricsConfig) string {
+	if len(metric.Symbols) != 1 {
+		return ""
+	}
+	tableOID := trimProfileOID(metric.Table.OID)
+	columnOID := trimProfileOID(metric.Symbols[0].OID)
+	scope, ok := strings.CutPrefix(tableOID, columnOID+".")
+	if !ok {
+		return ""
+	}
+	return scope
+}
+
+func trimProfileOID(oid string) string {
+	return strings.Trim(oid, ".")
 }
 
 func longestCommonPrefix(oids []string) string {

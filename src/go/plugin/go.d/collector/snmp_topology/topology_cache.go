@@ -21,7 +21,7 @@ type topologyBuilder struct {
 
 	agentID     string
 	localDevice topologymodel.Device
-	// localManagementAddressKeys deduplicates high-cardinality IP-MIB rows during collection.
+	// localManagementAddressKeys deduplicates local management observations while the builder is mutable.
 	// It is build-only state and is released when the builder is finalized.
 	localManagementAddressKeys map[managementAddressKey]struct{}
 	// targetManagementIPs is private pre-finalization selection evidence.
@@ -33,6 +33,8 @@ type topologyBuilder struct {
 
 	ifNamesByIndex      map[string]string
 	ifStatusByIndex     map[string]ifStatus
+	// ipAddressesByIP is the build-only source of truth for legacy/modern reconciliation.
+	ipAddressesByIP     map[string]ipAddressCandidates
 	ifIndexByIP         map[string]string
 	ifNetmaskByIP       map[string]string
 	l3InterfacesByIP    map[string]topologymodel.L3Interface

@@ -275,8 +275,9 @@ func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfaceP
 	}
 
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIPAddr:  "10.20.4.2",
-		tagTopoIfIndex: "1",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIPAddr:   "10.20.4.2",
+		tagTopoIfIndex:  "1",
 	})
 	cache.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "1",
@@ -293,25 +294,26 @@ func TestTopologyCache_UpdateIfIndexByIP_PreservesInventoryAndFiltersManagementC
 	cache := newTopologyBuilder()
 
 	rows := []map[string]string{
-		{tagTopoIfIndex: "1", tagTopoIPAddr: "10.20.4.1", tagTopoIPMask: "255.255.255.0"},
-		{tagTopoIfIndex: "2", tagTopoIPAddr: "2001:db8::1"},
-		{tagTopoIfIndex: "3", tagTopoIPAddr: "127.0.0.1", tagTopoIPMask: "255.0.0.0"},
-		{tagTopoIfIndex: "4", tagTopoIPAddr: "169.254.1.1", tagTopoIPMask: "255.255.0.0"},
-		{tagTopoIfIndex: "5", tagTopoIPAddr: "0.0.0.0", tagTopoIPMask: "0.0.0.0"},
-		{tagTopoIfIndex: "6", tagTopoIPAddr: "224.0.0.1", tagTopoIPMask: "240.0.0.0"},
-		{tagTopoIfIndex: "7", tagTopoIPAddr: "255.255.255.255", tagTopoIPMask: "255.255.255.255"},
-		{tagTopoIfIndex: "8", tagTopoIPAddr: "192.0.2.0", tagTopoIPMask: "255.255.255.0"},
-		{tagTopoIfIndex: "9", tagTopoIPAddr: "192.0.2.255", tagTopoIPMask: "255.255.255.0"},
-		{tagTopoIfIndex: "10", tagTopoIPAddr: "192.0.2.10", tagTopoIPMask: "255.255.255.254"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "1", tagTopoIPAddr: "10.20.4.1", tagTopoIPMask: "255.255.255.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "2", tagTopoIPAddr: "2001:db8::1"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "3", tagTopoIPAddr: "127.0.0.1", tagTopoIPMask: "255.0.0.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "4", tagTopoIPAddr: "169.254.1.1", tagTopoIPMask: "255.255.0.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "5", tagTopoIPAddr: "0.0.0.0", tagTopoIPMask: "0.0.0.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "6", tagTopoIPAddr: "224.0.0.1", tagTopoIPMask: "240.0.0.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "7", tagTopoIPAddr: "255.255.255.255", tagTopoIPMask: "255.255.255.255"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "8", tagTopoIPAddr: "192.0.2.0", tagTopoIPMask: "255.255.255.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "9", tagTopoIPAddr: "192.0.2.255", tagTopoIPMask: "255.255.255.0"},
+		{tagTopoIPSource: topoIPSourceLegacy, tagTopoIfIndex: "10", tagTopoIPAddr: "192.0.2.10", tagTopoIPMask: "255.255.255.254"},
 	}
 	for _, row := range rows {
 		cache.updateIfIndexByIP(row)
 	}
 	// Duplicate row should not duplicate management address entries.
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "1",
-		tagTopoIPAddr:  "10.20.4.1",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "1",
+		tagTopoIPAddr:   "10.20.4.1",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 
 	require.Equal(t, "1", cache.ifIndexByIP["10.20.4.1"])
@@ -335,6 +337,7 @@ func TestTopologyCache_UpdateIfIndexByIP_PreservesInventoryAndFiltersManagementC
 		}, cache.l3InterfacesByIP[row[tagTopoIPAddr]])
 	}
 
+	cache.finalize()
 	addrs := cache.localDevice.ManagementAddresses
 	require.Len(t, addrs, 3)
 	require.Contains(t, addrs, topologymodel.ManagementAddress{
@@ -374,14 +377,16 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 			}
 			addIPMIB := func() {
 				cache.updateIfIndexByIP(map[string]string{
-					tagTopoIfIndex: "1",
-					tagTopoIPAddr:  "192.0.2.0",
-					tagTopoIPMask:  "255.255.255.0",
+					tagTopoIPSource: topoIPSourceLegacy,
+					tagTopoIfIndex:  "1",
+					tagTopoIPAddr:   "192.0.2.0",
+					tagTopoIPMask:   "255.255.255.0",
 				})
 				cache.updateIfIndexByIP(map[string]string{
-					tagTopoIfIndex: "2",
-					tagTopoIPAddr:  "192.0.2.10",
-					tagTopoIPMask:  "255.255.255.0",
+					tagTopoIPSource: topoIPSourceLegacy,
+					tagTopoIfIndex:  "2",
+					tagTopoIPAddr:   "192.0.2.10",
+					tagTopoIPMask:   "255.255.255.0",
 				})
 			}
 
@@ -417,9 +422,10 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testi
 		ChassisIDType: "macAddress",
 	}
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "1",
-		tagTopoIPAddr:  "192.0.2.10",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "1",
+		tagTopoIPAddr:   "192.0.2.10",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cache.updateLldpLocManAddr(map[string]string{
 		tagLldpLocMgmtAddrSubtype: "16",
@@ -456,9 +462,10 @@ func TestTopologyCacheFinalizePreparesStableObservationSnapshot(t *testing.T) {
 		tagTopoIfOper:  "up",
 	})
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "192.0.2.1",
-		tagTopoIPMask:  "255.255.255.255",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "192.0.2.1",
+		tagTopoIPMask:   "255.255.255.255",
 	})
 	cache.finalize()
 

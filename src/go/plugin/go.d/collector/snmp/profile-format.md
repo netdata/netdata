@@ -433,6 +433,16 @@ topology:
   symbols and for `metric_tags`.
 - `metric_tags` inside a topology row work like table metric tags and identify
   or enrich the topology row.
+- A cross-table tag whose target table has no row producer creates an internal
+  dependency-only collection route. For topology rows, that route is walked
+  only after its owning row produces at least one anchor PDU. A target table
+  with its own symbol-bearing row remains an independent eager producer.
+- When a topology row has exactly one readable anchor symbol and its `table.OID`
+  is the symbol column plus a fixed structural index prefix, simple same-index
+  cross-table dependencies inherit that prefix. For example, an anchor root
+  `<column>.1` constrains dependency column walks to `<dependency-column>.1`.
+  Dependencies using `lookup_symbol`, multiple anchors, or conflicting scopes
+  use their ordinary common-prefix route instead.
 - `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
   topology kind and should not be declared under `topology:`.
 
@@ -1418,6 +1428,10 @@ Examples:
   `IP-MIB::ipNetToPhysicalNetAddress` are `not-accessible` index components.
   Derive them from the row index. The physical MAC value,
   `ipNetToPhysicalPhysAddress`, is readable and can stay as a column symbol.
+- `IP-MIB::ipAddressAddr` is a `not-accessible` `ipAddressTable` index
+  component. Derive its address from the row index. Use a readable column such
+  as `ipAddressIfIndex` as the row anchor; `ipAddressType`, `ipAddressPrefix`,
+  `ipAddressStatus`, and `ipAddressRowStatus` are readable tag sources.
 - `LLDP-MIB::lldpLocManAddrSubtype` and `LLDP-MIB::lldpLocManAddr` are
   `not-accessible` index components. Anchor the row on a readable column such as
   `lldpLocManAddrLen`, then derive subtype and address from the row index. Use

@@ -53,6 +53,7 @@ func (c *topologyBuilder) finalize() topologyBuilderFinalizeStats {
 		return topologyBuilderFinalizeStats{}
 	}
 
+	c.finalizeIPAddresses()
 	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
 	c.localManagementAddressKeys = nil
 	c.rebuildTrapSourceMatchMethods()

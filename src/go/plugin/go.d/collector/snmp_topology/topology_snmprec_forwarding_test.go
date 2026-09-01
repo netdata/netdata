@@ -255,6 +255,7 @@ func parseSnmprecForwardingFixture(t *testing.T, path string) snmprecForwardingF
 
 		if suffix, ok := parseOIDSuffix(oid, "1.3.6.1.2.1.4.20.1.1"); ok {
 			entry := ensureTagMap(data.ipIfEntries, suffix)
+			entry[tagTopoIPSource] = topoIPSourceLegacy
 			entry[tagTopoIPAddr] = val
 			continue
 		}

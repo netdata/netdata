@@ -90,6 +90,19 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 					"unused_lldp":             "must-not-appear-unused-lldp-tag",
 				},
 			},
+			{
+				TopologyKind: ddsnmp.KindIpIfIndex,
+				Tags: map[string]string{
+					tagTopoIPSource: topoIPSourceModern,
+					tagTopoIfIndex:  "7",
+					tagTopoIPAddr:   "192.0.2.1",
+					tagTopoIPType:   "unicast",
+					tagTopoIPPrefix: "1.3.6.1.2.1.4.32.1.5.7.1.4.192.0.2.0.24",
+					tagTopoIPStatus: "preferred",
+					tagTopoIPRow:    "active",
+					"unused_ip":     "must-not-appear-unused-ip-tag",
+				},
+			},
 		},
 		BGPRows: []ddsnmp.BGPRow{{
 			OriginProfileID: "_std-bgp4-mib.yaml",
@@ -194,6 +207,7 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		"must-not-appear-unused-profile-tag",
 		"must-not-appear-profile-tag-vendor",
 		"must-not-appear-unused-metric-tag",
+		"must-not-appear-unused-ip-tag",
 		"must-not-appear-unused-bgp-tag",
 		"must-not-appear-non-vlan-context-row",
 		"must-not-appear-invalid-octet-tag",
@@ -203,6 +217,12 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[2].tags, tagLldpRemMgmtAddrLen)
+	for _, tag := range []string{
+		tagTopoIPSource, tagTopoIfIndex, tagTopoIPAddr, tagTopoIPType,
+		tagTopoIPPrefix, tagTopoIPStatus, tagTopoIPRow,
+	} {
+		require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[3].tags, tag)
+	}
 	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows[0].tags, "neighbor")
 	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.metadata, tagOSPFRouterID)
 	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.tags, tagBridgeBaseAddress)

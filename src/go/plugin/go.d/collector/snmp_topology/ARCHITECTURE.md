@@ -232,10 +232,21 @@ their configured root as values.
 The standard capabilities have separate owners:
 
 - `generic-device.yaml` and `generic-ups.yaml` extend
-  `_std-topology-ip-mib.yaml`. This baseline walks the legacy IPv4
-  `ipAddrTable` and provides address, interface-index, and netmask facts for L3
-  subnet enrichment. The address comes from the indexed row suffix; the `.2`
-  ifIndex and `.3` netmask columns are the required readable PDUs.
+  `_std-topology-ip-mib.yaml`. This baseline keeps the legacy `ipAddrTable` and
+  also collects RFC 4293 `ipAddressTable` IPv4 rows. The modern anchor is the
+  readable `ipAddressIfIndex` column constrained by the IPv4 address-type index;
+  its type, prefix pointer, address status, and row status columns are walked
+  only when the anchor returns rows. Unsupported and IPv6-only agents therefore
+  pay for one empty modern anchor walk, while supported IPv4 agents return at
+  most five required varbinds per address. The address itself is derived from
+  the not-accessible row index.
+- Both IP-MIB sources feed one canonical per-IP record. Valid legacy facts take
+  precedence; a valid modern prefix may fill a missing legacy mask only when
+  the interface index agrees. Modern rows must be active unicast addresses in
+  preferred or deprecated state. A valid `ipAddressPrefix` RowPointer is decoded
+  only when it targets the exact `ipAddressPrefixOrigin` row for the same
+  interface and containing IPv4 prefix; a missing, `0.0`, or malformed pointer
+  retains address/interface inventory without a netmask.
 - `_std-topology-interface-mib.yaml` owns interface identity and state.
 - `_std-topology-bridge-base-mib.yaml` owns bridge identity and bridge-port to
   ifIndex mapping.

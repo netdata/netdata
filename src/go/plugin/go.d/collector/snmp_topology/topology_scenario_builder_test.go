@@ -312,9 +312,10 @@ func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice)
 		)
 		if port.ip != "" && port.netmask != "" {
 			metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindIpIfIndex, map[string]string{
-				tagTopoIfIndex: strconv.Itoa(port.ifIndex),
-				tagTopoIPAddr:  port.ip,
-				tagTopoIPMask:  port.netmask,
+				tagTopoIPSource: topoIPSourceLegacy,
+				tagTopoIfIndex:  strconv.Itoa(port.ifIndex),
+				tagTopoIPAddr:   port.ip,
+				tagTopoIPMask:   port.netmask,
 			}))
 		}
 	}

@@ -52,6 +52,11 @@ Use this skill before editing files under:
    row-index selector: `index`, `index_from_end`, or `index_transform`. Use
    `index_from_end` for trailing AFI/SAFI-like components after variable-length
    indexes such as `InetAddress`.
+15. To constrain a topology table to a fixed structural index prefix, use one
+    readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
+    Simple same-index cross-table dependencies inherit that prefix and are
+    anchor-gated. Do not rely on propagation for multiple anchors,
+    `lookup_symbol`, or conflicting dependency scopes.
 
 ## Device-Scoped MIB Deviations
 
@@ -100,6 +105,25 @@ IP-MIB `ipNetToPhysicalTable` address:
 ```
 
 The `start: 3` skips `ifIndex`, address type, and the InetAddress length byte.
+
+IP-MIB `ipAddressTable` IPv4 address:
+
+```yaml
+table:
+  OID: 1.3.6.1.2.1.4.34.1.3.1
+symbols:
+  - OID: 1.3.6.1.2.1.4.34.1.3
+metric_tags:
+  - tag: topo_ip_addr
+    symbol:
+      format: ip_address
+    index_transform:
+      - start: 2
+```
+
+The table root anchors on readable `ipAddressIfIndex` and appends index prefix
+`1` for IPv4. The address is the not-accessible `ipAddressAddr` index component;
+`start: 2` skips address type and length.
 
 LLDP-MIB local management address:
 
