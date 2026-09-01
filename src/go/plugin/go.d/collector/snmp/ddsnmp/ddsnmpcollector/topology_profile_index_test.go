@@ -109,7 +109,7 @@ func TestTopologyProfile_IPAddressUsesTableIndex(t *testing.T) {
 		createIntegerPDU("1.3.6.1.2.1.4.20.1.2.192.0.2.17", 7),
 		createPDU("1.3.6.1.2.1.4.20.1.3.192.0.2.17", gosnmp.IPAddress, "255.255.255.248"),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.3.1", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.34.1.3.1.4", nil)
 
 	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-ip-mib")
 

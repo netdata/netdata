@@ -112,20 +112,21 @@ IP-MIB `ipAddressTable` IPv4 address:
 
 ```yaml
 table:
-  OID: 1.3.6.1.2.1.4.34.1.3.1
+  OID: 1.3.6.1.2.1.4.34.1.3.1.4
 symbols:
   - OID: 1.3.6.1.2.1.4.34.1.3
 metric_tags:
   - tag: topo_ip_addr
     symbol:
-      format: ip_address
     index_transform:
       - start: 2
 ```
 
 The table root anchors on readable `ipAddressIfIndex` and appends index prefix
-`1` for IPv4. The address is the not-accessible `ipAddressAddr` index component;
-`start: 2` skips address type and length.
+`1.4` for IPv4 type and its required four-octet length. The address is the
+not-accessible `ipAddressAddr` index component; `start: 2` skips address type
+and length. Keep the transformed octets raw so malformed trailing components
+cannot be normalized as another address family.
 
 LLDP-MIB local management address:
 

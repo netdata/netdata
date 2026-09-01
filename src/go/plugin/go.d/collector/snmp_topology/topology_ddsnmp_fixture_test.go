@@ -93,8 +93,9 @@ func requireModernIPAddressWalkEnvelope(t testing.TB, walkRoots []string) {
 	require.Len(t, modernRoots, 5, "modern IPv4 inventory must stay within the five-field wire envelope")
 	for _, root := range modernRoots {
 		parts := strings.Split(strings.TrimPrefix(root, entryOID+"."), ".")
-		require.Len(t, parts, 2, "modern route must be a narrow column root with a structural address-family suffix: %s", root)
+		require.Len(t, parts, 3, "modern route must be a narrow column root with structural family and length suffixes: %s", root)
 		require.Equal(t, "1", parts[1], "modern route must be constrained to the IPv4 InetAddressType index: %s", root)
+		require.Equal(t, "4", parts[2], "modern route must require the four-octet IPv4 InetAddress length: %s", root)
 	}
 }
 
@@ -132,6 +133,35 @@ func TestTopologyProductionPath_CatalogFixtureKeepsModernInventoryWithoutPrefix(
 		Address: ip, AddressType: "ipv4", Source: "ip_mib",
 	})
 	require.Equal(t, "management_address", cache.trapMatchMethodByIP[ip])
+}
+
+func TestTopologyProductionPath_CatalogFixtureRejectsMalformedModernIPv4Indexes(t *testing.T) {
+	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "iosxe_c9800.snmprec"))
+	addMalformedModernIPv4FixtureRow(fixture, "1.16.0.0.0.0.0.0.0.0.0.0.255.255.203.0.113.241", 7)
+	addMalformedModernIPv4FixtureRow(fixture, "1.4.0.0.0.0.0.0.0.0.0.0.255.255.203.0.113.242", 8)
+
+	dev, profileMetrics := collectCatalogFixtureTopology(t, fixture)
+	cache := newTestTopologyCache(dev)
+	cache.ingestTopologyProfileMetrics(profileMetrics)
+	cache.finalize()
+
+	require.Empty(t, cache.ipIfIndex("203.0.113.241"), "IPv4 type with a 16-octet declared address must be rejected")
+	require.Empty(t, cache.ipIfIndex("203.0.113.242"), "IPv4 length with trailing mapped payload must be rejected")
+}
+
+func addMalformedModernIPv4FixtureRow(fixture *topologySNMPRecHandler, index string, ifIndex int) {
+	const entryOID = "1.3.6.1.2.1.4.34.1"
+	fixture.addEntries(
+		gosnmp.SnmpPDU{Name: entryOID + ".3." + index, Type: gosnmp.Integer, Value: ifIndex},
+		gosnmp.SnmpPDU{Name: entryOID + ".4." + index, Type: gosnmp.Integer, Value: 1},
+		gosnmp.SnmpPDU{
+			Name:  entryOID + ".5." + index,
+			Type:  gosnmp.ObjectIdentifier,
+			Value: fmt.Sprintf("1.3.6.1.2.1.4.32.1.5.%d.1.4.203.0.113.0.24", ifIndex),
+		},
+		gosnmp.SnmpPDU{Name: entryOID + ".7." + index, Type: gosnmp.Integer, Value: 1},
+		gosnmp.SnmpPDU{Name: entryOID + ".10." + index, Type: gosnmp.Integer, Value: 1},
+	)
 }
 
 func collectCatalogFixtureTopology(

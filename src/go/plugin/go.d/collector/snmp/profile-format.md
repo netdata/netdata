@@ -483,9 +483,10 @@ Stock profiles compose topology capabilities independently:
   netmask facts used for L3 subnet topology. `generic-device.yaml` and
   `generic-ups.yaml` extend it as their baseline. The legacy `ipAddrTable`
   address is derived from the row index. RFC 4293 `ipAddressTable` IPv4 rows
-  anchor on the readable `ipAddressIfIndex` column and derive the address from
-  the variable-length index. Their type, prefix pointer, address status, and
-  row status dependency columns are IPv4-scoped and remain dormant when the
+  anchor on the readable `ipAddressIfIndex` column with the exact IPv4
+  type-and-four-octet-length index prefix, then derive the raw four address
+  octets from the index. Their type, prefix pointer, address status, and row
+  status dependency columns share that scope and remain dormant when the
   anchor is empty. Both sources resolve into one legacy-preferred per-IP fact;
   a valid modern prefix fills only a missing legacy mask on the same ifIndex.
 - `_std-topology-interface-mib.yaml` provides interface identity and status.
@@ -1435,9 +1436,11 @@ Examples:
   Derive them from the row index. The physical MAC value,
   `ipNetToPhysicalPhysAddress`, is readable and can stay as a column symbol.
 - `IP-MIB::ipAddressAddr` is a `not-accessible` `ipAddressTable` index
-  component. Derive its address from the row index. Use a readable column such
-  as `ipAddressIfIndex` as the row anchor; `ipAddressType`, `ipAddressPrefix`,
-  `ipAddressStatus`, and `ipAddressRowStatus` are readable tag sources.
+  component. For IPv4, constrain the readable `ipAddressIfIndex` anchor to the
+  exact type-and-length prefix `1.4` and keep the four transformed address
+  octets raw so malformed widths or trailing components fail IPv4 parsing.
+  `ipAddressType`, `ipAddressPrefix`, `ipAddressStatus`, and
+  `ipAddressRowStatus` are readable tag sources.
 - `LLDP-MIB::lldpLocManAddrSubtype` and `LLDP-MIB::lldpLocManAddr` are
   `not-accessible` index components. Anchor the row on a readable column such as
   `lldpLocManAddrLen`, then derive subtype and address from the row index. Use

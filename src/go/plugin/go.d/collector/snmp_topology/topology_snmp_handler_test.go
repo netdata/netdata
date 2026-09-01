@@ -28,6 +28,13 @@ func newTopologySNMPHandler(entries []gosnmp.SnmpPDU) *topologySNMPRecHandler {
 	return handler
 }
 
+func (h *topologySNMPRecHandler) addEntries(entries ...gosnmp.SnmpPDU) {
+	for _, pdu := range entries {
+		h.entries = append(h.entries, pdu)
+		h.byOID[strings.TrimPrefix(pdu.Name, ".")] = pdu
+	}
+}
+
 func (h *topologySNMPRecHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	variables := make([]gosnmp.SnmpPDU, 0, len(oids))
 	for _, oid := range oids {
