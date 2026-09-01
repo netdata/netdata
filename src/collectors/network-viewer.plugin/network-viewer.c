@@ -66,6 +66,7 @@ static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&nv_proto_mutex);
 #endif
 }
+
 static void __attribute__((destructor)) destroy_mutex(void) {
 #if defined(OS_FREEBSD) || defined(OS_MACOS)
     netdata_mutex_destroy(&nv_proto_mutex);
@@ -2218,3 +2219,4 @@ int main(int argc, char **argv) {
 
     return exit_code;
 }
+

@@ -83,17 +83,6 @@ static void initialize(void)
     dictionary_register_insert_callback(processors, dict_processor_insert_cb, NULL);
 }
 
-static unsigned int count_set_bits(KAFFINITY mask)
-{
-    unsigned int count = 0;
-    while (mask) {
-        count += (unsigned int)(mask & 1);
-        mask >>= 1;
-    }
-
-    return count;
-}
-
 static unsigned int processor_mask_span(KAFFINITY mask)
 {
     unsigned int span = 0;
@@ -148,12 +137,14 @@ static bool processor_topology_add_mask(
     return true;
 }
 
-static bool processor_topology_from_extended_api(struct processor_topology *topology)
+static bool processor_topology_from_extended_api(struct processor_topology *topology, bool *api_available)
 {
     typedef BOOL(WINAPI * get_logical_processor_information_ex_t)(
         LOGICAL_PROCESSOR_RELATIONSHIP relationship_type,
         PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX buffer,
         PDWORD returned_length);
+
+    *api_available = false;
 
     HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
     union {
@@ -163,6 +154,8 @@ static bool processor_topology_from_extended_api(struct processor_topology *topo
     get_logical_processor_information_ex_t get_logical_processor_information_ex = api.typed;
     if (!get_logical_processor_information_ex)
         return false;
+
+    *api_available = true;
 
     DWORD buffer_length = 0;
     if (get_logical_processor_information_ex(RelationAll, NULL, &buffer_length) ||
@@ -264,8 +257,12 @@ static bool processor_topology_from_legacy_api(struct processor_topology *topolo
 static bool processor_topology_refresh(void)
 {
     struct processor_topology topology = {0};
-    if (!processor_topology_from_extended_api(&topology) && !processor_topology_from_legacy_api(&topology))
-        return false;
+    bool extended_api_available = false;
+    if (!processor_topology_from_extended_api(&topology, &extended_api_available)) {
+        // The legacy API can fabricate duplicate IDs when the extended API is available.
+        if (extended_api_available || !processor_topology_from_legacy_api(&topology))
+            return false;
+    }
 
     freez(processor_topology.entries);
     processor_topology = topology;
@@ -321,10 +318,7 @@ static bool processor_information_instance_to_cpu_id(const char *instance_name, 
     if (end == processor_number || *end != '\0')
         return false;
 
-    if (processor_topology_find(numa_node, processor, cpu_id))
-        return true;
-
-    return processor_topology_refresh() && processor_topology_find(numa_node, processor, cpu_id);
+    return processor_topology_find(numa_node, processor, cpu_id);
 }
 
 static bool
@@ -337,6 +331,8 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
     static const RRDVAR_ACQUIRED *cpus_var = NULL;
     int cores_found = 0;
     uint64_t totalIPC = 0;
+    bool topology_refresh_attempted = false;
+    bool topology_mapping_failed = false;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -355,8 +351,17 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
             is_total = true;
             cpu = -1;
         } else {
-            if (processor_information && !processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu))
-                continue;
+            if (processor_information && !processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu)) {
+                if (!topology_refresh_attempted) {
+                    topology_refresh_attempted = true;
+                    processor_topology_refresh();
+                }
+
+                if (!processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu)) {
+                    topology_mapping_failed = true;
+                    continue;
+                }
+            }
 
             p = dictionary_set(processors, windows_shared_buffer, NULL, sizeof(*p));
             is_total = false;
@@ -451,6 +456,14 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
         //        rrdset_done(p->st2);
     }
 
+    if (topology_mapping_failed) {
+        static bool logged = false;
+        if (!logged) {
+            netdata_log_error("Processor Information topology mapping failed; skipping unmappable processor instances");
+            logged = true;
+        }
+    }
+
     if (cpus_var)
         rrdvar_host_variable_set(localhost, cpus_var, cores_found);
 
@@ -481,10 +494,25 @@ int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused)
         return -1;
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
+    if (!pDataBlock || do_processors(pDataBlock, object_name, processor_information, update_every))
         return 0;
 
-    do_processors(pDataBlock, object_name, processor_information, update_every);
+    if (!processor_information)
+        return 0;
+
+    static bool fallback_logged = false;
+    if (!fallback_logged) {
+        netdata_log_error("Processor Information is unavailable in performance data; falling back to Processor");
+        fallback_logged = true;
+    }
+
+    id = RegistryFindIDByName("Processor");
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        return 0;
+
+    pDataBlock = perflibGetPerformanceData(id);
+    if (pDataBlock)
+        do_processors(pDataBlock, "Processor", false, update_every);
 
     return 0;
 }
