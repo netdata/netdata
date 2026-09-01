@@ -112,6 +112,64 @@ func TestCollectRevalidatesReplicationPolicyBeforeMutation(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestCollectValidatesExactGeneratedKeyBeforeMutation(t *testing.T) {
+	source, destination, _ := newAWSClients()
+	engine := newAWSEngine(t, source, destination, nil)
+	keyTime := time.Unix(100, 0)
+	engine.generator.Now = func() time.Time { return keyTime }
+	source.BucketReplicationFunc = replicationRules(
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+			DeleteMarkerReplication: true, Priority: 10,
+		},
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "unowned-destination", Prefix: engine.keyPrefix + "1",
+			DeleteMarkerReplication: true, Priority: 20,
+		},
+	)
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Nil(t, result.Probe)
+	assert.Zero(t, source.Count("put"))
+	source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+		Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+		DeleteMarkerReplication: true,
+	})
+	engine.Cleanup(context.Background())
+}
+
+func TestCollectValidatesExactOwnedKeysBeforeCleanup(t *testing.T) {
+	source, destination, model := newAWSClients()
+	model.failPutAfterMutation = true
+	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
+		opts.QueueCapacity = 1
+	})
+
+	engine.Collect(context.Background())
+	key, _ := model.onlySourceObject(t)
+	source.BucketReplicationFunc = replicationRules(
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+			DeleteMarkerReplication: true, Priority: 10,
+		},
+		s3client.ReplicationRule{
+			Enabled: true, DestinationBucket: "unowned-destination", Prefix: key,
+			DeleteMarkerReplication: true, Priority: 20,
+		},
+	)
+	listsBefore := source.Count("list_versions")
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Equal(t, listsBefore, source.Count("list_versions"))
+	source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
+		Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+		DeleteMarkerReplication: true,
+	})
+	engine.Cleanup(context.Background())
+}
+
 func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
 	tests := map[string]func(*testutil.S3, *testutil.S3){
 		"source versioning disabled": func(source, _ *testutil.S3) {

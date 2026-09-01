@@ -323,7 +323,9 @@ func (e *Engine) Cleanup(ctx context.Context) {
 	}
 	e.closed = true
 	if e.locked {
-		_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
+		if e.validateProvider(ctx, nil) == nil {
+			_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
+		}
 		_ = e.persist()
 		e.journal.Unlock()
 		e.locked = false

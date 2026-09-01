@@ -5,7 +5,9 @@ package s3check
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -272,29 +274,76 @@ func modeUsesDestination(mode string) bool {
 }
 
 func sameS3Location(left, right S3Config) bool {
-	return canonicalEndpoint(left.Endpoint) == canonicalEndpoint(right.Endpoint) && left.Bucket == right.Bucket
+	return s3LocationKey(left, true) == s3LocationKey(right, true)
 }
 
-func canonicalEndpoint(value string) string {
-	if value == "" {
+func s3LocationKey(config S3Config, resolveZone bool) string {
+	parsed, err := url.Parse(config.Endpoint)
+	if err != nil {
+		return config.Endpoint + "/" + config.Bucket
+	}
+	host := canonicalHostname(parsed.Hostname(), resolveZone)
+	bucketPrefix := strings.ToLower(config.Bucket) + "."
+	if !boolValue(config.PathStyle) && strings.HasPrefix(host, bucketPrefix) {
+		host = strings.TrimPrefix(host, bucketPrefix)
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	port := canonicalPort(scheme, parsed.Port())
+	if port == "" {
+		if scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+	return net.JoinHostPort(host, port) + "/" + config.Bucket
+}
+
+func canonicalPort(scheme, port string) string {
+	if port == "" {
 		return ""
 	}
-	parsed, err := url.Parse(value)
+	number, err := strconv.ParseUint(port, 10, 16)
 	if err != nil {
-		return value
+		return port
 	}
-	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host)
+	if (scheme == "http" && number == 80) || (scheme == "https" && number == 443) {
+		return ""
+	}
+	return strconv.FormatUint(number, 10)
+}
+
+func canonicalHostname(host string, resolveZone bool) string {
+	host = strings.TrimSuffix(host, ".")
+	host = strings.Replace(host, "%25", "%", 1)
+	address, zone, hasZone := strings.Cut(host, "%")
+	if hasZone && zone != "" {
+		if ip := net.ParseIP(strings.ToLower(address)); ip != nil && ip.To4() == nil {
+			if resolveZone {
+				if iface, err := net.InterfaceByName(zone); err == nil {
+					zone = strconv.FormatUint(uint64(iface.Index), 10)
+				}
+			}
+			if number, err := strconv.ParseUint(zone, 10, 32); err == nil {
+				zone = strconv.FormatUint(number, 10)
+			}
+			return ip.String() + "%" + zone
+		}
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.String()
+	}
+	return strings.ToLower(host)
 }
 
 func (c Config) ownershipFingerprint() string {
 	parts := []string{
 		c.Mode,
-		canonicalEndpoint(c.Source.Endpoint),
-		c.Source.Bucket,
+		s3LocationKey(c.Source, false),
 		c.Prefix,
 	}
 	if c.Destination != nil {
-		parts = append(parts, canonicalEndpoint(c.Destination.Endpoint), c.Destination.Bucket)
+		parts = append(parts, s3LocationKey(*c.Destination, false))
 	}
 	return journal.Fingerprint(parts...)
 }

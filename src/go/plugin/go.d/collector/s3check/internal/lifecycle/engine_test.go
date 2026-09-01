@@ -63,6 +63,37 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client := newLifecycleClient()
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		clientModel(client).put(bucket, key, payload)
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	engine, err := New(Options{
+		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second, UpdateEvery: time.Minute, QueueCapacity: 1, CleanupBatch: 1,
+	})
+	require.NoError(t, err)
+
+	result := engine.Collect(context.Background())
+	require.Equal(t, 1, result.Cleanup.Pending)
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+	}
+	deletesBefore := client.Count("delete")
+
+	engine.Cleanup(context.Background())
+	assert.Equal(t, deletesBefore, client.Count("delete"))
+	var persisted state
+	found, err := j.Load(&persisted)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Len(t, persisted.Entries, 1)
+}
+
 func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client := newLifecycleClient()

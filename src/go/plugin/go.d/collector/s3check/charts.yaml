@@ -38,7 +38,7 @@ groups:
           - selector: 'probe_status{probe_status="failed"}'
             name: failed
       - id: payload_mismatch
-        title: S3 replicated payload mismatch
+        title: S3 payload verification mismatch
         context: payload_mismatch
         units: status
         type: line

@@ -5,6 +5,7 @@ package s3check
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -85,6 +86,61 @@ func TestConfigValidationModeBoundaries(t *testing.T) {
 		cfg.WriteObjective = confopt.LongDuration(time.Second)
 		assert.ErrorContains(t, cfg.validate(), "write_objective")
 	})
+}
+
+func TestConfigRejectsEquivalentS3Locations(t *testing.T) {
+	tests := map[string]struct {
+		sourceEndpoint       string
+		destinationEndpoint  string
+		sourcePathStyle      bool
+		destinationPathStyle bool
+	}{
+		"default port": {
+			sourceEndpoint: "http://127.0.0.1", destinationEndpoint: "http://127.0.0.1:80",
+			sourcePathStyle: true, destinationPathStyle: true,
+		},
+		"hostname case and root dot": {
+			sourceEndpoint: "https://RGW.EXAMPLE.", destinationEndpoint: "https://rgw.example:443",
+			sourcePathStyle: true, destinationPathStyle: true,
+		},
+		"equivalent IPv6 literal": {
+			sourceEndpoint: "http://[::1]", destinationEndpoint: "http://[0:0:0:0:0:0:0:1]:80",
+			sourcePathStyle: true, destinationPathStyle: true,
+		},
+		"virtual host and path style": {
+			sourceEndpoint: "https://shared-bucket.rgw.example", destinationEndpoint: "https://rgw.example:443",
+			sourcePathStyle: false, destinationPathStyle: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig(contract.ModeCephMultisite)
+			cfg.Source.Endpoint = tc.sourceEndpoint
+			cfg.Source.Bucket = "shared-bucket"
+			cfg.Source.PathStyle = new(tc.sourcePathStyle)
+			cfg.Destination.Endpoint = tc.destinationEndpoint
+			cfg.Destination.Bucket = "shared-bucket"
+			cfg.Destination.PathStyle = new(tc.destinationPathStyle)
+
+			assert.ErrorContains(t, cfg.validate(), "source and destination must identify different S3 locations")
+		})
+	}
+}
+
+func TestCephGuideUsesCurrentS3CheckContract(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "..", "..", "..", "docs", "guides", "ceph", "README.md")
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	guide := string(raw)
+
+	assert.Contains(t, guide, "mode: ceph_multisite")
+	assert.Contains(t, guide, "write_objective:")
+	assert.Contains(t, guide, "delete_timeout:")
+	assert.NotContains(t, guide, "mode: multisite")
+	assert.NotContains(t, guide, "rpo_threshold_ms")
+	assert.NotContains(t, guide, "replication_timeout_ms")
+	assert.NotContains(t, guide, "verify_delete")
 }
 
 func TestOwnershipFingerprintContract(t *testing.T) {

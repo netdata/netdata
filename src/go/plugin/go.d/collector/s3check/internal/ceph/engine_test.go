@@ -72,6 +72,37 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
+	j := newCephJournal(t, t.TempDir())
+	source, destination, _ := newCephClients()
+	engine, err := New(Options{
+		Source: source, Destination: destination,
+		SourceBucket: "source", DestinationBucket: "destination",
+		Journal: j, Generator: newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
+		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
+		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
+	})
+	require.NoError(t, err)
+
+	result := engine.Collect(context.Background())
+	require.Equal(t, 1, result.Cleanup.Pending)
+	source.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+	}
+	sourceDeletesBefore := source.Count("delete")
+	destinationDeletesBefore := destination.Count("delete")
+
+	engine.Cleanup(context.Background())
+	assert.Equal(t, sourceDeletesBefore, source.Count("delete"))
+	assert.Equal(t, destinationDeletesBefore, destination.Count("delete"))
+	var persisted state
+	found, err := j.Load(&persisted)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Len(t, persisted.Entries, 1)
+}
+
 func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing.T) {
 	j := newCephJournal(t, t.TempDir())
 	source, destination, model := newCephClients()

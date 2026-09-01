@@ -207,15 +207,20 @@ func New(opts Options) (*Engine, error) {
 }
 
 func (e *Engine) Check(ctx context.Context) error {
-	return e.validateProvider(ctx, nil)
+	_, err := e.validateProvider(ctx, nil, e.keyPrefix)
+	return err
 }
 
-func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.OperationResult) error {
+func (e *Engine) validateProvider(
+	ctx context.Context,
+	operations *[]contract.OperationResult,
+	keys ...string,
+) ([]s3client.ReplicationRule, error) {
 	if err := e.checkVersioning(ctx, operations, e.source, e.sourceBucket, contract.EndpointSource); err != nil {
-		return err
+		return nil, err
 	}
 	if err := e.checkVersioning(ctx, operations, e.destination, e.destinationBucket, contract.EndpointDestination); err != nil {
-		return err
+		return nil, err
 	}
 	var rules []s3client.ReplicationRule
 	_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationSetup, func(callCtx context.Context) error {
@@ -224,11 +229,20 @@ func (e *Engine) validateProvider(ctx context.Context, operations *[]contract.Op
 		return callErr
 	})
 	if err != nil {
-		return fmt.Errorf("check AWS source replication policy: %w", err)
+		return nil, fmt.Errorf("check AWS source replication policy: %w", err)
 	}
+	for _, key := range keys {
+		if err := e.validateReplicationRules(rules, key); err != nil {
+			return nil, err
+		}
+	}
+	return rules, nil
+}
+
+func (e *Engine) validateReplicationRules(rules []s3client.ReplicationRule, key string) error {
 	var effective *s3client.ReplicationRule
 	for _, rule := range rules {
-		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(e.keyPrefix, rule.Prefix) {
+		if !rule.Enabled || rule.TagFiltered || !strings.HasPrefix(key, rule.Prefix) {
 			continue
 		}
 		if rule.DestinationBucket != e.destinationBucket {
@@ -300,7 +314,15 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
 		result.LastTerminal = cloneProbeResult(e.state.LastTerminal)
 	}()
-	if err := e.validateProvider(ctx, &result.Operations); err != nil {
+	keys := make([]string, 0, len(e.state.Entries))
+	for _, owned := range e.state.Entries {
+		keys = append(keys, owned.Key)
+	}
+	if len(keys) == 0 {
+		keys = append(keys, e.keyPrefix)
+	}
+	rules, err := e.validateProvider(ctx, &result.Operations, keys...)
+	if err != nil {
 		result.Err = fmt.Errorf("validate AWS provider safety: %w", err)
 		return result
 	}
@@ -309,7 +331,10 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	if active := e.active(); active != nil {
 		result.Probe = e.advanceActive(ctx, active, &result.Operations)
 	} else if len(e.state.Entries) < e.queueCapacity {
-		result.Probe = e.startProbe(ctx, &result.Operations)
+		result.Probe, err = e.startProbe(ctx, &result.Operations, rules)
+		if err != nil {
+			result.Err = fmt.Errorf("validate AWS generated key policy: %w", err)
+		}
 	}
 	return result
 }

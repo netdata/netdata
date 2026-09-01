@@ -448,7 +448,7 @@ modules:
       - name: s3check_payload_mismatch
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
         metric: s3check.payload_mismatch
-        info: The destination returned different bytes for the exact key written by the source probe.
+        info: The verification read returned different bytes for the exact key written by the probe.
       - name: s3check_write_visibility_objective
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
         metric: s3check.write_visibility_objective
@@ -497,7 +497,7 @@ modules:
                 - name: waiting
                 - name: failed
             - name: s3check.payload_mismatch
-              description: S3 Replicated Payload Mismatch
+              description: S3 Payload Verification Mismatch
               unit: status
               chart_type: line
               dimensions:

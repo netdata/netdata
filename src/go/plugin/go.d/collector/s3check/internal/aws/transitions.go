@@ -15,10 +15,14 @@ import (
 func (e *Engine) startProbe(
 	ctx context.Context,
 	operations *[]contract.OperationResult,
-) *contract.ProbeResult {
+	rules []s3client.ReplicationRule,
+) (*contract.ProbeResult, error) {
 	object, err := e.generator.Next()
 	if err != nil {
-		return e.finishTerminal(failedProbe(contract.ReasonInternal))
+		return e.finishTerminal(failedProbe(contract.ReasonInternal)), nil
+	}
+	if err := e.validateReplicationRules(rules, object.Key); err != nil {
+		return nil, err
 	}
 	owned := entry{
 		Key: object.Key, Digest: object.Digest, CreatedAt: e.now().UTC(), Phase: phasePutIntent,
@@ -27,7 +31,7 @@ func (e *Engine) startProbe(
 	e.state.ActiveKey = owned.Key
 	if err := e.persist(); err != nil {
 		e.remove(owned.Key)
-		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership)), nil
 	}
 
 	var put s3client.PutResult
@@ -44,17 +48,17 @@ func (e *Engine) startProbe(
 	})
 	active := e.active()
 	if active == nil {
-		return e.finishTerminal(failedProbe(contract.ReasonInternal))
+		return e.finishTerminal(failedProbe(contract.ReasonInternal)), nil
 	}
 	if err != nil {
 		active.Phase = phaseReconcilePut
 		e.retire(active)
-		return e.finishTerminal(failedProbe(contract.ReasonRequest))
+		return e.finishTerminal(failedProbe(contract.ReasonRequest)), nil
 	}
 	if put.VersionID == "" || put.ETag == "" {
 		active.Phase = phaseReconcilePut
 		e.retire(active)
-		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership)), nil
 	}
 	now := e.now().UTC()
 	active.SourceObjectID = put.VersionID
@@ -64,9 +68,9 @@ func (e *Engine) startProbe(
 	active.Phase = phaseWaitObject
 	if err := e.persist(); err != nil {
 		e.retire(active)
-		return e.finishTerminal(failedProbe(contract.ReasonOwnership))
+		return e.finishTerminal(failedProbe(contract.ReasonOwnership)), nil
 	}
-	return e.advanceActive(ctx, active, operations)
+	return e.advanceActive(ctx, active, operations), nil
 }
 
 func (e *Engine) advanceActive(
