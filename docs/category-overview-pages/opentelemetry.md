@@ -31,7 +31,8 @@ workflow is not yet documented. Stay tuned.
 
 ## Requirements
 
-- Official Linux and macOS builds include the plugin.
+- Every Netdata install on Linux includes the plugin — native packages, static builds (except 32-bit ARMv6), and
+  Docker images — and so do macOS installs made with the kickstart script. It is not available on Windows or FreeBSD.
 - Viewing logs requires signing in with Netdata Cloud, free for community use.
 - The examples on these pages are validated with OpenTelemetry Collector Contrib 0.157.0.
 

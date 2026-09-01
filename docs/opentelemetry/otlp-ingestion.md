@@ -24,7 +24,7 @@ flowchart LR
 
 ## What you need
 
-- A Netdata Agent on Linux or macOS with `otel.plugin` available. Official builds include it. Linux source installs using `netdata-installer.sh` require a compatible Rust toolchain and `--enable-plugin-otel`; on macOS, the installer enables the plugin automatically when it finds a compatible Rust toolchain.
+- A Netdata Agent with the OpenTelemetry plugin. It is part of every Netdata install on Linux — the native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it — and of macOS installs made with the Netdata kickstart script. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
 - An OTLP/gRPC source. The examples use [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) because the `host_metrics` and `file_log` receivers are Contrib components.
 - Network access from the sender to the Agent's endpoint.
 - For log verification, a Netdata Cloud account and sign-in. The `otel-logs` view is access-gated.
@@ -132,7 +132,7 @@ Do not expose a plaintext `0.0.0.0:4317` listener. The optional `auth.enabled` s
 
 ## Troubleshoot the pipeline
 
-- **The plugin is absent:** official builds include it. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
+- **The plugin is absent:** on Linux native packages, confirm the `netdata-plugin-otel` package is installed; on ARMv6 static builds, Windows, and FreeBSD the plugin is not available.
 - **The plugin does not start:** check the Agent journal for strict `otel.yaml` or `NETDATA_OTEL_CFG_*` validation errors.
 - **The Collector or SDK connects but data is absent:** confirm that it uses OTLP/gRPC on `4317`; SDKs commonly select it with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Then check both sender and Agent logs for rejected exports. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
 - **A metric is absent:** exponential histograms are not currently ingested. For other metrics, inspect mapping errors and search for the `otel.<metric-name>` context.

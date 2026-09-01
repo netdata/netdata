@@ -7,7 +7,7 @@ full-text search, histograms, and live tail as every other source.
 
 - **Where they are stored:** `traps/<job>/<machine-id>/` under the Netdata log directory (`/var/log/netdata` by
   default), one directory per collector job.
-- **Retention:** per job, `retention.max_size` (10 GB by default) and an optional `max_duration`; see
+- **Retention:** per job, `retention.max_size` (`10GB` by default) and an optional `max_duration`; see
   [Log Storage and Retention](/docs/logs/log-storage-and-retention.md#journals-written-by-netdata).
 - **Command line and SIEM:** on Linux with systemd 252 or later, `journalctl --directory=<dir>` reads the files, and
   so do SIEM agents that ingest journal files. Netdata reads them on every platform it writes them on.

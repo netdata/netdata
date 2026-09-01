@@ -92,13 +92,14 @@ so do SIEM agents that ingest journal files.
 
 - **[SNMP traps](/docs/logs/snmp-trap-logs.md)** are written under `traps/<job>/<machine-id>/` in the Netdata log directory (`/var/log/netdata` by
   default), one directory per collector job. Retention is set per job in the collector configuration:
-  `retention.max_size` (10 GB by default) and an optional `max_duration`; files rotate automatically. Query them from
+  `retention.max_size` (`10GB` by
+  default) and an optional `max_duration`; files rotate automatically. Query them from
   the Logs tab (`snmp:traps`) or with `journalctl --directory=<dir>`. See
   [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md) and
   [Configuration](/docs/npm/snmp-traps/configuration.md).
 - **[Network flows](/docs/logs/network-flows.md)** (NetFlow, sFlow, IPFIX) are written under `flows/` in the Netdata cache directory
-  (`/var/cache/netdata/flows` by default) in four tiers, `raw`, `1m`, `5m`, and `1h`, with a new file every hour.
-  Retention is set per tier: `size_of_journal_files` (10 GB per tier by default, about 40 GB in total) and an optional
+  (`/var/cache/netdata/flows` by default) in four tiers, `raw`, `1m`, `5m`, and `1h`; files rotate on size, and a file spans at most one hour.
+  Retention is set per tier: `size_of_journal_files` (`10GB` per tier by default, about 40 GB in total) and an optional
   `duration_of_journal_files`. Query them from the Network Flows view or with `journalctl --file=<file>`. See
   [Retention and Querying](/docs/npm/network-flows/retention-querying.md) and
   [Configuration](/docs/npm/network-flows/configuration.md).
