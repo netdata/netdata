@@ -281,7 +281,9 @@ in [Text Files to Journals](/docs/logs/text-files-to-journals.md).
 ## Network devices
 
 Point the devices at a Collector `syslog` receiver that forwards to Netdata; see
-[Syslog from Network Devices](/docs/npm/syslog/README.md).
+[Syslog from Network Devices](/docs/npm/syslog/README.md). SNMP traps and network flows need no Collector: Netdata
+receives them directly and stores them as journal-compatible files on the receiving node; see
+[SNMP Traps](/docs/npm/snmp-traps/README.md) and [Network Flows](/docs/npm/network-flows/README.md).
 
 ## Verify
 

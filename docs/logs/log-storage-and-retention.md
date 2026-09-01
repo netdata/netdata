@@ -12,6 +12,7 @@ receiving node, with per-tenant retention and optional offloading to object stor
 | In place on macOS nodes | The unified log store on the node | Managed by macOS |
 | On an existing journal centralization point | Journal files written by `systemd-journal-remote` | `journal-remote.conf` |
 | On an existing Windows Event Collector | The forwarded-events channels of the collector | Per-channel maximum size and retention policy |
+| Journals written by Netdata (SNMP traps, network flows) | Journal-compatible files on the node that receives them | The collector's retention settings |
 | Centralized with OpenTelemetry | Netdata's log store on the receiving node, optionally offloaded to object storage | `otel.yaml`, per tenant |
 
 Netdata reads whatever each store retains. Changing a retention setting changes what is queryable from that moment on;
@@ -81,6 +82,26 @@ the combined volume of all forwarders multiplied by the retention you need.
 macOS manages the retention of its unified log store itself. Netdata reads what the store holds; there is no
 Netdata-side retention setting. To keep macOS logs longer than the OS does, centralize them with OpenTelemetry (see
 [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md)).
+
+## Journals written by Netdata
+
+Netdata writes SNMP traps and network flows into journal-compatible files itself: the systemd journal file format,
+produced by Netdata's own writer, with no `systemd-journald` involved. Netdata reads them on every platform it writes
+them on; on Linux, `journalctl` from systemd 252 or later reads the same files (they use the compact journal mode), and
+so do SIEM agents that ingest journal files.
+
+- **SNMP traps** are written under `traps/<job>/<machine-id>/` in the Netdata log directory (`/var/log/netdata` by
+  default), one directory per collector job. Retention is set per job in the collector configuration:
+  `retention.max_size` (10 GB by default) and an optional `max_duration`; files rotate automatically. Query them from
+  the Logs tab (`snmp:traps`) or with `journalctl --directory=<dir>`. See
+  [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md) and
+  [Configuration](/docs/npm/snmp-traps/configuration.md).
+- **Network flows** (NetFlow, sFlow, IPFIX) are written under `flows/` in the Netdata cache directory
+  (`/var/cache/netdata/flows` by default) in four tiers, `raw`, `1m`, `5m`, and `1h`, with a new file every hour.
+  Retention is set per tier: `size_of_journal_files` (10 GB per tier by default, about 40 GB in total) and an optional
+  `duration_of_journal_files`. Query them from the Network Flows view or with `journalctl --file=<file>`. See
+  [Retention and Querying](/docs/npm/network-flows/retention-querying.md) and
+  [Configuration](/docs/npm/network-flows/configuration.md).
 
 ## Netdata's log store
 

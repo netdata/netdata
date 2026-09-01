@@ -17,12 +17,15 @@ need it.
 |:-----|:--------|:------------------|:------|
 | **In place, on each node** | The OS log store: systemd journal files on Linux, event channels on Windows, the unified log on macOS | Field filters with live counters, full-text search across every field, histograms, live tail, and one interface across all nodes | Install Netdata |
 | **On the OS-native centralization points you already run** | Journals aggregated by `systemd-journal-remote`; forwarded-events channels on a Windows Event Collector | The same, over every sender the point aggregates, with the logs still in native format for `journalctl`, Event Viewer, and SIEM agents | Install Netdata on the centralization point |
+| **Journals written by Netdata** | Journal-compatible files that Netdata itself writes for SNMP traps and network flows, on the node that receives them; no `systemd-journald` involved | The same indexing and querying as any journal; readable with `journalctl` and by SIEM agents on Linux | Configure the SNMP trap or network flow collector |
 | **Centralized with OpenTelemetry** | Netdata's own indexed log store on the receiving node: retention per tenant, optional offloading to S3-compatible object storage with transparent read-back | Storage that outlives the sending nodes, retention beyond a node's disk, and the same interface | Point an OpenTelemetry Collector at Netdata's OTLP endpoint |
 
 The OS-native tiers add no storage and no pipeline: Netdata reads the logs where the operating system writes them, and
-the operating system's own tools keep working on the same data. The OpenTelemetry tier is for the logs that must
-survive their source, need retention beyond the node's disk, or come from platforms without an OS log store, such as
-Kubernetes.
+the operating system's own tools keep working on the same data. The journals Netdata writes for SNMP traps and network
+flows use the systemd journal file format without requiring systemd: Netdata reads them on every platform it writes
+them on, and on Linux `journalctl` (systemd 252 or later) and SIEM agents read the same files. The OpenTelemetry tier
+is for the logs that must survive their source, need retention beyond the node's disk, or come from platforms without
+an OS log store, such as Kubernetes.
 
 ## Decide per source
 
@@ -34,6 +37,7 @@ Kubernetes.
 | Kubernetes and containers | Run the [OpenTelemetry Collector in the cluster](/docs/logs/centralizing-logs-with-opentelemetry.md#kubernetes-and-containers) and ship container logs to Netdata's log store. |
 | Application text files | Convert them to journal entries with `log2journal` to keep using `journalctl` and your SIEM on them, or ship them with an OpenTelemetry Collector. |
 | Network devices sending syslog | An OpenTelemetry Collector syslog receiver forwarding to Netdata. |
+| Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Network Flows](/docs/npm/network-flows/README.md). |
 | macOS | In place. macOS has no OS-native log forwarding; to centralize, use the OpenTelemetry Collector's macOS receiver. |
 
 Any mix works. Centralization points do not need to be infrastructure-wide: run one per team, environment, or
@@ -42,14 +46,16 @@ centralization point in one dashboard with one role-based access model.
 
 ## Log sources
 
-| Source | Platform | Storage | Appears in the Logs tab as |
-|:-------|:---------|:--------|:---------------------------|
-| [systemd journal](/src/collectors/systemd-journal.plugin/README.md) | Linux | Native journal files: system, user, namespace, and remote journals | `systemd-journal` |
-| [Windows Event Log](/src/collectors/windows-events.plugin/README.md) | Windows | Native event channels, including the forwarded-events channels on a collector | `windows-events` |
-| [macOS unified log](/src/collectors/macos-logs.plugin/README.md) | macOS | The native unified log store | `macos-logs` |
-| [OpenTelemetry logs](/src/crates/otel-plugin/README.md) | Any, via OTLP | Netdata's indexed log store | `otel-logs` |
-| Text log files | Any | A journal, through [log2journal](/src/collectors/log2journal/README.md); or Netdata's log store, through an [OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md) | `systemd-journal` or `otel-logs` |
-| [Network device syslog](/docs/npm/syslog/README.md) | Network devices | Netdata's log store, through an OpenTelemetry Collector | `otel-logs` |
+| Source | Platform | Storage | Where you query it |
+|:-------|:---------|:--------|:-------------------|
+| [systemd journal](/src/collectors/systemd-journal.plugin/README.md) | Linux | Native journal files: system, user, namespace, and remote journals | Logs tab, `systemd-journal` |
+| [Windows Event Log](/src/collectors/windows-events.plugin/README.md) | Windows | Native event channels, including the forwarded-events channels on a collector | Logs tab, `windows-events` |
+| [macOS unified log](/src/collectors/macos-logs.plugin/README.md) | macOS | The native unified log store | Logs tab, `macos-logs` |
+| [OpenTelemetry logs](/src/crates/otel-plugin/README.md) | Any, via OTLP | Netdata's indexed log store | Logs tab, `otel-logs` |
+| Text log files | Any | A journal, through [log2journal](/src/collectors/log2journal/README.md); or Netdata's log store, through an [OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md) | Logs tab, `systemd-journal` or `otel-logs` |
+| [Network device syslog](/docs/npm/syslog/README.md) | Network devices | Netdata's log store, through an OpenTelemetry Collector | Logs tab, `otel-logs` |
+| [SNMP traps](/docs/npm/snmp-traps/README.md) | Network devices | Journal-compatible files written by Netdata under its log directory | Logs tab, `snmp:traps` (SNMP Trap Logs) |
+| [Network flows](/docs/npm/network-flows/README.md) (NetFlow, sFlow, IPFIX) | Network devices | Journal-compatible files written by Netdata under its cache directory, in four time tiers | The Network Flows view |
 
 ## One interface for every source
 
@@ -91,6 +97,8 @@ runs the same service inside your own infrastructure.
   centralize and the Collector recipes for each.
 - [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) — retention settings per tier, offloading to
   object storage, and sizing.
+- [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Network Flows](/docs/npm/network-flows/README.md) — the journals
+  Netdata writes for network devices, documented under Network Performance Monitoring.
 - Integrations — the per-source integration cards.
 - OpenTelemetry — [OTLP ingestion](/docs/opentelemetry/otlp-ingestion.md),
   [logs collection](/docs/opentelemetry/logs-collection.md),
