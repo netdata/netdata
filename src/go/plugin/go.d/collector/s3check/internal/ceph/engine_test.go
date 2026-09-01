@@ -289,6 +289,79 @@ func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestCleanupRequiresDurableRetirementBeforeDeletingDestination(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "state")
+	j := newCephJournal(t, root)
+	source, destination, model := newCephClients()
+	now := time.Unix(100, 0)
+	newEngine := func(journalState *journal.Journal) *Engine {
+		engine, err := New(Options{
+			Source: source, Destination: destination,
+			SourceBucket: "source", DestinationBucket: "destination",
+			Journal: journalState, Generator: newCephGenerator(journalState.OwnerID()),
+			SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
+			WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
+			DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
+			QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+		})
+		require.NoError(t, err)
+		return engine
+	}
+	engine := newEngine(j)
+
+	first := engine.Collect(context.Background())
+	require.NotNil(t, first.Probe)
+	require.Equal(t, contract.StatusWaiting, first.Probe.Status)
+	require.Len(t, model.source, 1)
+	var key string
+	for candidate := range model.source {
+		key = candidate
+	}
+	model.replicateWrite(key)
+	deletePending := engine.Collect(context.Background())
+	require.NotNil(t, deletePending.Probe)
+	require.Equal(t, contract.StatusWaiting, deletePending.Probe.Status)
+	require.Contains(t, model.destination, key)
+
+	var durable state
+	found, err := j.Load(&durable)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, key, durable.ActiveKey)
+	require.Equal(t, phaseDeleteVisibility, durable.Entries[0].Phase)
+
+	backup := root + ".backup"
+	require.NoError(t, os.Rename(root, backup))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_ = os.Remove(root)
+			_ = os.Rename(backup, root)
+		}
+	})
+	originalDestinationGet := destination.GetFunc
+	destination.GetFunc = func(context.Context, string, string, string, int64) (s3client.GetResult, error) {
+		return s3client.GetResult{}, errors.New("destination read unavailable")
+	}
+
+	failed := engine.Collect(context.Background())
+	require.Error(t, failed.Err)
+	engine.Cleanup(context.Background())
+	destination.GetFunc = originalDestinationGet
+	require.NoError(t, os.Remove(root))
+	require.NoError(t, os.Rename(backup, root))
+	restored = true
+
+	successorJournal := newCephJournal(t, root)
+	successor := newEngine(successorJournal)
+	t.Cleanup(func() { successor.Cleanup(context.Background()) })
+	afterRestart := successor.Collect(context.Background())
+	require.NotNil(t, afterRestart.Probe)
+	assert.NotEqual(t, contract.StatusSuccess, afterRestart.Probe.Status)
+	assert.Contains(t, model.destination, key)
+}
+
 func newCephJournal(t *testing.T, root string) *journal.Journal {
 	t.Helper()
 	j, err := journal.New(
