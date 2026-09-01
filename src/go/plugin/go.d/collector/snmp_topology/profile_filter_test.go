@@ -43,6 +43,7 @@ func TestFindTopologyProfiles_IPBaselineBoundaries(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			profiles := (&Collector{}).findTopologyProfiles(tc.device)
+			require.NotEmpty(t, profiles)
 			ipSources := make(map[string]int)
 			for _, profile := range profiles {
 				for _, topology := range profile.Definition.Topology {

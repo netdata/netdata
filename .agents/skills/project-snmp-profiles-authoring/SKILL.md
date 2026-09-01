@@ -113,11 +113,14 @@ IP-MIB `ipAddressTable` IPv4 address:
 ```yaml
 table:
   OID: 1.3.6.1.2.1.4.34.1.3.1.4
+  name: ipAddressTableIPv4
 symbols:
   - OID: 1.3.6.1.2.1.4.34.1.3
+    name: ip_if_index
 metric_tags:
   - tag: topo_ip_addr
     symbol:
+      name: ipAddressAddr
     index_transform:
       - start: 2
 ```
@@ -125,7 +128,9 @@ metric_tags:
 The table root anchors on readable `ipAddressIfIndex` and appends index prefix
 `1.4` for IPv4 type and its required four-octet length. The address is the
 not-accessible `ipAddressAddr` index component; `start: 2` skips address type
-and length. Keep the transformed components raw and require the topology
+and length. The open-ended slice is intentional: a fixed `end` would hide
+malformed trailing components instead of letting the strict consumer reject
+the row. Keep the transformed components raw and require the topology
 consumer to decode exactly four decimal octets in `0..255`; structural walk
 scope alone does not validate the remaining instance suffix. A malformed
 descendant can activate dependency walks, but it MUST NOT emit topology.

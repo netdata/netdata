@@ -93,6 +93,8 @@ func (d *crossTableDependency) add(tag ddprofiledefinition.MetricTagConfig, inde
 	scopedWalkOID := ""
 	if indexScope != "" && tag.Index == 0 && len(tag.IndexTransform) == 0 &&
 		tag.Symbol.OID != "" && tag.LookupSymbol.OID == "" {
+		// A direct cross-table join already requires the dependency to use the
+		// anchor's unchanged row-index suffix. Narrowing only preserves its fixed prefix.
 		scopedWalkOID = trimProfileOID(tag.Symbol.OID) + "." + indexScope
 	}
 	if d.seen && d.scopedWalkOID != scopedWalkOID {

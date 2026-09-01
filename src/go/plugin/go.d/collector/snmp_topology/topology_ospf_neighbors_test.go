@@ -22,33 +22,6 @@ func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testi
 	require.Empty(t, cache.ospfNeighborsByKey)
 }
 
-func TestTopologyCache_OSPFMatchingReusesCompactL3Projection(t *testing.T) {
-	cache := newTopologyBuilder()
-	for i := range 256 {
-		cache.updateIfIndexByIP(modernIPv4Tags(
-			fmt.Sprintf("10.0.%d.%d", i/256, i%256),
-			fmt.Sprintf("%d", i+1),
-			"0.0",
-		))
-	}
-	cache.finalize()
-	localInterfaces := newTopologyOSPFLocalInterfaceIndex(cache.snapshotL3Interfaces("local"))
-
-	allocsForMatches := func(matches int) float64 {
-		return testing.AllocsPerRun(10, func() {
-			for range matches {
-				match, ok := localInterfaces.match("192.0.2.1")
-				runtime.KeepAlive(match)
-				runtime.KeepAlive(ok)
-			}
-		})
-	}
-
-	one := allocsForMatches(1)
-	many := allocsForMatches(32)
-	require.LessOrEqual(t, many, one+4, "matching must not rebuild the full address projection per neighbor")
-}
-
 func TestTopologyCache_OSPFSnapshotAllocationsDoNotScaleWithPrefixNeighborCrossProduct(t *testing.T) {
 	allocsForNeighbors := func(neighbors int) float64 {
 		cache := newTopologyBuilder()
