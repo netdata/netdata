@@ -238,9 +238,10 @@ static void initialize(void)
 #define MOUNT_POINTS_REFRESH_EVERY_UT (60 * USEC_PER_SEC)
 
 // Canonical form of a mount path: no trailing backslash, so "C:\" and "C:" are the same instance.
-static void canonicalize_mount_path(char *path)
+// path_size bounds the scan so a non-null-terminated buffer cannot run past the end of the array.
+static void canonicalize_mount_path(char *path, size_t path_size)
 {
-    size_t len = strlen(path);
+    size_t len = strnlen(path, path_size);
     while (len > 1 && path[len - 1] == '\\')
         path[--len] = '\0';
 }
@@ -260,7 +261,7 @@ static bool volume_root_path_w(const char *name, wchar_t *dst, size_t dst_count)
     else
         snprintfz(path, sizeof(path), "\\\\.\\%s", name);
 
-    size_t len = strlen(path);
+    size_t len = strnlen(path, sizeof(path));
     if (len && path[len - 1] != '\\' && len + 2 <= sizeof(path)) {
         path[len] = '\\';
         path[len + 1] = '\0';
@@ -317,12 +318,18 @@ static void mount_points_add_volume_paths(
     }
 
     // the result is a MULTI_SZ: every mount path of the volume, terminated by an empty string
-    for (const wchar_t *p = buf; *p; p += wcslen(p) + 1) {
+    for (const wchar_t *p = buf; *p;) {
+        // bound the scan so a malformed entry that runs past the buffer cannot be walked off the end
+        size_t remaining = (size_t)buf_count - (size_t)(p - buf);
+        size_t entry_len = wcsnlen(p, remaining);
+        if (entry_len == remaining)
+            break;
+
         char path[ND_MOUNT_PATH_MAX];
-        if (!utf16_to_utf8(path, sizeof(path), p, -1, NULL))
+        if (!utf16_to_utf8(path, sizeof(path), p, (int)entry_len, NULL))
             continue;
 
-        canonicalize_mount_path(path);
+        canonicalize_mount_path(path, sizeof(path));
         if (!*path)
             continue;
 
@@ -331,6 +338,8 @@ static void mount_points_add_volume_paths(
 
         if (first_path && !*first_path)
             snprintfz(first_path, first_path_size, "%s", path);
+
+        p += entry_len + 1;
     }
 
     if (buf != stack_buf)
@@ -345,7 +354,9 @@ static void mount_points_add_volume_paths(
 static void mount_points_map_device(DICTIONARY *devices, const wchar_t *volumeGUID, const char *mount_path)
 {
     // "\\?\Volume{guid}\" -> "Volume{guid}"
-    size_t len = wcslen(volumeGUID);
+    // FindFirstVolumeW() always null-terminates, but bound the scan to the caller's buffer so a
+    // future change that passes a different size cannot walk past the end of the array.
+    size_t len = wcsnlen(volumeGUID, MAX_PATH + 1);
     if (len < 5 || wcsncmp(volumeGUID, L"\\\\?\\", 4) != 0)
         return;
 
@@ -523,7 +534,7 @@ static void logical_disk_resolve_name(const char *instance, char *dst, size_t ds
     }
 
     snprintfz(dst, dst_size, "%s", instance);
-    canonicalize_mount_path(dst);
+    canonicalize_mount_path(dst, dst_size);
 }
 
 // Volume metadata: filesystem, serial number and read-only state. The perflib instance name is
