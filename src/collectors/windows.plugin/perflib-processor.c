@@ -235,10 +235,11 @@ static bool processor_topology_refresh(void)
     return true;
 }
 
-static bool processor_topology_find(uint32_t group, uint32_t processor, int *cpu_id)
+static bool processor_topology_find(
+    const struct processor_topology *topology, uint32_t group, uint32_t processor, int *cpu_id)
 {
-    for (size_t i = 0; i < processor_topology.entries_count; i++) {
-        const struct processor_topology_entry *entry = &processor_topology.entries[i];
+    for (size_t i = 0; i < topology->entries_count; i++) {
+        const struct processor_topology_entry *entry = &topology->entries[i];
         if (entry->group == group && entry->processor == processor) {
             *cpu_id = entry->cpu_id;
             return true;
@@ -262,7 +263,7 @@ int perflib_processor_unittest(void)
         topology.entries_count != 3 || topology.entries[0].processor != 1 || topology.entries[0].cpu_id != 1 ||
         topology.entries[1].processor != 3 || topology.entries[1].cpu_id != 3 || topology.entries[2].processor != 1 ||
         topology.entries[2].cpu_id != 5 ||
-        !(processor_topology_find(1, 1, &mapped_cpu) && mapped_cpu == 5)) {
+        !(processor_topology_find(&topology, 1, 1, &mapped_cpu) && mapped_cpu == 5)) {
         fprintf(stderr, "perflib processor unittest: sparse processor masks produced invalid group mapping\n");
         errors++;
     }
@@ -298,7 +299,7 @@ static bool processor_information_instance_to_cpu_id(const char *instance_name, 
     if (end == processor_number || *end != '\0')
         return false;
 
-    return processor_topology_find(group, processor, cpu_id);
+    return processor_topology_find(&processor_topology, group, processor, cpu_id);
 }
 
 static bool
