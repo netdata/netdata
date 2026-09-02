@@ -32,11 +32,17 @@ func TestMetricRendererPreservesGapsAndCountsLogicalCalls(t *testing.T) {
 				Duration: time.Second,
 			},
 		},
-		Cleanup: contract.CleanupResult{Pending: 2, Backpressure: true},
+		Cleanup: contract.CleanupResult{
+			Pending:      2,
+			Backpressure: true,
+		},
 		Probe: &contract.ProbeResult{
-			Status: contract.StatusWaiting, Reason: contract.ReasonNone,
+			Status: contract.StatusWaiting,
+			Reason: contract.ReasonNone,
 			WriteVisibility: contract.ObjectiveResult{
-				Performed: true, Status: contract.StatusSuccess, Lag: 3 * time.Second,
+				Performed: true,
+				Status:    contract.StatusSuccess,
+				Lag:       3 * time.Second,
 			},
 		},
 	}
@@ -46,7 +52,9 @@ func TestMetricRendererPreservesGapsAndCountsLogicalCalls(t *testing.T) {
 	cc.CommitCycleSuccess()
 	reader := store.Read(metrix.ReadRaw())
 	common := metrix.Labels{
-		"mode": string(contract.ModeCephMultisite), "source": "site-a", "destination": "site-b",
+		"mode":        string(contract.ModeCephMultisite),
+		"source":      "site-a",
+		"destination": "site-b",
 	}
 	assertMetricValue(t, reader, "cleanup_pending_objects", common, 2)
 	assertMetricValue(t, reader, "mutation_backpressure", common, 1)
@@ -56,8 +64,11 @@ func TestMetricRendererPreservesGapsAndCountsLogicalCalls(t *testing.T) {
 	_, ok = reader.Value("payload_mismatch", withReason(common, contract.ReasonNone))
 	assert.False(t, ok, "unperformed payload comparison must remain a gap")
 	operationLabels := metrix.Labels{
-		"mode": string(contract.ModeCephMultisite), "source": "site-a", "destination": "site-b",
-		"endpoint": string(contract.EndpointDestination), "operation": string(contract.OperationRead),
+		"mode":        string(contract.ModeCephMultisite),
+		"source":      "site-a",
+		"destination": "site-b",
+		"endpoint":    string(contract.EndpointDestination),
+		"operation":   string(contract.OperationRead),
 	}
 	assertMetricValue(t, reader, "operation_calls_total", operationLabels, 2)
 	assertMetricValue(t, reader, "operation_failures_total", operationLabels, 1)
@@ -77,11 +88,16 @@ func TestMetricRendererUsesLastTerminalDuringBackpressure(t *testing.T) {
 	renderer.reset("source", "destination")
 	cc := mustCycleController(t, store)
 	result := contract.Result{
-		Mode:    contract.ModeAWSReplication,
-		Cleanup: contract.CleanupResult{Pending: 8, Backpressure: true},
+		Mode: contract.ModeAWSReplication,
+		Cleanup: contract.CleanupResult{
+			Pending:      8,
+			Backpressure: true,
+		},
 		LastTerminal: &contract.ProbeResult{
-			Status: contract.StatusFailed, Reason: contract.ReasonPayloadMismatch,
-			PayloadCompared: true, PayloadMismatch: true,
+			Status:          contract.StatusFailed,
+			Reason:          contract.ReasonPayloadMismatch,
+			PayloadCompared: true,
+			PayloadMismatch: true,
 		},
 	}
 
@@ -89,8 +105,10 @@ func TestMetricRendererUsesLastTerminalDuringBackpressure(t *testing.T) {
 	renderer.write(result)
 	cc.CommitCycleSuccess()
 	assertMetricValue(t, store.Read(metrix.ReadRaw()), "payload_mismatch", metrix.Labels{
-		"mode": string(contract.ModeAWSReplication), "source": "source", "destination": "destination",
-		"reason": string(contract.ReasonPayloadMismatch),
+		"mode":        string(contract.ModeAWSReplication),
+		"source":      "source",
+		"destination": "destination",
+		"reason":      string(contract.ReasonPayloadMismatch),
 	}, 1)
 }
 
@@ -106,12 +124,18 @@ func TestMetricChartCoverage(t *testing.T) {
 			Duration: time.Second,
 		}},
 		Probe: &contract.ProbeResult{
-			Status: contract.StatusSuccess, Reason: contract.ReasonNone, PayloadCompared: true,
+			Status:          contract.StatusSuccess,
+			Reason:          contract.ReasonNone,
+			PayloadCompared: true,
 			WriteVisibility: contract.ObjectiveResult{
-				Performed: true, Status: contract.StatusSuccess, Lag: time.Second,
+				Performed: true,
+				Status:    contract.StatusSuccess,
+				Lag:       time.Second,
 			},
 			DeleteVisibility: contract.ObjectiveResult{
-				Performed: true, Status: contract.StatusSuccess, Lag: time.Second,
+				Performed: true,
+				Status:    contract.StatusSuccess,
+				Lag:       time.Second,
 			},
 		},
 	}

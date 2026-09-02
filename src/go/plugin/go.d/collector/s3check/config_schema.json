@@ -19,7 +19,10 @@
       "credentials": {
         "title": "Static credentials",
         "description": "Optional explicit credentials for this endpoint. Omit this object to use the AWS SDK default credential chain.",
-        "type": ["object", "null"],
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": false,
         "properties": {
           "access_key_id": {
@@ -43,7 +46,10 @@
             "sensitive": true
           }
         },
-        "required": ["access_key_id", "secret_access_key"]
+        "required": [
+          "access_key_id",
+          "secret_access_key"
+        ]
       },
       "connection": {
         "type": "object",
@@ -73,11 +79,16 @@
             "type": "string",
             "minLength": 1
           },
-          "credentials": {"$ref": "#/definitions/credentials"},
+          "credentials": {
+            "$ref": "#/definitions/credentials"
+          },
           "assume_role": {
             "title": "Assume role",
             "description": "Optional role assumed independently for this endpoint.",
-            "type": ["object", "null"],
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": false,
             "properties": {
               "role_arn": {
@@ -91,7 +102,9 @@
                 "sensitive": true
               }
             },
-            "required": ["role_arn"]
+            "required": [
+              "role_arn"
+            ]
           },
           "path_style": {
             "title": "Path-style addressing",
@@ -135,10 +148,17 @@
             "sensitive": true
           }
         },
-        "required": ["region", "bucket"],
+        "required": [
+          "region",
+          "bucket"
+        ],
         "dependencies": {
-          "tls_cert": ["tls_key"],
-          "tls_key": ["tls_cert"]
+          "tls_cert": [
+            "tls_key"
+          ],
+          "tls_key": [
+            "tls_cert"
+          ]
         }
       },
       "lifecycle_mode": {
@@ -158,10 +178,16 @@
           },
           "source": {
             "title": "S3 connection",
-            "allOf": [{"$ref": "#/definitions/connection"}]
+            "allOf": [
+              {
+                "$ref": "#/definitions/connection"
+              }
+            ]
           }
         },
-        "required": ["source"]
+        "required": [
+          "source"
+        ]
       },
       "replication_mode": {
         "title": "Replication configuration",
@@ -180,11 +206,19 @@
           },
           "source": {
             "title": "Source connection",
-            "allOf": [{"$ref": "#/definitions/connection"}]
+            "allOf": [
+              {
+                "$ref": "#/definitions/connection"
+              }
+            ]
           },
           "destination": {
             "title": "Destination connection",
-            "allOf": [{"$ref": "#/definitions/connection"}]
+            "allOf": [
+              {
+                "$ref": "#/definitions/connection"
+              }
+            ]
           },
           "write_objective": {
             "title": "Write visibility objective",
@@ -215,7 +249,10 @@
             "minLength": 2
           }
         },
-        "required": ["source", "destination"]
+        "required": [
+          "source",
+          "destination"
+        ]
       }
     },
     "properties": {
@@ -237,7 +274,11 @@
         "title": "Probe mode",
         "description": "Lifecycle checks one endpoint; replication modes measure one source-to-destination direction.",
         "type": "string",
-        "enum": ["lifecycle", "ceph_multisite", "aws_replication"],
+        "enum": [
+          "lifecycle",
+          "ceph_multisite",
+          "aws_replication"
+        ],
         "default": "lifecycle"
       },
       "vnode": {
@@ -252,104 +293,217 @@
           {
             "title": "Lifecycle",
             "properties": {
-              "mode": {"const": "lifecycle"},
+              "mode": {
+                "const": "lifecycle"
+              },
               "mode_lifecycle": {
                 "title": "Lifecycle configuration",
-                "allOf": [{"$ref": "#/definitions/lifecycle_mode"}]
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/lifecycle_mode"
+                  }
+                ]
               }
             },
-            "required": ["mode_lifecycle"],
+            "required": [
+              "mode_lifecycle"
+            ],
             "not": {
               "anyOf": [
-                {"required": ["mode_ceph_multisite"]},
-                {"required": ["mode_aws_replication"]}
+                {
+                  "required": [
+                    "mode_ceph_multisite"
+                  ]
+                },
+                {
+                  "required": [
+                    "mode_aws_replication"
+                  ]
+                }
               ]
             }
           },
           {
             "title": "Ceph multisite",
             "properties": {
-              "mode": {"const": "ceph_multisite"},
+              "mode": {
+                "const": "ceph_multisite"
+              },
               "mode_ceph_multisite": {
                 "title": "Ceph multisite configuration",
-                "allOf": [{"$ref": "#/definitions/replication_mode"}]
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/replication_mode"
+                  }
+                ]
               }
             },
-            "required": ["mode_ceph_multisite"],
+            "required": [
+              "mode_ceph_multisite"
+            ],
             "not": {
               "anyOf": [
-                {"required": ["mode_lifecycle"]},
-                {"required": ["mode_aws_replication"]}
+                {
+                  "required": [
+                    "mode_lifecycle"
+                  ]
+                },
+                {
+                  "required": [
+                    "mode_aws_replication"
+                  ]
+                }
               ]
             }
           },
           {
             "title": "AWS replication",
             "properties": {
-              "mode": {"const": "aws_replication"},
+              "mode": {
+                "const": "aws_replication"
+              },
               "mode_aws_replication": {
                 "title": "AWS replication configuration",
-                "allOf": [{"$ref": "#/definitions/replication_mode"}]
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/replication_mode"
+                  }
+                ]
               }
             },
-            "required": ["mode_aws_replication"],
+            "required": [
+              "mode_aws_replication"
+            ],
             "not": {
               "anyOf": [
-                {"required": ["mode_lifecycle"]},
-                {"required": ["mode_ceph_multisite"]}
+                {
+                  "required": [
+                    "mode_lifecycle"
+                  ]
+                },
+                {
+                  "required": [
+                    "mode_ceph_multisite"
+                  ]
+                }
               ]
             }
           }
         ]
       }
     },
-    "required": ["mode"]
+    "required": [
+      "mode"
+    ]
   },
   "uiSchema": {
-    "uiOptions": {"fullPage": true},
+    "uiOptions": {
+      "fullPage": true
+    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
         {
           "title": "Mode",
-          "fields": ["mode", "mode_lifecycle", "mode_ceph_multisite", "mode_aws_replication"]
+          "fields": [
+            "mode",
+            "mode_lifecycle",
+            "mode_ceph_multisite",
+            "mode_aws_replication"
+          ]
         },
         {
           "title": "Collection",
-          "fields": ["update_every", "autodetection_retry"]
+          "fields": [
+            "update_every",
+            "autodetection_retry"
+          ]
         },
         {
           "title": "Virtual Node",
-          "fields": ["vnode"]
+          "fields": [
+            "vnode"
+          ]
         }
       ]
     },
     "mode": {
       "ui:help": "Choose the check to run. Lifecycle checks one endpoint; Ceph multisite and AWS replication check one source-to-destination direction.",
       "ui:widget": "radio",
-      "ui:options": {"inline": true}
+      "ui:options": {
+        "inline": true
+      }
     },
     "mode_lifecycle": {
       "source": {
         "ui:flavour": "tabs",
         "ui:options": {
           "tabs": [
-            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-            {"title": "Labels", "fields": ["name"]}
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
           ]
         },
-        "endpoint": {"ui:placeholder": "https://s3.example.net"},
-        "credentials": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
+        "endpoint": {
+          "ui:placeholder": "https://s3.example.net"
         },
-        "assume_role": {"external_id": {"ui:widget": "password"}},
-        "proxy_url": {"ui:widget": "password"},
-        "tls_key": {"ui:widget": "password"}
+        "credentials": {
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        }
       }
     },
     "mode_ceph_multisite": {
@@ -357,43 +511,141 @@
         "ui:flavour": "tabs",
         "ui:options": {
           "tabs": [
-            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-            {"title": "Labels", "fields": ["name"]}
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
           ]
         },
-        "endpoint": {"ui:placeholder": "https://zone-a.example.net"},
-        "credentials": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
+        "endpoint": {
+          "ui:placeholder": "https://zone-a.example.net"
         },
-        "assume_role": {"external_id": {"ui:widget": "password"}},
-        "proxy_url": {"ui:widget": "password"},
-        "tls_key": {"ui:widget": "password"}
+        "credentials": {
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        }
       },
       "destination": {
         "ui:flavour": "tabs",
         "ui:options": {
           "tabs": [
-            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-            {"title": "Labels", "fields": ["name"]}
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
           ]
         },
-        "endpoint": {"ui:placeholder": "https://zone-b.example.net"},
-        "credentials": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
+        "endpoint": {
+          "ui:placeholder": "https://zone-b.example.net"
         },
-        "assume_role": {"external_id": {"ui:widget": "password"}},
-        "proxy_url": {"ui:widget": "password"},
-        "tls_key": {"ui:widget": "password"}
+        "credentials": {
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        }
       }
     },
     "mode_aws_replication": {
@@ -401,43 +653,141 @@
         "ui:flavour": "tabs",
         "ui:options": {
           "tabs": [
-            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-            {"title": "Labels", "fields": ["name"]}
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
           ]
         },
-        "endpoint": {"ui:placeholder": "Leave empty for the AWS SDK endpoint"},
-        "credentials": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
+        "endpoint": {
+          "ui:placeholder": "Leave empty for the AWS SDK endpoint"
         },
-        "assume_role": {"external_id": {"ui:widget": "password"}},
-        "proxy_url": {"ui:widget": "password"},
-        "tls_key": {"ui:widget": "password"}
+        "credentials": {
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        }
       },
       "destination": {
         "ui:flavour": "tabs",
         "ui:options": {
           "tabs": [
-            {"title": "Connection", "fields": ["endpoint", "region", "bucket", "path_style"]},
-            {"title": "Authentication", "fields": ["credentials", "assume_role"]},
-            {"title": "HTTP", "fields": ["timeout", "proxy_url"]},
-            {"title": "TLS", "fields": ["tls_skip_verify", "tls_ca", "tls_cert", "tls_key"]},
-            {"title": "Labels", "fields": ["name"]}
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
           ]
         },
-        "endpoint": {"ui:placeholder": "Leave empty for the AWS SDK endpoint"},
-        "credentials": {
-          "access_key_id": {"ui:widget": "password"},
-          "secret_access_key": {"ui:widget": "password"},
-          "session_token": {"ui:widget": "password"}
+        "endpoint": {
+          "ui:placeholder": "Leave empty for the AWS SDK endpoint"
         },
-        "assume_role": {"external_id": {"ui:widget": "password"}},
-        "proxy_url": {"ui:widget": "password"},
-        "tls_key": {"ui:widget": "password"}
+        "credentials": {
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        }
       }
     },
     "vnode": {

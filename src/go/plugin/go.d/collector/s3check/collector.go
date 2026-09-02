@@ -40,7 +40,10 @@ func init() {
 }
 
 func New() *Collector {
-	config := Config{UpdateEvery: defaultUpdateEvery, Mode: string(contract.ModeLifecycle)}
+	config := Config{
+		UpdateEvery: defaultUpdateEvery,
+		Mode:        string(contract.ModeLifecycle),
+	}
 	c := &Collector{
 		Config:           config,
 		store:            metrix.NewCollectorStore(),

@@ -188,7 +188,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonInternal))
 		return result
 	}
-	owned := entry{Key: object.Key}
+	owned := entry{
+		Key: object.Key,
+	}
 	e.state.Entries = append(e.state.Entries, owned)
 	if err := e.persist(); err != nil {
 		e.state.Entries = e.state.Entries[:len(e.state.Entries)-1]
@@ -198,7 +200,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	index := len(e.state.Entries) - 1
 
 	if _, err := e.call(ctx, &result.Operations, contract.OperationPut, func(callCtx context.Context) error {
-		_, callErr := e.client.Put(callCtx, e.bucket, object.Key, object.Payload, s3client.PutOptions{IfNoneMatch: true})
+		_, callErr := e.client.Put(callCtx, e.bucket, object.Key, object.Payload, s3client.PutOptions{
+			IfNoneMatch: true,
+		})
 		return callErr
 	}); err != nil {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
@@ -261,7 +265,8 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 			return nil
 		}
 		return callErr
-	}); err != nil || !absent {
+	}); err != nil ||
+		!absent {
 		probeResult := contract.FailedProbe(contract.ReasonCleanup)
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
@@ -271,7 +276,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 
 	e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
 	success := &contract.ProbeResult{
-		Status: contract.StatusSuccess, Reason: contract.ReasonNone, PayloadCompared: true,
+		Status:          contract.StatusSuccess,
+		Reason:          contract.ReasonNone,
+		PayloadCompared: true,
 	}
 	result.Probe = e.finish(success)
 	if err := e.persist(); err != nil {

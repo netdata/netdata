@@ -33,8 +33,14 @@ func TestCollectorConfigurationReturnsEffectiveSelectedMode(t *testing.T) {
 		Name: "aws-replication",
 		Mode: string(contract.ModeAWSReplication),
 		ModeAWSReplication: &ReplicationModeConfig{
-			Source:      S3Config{Region: "us-east-1", Bucket: "source-bucket"},
-			Destination: S3Config{Region: "us-west-2", Bucket: "destination-bucket"},
+			Source: S3Config{
+				Region: "us-east-1",
+				Bucket: "source-bucket",
+			},
+			Destination: S3Config{
+				Region: "us-west-2",
+				Bucket: "destination-bucket",
+			},
 		},
 	}
 
@@ -101,7 +107,9 @@ func TestConfigSchemaModeBranches(t *testing.T) {
 }
 
 func TestConfigDefaultsUseHumanDurations(t *testing.T) {
-	lifecycle := Config{Name: "job"}
+	lifecycle := Config{
+		Name: "job",
+	}
 	lifecycle.applyDefaults()
 
 	require.NotNil(t, lifecycle.ModeLifecycle)
@@ -110,7 +118,10 @@ func TestConfigDefaultsUseHumanDurations(t *testing.T) {
 	assert.Nil(t, lifecycle.ModeLifecycle.Source.Credentials)
 	assert.True(t, boolValue(lifecycle.ModeLifecycle.Source.PathStyle))
 
-	replication := Config{Name: "job", Mode: string(contract.ModeCephMultisite)}
+	replication := Config{
+		Name: "job",
+		Mode: string(contract.ModeCephMultisite),
+	}
 	replication.applyDefaults()
 	require.NotNil(t, replication.ModeCephMultisite)
 	assert.Equal(t, defaultPrefix, replication.ModeCephMultisite.Prefix)
@@ -127,16 +138,22 @@ func TestS3ConfigCredentialSelection(t *testing.T) {
 	assert.Nil(t, defaultChain.TypeStatic)
 
 	static := &awsauth.StaticCredentialConfig{
-		AccessKeyID: "key", SecretAccessKey: "secret", SessionToken: "token",
+		AccessKeyID:     "key",
+		SecretAccessKey: "secret",
+		SessionToken:    "token",
 	}
-	explicit := S3Config{Credentials: static}.credentialConfig()
+	explicit := S3Config{
+		Credentials: static,
+	}.credentialConfig()
 	assert.Equal(t, awsauth.CredentialTypeStatic, explicit.Type)
 	assert.Same(t, static, explicit.TypeStatic)
 }
 
 func TestS3ConfigStaticCredentialValidationUsesPublicPath(t *testing.T) {
 	cfg := validConfig(contract.ModeLifecycle)
-	cfg.ModeLifecycle.Source.Credentials = &awsauth.StaticCredentialConfig{AccessKeyID: "key"}
+	cfg.ModeLifecycle.Source.Credentials = &awsauth.StaticCredentialConfig{
+		AccessKeyID: "key",
+	}
 
 	err := cfg.validate()
 	assert.ErrorContains(t, err, "source.credentials.secret_access_key is required")
@@ -225,7 +242,8 @@ func TestOwnershipFingerprintContract(t *testing.T) {
 	presentationAndTransport.ModeAWSReplication.Source.Name = "renamed source"
 	presentationAndTransport.ModeAWSReplication.Source.Region = "eu-west-1"
 	presentationAndTransport.ModeAWSReplication.Source.Credentials = &awsauth.StaticCredentialConfig{
-		AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret",
+		AccessKeyID:     "AKIAEXAMPLE",
+		SecretAccessKey: "secret",
 	}
 	presentationAndTransport.ModeAWSReplication.Source.Timeout = confopt.LongDuration(20 * time.Second)
 	presentationAndTransport.ModeAWSReplication.Source.ProxyURL = "http://proxy.example"
@@ -253,17 +271,26 @@ func jsonValue(t *testing.T, value any) any {
 }
 
 func validConfig(mode contract.Mode) Config {
-	cfg := Config{Name: "s3check-test", Mode: string(mode)}
+	cfg := Config{
+		Name: "s3check-test",
+		Mode: string(mode),
+	}
 	cfg.applyDefaults()
-	source := S3Config{Endpoint: "https://source.example", Region: "us-east-1", Bucket: "source-bucket"}
+	source := S3Config{
+		Endpoint: "https://source.example",
+		Region:   "us-east-1",
+		Bucket:   "source-bucket",
+	}
 	source.applyDefaults("source")
 	switch mode {
 	case contract.ModeLifecycle:
 		cfg.ModeLifecycle.Source = source
 	case contract.ModeCephMultisite, contract.ModeAWSReplication:
 		destination := S3Config{
-			Name: "destination", Endpoint: "https://destination.example",
-			Region: "us-east-1", Bucket: "destination-bucket",
+			Name:     "destination",
+			Endpoint: "https://destination.example",
+			Region:   "us-east-1",
+			Bucket:   "destination-bucket",
 		}
 		destination.applyDefaults("destination")
 		selected := cfg.ModeCephMultisite

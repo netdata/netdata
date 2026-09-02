@@ -45,12 +45,18 @@ func TestCheckUsesGeneratedOwnerNamespaceForRuleApplicability(t *testing.T) {
 		require.NoError(t, err)
 		source.BucketReplicationFunc = replicationRules(
 			s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-				DeleteMarkerReplication: true, Priority: 10,
+				Enabled:                 true,
+				DestinationBucket:       "destination",
+				Prefix:                  "netdata-s3check/",
+				DeleteMarkerReplication: true,
+				Priority:                10,
 			},
 			s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "unowned-destination", Prefix: namespace,
-				DeleteMarkerReplication: true, Priority: 20,
+				Enabled:                 true,
+				DestinationBucket:       "unowned-destination",
+				Prefix:                  namespace,
+				DeleteMarkerReplication: true,
+				Priority:                20,
 			},
 		)
 
@@ -64,12 +70,18 @@ func TestCheckUsesGeneratedOwnerNamespaceForRuleApplicability(t *testing.T) {
 		require.NoError(t, err)
 		source.BucketReplicationFunc = replicationRules(
 			s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-				DeleteMarkerReplication: true, Priority: 10,
+				Enabled:                 true,
+				DestinationBucket:       "destination",
+				Prefix:                  "netdata-s3check/",
+				DeleteMarkerReplication: true,
+				Priority:                10,
 			},
 			s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "unowned-destination", Prefix: namespace + "probe-",
-				DeleteMarkerReplication: true, Priority: 20,
+				Enabled:                 true,
+				DestinationBucket:       "unowned-destination",
+				Prefix:                  namespace + "probe-",
+				DeleteMarkerReplication: true,
+				Priority:                20,
 			},
 		)
 
@@ -82,8 +94,11 @@ func TestCheckUsesGeneratedOwnerNamespaceForRuleApplicability(t *testing.T) {
 		namespace, err := engine.generator.Namespace()
 		require.NoError(t, err)
 		source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "destination", Prefix: namespace,
-			DeleteMarkerReplication: true, Priority: 10,
+			Enabled:                 true,
+			DestinationBucket:       "destination",
+			Prefix:                  namespace,
+			DeleteMarkerReplication: true,
+			Priority:                10,
 		})
 
 		require.NoError(t, engine.Check(context.Background()))
@@ -96,12 +111,18 @@ func TestCollectRevalidatesReplicationPolicyBeforeMutation(t *testing.T) {
 	require.NoError(t, engine.Check(context.Background()))
 	source.BucketReplicationFunc = replicationRules(
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-			DeleteMarkerReplication: true, Priority: 10,
+			Enabled:                 true,
+			DestinationBucket:       "destination",
+			Prefix:                  "netdata-s3check/",
+			DeleteMarkerReplication: true,
+			Priority:                10,
 		},
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "unowned-destination", Prefix: "netdata-s3check/",
-			DeleteMarkerReplication: true, Priority: 20,
+			Enabled:                 true,
+			DestinationBucket:       "unowned-destination",
+			Prefix:                  "netdata-s3check/",
+			DeleteMarkerReplication: true,
+			Priority:                20,
 		},
 	)
 
@@ -119,12 +140,18 @@ func TestCollectValidatesExactGeneratedKeyBeforeMutation(t *testing.T) {
 	engine.generator.Now = func() time.Time { return keyTime }
 	source.BucketReplicationFunc = replicationRules(
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-			DeleteMarkerReplication: true, Priority: 10,
+			Enabled:                 true,
+			DestinationBucket:       "destination",
+			Prefix:                  "netdata-s3check/",
+			DeleteMarkerReplication: true,
+			Priority:                10,
 		},
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "unowned-destination", Prefix: engine.keyPrefix + "1",
-			DeleteMarkerReplication: true, Priority: 20,
+			Enabled:                 true,
+			DestinationBucket:       "unowned-destination",
+			Prefix:                  engine.keyPrefix + "1",
+			DeleteMarkerReplication: true,
+			Priority:                20,
 		},
 	)
 
@@ -133,7 +160,9 @@ func TestCollectValidatesExactGeneratedKeyBeforeMutation(t *testing.T) {
 	assert.Nil(t, result.Probe)
 	assert.Zero(t, source.Count("put"))
 	source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-		Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+		Enabled:                 true,
+		DestinationBucket:       "destination",
+		Prefix:                  "netdata-s3check/",
 		DeleteMarkerReplication: true,
 	})
 	engine.Cleanup(context.Background())
@@ -150,12 +179,18 @@ func TestCollectValidatesExactOwnedKeysBeforeCleanup(t *testing.T) {
 	key, _ := model.onlySourceObject(t)
 	source.BucketReplicationFunc = replicationRules(
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-			DeleteMarkerReplication: true, Priority: 10,
+			Enabled:                 true,
+			DestinationBucket:       "destination",
+			Prefix:                  "netdata-s3check/",
+			DeleteMarkerReplication: true,
+			Priority:                10,
 		},
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "unowned-destination", Prefix: key,
-			DeleteMarkerReplication: true, Priority: 20,
+			Enabled:                 true,
+			DestinationBucket:       "unowned-destination",
+			Prefix:                  key,
+			DeleteMarkerReplication: true,
+			Priority:                20,
 		},
 	)
 	listsBefore := source.Count("list_versions")
@@ -164,7 +199,9 @@ func TestCollectValidatesExactOwnedKeysBeforeCleanup(t *testing.T) {
 	assert.Error(t, result.Err)
 	assert.Equal(t, listsBefore, source.Count("list_versions"))
 	source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-		Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+		Enabled:                 true,
+		DestinationBucket:       "destination",
+		Prefix:                  "netdata-s3check/",
 		DeleteMarkerReplication: true,
 	})
 	engine.Cleanup(context.Background())
@@ -179,12 +216,18 @@ func TestCleanupValidatesExactOwnedKeysBeforeShutdownMutation(t *testing.T) {
 	model.replicateObject(t, key, sourceObjectID)
 	source.BucketReplicationFunc = replicationRules(
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-			DeleteMarkerReplication: true, Priority: 10,
+			Enabled:                 true,
+			DestinationBucket:       "destination",
+			Prefix:                  "netdata-s3check/",
+			DeleteMarkerReplication: true,
+			Priority:                10,
 		},
 		s3client.ReplicationRule{
-			Enabled: true, DestinationBucket: "unowned-destination", Prefix: key,
-			DeleteMarkerReplication: true, Priority: 20,
+			Enabled:                 true,
+			DestinationBucket:       "unowned-destination",
+			Prefix:                  key,
+			DeleteMarkerReplication: true,
+			Priority:                20,
 		},
 	)
 
@@ -199,60 +242,90 @@ func TestCheckRejectsUnsafeProviderConfiguration(t *testing.T) {
 	tests := map[string]func(*testutil.S3, *testutil.S3){
 		"source versioning disabled": func(source, _ *testutil.S3) {
 			source.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-				return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+				return s3client.BucketVersioningResult{
+					Status: s3client.VersioningDisabled,
+				}, nil
 			}
 		},
 		"destination versioning suspended": func(_, destination *testutil.S3) {
 			destination.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-				return s3client.BucketVersioningResult{Status: s3client.VersioningSuspended}, nil
+				return s3client.BucketVersioningResult{
+					Status: s3client.VersioningSuspended,
+				}, nil
 			}
 		},
 		"MFA Delete enabled": func(source, _ *testutil.S3) {
 			source.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-				return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled, MFADelete: true}, nil
+				return s3client.BucketVersioningResult{
+					Status:    s3client.VersioningEnabled,
+					MFADelete: true,
+				}, nil
 			}
 		},
 		"wrong destination": func(source, _ *testutil.S3) {
 			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "other", Prefix: "netdata-s3check/", DeleteMarkerReplication: true,
+				Enabled:                 true,
+				DestinationBucket:       "other",
+				Prefix:                  "netdata-s3check/",
+				DeleteMarkerReplication: true,
 			})
 		},
 		"prefix does not contain probes": func(source, _ *testutil.S3) {
 			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "destination", Prefix: "other/", DeleteMarkerReplication: true,
+				Enabled:                 true,
+				DestinationBucket:       "destination",
+				Prefix:                  "other/",
+				DeleteMarkerReplication: true,
 			})
 		},
 		"tag filtered": func(source, _ *testutil.S3) {
 			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/", TagFiltered: true,
+				Enabled:                 true,
+				DestinationBucket:       "destination",
+				Prefix:                  "netdata-s3check/",
+				TagFiltered:             true,
 				DeleteMarkerReplication: true,
 			})
 		},
 		"delete markers disabled": func(source, _ *testutil.S3) {
 			source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-				Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
+				Enabled:           true,
+				DestinationBucket: "destination",
+				Prefix:            "netdata-s3check/",
 			})
 		},
 		"additional applicable destination": func(source, _ *testutil.S3) {
 			source.BucketReplicationFunc = replicationRules(
 				s3client.ReplicationRule{
-					Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-					DeleteMarkerReplication: true, Priority: 10,
+					Enabled:                 true,
+					DestinationBucket:       "destination",
+					Prefix:                  "netdata-s3check/",
+					DeleteMarkerReplication: true,
+					Priority:                10,
 				},
 				s3client.ReplicationRule{
-					Enabled: true, DestinationBucket: "unowned-destination", Prefix: "netdata-s3check/",
-					DeleteMarkerReplication: true, Priority: 20,
+					Enabled:                 true,
+					DestinationBucket:       "unowned-destination",
+					Prefix:                  "netdata-s3check/",
+					DeleteMarkerReplication: true,
+					Priority:                20,
 				},
 			)
 		},
 		"higher priority rule disables delete markers": func(source, _ *testutil.S3) {
 			source.BucketReplicationFunc = replicationRules(
 				s3client.ReplicationRule{
-					Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/",
-					DeleteMarkerReplication: true, Priority: 10,
+					Enabled:                 true,
+					DestinationBucket:       "destination",
+					Prefix:                  "netdata-s3check/",
+					DeleteMarkerReplication: true,
+					Priority:                10,
 				},
 				s3client.ReplicationRule{
-					Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/", Priority: 20,
+					Enabled:           true,
+					DestinationBucket: "destination",
+					Prefix:            "netdata-s3check/",
+					Priority:          20,
 				},
 			)
 		},
@@ -395,8 +468,12 @@ func TestReconciliationIsBoundedAndRetainsStateOnPaginationOverflow(t *testing.T
 	model.failPutAfterMutation = true
 	source.ListVersionsFunc = func(context.Context, string, string, string, string, int32) (s3client.VersionPage, error) {
 		return s3client.VersionPage{
-			Versions:  []s3client.Version{{Kind: s3client.VersionObject, Key: "different-key", VersionID: "v"}},
-			Truncated: true, NextKeyMarker: "next", NextVersionIDMarker: "next-version",
+			Versions: []s3client.Version{
+				{Kind: s3client.VersionObject, Key: "different-key", VersionID: "v"},
+			},
+			Truncated:           true,
+			NextKeyMarker:       "next",
+			NextVersionIDMarker: "next-version",
 		}, nil
 	}
 	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
@@ -606,9 +683,11 @@ func TestExactCleanupRequiresDurablePhaseBeforeDeletingVersions(t *testing.T) {
 
 func TestValidateEntryPhaseRejectsMutationWithoutRequiredProof(t *testing.T) {
 	err := validateEntryPhase(entry{
-		Phase:          phaseDeleteIntent,
-		SourceObjectID: "source-version", DestinationObjectID: "destination-version",
-		ObjectSeen: true, VisibleAt: ptrTime(time.Unix(100, 0)),
+		Phase:               phaseDeleteIntent,
+		SourceObjectID:      "source-version",
+		DestinationObjectID: "destination-version",
+		ObjectSeen:          true,
+		VisibleAt:           ptrTime(time.Unix(100, 0)),
 	})
 	assert.ErrorContains(t, err, "source object identity")
 }
@@ -648,16 +727,25 @@ func newAWSEngineWithJournal(
 ) *Engine {
 	t.Helper()
 	opts := Options{
-		Source: source, Destination: destination,
-		SourceBucket: "source", DestinationBucket: "destination",
-		ProbePrefix: "netdata-s3check/", Journal: j,
+		Source:            source,
+		Destination:       destination,
+		SourceBucket:      "source",
+		DestinationBucket: "destination",
+		ProbePrefix:       "netdata-s3check/",
+		Journal:           j,
 		Generator: probe.Generator{
-			Prefix: "netdata-s3check/", OwnerID: j.OwnerID(), Now: time.Now,
-			Random: bytes.NewReader(bytes.Repeat([]byte{3}, 64*(16+probe.PayloadBytes))),
+			Prefix:  "netdata-s3check/",
+			OwnerID: j.OwnerID(),
+			Now:     time.Now,
+			Random:  bytes.NewReader(bytes.Repeat([]byte{3}, 64*(16+probe.PayloadBytes))),
 		},
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second, UpdateEvery: time.Minute,
-		WriteObjective: 15 * time.Second, WriteTimeout: time.Minute,
-		DeleteObjective: 10 * time.Second, DeleteTimeout: time.Minute,
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		UpdateEvery:               time.Minute,
+		WriteObjective:            15 * time.Second,
+		WriteTimeout:              time.Minute,
+		DeleteObjective:           10 * time.Second,
+		DeleteTimeout:             time.Minute,
 	}
 	if now != nil {
 		opts.Now = func() time.Time { return *now }
@@ -670,7 +758,9 @@ func newAWSEngineWithJournal(
 	return engine
 }
 
-func replicationRules(rules ...s3client.ReplicationRule) func(context.Context, string) ([]s3client.ReplicationRule, error) {
+func replicationRules(
+	rules ...s3client.ReplicationRule,
+) func(context.Context, string) ([]s3client.ReplicationRule, error) {
 	return func(context.Context, string) ([]s3client.ReplicationRule, error) { return rules, nil }
 }
 
@@ -811,11 +901,17 @@ func (m *awsModel) bucketLocked(bucket string) map[string][]awsVersion {
 }
 
 func newAWSClients() (*testutil.S3, *testutil.S3, *awsModel) {
-	model := &awsModel{source: make(map[string][]awsVersion), destination: make(map[string][]awsVersion)}
+	model := &awsModel{
+		source:      make(map[string][]awsVersion),
+		destination: make(map[string][]awsVersion),
+	}
 	source := newAWSClient(model, "source")
 	destination := newAWSClient(model, "destination")
 	source.BucketReplicationFunc = replicationRules(s3client.ReplicationRule{
-		Enabled: true, DestinationBucket: "destination", Prefix: "netdata-s3check/", DeleteMarkerReplication: true,
+		Enabled:                 true,
+		DestinationBucket:       "destination",
+		Prefix:                  "netdata-s3check/",
+		DeleteMarkerReplication: true,
 	})
 	destination.BucketReplicationFunc = func(context.Context, string) ([]s3client.ReplicationRule, error) {
 		return nil, s3client.ErrReplicationConfigAbsent
@@ -826,7 +922,9 @@ func newAWSClients() (*testutil.S3, *testutil.S3, *awsModel) {
 func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
 	client := &testutil.S3{}
 	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningEnabled,
+		}, nil
 	}
 	client.PutFunc = func(
 		_ context.Context, bucket, key string, payload []byte, opts s3client.PutOptions,
@@ -847,7 +945,10 @@ func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
 			model.failPutAfterMutation = false
 			return s3client.PutResult{}, errors.New("ambiguous PUT")
 		}
-		return s3client.PutResult{VersionID: id, ETag: etag}, nil
+		return s3client.PutResult{
+			VersionID: id,
+			ETag:      etag,
+		}, nil
 	}
 	client.GetFunc = func(
 		_ context.Context, bucket, key, versionID string, _ int64,
@@ -866,7 +967,9 @@ func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
 			return s3client.GetResult{}, s3client.ErrObjectNotFound
 		}
 		return s3client.GetResult{
-			Payload: append([]byte(nil), found.payload...), VersionID: found.id, ETag: found.etag,
+			Payload:   append([]byte(nil), found.payload...),
+			VersionID: found.id,
+			ETag:      found.etag,
 		}, nil
 	}
 	client.ListCurrentFunc = func(context.Context, string, string, int32) (s3client.CurrentPage, error) {
@@ -888,7 +991,10 @@ func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
 		for _, key := range keys {
 			for _, version := range model.bucketLocked(bucket)[key] {
 				page.Versions = append(page.Versions, s3client.Version{
-					Kind: version.kind, Key: key, VersionID: version.id, IsLatest: version.latest,
+					Kind:      version.kind,
+					Key:       key,
+					VersionID: version.id,
+					IsLatest:  version.latest,
 				})
 			}
 		}
@@ -926,7 +1032,10 @@ func newAWSClient(model *awsModel, bucketName string) *testutil.S3 {
 			model.failDeleteAfterMutation = false
 			return s3client.DeleteResult{}, errors.New("ambiguous DELETE")
 		}
-		return s3client.DeleteResult{VersionID: id, DeleteMarker: true}, nil
+		return s3client.DeleteResult{
+			VersionID:    id,
+			DeleteMarker: true,
+		}, nil
 	}
 	return client
 }

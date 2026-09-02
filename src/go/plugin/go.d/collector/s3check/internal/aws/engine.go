@@ -182,14 +182,23 @@ func New(opts Options) (*Engine, error) {
 	}
 
 	engine := &Engine{
-		source: opts.Source, destination: opts.Destination,
-		sourceBucket: opts.SourceBucket, destinationBucket: opts.DestinationBucket,
-		journal: opts.Journal, generator: opts.Generator, keyPrefix: keyPrefix,
-		sourceRequestTimeout: opts.SourceRequestTimeout, destinationRequestTimeout: opts.DestinationRequestTimeout,
-		updateEvery:    opts.UpdateEvery,
-		writeObjective: opts.WriteObjective, writeTimeout: opts.WriteTimeout,
-		deleteObjective: opts.DeleteObjective, deleteTimeout: opts.DeleteTimeout,
-		queueCapacity: opts.QueueCapacity, cleanupBatch: opts.CleanupBatch, now: opts.Now,
+		source:                    opts.Source,
+		destination:               opts.Destination,
+		sourceBucket:              opts.SourceBucket,
+		destinationBucket:         opts.DestinationBucket,
+		journal:                   opts.Journal,
+		generator:                 opts.Generator,
+		keyPrefix:                 keyPrefix,
+		sourceRequestTimeout:      opts.SourceRequestTimeout,
+		destinationRequestTimeout: opts.DestinationRequestTimeout,
+		updateEvery:               opts.UpdateEvery,
+		writeObjective:            opts.WriteObjective,
+		writeTimeout:              opts.WriteTimeout,
+		deleteObjective:           opts.DeleteObjective,
+		deleteTimeout:             opts.DeleteTimeout,
+		queueCapacity:             opts.QueueCapacity,
+		cleanupBatch:              opts.CleanupBatch,
+		now:                       opts.Now,
 	}
 	found, err := engine.journal.Load(&engine.state)
 	if err != nil {
@@ -221,11 +230,17 @@ func (e *Engine) validateProvider(
 		return nil, err
 	}
 	var rules []s3client.ReplicationRule
-	_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationSetup, func(callCtx context.Context) error {
-		var callErr error
-		rules, callErr = e.source.BucketReplication(callCtx, e.sourceBucket)
-		return callErr
-	})
+	_, err := e.call(
+		ctx,
+		operations,
+		contract.EndpointSource,
+		contract.OperationSetup,
+		func(callCtx context.Context) error {
+			var callErr error
+			rules, callErr = e.source.BucketReplication(callCtx, e.sourceBucket)
+			return callErr
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("check AWS source replication policy: %w", err)
 	}
@@ -258,7 +273,9 @@ func (e *Engine) validateReplicationRules(rules []s3client.ReplicationRule, key 
 		return errors.New("AWS source has no enabled applicable replication rule for the configured destination")
 	}
 	if !effective.DeleteMarkerReplication {
-		return errors.New("AWS effective replication rule for the configured destination does not replicate delete markers")
+		return errors.New(
+			"AWS effective replication rule for the configured destination does not replicate delete markers",
+		)
 	}
 	return nil
 }
@@ -290,7 +307,8 @@ func (e *Engine) checkVersioning(
 
 func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	result = contract.Result{
-		Mode: contract.ModeAWSReplication, LastTerminal: contract.CloneProbe(e.state.LastTerminal),
+		Mode:         contract.ModeAWSReplication,
+		LastTerminal: contract.CloneProbe(e.state.LastTerminal),
 	}
 	e.diagnostic = nil
 	defer func() {

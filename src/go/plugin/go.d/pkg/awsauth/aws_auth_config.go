@@ -24,20 +24,20 @@ const (
 
 // StaticCredentialConfig contains explicit long-lived or temporary AWS credentials.
 type StaticCredentialConfig struct {
-	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty"`
+	AccessKeyID     string `yaml:"access_key_id,omitempty"     json:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty"`
-	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
+	SessionToken    string `yaml:"session_token,omitempty"     json:"session_token,omitempty"`
 }
 
 // CredentialConfig describes only how the base AWS credentials are acquired.
 // The caller compiles it with optional role assumption into an Identity.
 type CredentialConfig struct {
-	Type       string                  `yaml:"type" json:"type"`
+	Type       string                  `yaml:"type"                  json:"type"`
 	TypeStatic *StaticCredentialConfig `yaml:"type_static,omitempty" json:"type_static,omitempty"`
 }
 
 type AssumeRoleConfig struct {
-	RoleARN    string `yaml:"role_arn,omitempty" json:"role_arn,omitempty"`
+	RoleARN    string `yaml:"role_arn,omitempty"    json:"role_arn,omitempty"`
 	ExternalID string `yaml:"external_id,omitempty" json:"external_id,omitempty"`
 }
 
@@ -66,7 +66,12 @@ func (c CredentialConfig) ValidateWithPath(path string) error {
 	switch c.Type {
 	case CredentialTypeDefault:
 		if c.TypeStatic != nil {
-			return fmt.Errorf("%s is not allowed when %s is %q", fieldPath(path, "type_static"), typeField, CredentialTypeDefault)
+			return fmt.Errorf(
+				"%s is not allowed when %s is %q",
+				fieldPath(path, "type_static"),
+				typeField,
+				CredentialTypeDefault,
+			)
 		}
 	case CredentialTypeStatic:
 		if c.TypeStatic == nil {
@@ -118,7 +123,10 @@ type Identity struct {
 }
 
 func NewIdentity(ref string, credentials CredentialConfig, role *AssumeRoleConfig) Identity {
-	id := Identity{Ref: ref, credentials: credentials}
+	id := Identity{
+		Ref:         ref,
+		credentials: credentials,
+	}
 	if role != nil {
 		v := *role
 		id.role = &v

@@ -135,7 +135,10 @@ func TestConcurrentOwnerSyncsParentBeforeAcquiringLock(t *testing.T) {
 	firstDone := make(chan lockResult, 1)
 	go func() {
 		locked, lockErr := first.TryLock()
-		firstDone <- lockResult{locked: locked, err: lockErr}
+		firstDone <- lockResult{
+			locked: locked,
+			err:    lockErr,
+		}
 	}()
 	<-firstRootSyncStarted
 
@@ -159,7 +162,9 @@ func TestMutationRequiresLifetimeLock(t *testing.T) {
 	j, err := New(t.TempDir(), "agent", "job", testFingerprint)
 	require.NoError(t, err)
 
-	err = j.Save(testState{Pending: []string{"key"}})
+	err = j.Save(testState{
+		Pending: []string{"key"},
+	})
 	assert.ErrorIs(t, err, ErrNotLocked)
 	err = j.Clear()
 	assert.ErrorIs(t, err, ErrNotLocked)
@@ -169,7 +174,9 @@ func TestMutationRequiresLifetimeLock(t *testing.T) {
 	require.True(t, locked)
 	t.Cleanup(j.Unlock)
 
-	require.NoError(t, j.Save(testState{Pending: []string{"key"}}))
+	require.NoError(t, j.Save(testState{
+		Pending: []string{"key"},
+	}))
 	var got testState
 	found, err := j.Load(&got)
 	require.NoError(t, err)
@@ -215,7 +222,9 @@ func TestTryTakeoverLoadsStateAfterWaitingOwnerReleases(t *testing.T) {
 	locked, err := incumbent.TryLock()
 	require.NoError(t, err)
 	require.True(t, locked)
-	require.NoError(t, incumbent.Save(testState{Pending: []string{"old"}}))
+	require.NoError(t, incumbent.Save(testState{
+		Pending: []string{"old"},
+	}))
 
 	var stale testState
 	found, err := successor.Load(&stale)
@@ -223,7 +232,9 @@ func TestTryTakeoverLoadsStateAfterWaitingOwnerReleases(t *testing.T) {
 	require.True(t, found)
 	assert.Equal(t, []string{"old"}, stale.Pending)
 
-	require.NoError(t, incumbent.Save(testState{Pending: []string{"authoritative"}}))
+	require.NoError(t, incumbent.Save(testState{
+		Pending: []string{"authoritative"},
+	}))
 	incumbent.Unlock()
 
 	var authoritative testState
@@ -242,7 +253,9 @@ func TestFingerprintMismatchRequiresOldConfiguration(t *testing.T) {
 	locked, err := original.TryLock()
 	require.NoError(t, err)
 	require.True(t, locked)
-	require.NoError(t, original.Save(testState{Pending: []string{"key"}}))
+	require.NoError(t, original.Save(testState{
+		Pending: []string{"key"},
+	}))
 	original.Unlock()
 
 	changedFingerprint := "a6e160c527c1903398e8bcf47ca8f165ab2e70c16ba90a9a66c06330f705f151"

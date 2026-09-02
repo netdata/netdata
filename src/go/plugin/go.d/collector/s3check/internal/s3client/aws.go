@@ -42,13 +42,19 @@ func New(ctx context.Context, cfg Config) (Client, error) {
 	if err != nil {
 		return nil, errors.New("invalid S3 HTTP transport configuration")
 	}
-	awsConfig, err := cfg.Identity.NewConfig(ctx, awsauth.ConfigOptions{Region: cfg.Region, HTTPClient: httpClient})
+	awsConfig, err := cfg.Identity.NewConfig(ctx, awsauth.ConfigOptions{
+		Region:     cfg.Region,
+		HTTPClient: httpClient,
+	})
 	if err != nil {
 		httpClient.CloseIdleConnections()
 		return nil, fmt.Errorf("create AWS configuration: %w", err)
 	}
 	client := s3.NewFromConfig(awsConfig, func(options *s3.Options) { configureS3Options(options, cfg) })
-	return &awsClient{client: client, httpClient: httpClient}, nil
+	return &awsClient{
+		client:     client,
+		httpClient: httpClient,
+	}, nil
 }
 
 func configureS3Options(options *s3.Options, cfg Config) {
@@ -64,7 +70,9 @@ type awsClient struct {
 }
 
 func (c *awsClient) BucketVersioning(ctx context.Context, bucket string) (BucketVersioningResult, error) {
-	out, err := c.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: aws.String(bucket)})
+	out, err := c.client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
+		Bucket: aws.String(bucket),
+	})
 	if err != nil {
 		return BucketVersioningResult{}, err
 	}
@@ -75,7 +83,9 @@ func (c *awsClient) BucketVersioning(ctx context.Context, bucket string) (Bucket
 }
 
 func (c *awsClient) BucketReplication(ctx context.Context, bucket string) ([]ReplicationRule, error) {
-	out, err := c.client.GetBucketReplication(ctx, &s3.GetBucketReplicationInput{Bucket: aws.String(bucket)})
+	out, err := c.client.GetBucketReplication(ctx, &s3.GetBucketReplicationInput{
+		Bucket: aws.String(bucket),
+	})
 	if err != nil {
 		if hasErrorCode(err, "ReplicationConfigurationNotFoundError", "NoSuchReplicationConfiguration") {
 			return nil, ErrReplicationConfigAbsent
@@ -151,7 +161,10 @@ func (c *awsClient) Put(
 	if err != nil {
 		return PutResult{}, err
 	}
-	return PutResult{VersionID: aws.ToString(out.VersionId), ETag: aws.ToString(out.ETag)}, nil
+	return PutResult{
+		VersionID: aws.ToString(out.VersionId),
+		ETag:      aws.ToString(out.ETag),
+	}, nil
 }
 
 func (c *awsClient) Get(
@@ -159,7 +172,10 @@ func (c *awsClient) Get(
 	bucket, key, versionID string,
 	maxBytes int64,
 ) (GetResult, error) {
-	input := &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
 	if versionID != "" {
 		input.VersionId = aws.String(versionID)
 	}
@@ -199,7 +215,10 @@ func (c *awsClient) ListCurrent(
 	if err != nil {
 		return CurrentPage{}, err
 	}
-	page := CurrentPage{Keys: make([]string, 0, len(out.Contents)), Truncated: aws.ToBool(out.IsTruncated)}
+	page := CurrentPage{
+		Keys:      make([]string, 0, len(out.Contents)),
+		Truncated: aws.ToBool(out.IsTruncated),
+	}
 	for _, object := range out.Contents {
 		if object.Key != nil {
 			page.Keys = append(page.Keys, *object.Key)
@@ -256,7 +275,10 @@ func (c *awsClient) ListVersions(
 func (c *awsClient) Delete(
 	ctx context.Context, bucket, key string, opts DeleteOptions,
 ) (DeleteResult, error) {
-	input := &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}
+	input := &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
 	if opts.VersionID != "" {
 		input.VersionId = aws.String(opts.VersionID)
 	}

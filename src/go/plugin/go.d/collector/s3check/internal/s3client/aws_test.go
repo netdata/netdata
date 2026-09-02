@@ -47,7 +47,11 @@ func TestNewRoutesAssumeRoleAndS3ThroughConfiguredProxy(t *testing.T) {
 		case r.URL.Query().Has("versioning"):
 			s3Calls.Add(1)
 			w.Header().Set("Content-Type", "application/xml")
-			_, _ = w.Write([]byte(`<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>`))
+			_, _ = w.Write(
+				[]byte(
+					`<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>`,
+				),
+			)
 		default:
 			http.Error(w, "unexpected request", http.StatusBadRequest)
 		}
@@ -59,12 +63,19 @@ func TestNewRoutesAssumeRoleAndS3ThroughConfiguredProxy(t *testing.T) {
 	identity := awsauth.NewIdentity("source", awsauth.CredentialConfig{
 		Type: awsauth.CredentialTypeStatic,
 		TypeStatic: &awsauth.StaticCredentialConfig{
-			AccessKeyID: "AKIABASEIDENTITY", SecretAccessKey: "base-secret",
+			AccessKeyID:     "AKIABASEIDENTITY",
+			SecretAccessKey: "base-secret",
 		},
-	}, &awsauth.AssumeRoleConfig{RoleARN: "arn:aws:iam::000000000000:role/example"})
+	}, &awsauth.AssumeRoleConfig{
+		RoleARN: "arn:aws:iam::000000000000:role/example",
+	})
 	client, err := New(context.Background(), Config{
-		Identity: identity, Region: "us-east-1", Endpoint: unreachableEndpoint,
-		PathStyle: true, Timeout: time.Second, ProxyURL: proxy.URL,
+		Identity:  identity,
+		Region:    "us-east-1",
+		Endpoint:  unreachableEndpoint,
+		PathStyle: true,
+		Timeout:   time.Second,
+		ProxyURL:  proxy.URL,
 	})
 	require.NoError(t, err)
 	defer client.CloseIdleConnections()
@@ -81,7 +92,8 @@ func TestNewRoutesAssumeRoleAndS3ThroughConfiguredProxy(t *testing.T) {
 func TestConfigureS3OptionsCanonicalizesEndpointAndPathStyle(t *testing.T) {
 	var options s3.Options
 	configureS3Options(&options, Config{
-		Endpoint: "https://s3.example", PathStyle: true,
+		Endpoint:  "https://s3.example",
+		PathStyle: true,
 	})
 
 	assert.Equal(t, "https://s3.example", aws.ToString(options.BaseEndpoint))
@@ -100,7 +112,9 @@ func TestConvertReplicationRule(t *testing.T) {
 				Destination: &types.Destination{
 					Bucket: aws.String("arn:aws:s3:::destination"),
 				},
-				Filter: &types.ReplicationRuleFilter{Prefix: aws.String("netdata/")},
+				Filter: &types.ReplicationRuleFilter{
+					Prefix: aws.String("netdata/"),
+				},
 				DeleteMarkerReplication: &types.DeleteMarkerReplication{
 					Status: types.DeleteMarkerReplicationStatusEnabled,
 				},
@@ -115,29 +129,51 @@ func TestConvertReplicationRule(t *testing.T) {
 		},
 		"tag filtered rule": {
 			rule: types.ReplicationRule{
-				Destination: &types.Destination{Bucket: aws.String("arn:aws:s3:::destination")},
-				Filter:      &types.ReplicationRuleFilter{Tag: &types.Tag{Key: aws.String("key"), Value: aws.String("value")}},
+				Destination: &types.Destination{
+					Bucket: aws.String("arn:aws:s3:::destination"),
+				},
+				Filter: &types.ReplicationRuleFilter{
+					Tag: &types.Tag{
+						Key:   aws.String("key"),
+						Value: aws.String("value"),
+					},
+				},
 			},
-			want: ReplicationRule{DestinationBucket: "destination", TagFiltered: true},
+			want: ReplicationRule{
+				DestinationBucket: "destination",
+				TagFiltered:       true,
+			},
 		},
 		"and filter retains prefix and identifies tags": {
 			rule: types.ReplicationRule{
-				Destination: &types.Destination{Bucket: aws.String("destination")},
-				Filter: &types.ReplicationRuleFilter{And: &types.ReplicationRuleAndOperator{
-					Prefix: aws.String("prefix/"),
-					Tags:   []types.Tag{{Key: aws.String("key"), Value: aws.String("value")}},
-				}},
+				Destination: &types.Destination{
+					Bucket: aws.String("destination"),
+				},
+				Filter: &types.ReplicationRuleFilter{
+					And: &types.ReplicationRuleAndOperator{
+						Prefix: aws.String("prefix/"),
+						Tags:   []types.Tag{{Key: aws.String("key"), Value: aws.String("value")}},
+					},
+				},
 			},
-			want: ReplicationRule{DestinationBucket: "destination", Prefix: "prefix/", TagFiltered: true},
+			want: ReplicationRule{
+				DestinationBucket: "destination",
+				Prefix:            "prefix/",
+				TagFiltered:       true,
+			},
 		},
 		"V1 rule implicitly replicates user delete markers": {
 			rule: types.ReplicationRule{
-				Status:      types.ReplicationRuleStatusEnabled,
-				Destination: &types.Destination{Bucket: aws.String("destination")},
-				Prefix:      aws.String("netdata/"),
+				Status: types.ReplicationRuleStatusEnabled,
+				Destination: &types.Destination{
+					Bucket: aws.String("destination"),
+				},
+				Prefix: aws.String("netdata/"),
 			},
 			want: ReplicationRule{
-				Enabled: true, DestinationBucket: "destination", Prefix: "netdata/",
+				Enabled:                 true,
+				DestinationBucket:       "destination",
+				Prefix:                  "netdata/",
 				DeleteMarkerReplication: true,
 			},
 		},
@@ -152,6 +188,10 @@ func TestConvertReplicationRule(t *testing.T) {
 
 func TestObjectAbsenceRejectsGenericNotFound(t *testing.T) {
 	assert.True(t, isObjectNotFound(&types.NoSuchKey{}))
-	assert.True(t, isObjectNotFound(&smithy.GenericAPIError{Code: "NoSuchKey"}))
-	assert.False(t, isObjectNotFound(&smithy.GenericAPIError{Code: "NotFound"}))
+	assert.True(t, isObjectNotFound(&smithy.GenericAPIError{
+		Code: "NoSuchKey",
+	}))
+	assert.False(t, isObjectNotFound(&smithy.GenericAPIError{
+		Code: "NotFound",
+	}))
 }

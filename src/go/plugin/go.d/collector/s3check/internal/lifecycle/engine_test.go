@@ -47,13 +47,19 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client, _ := newLifecycleClient()
 	engine, err := New(Options{
-		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
-		RequestTimeout: time.Second, UpdateEvery: time.Minute,
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
 	})
 	require.NoError(t, err)
 	require.NoError(t, engine.Check(context.Background()))
 	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningEnabled,
+		}, nil
 	}
 
 	result := engine.Collect(context.Background())
@@ -73,15 +79,23 @@ func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
 		return s3client.PutResult{}, errors.New("ambiguous put")
 	}
 	engine, err := New(Options{
-		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
-		RequestTimeout: time.Second, UpdateEvery: time.Minute, QueueCapacity: 1, CleanupBatch: 1,
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+		QueueCapacity:  1,
+		CleanupBatch:   1,
 	})
 	require.NoError(t, err)
 
 	result := engine.Collect(context.Background())
 	require.Equal(t, 1, result.Cleanup.Pending)
 	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningEnabled,
+		}, nil
 	}
 	deletesBefore := client.Count("delete")
 
@@ -181,8 +195,14 @@ func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
 		return s3client.DeleteResult{}, errors.New("cleanup unavailable")
 	}
 	engine, err := New(Options{
-		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
-		RequestTimeout: time.Second, UpdateEvery: time.Minute, QueueCapacity: 1, CleanupBatch: 1,
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+		QueueCapacity:  1,
+		CleanupBatch:   1,
 	})
 	require.NoError(t, err)
 
@@ -264,9 +284,15 @@ func TestAmbiguousPutRetainsOwnershipForRequestUncertaintyWindow(t *testing.T) {
 	}
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
-		RequestTimeout: time.Minute, UpdateEvery: time.Second,
-		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Minute,
+		UpdateEvery:    time.Second,
+		QueueCapacity:  1,
+		CleanupBatch:   1,
+		Now:            func() time.Time { return now },
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { engine.Cleanup(context.Background()) })
@@ -307,8 +333,14 @@ func TestSameOwnerTakeoverReloadsIncumbentOwnership(t *testing.T) {
 	}
 	newEngine := func(j *journal.Journal) *Engine {
 		engine, err := New(Options{
-			Client: client, Bucket: "bucket", Journal: j, Generator: newGenerator(j.OwnerID()),
-			RequestTimeout: time.Second, UpdateEvery: time.Minute, QueueCapacity: 1, CleanupBatch: 1,
+			Client:         client,
+			Bucket:         "bucket",
+			Journal:        j,
+			Generator:      newGenerator(j.OwnerID()),
+			RequestTimeout: time.Second,
+			UpdateEvery:    time.Minute,
+			QueueCapacity:  1,
+			CleanupBatch:   1,
 		})
 		require.NoError(t, err)
 		return engine
@@ -327,7 +359,12 @@ func TestSameOwnerTakeoverReloadsIncumbentOwnership(t *testing.T) {
 	takenOver := successor.Collect(context.Background())
 	assert.Equal(t, 1, takenOver.Cleanup.Pending)
 	assert.True(t, takenOver.Cleanup.Backpressure)
-	assert.Equal(t, 1, client.Count("put"), "successor must not overwrite incumbent state with its stale constructor snapshot")
+	assert.Equal(
+		t,
+		1,
+		client.Count("put"),
+		"successor must not overwrite incumbent state with its stale constructor snapshot",
+	)
 	successor.Cleanup(context.Background())
 }
 
@@ -393,9 +430,13 @@ func (m *objectModel) keys(bucket, prefix string) []string {
 
 func newLifecycleClient() (*testutil.S3, *objectModel) {
 	client := &testutil.S3{}
-	model := &objectModel{objects: make(map[string][]byte)}
+	model := &objectModel{
+		objects: make(map[string][]byte),
+	}
 	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningDisabled,
+		}, nil
 	}
 	client.BucketReplicationFunc = func(context.Context, string) ([]s3client.ReplicationRule, error) {
 		return nil, s3client.ErrReplicationConfigAbsent
@@ -409,10 +450,14 @@ func newLifecycleClient() (*testutil.S3, *objectModel) {
 		if !ok {
 			return s3client.GetResult{}, s3client.ErrObjectNotFound
 		}
-		return s3client.GetResult{Payload: payload}, nil
+		return s3client.GetResult{
+			Payload: payload,
+		}, nil
 	}
 	client.ListCurrentFunc = func(_ context.Context, bucket, prefix string, _ int32) (s3client.CurrentPage, error) {
-		return s3client.CurrentPage{Keys: model.keys(bucket, prefix)}, nil
+		return s3client.CurrentPage{
+			Keys: model.keys(bucket, prefix),
+		}, nil
 	}
 	client.ListVersionsFunc = func(context.Context, string, string, string, string, int32) (s3client.VersionPage, error) {
 		return s3client.VersionPage{}, nil

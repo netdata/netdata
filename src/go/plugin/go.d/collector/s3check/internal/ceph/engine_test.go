@@ -28,17 +28,18 @@ func TestCheckReadsBothUnversionedBucketsWithoutMutation(t *testing.T) {
 	j := newCephJournal(t, root)
 	source, destination, _ := newCephClients()
 	engine, err := New(Options{
-		Source:               source,
-		Destination:          destination,
-		SourceBucket:         "source",
-		DestinationBucket:    "destination",
-		Journal:              j,
-		Generator:            newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-		WriteObjective:  10 * time.Minute,
-		WriteTimeout:    20 * time.Minute,
-		DeleteObjective: 5 * time.Minute,
-		DeleteTimeout:   10 * time.Minute,
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            10 * time.Minute,
+		WriteTimeout:              20 * time.Minute,
+		DeleteObjective:           5 * time.Minute,
+		DeleteTimeout:             10 * time.Minute,
 	})
 	require.NoError(t, err)
 
@@ -53,17 +54,25 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	j := newCephJournal(t, t.TempDir())
 	source, destination, _ := newCephClients()
 	engine, err := New(Options{
-		Source: source, Destination: destination,
-		SourceBucket: "source", DestinationBucket: "destination",
-		Journal: j, Generator: newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
-		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            time.Minute,
+		WriteTimeout:              2 * time.Minute,
+		DeleteObjective:           time.Minute,
+		DeleteTimeout:             2 * time.Minute,
 	})
 	require.NoError(t, err)
 	require.NoError(t, engine.Check(context.Background()))
 	destination.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningEnabled,
+		}, nil
 	}
 
 	result := engine.Collect(context.Background())
@@ -77,19 +86,27 @@ func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
 	j := newCephJournal(t, t.TempDir())
 	source, destination, _ := newCephClients()
 	engine, err := New(Options{
-		Source: source, Destination: destination,
-		SourceBucket: "source", DestinationBucket: "destination",
-		Journal: j, Generator: newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
-		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            time.Minute,
+		WriteTimeout:              2 * time.Minute,
+		DeleteObjective:           time.Minute,
+		DeleteTimeout:             2 * time.Minute,
 	})
 	require.NoError(t, err)
 
 	result := engine.Collect(context.Background())
 	require.Equal(t, 1, result.Cleanup.Pending)
 	source.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningEnabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningEnabled,
+		}, nil
 	}
 	sourceDeletesBefore := source.Count("delete")
 	destinationDeletesBefore := destination.Count("delete")
@@ -109,18 +126,19 @@ func TestDirectionalProbePreservesExactKeyAndMeasuresSuccessfulEvents(t *testing
 	source, destination, model := newCephClients()
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Source:               source,
-		Destination:          destination,
-		SourceBucket:         "source",
-		DestinationBucket:    "different-destination",
-		Journal:              j,
-		Generator:            newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-		WriteObjective:  15 * time.Second,
-		WriteTimeout:    time.Minute,
-		DeleteObjective: 10 * time.Second,
-		DeleteTimeout:   time.Minute,
-		Now:             func() time.Time { return now },
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "different-destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            15 * time.Second,
+		WriteTimeout:              time.Minute,
+		DeleteObjective:           10 * time.Second,
+		DeleteTimeout:             time.Minute,
+		Now:                       func() time.Time { return now },
 	})
 	require.NoError(t, err)
 
@@ -162,19 +180,20 @@ func TestWriteTimeoutMovesProbeToCleanupWithoutBlockingNewActiveSlot(t *testing.
 	source, destination, _ := newCephClients()
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Source:               source,
-		Destination:          destination,
-		SourceBucket:         "source",
-		DestinationBucket:    "destination",
-		Journal:              j,
-		Generator:            newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-		WriteObjective:  time.Minute,
-		WriteTimeout:    2 * time.Minute,
-		DeleteObjective: time.Minute,
-		DeleteTimeout:   2 * time.Minute,
-		QueueCapacity:   3,
-		Now:             func() time.Time { return now },
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            time.Minute,
+		WriteTimeout:              2 * time.Minute,
+		DeleteObjective:           time.Minute,
+		DeleteTimeout:             2 * time.Minute,
+		QueueCapacity:             3,
+		Now:                       func() time.Time { return now },
 	})
 	require.NoError(t, err)
 
@@ -216,13 +235,21 @@ func TestAmbiguousPutRetainsOwnershipForSourceRequestUncertaintyWindow(t *testin
 	}
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Source: source, Destination: destination,
-		SourceBucket: "source", DestinationBucket: "destination",
-		Journal: j, Generator: newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Minute, DestinationRequestTimeout: time.Second,
-		WriteObjective: time.Second, WriteTimeout: 10 * time.Second,
-		DeleteObjective: time.Second, DeleteTimeout: time.Second,
-		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Minute,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            time.Second,
+		WriteTimeout:              10 * time.Second,
+		DeleteObjective:           time.Second,
+		DeleteTimeout:             time.Second,
+		QueueCapacity:             1,
+		CleanupBatch:              1,
+		Now:                       func() time.Time { return now },
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { engine.Cleanup(context.Background()) })
@@ -263,13 +290,21 @@ func TestJournalFailurePreservesBackpressureAndLastTerminal(t *testing.T) {
 	source, destination, _ := newCephClients()
 	now := time.Unix(100, 0)
 	engine, err := New(Options{
-		Source: source, Destination: destination,
-		SourceBucket: "source", DestinationBucket: "destination",
-		Journal: j, Generator: newCephGenerator(j.OwnerID()),
-		SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-		WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
-		DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
-		QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+		Source:                    source,
+		Destination:               destination,
+		SourceBucket:              "source",
+		DestinationBucket:         "destination",
+		Journal:                   j,
+		Generator:                 newCephGenerator(j.OwnerID()),
+		SourceRequestTimeout:      time.Second,
+		DestinationRequestTimeout: time.Second,
+		WriteObjective:            time.Minute,
+		WriteTimeout:              2 * time.Minute,
+		DeleteObjective:           time.Minute,
+		DeleteTimeout:             2 * time.Minute,
+		QueueCapacity:             1,
+		CleanupBatch:              1,
+		Now:                       func() time.Time { return now },
 	})
 	require.NoError(t, err)
 
@@ -296,13 +331,21 @@ func TestCleanupRequiresDurableRetirementBeforeDeletingDestination(t *testing.T)
 	now := time.Unix(100, 0)
 	newEngine := func(journalState *journal.Journal) *Engine {
 		engine, err := New(Options{
-			Source: source, Destination: destination,
-			SourceBucket: "source", DestinationBucket: "destination",
-			Journal: journalState, Generator: newCephGenerator(journalState.OwnerID()),
-			SourceRequestTimeout: time.Second, DestinationRequestTimeout: time.Second,
-			WriteObjective: time.Minute, WriteTimeout: 2 * time.Minute,
-			DeleteObjective: time.Minute, DeleteTimeout: 2 * time.Minute,
-			QueueCapacity: 1, CleanupBatch: 1, Now: func() time.Time { return now },
+			Source:                    source,
+			Destination:               destination,
+			SourceBucket:              "source",
+			DestinationBucket:         "destination",
+			Journal:                   journalState,
+			Generator:                 newCephGenerator(journalState.OwnerID()),
+			SourceRequestTimeout:      time.Second,
+			DestinationRequestTimeout: time.Second,
+			WriteObjective:            time.Minute,
+			WriteTimeout:              2 * time.Minute,
+			DeleteObjective:           time.Minute,
+			DeleteTimeout:             2 * time.Minute,
+			QueueCapacity:             1,
+			CleanupBatch:              1,
+			Now:                       func() time.Time { return now },
 		})
 		require.NoError(t, err)
 		return engine
@@ -412,11 +455,16 @@ func (m *cephModel) replicateDelete(key string) {
 }
 
 func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
-	model := &cephModel{source: make(map[string][]byte), destination: make(map[string][]byte)}
+	model := &cephModel{
+		source:      make(map[string][]byte),
+		destination: make(map[string][]byte),
+	}
 	source := &testutil.S3{}
 	destination := &testutil.S3{}
 	versioning := func(context.Context, string) (s3client.BucketVersioningResult, error) {
-		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningDisabled,
+		}, nil
 	}
 	source.BucketVersioningFunc = versioning
 	destination.BucketVersioningFunc = versioning
@@ -446,7 +494,9 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		if !ok {
 			return s3client.GetResult{}, s3client.ErrObjectNotFound
 		}
-		return s3client.GetResult{Payload: append([]byte(nil), payload...)}, nil
+		return s3client.GetResult{
+			Payload: append([]byte(nil), payload...),
+		}, nil
 	}
 	destination.GetFunc = func(_ context.Context, bucket, key, _ string, _ int64) (s3client.GetResult, error) {
 		if bucket != "different-destination" && bucket != "destination" {
@@ -459,7 +509,9 @@ func newCephClients() (*testutil.S3, *testutil.S3, *cephModel) {
 		if !ok {
 			return s3client.GetResult{}, s3client.ErrObjectNotFound
 		}
-		return s3client.GetResult{Payload: append([]byte(nil), payload...)}, nil
+		return s3client.GetResult{
+			Payload: append([]byte(nil), payload...),
+		}, nil
 	}
 	source.DeleteFunc = func(_ context.Context, bucket, key string, _ s3client.DeleteOptions) (s3client.DeleteResult, error) {
 		if bucket != "source" {

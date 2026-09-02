@@ -94,13 +94,17 @@ func TestCollectorUsesIndependentLogicalCallTimeouts(t *testing.T) {
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok)
 		sourceDeadline = time.Until(deadline)
-		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningDisabled,
+		}, nil
 	}
 	destination.BucketVersioningFunc = func(ctx context.Context, _ string) (s3client.BucketVersioningResult, error) {
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok)
 		destinationDeadline = time.Until(deadline)
-		return s3client.BucketVersioningResult{Status: s3client.VersioningDisabled}, nil
+		return s3client.BucketVersioningResult{
+			Status: s3client.VersioningDisabled,
+		}, nil
 	}
 
 	c := New()
@@ -168,7 +172,9 @@ func checkClients(mode contract.Mode) []*testutil.S3 {
 func checkClient(versioning s3client.VersioningStatus) *testutil.S3 {
 	return &testutil.S3{
 		BucketVersioningFunc: func(context.Context, string) (s3client.BucketVersioningResult, error) {
-			return s3client.BucketVersioningResult{Status: versioning}, nil
+			return s3client.BucketVersioningResult{
+				Status: versioning,
+			}, nil
 		},
 		BucketReplicationFunc: func(context.Context, string) ([]s3client.ReplicationRule, error) { return nil, nil },
 		PutFunc: func(context.Context, string, string, []byte, s3client.PutOptions) (s3client.PutResult, error) {

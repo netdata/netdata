@@ -30,7 +30,10 @@ func (c *Collector) buildEngine(
 	if err != nil {
 		return nil, fmt.Errorf("create source S3 client: %w", err)
 	}
-	generator := probe.Generator{Prefix: config.Prefix, OwnerID: j.OwnerID()}
+	generator := probe.Generator{
+		Prefix:  config.Prefix,
+		OwnerID: j.OwnerID(),
+	}
 	if config.Mode == contract.ModeLifecycle {
 		engine, engineErr := lifecycle.New(lifecycle.Options{
 			Client:         source,
@@ -56,22 +59,35 @@ func (c *Collector) buildEngine(
 	switch config.Mode {
 	case contract.ModeCephMultisite:
 		engine, err = ceph.New(ceph.Options{
-			Source: source, Destination: destination,
-			SourceBucket: config.Source.Bucket, DestinationBucket: config.Destination.Bucket,
-			Journal: j, Generator: generator,
-			SourceRequestTimeout: config.Source.Timeout.Duration(), DestinationRequestTimeout: config.Destination.Timeout.Duration(),
-			WriteObjective: config.WriteObjective.Duration(), WriteTimeout: config.WriteTimeout.Duration(),
-			DeleteObjective: config.DeleteObjective.Duration(), DeleteTimeout: config.DeleteTimeout.Duration(),
+			Source:                    source,
+			Destination:               destination,
+			SourceBucket:              config.Source.Bucket,
+			DestinationBucket:         config.Destination.Bucket,
+			Journal:                   j,
+			Generator:                 generator,
+			SourceRequestTimeout:      config.Source.Timeout.Duration(),
+			DestinationRequestTimeout: config.Destination.Timeout.Duration(),
+			WriteObjective:            config.WriteObjective.Duration(),
+			WriteTimeout:              config.WriteTimeout.Duration(),
+			DeleteObjective:           config.DeleteObjective.Duration(),
+			DeleteTimeout:             config.DeleteTimeout.Duration(),
 		})
 	case contract.ModeAWSReplication:
 		engine, err = aws.New(aws.Options{
-			Source: source, Destination: destination,
-			SourceBucket: config.Source.Bucket, DestinationBucket: config.Destination.Bucket,
-			ProbePrefix: config.Prefix, Journal: j, Generator: generator,
-			SourceRequestTimeout: config.Source.Timeout.Duration(), DestinationRequestTimeout: config.Destination.Timeout.Duration(),
-			UpdateEvery:    time.Duration(c.UpdateEvery) * time.Second,
-			WriteObjective: config.WriteObjective.Duration(), WriteTimeout: config.WriteTimeout.Duration(),
-			DeleteObjective: config.DeleteObjective.Duration(), DeleteTimeout: config.DeleteTimeout.Duration(),
+			Source:                    source,
+			Destination:               destination,
+			SourceBucket:              config.Source.Bucket,
+			DestinationBucket:         config.Destination.Bucket,
+			ProbePrefix:               config.Prefix,
+			Journal:                   j,
+			Generator:                 generator,
+			SourceRequestTimeout:      config.Source.Timeout.Duration(),
+			DestinationRequestTimeout: config.Destination.Timeout.Duration(),
+			UpdateEvery:               time.Duration(c.UpdateEvery) * time.Second,
+			WriteObjective:            config.WriteObjective.Duration(),
+			WriteTimeout:              config.WriteTimeout.Duration(),
+			DeleteObjective:           config.DeleteObjective.Duration(),
+			DeleteTimeout:             config.DeleteTimeout.Duration(),
 		})
 	default:
 		err = fmt.Errorf("unsupported s3check mode %q", config.Mode)

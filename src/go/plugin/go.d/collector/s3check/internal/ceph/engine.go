@@ -264,7 +264,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		contract.EndpointSource,
 		contract.OperationPut,
 		func(callCtx context.Context) error {
-			_, callErr := e.source.Put(callCtx, e.sourceBucket, object.Key, object.Payload, s3client.PutOptions{IfNoneMatch: true})
+			_, callErr := e.source.Put(callCtx, e.sourceBucket, object.Key, object.Payload, s3client.PutOptions{
+				IfNoneMatch: true,
+			})
 			return callErr
 		},
 	); err != nil {

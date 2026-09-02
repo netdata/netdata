@@ -76,7 +76,11 @@ func (g Generator) Next() (Object, error) {
 		now().UTC().UnixNano(),
 		hex.EncodeToString(nonce),
 	)
-	return Object{Key: key, Payload: payload, Digest: hex.EncodeToString(sum[:])}, nil
+	return Object{
+		Key:     key,
+		Payload: payload,
+		Digest:  hex.EncodeToString(sum[:]),
+	}, nil
 }
 
 func Digest(payload []byte) string {

@@ -79,13 +79,21 @@ func (e *Engine) advanceRetired(
 				}
 			}
 			var deleted s3client.DeleteResult
-			_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationCleanup, func(callCtx context.Context) error {
-				var callErr error
-				deleted, callErr = e.source.Delete(
-					callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{IfMatch: owned.SourceObjectETag},
-				)
-				return callErr
-			})
+			_, err := e.call(
+				ctx,
+				operations,
+				contract.EndpointSource,
+				contract.OperationCleanup,
+				func(callCtx context.Context) error {
+					var callErr error
+					deleted, callErr = e.source.Delete(
+						callCtx, e.sourceBucket, owned.Key, s3client.DeleteOptions{
+							IfMatch: owned.SourceObjectETag,
+						},
+					)
+					return callErr
+				},
+			)
 			if err != nil {
 				owned.Phase = phaseReconcileDelete
 				_ = e.persist()
@@ -153,12 +161,20 @@ func (e *Engine) cleanupExact(
 		{e.destination, e.destinationBucket, contract.EndpointDestination, owned.DestinationMarkerID},
 	}
 	for _, target := range targets {
-		_, err := e.call(ctx, operations, target.endpoint, contract.OperationCleanup, func(callCtx context.Context) error {
-			_, callErr := target.client.Delete(
-				callCtx, target.bucket, owned.Key, s3client.DeleteOptions{VersionID: target.version},
-			)
-			return callErr
-		})
+		_, err := e.call(
+			ctx,
+			operations,
+			target.endpoint,
+			contract.OperationCleanup,
+			func(callCtx context.Context) error {
+				_, callErr := target.client.Delete(
+					callCtx, target.bucket, owned.Key, s3client.DeleteOptions{
+						VersionID: target.version,
+					},
+				)
+				return callErr
+			},
+		)
 		if err != nil {
 			return false, err
 		}
@@ -171,7 +187,13 @@ func (e *Engine) cleanupExact(
 		return false, err
 	}
 	destinationVersions, err := e.listExact(
-		ctx, e.destination, e.destinationBucket, contract.EndpointDestination, contract.OperationCleanup, owned.Key, operations,
+		ctx,
+		e.destination,
+		e.destinationBucket,
+		contract.EndpointDestination,
+		contract.OperationCleanup,
+		owned.Key,
+		operations,
 	)
 	if err != nil {
 		return false, err
@@ -211,7 +233,11 @@ func (e *Engine) listExact(
 			}
 			versions = append(versions, version)
 			if len(versions) > maxListedVersions {
-				return nil, fmt.Errorf("%w: exact-key version count exceeds %d", errOwnershipInvariant, maxListedVersions)
+				return nil, fmt.Errorf(
+					"%w: exact-key version count exceeds %d",
+					errOwnershipInvariant,
+					maxListedVersions,
+				)
 			}
 		}
 		if !page.Truncated {

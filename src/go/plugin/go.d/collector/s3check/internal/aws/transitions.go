@@ -25,7 +25,10 @@ func (e *Engine) startProbe(
 		return nil, err
 	}
 	owned := entry{
-		Key: object.Key, Digest: object.Digest, CreatedAt: e.now().UTC(), Phase: phasePutIntent,
+		Key:       object.Key,
+		Digest:    object.Digest,
+		CreatedAt: e.now().UTC(),
+		Phase:     phasePutIntent,
 	}
 	e.state.Entries = append(e.state.Entries, owned)
 	e.state.ActiveKey = owned.Key
@@ -35,17 +38,25 @@ func (e *Engine) startProbe(
 	}
 
 	var put s3client.PutResult
-	_, err = e.call(ctx, operations, contract.EndpointSource, contract.OperationPut, func(callCtx context.Context) error {
-		var callErr error
-		put, callErr = e.source.Put(
-			callCtx,
-			e.sourceBucket,
-			object.Key,
-			object.Payload,
-			s3client.PutOptions{IfNoneMatch: true},
-		)
-		return callErr
-	})
+	_, err = e.call(
+		ctx,
+		operations,
+		contract.EndpointSource,
+		contract.OperationPut,
+		func(callCtx context.Context) error {
+			var callErr error
+			put, callErr = e.source.Put(
+				callCtx,
+				e.sourceBucket,
+				object.Key,
+				object.Payload,
+				s3client.PutOptions{
+					IfNoneMatch: true,
+				},
+			)
+			return callErr
+		},
+	)
 	active := e.active()
 	if active == nil {
 		return e.persistTerminal(contract.FailedProbe(contract.ReasonInternal)), nil
@@ -211,13 +222,19 @@ func (e *Engine) reconcilePut(
 	owned.PutAbsentSince = nil
 
 	var got s3client.GetResult
-	_, err = e.call(ctx, operations, contract.EndpointSource, contract.OperationReconcile, func(callCtx context.Context) error {
-		var callErr error
-		got, callErr = e.source.Get(
-			callCtx, e.sourceBucket, owned.Key, objects[0].VersionID, probe.PayloadBytes,
-		)
-		return callErr
-	})
+	_, err = e.call(
+		ctx,
+		operations,
+		contract.EndpointSource,
+		contract.OperationReconcile,
+		func(callCtx context.Context) error {
+			var callErr error
+			got, callErr = e.source.Get(
+				callCtx, e.sourceBucket, owned.Key, objects[0].VersionID, probe.PayloadBytes,
+			)
+			return callErr
+		},
+	)
 	if err != nil {
 		return false, err
 	}
@@ -288,7 +305,9 @@ func (e *Engine) observeObject(
 	owned.Phase = phaseDeleteIntent
 	if err := e.persist(); err != nil && active {
 		e.retire(owned)
-		return false, e.persistTerminal(withPayloadComparison(owned, contract.FailedProbe(contract.ReasonOwnership))), nil
+		return false, e.persistTerminal(
+			withPayloadComparison(owned, contract.FailedProbe(contract.ReasonOwnership)),
+		), nil
 	} else if err != nil {
 		return false, nil, err
 	}
@@ -309,16 +328,24 @@ func (e *Engine) createMarker(
 		}
 	}
 	var deleted s3client.DeleteResult
-	_, err := e.call(ctx, operations, contract.EndpointSource, contract.OperationDelete, func(callCtx context.Context) error {
-		var callErr error
-		deleted, callErr = e.source.Delete(
-			callCtx,
-			e.sourceBucket,
-			owned.Key,
-			s3client.DeleteOptions{IfMatch: owned.SourceObjectETag},
-		)
-		return callErr
-	})
+	_, err := e.call(
+		ctx,
+		operations,
+		contract.EndpointSource,
+		contract.OperationDelete,
+		func(callCtx context.Context) error {
+			var callErr error
+			deleted, callErr = e.source.Delete(
+				callCtx,
+				e.sourceBucket,
+				owned.Key,
+				s3client.DeleteOptions{
+					IfMatch: owned.SourceObjectETag,
+				},
+			)
+			return callErr
+		},
+	)
 	if err != nil {
 		owned.Phase = phaseReconcileDelete
 		owned.MeasureDelete = false
@@ -417,7 +444,9 @@ func (e *Engine) observeMarker(
 	)
 	if listErr != nil {
 		if active {
-			return false, e.persistTerminal(withPayloadComparison(owned, contract.FailedProbe(reasonForError(listErr)))), nil
+			return false, e.persistTerminal(
+				withPayloadComparison(owned, contract.FailedProbe(reasonForError(listErr))),
+			), nil
 		}
 		return false, nil, listErr
 	}
@@ -426,7 +455,9 @@ func (e *Engine) observeMarker(
 		len(markers) != 1 || !markers[0].IsLatest {
 		if active && e.deleteTimedOut(owned) {
 			e.retire(owned)
-			result := e.persistTerminal(withPayloadComparison(owned, contract.FailedProbe(contract.ReasonDeleteTimeout)))
+			result := e.persistTerminal(
+				withPayloadComparison(owned, contract.FailedProbe(contract.ReasonDeleteTimeout)),
+			)
 			return false, result, nil
 		}
 		return false, nil, nil
@@ -438,7 +469,9 @@ func (e *Engine) observeMarker(
 	owned.Phase = phaseExactCleanup
 	if err := e.persist(); err != nil && active {
 		e.retire(owned)
-		return false, e.persistTerminal(withPayloadComparison(owned, contract.FailedProbe(contract.ReasonOwnership))), nil
+		return false, e.persistTerminal(
+			withPayloadComparison(owned, contract.FailedProbe(contract.ReasonOwnership)),
+		), nil
 	} else if err != nil {
 		return false, nil, err
 	}
@@ -484,7 +517,12 @@ func (e *Engine) call(
 			reason = contract.ReasonRequest
 		}
 		*operations = append(*operations, contract.OperationResult{
-			Name: name, Endpoint: endpoint, Status: status, Reason: reason, Duration: duration, Err: err,
+			Name:     name,
+			Endpoint: endpoint,
+			Status:   status,
+			Reason:   reason,
+			Duration: duration,
+			Err:      err,
 		})
 	}
 	return duration, err

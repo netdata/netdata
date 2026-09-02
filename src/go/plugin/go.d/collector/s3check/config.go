@@ -36,31 +36,31 @@ const (
 )
 
 type Config struct {
-	Name               string `yaml:"name,omitempty" json:"name,omitempty"`
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode,omitempty"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every,omitempty"`
+	Name               string `yaml:"name,omitempty"                json:"name,omitempty"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode,omitempty"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
 
-	Mode               string                 `yaml:"mode" json:"mode"`
-	ModeLifecycle      *LifecycleModeConfig   `yaml:"mode_lifecycle,omitempty" json:"mode_lifecycle,omitempty"`
-	ModeCephMultisite  *ReplicationModeConfig `yaml:"mode_ceph_multisite,omitempty" json:"mode_ceph_multisite,omitempty"`
+	Mode               string                 `yaml:"mode"                           json:"mode"`
+	ModeLifecycle      *LifecycleModeConfig   `yaml:"mode_lifecycle,omitempty"       json:"mode_lifecycle,omitempty"`
+	ModeCephMultisite  *ReplicationModeConfig `yaml:"mode_ceph_multisite,omitempty"  json:"mode_ceph_multisite,omitempty"`
 	ModeAWSReplication *ReplicationModeConfig `yaml:"mode_aws_replication,omitempty" json:"mode_aws_replication,omitempty"`
 }
 
 type LifecycleModeConfig struct {
 	Prefix string   `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-	Source S3Config `yaml:"source" json:"source"`
+	Source S3Config `yaml:"source"           json:"source"`
 }
 
 type ReplicationModeConfig struct {
 	Prefix      string   `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-	Source      S3Config `yaml:"source" json:"source"`
-	Destination S3Config `yaml:"destination" json:"destination"`
+	Source      S3Config `yaml:"source"           json:"source"`
+	Destination S3Config `yaml:"destination"      json:"destination"`
 
-	WriteObjective  confopt.LongDuration `yaml:"write_objective,omitempty" json:"write_objective,omitempty"`
-	WriteTimeout    confopt.LongDuration `yaml:"write_timeout,omitempty" json:"write_timeout,omitempty"`
+	WriteObjective  confopt.LongDuration `yaml:"write_objective,omitempty"  json:"write_objective,omitempty"`
+	WriteTimeout    confopt.LongDuration `yaml:"write_timeout,omitempty"    json:"write_timeout,omitempty"`
 	DeleteObjective confopt.LongDuration `yaml:"delete_objective,omitempty" json:"delete_objective,omitempty"`
-	DeleteTimeout   confopt.LongDuration `yaml:"delete_timeout,omitempty" json:"delete_timeout,omitempty"`
+	DeleteTimeout   confopt.LongDuration `yaml:"delete_timeout,omitempty"   json:"delete_timeout,omitempty"`
 }
 
 type selectedModeConfig struct {
@@ -77,17 +77,17 @@ type selectedModeConfig struct {
 
 // S3Config describes one source or destination connection. Name is presentation-only.
 type S3Config struct {
-	Name     string `yaml:"name,omitempty" json:"name,omitempty"`
+	Name     string `yaml:"name,omitempty"     json:"name,omitempty"`
 	Endpoint string `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
-	Region   string `yaml:"region" json:"region"`
-	Bucket   string `yaml:"bucket" json:"bucket"`
+	Region   string `yaml:"region"             json:"region"`
+	Bucket   string `yaml:"bucket"             json:"bucket"`
 
 	Credentials *awsauth.StaticCredentialConfig `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 	AssumeRole  *awsauth.AssumeRoleConfig       `yaml:"assume_role,omitempty" json:"assume_role,omitempty"`
 
 	PathStyle        *bool                `yaml:"path_style,omitempty" json:"path_style,omitempty"`
-	Timeout          confopt.LongDuration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	ProxyURL         string               `yaml:"proxy_url,omitempty" json:"proxy_url,omitempty"`
+	Timeout          confopt.LongDuration `yaml:"timeout,omitempty"    json:"timeout,omitempty"`
+	ProxyURL         string               `yaml:"proxy_url,omitempty"  json:"proxy_url,omitempty"`
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
@@ -269,7 +269,9 @@ func (c *Config) selectedModeConfig() (*selectedModeConfig, error) {
 			errs = append(errs, errors.New("mode_lifecycle is required when mode is lifecycle"))
 		} else {
 			selected = &selectedModeConfig{
-				Mode: contract.ModeLifecycle, Prefix: c.ModeLifecycle.Prefix, Source: c.ModeLifecycle.Source,
+				Mode:   contract.ModeLifecycle,
+				Prefix: c.ModeLifecycle.Prefix,
+				Source: c.ModeLifecycle.Source,
 			}
 		}
 		reject("mode_ceph_multisite", c.ModeCephMultisite != nil)
@@ -296,9 +298,14 @@ func (c *Config) selectedModeConfig() (*selectedModeConfig, error) {
 
 func selectedReplicationConfig(mode contract.Mode, config *ReplicationModeConfig) *selectedModeConfig {
 	return &selectedModeConfig{
-		Mode: mode, Prefix: config.Prefix, Source: config.Source, Destination: &config.Destination,
-		WriteObjective: config.WriteObjective, WriteTimeout: config.WriteTimeout,
-		DeleteObjective: config.DeleteObjective, DeleteTimeout: config.DeleteTimeout,
+		Mode:            mode,
+		Prefix:          config.Prefix,
+		Source:          config.Source,
+		Destination:     &config.Destination,
+		WriteObjective:  config.WriteObjective,
+		WriteTimeout:    config.WriteTimeout,
+		DeleteObjective: config.DeleteObjective,
+		DeleteTimeout:   config.DeleteTimeout,
 	}
 }
 
@@ -340,7 +347,9 @@ func (c *S3Config) validate(path string) error {
 
 func (c S3Config) credentialConfig() awsauth.CredentialConfig {
 	if c.Credentials == nil {
-		return awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}
+		return awsauth.CredentialConfig{
+			Type: awsauth.CredentialTypeDefault,
+		}
 	}
 	return awsauth.CredentialConfig{
 		Type:       awsauth.CredentialTypeStatic,
@@ -377,7 +386,8 @@ func validateEndpoint(value, path string) error {
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return errors.New(path + " must use http or https")
 	}
-	if parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" ||
+		parsed.Fragment != "" {
 		return errors.New(path + " must contain only a scheme and host")
 	}
 	return nil

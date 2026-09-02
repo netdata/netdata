@@ -5,7 +5,10 @@ package contract
 import "time"
 
 func FailedProbe(reason Reason) *ProbeResult {
-	return &ProbeResult{Status: StatusFailed, Reason: reason}
+	return &ProbeResult{
+		Status: StatusFailed,
+		Reason: reason,
+	}
 }
 
 func CloneProbe(value *ProbeResult) *ProbeResult {
@@ -21,5 +24,9 @@ func ObjectiveResultFor(lag, objective time.Duration) ObjectiveResult {
 	if lag >= objective {
 		status = StatusFailed
 	}
-	return ObjectiveResult{Performed: true, Status: status, Lag: lag}
+	return ObjectiveResult{
+		Performed: true,
+		Status:    status,
+		Lag:       lag,
+	}
 }

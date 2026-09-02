@@ -37,12 +37,16 @@ func (s *S3) record(call Call) {
 }
 
 func (s *S3) BucketVersioning(ctx context.Context, bucket string) (s3client.BucketVersioningResult, error) {
-	s.record(Call{Operation: "bucket_versioning"})
+	s.record(Call{
+		Operation: "bucket_versioning",
+	})
 	return s.BucketVersioningFunc(ctx, bucket)
 }
 
 func (s *S3) BucketReplication(ctx context.Context, bucket string) ([]s3client.ReplicationRule, error) {
-	s.record(Call{Operation: "bucket_replication"})
+	s.record(Call{
+		Operation: "bucket_replication",
+	})
 	return s.BucketReplicationFunc(ctx, bucket)
 }
 
@@ -52,7 +56,10 @@ func (s *S3) Put(
 	payload []byte,
 	opts s3client.PutOptions,
 ) (s3client.PutResult, error) {
-	s.record(Call{Operation: "put", Key: key})
+	s.record(Call{
+		Operation: "put",
+		Key:       key,
+	})
 	return s.PutFunc(ctx, bucket, key, payload, opts)
 }
 
@@ -61,7 +68,11 @@ func (s *S3) Get(
 	bucket, key, versionID string,
 	maxBytes int64,
 ) (s3client.GetResult, error) {
-	s.record(Call{Operation: "get", Key: key, VersionID: versionID})
+	s.record(Call{
+		Operation: "get",
+		Key:       key,
+		VersionID: versionID,
+	})
 	return s.GetFunc(ctx, bucket, key, versionID, maxBytes)
 }
 
@@ -70,7 +81,10 @@ func (s *S3) ListCurrent(
 	bucket, prefix string,
 	maxKeys int32,
 ) (s3client.CurrentPage, error) {
-	s.record(Call{Operation: "list_current", Key: prefix})
+	s.record(Call{
+		Operation: "list_current",
+		Key:       prefix,
+	})
 	return s.ListCurrentFunc(ctx, bucket, prefix, maxKeys)
 }
 
@@ -90,7 +104,11 @@ func (s *S3) ListVersions(
 func (s *S3) Delete(
 	ctx context.Context, bucket, key string, opts s3client.DeleteOptions,
 ) (s3client.DeleteResult, error) {
-	s.record(Call{Operation: "delete", Key: key, VersionID: opts.VersionID})
+	s.record(Call{
+		Operation: "delete",
+		Key:       key,
+		VersionID: opts.VersionID,
+	})
 	return s.DeleteFunc(ctx, bucket, key, opts)
 }
 
