@@ -2,7 +2,9 @@
 
 ## Status
 
-Status: planning | ready | in-progress | paused | completed
+Status: planning
+
+One value only: `planning`, `ready`, `in-progress`, `paused`, or `completed`.
 
 `planning` means analysis or decisions are incomplete. `ready` means the
 Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
@@ -26,6 +28,8 @@ Sub-state: <short current truth>
 Regresses (optional): PR #NNNNN
 
 Umbrella (optional, step SOWs only): SOW-YYYYMMDD-<family>-umbrella
+
+Branch (optional): <branch name, once created>
 
 ### Assistant Understanding
 
@@ -62,7 +66,9 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: blocked | ready | needs-user-decision
+Gate status: blocked
+
+One value only: `blocked`, `ready`, or `needs-user-decision`. This is the gate's key, distinct from the SOW `Status:`.
 
 Problem / root-cause model:
 
@@ -194,6 +200,10 @@ Reviewer findings:
 Same-failure scan:
 
 - <search and result>
+
+SOW audit:
+
+- <`bash .agents/sow/audit.sh` summary line; each remaining failure fixed or explained>
 
 Sensitive data gate:
 

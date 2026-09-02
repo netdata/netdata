@@ -180,6 +180,7 @@ Aborting — no files were moved, no data lost."
   # Case 4: this worktree may still carry old-style top-level queue dirs; push
   # their contents into origin's shared q/ before linking (no data loss).
   migrate_old_queues "$origin/$SOW_DIR/q" "$(basename "$top")"
+  retire_active_queue "$origin/$SOW_DIR/q" "$(basename "$top")"
 
   link_one "$SOW_DIR/q"     "$origin/$SOW_DIR/q"
   link_one "$SOW_DIR/specs" "$origin/$SOW_DIR/specs"

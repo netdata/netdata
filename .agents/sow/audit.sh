@@ -306,7 +306,7 @@ done
 if [ -d .agents/skills ]; then
   while IFS= read -r file; do
     scan_files+=("$file")
-  done < <(find .agents/skills -type f 2>/dev/null | sort)
+  done < <(find -L .agents/skills -type f 2>/dev/null | sort)
 fi
 
 if [ -d .agents/skill-verification ]; then

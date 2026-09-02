@@ -1,9 +1,11 @@
 # Go Area Instructions
 
-This file routes Go-specific work under `src/go/`. The repo-root `AGENTS.md` applies in full; a more specific
-`AGENTS.md` in a subdirectory overrides this file where they conflict, for that subtree. Paths in the routing table
-are repo-relative; Go commands and Go package paths are relative to the module root `src/go/` (the only `go.mod`),
-so run them from there.
+This file routes Go-specific work under `src/go/`. The repo-root `AGENTS.md` applies in full; where the two
+conflict, this more specific file wins. A more specific
+`AGENTS.md` in a subdirectory (today `src/go/plugin/ibm.d/AGENTS.md`) overrides this file for that subtree only where
+the two conflict; everything here that it does not contradict still applies there. Paths are repo-relative unless
+they are Go commands or Go package paths, which are relative to this tree's module root `src/go/` (its `go.mod`); run
+them from there.
 
 ## Task Routing
 
@@ -94,8 +96,8 @@ a plausible future problem is not a requirement.
 metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths: they run for every collector on
 every cycle.
 
-- A hot-path change MUST include before/after `go test -bench` numbers (use `git stash` for the "before"
-  baseline), not just "tests pass".
+- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers (use `git stash` for the
+  "before" baseline), not just "tests pass".
 - Allocation count is the gate: assert allocs stay within the intended envelope (for example a sparse commit stays
   ~O(touched), never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline
   and never record a personal name in the file.
@@ -109,8 +111,8 @@ every cycle.
 `gofmt` and `goimports` are the baseline. The repository additionally RECOMMENDS (not CI-enforced) this pipeline,
 which keeps wrapping tight and keyed struct literals readable:
 
-1. `golines -m 120 -t 4 -w <paths>`: join over-wrapped signatures/calls and split lines past ~120 columns. Skip if
-   `golines` is not installed (`go install github.com/segmentio/golines@latest`).
+1. `golines -m 120 -t 4 -w <paths>`: join over-wrapped signatures/calls and split lines past ~120 columns. SKIP this
+   step if `golines` is not installed (`go install github.com/segmentio/golines@latest`).
 2. `go run ./tools/expandstructs <paths>`: one keyed struct-literal field per line (formats in-process with
    `go/format`).
 3. `goimports -w <paths>`: order imports.
@@ -122,7 +124,7 @@ Conventions this encodes:
 - Keyed struct literals of a named type go ONE field per line.
 
 `gofmt`/`goimports` cannot express these two rules, so they are not CI-enforced; re-run the pipeline if code drifts.
-See `tools/expandstructs/README.md`.
+See `src/go/tools/expandstructs/README.md`.
 
 ## Validation For Go Changes
 
@@ -132,7 +134,8 @@ See `tools/expandstructs/README.md`.
 - Shared framework code: ALSO build and test representative consumers (a couple of real collectors) plus
   `-race ./plugin/agent/jobmgr/`, so the change is proven against real users, not only its own package.
 - Prefer `testify/require` for prerequisites and `testify/assert` for comparisons. Use `t.Fatal`/`t.Fatalf`
-  directly for genuine test control flow or when no clearer assertion exists.
+  directly for genuine test control flow or when no clearer assertion exists. Test shape: root `AGENTS.md`, "Go
+  Test Style".
 
 ## Go Review And Reachability
 
@@ -147,8 +150,8 @@ See `tools/expandstructs/README.md`.
 
 - Changes SHOULD stay atomic. If a collector or framework task grows, split it into coherent batches before review
   becomes difficult.
-- Every batch boundary is a Re-evaluation checkpoint (root `AGENTS.md`): you MUST re-evaluate clean end state and
-  scope there. If a separate framework fix, collector cleanup, or docs rewrite has become necessary, split it into
-  its own step or submit it independently before continuing.
+- Treat every batch boundary as an additional Re-evaluation checkpoint (root `AGENTS.md`, "Clean End State Over Less
+  Churn"): you MUST re-evaluate clean end state and scope there. If a separate framework fix, collector cleanup, or docs
+  rewrite has become necessary, split it into its own step or submit it independently before continuing.
 - Changes MUST NOT mix framework changes, collector migrations, and integration-doc regeneration unless one coherent
   behavior change requires them.
