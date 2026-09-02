@@ -42,6 +42,7 @@ section() {
 
 read_sow_status() {
   awk '
+    { sub(/\r$/, "") }
     function clean(s, a) {
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
       gsub(/`/, "", s)
@@ -106,6 +107,7 @@ for q in pending current "done"; do
     warn ".agents/sow/q/$q missing (run .agents/sow/worktree-link.sh)"
   fi
 done
+[ ! -d .agents/sow/q/active ] || warn "retired queue .agents/sow/q/active exists; run .agents/sow/worktree-link.sh to fold it into current/"
 
 section "tracking invariants"
 for f in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
@@ -149,7 +151,7 @@ sow_heading_text() { printf '%s\n' "$1" | tr -d '\r' | sed -E 's/[[:space:]]*<!-
 while IFS= read -r h; do
   [ -n "$h" ] || continue
   text=$(sow_heading_text "$h")
-  tag_list=$(printf '%s\n' "$h" | grep -o -- '<!-- sow:[a-z-]* -->' | sed -E 's/^<!-- sow:([a-z-]*) -->$/\1/')
+  tag_list=$(printf '%s\n' "$h" | sed -E 's/[[:space:]]+$//' | grep -o -- '<!-- sow:[a-z-]* -->$' | sed -E 's/^<!-- sow:([a-z-]*) -->$/\1/')
   ntag=0; [ -n "$tag_list" ] && ntag=$(printf '%s\n' "$tag_list" | wc -l | tr -d ' ')
   tag=""
   if [ "$ntag" -eq 1 ]; then
@@ -185,7 +187,7 @@ sow_has_line() {
     fence { next }
     { sub(/[[:space:]]*<!--.*-->[[:space:]]*$/, ""); sub(/[[:space:]]+$/, "") }
     m == "exact" && $0 == n { f = 1 }
-    m == "prefix" { l = $0; sub(/^[[:space:]]*[-*]+[[:space:]]+/, "", l); gsub(/\*\*/, "", l); if (index(l, n) == 1) f = 1 }
+    m == "prefix" { l = $0; sub(/^[[:space:]]*[-*]+[[:space:]]+/, "", l); gsub(/\*\*/, "", l); gsub(/`/, "", l); if (index(l, n) == 1) f = 1 }
     END { exit !f }' "$2"
 }
 active_count=0
