@@ -151,14 +151,15 @@ sow_heading_text() { printf '%s\n' "$1" | tr -d '\r' | sed -E 's/[[:space:]]*<!-
 while IFS= read -r h; do
   [ -n "$h" ] || continue
   text=$(sow_heading_text "$h")
+  # Every HTML comment mentioning sow: counts; only one, in the exact trailing form, is a valid tag.
+  ncomment=$(printf '%s\n' "$h" | grep -o -- '<!--[^>]*-->' | grep -ci -- 'sow:')
   tag_list=$(printf '%s\n' "$h" | sed -E 's/[[:space:]]+$//' | grep -o -- '<!-- sow:[a-z-]* -->$' | sed -E 's/^<!-- sow:([a-z-]*) -->$/\1/')
-  ntag=0; [ -n "$tag_list" ] && ntag=$(printf '%s\n' "$tag_list" | wc -l | tr -d ' ')
   tag=""
-  if [ "$ntag" -eq 1 ]; then
-    tag="$tag_list"
-  elif [ "$ntag" -gt 1 ]; then
+  if [ "$ncomment" -gt 1 ]; then
     warn "template heading carries several sow: tags; treated as required everywhere: $h"
-  elif printf '%s\n' "$h" | grep -qi -- '<!--[^>]*sow:'; then
+  elif [ "$ncomment" -eq 1 ] && [ -n "$tag_list" ]; then
+    tag="$tag_list"
+  elif [ "$ncomment" -eq 1 ]; then
     warn "template heading carries a malformed sow: tag; treated as required everywhere: $h"
   fi
   case "$tag" in
@@ -169,21 +170,21 @@ while IFS= read -r h; do
     *) warn "template heading carries unknown sow: tag '$tag'; treated as required everywhere: $h"
        sow_base_sections+=("$text") ;;
   esac
-done < <(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence && /^## /' .agents/sow/SOW.template.md 2>/dev/null)
+done < <(awk '/^[[:space:]]*(```|~~~)/ { fence = !fence; next } !fence && /^## /' .agents/sow/SOW.template.md 2>/dev/null)
 pinned_sow_fields_all=("Sensitive data handling plan:")
 pinned_sow_fields_impl=("Sensitive data gate:")
 [ "${#sow_base_sections[@]}" -gt 0 ] || warn "no untagged '## ' heading in .agents/sow/SOW.template.md; structural SOW check skipped"
 
 # $1 needle, $2 file. A '## ' needle must equal a whole heading line; any other
 # needle ("Label:") must start a line once a list marker and bold markers are
-# dropped. Lines inside ``` fences are ignored. The needle travels via the environment
+# dropped. Lines inside ``` or ~~~ fences are ignored. The needle travels via the environment
 # so a backslash in a heading is not reinterpreted by awk.
 sow_has_line() {
   local mode=prefix; case "$1" in "## "*) mode=exact ;; esac
   n="$1" awk -v m="$mode" '
     BEGIN { n = ENVIRON["n"] }
     { sub(/\r$/, "") }
-    /^[[:space:]]*```/ { fence = !fence; next }
+    /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
     fence { next }
     { sub(/[[:space:]]*<!--.*-->[[:space:]]*$/, ""); sub(/[[:space:]]+$/, "") }
     m == "exact" && $0 == n { f = 1 }
