@@ -14,652 +14,765 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: >-
-          Runs active S3 lifecycle, Ceph RGW multisite, or AWS S3 replication checks from the Agent's client vantage.
+          Runs active S3 checks from the Agent: write, read, list, and delete round trips against one endpoint, or
+          object propagation between Ceph RGW zones or AWS S3 replicated buckets.
       keywords:
         - s3
         - object storage
         - ceph
         - rgw
+        - aws
         - replication
+        - multisite
         - synthetic
     overview:
       data_collection:
         metrics_description: |
-          Monitor authenticated S3 checks, replication visibility objectives, payload correctness, cleanup backlog, and
-          mutation backpressure.
+          Monitor S3-compatible object storage with active checks that write, read, list, and delete small probe
+          objects and time their replication between sites.
 
-          Work that was not performed is left as a metric gap. Request counters represent logical S3 calls; SDK retry
-          attempts are intentionally not presented as separately observed network requests.
+          The collector runs on the Netdata Agent as an ordinary S3 client, so every result includes what a real
+          client experiences on that path: DNS, network, proxies, TLS, authentication, and the service itself. It
+          reports the outcome and duration of each S3 operation, whether the content read back matches what was
+          written, how long replication took compared with your objectives, how many probe objects still await
+          cleanup, and whether new probes are paused because cleanup is backlogged.
+
+          One job runs one of three modes:
+
+          | Mode | What it checks | Bucket requirements |
+          |:-----|:---------------|:--------------------|
+          | `lifecycle` | One endpoint. Writes a probe object, reads it back and verifies its content, confirms it is listed, deletes it, and confirms it is gone. Works with AWS S3, Ceph RGW, and other S3-compatible services. | Versioning never enabled |
+          | `ceph_multisite` | One replication direction between two Ceph RGW zones. Writes at the source, waits until the same object is readable at the destination, deletes it at the source, and waits until the destination no longer serves it. | Versioning never enabled on either bucket |
+          | `aws_replication` | One replication direction between two AWS S3 buckets, following AWS replication semantics: the object version created by the write and the delete marker created by the delete are each expected to replicate. | Versioning enabled on both buckets and a replication rule that replicates delete markers |
+
+          The `lifecycle` mode checks the life cycle of a probe object; it does not inspect S3 Lifecycle Management
+          rules. Replication modes check one direction only: to validate a bidirectional setup, configure one job per
+          direction.
         method_description: |
-          `lifecycle` creates one owner-scoped object, verifies exact payload and list visibility, deletes it, and proves
-          current-object read absence. It requires an unversioned bucket.
+          Every job owns a private key space inside the configured prefix, `<prefix><owner>/probe-...`, where the
+          owner segment is derived from this Agent and job. The collector writes, reads, lists, and deletes only keys
+          it has recorded in that space. It never scans or touches other objects in the bucket, and Agents or jobs
+          that share a bucket and prefix never interfere with each other.
 
-          `ceph_multisite` writes at one Ceph RGW site, verifies the exact full key at a configured destination, deletes at
-          the source, and measures when the destination current object becomes unreadable. Both buckets must be unversioned.
+          Before a probe object is written, its key is recorded in a local journal under the Agent's state
+          directory. If a probe is interrupted by a restart, a network failure, or an ambiguous response, the recorded
+          objects are deleted during later collections, a few per collection. Cleanup is best effort: it requires the
+          same job name, mode, endpoints, buckets, prefix, and working credentials, and it cannot remove objects when
+          the service or the permissions are gone. The number of objects awaiting cleanup is bounded. When that bound
+          is reached, the collector keeps observing and cleaning up but stops creating new probe objects until a slot
+          is free, and the `mutation_backpressure` chart shows the pause.
 
-          `aws_replication` requires versioning on both buckets and an enabled applicable replication rule targeting the
-          configured destination with delete-marker replication. It tracks the source and destination object versions and
-          delete markers independently, then deletes only those exact versions during cleanup.
-
-          Every mode persists owner-scoped recovery state before mutation. One bounded active probe and cleanup queue are
-          advanced per job. At capacity, cleanup and observation continue while new mutations are suspended. Jobs never
-          scan, lock, or delete another Agent/job owner's namespace.
+          Replication modes poll the destination once per collection until the configured timeout. Each replication
+          job has objectives, the propagation time you consider healthy, and timeouts, the point at which the probe is
+          declared failed and its object is scheduled for cleanup. Delete propagation is measured as the moment the
+          destination stops serving the object; how the storage system reclaims space behind that is not observed. In
+          `aws_replication` mode cleanup deletes only the exact object versions and delete markers the probe created.
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
         description: |
-          All modes require permission to read bucket versioning plus object read, list, write, and delete permissions in
-          the owner prefix. Ceph and AWS destinations need read, list, and exact cleanup delete permissions but no direct
-          write permission. AWS replication additionally needs permission to read the source replication configuration and
-          list/delete exact object versions and delete markers in both buckets.
+          Grant each endpoint only the operations its role needs, scoped to the configured bucket and, for object
+          operations, to the configured prefix:
+
+          | Mode | Source endpoint | Destination endpoint |
+          |:-----|:----------------|:---------------------|
+          | `lifecycle` | `s3:GetBucketVersioning`, `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:DeleteObject` | not used |
+          | `ceph_multisite` | `s3:GetBucketVersioning`, `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` | `s3:GetBucketVersioning`, `s3:GetObject`, `s3:DeleteObject` |
+          | `aws_replication` | `s3:GetBucketVersioning`, `s3:GetReplicationConfiguration`, `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`, `s3:ListBucketVersions`, `s3:DeleteObject`, `s3:DeleteObjectVersion` | `s3:GetBucketVersioning`, `s3:GetObject`, `s3:ListBucketVersions`, `s3:DeleteObjectVersion` |
+
+          The collector never writes to a destination; its delete permission is used only to remove the replicated
+          copy of a probe object during cleanup. When `assume_role` is configured, the base credentials also need
+          `sts:AssumeRole` on that role.
       default_behavior:
         auto_detection:
           description: |
-            There is no automatic discovery. Configure the mode, source region and bucket, authentication, and a
-            destination for replication modes.
+            There is no auto-detection. A job needs a mode, a source region and bucket, credentials or an AWS SDK
+            credential source on the Agent host, and a destination for the replication modes.
         limits:
           description: |
-            The collector advances at most one active probe plus a fixed cleanup batch per collection. Ownership state,
-            cleanup queue capacity, AWS version-list pages/items, and shutdown cleanup time are fixed internal bounds rather
-            than public tuning options. Replication polling occurs once per collection interval until its configured timeout.
+            Each job runs one probe at a time and cleans up a few pending objects per collection. The number of
+            objects tracked for cleanup is a fixed internal bound; when it is reached, new probes pause until cleanup
+            frees a slot. Probe objects are 4 KiB. Replication objectives must be at least one collection interval,
+            because the destination is polled once per collection, and objectives and timeouts are capped at 24 hours.
         performance_impact:
           description: |
-            The collector actively creates and deletes small objects. Use a reserved prefix, restricted credentials, and an
-            interval appropriate for the replication policy. Each collection also rechecks the bucket/provider prerequisites
-            before cleanup or mutation.
+            The impact on the Agent is negligible. On the storage side each collection issues a handful of small
+            requests under the configured prefix: at most one new probe object with its reads, listing, and delete,
+            plus a few cleanup deletes. Use a dedicated bucket or reserved prefix, credentials restricted to it, and a
+            collection interval that matches how often you want to exercise the service.
     setup:
       prerequisites:
         list:
+          - title: Choose a mode and prepare the buckets
+            description: |
+              The collector verifies the bucket contract of its mode before every collection and refuses to run
+              when it is not met:
+
+              | Mode | Buckets | Versioning | Replication policy |
+              |:-----|:--------|:-----------|:-------------------|
+              | `lifecycle` | one bucket | never enabled; a suspended state is also rejected | none |
+              | `ceph_multisite` | one bucket per zone, names may differ | never enabled on either bucket | the zones must sync the bucket so that a key written at the source appears unchanged at the destination |
+              | `aws_replication` | one bucket per side, names may differ | enabled on both buckets, MFA Delete off | an enabled replication rule on the source bucket that covers the prefix without tag filters, targets the destination bucket, and has delete marker replication enabled; no other enabled rule may replicate the prefix to a different bucket |
+
+              The destination key is always identical to the source key. Policies that rename or re-prefix objects are
+              not supported. A dedicated bucket is the simplest way to meet these requirements, but any bucket that
+              satisfies them works.
+
+              Every probe object is written with a conditional `If-None-Match: *` request so that a probe can never
+              overwrite an existing key; the service must support conditional writes.
           - title: Reserve an object prefix
             description: |
-              Reserve the configured prefix for this collector. The collector adds an Agent/job owner namespace below it
-              and only cleans exact objects recorded in that namespace.
-          - title: Select the mode and bucket versioning contract
+              Pick a prefix, by default `netdata-s3check/`, and do not store your own data under it. The collector
+              creates and deletes objects only under `<prefix><owner>/`, where the owner segment is unique to this
+              Agent and job, so several Agents and jobs can safely share a prefix and even a bucket. Keys outside the
+              collector's own namespace are never listed, read, or deleted.
+          - title: Create credentials with the minimum permissions
             description: |
-              Use unversioned buckets for `lifecycle` and `ceph_multisite`. Use versioned buckets for `aws_replication` and
-              enable delete-marker replication on the applicable source rule.
-          - title: Create restricted credentials
+              Each endpoint authenticates independently. Omit `credentials` to use the AWS SDK default credential
+              chain on the Agent host (environment variables, shared config and profiles, instance or task roles), or
+              provide static keys, preferably as go.d secret references such as `${env:NAME}` rather than plaintext.
+              Optionally add `assume_role` to switch to a role with those base credentials.
+
+              Grant only the operations listed in the permissions table of the Overview, scoped to the bucket and, for
+              object operations, to the prefix. When `assume_role` is configured, the base credentials must also be
+              allowed to call `sts:AssumeRole` on that role.
+          - title: Run the job where your clients run
             description: |
-              Omit `credentials` to use the AWS SDK default chain, or provide static credentials directly in that object.
-              Assume-role is configured independently for each endpoint. Prefer go.d secret references over plaintext.
-          - title: Choose the client vantage
-            description: |
-              Run each directional job on the Agent whose network path represents the client-visible behavior to measure.
+              Results reflect the network path of the Agent that runs the job: DNS, routing, proxies, TLS, and
+              authentication are all part of the measurement. Run each job on the Agent that best represents the
+              clients you care about. Replication checks cover one direction; add a second job with source and
+              destination swapped to check the reverse direction.
       configuration:
         file:
           name: go.d/s3check.conf
         options:
           description: |
-            Select `mode`, then configure only its matching `mode_*` object. Durations use readable values such as `10s`,
-            `5m`, or `30m`.
+            Set `mode` and configure only the matching `mode_*` object; the other two must be absent. Durations accept
+            human-readable values such as `10s`, `5m`, `1h`, or `1d`.
+
+            **Endpoint settings.** Every `source` and `destination` object takes the same connection settings:
+
+            - `endpoint`, `region`, `bucket`, `path_style`: where the bucket lives. For AWS S3 leave `endpoint` empty
+              and set `path_style: no`; for Ceph RGW and other S3-compatible services set the full URL and keep
+              path-style addressing.
+            - `credentials`: static access keys. Omit the object to use the AWS SDK default credential chain of the
+              Agent host. Prefer go.d secret references such as `${env:NAME}` over plaintext values.
+            - `assume_role`: optional. The base credentials call STS AssumeRole and the returned temporary credentials
+              are used for this endpoint only.
+            - `timeout`, `proxy_url`, and the `tls_*` options apply to every S3 request and to the STS AssumeRole
+              request of that endpoint. An empty `proxy_url` honors the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`
+              environment of the Agent.
+
+            **Prefix.** The collector only writes, reads, lists, and deletes keys under `<prefix><owner>/`, where the
+            owner segment is derived from this Agent and job. Reserve the prefix for Netdata; several Agents and jobs
+            may share it.
+
+            **Objectives and timeouts (replication modes).** An objective is the propagation time you consider
+            healthy: exceeding it marks the `write_visibility_objective` or `delete_visibility_objective` chart as
+            breached while the probe keeps waiting. A timeout is the hard limit: exceeding it fails the probe with
+            reason `visibility_timeout` or `delete_timeout` and schedules the object for cleanup. Objectives must be at
+            least `update_every`, because the destination is polled once per collection, timeouts must be at least
+            their objective, and all four are capped at `24h`.
           folding:
             title: Config options
             enabled: true
           list:
             - name: "mode"
-              description: "Check mode. Select `lifecycle`, `ceph_multisite`, or `aws_replication`."
+              description: "Check to run: `lifecycle`, `ceph_multisite`, or `aws_replication`."
               default_value: "lifecycle"
               required: false
               group: "Mode"
+              detailed_description: |
+                Select the mode first and configure only its `mode_*` object. A job whose mode object is missing, or
+                that also sets another mode's object, is rejected. The Overview compares the three modes.
             - name: "mode_lifecycle"
-              description: "Configuration for the single-endpoint lifecycle check. Required when `mode` selects this check."
+              description: "Settings of the `lifecycle` mode. Required when `mode` is `lifecycle`."
               default_value: ""
               required: false
               group: "Mode / Lifecycle"
+              detailed_description: |
+                Each collection writes one 4 KiB probe object under the prefix, reads it back and verifies its content,
+                confirms it appears in a listing, deletes it, and confirms it is gone. A successful collection leaves
+                nothing behind.
+
+                The bucket must never have had versioning enabled; a suspended state is also rejected, because a plain
+                delete must remove the object completely. Required permissions on the bucket: `s3:GetBucketVersioning`,
+                `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:DeleteObject`.
             - name: "mode_lifecycle.prefix"
-              description: "Reserved object-key prefix ending with a slash."
+              description: "Key prefix reserved for probe objects. Must end with `/`."
               default_value: "netdata-s3check/"
               required: false
               group: "Mode / Lifecycle"
             - name: "mode_lifecycle.source"
-              description: "Source S3 connection and authentication. Required when this mode is selected."
+              description: "The S3 endpoint to check. Required."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.name"
-              description: "Presentation-only source label."
+              description: "Label for this endpoint on charts (the `source` label)."
               default_value: "source"
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.endpoint"
-              description: "Optional HTTP(S) source endpoint. Empty uses the AWS SDK regional endpoint."
+              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.region"
-              description: "Source signing region. Required when this mode is selected."
+              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.bucket"
-              description: "Source probe bucket. Required when this mode is selected."
+              description: "Bucket that holds the probe objects. Required."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.path_style"
-              description: "Put the source bucket in the request path. This is common for Ceph RGW."
+              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
               default_value: true
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials"
-              description: "Optional static source credentials. Omit to use the AWS SDK default chain."
+              description: "Static access keys. Omit to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials.access_key_id"
-              description: "Source access key ID. Use a go.d secret reference."
+              description: "Access key ID. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials.secret_access_key"
-              description: "Source secret access key. Use a go.d secret reference."
+              description: "Secret access key. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials.session_token"
-              description: "Optional source session token."
+              description: "Session token for temporary credentials."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.assume_role"
-              description: "Optional role assumed from the source base credentials."
+              description: "IAM role to assume with this endpoint's base credentials."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.assume_role.role_arn"
-              description: "Source role ARN."
+              description: "ARN of the role to assume. Required when `assume_role` is set."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.assume_role.external_id"
-              description: "Optional source role external ID."
+              description: "External ID expected by the role's trust policy."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.timeout"
-              description: "Timeout for one logical source S3 call."
+              description: "Maximum duration of one S3 or STS request, up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.proxy_url"
-              description: "Optional source HTTP proxy URL."
+              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_skip_verify"
-              description: "Skip source TLS verification. This is insecure."
+              description: "Skip TLS certificate verification. Insecure."
               default_value: false
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_ca"
-              description: "Absolute path to the source CA bundle."
+              description: "Absolute path to a CA bundle for a private CA."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_cert"
-              description: "Absolute path to the source client certificate."
+              description: "Absolute path to a client certificate. Requires `tls_key`."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_key"
-              description: "Absolute path to the source client key."
+              description: "Absolute path to the client certificate key. Requires `tls_cert`."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_ceph_multisite"
-              description: "Configuration for one Ceph RGW source-to-destination direction. Required when `mode` selects this check."
+              description: "Settings of the `ceph_multisite` mode. Required when `mode` is `ceph_multisite`."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite"
+              detailed_description: |
+                Writes a probe object at the source zone, polls the destination zone once per collection until the same
+                key is readable there with the same content, deletes it at the source, and polls until the destination
+                no longer serves it. Write lag is measured from the source write, delete lag from the source delete.
+
+                Both buckets must be unversioned. The source needs `s3:GetBucketVersioning`, `s3:PutObject`,
+                `s3:GetObject`, `s3:DeleteObject`; the destination needs `s3:GetBucketVersioning`, `s3:GetObject`,
+                `s3:DeleteObject`. The collector never writes to the destination and deletes there only its own
+                replicated copies during cleanup. Use one job per direction.
             - name: "mode_ceph_multisite.prefix"
-              description: "Reserved object-key prefix ending with a slash."
+              description: "Key prefix reserved for probe objects. Must end with `/`."
               default_value: "netdata-s3check/"
               required: false
               group: "Mode / Ceph multisite"
             - name: "mode_ceph_multisite.source"
-              description: "Source S3 connection and authentication. Required when this mode is selected."
+              description: "Where probe objects are written and deleted. Required."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.name"
-              description: "Presentation-only source label."
+              description: "Label for this endpoint on charts (the `source` label)."
               default_value: "source"
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.endpoint"
-              description: "Optional HTTP(S) source endpoint. Empty uses the AWS SDK regional endpoint."
+              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.region"
-              description: "Source signing region. Required when this mode is selected."
+              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.bucket"
-              description: "Source probe bucket. Required when this mode is selected."
+              description: "Bucket that holds the probe objects. Required."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.path_style"
-              description: "Put the source bucket in the request path. This is common for Ceph RGW."
+              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
               default_value: true
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials"
-              description: "Optional static source credentials. Omit to use the AWS SDK default chain."
+              description: "Static access keys. Omit to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials.access_key_id"
-              description: "Source access key ID. Use a go.d secret reference."
+              description: "Access key ID. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials.secret_access_key"
-              description: "Source secret access key. Use a go.d secret reference."
+              description: "Secret access key. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials.session_token"
-              description: "Optional source session token."
+              description: "Session token for temporary credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.assume_role"
-              description: "Optional role assumed from the source base credentials."
+              description: "IAM role to assume with this endpoint's base credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.assume_role.role_arn"
-              description: "Source role ARN."
+              description: "ARN of the role to assume. Required when `assume_role` is set."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.assume_role.external_id"
-              description: "Optional source role external ID."
+              description: "External ID expected by the role's trust policy."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.timeout"
-              description: "Timeout for one logical source S3 call."
+              description: "Maximum duration of one S3 or STS request, up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.proxy_url"
-              description: "Optional source HTTP proxy URL."
+              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_skip_verify"
-              description: "Skip source TLS verification. This is insecure."
+              description: "Skip TLS certificate verification. Insecure."
               default_value: false
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_ca"
-              description: "Absolute path to the source CA bundle."
+              description: "Absolute path to a CA bundle for a private CA."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_cert"
-              description: "Absolute path to the source client certificate."
+              description: "Absolute path to a client certificate. Requires `tls_key`."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_key"
-              description: "Absolute path to the source client key."
+              description: "Absolute path to the client certificate key. Requires `tls_cert`."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.destination"
-              description: "Destination S3 connection and authentication. Required when this mode is selected."
+              description: "Where replicated copies must appear. Never written by the collector. Required."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.name"
-              description: "Presentation-only destination label."
+              description: "Label for this endpoint on charts (the `destination` label)."
               default_value: "destination"
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.endpoint"
-              description: "Optional HTTP(S) destination endpoint. Empty uses the AWS SDK regional endpoint."
+              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.region"
-              description: "Destination signing region. Required when this mode is selected."
+              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.bucket"
-              description: "Destination probe bucket. Required when this mode is selected."
+              description: "Bucket that holds the probe objects. Required."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.path_style"
-              description: "Put the destination bucket in the request path. This is common for Ceph RGW."
+              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
               default_value: true
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials"
-              description: "Optional static destination credentials. Omit to use the AWS SDK default chain."
+              description: "Static access keys. Omit to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials.access_key_id"
-              description: "Destination access key ID. Use a go.d secret reference."
+              description: "Access key ID. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials.secret_access_key"
-              description: "Destination secret access key. Use a go.d secret reference."
+              description: "Secret access key. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials.session_token"
-              description: "Optional destination session token."
+              description: "Session token for temporary credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.assume_role"
-              description: "Optional role assumed from the destination base credentials."
+              description: "IAM role to assume with this endpoint's base credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.assume_role.role_arn"
-              description: "Destination role ARN."
+              description: "ARN of the role to assume. Required when `assume_role` is set."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.assume_role.external_id"
-              description: "Optional destination role external ID."
+              description: "External ID expected by the role's trust policy."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.timeout"
-              description: "Timeout for one logical destination S3 call."
+              description: "Maximum duration of one S3 or STS request, up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.proxy_url"
-              description: "Optional destination HTTP proxy URL."
+              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_skip_verify"
-              description: "Skip destination TLS verification. This is insecure."
+              description: "Skip TLS certificate verification. Insecure."
               default_value: false
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_ca"
-              description: "Absolute path to the destination CA bundle."
+              description: "Absolute path to a CA bundle for a private CA."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_cert"
-              description: "Absolute path to the destination client certificate."
+              description: "Absolute path to a client certificate. Requires `tls_key`."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_key"
-              description: "Absolute path to the destination client key."
+              description: "Absolute path to the client certificate key. Requires `tls_cert`."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.write_objective"
-              description: "Source PUT to verified destination visibility objective."
+              description: "Healthy propagation time for a new object. Exceeding it flags the objective chart only."
               default_value: "15m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_ceph_multisite.write_timeout"
-              description: "Maximum source PUT to destination visibility wait."
+              description: "Hard limit for a new object to appear at the destination. Exceeding it fails the probe."
               default_value: "30m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_ceph_multisite.delete_objective"
-              description: "Source delete to destination current-object invisibility objective."
+              description: "Healthy time for a source delete to hide the destination copy."
               default_value: "5m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_ceph_multisite.delete_timeout"
-              description: "Maximum source delete to destination current-object invisibility wait."
+              description: "Hard limit for the destination copy to disappear. Exceeding it fails the probe."
               default_value: "15m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_aws_replication"
-              description: "Configuration for one AWS S3 source-to-destination replication direction. Required when `mode` selects this check."
+              description: "Settings of the `aws_replication` mode. Required when `mode` is `aws_replication`."
               default_value: ""
               required: false
               group: "Mode / AWS replication"
+              detailed_description: |
+                Follows AWS S3 replication semantics: the source write creates an object version, the source delete
+                creates a delete marker, and both are expected to replicate. The collector records the exact version and
+                marker IDs on both sides and deletes only those during cleanup.
+
+                Both buckets need versioning enabled with MFA Delete off. The source bucket needs an enabled replication
+                rule that covers the prefix without tag filters, targets the destination bucket, and has delete marker
+                replication enabled; no other enabled rule may replicate the prefix to a different bucket. Source
+                permissions: `s3:GetBucketVersioning`, `s3:GetReplicationConfiguration`, `s3:PutObject`, `s3:GetObject`,
+                `s3:GetObjectVersion`, `s3:ListBucketVersions`, `s3:DeleteObject`, `s3:DeleteObjectVersion`. Destination
+                permissions: `s3:GetBucketVersioning`, `s3:GetObject`, `s3:ListBucketVersions`,
+                `s3:DeleteObjectVersion`. Use one job per direction.
             - name: "mode_aws_replication.prefix"
-              description: "Reserved object-key prefix ending with a slash."
+              description: "Key prefix reserved for probe objects. Must end with `/`."
               default_value: "netdata-s3check/"
               required: false
               group: "Mode / AWS replication"
             - name: "mode_aws_replication.source"
-              description: "Source S3 connection and authentication. Required when this mode is selected."
+              description: "Where probe objects are written and deleted. Required."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.name"
-              description: "Presentation-only source label."
+              description: "Label for this endpoint on charts (the `source` label)."
               default_value: "source"
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.endpoint"
-              description: "Optional HTTP(S) source endpoint. Empty uses the AWS SDK regional endpoint."
+              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.region"
-              description: "Source signing region. Required when this mode is selected."
+              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.bucket"
-              description: "Source probe bucket. Required when this mode is selected."
+              description: "Bucket that holds the probe objects. Required."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.path_style"
-              description: "Put the source bucket in the request path. This is common for Ceph RGW."
+              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
               default_value: true
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials"
-              description: "Optional static source credentials. Omit to use the AWS SDK default chain."
+              description: "Static access keys. Omit to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials.access_key_id"
-              description: "Source access key ID. Use a go.d secret reference."
+              description: "Access key ID. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials.secret_access_key"
-              description: "Source secret access key. Use a go.d secret reference."
+              description: "Secret access key. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials.session_token"
-              description: "Optional source session token."
+              description: "Session token for temporary credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.assume_role"
-              description: "Optional role assumed from the source base credentials."
+              description: "IAM role to assume with this endpoint's base credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.assume_role.role_arn"
-              description: "Source role ARN."
+              description: "ARN of the role to assume. Required when `assume_role` is set."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.assume_role.external_id"
-              description: "Optional source role external ID."
+              description: "External ID expected by the role's trust policy."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.timeout"
-              description: "Timeout for one logical source S3 call."
+              description: "Maximum duration of one S3 or STS request, up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.proxy_url"
-              description: "Optional source HTTP proxy URL."
+              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_skip_verify"
-              description: "Skip source TLS verification. This is insecure."
+              description: "Skip TLS certificate verification. Insecure."
               default_value: false
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_ca"
-              description: "Absolute path to the source CA bundle."
+              description: "Absolute path to a CA bundle for a private CA."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_cert"
-              description: "Absolute path to the source client certificate."
+              description: "Absolute path to a client certificate. Requires `tls_key`."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_key"
-              description: "Absolute path to the source client key."
+              description: "Absolute path to the client certificate key. Requires `tls_cert`."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.destination"
-              description: "Destination S3 connection and authentication. Required when this mode is selected."
+              description: "Where replicated copies must appear. Never written by the collector. Required."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.name"
-              description: "Presentation-only destination label."
+              description: "Label for this endpoint on charts (the `destination` label)."
               default_value: "destination"
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.endpoint"
-              description: "Optional HTTP(S) destination endpoint. Empty uses the AWS SDK regional endpoint."
+              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.region"
-              description: "Destination signing region. Required when this mode is selected."
+              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.bucket"
-              description: "Destination probe bucket. Required when this mode is selected."
+              description: "Bucket that holds the probe objects. Required."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.path_style"
-              description: "Put the destination bucket in the request path. This is common for Ceph RGW."
+              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
               default_value: true
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials"
-              description: "Optional static destination credentials. Omit to use the AWS SDK default chain."
+              description: "Static access keys. Omit to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials.access_key_id"
-              description: "Destination access key ID. Use a go.d secret reference."
+              description: "Access key ID. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials.secret_access_key"
-              description: "Destination secret access key. Use a go.d secret reference."
+              description: "Secret access key. Required when `credentials` is set."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials.session_token"
-              description: "Optional destination session token."
+              description: "Session token for temporary credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.assume_role"
-              description: "Optional role assumed from the destination base credentials."
+              description: "IAM role to assume with this endpoint's base credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.assume_role.role_arn"
-              description: "Destination role ARN."
+              description: "ARN of the role to assume. Required when `assume_role` is set."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.assume_role.external_id"
-              description: "Optional destination role external ID."
+              description: "External ID expected by the role's trust policy."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.timeout"
-              description: "Timeout for one logical destination S3 call."
+              description: "Maximum duration of one S3 or STS request, up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.proxy_url"
-              description: "Optional destination HTTP proxy URL."
+              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_skip_verify"
-              description: "Skip destination TLS verification. This is insecure."
+              description: "Skip TLS certificate verification. Insecure."
               default_value: false
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_ca"
-              description: "Absolute path to the destination CA bundle."
+              description: "Absolute path to a CA bundle for a private CA."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_cert"
-              description: "Absolute path to the destination client certificate."
+              description: "Absolute path to a client certificate. Requires `tls_key`."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_key"
-              description: "Absolute path to the destination client key."
+              description: "Absolute path to the client certificate key. Requires `tls_cert`."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.write_objective"
-              description: "Source PUT to verified destination visibility objective."
+              description: "Healthy propagation time for a new object. Exceeding it flags the objective chart only."
               default_value: "15m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "mode_aws_replication.write_timeout"
-              description: "Maximum source PUT to destination visibility wait."
+              description: "Hard limit for a new object to appear at the destination. Exceeding it fails the probe."
               default_value: "30m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "mode_aws_replication.delete_objective"
-              description: "Source delete to destination current-object invisibility objective."
+              description: "Healthy time for a source delete to hide the destination copy."
               default_value: "5m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "mode_aws_replication.delete_timeout"
-              description: "Maximum source delete to destination current-object invisibility wait."
+              description: "Hard limit for the destination copy to disappear. Exceeding it fails the probe."
               default_value: "15m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "update_every"
-              description: "Probe polling interval in seconds."
+              description: "Collection interval in seconds. Replication modes poll the destination once per interval."
               default_value: 120
               required: false
               group: "Collection"
             - name: "autodetection_retry"
-              description: "Seconds between retries after the initial provider check fails. Zero disables retries."
+              description: "Seconds between retries when the initial bucket check fails. `0` disables retries."
               default_value: 0
               required: false
               group: "Collection"
             - name: "vnode"
-              description: "Associates all charts with a configured Virtual Node."
+              description: "Virtual Node that owns the charts of this job."
               default_value: ""
               required: false
               group: "Virtual Node"
@@ -668,8 +781,10 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Lifecycle with static credentials
-              description: Use a dedicated unversioned bucket and reserved prefix.
+            - name: Lifecycle check of an S3-compatible endpoint
+              description: |
+                Checks one Ceph RGW or other S3-compatible endpoint with static access keys read from environment
+                variables. The bucket must never have had versioning enabled.
               config: |
                 jobs:
                   - name: s3_lifecycle
@@ -683,8 +798,27 @@ modules:
                           access_key_id: ${env:NETDATA_S3CHECK_ACCESS_KEY_ID}
                           secret_access_key: ${env:NETDATA_S3CHECK_SECRET_ACCESS_KEY}
                         path_style: yes
-            - name: Ceph RGW multisite direction
-              description: Use one job per source-to-destination direction; both buckets must be unversioned.
+            - name: Lifecycle check through a proxy with a private CA
+              description: |
+                The proxy and the CA bundle apply to this endpoint's S3 requests (and to STS if `assume_role` were
+                set). Credentials are omitted, so the AWS SDK default credential chain on the Agent host is used.
+              config: |
+                jobs:
+                  - name: s3_lifecycle_proxied
+                    mode: lifecycle
+                    mode_lifecycle:
+                      prefix: monitoring/netdata/
+                      source:
+                        endpoint: https://s3.internal.example.net
+                        region: us-east-1
+                        bucket: netdata-s3check
+                        proxy_url: http://proxy.example.net:3128
+                        tls_ca: /etc/ssl/private-ca.pem
+                        timeout: 15s
+            - name: Ceph RGW multisite, one direction
+              description: |
+                Measures replication from zone A to zone B. Add a second job with source and destination swapped to
+                check the reverse direction. Both buckets must be unversioned, and each zone uses its own keys.
               config: |
                 jobs:
                   - name: ceph_site_a_to_site_b
@@ -695,17 +829,27 @@ modules:
                         endpoint: https://rgw-site-a.example.net
                         region: us-east-1
                         bucket: netdata-s3check
+                        credentials:
+                          access_key_id: ${env:NETDATA_S3CHECK_SITE_A_ACCESS_KEY_ID}
+                          secret_access_key: ${env:NETDATA_S3CHECK_SITE_A_SECRET_ACCESS_KEY}
                       destination:
                         name: site-b
                         endpoint: https://rgw-site-b.example.net
                         region: us-east-1
                         bucket: netdata-s3check
+                        credentials:
+                          access_key_id: ${env:NETDATA_S3CHECK_SITE_B_ACCESS_KEY_ID}
+                          secret_access_key: ${env:NETDATA_S3CHECK_SITE_B_SECRET_ACCESS_KEY}
                       write_objective: 15m
                       write_timeout: 30m
                       delete_objective: 5m
                       delete_timeout: 15m
-            - name: AWS replication with independent roles
-              description: Both buckets must be versioned and the applicable source rule must replicate delete markers.
+            - name: AWS S3 replication with a role per account
+              description: |
+                Checks replication from a bucket in one region to a bucket in another. Base credentials come from the
+                AWS SDK default credential chain on the Agent host, for example an instance profile, and each endpoint
+                then assumes its own role. Both buckets must be versioned and the source rule must replicate delete
+                markers. `path_style` is disabled because AWS S3 uses virtual-hosted-style addressing.
               config: |
                 jobs:
                   - name: aws_replication
@@ -715,30 +859,53 @@ modules:
                         name: us-east-1
                         region: us-east-1
                         bucket: source-bucket
+                        path_style: no
                         assume_role:
-                          role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-source
+                          role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-s3-source
                       destination:
                         name: us-west-2
                         region: us-west-2
                         bucket: destination-bucket
+                        path_style: no
                         assume_role:
-                          role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-destination
+                          role_arn: arn:aws:iam::[ACCOUNT]:role/netdata-s3-destination
     troubleshooting:
       problems:
         list:
-          - name: Provider safety check fails
+          - name: The job fails its initial check
             description: |
-              Verify endpoint reachability, credentials, bucket permissions, and the mode's versioning contract. AWS mode
-              also requires one applicable destination rule with delete-marker replication and no additional applicable
-              destination outside this job's ownership.
-          - name: Cleanup remains pending or backpressure is active
+              Before writing anything, the collector reads the bucket versioning state of every endpoint and, in
+              `aws_replication` mode, the replication rules of the source bucket. A failure here means one of:
+
+              - the endpoint is not reachable from the Agent (DNS, routing, proxy, TLS, or `region`);
+              - the credentials are rejected or lack `s3:GetBucketVersioning` (or `s3:GetReplicationConfiguration`);
+              - the bucket does not meet the mode's versioning contract: never versioned for `lifecycle` and
+                `ceph_multisite`, versioning enabled with MFA Delete off for `aws_replication`;
+              - in `aws_replication` mode, no enabled rule covers the prefix and targets the destination bucket with
+                delete marker replication, or another enabled rule replicates the prefix elsewhere.
+
+              Chart labels carry only a bounded `reason`; the exact provider error is in the collector log.
+          - name: Objects remain pending cleanup or new probes are paused
             description: |
-              Restore the same job name, mode, endpoint, buckets, prefix, and credentials that created the unresolved
-              objects. The collector never evicts unresolved ownership or adopts another identity's state.
-          - name: Replication waits indefinitely
+              After an interrupted probe the collector deletes the objects it recorded a few per collection.
+              `cleanup_pending_objects` shows the backlog and `mutation_backpressure` turns active when the backlog
+              reaches its bound, which pauses new probes but not observation or cleanup.
+
+              Cleanup needs the same job name, mode, prefix, endpoints, buckets, and working credentials that created
+              the objects. If you changed the mode, prefix, endpoint, or bucket while objects were pending, the job
+              refuses to start with an ownership mismatch error; if you renamed the job, the old objects are left
+              behind. In both cases restore the previous configuration under the previous job name until the backlog
+              drains, then change it. A `cleanup` reason means a probe object could not be confirmed gone, usually a
+              permission problem; an `ownership` reason means the local state could not be locked or saved. The
+              collector log has the details.
+          - name: Replication probes stay in waiting or time out
             description: |
-              Waiting stops at the configured write/delete timeout. Check the replication policy, full-key mapping, and
-              destination credentials. Ceph and AWS preserve the exact source key; destination prefix rewriting is unsupported.
+              A replication probe reports `waiting` until the destination serves the object (write) or stops serving
+              it (delete), and fails with `visibility_timeout` or `delete_timeout` when the configured timeout passes.
+              Check that the replication policy or zone sync covers the prefix, that the destination credentials can
+              read the bucket, and that the policy delivers the object under exactly the same key. Persistent waits
+              usually mean replication is slower than your objectives and timeouts assume; align them with what the
+              replication setup promises.
     alerts:
       - name: s3check_runtime_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
@@ -769,30 +936,35 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        All contexts use bounded mode, endpoint, operation, reason, and presentation labels. Unperformed work is a gap.
+        All charts carry the `mode`, `source`, and `destination` labels (`destination` is empty in `lifecycle`
+        mode). Work that did not happen during a collection leaves a gap rather than a zero, so a missing point means
+        "not measured". Call counters count logical S3 operations as the collector issued them; retries performed
+        inside the AWS SDK are not counted separately. The `reason` label uses a fixed vocabulary: `none`, `request`,
+        `payload_mismatch`, `visibility_timeout`, `delete_timeout`, `cleanup`, `ownership`, `internal`. Raw provider
+        errors appear only in the collector log.
       availability: []
       scopes:
         - name: job status
-          description: Runtime and probe outcomes for one configured job.
+          description: Outcome of the collection and of the current or last completed probe.
           labels:
             - name: mode
-              description: Configured probe mode.
+              description: Configured mode.
             - name: source
-              description: Source presentation name.
+              description: Display name of the source endpoint.
             - name: destination
-              description: Destination presentation name, empty for lifecycle mode.
+              description: Display name of the destination endpoint; empty in `lifecycle` mode.
             - name: reason
-              description: Bounded outcome reason; raw provider errors are logs only.
+              description: Why the outcome failed; `none` otherwise.
           metrics:
             - name: s3check.runtime_status
-              description: S3 Check Runtime Status
+              description: S3 check runtime status
               unit: status
               chart_type: line
               dimensions:
                 - name: success
                 - name: failed
             - name: s3check.probe_status
-              description: S3 Check Probe Status
+              description: S3 check probe status
               unit: status
               chart_type: line
               dimensions:
@@ -800,96 +972,106 @@ modules:
                 - name: waiting
                 - name: failed
             - name: s3check.payload_mismatch
-              description: S3 Payload Verification Mismatch
+              description: S3 payload verification mismatch
               unit: status
               chart_type: line
               dimensions:
                 - name: mismatch
         - name: replication objectives
-          description: Client-visible source-to-destination propagation observations.
+          description: >-
+            How long a source change took to become visible at the destination and whether that exceeded the
+            configured objective. Replication modes only.
           labels:
             - name: mode
               description: Configured replication mode.
             - name: source
-              description: Source presentation name.
+              description: Display name of the source endpoint.
             - name: destination
-              description: Destination presentation name.
+              description: Display name of the destination endpoint.
             - name: reason
-              description: Bounded probe outcome reason.
+              description: Why the probe failed; `none` otherwise.
           metrics:
             - name: s3check.write_visibility_lag
-              description: S3 Write Visibility Lag
+              description: S3 write visibility lag
               unit: seconds
               chart_type: line
               dimensions:
                 - name: lag
             - name: s3check.write_visibility_objective
-              description: S3 Write Visibility Objective Status
+              description: S3 write visibility objective status
               unit: status
               chart_type: line
               dimensions:
                 - name: breached
             - name: s3check.delete_visibility_lag
-              description: S3 Delete Visibility Lag
+              description: S3 delete visibility lag
               unit: seconds
               chart_type: line
               dimensions:
                 - name: lag
             - name: s3check.delete_visibility_objective
-              description: S3 Delete Visibility Objective Status
+              description: S3 delete visibility objective status
               unit: status
               chart_type: line
               dimensions:
                 - name: breached
         - name: ownership
-          description: Bounded exact-object cleanup state.
+          description: >-
+            Probe objects still awaiting cleanup and whether new probes are paused because the cleanup bound is
+            reached.
           labels:
             - name: mode
-              description: Configured probe mode.
+              description: Configured mode.
             - name: source
-              description: Source presentation name.
+              description: Display name of the source endpoint.
             - name: destination
-              description: Destination presentation name.
+              description: Display name of the destination endpoint; empty in `lifecycle` mode.
           metrics:
             - name: s3check.cleanup_pending_objects
-              description: S3 Owned Objects Pending Cleanup
+              description: S3 owned objects pending cleanup
               unit: objects
               chart_type: line
               dimensions:
                 - name: pending
             - name: s3check.mutation_backpressure
-              description: S3 Mutation Backpressure Status
+              description: S3 mutation backpressure status
               unit: status
               chart_type: line
               dimensions:
                 - name: active
         - name: operation
-          description: One bounded logical S3 operation class and endpoint.
+          description: >-
+            One logical S3 operation class on one endpoint: `setup` (precondition checks), `put`, `read`, `list`,
+            `delete`, `write_visibility`, `delete_visibility`, `reconcile`, or `cleanup`.
           labels:
             - name: mode
-              description: Configured probe mode.
+              description: Configured mode.
             - name: endpoint
-              description: Source or destination.
+              description: "`source` or `destination`."
             - name: operation
-              description: Bounded logical operation name.
+              description: Logical operation name.
+            - name: source
+              description: Display name of the source endpoint.
+            - name: destination
+              description: Display name of the destination endpoint; empty in `lifecycle` mode.
             - name: reason
-              description: Bounded operation outcome reason.
+              description: Why the operation failed; `none` otherwise. Not present on `s3check.operation_calls`.
           metrics:
             - name: s3check.operation_status
-              description: S3 Logical Operation Status
+              description: S3 logical operation status
               unit: status
               chart_type: line
               dimensions:
                 - name: success
                 - name: failed
             - name: s3check.operation_duration
-              description: S3 Logical Operation Duration
+              description: S3 logical operation duration
               unit: seconds
               chart_type: line
               dimensions:
                 - name: duration
             - name: s3check.operation_calls
-              description: S3 Logical Calls
+              description: S3 logical calls
               unit: calls/s
               chart_type: line
               dimensions:
