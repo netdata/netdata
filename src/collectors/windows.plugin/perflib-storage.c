@@ -325,8 +325,15 @@ static void mount_points_add_volume_paths(
         if (entry_len == remaining)
             break;
 
+        // Advance past this entry before the rest of the body runs. Everything below leaves the
+        // iteration with continue, and the loop has no increment in its header, so an increment
+        // placed after those skips would never run for a skipped entry and the walk would spin on
+        // it forever - a hang, not a missed volume.
+        const wchar_t *entry = p;
+        p += entry_len + 1;
+
         char path[ND_MOUNT_PATH_MAX];
-        if (!utf16_to_utf8(path, sizeof(path), p, (int)entry_len, NULL))
+        if (!utf16_to_utf8(path, sizeof(path), entry, (int)entry_len, NULL))
             continue;
 
         canonicalize_mount_path(path, sizeof(path));
@@ -338,8 +345,6 @@ static void mount_points_add_volume_paths(
 
         if (first_path && !*first_path)
             snprintfz(first_path, first_path_size, "%s", path);
-
-        p += entry_len + 1;
     }
 
     if (buf != stack_buf)
@@ -411,7 +416,21 @@ static bool mount_points_scan_volumes(DICTIONARY *paths, DICTIONARY *devices)
 
     } while (FindNextVolumeW(h, volumeGUID, _countof(volumeGUID)));
 
+    // capture before FindVolumeClose(), which overwrites the thread's last error
+    DWORD err = GetLastError();
     FindVolumeClose(h);
+
+    // anything other than a clean end of enumeration means the snapshot is incomplete; accepting it
+    // would evict the volumes we never reached
+    if (err != ERROR_NO_MORE_FILES) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_DEBUG,
+            "FindNextVolumeW() failed (error: %lu); keeping the previous mount point registry",
+            err);
+        return false;
+    }
+
     return true;
 }
 
@@ -467,7 +486,19 @@ static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
 
     } while (FindNextFileW(h, &fd));
 
+    // capture before FindClose(), which overwrites the thread's last error
+    DWORD err = GetLastError();
     FindClose(h);
+
+    if (err != ERROR_NO_MORE_FILES) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_DEBUG,
+            "Cannot finish enumerating ClusterStorage (error: %lu); keeping the previous mount point registry",
+            err);
+        return false;
+    }
+
     return true;
 }
 
