@@ -339,7 +339,7 @@ fn info_response_shape_is_pinned() {
             "v": 3,
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
-                "slowest", "search", "tenant", "after", "before", "last", "anchor",
+                "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
                 "min_trace_duration_ns"
             ],
             "required_params": [],
