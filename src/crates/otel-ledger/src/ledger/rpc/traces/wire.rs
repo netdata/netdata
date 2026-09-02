@@ -293,6 +293,10 @@ pub struct FunctionsParams {
     pub before: i64,
     #[serde(default = "default_limit")]
     pub last: usize,
+    /// Opaque cursor from the previous page's `anchor.next`. It also
+    /// suppresses the embedded window aggregate: the cursor freezes the
+    /// window, so the section would repeat the first page's (see
+    /// [`SearchResult::overview`]).
     #[serde(default)]
     pub anchor: Option<String>,
     #[serde(default)]
@@ -325,6 +329,8 @@ pub struct FunctionsParams {
     /// bound (the composition site's scope gate: a window-scoped list
     /// beside a filtered page contradicts what the page shows).
     /// `null`, `false`, and absent all mean off; only `true` opts in.
+    /// Moot while [`Self::anchor`] is set — that page carries no
+    /// aggregate to put lists in.
     #[serde(default)]
     pub overview_facets: Option<bool>,
 }
@@ -825,6 +831,16 @@ pub struct SearchResult {
     /// legacy `search` mode never carries it — and absent (never
     /// `null`) when not composed, so a consumer detects it by PRESENCE
     /// and degrades to page-derived numbers without a version gate.
+    ///
+    /// Present on a FIRST page only: a request carrying an anchor
+    /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all. Such
+    /// a page reruns the same query over the cursor's frozen window, and
+    /// the aggregate applies none of the page's filters, so recomposing
+    /// it would repeat the section the first page already delivered —
+    /// one extra full-window pass per page of a walk, for identical
+    /// numbers. A consumer therefore keeps the first page's section for
+    /// the whole walk, and only re-reads it on a request without an
+    /// anchor (the only kind that can move the window).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overview: Option<OverviewSection>,
 }
@@ -853,6 +869,11 @@ pub struct AnchorWire {
 /// [`OverviewResult`] minus `mode` (the enclosing result already
 /// self-describes as `search`), plus the grid's own `coverage`, the
 /// `scope` honesty flag, and its OWN `status`.
+///
+/// Carried by a Functions FIRST page only — a request with an anchor
+/// ([`FunctionsParams::anchor`]) omits the section rather than recompute
+/// an identical one, so a paginating consumer must hold on to the
+/// section it was given. See [`SearchResult::overview`].
 ///
 /// Its population is NOT the page's, in two directions that a caption
 /// must respect: the grid and totals are TRACE-ENVELOPE-aligned over

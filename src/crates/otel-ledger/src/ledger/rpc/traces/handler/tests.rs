@@ -1258,6 +1258,95 @@ async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() 
 }
 
 #[tokio::test]
+async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
+    let h = handler_with_search_corpus().await;
+
+    // Page 1 carries no cursor, so the aggregate is composed as ever.
+    let v1 = serde_json::to_value(call_on(&h, functions_body(2)).await.unwrap()).unwrap();
+    assert_eq!(ids(&v1["data"]), ["0e", "0c"]);
+    assert_eq!(
+        v1["data"]["overview"]["totals"],
+        json!({"traces": 5, "spans": 8, "errors": 0})
+    );
+    let next1 = v1["data"]["anchor"]["next"].clone();
+
+    // Page 2: the tie partner D, then B, and its own cursor. Asserted
+    // BEFORE the section, so the red run proves the page is what it
+    // always was and only the aggregate changed.
+    let mut body = functions_body(2);
+    body["anchor"] = next1.clone();
+    let v2 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v2["data"]), ["0d", "0b"]);
+    assert_eq!(
+        v2["data"]["items"],
+        json!({"returned": 2, "max_to_return": 2})
+    );
+    let next2 = v2["data"]["anchor"]["next"].clone();
+    assert!(
+        next2.is_string(),
+        "a full anchor page still hands out its own cursor"
+    );
+
+    // The same cursor through the legacy mode — which never composed an
+    // aggregate — yields the identical page: proof the omission
+    // perturbs nothing the client reads off it.
+    let mut legacy = window_body();
+    legacy["limit"] = json!(2);
+    legacy["spans_per_trace"] = json!(0);
+    legacy["anchor"] = next1;
+    let l2 = serde_json::to_value(call_on(&h, as_mode("search", legacy)).await.unwrap()).unwrap();
+    assert_eq!(l2["traces"], v2["data"]["traces"]);
+    assert_eq!(l2["items"], v2["data"]["items"]);
+    assert_eq!(l2["anchor"], v2["data"]["anchor"]);
+
+    // An anchor page reruns the cursor's FROZEN window, so its
+    // aggregate would be a byte-for-byte repeat of the one the client
+    // already holds: the second engine pass is skipped and the key is
+    // ABSENT, not null — `get` returning None distinguishes the two.
+    assert!(
+        v2["data"].get("overview").is_none(),
+        "an anchor page repeats the first page's window: no second pass"
+    );
+
+    // Page 3: A alone, short, so no cursor — and still no aggregate.
+    body["anchor"] = next2;
+    let v3 = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v3["data"]), ["0a"]);
+    assert!(v3["data"].get("anchor").is_none());
+    assert!(v3["data"].get("overview").is_none());
+}
+
+#[tokio::test]
+async fn the_root_facets_opt_in_cannot_resurrect_the_aggregate_on_an_anchor_page() {
+    let h = handler_with_search_corpus().await;
+
+    // First page, facets opted in over an unfiltered page: the scope
+    // gate honours the opt-in, exactly as before.
+    let mut body = functions_body(2);
+    body["overview_facets"] = json!(true);
+    let v1 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(
+        v1["data"]["overview"]["top_root_services"],
+        json!({
+            "top": [
+                {"value": "svc-a", "traces": 3},
+                {"value": "svc-b", "traces": 2}
+            ],
+            "other": 0,
+            "unattributed": 0
+        })
+    );
+
+    // The same request plus a cursor: the opt-in gates the facet LISTS
+    // inside the section, never the section's existence, so an anchor
+    // page has neither.
+    body["anchor"] = v1["data"]["anchor"]["next"].clone();
+    let v2 = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v2["data"]), ["0d", "0b"]);
+    assert!(v2["data"].get("overview").is_none());
+}
+
+#[tokio::test]
 async fn the_legacy_search_mode_carries_no_aggregate_section() {
     let h = handler_with_search_corpus().await;
     let v =
