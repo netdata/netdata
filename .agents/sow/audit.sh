@@ -77,19 +77,22 @@ fi
 section "canonical AGENTS.md sections"
 required_sections=(
   "## Goals"
+  "## Development Principles"
   "## SOW System"
-  "### Roles"
+  "### Storage Model"
+  "### Umbrella And Step SOWs"
+  "### Pre-Implementation Gate"
   "### Git Worktrees"
+  "### Git And PR Workflow"
+  "### Review"
+  "### Regressions"
+  "### Validation Gate"
+  "### Enforcement"
   "### Sensitive Data In Durable Artifacts"
   "### Durable AI-Facing Artifact Formatting"
   "### Open-Source Reference Evidence"
-  "### Pre-Implementation Gate"
-  "### SOW Completion And Merge"
-  "### Enforcement"
-  "### Regressions"
-  "### Project Skills"
   "### Specs"
-  "### Project-specific overrides"
+  "### Project Skills"
 )
 
 for heading in "${required_sections[@]}"; do
@@ -124,7 +127,7 @@ for path in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-se
   fi
 done
 
-for q in pending current active "done"; do
+for q in pending current "done"; do
   if [ -d ".agents/sow/q/$q" ]; then
     ok ".agents/sow/q/$q exists"
   else
@@ -161,9 +164,9 @@ total_sows=0
 ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never committed)"
 
 # Structural completeness is advisory and checked only for in-flight SOWs in the
-# active queue; pending stubs and completed (done/) history are exempt.
+# current queue; pending stubs and completed (done/) history are exempt.
 active_count=0
-if [ -d .agents/sow/q/active ]; then
+if [ -d .agents/sow/q/current ]; then
   while IFS= read -r sow; do
     [ -n "$sow" ] || continue
     active_count=$((active_count + 1))
@@ -181,6 +184,7 @@ if [ -d .agents/sow/q/active ]; then
         ;;
     esac
 
+    case "$sow" in *-umbrella.md) continue ;; esac   # umbrellas hold no gate/validation by design
     for needle in \
       "## Pre-Implementation Gate" \
       "Sensitive data handling plan:" \
@@ -194,11 +198,11 @@ if [ -d .agents/sow/q/active ]; then
         warn "$sow is missing $needle"
       fi
     done
-  done < <(find -L .agents/sow/q/active -type f -name 'SOW-*.md' 2>/dev/null | sort)
+  done < <(find -L .agents/sow/q/current -type f -name 'SOW-*.md' 2>/dev/null | sort)
 fi
 
 if [ "$active_count" -eq 0 ]; then
-  ok "no in-flight SOWs in .agents/sow/q/active"
+  ok "no in-flight SOWs in .agents/sow/q/current"
 fi
 
 section "spec index"
@@ -251,6 +255,7 @@ if command -v rg >/dev/null 2>&1; then
     rg --no-filename -o '\.agents/sow/specs/[A-Za-z0-9._/-]+\.md' \
       AGENTS.md .agents/skills docs src \
       -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
+      -g '!TODO*.md' -g '!**/TODO*.md' \
       2>/dev/null | sort -u
   )
 else
@@ -302,7 +307,7 @@ done
 if [ -d .agents/skills ]; then
   while IFS= read -r file; do
     scan_files+=("$file")
-  done < <(find .agents/skills -type f 2>/dev/null | sort)
+  done < <(find -L .agents/skills -type f 2>/dev/null | sort)
 fi
 
 if [ -d .agents/skill-verification ]; then
