@@ -101,11 +101,10 @@ For broad queries without full-text search or filters on high-cardinality detail
 expensive row-detail fields for entries that cannot be returned in the current page. In that fast path, diagnostic
 `bytes_read` counters report materialized message bytes, not every raw OSLog payload byte scanned.
 
-
 ## Managing the logs
 
 macOS logs are managed and queried the same way as every other log source in Netdata — field filters with counters,
-full-text search, per-field histograms, PLAY live tail, and sampling at scale. See [Managing Logs](/docs/dashboards-and-charts/logs-tab.md) for the shared workflow.
+full-text search, per-field histograms, and PLAY live tail. See [Managing Logs](/docs/dashboards-and-charts/logs-tab.md) for the shared workflow.
 
 ## FAQ
 
@@ -161,7 +160,7 @@ root-owned setuid permission model as Netdata's other privileged Function plugin
 Confirm the plugin binary is present and executable:
 
 ```bash
-ls -l /usr/libexec/netdata/plugins.d/macos-logs.plugin
+ls -l /usr/local/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin
 ```
 
 Confirm the plugin process is running while the Agent is active:

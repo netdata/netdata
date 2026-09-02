@@ -9,10 +9,10 @@ Kubernetes; leave the rest managed in place, where they cost nothing extra. See
 
 Two things to set up:
 
-1. **The receiving Agent.** Any Netdata Agent with the OpenTelemetry plugin (official Linux and macOS builds include
-   it). Bind its OTLP endpoint beyond loopback with TLS or mutual TLS, and enable tenant selection when different
+1. **The receiving Agent.** Any Netdata Agent with the OpenTelemetry plugin (see the availability note in
+   [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md)). Bind its OTLP endpoint beyond loopback with TLS or mutual TLS, and enable tenant selection when different
    sender groups need their own retention. See
-   [Accept remote senders securely](/docs/opentelemetry/otlp-ingestion.md#accept-remote-senders-securely) and, for
+   [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) and, for
    retention and offloading to object storage, [Log Storage and Retention](/docs/logs/log-storage-and-retention.md).
 2. **The senders.** One OpenTelemetry Collector per node or cluster, with a persistent queue and the receiver for the
    source. The recipes are in [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md):

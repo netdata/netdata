@@ -2,7 +2,7 @@
 
 [KEY FEATURES](#key-features) | [EVENTS SOURCES](#events-sources) | [EVENT FIELDS](#event-fields) |
 [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
-[CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq)
+[CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq) | [HOW TO VERIFY SETUP](#how-to-verify-setup)
 
 You view, explore and analyze Windows Events from the Netdata dashboard: filter on the System fields, search the full
 text of System and User fields, and break down event frequency per field value over time.
@@ -28,6 +28,7 @@ text of System and User fields, and break down event frequency per field value o
   requires a signed-in Netdata Cloud user of the Agent's Space (a free Community account is sufficient).
 - The Netdata service account must be able to read the channels you want to explore; the Security channel in
   particular requires explicit read permission when Netdata does not run as Local System.
+
 For more information check [this discussion](https://github.com/netdata/netdata/discussions/16136).
 
 ## Events Sources

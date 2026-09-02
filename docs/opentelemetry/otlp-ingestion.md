@@ -10,21 +10,22 @@ Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry
 | An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata as described below                                               |
 | Network devices send syslog                                                         | Use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) |
 
-The Netdata Agent receives OTLP metrics, logs, and traces. Traces are accepted and stored under their own retention settings — the `traces` section of `otel.yaml`, which takes the same rotation and retention options as `logs`; a traces view is not yet available in the dashboards. Stay tuned.
+The Netdata Agent receives OTLP metrics, logs, and traces. Traces are accepted and stored under their own retention settings — the `traces` section of `otel.yaml`, which takes the same rotation and retention options as `logs`; unlike logs, trace files offloaded to object storage are not fetched back for queries. A traces view is not yet available in the dashboards. Stay tuned.
 
 ## How data flows
 
 ```mermaid
 flowchart LR
-    collector["OpenTelemetry Collector<br/>receivers · processors · exporters"] -->|"OTLP/gRPC · port 4317"| plugin["Netdata Agent<br/>otel.plugin"]
+    collector["OpenTelemetry Collector<br/>receivers · processors · exporters"] -->|"OTLP/gRPC · port 4317"| plugin["Netdata Agent<br/>OpenTelemetry plugin"]
     sdk["OTLP SDK or<br/>instrumented application"] -->|"OTLP/gRPC · port 4317"| plugin
     plugin --> metrics["Metrics<br/>charts and alerts"]
     plugin --> logs["Logs<br/>indexed Logs tab"]
+    plugin --> traces["Traces<br/>stored"]
 ```
 
 ## What you need
 
-- A Netdata Agent with the OpenTelemetry plugin. It is part of every Netdata install on Linux — the native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it — and of macOS installs made with the Netdata kickstart script, whose dependency step provisions the Rust toolchain the plugin needs and stops the install if it cannot. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
+- A Netdata Agent with the OpenTelemetry plugin. Linux native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it. macOS kickstart installs provision a Rust toolchain and build it; if no adequate toolchain ends up available, the install continues with a warning and without the plugin. Linux source builds need `--enable-plugin-otel`. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
 - An OTLP/gRPC source. The examples use [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) because the `host_metrics` and `file_log` receivers are Contrib components.
 - Network access from the sender to the Agent's endpoint.
 - For log verification, a Netdata Cloud account and sign-in. The `otel-logs` view is access-gated.
@@ -120,15 +121,11 @@ In Netdata, open the node's Logs tab, select the `otel-logs` source, and choose 
 
 ## Accept remote senders securely
 
-The default loopback endpoint is the safe choice for a same-host Collector. To receive remote OTLP traffic:
-
-1. Open `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and bind `endpoint.path` to an address reachable by the sender.
-2. Configure a server certificate and key. Add `endpoint.tls_ca_cert_path` to require client certificates.
-3. Restrict port `4317` with network access controls.
-4. Restart the Netdata Agent to apply the `otel.yaml` changes.
-5. Configure matching CA and, for mutual TLS, client certificate settings in the sender.
-
-Do not expose a plaintext `0.0.0.0:4317` listener. The optional `auth.enabled` setting requires an `X-Scope-OrgID` header for log tenant selection, but it does not authenticate the sender. Each tenant has its own retention policy and storage tree; see [Log Storage and Retention](/docs/logs/log-storage-and-retention.md). See the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for the full public endpoint, tenant, retention, mapping, and remote-storage configuration.
+The default loopback endpoint is the safe choice for a same-host Collector. To receive remote OTLP traffic, bind
+beyond loopback with TLS or mutual TLS, restrict port `4317` with network controls, and enable tenant selection when
+log and trace sender groups need separate retention — the procedure, certificate rotation, and what tenant selection
+does and does not protect are in [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). See
+the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for every option.
 
 ## Troubleshoot the pipeline
 

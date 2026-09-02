@@ -285,7 +285,9 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             # collectors (Collecting Metrics/...) are unaffected.
             if learn_rel_path.startswith("Network Performance Monitoring/"):
                 learn_rel_path += "/Integrations"
-            # The Syslog chapter lives in the OpenTelemetry section on Learn.
+            # The Syslog chapter lives in the OpenTelemetry section on Learn. The matched
+            # string comes from the 'network-performance-monitoring.syslog' category name
+            # in integrations/categories.yaml; update both together.
             if learn_rel_path == "Network Performance Monitoring/Syslog from Network Devices/Integrations":
                 learn_rel_path = "OpenTelemetry/Syslog from Network Devices/Integrations"
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None

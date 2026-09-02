@@ -536,7 +536,7 @@ Usually we use `.*` to indicate that we need to match everything up to a charact
 
 ### Performance of systemd journals
 
-The ingestion pipeline of logs, from `tail` to `systemd-journald` or `systemd-journal-remote`, is efficient in all aspects. RAM usage is independent of the number of fields indexed, so ingesting high volumes of structured logs does not increase the memory footprint as the schema grows.
+In the ingestion pipeline from `tail` to `systemd-journald` or `systemd-journal-remote`, RAM usage is independent of the number of fields indexed, so ingesting high volumes of structured logs does not increase the memory footprint as the schema grows.
 
 High fields cardinality does not have a noticeable impact on systemd-journal. The amount of fields indexed and the amount of unique values per field, have a linear and predictable result in the resource utilization of `systemd-journald` and `systemd-journal-remote`.
 

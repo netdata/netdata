@@ -1,7 +1,7 @@
 # OpenTelemetry
 
-The Netdata Agent receives OpenTelemetry metrics and logs over OTLP/gRPC, on port 4317: metrics become Netdata charts
-and logs are stored in Netdata's indexed log store. Anything that speaks OTLP/gRPC can send to it — an OpenTelemetry
+The Netdata Agent receives OpenTelemetry telemetry over OTLP/gRPC, on port 4317: metrics become Netdata charts, logs
+are stored in Netdata's indexed log store, and traces are accepted and stored. Anything that speaks OTLP/gRPC can send to it — an OpenTelemetry
 Collector, an instrumented application, an SDK — with TLS or mutual TLS on the endpoint and, when different sender
 groups need their own retention, a tenant per group. Start with
 [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) for the endpoint, the exporter block, and two smoke tests.
@@ -31,20 +31,23 @@ workflow is not yet documented. Stay tuned.
 
 ## Requirements
 
-- Every Netdata install on Linux includes the plugin — native packages, static builds (except 32-bit ARMv6), and
-  Docker images — and so do macOS installs made with the kickstart script, which provisions the Rust toolchain the
-  plugin needs and stops the install if it cannot. It is not available on Windows or FreeBSD.
+- Linux native packages install the plugin as a dependency of `netdata`; static builds bundle it (except 32-bit
+  ARMv6) and all Docker images include it. macOS kickstart installs provision a Rust toolchain and build it — when no
+  adequate toolchain ends up available, the install continues with a warning and without the plugin. Linux source
+  builds need `--enable-plugin-otel`. It is not available on Windows or FreeBSD.
 - Viewing logs requires signing in with Netdata Cloud, free for community use.
 - The examples on these pages are validated with OpenTelemetry Collector Contrib 0.157.0.
 
 ## In this section
 
-- [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — the endpoint, the exporter, smoke tests, accepting remote
-  senders securely, troubleshooting.
+- [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — the endpoint, the exporter, smoke tests, troubleshooting.
+- [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) — TLS, mutual TLS, network
+  controls, certificate rotation, tenants.
 - [Metrics Collection](/docs/opentelemetry/metrics-collection.md) — receiver recipes for hosts and applications.
 - [Logs Collection](/docs/opentelemetry/logs-collection.md) — receiver recipes for journals, files, Windows event
   channels, Kubernetes, macOS, and syslog.
 - [Transformations](/docs/opentelemetry/transformations.md) — parse, enrich, normalize, and drop records before
   export.
 - [Logs-to-Metrics](/docs/opentelemetry/logs-to-metrics.md) — count matching log records and alert on the rate.
+- [Syslog from Network Devices](/docs/npm/syslog/README.md) — device syslog through a Collector receiver.
 - [OpenTelemetry Plugin Reference](/src/crates/otel-plugin/README.md) — every `otel.yaml` option.

@@ -2,7 +2,7 @@
 
 Netdata manages logs in a mix of distributed and centralized ways. It uses the indexed log databases each operating
 system already maintains — on every node, and on the OS-native log centralization points you already run — and adds
-its own high-performance indexed log store, with transparent offloading to object storage, for the logs you choose to
+its own indexed log store, with transparent offloading to object storage, for the logs you choose to
 centralize. Every event stays queryable from the same interface, and you control what logs cost by deciding where each
 source is stored and for how long, instead of filtering or discarding logs to fit a budget. See
 [Log Storage and Retention](/docs/logs/log-storage-and-retention.md).
@@ -36,9 +36,9 @@ an OS log store, such as Kubernetes.
 | You already aggregate journals or Windows events with `systemd-journal-remote` or Windows Event Forwarding | Install Netdata on the aggregation point. The aggregated logs stay in native format for your existing tooling. |
 | Kubernetes and containers | Run the [OpenTelemetry Collector in the cluster](/docs/opentelemetry/logs-collection.md#kubernetes-and-containers) and ship container logs to Netdata's log store. |
 | Application text files | Convert them to journal entries with `log2journal` to keep using `journalctl` and your SIEM on them, or ship them with an OpenTelemetry Collector. |
-| Network devices sending syslog | An OpenTelemetry Collector syslog receiver forwarding to Netdata. |
+| Network devices sending syslog | An [OpenTelemetry Collector syslog receiver](/docs/npm/syslog/README.md) forwarding to Netdata. |
 | Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md). |
-| macOS | In place. macOS has no OS-native log forwarding; to centralize, use the OpenTelemetry Collector's macOS receiver. |
+| macOS | In place. macOS has no OS-native log forwarding; to centralize, use the [OpenTelemetry Collector's macOS receiver](/docs/opentelemetry/logs-collection.md#macos-unified-log). |
 
 Any mix works. Centralization points do not need to be infrastructure-wide: run one per team, environment, or
 datacenter, sized for its own volume, and keep critical systems' logs local. Netdata Cloud presents every node and every
@@ -59,7 +59,7 @@ centralization point in one dashboard with one role-based access model.
 
 ## One interface for every source
 
-All sources share the Logs tab: field filters with live counters, full-text search, per-field histograms, live tail,
+All log sources share the Logs tab (network flows have their own view): field filters with live counters, full-text search, per-field histograms, live tail,
 and the node's per-second metrics on the same dashboard, so you read an event next to the exact moment a metric
 changed. Netdata Cloud brings every node and centralization point into one dashboard with role-based access, so
 reading production logs does not require shell access to production systems. See
@@ -100,7 +100,7 @@ runs the same service inside your own infrastructure.
 - [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md) — the journals
   Netdata writes for network devices.
 - Integrations — the per-source integration cards.
-- OpenTelemetry — [OTLP ingestion](/docs/opentelemetry/otlp-ingestion.md),
+- Related: the OpenTelemetry section — [OTLP ingestion](/docs/opentelemetry/otlp-ingestion.md),
   [logs collection](/docs/opentelemetry/logs-collection.md),
   [transformations](/docs/opentelemetry/transformations.md),
   [logs-to-metrics](/docs/opentelemetry/logs-to-metrics.md), and the

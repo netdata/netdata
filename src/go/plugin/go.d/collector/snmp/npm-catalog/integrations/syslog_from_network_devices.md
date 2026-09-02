@@ -24,9 +24,9 @@ Module: otel
 
 ## Overview
 
-Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemetry Collector with a syslog receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which stores it as structured journal logs you explore and query in the Logs tab.
+Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemetry Collector with a syslog receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which stores it in Netdata's indexed log store you explore and query in the Logs tab.
 
-Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog receiver pointed at the Agent's OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent's otel plugin writes the records to systemd-compatible journal files.
+Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog receiver pointed at the Agent's OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent's otel plugin writes the records to Netdata's indexed log store.
 
 This integration is only supported on the following platforms:
 

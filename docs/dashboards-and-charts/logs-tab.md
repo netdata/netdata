@@ -16,7 +16,7 @@ The Logs tab shows entries from the sources available on the node:
 | `windows-events` | Windows | Windows event channels, auto-detected and aggregated, including forwarded-events channels on a Windows Event Collector | [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) |
 | `macos-logs` | macOS | The native unified log store, through Apple's OSLog framework | [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) |
 | `otel-logs` | Any, via OTLP | Logs received by the OpenTelemetry plugin and stored in Netdata's indexed log store | [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) |
-| `snmp:traps` | Any node running the SNMP traps collector | Journal-compatible files that Netdata writes for the traps it receives | [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) |
+| `snmp:traps` | Any | Journal-compatible files Netdata writes for the traps received by its SNMP traps collector | [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) |
 
 Application text files appear under `systemd-journal` when converted with log2journal, or under `otel-logs` when
 shipped through an OpenTelemetry Collector; see [Text Files to Journals](/docs/logs/text-files-to-journals.md).
@@ -43,7 +43,9 @@ The **Sources** selector on the right sidebar narrows a query to part of a sourc
 - `otel-logs` offers a **Services** selector built from the `service.namespace` and `service.name` resource attributes
   of the ingested streams.
 
-All sources are queried together by default. Selecting a specific source before a deep analysis makes queries faster.
+Each source merges its own sub-sources by default — journals within `systemd-journal`, channels within
+`windows-events`; different sources are separate queries. Narrowing the selection before a deep analysis makes
+queries faster.
 
 ## Filtering by field
 
@@ -99,8 +101,8 @@ The OS-native sources and the OpenTelemetry log store use different query engine
 
 ### systemd journal
 
-- Netdata reads the journal files directly, one file at a time with cached file metadata lookups, so a query costs no
-  more than the equivalent `journalctl` query on the same files.
+- Netdata reads the journal files directly, one file at a time — with cached file metadata lookups on builds that use
+  `libsystemd` — so a query costs no more than the equivalent `journalctl` query on the same files.
 - Each query fully evaluates the newest 500,000 entries, distributes the rest of its 1,000,000-entry budget across
   the queried files, and samples beyond it. Beyond the budget:
   - the rows shown are always real entries;
@@ -117,8 +119,9 @@ The OS-native sources and the OpenTelemetry log store use different query engine
 ### OpenTelemetry log store
 
 - Counts are exact; no sampling is applied.
-- The time range bounds the work of a query: the default window is the last 15 minutes, and there is no query timeout,
-  so on a large store narrow the window before adding a full-text search.
+- The time range bounds the work of a query: the default window is the last 15 minutes. The store itself applies no
+  entry budget, but the Agent cancels the function after its timeout (currently 10 seconds for `otel-logs`), so on a
+  large store narrow the window before adding a full-text search.
 - Files offloaded to object storage are fetched transparently when a query needs them; the first query over archived
   data waits for the download.
 - Fields with very many distinct values are searchable and filterable but are not offered as filter facets.

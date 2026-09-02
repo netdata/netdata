@@ -1,4 +1,12 @@
-# Syslog from Network Devices
+<!--startmeta
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/syslog-pointer.md"
+sidebar_label: "Syslog"
+learn_status: "Published"
+learn_rel_path: "Network Performance Monitoring"
+keywords: ['syslog', 'network devices', 'opentelemetry', 'npm']
+endmeta-->
+
+# Syslog
 
 Netdata ingests syslog from network devices through an OpenTelemetry Collector: the Collector listens for syslog over
 UDP or TCP, parses RFC 3164 or RFC 5424 records, and forwards them over OTLP to a Netdata Agent, which stores them in

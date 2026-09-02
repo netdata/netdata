@@ -160,8 +160,8 @@ The sidebar shows:
 
 The plugin offers a curated set of journal fields as filters by default, each with counters, and you can enable any
 other journal field as a filter from the dashboard — the query then evaluates it the same way. Message text and
-timestamps are covered by full-text search and the time selection rather than filters, which search the full text of
-every field of every entry.
+timestamps are covered by full-text search and the time selection rather than filters. Full-text search covers the
+full text of every field of every entry.
 
 :::tip
 
@@ -409,8 +409,7 @@ cannot read or change this setting.
 
 Rules for the value:
 
-- Up to 100 directories. Paths must be absolute; `/`, `/dev`, `/proc`, `/sys`, `/etc` and `/lib*` (including `/lib32`
-  and `/lib64`) are rejected, as are paths containing `/./` or `/../`.
+- Up to 100 directories. Paths must be absolute; `/`, `/dev`, `/proc`, `/sys`, `/etc`, `/lib`, `/lib32` and `/lib64` are rejected, as are paths containing `/./` or `/../`.
 - Each update replaces the whole list — the configured directories replace the defaults — and the journal watcher
   restarts immediately, so no Agent restart is needed.
 - Directories that do not exist are accepted, with a warning in the response. The directory watcher is `inotify`-based,

@@ -90,16 +90,18 @@ produced by Netdata's own writer, with no `systemd-journald` involved. Netdata r
 them on; on Linux, `journalctl` from systemd 252 or later reads the same files (they use the compact journal mode), and
 so do SIEM agents that ingest journal files.
 
-- **[SNMP traps](/docs/logs/snmp-trap-logs.md)** are written under `traps/<job>/<machine-id>/` in the Netdata log directory (`/var/log/netdata` by
-  default), one directory per collector job. Retention is set per job in the collector configuration:
-  `retention.max_size` (`10GB` by
-  default) and an optional `max_duration`; files rotate automatically. Query them from
+- **[SNMP traps](/docs/logs/snmp-trap-logs.md)** are written under `traps/<job>/<machine-id>/` in the Netdata log directory (`/var/log/netdata` on
+  package installs; static installs use `/opt/netdata/var/log/netdata`), one directory per collector job. Retention is
+  set per job in the collector configuration:
+  `retention.max_size` (`10GB` by default) and an optional `max_duration`; files rotate automatically. Query them from
   the Logs tab (`snmp:traps`) or with `journalctl --directory=<dir>`. See
   [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md) and
   [Configuration](/docs/npm/snmp-traps/configuration.md).
 - **[Network flows](/docs/logs/network-flows.md)** (NetFlow, sFlow, IPFIX) are written under `flows/` in the Netdata cache directory
-  (`/var/cache/netdata/flows` by default) in four tiers, `raw`, `1m`, `5m`, and `1h`; files rotate on size, and a file spans at most one hour.
-  Retention is set per tier: `size_of_journal_files` (`10GB` per tier by default, about 40 GB in total) and an optional
+  (`/var/cache/netdata/flows` on package installs) in four tiers, `raw`, `1m`, `5m`, and `1h`; files rotate on size, and
+  a file spans at most one hour.
+  Retention is set per tier: `size_of_journal_files` (`10GB` per tier by default, at least 40 GB in total) and an
+  optional
   `duration_of_journal_files`. Query them from the Network Flows view or with `journalctl --file=<file>`. See
   [Retention and Querying](/docs/npm/network-flows/retention-querying.md) and
   [Configuration](/docs/npm/network-flows/configuration.md).
@@ -107,11 +109,13 @@ so do SIEM agents that ingest journal files.
 ## Netdata's log store
 
 Logs received over OpenTelemetry are stored by the receiving Netdata Agent under `base_dir`
-(default `/var/log/netdata/otel/v2`), in one directory tree per tenant. Incoming records are appended to a write-ahead
-log; when a write-ahead log reaches `max_file_size` (25 MB), `max_entries` (50000), or 15 minutes of age, it is sealed
-into an indexed file and the write-ahead log is deleted. Each indexed file stores every distinct field value once, in
-compressed dictionaries, and references it from every entry, so every field is indexed and the disk usage stays close to
-that of the compressed raw text.
+(default `/var/log/netdata/otel/v2` on package installs), with per-tenant subdirectories under each signal's
+write-ahead-log and index directories. Incoming records are appended to a write-ahead log; when it reaches
+`max_file_size` (25 MB), `max_entries` (50000), or `max_file_duration` (about 15 minutes), it is sealed
+into an indexed file and the write-ahead log is deleted. Each indexed file stores every distinct `field=value` pair
+once,
+in compressed dictionaries local to that file, and references it from every entry, so every field is indexed and the
+disk usage stays close to that of the compressed raw text.
 
 Retention applies to sealed indexed files, per tenant, oldest first, when any of three limits is exceeded:
 
@@ -123,7 +127,8 @@ Retention applies to sealed indexed files, per tenant, oldest first, when any of
 
 `max_total_size` is not a cap on the plugin's disk usage: active write-ahead logs (up to `max_file_size` per stream),
 catalogs, and the remote read cache are additional. Retention runs when a file is sealed; a tenant that stops sending
-keeps its last files until it sends again or the Agent restarts.
+gets one final pass when its last write-ahead log
+seals on idle (within about 15 minutes), then keeps its remaining files until it sends again or the Agent restarts.
 
 Per-tenant sections inherit every field they omit from `default`. The section name is the tenant, which is the
 `X-Scope-OrgID` header value when tenant selection is enabled:
@@ -141,8 +146,8 @@ logs:
       max_age: "400 days"
 ```
 
-With tenant selection enabled, a sender that omits the `X-Scope-OrgID` header is rejected; with it disabled, every
-record lands in the `default` tenant regardless of headers.
+With tenant selection enabled, a log or trace sender that omits the `X-Scope-OrgID` header is rejected (metrics are
+not tenant-scoped); with it disabled, every record lands in the `default` tenant regardless of headers.
 
 Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and restart
 the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md).
@@ -151,9 +156,11 @@ the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/
 
 With `remote_storage.enabled: true`, every sealed indexed file is also uploaded to `remote_storage.uri`, an `s3://` or
 `fs://` location. Uploading changes nothing locally: files stay under local retention, and a local file is not deleted
-by retention until its presence in the remote is confirmed. When a query needs an offloaded file that is no longer
+by retention until its catalog entry confirms it is in the remote. When a query needs an offloaded file that is no
+longer
 local, the Agent downloads it through a cache bounded by `remote_storage.read_cache_max_size` (1GB), and the query
-waits for the download. A query whose files exceed the cache fails with a message to narrow the time range.
+waits for the download. A query whose files exceed the cache fails with a message to narrow the time window or stream
+filter.
 
 ```yaml
 remote_storage:
@@ -185,12 +192,15 @@ remote_storage:
 
 ### Sizing the receiving node
 
-Run the pipeline for a full day, then measure `du -sh` on the tenant's `index` directory under `base_dir` and multiply
+Run the pipeline for a full day, then measure `du -sh` on the tenant's directory under `<base_dir>/logs/index/` and
+multiply
 by the retention you want locally. For long retention there are two shapes: keep everything on local disk, sizing it
 as one day's index size × `max_age`, as the `audit` example above does with its 400 days; or keep `max_age` short
 (30 days, say), enable offloading, and size the object storage for one day's index size × the total retention you
-want reachable — older files are then fetched back from S3 through the read cache when queried. Add headroom for active write-ahead logs (`max_file_size` per stream) and for the
-read cache when offloading is enabled. Queries are bounded only by their time range, so on large stores keep the
+want reachable — older files are then fetched back from S3 through the read cache when queried. Add headroom for active
+write-ahead logs (`max_file_size` per stream) and for the
+read cache when offloading is enabled. Queries are bounded by their time range and by the Agent's function timeout, so
+on large stores keep the
 default window and narrow it further before running a full-text search; see
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).
 
@@ -203,14 +213,14 @@ without a running Agent — which makes it usable for forensics: a stopped node,
 ```bash
 sudo /usr/libexec/netdata/plugins.d/otel-plugin logs \
   --config /etc/netdata/otel.yaml --tenant default \
-  --name checkout --since -1h --filter 'level=error'
+  --name checkout --since -1h --filter 'level=error' --limit 1000
 ```
 
 - Select the window with `--since`/`--until` (epoch seconds, relative values such as `-1h`, or UTC datetimes), the
   stream with `--name`/`--namespace`, rows with `--filter 'field=value,field~regex'` and `--query REGEX`, and the
   output fields with `--fields`.
-- Output is NDJSON on stdout, one object per row, ready for `jq`; a `matched=/returned=` summary and any warnings go
-  to stderr.
+- Output is NDJSON on stdout, one object per row and 50 rows by default (raise it with `--limit`), ready for `jq`;
+  a `matched=N returned=M window=...` summary and any warnings go to stderr.
 - It reads local files only: records offloaded to object storage and already evicted locally are not visible to it,
   and the newest records of an actively written stream may be missing. The Logs tab is authoritative for live data.
 - It runs read-only, takes no locks, and does not disturb ingestion; it needs read access to the store's directory

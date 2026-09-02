@@ -21,7 +21,7 @@ queue so a Collector restart or a network outage does not lose records:
 
 ```yaml
 extensions:
-  file_storage:
+  file_storage/netdata:
     directory: /var/lib/otelcol/netdata
     create_directory: true
 
@@ -36,14 +36,15 @@ exporters:
     headers:
       X-Scope-OrgID: production
     sending_queue:
-      storage: file_storage
+      storage: file_storage/netdata
 
 service:
-  extensions: [file_storage]
+  extensions: [file_storage/netdata]
 ```
 
 The receiving Agent's endpoint, TLS, and tenant settings are described in
-[Accept remote senders securely](/docs/opentelemetry/otlp-ingestion.md#accept-remote-senders-securely).
+[Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). When you combine blocks, list every
+extension you use in one `service.extensions` list.
 
 Set `service.name` and, when useful, `service.namespace` as resource attributes so operators can identify each stream consistently in the Netdata Logs tab.
 
@@ -325,11 +326,14 @@ helm install otel-logs open-telemetry/opentelemetry-collector -n otel-logs -f va
 ```
 
 The `k8sattributes` processor derives `service.namespace` and `service.name` from the pod's labels and annotations
-following the OpenTelemetry semantic conventions, so each workload appears as its own service in the Logs tab; the
+following the OpenTelemetry semantic conventions — from the `app.kubernetes.io` labels and
+`resource.opentelemetry.io` annotations, falling back to the workload name and the Kubernetes namespace — so each
+workload appears as its own service in the Logs tab; the
 container parser adds the pod, namespace, and container from the file path. `storeCheckpoints` keeps file offsets in
 `/var/lib/otelcol` on the node so a Collector restart does not replay or skip lines. The values above are validated
 by rendering them with the `opentelemetry-collector` Helm chart 0.172.0 and validating the resulting Collector
-configuration with Contrib 0.157.0.
+configuration with Contrib 0.157.0. The chart deploys its own Collector build (chart 0.172.0 ships Collector
+0.159.0); pin `image.tag` to run a specific Collector version.
 
 The `kubernetes` tenant the exporter selects needs its own retention policy on the receiving Agent, or its records
 land under the 7-day, 1GB defaults:
@@ -346,19 +350,20 @@ logs:
 
 See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how tenant retention and offloading work.
 
-Without Helm, this is the receiver the preset generates — it is not a standalone recipe; pair it with an exporter,
-a `file_storage` extension for the checkpoints, and a logs pipeline as in the recipes above:
+Without Helm, this is the receiver the preset generates, abridged — the rendered configuration also carries the
+collector's own log exclusions and the parser's `max_log_size`. It is not a standalone recipe; pair it with an
+exporter, a storage extension for the checkpoints, and a logs pipeline as in the recipes above:
 
 ```yaml
 receivers:
-  filelog:
+  file_log:
     include: [/var/log/pods/*/*/*.log]
     start_at: end
     include_file_path: true
     include_file_name: false
     retry_on_failure:
       enabled: true
-    storage: file_storage  # provided by the chart's storeCheckpoints preset
+    storage: file_storage  # under Helm, the storeCheckpoints preset provides this extension
     operators:
       - type: container
         id: container-parser
@@ -407,7 +412,7 @@ for archive mode, predicates, and the complete option set.
 
 ## Syslog
 
-The Collector Contrib `syslog` receiver can listen over TCP or UDP and parse RFC 3164 or RFC 5424 records. Netdata maintains a separate end-to-end guide because durable network ingestion also requires listener exposure, firewall rules, transport choices, and persistent Collector queues. Follow [Collect syslog with the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md) instead of duplicating that configuration here.
+The Collector Contrib `syslog` receiver can listen over TCP or UDP and parse RFC 3164 or RFC 5424 records. Netdata maintains a separate end-to-end guide because durable network ingestion also requires listener exposure, firewall rules, transport choices, and persistent Collector queues. Follow the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) instead of duplicating that configuration here.
 
 ## Verify and troubleshoot logs
 
