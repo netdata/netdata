@@ -5,6 +5,7 @@
 #include "web/mcp/adapters/mcp-http.h"
 #include "web/mcp/adapters/mcp-sse.h"
 #include "registry/registry.h"
+#include <openssl/rsa.h>
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers
@@ -2461,10 +2462,21 @@ static int web_client_unittest_tls_pending(void) {
         goto cleanup;
 
     certificate = X509_new();
-    if(!certificate || !X509_set_version(certificate, 2) ||
+    if(!certificate)
+        goto cleanup;
+
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+    ASN1_TIME *not_before = X509_get_notBefore(certificate);
+    ASN1_TIME *not_after = X509_get_notAfter(certificate);
+#else
+    ASN1_TIME *not_before = X509_getm_notBefore(certificate);
+    ASN1_TIME *not_after = X509_getm_notAfter(certificate);
+#endif
+
+    if(!X509_set_version(certificate, 2) ||
        !ASN1_INTEGER_set(X509_get_serialNumber(certificate), 1) ||
-       !X509_gmtime_adj(X509_get_notBefore(certificate), 0) ||
-       !X509_gmtime_adj(X509_get_notAfter(certificate), 60) ||
+       !X509_gmtime_adj(not_before, 0) ||
+       !X509_gmtime_adj(not_after, 60) ||
        !X509_set_pubkey(certificate, key))
         goto cleanup;
 
