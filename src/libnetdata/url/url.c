@@ -248,14 +248,67 @@ fail_cleanup:
 }
 
 inline bool
-url_is_request_complete_and_extract_payload(const char *begin, const char *end, size_t length, BUFFER **post_payload) {
-    if (begin == end || length < 4)
+url_is_request_complete_and_extract_payload(
+    const char *begin, const char *end, size_t length, BUFFER **post_payload, size_t *expected_size) {
+    if (length < 4)
+        return false;
+
+    // A prior four-byte "PUT " receive rewinds the incremental cursor to begin.
+    if (begin == end && strncmp(begin, "PUT ", 4) != 0)
         return false;
 
     if(likely(strncmp(begin, "GET ", 4)) == 0) {
         return strstr(end - 4, "\r\n\r\n");
     }
     else if(unlikely(strncmp(begin, "POST ", 5) == 0 || strncmp(begin, "PUT ", 4) == 0)) {
+        if(*expected_size == SIZE_MAX)
+            return false;
+
+        if(!*expected_size) {
+            // The first call may contain the whole request; later calls begin before newly received bytes.
+            const char *headers_search_from = (end == begin + length) ? begin : end;
+            if(!strstr(headers_search_from, "\r\n\r\n"))
+                return false;
+
+            const char *cl = strcasestr(begin, "Content-Length: ");
+            if(!cl)
+                goto invalid_content_length;
+            cl = &cl[16];
+
+            while(*cl == ' ' || *cl == '\t')
+                cl++;
+
+            if(!isdigit((uint8_t)*cl))
+                goto invalid_content_length;
+
+            char *content_length_end;
+            errno_clear();
+            unsigned long long parsed_content_length = strtoull(cl, &content_length_end, 10);
+            if(errno != 0 || parsed_content_length > SIZE_MAX)
+                goto invalid_content_length;
+
+            while(*content_length_end == ' ' || *content_length_end == '\t')
+                content_length_end++;
+
+            if(content_length_end[0] != '\r' || content_length_end[1] != '\n')
+                goto invalid_content_length;
+
+            const char *payload = strstr(cl, "\r\n\r\n");
+            if(!payload)
+                goto invalid_content_length;
+            payload += 4;
+
+            size_t payload_offset = payload - begin;
+            size_t content_length = (size_t)parsed_content_length;
+            if(content_length > SIZE_MAX - payload_offset)
+                goto invalid_content_length;
+
+            *expected_size = payload_offset + content_length;
+        }
+
+        if(length != *expected_size)
+            return false;
+
         const char *cl = strcasestr(begin, "Content-Length: ");
         if(!cl) return false;
         cl = &cl[16];
@@ -313,6 +366,10 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
             return true;
         }
 
+        return false;
+
+invalid_content_length:
+        *expected_size = SIZE_MAX;
         return false;
     }
     else {
