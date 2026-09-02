@@ -103,7 +103,14 @@ static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, vo
     return __atomic_load_n(&req->canceled, __ATOMIC_RELAXED);
 }
 
-static HTTP_VALIDATION aclk_http_request_size_validation(const char *request, size_t *request_length) {
+static HTTP_VALIDATION aclk_http_request_size_validation(
+    const char *request, size_t request_size, size_t *request_length)
+{
+    if(request_size > NETDATA_WEB_REQUEST_MAX_SIZE) {
+        *request_length = NETDATA_WEB_REQUEST_MAX_SIZE + 1;
+        return HTTP_VALIDATION_REQUEST_TOO_LARGE;
+    }
+
     *request_length = strnlen(request, NETDATA_WEB_REQUEST_MAX_SIZE + 1);
     return web_client_request_size_validation(*request_length);
 }
@@ -140,8 +147,8 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
 
     buffer_flush(w->response.data);
     size_t request_length;
-    HTTP_VALIDATION validation =
-        aclk_http_request_size_validation(query->data.http_api_v2.payload, &request_length);
+    HTTP_VALIDATION validation = aclk_http_request_size_validation(
+        query->data.http_api_v2.payload, query->data.http_api_v2.request_size, &request_length);
     if(validation == HTTP_VALIDATION_OK) {
         buffer_contents_replace(w->response.data, query->data.http_api_v2.payload, request_length);
         w->statistics.received_bytes = request_length;
@@ -258,12 +265,19 @@ int aclk_query_unittest(void) {
 
     size_t request_length;
     request[NETDATA_WEB_REQUEST_MAX_SIZE] = '\0';
-    if(aclk_http_request_size_validation(request, &request_length) != HTTP_VALIDATION_OK ||
+    if(aclk_http_request_size_validation(request, NETDATA_WEB_REQUEST_MAX_SIZE, &request_length) != HTTP_VALIDATION_OK ||
        request_length != NETDATA_WEB_REQUEST_MAX_SIZE)
         errors++;
 
     request[NETDATA_WEB_REQUEST_MAX_SIZE] = 'a';
-    if(aclk_http_request_size_validation(request, &request_length) != HTTP_VALIDATION_REQUEST_TOO_LARGE ||
+    if(aclk_http_request_size_validation(request, NETDATA_WEB_REQUEST_MAX_SIZE + 1, &request_length) !=
+           HTTP_VALIDATION_REQUEST_TOO_LARGE ||
+       request_length != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
+        errors++;
+
+    request[0] = '\0';
+    if(aclk_http_request_size_validation(request, NETDATA_WEB_REQUEST_MAX_SIZE + 1, &request_length) !=
+           HTTP_VALIDATION_REQUEST_TOO_LARGE ||
        request_length != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
         errors++;
 

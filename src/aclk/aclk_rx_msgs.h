@@ -5,7 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-int aclk_handle_cloud_cmd_message(char *payload);
+int aclk_handle_cloud_cmd_message(char *payload, size_t payload_length);
 int aclk_rx_msgs_unittest(void);
 void aclk_init_rx_msg_handlers(void);
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic);

@@ -32,6 +32,7 @@ typedef enum {
 struct aclk_query_http_api_v2 {
     char *payload;
     char *query;
+    size_t request_size;
 };
 
 struct aclk_bin_payload {

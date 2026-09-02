@@ -183,7 +183,8 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
     // make sure the machine exists
     REGISTRY_MACHINE *m = registry_machine_find(machine_guid);
     if(!m) {
-        netdata_log_info("Registry request verification failed: machine not found (url_bytes=%zu)", strlen(url));
+        netdata_log_info("Registry request verification failed: machine not found (machine_bytes=%zu)",
+                         strlen(machine_guid));
         return NULL;
     }
     if(mm) *mm = m;
@@ -191,7 +192,8 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
     // make sure the person exist
     REGISTRY_PERSON *p = registry_person_find(person_guid);
     if(!p) {
-        netdata_log_info("Registry request verification failed: person not found (url_bytes=%zu)", strlen(url));
+        netdata_log_info("Registry request verification failed: person not found (person_bytes=%zu)",
+                         strlen(person_guid));
         return NULL;
     }
     if(pp) *pp = p;

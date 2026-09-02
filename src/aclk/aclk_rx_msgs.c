@@ -95,22 +95,6 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
     return 0;
 }
 
-static inline int aclk_extract_v2_data(char *payload, char **data, bool *request_too_large)
-{
-    char* ptr = strstr(payload, ACLK_V2_PAYLOAD_SEPARATOR);
-    if(!ptr)
-        return 1;
-
-    ptr += strlen(ACLK_V2_PAYLOAD_SEPARATOR);
-    size_t length = strnlen(ptr, NETDATA_WEB_REQUEST_MAX_SIZE + 1);
-    *request_too_large =
-        web_client_request_size_validation(length) == HTTP_VALIDATION_REQUEST_TOO_LARGE;
-    *data = mallocz(length + 1);
-    memcpy(*data, ptr, length);
-    (*data)[length] = '\0';
-    return 0;
-}
-
 static const char *aclk_find_v2_payload_separator(const char *msg, size_t msg_len) {
     static const char separator[] = ACLK_V2_PAYLOAD_SEPARATOR;
     const size_t separator_length = sizeof(separator) - 1;
@@ -124,6 +108,24 @@ static const char *aclk_find_v2_payload_separator(const char *msg, size_t msg_le
     }
 
     return NULL;
+}
+
+static inline int aclk_extract_v2_data(char *payload, size_t payload_length, char **data, size_t *request_size)
+{
+    static const char separator[] = ACLK_V2_PAYLOAD_SEPARATOR;
+    const char *separator_start = aclk_find_v2_payload_separator(payload, payload_length);
+    if(!separator_start)
+        return 1;
+
+    const char *request = separator_start + sizeof(separator) - 1;
+    *request_size = payload_length - (size_t)(request - payload);
+
+    size_t bounded_size = MIN(*request_size, (size_t)NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    size_t length = strnlen(request, bounded_size);
+    *data = mallocz(length + 1);
+    memcpy(*data, request, length);
+    (*data)[length] = '\0';
+    return 0;
 }
 
 static char *aclk_old_proto_cmd_to_cstring(const char *msg, size_t msg_len, size_t *copied_length) {
@@ -156,25 +158,34 @@ int aclk_rx_msgs_unittest(void) {
     raw[envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1] = '\0';
 
     char *request = NULL;
-    bool request_too_large = false;
+    size_t request_size = 0;
     raw[envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE] = '\0';
-    if(aclk_extract_v2_data(raw, &request, &request_too_large) || request_too_large ||
+    if(aclk_extract_v2_data(raw, envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE,
+                            &request, &request_size) ||
+       request_size != NETDATA_WEB_REQUEST_MAX_SIZE ||
        strlen(request) != NETDATA_WEB_REQUEST_MAX_SIZE)
         errors++;
     freez(request);
 
     raw[envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE] = 'a';
-    if(aclk_extract_v2_data(raw, &request, &request_too_large) || !request_too_large ||
+    if(aclk_extract_v2_data(raw, envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1,
+                            &request, &request_size) ||
+       request_size != NETDATA_WEB_REQUEST_MAX_SIZE + 1 ||
        strlen(request) != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
         errors++;
     freez(request);
 
+    raw[envelope_length + 16] = '\0';
     size_t copied_length = 0;
     CLEAN_CHAR_P *bounded = aclk_old_proto_cmd_to_cstring(
         raw, envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1, &copied_length);
     if(!bounded || copied_length != envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1 ||
-       bounded[copied_length] != '\0')
+       bounded[copied_length] != '\0' ||
+       aclk_extract_v2_data(bounded, copied_length, &request, &request_size) ||
+       request_size != NETDATA_WEB_REQUEST_MAX_SIZE + 1 || strlen(request) != 16)
         errors++;
+    freez(request);
+    raw[envelope_length + 16] = 'a';
 
     if(aclk_old_proto_cmd_to_cstring("no separator", 12, NULL))
         errors++;
@@ -213,7 +224,8 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     return 0;
 }
 
-static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent, char *raw_payload)
+static int aclk_handle_cloud_http_request_v2(
+    struct aclk_request *cloud_to_agent, char *raw_payload, size_t raw_payload_length)
 {
     errno_clear();
     if (cloud_to_agent->version < ACLK_V_COMPRESSION) {
@@ -225,14 +237,14 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     }
 
     aclk_query_t *query = aclk_query_new(HTTP_API_V2);
-    bool request_too_large = false;
-
-    if (unlikely(aclk_extract_v2_data(raw_payload, &query->data.http_api_v2.payload, &request_too_large))) {
+    if (unlikely(aclk_extract_v2_data(raw_payload, raw_payload_length,
+                                      &query->data.http_api_v2.payload,
+                                      &query->data.http_api_v2.request_size))) {
         netdata_log_error("Error extracting payload expected after the JSON dictionary.");
         goto error;
     }
 
-    if (unlikely(!request_too_large &&
+    if (unlikely(query->data.http_api_v2.request_size <= NETDATA_WEB_REQUEST_MAX_SIZE &&
                  aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
         netdata_log_error("Could not extract payload from query");
         goto error;
@@ -263,7 +275,7 @@ error:
     return 1;
 }
 
-int aclk_handle_cloud_cmd_message(char *payload)
+int aclk_handle_cloud_cmd_message(char *payload, size_t payload_length)
 {
     struct aclk_request cloud_to_agent;
     memset(&cloud_to_agent, 0, sizeof(struct aclk_request));
@@ -273,7 +285,6 @@ int aclk_handle_cloud_cmd_message(char *payload)
         return 1;
     }
 
-    size_t payload_length = strlen(payload);
     netdata_log_debug(D_ACLK, "ACLK incoming 'cmd' message of %zu bytes", payload_length);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
@@ -295,7 +306,7 @@ int aclk_handle_cloud_cmd_message(char *payload)
         goto err_cleanup;
     }
 
-    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
+    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload, payload_length))) {
         // aclk_handle_cloud_http_request_v2 takes ownership of msg_id and
         // callback_topic on success. The JSON-parsed payload field is not
         // consumed by v2 (the HTTP body comes from the raw frame), so free
@@ -323,13 +334,14 @@ int handle_old_proto_cmd(const char *msg, size_t msg_len)
     // msg is binary payload in all other cases
     // however in this message from old legacy cloud
     // we have to convert it to C string
-    char *str = aclk_old_proto_cmd_to_cstring(msg, msg_len, NULL);
+    size_t copied_length = 0;
+    char *str = aclk_old_proto_cmd_to_cstring(msg, msg_len, &copied_length);
     if(!str) {
         error_report("ACLK legacy command message has no HTTP payload separator");
         return 1;
     }
 
-    int rc = aclk_handle_cloud_cmd_message(str);
+    int rc = aclk_handle_cloud_cmd_message(str, copied_length);
     freez(str);
     return rc;
 }
