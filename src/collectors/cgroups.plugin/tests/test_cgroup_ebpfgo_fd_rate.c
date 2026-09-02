@@ -32,6 +32,7 @@ int main(void)
      * gaps, then expires after a complete producer interval. */
     failed |= expect_rate("fd token grace", cgroup_ebpfgo_fd_token_grace_generations(10, 1), 10);
     failed |= expect_rate("fd token survives short gap", cgroup_ebpfgo_fd_token_expired(1, 4, 10, 1), 0);
+    failed |= expect_rate("fd token survives producer interval boundary", cgroup_ebpfgo_fd_token_expired(1, 11, 10, 1), 0);
     failed |= expect_rate("fd token expires after producer interval", cgroup_ebpfgo_fd_token_expired(1, 12, 10, 1), 1);
     return failed;
 }

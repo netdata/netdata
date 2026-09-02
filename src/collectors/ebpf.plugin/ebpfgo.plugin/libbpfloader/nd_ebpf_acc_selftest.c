@@ -126,10 +126,6 @@ static int nd_ebpf_key_delete_selftest(void)
         {.key = 7, .tgid = 100, .ct = 10},
         {.key = 7, .tgid = 200, .ct = 20},
     };
-    const struct nd_ebpf_key_table table = {
-        .items = keys,
-        .count = sizeof(keys) / sizeof(keys[0]),
-    };
     const uint32_t dead[] = {100, 200};
     struct nd_ebpf_key_delete_selftest_slot slots[] = {
         {.tgid = 100, .ct = 10},
@@ -137,28 +133,28 @@ static int nd_ebpf_key_delete_selftest(void)
     };
 
     if (nd_ebpf_map_key_delete_eligible(
-            &table, dead, 2, 7, slots, sizeof(slots[0]),
+            keys, 2, dead, 2, slots, sizeof(slots[0]),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, tgid),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, ct), 2))
         return 40;
 
     slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 200, .ct = 20};
     if (!nd_ebpf_map_key_delete_eligible(
-            &table, dead, 2, 7, slots, sizeof(slots[0]),
+            keys, 2, dead, 2, slots, sizeof(slots[0]),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, tgid),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, ct), 2))
         return 41;
 
     slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 300, .ct = 20};
     if (nd_ebpf_map_key_delete_eligible(
-            &table, dead, 2, 7, slots, sizeof(slots[0]),
+            keys, 2, dead, 2, slots, sizeof(slots[0]),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, tgid),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, ct), 2))
         return 42;
 
     slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 100, .ct = 0};
     if (nd_ebpf_map_key_delete_eligible(
-            &table, dead, 2, 7, slots, sizeof(slots[0]),
+            keys, 2, dead, 2, slots, sizeof(slots[0]),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, tgid),
             offsetof(struct nd_ebpf_key_delete_selftest_slot, ct), 2))
         return 43;

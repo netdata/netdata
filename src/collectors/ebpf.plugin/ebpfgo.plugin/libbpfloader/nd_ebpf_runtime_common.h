@@ -786,40 +786,60 @@ static inline int nd_ebpf_update_controller(
     return 0;
 }
 
-static inline bool nd_ebpf_tgid_in_batch(const uint32_t *tgids, size_t count, uint32_t tgid)
+static inline int nd_ebpf_u32_cmp(const void *left, const void *right)
 {
-    for (size_t i = 0; i < count; i++) {
-        if (tgids[i] == tgid)
-            return true;
-    }
-    return false;
+    const uint32_t a = *(const uint32_t *)left;
+    const uint32_t b = *(const uint32_t *)right;
+    return (a > b) - (a < b);
 }
 
-static inline bool nd_ebpf_key_has_snapshot(
-    const struct nd_ebpf_key_table *keys,
-    uint32_t key,
+static inline int nd_ebpf_key_tgid_cmp(const void *left, const void *right)
+{
+    const struct nd_ebpf_key_tgid *a = left;
+    const struct nd_ebpf_key_tgid *b = right;
+    if (a->key != b->key)
+        return a->key > b->key ? 1 : -1;
+    if (a->tgid != b->tgid)
+        return a->tgid > b->tgid ? 1 : -1;
+    return a->ct > b->ct ? 1 : a->ct < b->ct ? -1 : 0;
+}
+
+static inline bool nd_ebpf_sorted_tgid_in_batch(const uint32_t *tgids, size_t count, uint32_t tgid)
+{
+    return bsearch(&tgid, tgids, count, sizeof(*tgids), nd_ebpf_u32_cmp) != NULL;
+}
+
+static inline bool nd_ebpf_key_group_has_snapshot(
+    const struct nd_ebpf_key_tgid *items,
+    size_t count,
     uint32_t tgid,
     uint64_t ct)
 {
     if (!ct)
         return false;
 
-    for (size_t i = 0; i < keys->count; i++) {
-        const struct nd_ebpf_key_tgid *item = &keys->items[i];
-        if (item->key == key && item->tgid == tgid && item->ct == ct)
-            return true;
+    size_t left = 0;
+    size_t right = count;
+    while (left < right) {
+        size_t mid = left + (right - left) / 2;
+        const struct nd_ebpf_key_tgid *item = &items[mid];
+        if (item->tgid < tgid || (item->tgid == tgid && item->ct < ct))
+            left = mid + 1;
+        else
+            right = mid;
     }
-    return false;
+
+    return left < count && items[left].tgid == tgid && items[left].ct == ct;
 }
 
 /* A map key can contain a different process in every per-CPU slot.  It is
  * safe to delete only when every populated slot still matches the snapshot and
  * every occupant is in the confirmed-dead batch. */
 static inline bool nd_ebpf_map_key_delete_eligible(
-    const struct nd_ebpf_key_table *keys,
+    const struct nd_ebpf_key_tgid *items,
+    size_t items_count,
     const uint32_t *tgids,
     size_t count,
-    uint32_t map_key,
     const void *values,
     size_t value_size,
     size_t tgid_offset,
@@ -839,8 +859,8 @@ static inline bool nd_ebpf_map_key_delete_eligible(
         uint64_t current_ct;
         memcpy(&current_ct, (const char *)values + (size_t)slot * value_size + ct_offset,
                sizeof(current_ct));
-        if (!nd_ebpf_tgid_in_batch(tgids, count, current_tgid) ||
-            !nd_ebpf_key_has_snapshot(keys, map_key, current_tgid, current_ct))
+        if (!nd_ebpf_sorted_tgid_in_batch(tgids, count, current_tgid) ||
+            !nd_ebpf_key_group_has_snapshot(items, items_count, current_tgid, current_ct))
             return false;
     }
 
@@ -865,7 +885,7 @@ static inline bool nd_ebpf_map_key_delete_eligible(
 static inline int nd_ebpf_map_delete_tgids(
     struct bpf_object *obj,
     const char *map_name,
-    const struct nd_ebpf_key_table *keys,
+    struct nd_ebpf_key_table *keys,
     const uint32_t *tgids,
     size_t count,
     void *values,
@@ -893,36 +913,45 @@ static inline int nd_ebpf_map_delete_tgids(
     if (!keys || !keys->items || keys->count == 0 || !tgids || count == 0)
         return 0;
 
-    int rc = 0;
-    for (size_t k = 0; k < keys->count; k++) {
-        const struct nd_ebpf_key_tgid *item = &keys->items[k];
-        if (!item->ct || !nd_ebpf_tgid_in_batch(tgids, count, item->tgid))
-            continue;
+    uint32_t *dead = mallocz(count * sizeof(*dead));
+    memcpy(dead, tgids, count * sizeof(*dead));
+    qsort(dead, count, sizeof(*dead), nd_ebpf_u32_cmp);
+    qsort(keys->items, keys->count, sizeof(*keys->items), nd_ebpf_key_tgid_cmp);
 
-        uint32_t map_key = item->key;
-        bool seen = false;
-        for (size_t previous = 0; previous < k; previous++) {
-            if (keys->items[previous].key == map_key) {
-                seen = true;
+    int rc = 0;
+    for (size_t start = 0; start < keys->count;) {
+        size_t end = start + 1;
+        uint32_t map_key = keys->items[start].key;
+        while (end < keys->count && keys->items[end].key == map_key)
+            end++;
+
+        bool candidate = false;
+        for (size_t i = start; i < end; i++) {
+            if (keys->items[i].ct && nd_ebpf_sorted_tgid_in_batch(dead, count, keys->items[i].tgid)) {
+                candidate = true;
                 break;
             }
         }
-        if (seen || !values || !value_size || bpf_map_lookup_elem(fd, &map_key, values) != 0)
-            continue;
 
-        enum bpf_map_type mtype = bpf_map__type(map);
-        int slots = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
-                    ? percpu_entries_cap : 1;
-        if (!nd_ebpf_map_key_delete_eligible(
-                keys, tgids, count, map_key, values, value_size, tgid_offset, ct_offset, slots))
-            continue;
+        if (candidate && values && value_size && bpf_map_lookup_elem(fd, &map_key, values) == 0) {
+            enum bpf_map_type mtype = bpf_map__type(map);
+            int slots = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
+                        ? percpu_entries_cap : 1;
+            if (nd_ebpf_map_key_delete_eligible(
+                    &keys->items[start], end - start, dead, count, values, value_size,
+                    tgid_offset, ct_offset, slots)) {
+                int per = bpf_map_delete_elem(fd, &map_key);
+                /* Treat "not found" as success: the BPF program may have removed the
+                 * bucket between snapshot and delete. */
+                if (per != 0 && per != -ENOENT)
+                    rc = per;
+            }
+        }
 
-        int per = bpf_map_delete_elem(fd, &map_key);
-        /* Treat "not found" as success: the BPF program may have removed the
-         * bucket between snapshot and delete. */
-        if (per != 0 && per != -ENOENT)
-            rc = per;
+        start = end;
     }
+
+    freez(dead);
 
     return rc;
 }
