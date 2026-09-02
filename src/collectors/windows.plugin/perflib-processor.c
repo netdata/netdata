@@ -52,8 +52,8 @@ void dict_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *
 static DICTIONARY *processors = NULL;
 
 struct processor_topology_entry {
-    uint32_t numa_node;
-    uint32_t numa_index;
+    uint32_t group;
+    uint32_t processor;
     int cpu_id;
 };
 
@@ -61,14 +61,6 @@ struct processor_topology {
     struct processor_topology_entry *entries;
     size_t entries_count;
     size_t entries_capacity;
-};
-
-// Windows 20H2 extends the SDK's NUMA_NODE_RELATIONSHIP with GroupCount and GroupMasks.
-struct processor_numa_node_relationship {
-    DWORD node_number;
-    BYTE reserved[18];
-    WORD group_count;
-    GROUP_AFFINITY group_masks[ANYSIZE_ARRAY];
 };
 
 static struct processor_topology processor_topology = {0};
@@ -95,7 +87,7 @@ static unsigned int processor_mask_span(KAFFINITY mask)
 }
 
 static bool
-processor_topology_add(struct processor_topology *topology, uint32_t numa_node, uint32_t numa_index, uint64_t cpu_id)
+processor_topology_add(struct processor_topology *topology, uint32_t group, uint32_t processor, uint64_t cpu_id)
 {
     if (cpu_id > INT_MAX)
         return false;
@@ -107,8 +99,8 @@ processor_topology_add(struct processor_topology *topology, uint32_t numa_node, 
     }
 
     topology->entries[topology->entries_count++] = (struct processor_topology_entry){
-        .numa_node = numa_node,
-        .numa_index = numa_index,
+        .group = group,
+        .processor = processor,
         .cpu_id = (int)cpu_id,
     };
     return true;
@@ -116,21 +108,15 @@ processor_topology_add(struct processor_topology *topology, uint32_t numa_node, 
 
 static bool processor_topology_add_mask(
     struct processor_topology *topology,
-    uint32_t numa_node,
+    uint32_t group,
     KAFFINITY mask,
     uint64_t group_offset)
 {
-    uint32_t numa_index = 0;
-    for (size_t i = 0; i < topology->entries_count; i++) {
-        if (topology->entries[i].numa_node == numa_node)
-            numa_index++;
-    }
-
     for (unsigned int bit = 0; mask; bit++, mask >>= 1) {
         if (!(mask & 1))
             continue;
 
-        if (!processor_topology_add(topology, numa_node, numa_index++, group_offset + bit))
+        if (!processor_topology_add(topology, group, bit, group_offset + bit))
             return false;
     }
 
@@ -189,37 +175,17 @@ static bool processor_topology_from_extended_api(struct processor_topology *topo
         for (WORD group = 1; group < group_count; group++)
             group_offsets[group] =
                 group_offsets[group - 1] + processor_mask_span(entry->Group.GroupInfo[group - 1].ActiveProcessorMask);
+
+        for (WORD group = 0; group < group_count; group++) {
+            if (!processor_topology_add_mask(
+                    topology, group, entry->Group.GroupInfo[group].ActiveProcessorMask, group_offsets[group]))
+                goto cleanup;
+        }
         break;
     }
 
     if (!group_offsets)
         goto cleanup;
-
-    for (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX entry = buffer; (BYTE *)entry < end;
-         entry = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)((BYTE *)entry + entry->Size)) {
-        if (entry->Relationship != RelationNumaNode)
-            continue;
-
-        size_t numa_header_size = offsetof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, NumaNode) +
-                                  offsetof(struct processor_numa_node_relationship, group_masks);
-        if (entry->Size < numa_header_size || (BYTE *)entry + entry->Size > end)
-            goto cleanup;
-
-        const struct processor_numa_node_relationship *numa = (const void *)&entry->NumaNode;
-        WORD node_group_count = numa->group_count;
-        if (!node_group_count)
-            node_group_count = 1;
-        if ((size_t)(entry->Size - numa_header_size) / sizeof(*numa->group_masks) < node_group_count)
-            goto cleanup;
-
-        for (WORD i = 0; i < node_group_count; i++) {
-            const GROUP_AFFINITY *group_mask = &numa->group_masks[i];
-            if (group_mask->Group >= group_count ||
-                !processor_topology_add_mask(
-                    topology, numa->node_number, group_mask->Mask, group_offsets[group_mask->Group]))
-                goto cleanup;
-        }
-    }
 
     freez(group_offsets);
     freez(buffer);
@@ -269,11 +235,11 @@ static bool processor_topology_refresh(void)
     return true;
 }
 
-static bool processor_topology_find(uint32_t numa_node, uint32_t numa_index, int *cpu_id)
+static bool processor_topology_find(uint32_t group, uint32_t processor, int *cpu_id)
 {
     for (size_t i = 0; i < processor_topology.entries_count; i++) {
         const struct processor_topology_entry *entry = &processor_topology.entries[i];
-        if (entry->numa_node == numa_node && entry->numa_index == numa_index) {
+        if (entry->group == group && entry->processor == processor) {
             *cpu_id = entry->cpu_id;
             return true;
         }
@@ -288,13 +254,16 @@ int perflib_processor_unittest(void)
     const KAFFINITY first_group_mask = ((KAFFINITY)1 << 1) | ((KAFFINITY)1 << 3);
     const KAFFINITY second_group_mask = (KAFFINITY)1 << 1;
     const uint64_t second_group_offset = processor_mask_span(first_group_mask);
+    int mapped_cpu = -1;
     int errors = 0;
 
     if (!processor_topology_add_mask(&topology, 0, first_group_mask, 0) ||
         !processor_topology_add_mask(&topology, 1, second_group_mask, second_group_offset) ||
-        topology.entries_count != 3 || topology.entries[0].cpu_id != 1 || topology.entries[1].cpu_id != 3 ||
-        topology.entries[2].cpu_id != 5) {
-        fprintf(stderr, "perflib processor unittest: sparse processor masks produced duplicate CPU IDs\n");
+        topology.entries_count != 3 || topology.entries[0].processor != 1 || topology.entries[0].cpu_id != 1 ||
+        topology.entries[1].processor != 3 || topology.entries[1].cpu_id != 3 || topology.entries[2].processor != 1 ||
+        topology.entries[2].cpu_id != 5 ||
+        !(processor_topology_find(1, 1, &mapped_cpu) && mapped_cpu == 5)) {
+        fprintf(stderr, "perflib processor unittest: sparse processor masks produced invalid group mapping\n");
         errors++;
     }
 
@@ -316,7 +285,7 @@ static bool processor_information_instance_is_total(const char *instance_name)
 static bool processor_information_instance_to_cpu_id(const char *instance_name, int *cpu_id)
 {
     char *separator;
-    uint32_t numa_node = str2uint32_t(instance_name, &separator);
+    uint32_t group = str2uint32_t(instance_name, &separator);
     if (separator == instance_name || *separator != ',')
         return false;
 
@@ -329,14 +298,14 @@ static bool processor_information_instance_to_cpu_id(const char *instance_name, 
     if (end == processor_number || *end != '\0')
         return false;
 
-    return processor_topology_find(numa_node, processor, cpu_id);
+    return processor_topology_find(group, processor, cpu_id);
 }
 
 static bool
 do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool processor_information, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, object_name);
-    if (!pObjectType)
+    if (!ObjectTypeHasInstances(pDataBlock, pObjectType))
         return false;
 
     if (processor_information) {
