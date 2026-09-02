@@ -188,7 +188,7 @@
     link: https://almalinux.org/
     icon_filename: "almalinux.svg"
   platform_info:
-    group: "include"
+    group: "no_include"
     distro: "almalinux"
   quick_start: -1
 - id: deploy-macos
