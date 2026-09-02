@@ -101,7 +101,8 @@ The OS-native sources and the OpenTelemetry log store use different query engine
 
 - Netdata reads the journal files directly, one file at a time with cached file metadata lookups, so a query costs no
   more than the equivalent `journalctl` query on the same files.
-- Each query fully evaluates the newest entries up to a budget of 1,000,000 entries. Beyond the budget:
+- Each query fully evaluates the newest 500,000 entries, distributes the rest of its 1,000,000-entry budget across
+  the queried files, and samples beyond it. Beyond the budget:
   - the rows shown are always real entries;
   - the histogram shows the remaining volume as `[unsampled]` and `[estimated]`;
   - the filter counters stop counting beyond the budget, they are not extrapolated.

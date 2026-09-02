@@ -213,12 +213,12 @@ See the upstream [file log receiver documentation](https://github.com/open-telem
 
 ## Windows event channels
 
-Install the Collector as a Windows service and use one `windowseventlog` receiver per channel. The service account
+Install the Collector as a Windows service and use one `windows_event_log` receiver per channel. The service account
 needs read access to each channel; the Security channel in particular requires it explicitly.
 
 ```yaml
 extensions:
-  file_storage:
+  file_storage/windows:
     directory: C:\ProgramData\otelcol\netdata
     create_directory: true
 
@@ -226,15 +226,15 @@ receivers:
   windows_event_log/application:
     channel: Application
     start_at: end
-    storage: file_storage
+    storage: file_storage/windows
   windows_event_log/system:
     channel: System
     start_at: end
-    storage: file_storage
+    storage: file_storage/windows
   windows_event_log/security:
     channel: Security
     start_at: end
-    storage: file_storage
+    storage: file_storage/windows
 
 processors:
   resource/windows:
@@ -247,7 +247,7 @@ processors:
         action: upsert
 
 service:
-  extensions: [file_storage]
+  extensions: [file_storage/windows]
   pipelines:
     logs:
       receivers: [windows_event_log/application, windows_event_log/system, windows_event_log/security]
@@ -258,7 +258,7 @@ service:
 On a Windows Event Collector, add a receiver for the `ForwardedEvents` channel to centralize what the forwarders send.
 The `storage` extension keeps a bookmark per channel, so a restart resumes where it stopped. Event bodies are
 structured records by default; set `raw: true` to keep the original XML instead. The receiver builds only on Windows,
-so validate this configuration on a Windows host. See the pinned upstream
+so validate this configuration on a Windows host. See the upstream
 [windowseventlog receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/windowseventlogreceiver)
 for remote collection, XML queries, and the complete option set.
 
@@ -346,7 +346,8 @@ logs:
 
 See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how tenant retention and offloading work.
 
-Without Helm, the receiver the preset generates is:
+Without Helm, this is the receiver the preset generates — it is not a standalone recipe; pair it with an exporter,
+a `file_storage` extension for the checkpoints, and a logs pipeline as in the recipes above:
 
 ```yaml
 receivers:
@@ -357,7 +358,7 @@ receivers:
     include_file_name: false
     retry_on_failure:
       enabled: true
-    storage: file_storage
+    storage: file_storage  # provided by the chart's storeCheckpoints preset
     operators:
       - type: container
         id: container-parser
@@ -366,7 +367,7 @@ receivers:
 Mount `/var/log/pods` and `/var/lib/otelcol` from the node into the Collector pod, and grant the service account the
 read permissions the `k8sattributes` processor needs (pods, namespaces, and replica sets across the cluster). See the
 upstream [opentelemetry-collector Helm chart documentation](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
-and the pinned [k8sattributes processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
+and the [k8sattributes processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
 for every preset and association option.
 
 ## macOS unified log
@@ -400,7 +401,7 @@ service:
 
 `max_log_age` bounds how far back the receiver reads on its first start. Run the Collector as a `launchd` service
 with permission to read system logs. The receiver builds only on macOS, so validate this configuration on a Mac. See
-the pinned upstream
+the upstream
 [macOS unified logging receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/macosunifiedloggingreceiver)
 for archive mode, predicates, and the complete option set.
 

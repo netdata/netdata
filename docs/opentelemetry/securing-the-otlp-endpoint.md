@@ -39,7 +39,8 @@ auth:
   enabled: true
 ```
 
-With tenant selection enabled, every sender must set the `X-Scope-OrgID` header and requests without it are rejected;
+With tenant selection enabled, every log and trace sender must set the `X-Scope-OrgID` header and requests without
+it are rejected — metrics are not tenant-scoped;
 the header chooses the tenant — its storage tree and its retention policy — and nothing more. It does not authenticate
 the sender: any client that passes TLS can claim any tenant, so rely on mutual TLS and network controls to decide who
 can send at all, and treat tenants as an organization tool (one retention policy per team, environment, or system).

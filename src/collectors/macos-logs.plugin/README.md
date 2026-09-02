@@ -4,8 +4,8 @@
 
 [KEY FEATURES](#key-features) | [LOG SOURCE](#log-source) | [LOG FIELDS](#log-fields) |
 [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
-[PREREQUISITES](#prerequisites) | [FAQ](#faq) | [TROUBLESHOOTING](#how-to-troubleshoot-common-issues) |
-[HOW TO VERIFY SETUP](#how-to-verify-setup)
+[PREREQUISITES](#prerequisites) | [MANAGING](#managing-the-logs) | [FAQ](#faq) |
+[TROUBLESHOOTING](#how-to-troubleshoot-common-issues) | [HOW TO VERIFY SETUP](#how-to-verify-setup)
 
 You view, explore, and analyze the macOS unified log from the Netdata dashboard: filter on the OSLog fields, search
 their full text, and break down log frequency per field value over time.

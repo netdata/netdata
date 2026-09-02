@@ -10,7 +10,7 @@ Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry
 | An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata as described below                                               |
 | Network devices send syslog                                                         | Use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) |
 
-The Netdata Agent receives OTLP metrics, logs, and traces. Traces are accepted and stored under their own retention settings (the `traces` options in the [plugin reference](/src/crates/otel-plugin/README.md)); a traces view is not yet available in the dashboards. Stay tuned.
+The Netdata Agent receives OTLP metrics, logs, and traces. Traces are accepted and stored under their own retention settings — the `traces` section of `otel.yaml`, which takes the same rotation and retention options as `logs`; a traces view is not yet available in the dashboards. Stay tuned.
 
 ## How data flows
 
@@ -24,14 +24,14 @@ flowchart LR
 
 ## What you need
 
-- A Netdata Agent with the OpenTelemetry plugin. It is part of every Netdata install on Linux — the native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it — and of macOS installs made with the Netdata kickstart script. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
+- A Netdata Agent with the OpenTelemetry plugin. It is part of every Netdata install on Linux — the native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it — and of macOS installs made with the Netdata kickstart script, whose dependency step provisions the Rust toolchain the plugin needs and stops the install if it cannot. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
 - An OTLP/gRPC source. The examples use [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) because the `host_metrics` and `file_log` receivers are Contrib components.
 - Network access from the sender to the Agent's endpoint.
 - For log verification, a Netdata Cloud account and sign-in. The `otel-logs` view is access-gated.
 
-The maintained examples are validated with OpenTelemetry Collector Contrib `0.157.0`. If you run an older release, check that release's component identifiers before copying the configuration.
+The maintained examples are validated with OpenTelemetry Collector Contrib `0.157.0`. Upstream documentation links on these pages follow upstream's latest version, which may be newer than the validated examples; if you run an older release, check that release's component identifiers before copying the configuration.
 
-For production pipelines beyond these smoke tests, continue with [Metrics Collection](/docs/opentelemetry/metrics-collection.md), [Logs Collection](/docs/opentelemetry/logs-collection.md), and [Transformations](/docs/opentelemetry/transformations.md). Each page links its pinned examples to the complete upstream Collector documentation.
+For production pipelines beyond these smoke tests, continue with [Metrics Collection](/docs/opentelemetry/metrics-collection.md), [Logs Collection](/docs/opentelemetry/logs-collection.md), and [Transformations](/docs/opentelemetry/transformations.md). Each page links its examples to the complete upstream Collector documentation.
 
 The plugin starts automatically and listens on the IPv4 loopback endpoint `127.0.0.1:4317`. The examples below put the Collector and Agent on the same host and intentionally disable TLS only for that loopback connection.
 

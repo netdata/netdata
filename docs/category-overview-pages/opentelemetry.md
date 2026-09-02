@@ -32,7 +32,8 @@ workflow is not yet documented. Stay tuned.
 ## Requirements
 
 - Every Netdata install on Linux includes the plugin — native packages, static builds (except 32-bit ARMv6), and
-  Docker images — and so do macOS installs made with the kickstart script. It is not available on Windows or FreeBSD.
+  Docker images — and so do macOS installs made with the kickstart script, which provisions the Rust toolchain the
+  plugin needs and stops the install if it cannot. It is not available on Windows or FreeBSD.
 - Viewing logs requires signing in with Netdata Cloud, free for community use.
 - The examples on these pages are validated with OpenTelemetry Collector Contrib 0.157.0.
 

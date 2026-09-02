@@ -186,9 +186,10 @@ remote_storage:
 ### Sizing the receiving node
 
 Run the pipeline for a full day, then measure `du -sh` on the tenant's `index` directory under `base_dir` and multiply
-by the retention you want locally. For a long-retention tenant such as the `audit` example above, the same arithmetic
-sizes the object storage: one day's index size × 400 days, while `max_age` keeps only the recent days on local disk
-and the rest lives in S3, fetched back through the read cache when queried. Add headroom for active write-ahead logs (`max_file_size` per stream) and for the
+by the retention you want locally. For long retention there are two shapes: keep everything on local disk, sizing it
+as one day's index size × `max_age`, as the `audit` example above does with its 400 days; or keep `max_age` short
+(30 days, say), enable offloading, and size the object storage for one day's index size × the total retention you
+want reachable — older files are then fetched back from S3 through the read cache when queried. Add headroom for active write-ahead logs (`max_file_size` per stream) and for the
 read cache when offloading is enabled. Queries are bounded only by their time range, so on large stores keep the
 default window and narrow it further before running a full-text search; see
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).
