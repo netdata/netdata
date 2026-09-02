@@ -1,277 +1,158 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "S3 check collector configuration",
+    "title": "S3 check job configuration",
     "type": "object",
-    "properties": {
-      "update_every": {
-        "title": "Update every",
-        "description": "Probe interval in seconds. It must be long enough for the configured timeout and retry budget.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 120
-      },
-      "autodetection_retry": {
-        "title": "Detection retry",
-        "description": "Recheck interval in seconds for a configured job whose initial S3 check failed. Zero disables retries.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 0
-      },
-      "endpoint": {
-        "title": "Endpoint",
-        "description": "Absolute HTTP(S) base endpoint of the S3-compatible service, without a path, query, or credentials.",
-        "type": "string",
-        "minLength": 1
-      },
-      "region": {
-        "title": "Region",
-        "description": "S3 signing region, for example us-east-1.",
-        "type": "string",
-        "minLength": 1
-      },
-      "bucket": {
-        "title": "Dedicated probe bucket",
-        "description": "Unversioned bucket reserved for this probe. Bucket versioning must be disabled and the bucket must not contain unrelated data.",
-        "type": "string",
-        "minLength": 3,
-        "maxLength": 63
-      },
-      "prefix": {
-        "title": "Probe prefix",
-        "description": "Dedicated key prefix, ending with a slash and used only by this collector.",
-        "type": "string",
-        "default": "netdata-s3check/",
-        "minLength": 2,
-        "maxLength": 256
-      },
-      "access_key_id": {
-        "title": "Access key ID",
-        "description": "Static S3 access key ID. Use a Netdata secret reference in configuration files.",
-        "type": "string",
-        "sensitive": true
-      },
-      "secret_access_key": {
-        "title": "Secret access key",
-        "description": "Static S3 secret access key. Use a Netdata secret reference in configuration files.",
-        "type": "string",
-        "sensitive": true
-      },
-      "session_token": {
-        "title": "Session token",
-        "description": "Optional static S3 session token.",
-        "type": "string",
-        "sensitive": true
-      },
-      "path_style": {
-        "title": "Path-style addressing",
-        "description": "Place the bucket in the URL path, as used by Ceph RGW and many S3-compatible services. Disable it for AWS S3 virtual-host addressing.",
-        "type": "boolean",
-        "default": true
-      },
-      "max_retries": {
-        "title": "Maximum retries",
-        "description": "Additional attempts allowed per S3 operation. Zero sends one attempt; the maximum is two.",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 2,
-        "default": 1
-      },
-      "latency_threshold_ms": {
-        "title": "Latency objective",
-        "description": "Successful stage duration in milliseconds that raises the silent latency alert. Zero disables the policy.",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 3600000,
-        "default": 0
-      },
-      "timeout": {
-        "title": "HTTP timeout",
-        "description": "Timeout in seconds for one HTTP attempt.",
-        "type": "number",
-        "minimum": 0.5,
-        "maximum": 10,
-        "default": 2
-      },
-      "not_follow_redirects": {
-        "title": "Reject redirects",
-        "description": "Reject endpoint redirects so signed requests cannot be resent to an unconfigured origin.",
-        "type": "boolean",
-        "default": true
-      },
-      "vnode": {
-        "title": "Vnode",
-        "description": "Associate this data collection job with a configured Virtual Node.",
-        "type": "string"
-      },
-      "proxy_url": {
-        "title": "Proxy URL",
-        "description": "HTTP proxy URL. An empty value uses the standard proxy environment variables.",
-        "type": "string",
-        "sensitive": true
-      },
-      "tls_skip_verify": {
-        "title": "Skip TLS verification",
-        "description": "Skip TLS certificate and hostname verification. This is insecure.",
-        "type": "boolean",
-        "default": false
-      },
-      "tls_ca": {
-        "title": "TLS CA",
-        "description": "Absolute path to a CA bundle.",
-        "type": "string",
-        "pattern": "^$|^/"
-      },
-      "tls_cert": {
-        "title": "TLS certificate",
-        "description": "Absolute path to a client certificate.",
-        "type": "string",
-        "pattern": "^$|^/"
-      },
-      "tls_key": {
-        "title": "TLS key",
-        "description": "Absolute path to a client private key.",
-        "type": "string",
-        "pattern": "^$|^/"
-      },
-      "mode": {
-        "title": "Probe mode",
-        "description": "Run the original single-endpoint lifecycle, or verify one explicit source-to-destination replication direction.",
-        "type": "string",
-        "enum": [
-          "single",
-          "multisite"
-        ],
-        "default": "single"
-      },
-      "source_site": {
-        "title": "Source site label",
-        "description": "Bounded operator label for the source site. Required in multisite mode.",
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 64,
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
-      },
-      "destination": {
-        "title": "Destination",
-        "description": "Explicit destination endpoint, credentials, bucket, prefix, and transport settings. Required in multisite mode; no other site is probed automatically.",
+    "propertyNames": {
+      "enum": [
+        "name",
+        "vnode",
+        "update_every",
+        "autodetection_retry",
+        "mode",
+        "mode_lifecycle",
+        "mode_ceph_multisite",
+        "mode_aws_replication"
+      ]
+    },
+    "definitions": {
+      "credentials": {
+        "title": "Static credentials",
+        "description": "Access keys for this endpoint. Omit to use the AWS SDK default credential chain.",
         "type": [
           "object",
           "null"
         ],
-        "additionalProperties": false,
         "properties": {
-          "site": {
-            "title": "Destination site label",
-            "description": "Bounded operator label for the destination site.",
+          "access_key_id": {
+            "title": "Access key ID",
+            "description": "Access key ID.",
             "type": "string",
             "minLength": 1,
-            "maxLength": 64,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            "sensitive": true
+          },
+          "secret_access_key": {
+            "title": "Secret access key",
+            "description": "Secret access key.",
+            "type": "string",
+            "minLength": 1,
+            "sensitive": true
+          },
+          "session_token": {
+            "title": "Session token",
+            "description": "Session token for temporary credentials. Leave empty for long-lived keys.",
+            "type": "string",
+            "sensitive": true
+          }
+        },
+        "required": [
+          "access_key_id",
+          "secret_access_key"
+        ]
+      },
+      "connection": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "title": "Display name",
+            "description": "Label for this endpoint on charts.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           },
           "endpoint": {
-            "title": "Endpoint",
-            "description": "Absolute HTTP(S) S3 base endpoint without a path, query, or credentials.",
-            "type": "string",
-            "minLength": 1
+            "title": "Endpoint URL",
+            "description": "Service URL with scheme and host only. Leave empty for the AWS regional endpoint.",
+            "type": "string"
           },
           "region": {
             "title": "Region",
-            "description": "S3 signing region for the destination.",
+            "description": "Signing region, for example `us-east-1`.",
             "type": "string",
             "minLength": 1
           },
           "bucket": {
-            "title": "Dedicated destination bucket",
-            "description": "Unversioned destination bucket reserved for this directional probe.",
+            "title": "Bucket",
+            "description": "Bucket that holds the probe objects.",
             "type": "string",
-            "minLength": 3,
-            "maxLength": 63
+            "minLength": 1
           },
-          "prefix": {
-            "title": "Destination probe prefix",
-            "description": "Dedicated destination key prefix ending with a slash.",
-            "type": "string",
-            "default": "netdata-s3check/",
-            "minLength": 2,
-            "maxLength": 256
+          "credentials": {
+            "$ref": "#/definitions/credentials"
           },
-          "access_key_id": {
-            "title": "Destination access key ID",
-            "description": "Static destination S3 access key ID. Use a Netdata secret reference in configuration files.",
-            "type": "string",
-            "sensitive": true
-          },
-          "secret_access_key": {
-            "title": "Destination secret access key",
-            "description": "Static destination S3 secret access key. Use a Netdata secret reference in configuration files.",
-            "type": "string",
-            "sensitive": true
-          },
-          "session_token": {
-            "title": "Destination session token",
-            "description": "Optional static destination S3 session token.",
-            "type": "string",
-            "sensitive": true
+          "assume_role": {
+            "title": "Assume role",
+            "description": "Role to assume with this endpoint's base credentials.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "role_arn": {
+                "title": "Role ARN",
+                "description": "ARN of the IAM role to assume.",
+                "type": "string",
+                "minLength": 1
+              },
+              "external_id": {
+                "title": "External ID",
+                "description": "External ID expected by the role's trust policy, if any.",
+                "type": "string",
+                "sensitive": true
+              }
+            },
+            "required": [
+              "role_arn"
+            ]
           },
           "path_style": {
-            "title": "Destination path-style addressing",
-            "description": "Place the destination bucket in the URL path, as used by Ceph RGW. Disable it for virtual-host addressing.",
+            "title": "Path-style addressing",
+            "description": "Put the bucket in the request path instead of the hostname.",
             "type": "boolean",
             "default": true
           },
           "timeout": {
-            "title": "Destination HTTP timeout",
-            "description": "Timeout in seconds for one destination HTTP attempt.",
-            "type": "number",
-            "minimum": 0.5,
-            "maximum": 10,
-            "default": 2
-          },
-          "not_follow_redirects": {
-            "title": "Reject destination redirects",
-            "description": "Reject destination redirects so signed requests cannot be resent to an unconfigured origin.",
-            "type": "boolean",
-            "default": true
+            "title": "Request timeout",
+            "description": "Maximum duration of one request, for example `10s`. Up to `1m`.",
+            "type": "string",
+            "default": "10s",
+            "minLength": 2
           },
           "proxy_url": {
-            "title": "Destination proxy URL",
-            "description": "HTTP proxy URL for the destination; empty uses standard proxy environment variables.",
+            "title": "Proxy URL",
+            "description": "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables.",
             "type": "string",
             "sensitive": true
           },
           "tls_skip_verify": {
-            "title": "Skip destination TLS verification",
-            "description": "Skip destination certificate and hostname verification. This is insecure.",
+            "title": "Skip TLS verification",
+            "description": "Disable certificate and hostname verification. Insecure.",
             "type": "boolean",
             "default": false
           },
           "tls_ca": {
-            "title": "Destination TLS CA",
-            "description": "Absolute path to a destination CA bundle.",
+            "title": "TLS CA bundle",
+            "description": "Absolute path to a CA bundle for a private certificate authority.",
             "type": "string",
             "pattern": "^$|^/"
           },
           "tls_cert": {
-            "title": "Destination TLS certificate",
-            "description": "Absolute path to a destination client certificate.",
+            "title": "TLS client certificate",
+            "description": "Absolute path to the client certificate. Requires the client key.",
             "type": "string",
             "pattern": "^$|^/"
           },
           "tls_key": {
-            "title": "Destination TLS key",
-            "description": "Absolute path to a destination client private key.",
+            "title": "TLS client key",
+            "description": "Absolute path to the client certificate key. Requires the client certificate.",
             "type": "string",
-            "pattern": "^$|^/"
+            "pattern": "^$|^/",
+            "sensitive": true
           }
         },
         "required": [
-          "site",
-          "endpoint",
           "region",
-          "bucket",
-          "access_key_id",
-          "secret_access_key"
+          "bucket"
         ],
         "dependencies": {
           "tls_cert": [
@@ -282,125 +163,237 @@
           ]
         }
       },
-      "rpo_threshold_ms": {
-        "title": "Replication RPO",
-        "description": "Source-write to destination-visibility duration in milliseconds that raises the silent RPO alert. It must be at least update_every because visibility is polled once per cycle.",
+      "lifecycle_mode": {
+        "title": "Lifecycle configuration",
+        "description": "Endpoint and prefix for the lifecycle check of one S3 service.",
+        "type": "object",
+        "properties": {
+          "prefix": {
+            "title": "Object prefix",
+            "description": "Key prefix for probe objects. Must end with `/`.",
+            "type": "string",
+            "default": "netdata-s3check/",
+            "minLength": 2,
+            "maxLength": 900,
+            "pattern": "^[^/].*/$"
+          },
+          "source": {
+            "title": "S3 connection",
+            "allOf": [
+              {
+                "$ref": "#/definitions/connection"
+              }
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "replication_mode": {
+        "title": "Replication configuration",
+        "description": "Source, destination, and propagation objectives for one replication direction.",
+        "type": "object",
+        "properties": {
+          "prefix": {
+            "title": "Object prefix",
+            "description": "Key prefix for probe objects. Must end with `/`.",
+            "type": "string",
+            "default": "netdata-s3check/",
+            "minLength": 2,
+            "maxLength": 900,
+            "pattern": "^[^/].*/$"
+          },
+          "source": {
+            "title": "Source connection",
+            "allOf": [
+              {
+                "$ref": "#/definitions/connection"
+              }
+            ]
+          },
+          "destination": {
+            "title": "Destination connection",
+            "allOf": [
+              {
+                "$ref": "#/definitions/connection"
+              }
+            ]
+          },
+          "write_objective": {
+            "title": "Write visibility objective",
+            "description": "Healthy time for a new object to appear at the destination, for example `15m`.",
+            "type": "string",
+            "default": "15m",
+            "minLength": 2
+          },
+          "write_timeout": {
+            "title": "Write visibility timeout",
+            "description": "Hard limit for a new object to appear at the destination, for example `30m`.",
+            "type": "string",
+            "default": "30m",
+            "minLength": 2
+          },
+          "delete_objective": {
+            "title": "Delete visibility objective",
+            "description": "Healthy time for a source delete to hide the destination copy, for example `5m`.",
+            "type": "string",
+            "default": "5m",
+            "minLength": 2
+          },
+          "delete_timeout": {
+            "title": "Delete visibility timeout",
+            "description": "Hard limit for the destination copy to disappear, for example `15m`.",
+            "type": "string",
+            "default": "15m",
+            "minLength": 2
+          }
+        },
+        "required": [
+          "source",
+          "destination"
+        ]
+      }
+    },
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Collection interval in seconds.",
         "type": "integer",
         "minimum": 1,
-        "maximum": 86400000,
-        "default": 900000
+        "default": 120
       },
-      "replication_timeout_ms": {
-        "title": "Replication polling deadline",
-        "description": "Maximum milliseconds from source write to destination visibility before the directional probe is abandoned and cleaned up.",
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Seconds between retries of the initial bucket check. Zero disables retries.",
         "type": "integer",
-        "minimum": 1,
-        "maximum": 86400000,
-        "default": 1800000
+        "minimum": 0,
+        "default": 0
       },
-      "delete_threshold_ms": {
-        "title": "Delete propagation objective",
-        "description": "Source-delete to destination-disappearance duration in milliseconds that raises the silent policy alert. It must be at least update_every because disappearance is polled once per cycle.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 86400000,
-        "default": 300000
+      "mode": {
+        "title": "Mode",
+        "description": "Which check this job runs.",
+        "type": "string",
+        "enum": [
+          "lifecycle",
+          "ceph_multisite",
+          "aws_replication"
+        ],
+        "default": "lifecycle"
       },
-      "delete_timeout_ms": {
-        "title": "Delete polling deadline",
-        "description": "Maximum milliseconds from source delete to destination disappearance before the destination copy is removed explicitly.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 86400000,
-        "default": 900000
-      },
-      "verify_delete": {
-        "title": "Verify delete propagation",
-        "description": "Wait for destination disappearance after deleting the source object before explicit destination cleanup.",
-        "type": "boolean",
-        "default": true
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Virtual Node that owns the charts of this job.",
+        "type": "string"
+      }
+    },
+    "dependencies": {
+      "mode": {
+        "oneOf": [
+          {
+            "title": "Lifecycle",
+            "properties": {
+              "mode": {
+                "const": "lifecycle"
+              },
+              "mode_lifecycle": {
+                "title": "Lifecycle configuration",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/lifecycle_mode"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mode_lifecycle"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "mode_ceph_multisite"
+                  ]
+                },
+                {
+                  "required": [
+                    "mode_aws_replication"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "title": "Ceph multisite",
+            "properties": {
+              "mode": {
+                "const": "ceph_multisite"
+              },
+              "mode_ceph_multisite": {
+                "title": "Ceph multisite configuration",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/replication_mode"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mode_ceph_multisite"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "mode_lifecycle"
+                  ]
+                },
+                {
+                  "required": [
+                    "mode_aws_replication"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "title": "AWS replication",
+            "properties": {
+              "mode": {
+                "const": "aws_replication"
+              },
+              "mode_aws_replication": {
+                "title": "AWS replication configuration",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/replication_mode"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mode_aws_replication"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "mode_lifecycle"
+                  ]
+                },
+                {
+                  "required": [
+                    "mode_ceph_multisite"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     "required": [
-      "endpoint",
-      "region",
-      "bucket",
-      "access_key_id",
-      "secret_access_key"
-    ],
-    "dependencies": {
-      "tls_cert": [
-        "tls_key"
-      ],
-      "tls_key": [
-        "tls_cert"
-      ]
-    },
-    "anyOf": [
-      {
-        "not": {
-          "required": [
-            "mode"
-          ]
-        },
-        "anyOf": [
-          {
-            "not": {
-              "required": [
-                "destination"
-              ]
-            }
-          },
-          {
-            "properties": {
-              "destination": {
-                "type": "null"
-              }
-            }
-          }
-        ]
-      },
-      {
-        "required": [
-          "mode"
-        ],
-        "properties": {
-          "mode": {
-            "const": "single"
-          }
-        },
-        "anyOf": [
-          {
-            "not": {
-              "required": [
-                "destination"
-              ]
-            }
-          },
-          {
-            "properties": {
-              "destination": {
-                "type": "null"
-              }
-            }
-          }
-        ]
-      },
-      {
-        "required": [
-          "mode",
-          "source_site",
-          "destination"
-        ],
-        "properties": {
-          "mode": {
-            "const": "multisite"
-          },
-          "destination": {
-            "type": "object"
-          }
-        }
-      }
+      "mode"
     ]
   },
   "uiSchema": {
@@ -411,79 +404,546 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Base",
+          "title": "Mode",
+          "fields": [
+            "mode",
+            "mode_lifecycle",
+            "mode_ceph_multisite",
+            "mode_aws_replication"
+          ]
+        },
+        {
+          "title": "Collection",
           "fields": [
             "update_every",
-            "mode",
-            "source_site",
-            "destination",
-            "autodetection_retry",
-            "endpoint",
-            "region",
-            "bucket",
-            "prefix",
-            "path_style",
-            "max_retries",
-            "latency_threshold_ms",
-            "vnode",
-            "rpo_threshold_ms",
-            "replication_timeout_ms",
-            "delete_threshold_ms",
-            "delete_timeout_ms",
-            "verify_delete"
+            "autodetection_retry"
           ]
         },
         {
-          "title": "Auth",
+          "title": "Virtual Node",
           "fields": [
-            "access_key_id",
-            "secret_access_key",
-            "session_token"
-          ]
-        },
-        {
-          "title": "HTTP",
-          "fields": [
-            "timeout",
-            "not_follow_redirects",
-            "proxy_url"
-          ]
-        },
-        {
-          "title": "TLS",
-          "fields": [
-            "tls_skip_verify",
-            "tls_ca",
-            "tls_cert",
-            "tls_key"
+            "vnode"
           ]
         }
       ]
     },
-    "access_key_id": {
-      "ui:widget": "password"
-    },
-    "secret_access_key": {
-      "ui:widget": "password"
-    },
-    "session_token": {
-      "ui:widget": "password"
-    },
-    "destination": {
-      "access_key_id": {
-        "ui:widget": "password"
-      },
-      "secret_access_key": {
-        "ui:widget": "password"
-      },
-      "session_token": {
-        "ui:widget": "password"
+    "mode": {
+      "ui:help": "Pick the mode that matches what you want to verify.\n\n- `lifecycle`: one endpoint. Writes a small probe object, reads it back, confirms it is listed, deletes it, and confirms it is gone. Bucket versioning must never have been enabled.\n- `ceph_multisite`: one replication direction between two Ceph RGW zones. Writes at the source, waits until the object appears at the destination, deletes it at the source, and waits until the destination no longer serves it. Both buckets must be unversioned.\n- `aws_replication`: one replication direction between two versioned AWS S3 buckets. Tracks the exact object versions and delete markers that AWS replication creates and requires an enabled replication rule with delete marker replication.\n\nReplication modes check one direction; add a second job with source and destination swapped for the reverse direction. All modes create and delete objects only under the configured prefix, in a namespace private to this Agent and job. Configure only the section of the selected mode.",
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
       }
     },
-    "endpoint": {
-      "ui:placeholder": "https://s3.example.net"
+    "mode_lifecycle": {
+      "ui:help": "Each collection writes one 4 KiB probe object under the prefix, reads it back and verifies its content, confirms it is listed, deletes it, and confirms it is gone. The bucket must never have had versioning enabled (a suspended state is rejected). Permissions on the bucket: `s3:GetBucketVersioning`, `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:DeleteObject`.",
+      "source": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
+          ]
+        },
+        "endpoint": {
+          "ui:help": "For Ceph RGW or other S3-compatible services set the full URL, for example `https://rgw.example.net:8443`. For AWS S3 leave it empty and set the region.",
+          "ui:placeholder": "https://s3.example.net"
+        },
+        "credentials": {
+          "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        },
+        "name": {
+          "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
+        },
+        "region": {
+          "ui:help": "Required even for services that do not use regions; Ceph RGW deployments commonly use `us-east-1`."
+        },
+        "path_style": {
+          "ui:help": "Keep enabled for Ceph RGW and most S3-compatible services. Disable for AWS S3, which uses virtual-hosted-style addressing."
+        },
+        "timeout": {
+          "ui:help": "Applies to each S3 request and to the STS AssumeRole request of this endpoint, including connection setup and TLS handshake. A request that exceeds it is a failed operation with reason `request`."
+        },
+        "tls_skip_verify": {
+          "ui:help": "Insecure. Prefer installing the service's CA or setting the TLS CA bundle."
+        },
+        "bucket": {
+          "ui:help": "The collector writes, reads, lists, and deletes its probe objects here. Versioning must never have been enabled."
+        }
+      },
+      "prefix": {
+        "ui:help": "The collector only writes, reads, lists, and deletes keys under `<prefix><owner>/`, where the owner segment is derived from this Agent and job. Reserve the prefix for Netdata; several Agents and jobs may share it."
+      }
+    },
+    "mode_ceph_multisite": {
+      "ui:help": "Writes a probe object at the source zone, polls the destination once per collection until the same key is readable there with the same content, deletes it at the source, and polls until the destination no longer serves it. Both buckets must be unversioned. Source permissions: `s3:GetBucketVersioning`, `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`. Destination permissions: `s3:GetBucketVersioning`, `s3:GetObject`, `s3:DeleteObject` (cleanup of replicated copies only; the collector never writes there).",
+      "source": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
+          ]
+        },
+        "endpoint": {
+          "ui:help": "For Ceph RGW or other S3-compatible services set the full URL, for example `https://rgw.example.net:8443`. For AWS S3 leave it empty and set the region.",
+          "ui:placeholder": "https://zone-a.example.net"
+        },
+        "credentials": {
+          "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        },
+        "name": {
+          "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
+        },
+        "region": {
+          "ui:help": "Required even for services that do not use regions; Ceph RGW deployments commonly use `us-east-1`."
+        },
+        "path_style": {
+          "ui:help": "Keep enabled for Ceph RGW and most S3-compatible services. Disable for AWS S3, which uses virtual-hosted-style addressing."
+        },
+        "timeout": {
+          "ui:help": "Applies to each S3 request and to the STS AssumeRole request of this endpoint, including connection setup and TLS handshake. A request that exceeds it is a failed operation with reason `request`."
+        },
+        "tls_skip_verify": {
+          "ui:help": "Insecure. Prefer installing the service's CA or setting the TLS CA bundle."
+        },
+        "bucket": {
+          "ui:help": "Probe objects are written and deleted here. Versioning must never have been enabled."
+        }
+      },
+      "destination": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
+          ]
+        },
+        "endpoint": {
+          "ui:help": "For Ceph RGW or other S3-compatible services set the full URL, for example `https://rgw.example.net:8443`. For AWS S3 leave it empty and set the region.",
+          "ui:placeholder": "https://zone-b.example.net"
+        },
+        "credentials": {
+          "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        },
+        "name": {
+          "ui:help": "Shown as the `destination` chart label. Changing it does not affect the objects the collector owns."
+        },
+        "region": {
+          "ui:help": "Required even for services that do not use regions; Ceph RGW deployments commonly use `us-east-1`."
+        },
+        "path_style": {
+          "ui:help": "Keep enabled for Ceph RGW and most S3-compatible services. Disable for AWS S3, which uses virtual-hosted-style addressing."
+        },
+        "timeout": {
+          "ui:help": "Applies to each S3 request and to the STS AssumeRole request of this endpoint, including connection setup and TLS handshake. A request that exceeds it is a failed operation with reason `request`."
+        },
+        "tls_skip_verify": {
+          "ui:help": "Insecure. Prefer installing the service's CA or setting the TLS CA bundle."
+        },
+        "bucket": {
+          "ui:help": "Replicated copies are read from here. The collector never writes to this bucket and deletes only its own replicated copies during cleanup. Versioning must never have been enabled."
+        }
+      },
+      "prefix": {
+        "ui:help": "The collector only writes, reads, lists, and deletes keys under `<prefix><owner>/`, where the owner segment is derived from this Agent and job. Reserve the prefix for Netdata; several Agents and jobs may share it."
+      },
+      "write_objective": {
+        "ui:help": "Measured from the successful source write until the destination serves the object with the correct content. Exceeding it marks the write objective chart as breached; the probe keeps waiting until the write timeout. Must be at least the collection interval and at most `24h`."
+      },
+      "write_timeout": {
+        "ui:help": "When exceeded the probe fails with reason `visibility_timeout` and the object is scheduled for cleanup. Must be between the write objective and `24h`."
+      },
+      "delete_objective": {
+        "ui:help": "Measured from the successful source delete until the destination no longer serves the object. Exceeding it marks the delete objective chart as breached; the probe keeps waiting until the delete timeout. Must be at least the collection interval and at most `24h`."
+      },
+      "delete_timeout": {
+        "ui:help": "When exceeded the probe fails with reason `delete_timeout` and cleanup is scheduled. Must be between the delete objective and `24h`."
+      }
+    },
+    "mode_aws_replication": {
+      "ui:help": "Follows AWS S3 replication semantics: the source write creates an object version and the source delete creates a delete marker, and both are expected to replicate. Both buckets need versioning enabled with MFA Delete off. The source bucket needs an enabled replication rule that covers the prefix without tag filters, targets the destination bucket, and replicates delete markers; no other enabled rule may replicate the prefix to a different bucket. Source permissions: `s3:GetBucketVersioning`, `s3:GetReplicationConfiguration`, `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`, `s3:ListBucketVersions`, `s3:DeleteObject`, `s3:DeleteObjectVersion`. Destination permissions: `s3:GetBucketVersioning`, `s3:GetObject`, `s3:ListBucketVersions`, `s3:DeleteObjectVersion`.",
+      "source": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
+          ]
+        },
+        "endpoint": {
+          "ui:help": "For Ceph RGW or other S3-compatible services set the full URL, for example `https://rgw.example.net:8443`. For AWS S3 leave it empty and set the region.",
+          "ui:placeholder": "Leave empty for the AWS SDK endpoint"
+        },
+        "credentials": {
+          "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        },
+        "name": {
+          "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
+        },
+        "region": {
+          "ui:help": "Required even for services that do not use regions; Ceph RGW deployments commonly use `us-east-1`."
+        },
+        "path_style": {
+          "ui:help": "Keep enabled for Ceph RGW and most S3-compatible services. Disable for AWS S3, which uses virtual-hosted-style addressing."
+        },
+        "timeout": {
+          "ui:help": "Applies to each S3 request and to the STS AssumeRole request of this endpoint, including connection setup and TLS handshake. A request that exceeds it is a failed operation with reason `request`."
+        },
+        "tls_skip_verify": {
+          "ui:help": "Insecure. Prefer installing the service's CA or setting the TLS CA bundle."
+        },
+        "bucket": {
+          "ui:help": "Probe objects are written and deleted here. Versioning must be enabled and the replication rule described in the mode help must cover the prefix."
+        }
+      },
+      "destination": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Connection",
+              "fields": [
+                "endpoint",
+                "region",
+                "bucket",
+                "path_style"
+              ]
+            },
+            {
+              "title": "Authentication",
+              "fields": [
+                "credentials",
+                "assume_role"
+              ]
+            },
+            {
+              "title": "HTTP",
+              "fields": [
+                "timeout",
+                "proxy_url"
+              ]
+            },
+            {
+              "title": "TLS",
+              "fields": [
+                "tls_skip_verify",
+                "tls_ca",
+                "tls_cert",
+                "tls_key"
+              ]
+            },
+            {
+              "title": "Labels",
+              "fields": [
+                "name"
+              ]
+            }
+          ]
+        },
+        "endpoint": {
+          "ui:help": "For Ceph RGW or other S3-compatible services set the full URL, for example `https://rgw.example.net:8443`. For AWS S3 leave it empty and set the region.",
+          "ui:placeholder": "Leave empty for the AWS SDK endpoint"
+        },
+        "credentials": {
+          "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
+          "access_key_id": {
+            "ui:widget": "password"
+          },
+          "secret_access_key": {
+            "ui:widget": "password"
+          },
+          "session_token": {
+            "ui:widget": "password"
+          }
+        },
+        "assume_role": {
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
+          "external_id": {
+            "ui:widget": "password"
+          }
+        },
+        "proxy_url": {
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
+          "ui:widget": "password"
+        },
+        "tls_key": {
+          "ui:widget": "password"
+        },
+        "name": {
+          "ui:help": "Shown as the `destination` chart label. Changing it does not affect the objects the collector owns."
+        },
+        "region": {
+          "ui:help": "Required even for services that do not use regions; Ceph RGW deployments commonly use `us-east-1`."
+        },
+        "path_style": {
+          "ui:help": "Keep enabled for Ceph RGW and most S3-compatible services. Disable for AWS S3, which uses virtual-hosted-style addressing."
+        },
+        "timeout": {
+          "ui:help": "Applies to each S3 request and to the STS AssumeRole request of this endpoint, including connection setup and TLS handshake. A request that exceeds it is a failed operation with reason `request`."
+        },
+        "tls_skip_verify": {
+          "ui:help": "Insecure. Prefer installing the service's CA or setting the TLS CA bundle."
+        },
+        "bucket": {
+          "ui:help": "Replicated versions and delete markers are observed here. The collector never writes to this bucket and deletes only the exact replicated versions and markers it tracked. Versioning must be enabled."
+        }
+      },
+      "prefix": {
+        "ui:help": "The collector only writes, reads, lists, and deletes keys under `<prefix><owner>/`, where the owner segment is derived from this Agent and job. Reserve the prefix for Netdata; several Agents and jobs may share it."
+      },
+      "write_objective": {
+        "ui:help": "Measured from the successful source write until the destination serves the object with the correct content. Exceeding it marks the write objective chart as breached; the probe keeps waiting until the write timeout. Must be at least the collection interval and at most `24h`."
+      },
+      "write_timeout": {
+        "ui:help": "When exceeded the probe fails with reason `visibility_timeout` and the object is scheduled for cleanup. Must be between the write objective and `24h`."
+      },
+      "delete_objective": {
+        "ui:help": "Measured from the successful source delete until the destination no longer serves the object. Exceeding it marks the delete objective chart as breached; the probe keeps waiting until the delete timeout. Must be at least the collection interval and at most `24h`."
+      },
+      "delete_timeout": {
+        "ui:help": "When exceeded the probe fails with reason `delete_timeout` and cleanup is scheduled. Must be between the delete objective and `24h`."
+      }
+    },
+    "update_every": {
+      "ui:help": "Each collection runs one lifecycle probe or advances one replication probe by one poll of the destination, so replication lag is measured with this resolution. Replication objectives must be at least this interval."
+    },
+    "autodetection_retry": {
+      "ui:help": "The initial check only reads bucket versioning (and the source replication rules in AWS mode); it never writes objects."
     },
     "vnode": {
+      "ui:help": "Optional. Assigns the charts of this job to a Virtual Node instead of this host.",
       "ui:placeholder": "Create a Virtual Node first, then reference its name here."
     }
   }
