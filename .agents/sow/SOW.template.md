@@ -3,9 +3,9 @@
 This template is the schema of a SOW. `.agents/sow/audit.sh` derives the required sections from the `##` headings and
 their tag, written exactly `<!-- sow:VALUE -->` (tags on `###` headings are ignored): no tag = required in every SOW,
 umbrellas included; `sow:implementation` = required except in umbrella SOWs; `sow:umbrella-only` = required in umbrella
-SOWs; `sow:optional` = never required. The audit also expects the field labels `Sensitive data handling plan:` and
-`Sensitive data gate:` verbatim (renaming them needs an audit change). The check is advisory and covers presence only;
-filling every field is your responsibility. Field semantics live in the placeholders.
+SOWs; `sow:optional` = never required. The audit also expects two field labels verbatim: `Sensitive data handling plan:`
+in every SOW and `Sensitive data gate:` in non-umbrella SOWs (renaming either needs an audit change). The check is
+advisory and covers presence only; filling every field is your responsibility. Field semantics live in the placeholders.
 
 ## Status
 
