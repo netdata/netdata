@@ -58,6 +58,11 @@ fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
 /// needs beyond the page's own window. The window itself is the page's
 /// (aligned to the grid), and the aggregate applies NO predicate — the
 /// scope flag on the wire says so.
+///
+/// Requested as an `Option`: `None` means no second pass and no
+/// `overview` section on the response. The Functions view passes `None`
+/// on an ANCHOR page (see the anchor gate in `functions`); the legacy
+/// `search` mode always does.
 struct AggregateRequest {
     /// Root-facet lists: opted in by the request AND allowed by the
     /// scope gate (see `functions`).
@@ -398,7 +403,9 @@ impl OtelTracesHandler {
     }
 
     /// The Functions view: the search page plus the full-window
-    /// aggregate, in one request. Nothing else composes both.
+    /// aggregate, in one request. Nothing else composes both — and only
+    /// a FIRST page does, since an anchor page's aggregate would repeat
+    /// the first page's (the anchor gate below).
     async fn functions(
         &self,
         ctx: &FunctionCallContext,
@@ -408,6 +415,18 @@ impl OtelTracesHandler {
         let search_params = params
             .search_params(unix_now_s())
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        // The anchor gate. An anchor page reruns the same query over the
+        // cursor's FROZEN window, and the aggregate is window-scoped and
+        // applies no predicate — so the section it would compose is the
+        // one the first page already delivered, byte for byte. Only the
+        // rows advance. Composing it again would spend a second
+        // full-window engine pass per page of a walk, so it is skipped
+        // and the section is simply ABSENT: consumers detect it by
+        // presence (a `null` was never on the wire), and the window can
+        // only change on a request that carries no anchor (an anchor
+        // page IGNORES the request's own bounds), which composes it
+        // afresh.
+        //
         // The scope gate. The aggregate is window-scoped, so with any
         // page filter active its root-facet lists would enumerate values
         // the filter excluded, counted over the unfiltered population
@@ -419,15 +438,13 @@ impl OtelTracesHandler {
         // page as a selected one. Gated before the engine call, so the
         // suppressed lists also cost nothing (the facets' price is the
         // sealed sources' dictionary decodes).
-        let aggregate = AggregateRequest {
+        let aggregate = params.anchor.is_none().then(|| AggregateRequest {
             facets: params.overview_facets.unwrap_or(false)
                 && params.selections.is_empty()
                 && params.min_trace_duration_ns.is_none()
                 && params.max_trace_duration_ns.is_none(),
-        };
-        let data = self
-            .search_result(ctx, &search_params, tenant, Some(aggregate))
-            .await?;
+        });
+        let data = self.search_result(ctx, &search_params, tenant, aggregate).await?;
         Ok(OtelTracesResponse::Functions(Box::new(
             FunctionsTracesResponse::new(data),
         )))
