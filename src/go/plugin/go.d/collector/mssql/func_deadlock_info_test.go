@@ -148,6 +148,36 @@ func TestQuerySystemHealthLatestDeadlockEventFile_SQLServer2014Compatible(t *tes
 	assert.Contains(t, query, "order by deadlock_time desc")
 }
 
+func TestQueryLatestDeadlock_FallsBackToRingBufferOnFileError(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
+	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(errors.New("event file is unavailable"))
+	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(
+		sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).AddRow(now, sampleDeadlockGraph),
+	)
+
+	c := New()
+	c.db = db
+	handler := newTestDeadlockHandler(c)
+	deadlockTime, deadlockXML, err := handler.queryLatestDeadlock(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, now, deadlockTime)
+	assert.Equal(t, sampleDeadlockGraph, deadlockXML)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestQueryLatestDeadlock_DoesNotFallbackOnContextOrPermissionError(t *testing.T) {
+	assert.False(t, shouldFallbackDeadlockEventFile(sql.ErrNoRows))
+	assert.False(t, shouldFallbackDeadlockEventFile(context.Canceled))
+	assert.False(t, shouldFallbackDeadlockEventFile(context.DeadlineExceeded))
+	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("VIEW SERVER STATE permission was denied")))
+	assert.True(t, shouldFallbackDeadlockEventFile(errors.New("event file is unavailable")))
+}
+
 func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
@@ -278,7 +308,7 @@ func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *test
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	c.Functions.ErrorInfo.UseRingBuffer = true
 
-	status, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Empty(t, rows)
@@ -415,11 +445,68 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 	c := New()
 	c.db = db
 
-	status, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Empty(t, rows)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_FallsBackToSystemHealthEventFile(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("dm_xe_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+	c.Functions.ErrorInfo.UseRingBuffer = true
+
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestErrorInfoSystemHealthFallbackIsIdentified(t *testing.T) {
+	assert.Contains(t, errorInfoHelp(mssqlErrorSourceSystemHealth), "does not capture every")
+	found := false
+	for _, col := range errorInfoColumns {
+		if col.Name == "source" {
+			found = true
+			assert.True(t, col.Visible)
+		}
+	}
+	assert.True(t, found, "source column must be exposed")
 }
 
 func TestCollectErrorInfo_ResolverTimeout(t *testing.T) {

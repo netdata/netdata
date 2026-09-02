@@ -362,6 +362,11 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
 	err := f.router.collector.db.QueryRowContext(ctx, query).Scan(&deadlockTime, &deadlockXML)
+	if err != nil && !f.router.collector.Functions.DeadlockInfo.UseRingBuffer && shouldFallbackDeadlockEventFile(err) {
+		// The file target can be unavailable while the built-in ring buffer remains usable.
+		// Retry only on a file read error to avoid parsing the ring buffer on every empty result.
+		err = f.router.collector.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, "", nil
@@ -377,6 +382,13 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 		return deadlockTime.Time, deadlockXML.String, nil
 	}
 	return time.Now().UTC(), deadlockXML.String, nil
+}
+
+func shouldFallbackDeadlockEventFile(err error) bool {
+	return !errors.Is(err, sql.ErrNoRows) &&
+		!errors.Is(err, context.Canceled) &&
+		!errors.Is(err, context.DeadlineExceeded) &&
+		!isDeadlockPermissionError(err)
 }
 
 func (f *funcDeadlockInfo) queryDatabaseNames(ctx context.Context) (map[int]string, error) {

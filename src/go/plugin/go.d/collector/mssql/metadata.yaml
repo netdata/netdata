@@ -968,10 +968,15 @@ modules:
             Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
             with both the `sql_text` and `query_hash` actions.
 
-            The session must be created by an administrator and include either an `event_file` target (the default) or a
-            `ring_buffer` target when `functions.error_info.use_ring_buffer` is enabled. Netdata returns recent error events
-            with error number, message, and SQL text. The `query_hash` action is required for reliable mapping into
-            `top-queries` (query text fallback is best-effort).
+            When the configured session or target is unavailable, the function falls back to the built-in `system_health`
+            session on SQL Server 2012+. The `Source` column identifies which source produced each row; `system_health`
+            captures only selected errors and is not a complete replacement for a dedicated error session.
+
+            The session should be created by an administrator and include either an `event_file` target (the default) or a
+            `ring_buffer` target when `functions.error_info.use_ring_buffer` is enabled. If it is unavailable, Netdata uses
+            the built-in `system_health` target as a reduced-coverage fallback. Netdata returns recent error events with
+            error number, message, and SQL text. The `query_hash` action is required for reliable mapping into `top-queries`
+            (query text fallback is best-effort).
 
             Use cases:
             - Identify recent query errors and their messages
@@ -979,8 +984,12 @@ modules:
             - Validate error rates seen in top-queries
           parameters: []
           returns:
-            description: Recent error events from the configured Extended Events session.
+            description: Recent error events from the configured Extended Events session or the system_health fallback.
             columns:
+              - name: Source
+                type: string
+                unit: ""
+                description: "Event source: configured-session or system-health. The system-health fallback contains only selected errors."
               - name: Timestamp
                 type: timestamp
                 unit: ""
@@ -1007,7 +1016,7 @@ modules:
                 visibility: hidden
                 description: "Query hash captured with the error event (used for mapping into top-queries)."
           performance: |
-            Executes on-demand queries against the configured Extended Events target:<br/>• Not part of regular metric collection<br/>• event_file reads scan and parse all retained files before returning the newest rows<br/>• The recommended 6 MB file size and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• Existing operator-managed sessions keep their own retention settings; the collector does not alter or reject them
+            Executes on-demand queries against the configured Extended Events target, falling back to `system_health` when unavailable:<br/>• Not part of regular metric collection<br/>• event_file reads scan and parse all retained files before returning the newest rows<br/>• The recommended 6 MB file size and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• Existing operator-managed sessions keep their own retention settings; the collector does not alter or reject them
           security: |
             Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
           prerequisites:
@@ -1129,7 +1138,7 @@ modules:
                           session_name: your_session_name
                   ```
           availability: |
-            Available on SQL Server, Azure SQL Managed Instance, and Azure SQL Database when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The session is server-scoped on SQL Server/Managed Instance and database-scoped in the Azure SQL Database selected in the DSN<br/>• When `functions.error_info.use_ring_buffer` is false, the session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`; Azure SQL Database event_file has `VIEW DATABASE PERFORMANCE STATE`, while ring_buffer has `VIEW DATABASE STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the selected target is unavailable or the function is disabled<br/>• Returns HTTP 504 if the query times out
+            Available on SQL Server 2012+, Azure SQL Managed Instance, and Azure SQL Database when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The configured session is used when its selected target is available; otherwise SQL Server/Managed Instance falls back to the built-in `system_health` target, while Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• When `functions.error_info.use_ring_buffer` is false, the configured session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the configured session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`; Azure SQL Database event_file has `VIEW DATABASE PERFORMANCE STATE`, while ring_buffer has `VIEW DATABASE STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if neither the selected target nor the applicable `system_health` fallback is available, or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:
