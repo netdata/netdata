@@ -408,15 +408,22 @@ impl OtelTracesHandler {
         let search_params = params
             .search_params(unix_now_s())
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
-        // The scope gate. The aggregate is window-scoped, so with a
-        // selection active its root-facet lists would enumerate values
-        // the rail filtered out, counted over the unfiltered population
+        // The scope gate. The aggregate is window-scoped, so with any
+        // page filter active its root-facet lists would enumerate values
+        // the filter excluded, counted over the unfiltered population
         // — a contradiction the section's `scope` flag cannot repair,
-        // because a flag captions a header, not a list. Gated before the
-        // engine call, so the suppressed lists also cost nothing (the
-        // facets' price is the sealed sources' dictionary decodes).
+        // because a flag captions a header, not a list. Every filter the
+        // Functions view forwards gates it, the duration bounds
+        // included: the aggregate applies neither, so a cell-click
+        // request narrowed to one duration band is as much a filtered
+        // page as a selected one. Gated before the engine call, so the
+        // suppressed lists also cost nothing (the facets' price is the
+        // sealed sources' dictionary decodes).
         let aggregate = AggregateRequest {
-            facets: params.overview_facets.unwrap_or(false) && params.selections.is_empty(),
+            facets: params.overview_facets.unwrap_or(false)
+                && params.selections.is_empty()
+                && params.min_trace_duration_ns.is_none()
+                && params.max_trace_duration_ns.is_none(),
         };
         let data = self
             .search_result(ctx, &search_params, tenant, Some(aggregate))

@@ -319,9 +319,10 @@ pub struct FunctionsParams {
     /// Also compute the embedded aggregate's top-root-service/operation
     /// facet lists. OPT-IN for the same reason the legacy mode's
     /// [`OverviewParams::facets`] is — resolving roots costs the sealed
-    /// sources' dictionary decodes — and honoured only while no
-    /// selection is active (the composition site's scope gate: a
-    /// window-scoped list beside a filtered page contradicts the rail).
+    /// sources' dictionary decodes — and honoured only while the page
+    /// carries no filter at all, neither a selection nor a duration
+    /// bound (the composition site's scope gate: a window-scoped list
+    /// beside a filtered page contradicts what the page shows).
     /// `null`, `false`, and absent all mean off; only `true` opts in.
     #[serde(default)]
     pub overview_facets: Option<bool>,
