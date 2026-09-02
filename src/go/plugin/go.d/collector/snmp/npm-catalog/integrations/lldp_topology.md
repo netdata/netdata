@@ -26,7 +26,7 @@ Module: snmp_topology
 
 Map Layer 2 neighbor links from devices that advertise LLDP (IEEE 802.1AB). Netdata's SNMP topology collector reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system name, and management address.
 
-Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the `topology:snmp` view.
+Netdata reads the LLDP-MIB or LLDP-V2-MIB local and remote neighbor tables over SNMP and stitches the links into the `topology:snmp` view.
 
 This integration is supported on all platforms.
 
@@ -37,7 +37,7 @@ This integration runs as a single instance per Netdata Agent.
 
 #### Auto-Detection
 
-Discovered automatically on devices that expose the LLDP-MIB.
+Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently enabled for Palo Alto firewalls.
 
 #### Limits
 
