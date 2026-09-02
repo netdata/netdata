@@ -263,8 +263,11 @@ Before non-trivial work:
 ### SOW Lifecycle
 
 - Create new SOWs from `.agents/sow/SOW.template.md` (project-local; MAY be customized). The template is the schema
-  of a SOW: every `##` section not marked `(optional ...)` MUST be present and filled, and `audit.sh` derives its
-  structural check from those headings, so adding a field means editing the template only. Create the file in
+  of a SOW: its `##` headings carry `<!-- sow:... -->` tags saying which SOW kinds require each section (explained at
+  the top of the template), and `audit.sh` derives its structural check from them, so adding or renaming a section
+  needs no audit change. Two field labels are additionally pinned in `audit.sh` (`Sensitive data handling plan:`,
+  `Sensitive data gate:`); renaming either in the template means updating `audit.sh` in the same change. The audit
+  checks presence only; every required section MUST still be filled. Create the file in
   `pending/` when the work is queued but not started, or directly in `current/` when starting now; move it from
   `pending/` to `current/` when you begin filling the Pre-Implementation Gate.
 - Filename: `SOW-YYYYMMDD-{slug}.md`, creation date plus descriptive slug. There is no sequential counter because it
@@ -431,12 +434,12 @@ evidence-backed reason it is unaffected.
 
 ### Enforcement
 
-- `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files,
-  and sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. The audit pins, as hard
-  failures, the marker line under "SOW System", the exact CRITICAL sensitive-data sentence, legacy `SOW-NNNN`
-  references, relocated spec paths, missing or untracked framework files, and a `q/` or `specs/` path that is not
-  gitignored. It checks in-flight SOW files (advisory) for the template's required sections plus the two
-  sensitive-data field labels. It does not scan SOW working files or specs for secrets.
+- `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files, and
+  sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. The audit pins, as hard failures,
+  the marker line under "SOW System", the exact CRITICAL sensitive-data sentence, legacy `SOW-NNNN` references,
+  relocated spec paths, missing or untracked framework files, and a `q/` or `specs/` path that is not gitignored. It
+  checks in-flight SOW files under `q/current/` (advisory) for the template's required sections for their kind (umbrella
+  or not) plus the two sensitive-data field labels. It does not scan SOW working files or specs for secrets.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and

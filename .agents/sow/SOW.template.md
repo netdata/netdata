@@ -1,7 +1,9 @@
 # SOW-YYYYMMDD-<slug> - <Title>
 
-This template is the schema of a SOW. Every `##` section not marked `(optional ...)` MUST be present and filled;
-`.agents/sow/audit.sh` derives its structural check from these headings. Field semantics live in the placeholders.
+This template is the schema of a SOW. `.agents/sow/audit.sh` derives the required sections from the `##` headings and
+their tags: untagged = required in every SOW; `<!-- sow:implementation -->` = required except in umbrella SOWs;
+`<!-- sow:umbrella-only -->` = required only in umbrella SOWs; `<!-- sow:optional -->` = never required. The audit
+checks presence; filling every field is your responsibility. Field semantics live in the placeholders.
 
 ## Status
 
@@ -53,7 +55,7 @@ Unknowns:
 - <Outcome with verification method.>
 - <Outcome with verification method.>
 
-## Analysis (optional)
+## Analysis <!-- sow:optional -->
 
 Sources checked:
 
@@ -67,7 +69,7 @@ Risks:
 
 - <risk and implication>
 
-## Pre-Implementation Gate
+## Pre-Implementation Gate <!-- sow:implementation -->
 
 Gate status: blocked
 
@@ -142,9 +144,9 @@ Open decisions:
 <Numbered user decisions, options, selection, and reasoning. User decisions must be recorded before implementation.>
 
 
-## Steps (optional: umbrella SOWs only)
+## Steps <!-- sow:umbrella-only -->
 
-See "Umbrella And Step SOWs" in `AGENTS.md`; delete this section in step SOWs.
+See "Umbrella And Step SOWs" in `AGENTS.md`; delete this section in non-umbrella SOWs.
 
 | # | Step SOW | Status | PR |
 |---|---|---|---|
@@ -158,7 +160,7 @@ See "Umbrella And Step SOWs" in `AGENTS.md`; delete this section in step SOWs.
   and reviewers. Keep this a current-state handoff: consolidate superseded rounds
   and do not reproduce the conversation or every review nit.>
 
-## Workflow Friction & Rule Gaps
+## Workflow Friction & Rule Gaps <!-- sow:implementation -->
 
 Running capture of anything that suggests a rule or workflow change: a rule that
 was missing, ambiguous, or slowed the work; a practice worth codifying; a review
@@ -168,7 +170,7 @@ Maintenance Gate).
 
 - <observation + which artifact it may touch (AGENTS.md / project skill / spec / SOW template)>
 
-## Validation
+## Validation <!-- sow:implementation -->
 
 Acceptance criteria evidence:
 
@@ -190,11 +192,11 @@ Tests or equivalent validation:
 
 Real-use evidence:
 
-- <manual/API/CLI/UI path>
+- <manual/API/CLI/UI path; or why no runnable path exists>
 
 Reviewer findings:
 
-- <reviewer and findings>
+- <reviewer; each finding and how it was handled: verified and fixed, rejected with evidence, or tracked>
 
 Same-failure scan:
 
@@ -210,7 +212,7 @@ Sensitive data gate:
   names, customer names, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident
   details; note redactions used.>
 
-## Artifact Maintenance Gate
+## Artifact Maintenance Gate <!-- sow:implementation -->
 
 - AGENTS.md: <updated path or evidence-backed reason no update was needed>
 - Runtime project skills: <updated .agents/skills/project-*/ path or evidence-backed reason no update was needed>
@@ -231,6 +233,6 @@ Follow-up mapping:
 
 - <implemented/rejected/GitHub issue link>
 
-## Outcome (optional)
+## Outcome <!-- sow:optional -->
 
 Pending.

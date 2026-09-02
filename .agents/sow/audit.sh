@@ -137,15 +137,33 @@ ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never
 
 # Structural completeness is advisory and checked only for in-flight SOWs in the
 # current queue; pending stubs and completed (done/) history are exempt.
-# Required sections come from the template (the SOW schema): every '## ' heading
-# not marked "(optional". The two sensitive-data field labels are pinned here as a
-# security contract (they also exist in the template).
-required_sow_sections=()
+# Required sections come from the template (the SOW schema). Each '## ' heading
+# carries an optional HTML-comment tag: none = required in every SOW;
+# sow:implementation = required except in umbrella SOWs; sow:umbrella-only =
+# required only in umbrella SOWs; sow:optional = never required. The two
+# sensitive-data field labels are pinned here as a security contract (they also
+# exist in the template). Needles are compared as whole lines after stripping
+# trailing whitespace and any HTML comment, on both sides.
+sow_base_sections=(); sow_impl_sections=(); sow_umbrella_sections=()
+# Normalize a line for matching: drop CR, trailing HTML comment, trailing space,
+# a leading list marker, and bold markers.
+strip_line() { tr -d '\r' | sed -E 's/[[:space:]]*<!--.*-->[[:space:]]*$//; s/[[:space:]]+$//; s/^[[:space:]]*[-*]+[[:space:]]+//; s/\*\*//g'; }
 while IFS= read -r h; do
-  [ -n "$h" ] && required_sow_sections+=("$h")
-done < <(grep -E '^## ' .agents/sow/SOW.template.md 2>/dev/null | grep -v -i '(optional')
+  [ -n "$h" ] || continue
+  case "$h" in
+    *"<!--"*sow:optional*)      ;;
+    *"<!--"*sow:umbrella-only*) sow_umbrella_sections+=("$(printf '%s\n' "$h" | strip_line)") ;;
+    *"<!--"*sow:implementation*) sow_impl_sections+=("$(printf '%s\n' "$h" | strip_line)") ;;
+    *)                          sow_base_sections+=("$(printf '%s\n' "$h" | strip_line)") ;;
+  esac
+done < <(grep -E '^## ' .agents/sow/SOW.template.md 2>/dev/null)
 pinned_sow_fields=("Sensitive data handling plan:" "Sensitive data gate:")
-[ "${#required_sow_sections[@]}" -gt 0 ] || fail "could not derive required SOW sections from .agents/sow/SOW.template.md"
+# $1 needle, $2 file. "## " headings must match a whole line; "Label:" fields match a
+# line prefix (inline content allowed). awk reads all input, so no SIGPIPE under pipefail.
+sow_has_line() {
+  local mode=prefix; case "$1" in "## "*) mode=exact ;; esac
+  strip_line < "$2" | awk -v n="$1" -v m="$mode" '(m=="exact" && $0==n) || (m=="prefix" && index($0,n)==1) {f=1} END{exit !f}'
+}
 active_count=0
 if [ -d .agents/sow/q/current ]; then
   while IFS= read -r sow; do
@@ -165,9 +183,18 @@ if [ -d .agents/sow/q/current ]; then
         ;;
     esac
 
-    case "$sow" in *-umbrella.md) continue ;; esac   # umbrellas hold no gate/validation by design
-    for needle in "${required_sow_sections[@]}" "${pinned_sow_fields[@]}"; do
-      if grep -qF "$needle" "$sow"; then
+    if [ "${#sow_base_sections[@]}" -eq 0 ]; then
+      warn "template headings unreadable; structural SOW check skipped"
+      continue
+    fi
+    # Umbrella SOWs hold decisions and the step table, not a gate or validation.
+    needles=("${sow_base_sections[@]}")
+    case "$sow" in
+      *-umbrella.md) needles+=(${sow_umbrella_sections[@]+"${sow_umbrella_sections[@]}"}) ;;
+      *)             needles+=(${sow_impl_sections[@]+"${sow_impl_sections[@]}"} "${pinned_sow_fields[@]}") ;;
+    esac
+    for needle in "${needles[@]}"; do
+      if sow_has_line "$needle" "$sow"; then
         ok "$sow contains $needle"
       else
         warn "$sow is missing $needle"
