@@ -181,6 +181,8 @@ func (c *Config) validate() error {
 
 func (c *Config) validatedModeConfig() (*selectedModeConfig, error) {
 	var errs []error
+	// The framework assigns the job name before Init. Direct construction must
+	// provide it explicitly because it scopes the durable ownership journal.
 	if strings.TrimSpace(c.Name) == "" {
 		errs = append(errs, errors.New("name is required"))
 	} else if c.Name != strings.TrimSpace(c.Name) {

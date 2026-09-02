@@ -24,10 +24,11 @@ const (
 )
 
 var (
-	ErrNotLocked           = errors.New("s3check journal is not locked")
-	ErrFingerprintMismatch = errors.New("s3check journal fingerprint mismatch")
-	ErrStateTooLarge       = errors.New("s3check journal state is too large")
-	syncDirectory          = syncDir
+	ErrNotLocked            = errors.New("s3check journal is not locked")
+	ErrFingerprintMismatch  = errors.New("s3check journal fingerprint mismatch")
+	ErrStateTooLarge        = errors.New("s3check journal state is too large")
+	ErrPublicationUncertain = errors.New("s3check journal publication is uncertain")
+	syncDirectory           = syncDir
 )
 
 type envelope struct {
@@ -39,14 +40,17 @@ type envelope struct {
 
 // Journal persists one job owner's recovery state and owns its lifetime lock.
 // Loading is read-only; Save and Clear require the caller to hold the lock.
+// Its root is Agent-owned storage; permission hardening is not a security
+// boundary against a local actor that can replace path components.
 type Journal struct {
 	path        string
 	ownerID     string
 	fingerprint string
 	locker      *filelock.Locker
 
-	mu     sync.Mutex
-	locked bool
+	mu             sync.Mutex
+	locked         bool
+	publicationErr error
 }
 
 func New(root, agentID, jobName, fingerprint string) (*Journal, error) {
@@ -101,6 +105,15 @@ func isSHA256Hex(value string) bool {
 func (j *Journal) OwnerID() string { return j.ownerID }
 
 func (j *Journal) Path() string { return j.path }
+
+// MutationError reports a prior namespace mutation whose durability could not
+// be established. The caller must reload through a new Journal before mutating
+// remote or journal state again.
+func (j *Journal) MutationError() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.publicationErr
+}
 
 // Load reads a complete atomically published state without creating files or directories.
 func (j *Journal) Load(dst any) (bool, error) {
@@ -194,6 +207,9 @@ func (j *Journal) Save(state any) error {
 	if !j.locked {
 		return ErrNotLocked
 	}
+	if j.publicationErr != nil {
+		return j.publicationErr
+	}
 	payload, err := json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("encode s3check journal state: %w", err)
@@ -214,7 +230,11 @@ func (j *Journal) Save(state any) error {
 	if len(raw) > maxStateBytes {
 		return ErrStateTooLarge
 	}
-	return writeAtomic(j.path, raw)
+	err = writeAtomic(j.path, raw)
+	if errors.Is(err, ErrPublicationUncertain) {
+		j.publicationErr = err
+	}
+	return err
 }
 
 func (j *Journal) Clear() error {
@@ -223,17 +243,31 @@ func (j *Journal) Clear() error {
 	if !j.locked {
 		return ErrNotLocked
 	}
-	if err := os.Remove(j.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if j.publicationErr != nil {
+		return j.publicationErr
+	}
+	removed := false
+	if err := os.Remove(j.path); err == nil {
+		removed = true
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove s3check journal: %w", err)
 	}
 	if err := os.Remove(j.path + ".tmp"); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove s3check temporary journal: %w", err)
+		return j.afterClearMutation(removed, fmt.Errorf("remove s3check temporary journal: %w", err))
 	}
 	dir := filepath.Dir(j.path)
 	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
-	return syncDirectory(dir)
+	return j.afterClearMutation(removed, syncDirectory(dir))
+}
+
+func (j *Journal) afterClearMutation(removed bool, err error) error {
+	if err == nil || !removed {
+		return err
+	}
+	j.publicationErr = fmt.Errorf("%w after removing state: %v", ErrPublicationUncertain, err)
+	return j.publicationErr
 }
 
 func writeAtomic(path string, raw []byte) (retErr error) {
@@ -269,7 +303,10 @@ func writeAtomic(path string, raw []byte) (retErr error) {
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("publish s3check journal: %w", err)
 	}
-	return syncDirectory(dir)
+	if err := syncDirectory(dir); err != nil {
+		return fmt.Errorf("%w after replacing state: %v", ErrPublicationUncertain, err)
+	}
+	return nil
 }
 
 func ensurePrivateDir(dir string, syncParent bool) error {

@@ -21,7 +21,7 @@ func CloneProbe(value *ProbeResult) *ProbeResult {
 
 func ObjectiveResultFor(lag, objective time.Duration) ObjectiveResult {
 	status := StatusSuccess
-	if lag >= objective {
+	if lag > objective {
 		status = StatusFailed
 	}
 	return ObjectiveResult{

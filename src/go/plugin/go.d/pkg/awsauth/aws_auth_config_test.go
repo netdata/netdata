@@ -89,6 +89,17 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		"static session token rejects whitespace-only value": {
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID:     "AKIAEXAMPLE",
+					SecretAccessKey: "secret",
+					SessionToken:    " ",
+				},
+			},
+			wantErr: true,
+		},
 		"missing type": {wantErr: true},
 		"invalid type": {cfg: CredentialConfig{
 			Type: "bogus",
@@ -125,6 +136,16 @@ func TestAssumeRoleConfig_ValidateWithPath(t *testing.T) {
 	err := cfg.ValidateWithPath("assume_role")
 	assert.ErrorContains(t, err, "assume_role.role_arn is required")
 	assert.ErrorContains(t, err, "assume_role.external_id must not contain surrounding whitespace")
+
+	t.Run("rejects whitespace-only external ID", func(t *testing.T) {
+		cfg := AssumeRoleConfig{
+			RoleARN:    "arn:aws:iam::123456789012:role/example",
+			ExternalID: " ",
+		}
+
+		err := cfg.ValidateWithPath("assume_role")
+		assert.ErrorContains(t, err, "assume_role.external_id must not contain surrounding whitespace")
+	})
 }
 
 func TestIdentity_NewConfig(t *testing.T) {

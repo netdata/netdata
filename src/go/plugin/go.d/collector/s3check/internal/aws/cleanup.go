@@ -79,6 +79,7 @@ func (e *Engine) advanceRetired(
 				}
 			}
 			var deleted s3client.DeleteResult
+			// This is the same conditional, retry-safe delete used by createMarker.
 			_, err := e.call(
 				ctx,
 				operations,

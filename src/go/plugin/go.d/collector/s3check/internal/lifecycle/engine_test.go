@@ -69,6 +69,98 @@ func TestCollectRevalidatesBucketVersioningBeforeMutation(t *testing.T) {
 	engine.Cleanup(context.Background())
 }
 
+func TestCollectRetainsOwnershipWhenPutCreatesVersion(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client, model := newLifecycleClient()
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		model.put(bucket, key, payload)
+		return s3client.PutResult{
+			VersionID: "version-1",
+		}, nil
+	}
+	engine, err := New(Options{
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+	})
+	require.NoError(t, err)
+
+	result := engine.Collect(context.Background())
+	assert.ErrorContains(t, result.Err, "versioning")
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	assert.Zero(t, client.Count("delete"))
+	requirePersistedEntries(t, j, 1)
+	engine.Cleanup(context.Background())
+}
+
+func TestCollectRevalidatesVersioningImmediatelyBeforeDelete(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client, _ := newLifecycleClient()
+	checks := 0
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		checks++
+		status := s3client.VersioningDisabled
+		if checks > 1 {
+			status = s3client.VersioningEnabled
+		}
+		return s3client.BucketVersioningResult{
+			Status: status,
+		}, nil
+	}
+	engine, err := New(Options{
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+	})
+	require.NoError(t, err)
+
+	result := engine.Collect(context.Background())
+	assert.ErrorContains(t, result.Err, "versioning")
+	assert.Equal(t, 2, client.Count("bucket_versioning"))
+	assert.Zero(t, client.Count("delete"))
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	requirePersistedEntries(t, j, 1)
+	engine.Cleanup(context.Background())
+}
+
+func TestCollectRetainsOwnershipWhenDeleteCreatesMarker(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client, model := newLifecycleClient()
+	client.DeleteFunc = func(
+		_ context.Context, bucket, key string, _ s3client.DeleteOptions,
+	) (s3client.DeleteResult, error) {
+		model.delete(bucket, key)
+		return s3client.DeleteResult{
+			VersionID:    "marker-1",
+			DeleteMarker: true,
+		}, nil
+	}
+	engine, err := New(Options{
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+	})
+	require.NoError(t, err)
+
+	result := engine.Collect(context.Background())
+	assert.ErrorContains(t, result.Err, "versioning")
+	assert.Equal(t, 1, client.Count("get"), "unsafe delete must not be reconciled as unversioned absence")
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	requirePersistedEntries(t, j, 1)
+	engine.Cleanup(context.Background())
+}
+
 func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
 	j := newTestJournal(t, t.TempDir())
 	client, model := newLifecycleClient()
@@ -106,6 +198,90 @@ func TestCleanupRevalidatesBucketVersioningBeforeDelete(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.Len(t, persisted.Entries, 1)
+}
+
+func TestBacklogRevalidatesVersioningImmediatelyBeforeDelete(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client, model := newLifecycleClient()
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		model.put(bucket, key, payload)
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	engine, err := New(Options{
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+		QueueCapacity:  1,
+		CleanupBatch:   1,
+	})
+	require.NoError(t, err)
+	first := engine.Collect(context.Background())
+	require.Equal(t, 1, first.Cleanup.Pending)
+
+	checks := 0
+	client.BucketVersioningFunc = func(context.Context, string) (s3client.BucketVersioningResult, error) {
+		checks++
+		status := s3client.VersioningDisabled
+		if checks > 1 {
+			status = s3client.VersioningEnabled
+		}
+		return s3client.BucketVersioningResult{
+			Status: status,
+		}, nil
+	}
+	result := engine.Collect(context.Background())
+	assert.ErrorContains(t, result.Err, "versioning")
+	assert.Equal(t, 2, checks)
+	assert.Zero(t, client.Count("delete"))
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	requirePersistedEntries(t, j, 1)
+	engine.Cleanup(context.Background())
+}
+
+func TestBacklogRetainsOwnershipWhenDeleteCreatesMarker(t *testing.T) {
+	j := newTestJournal(t, t.TempDir())
+	client, model := newLifecycleClient()
+	client.PutFunc = func(
+		_ context.Context, bucket, key string, payload []byte, _ s3client.PutOptions,
+	) (s3client.PutResult, error) {
+		model.put(bucket, key, payload)
+		return s3client.PutResult{}, errors.New("ambiguous put")
+	}
+	engine, err := New(Options{
+		Client:         client,
+		Bucket:         "bucket",
+		Journal:        j,
+		Generator:      newGenerator(j.OwnerID()),
+		RequestTimeout: time.Second,
+		UpdateEvery:    time.Minute,
+		QueueCapacity:  1,
+		CleanupBatch:   1,
+	})
+	require.NoError(t, err)
+	first := engine.Collect(context.Background())
+	require.Equal(t, 1, first.Cleanup.Pending)
+
+	client.DeleteFunc = func(
+		_ context.Context, bucket, key string, _ s3client.DeleteOptions,
+	) (s3client.DeleteResult, error) {
+		model.delete(bucket, key)
+		return s3client.DeleteResult{
+			VersionID:    "marker-1",
+			DeleteMarker: true,
+		}, nil
+	}
+	getsBefore := client.Count("get")
+	result := engine.Collect(context.Background())
+	assert.ErrorContains(t, result.Err, "versioning")
+	assert.Equal(t, getsBefore, client.Count("get"), "unsafe delete must not be reconciled as unversioned absence")
+	assert.Equal(t, 1, result.Cleanup.Pending)
+	requirePersistedEntries(t, j, 1)
+	engine.Cleanup(context.Background())
 }
 
 func TestSuccessfulProbeDoesNotEnterQuarantine(t *testing.T) {
@@ -378,6 +554,15 @@ func newTestJournal(t *testing.T, root string) *journal.Journal {
 	)
 	require.NoError(t, err)
 	return j
+}
+
+func requirePersistedEntries(t *testing.T, j *journal.Journal, count int) {
+	t.Helper()
+	var persisted state
+	found, err := j.Load(&persisted)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Len(t, persisted.Entries, count)
 }
 
 func newGenerator(ownerID string) probe.Generator {

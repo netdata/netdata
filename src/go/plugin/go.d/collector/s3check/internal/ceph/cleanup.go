@@ -91,6 +91,9 @@ func (e *Engine) cleanupBacklog(
 			continue
 		}
 
+		// CleanupAfter covers ambiguous source requests and both replication
+		// windows. Exact absence at both endpoints is the bounded final ownership
+		// confirmation; a failed persist leaves only a conservative stale entry.
 		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
 		if err := e.persist(); err != nil {
 			return result, err

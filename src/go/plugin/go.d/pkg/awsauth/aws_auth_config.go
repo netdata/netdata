@@ -101,14 +101,13 @@ func (c AssumeRoleConfig) ValidateWithPath(path string) error {
 }
 
 func validateCredentialValue(path, value string, required bool) error {
-	canonical := strings.TrimSpace(value)
-	if canonical == "" {
+	if value == "" {
 		if required {
 			return errors.New(path + " is required")
 		}
 		return nil
 	}
-	if value != canonical {
+	if value != strings.TrimSpace(value) {
 		return errors.New(path + " must not contain surrounding whitespace")
 	}
 	return nil

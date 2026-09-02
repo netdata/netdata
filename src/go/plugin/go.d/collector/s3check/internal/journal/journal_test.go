@@ -143,6 +143,8 @@ func TestConcurrentOwnerSyncsParentBeforeAcquiringLock(t *testing.T) {
 	<-firstRootSyncStarted
 
 	secondLocked, secondErr := second.TryLock()
+	// The first owner is still blocked before locking. Any parent sync observed
+	// here must therefore come from the concurrent owner's own lock preparation.
 	syncedMu.Lock()
 	syncedBeforeFirstCompletes := append([]string(nil), synced...)
 	syncedMu.Unlock()
@@ -183,6 +185,79 @@ func TestMutationRequiresLifetimeLock(t *testing.T) {
 	require.True(t, found)
 	assert.Equal(t, []string{"key"}, got.Pending)
 	require.NoError(t, j.Clear())
+	found, err = j.Load(&got)
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestSavePublicationFailureRejectsFurtherMutation(t *testing.T) {
+	j, err := New(t.TempDir(), "agent", "job", testFingerprint)
+	require.NoError(t, err)
+	locked, err := j.TryLock()
+	require.NoError(t, err)
+	require.True(t, locked)
+	t.Cleanup(j.Unlock)
+
+	originalSyncDirectory := syncDirectory
+	syncDirectory = func(string) error {
+		return errors.New("injected directory sync failure")
+	}
+	t.Cleanup(func() { syncDirectory = originalSyncDirectory })
+
+	err = j.Save(testState{
+		Pending: []string{"published"},
+	})
+	assert.ErrorIs(t, err, ErrPublicationUncertain)
+	assert.ErrorContains(t, err, "journal publication is uncertain")
+
+	var got testState
+	found, err := j.Load(&got)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, []string{"published"}, got.Pending)
+
+	err = j.Save(testState{
+		Pending: []string{"must-not-replace"},
+	})
+	assert.ErrorIs(t, err, ErrPublicationUncertain)
+	assert.ErrorContains(t, err, "journal publication is uncertain")
+	found, err = j.Load(&got)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, []string{"published"}, got.Pending)
+}
+
+func TestClearPublicationFailureRejectsFurtherMutation(t *testing.T) {
+	j, err := New(t.TempDir(), "agent", "job", testFingerprint)
+	require.NoError(t, err)
+	locked, err := j.TryLock()
+	require.NoError(t, err)
+	require.True(t, locked)
+	t.Cleanup(j.Unlock)
+	require.NoError(t, j.Save(testState{
+		Pending: []string{"published"},
+	}))
+
+	originalSyncDirectory := syncDirectory
+	syncDirectory = func(string) error {
+		return errors.New("injected directory sync failure")
+	}
+	t.Cleanup(func() { syncDirectory = originalSyncDirectory })
+
+	err = j.Clear()
+	assert.ErrorIs(t, err, ErrPublicationUncertain)
+	assert.ErrorContains(t, err, "journal publication is uncertain")
+
+	var got testState
+	found, err := j.Load(&got)
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	err = j.Save(testState{
+		Pending: []string{"must-not-republish"},
+	})
+	assert.ErrorIs(t, err, ErrPublicationUncertain)
+	assert.ErrorContains(t, err, "journal publication is uncertain")
 	found, err = j.Load(&got)
 	require.NoError(t, err)
 	assert.False(t, found)

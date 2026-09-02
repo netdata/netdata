@@ -60,6 +60,8 @@ type Engine struct {
 	closed     bool
 }
 
+var errVersioningSafety = errors.New("lifecycle bucket versioning changed during mutation")
+
 func New(opts Options) (*Engine, error) {
 	if opts.Client == nil {
 		return nil, errors.New("lifecycle S3 client is required")
@@ -199,8 +201,10 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}
 	index := len(e.state.Entries) - 1
 
+	var put s3client.PutResult
 	if _, err := e.call(ctx, &result.Operations, contract.OperationPut, func(callCtx context.Context) error {
-		_, callErr := e.client.Put(callCtx, e.bucket, object.Key, object.Payload, s3client.PutOptions{
+		var callErr error
+		put, callErr = e.client.Put(callCtx, e.bucket, object.Key, object.Payload, s3client.PutOptions{
 			IfNoneMatch: true,
 		})
 		return callErr
@@ -212,6 +216,11 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	e.state.Entries[index].PutConfirmed = true
 	if err := e.persist(); err != nil {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonOwnership))
+		return result
+	}
+	if put.VersionID != "" {
+		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
+		result.Err = fmt.Errorf("%w: PUT returned a version ID", errVersioningSafety)
 		return result
 	}
 
@@ -247,13 +256,13 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		return result
 	}
 
-	if _, err := e.call(ctx, &result.Operations, contract.OperationDelete, func(callCtx context.Context) error {
-		_, callErr := e.client.Delete(callCtx, e.bucket, object.Key, s3client.DeleteOptions{})
-		return callErr
-	}); err != nil {
+	if err := e.deleteUnversioned(ctx, &result.Operations, contract.OperationDelete, object.Key); err != nil {
 		probeResult := contract.FailedProbe(contract.ReasonRequest)
 		probeResult.PayloadCompared = true
 		result.Probe = e.finish(probeResult)
+		if errors.Is(err, errVersioningSafety) {
+			result.Err = err
+		}
 		_ = e.persist()
 		return result
 	}
@@ -289,16 +298,42 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	return result
 }
 
+func (e *Engine) deleteUnversioned(
+	ctx context.Context,
+	operations *[]contract.OperationResult,
+	operation contract.Operation,
+	key string,
+) error {
+	if err := e.validateProvider(ctx, operations); err != nil {
+		return fmt.Errorf("%w before DELETE: %v", errVersioningSafety, err)
+	}
+
+	var deleted s3client.DeleteResult
+	if _, err := e.call(ctx, operations, operation, func(callCtx context.Context) error {
+		var callErr error
+		deleted, callErr = e.client.Delete(callCtx, e.bucket, key, s3client.DeleteOptions{})
+		return callErr
+	}); err != nil {
+		return err
+	}
+	if deleted.VersionID != "" || deleted.DeleteMarker {
+		return fmt.Errorf("%w: DELETE returned version metadata", errVersioningSafety)
+	}
+	return nil
+}
+
 func (e *Engine) Cleanup(ctx context.Context) {
 	if e.closed {
 		return
 	}
 	e.closed = true
 	if e.locked {
-		if e.validateProvider(ctx, nil) == nil {
-			_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
+		if e.journal.MutationError() == nil {
+			if e.validateProvider(ctx, nil) == nil {
+				_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
+			}
+			_ = e.persist()
 		}
-		_ = e.persist()
 		e.journal.Unlock()
 		e.locked = false
 	}

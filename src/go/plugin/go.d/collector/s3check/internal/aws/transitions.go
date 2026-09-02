@@ -328,6 +328,9 @@ func (e *Engine) createMarker(
 		}
 	}
 	var deleted s3client.DeleteResult
+	// IfMatch makes a retry idempotent: after a successful delete, the current
+	// delete marker cannot match the original object's ETag. AWS requires both
+	// s3:DeleteObject and s3:GetObject for this conditional request.
 	_, err := e.call(
 		ctx,
 		operations,

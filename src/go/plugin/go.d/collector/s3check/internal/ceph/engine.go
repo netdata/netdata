@@ -258,6 +258,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		return result
 	}
 
+	// Ceph mode requires the configured prefix to be reserved for these probes.
+	// The conditional PUT detects accidental key reuse; every failure remains
+	// journal-owned because the request outcome can still be ambiguous.
 	if _, err := e.call(
 		ctx,
 		&result.Operations,
@@ -357,6 +360,8 @@ func (e *Engine) advanceWriteVisibility(
 
 	visibleAt := now
 	owned.VisibleAt = &visibleAt
+	// External writers are excluded from the owner namespace, so the current
+	// object cannot be replaced between the verified read and this delete.
 	if _, err := e.call(
 		ctx,
 		operations,
@@ -455,14 +460,16 @@ func (e *Engine) Cleanup(ctx context.Context) {
 	}
 	e.closed = true
 	if e.locked {
-		canCleanup := true
-		if active := e.active(); active != nil {
-			canCleanup = e.retire(active) == nil
+		if e.journal.MutationError() == nil {
+			canCleanup := true
+			if active := e.active(); active != nil {
+				canCleanup = e.retire(active) == nil
+			}
+			if canCleanup && e.validateProvider(ctx, nil) == nil {
+				_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
+			}
+			_ = e.persist()
 		}
-		if canCleanup && e.validateProvider(ctx, nil) == nil {
-			_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
-		}
-		_ = e.persist()
 		e.journal.Unlock()
 		e.locked = false
 	}

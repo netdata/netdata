@@ -30,11 +30,11 @@ func (e *Engine) cleanupBacklog(
 			continue
 		}
 		owned := &e.state.Entries[index]
-		_, deleteErr := e.call(ctx, operations, contract.OperationCleanup, func(callCtx context.Context) error {
-			_, err := e.client.Delete(callCtx, e.bucket, owned.Key, s3client.DeleteOptions{})
-			return err
-		})
+		deleteErr := e.deleteUnversioned(ctx, operations, contract.OperationCleanup, owned.Key)
 		if deleteErr != nil {
+			if errors.Is(deleteErr, errVersioningSafety) {
+				return result, deleteErr
+			}
 			continue
 		}
 
@@ -72,6 +72,8 @@ func (e *Engine) cleanupBacklog(
 			}
 		}
 
+		// The confirmed quiet absence resolves ownership. If persistence fails,
+		// the old journal entry is conservative and safe to forget on a later save.
 		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
 		if err := e.persist(); err != nil {
 			return result, err

@@ -11,6 +11,9 @@ import (
 )
 
 func (e *Engine) takeover() error {
+	if err := e.journal.MutationError(); err != nil {
+		return fmt.Errorf("continue lifecycle ownership: %w", err)
+	}
 	if e.locked {
 		return nil
 	}

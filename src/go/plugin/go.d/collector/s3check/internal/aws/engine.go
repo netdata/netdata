@@ -358,16 +358,18 @@ func (e *Engine) Cleanup(ctx context.Context) {
 	}
 	e.closed = true
 	if e.locked {
-		keys := e.ownedKeys()
-		if len(keys) == 0 {
-			_ = e.persist()
-		} else if _, err := e.validateProvider(ctx, nil, keys...); err == nil {
-			if active := e.active(); active != nil {
-				e.state.ActiveKey = ""
+		if e.journal.MutationError() == nil {
+			keys := e.ownedKeys()
+			if len(keys) == 0 {
+				_ = e.persist()
+			} else if _, err := e.validateProvider(ctx, nil, keys...); err == nil {
+				if active := e.active(); active != nil {
+					e.state.ActiveKey = ""
+					_ = e.persist()
+				}
+				_ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
 				_ = e.persist()
 			}
-			_ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
-			_ = e.persist()
 		}
 		e.journal.Unlock()
 		e.locked = false
@@ -385,6 +387,9 @@ func (e *Engine) ownedKeys() []string {
 }
 
 func (e *Engine) takeover() error {
+	if err := e.journal.MutationError(); err != nil {
+		return fmt.Errorf("continue AWS ownership: %w", err)
+	}
 	if e.locked {
 		return nil
 	}
