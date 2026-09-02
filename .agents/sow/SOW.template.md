@@ -71,7 +71,8 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - <Specs, code, docs, tests, logs, traces, prior PRs/issues, external references.>
-- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste machine-specific absolute mirror paths (the mirror lives at `${NETDATA_REPOS_DIR}`).>
+- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste
+  machine-specific absolute mirror paths (the mirror lives at `${NETDATA_REPOS_DIR}`).>
 
 Affected contracts and surfaces:
 
@@ -82,7 +83,8 @@ Clean-end-state target:
 - <The structure the codebase should have once the approved scope is fully delivered.>
 - Removed as redundant (i): <code/config/docs/tests this change makes redundant.>
 - Excluded coupled items (ii): <coupled items NOT part of this clean end state, each with reason + scope source.>
-- Reference search (when a path/contract is replaced): <command(s) run + result; every surviving reference mapped to (i)/(ii), or the target is incomplete.>
+- Reference search (when a path/contract is replaced): <command(s) run + result; every surviving reference mapped to
+  (i)/(ii), or the target is incomplete.>
 
 Existing patterns to reuse:
 
@@ -94,7 +96,9 @@ Risk and blast radius:
 
 Sensitive data handling plan:
 
-- <Whether the work may expose secrets, credentials, bearer tokens, SNMP communities, community/customer data, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; how evidence will be redacted in SOWs, specs, docs, skills, instructions, and code comments.>
+- <Whether the work may expose secrets, credentials, bearer tokens, SNMP communities, community/customer data, personal
+  data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; how evidence will be
+  redacted in SOWs, specs, docs, skills, instructions, and code comments.>
 
 Implementation plan:
 
@@ -112,11 +116,13 @@ Artifact impact plan:
 - Specs: <expected update or reason likely unaffected>
 - End-user/operator docs: <expected update or reason likely unaffected>
 - End-user/operator skills: <expected update or reason likely unaffected>
-- SOW lifecycle: <local-only working file under .agents/sow/q/ (never committed); durable-knowledge targets (skills/docs/code/tests); regression = new linked SOW; follow-up issues>
+- SOW lifecycle: <local-only working file under .agents/sow/q/ (never committed); durable-knowledge targets
+  (skills/docs/code/tests); regression = new linked SOW; follow-up issues>
 
 Open-source reference evidence:
 
-- <If local mirrored repositories under `${NETDATA_REPOS_DIR}` were checked, list each as `owner/repo @ commit` plus repository-relative paths. If none were checked, record why external OSS references were not relevant.>
+- <If local mirrored repositories under `${NETDATA_REPOS_DIR}` were checked, list each as `owner/repo @ commit` plus
+  repository-relative paths. If none were checked, record why external OSS references were not relevant.>
 
 Open decisions:
 
@@ -191,7 +197,9 @@ Same-failure scan:
 
 Sensitive data gate:
 
-- <Confirm durable artifacts contain no raw secrets, credentials, bearer tokens, SNMP communities, community member names, customer names, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; note redactions used.>
+- <Confirm durable artifacts contain no raw secrets, credentials, bearer tokens, SNMP communities, community member
+  names, customer names, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident
+  details; note redactions used.>
 
 ## Artifact Maintenance Gate
 
@@ -200,8 +208,11 @@ Sensitive data gate:
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
-- SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed; regression-as-new-SOW handling recorded>
-- Workflow friction triaged: <each `Workflow Friction & Rule Gaps` entry resolved to a rule update (file + change), an evidence-backed rejection, or a tracked follow-up; "no workflow friction arose" if the section is empty>
+- SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or
+  rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed;
+  regression-as-new-SOW handling recorded>
+- Workflow friction triaged: <each `Workflow Friction & Rule Gaps` entry resolved to a rule update (file + change), an
+  evidence-backed rejection, or a tracked follow-up; "no workflow friction arose" if the section is empty>
 
 Lessons:
 
