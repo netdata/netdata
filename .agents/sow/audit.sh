@@ -137,32 +137,52 @@ ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never
 
 # Structural completeness is advisory and checked only for in-flight SOWs in the
 # current queue; pending stubs and completed (done/) history are exempt.
-# Required sections come from the template (the SOW schema). Each '## ' heading
-# carries an optional HTML-comment tag: none = required in every SOW;
-# sow:implementation = required except in umbrella SOWs; sow:umbrella-only =
-# required only in umbrella SOWs; sow:optional = never required. The two
-# sensitive-data field labels are pinned here as a security contract (they also
-# exist in the template). Needles are compared as whole lines after stripping
-# trailing whitespace and any HTML comment, on both sides.
+# Required sections come from the template (the SOW schema). Each '## ' heading may
+# carry one tag written exactly '<!-- sow:VALUE -->': none = required in every SOW
+# (umbrellas included); implementation = required except in umbrella SOWs;
+# umbrella-only = required in umbrella SOWs; optional = never required. Malformed,
+# unknown, or multiple tags are reported and the heading is treated as required
+# everywhere. The two sensitive-data field labels are pinned as a security contract.
 sow_base_sections=(); sow_impl_sections=(); sow_umbrella_sections=()
-# Normalize a line for matching: drop CR, trailing HTML comment, trailing space,
-# a leading list marker, and bold markers.
-strip_line() { tr -d '\r' | sed -E 's/[[:space:]]*<!--.*-->[[:space:]]*$//; s/[[:space:]]+$//; s/^[[:space:]]*[-*]+[[:space:]]+//; s/\*\*//g'; }
+sow_heading_text() { printf '%s\n' "$1" | tr -d '\r' | sed -E 's/[[:space:]]*<!--.*-->[[:space:]]*$//; s/[[:space:]]+$//'; }
 while IFS= read -r h; do
   [ -n "$h" ] || continue
-  case "$h" in
-    *"<!--"*sow:optional*)      ;;
-    *"<!--"*sow:umbrella-only*) sow_umbrella_sections+=("$(printf '%s\n' "$h" | strip_line)") ;;
-    *"<!--"*sow:implementation*) sow_impl_sections+=("$(printf '%s\n' "$h" | strip_line)") ;;
-    *)                          sow_base_sections+=("$(printf '%s\n' "$h" | strip_line)") ;;
+  text=$(sow_heading_text "$h")
+  tag_list=$(printf '%s\n' "$h" | grep -o -- '<!-- sow:[a-z-]* -->' | sed -E 's/^<!-- sow:([a-z-]*) -->$/\1/')
+  ntag=0; [ -n "$tag_list" ] && ntag=$(printf '%s\n' "$tag_list" | wc -l | tr -d ' ')
+  tag=""
+  if [ "$ntag" -eq 1 ]; then
+    tag="$tag_list"
+  elif [ "$ntag" -gt 1 ]; then
+    warn "template heading carries several sow: tags; treated as required everywhere: $h"
+  elif printf '%s\n' "$h" | grep -qi -- 'sow:'; then
+    warn "template heading carries a malformed sow: tag; treated as required everywhere: $h"
+  fi
+  case "$tag" in
+    optional)       ;;
+    umbrella-only)  sow_umbrella_sections+=("$text") ;;
+    implementation) sow_impl_sections+=("$text") ;;
+    "")             sow_base_sections+=("$text") ;;
+    *) warn "template heading carries unknown sow: tag '$tag'; treated as required everywhere: $h"
+       sow_base_sections+=("$text") ;;
   esac
 done < <(grep -E '^## ' .agents/sow/SOW.template.md 2>/dev/null)
 pinned_sow_fields=("Sensitive data handling plan:" "Sensitive data gate:")
-# $1 needle, $2 file. "## " headings must match a whole line; "Label:" fields match a
-# line prefix (inline content allowed). awk reads all input, so no SIGPIPE under pipefail.
+[ "${#sow_base_sections[@]}" -gt 0 ] || warn "no untagged '## ' heading in .agents/sow/SOW.template.md; structural SOW check skipped"
+
+# $1 needle, $2 file. A '## ' needle must equal a whole heading line; any other
+# needle ("Label:") must start a line once a list marker and bold markers are
+# dropped. Lines inside ``` fences are ignored. awk reads to EOF (pipefail-safe).
 sow_has_line() {
   local mode=prefix; case "$1" in "## "*) mode=exact ;; esac
-  strip_line < "$2" | awk -v n="$1" -v m="$mode" '(m=="exact" && $0==n) || (m=="prefix" && index($0,n)==1) {f=1} END{exit !f}'
+  awk -v n="$1" -v m="$mode" '
+    { sub(/\r$/, "") }
+    /^[[:space:]]*```/ { fence = !fence; next }
+    fence { next }
+    { sub(/[[:space:]]*<!--.*-->[[:space:]]*$/, ""); sub(/[[:space:]]+$/, "") }
+    m == "exact" && $0 == n { f = 1 }
+    m == "prefix" { l = $0; sub(/^[[:space:]]*[-*]+[[:space:]]+/, "", l); gsub(/\*\*/, "", l); if (index(l, n) == 1) f = 1 }
+    END { exit !f }' "$2"
 }
 active_count=0
 if [ -d .agents/sow/q/current ]; then
@@ -183,11 +203,9 @@ if [ -d .agents/sow/q/current ]; then
         ;;
     esac
 
-    if [ "${#sow_base_sections[@]}" -eq 0 ]; then
-      warn "template headings unreadable; structural SOW check skipped"
-      continue
-    fi
-    # Umbrella SOWs hold decisions and the step table, not a gate or validation.
+    [ "${#sow_base_sections[@]}" -gt 0 ] || continue
+    # Umbrella SOWs get the base set plus umbrella-only sections; others get the
+    # base set plus implementation sections and the pinned field labels.
     needles=("${sow_base_sections[@]}")
     case "$sow" in
       *-umbrella.md) needles+=(${sow_umbrella_sections[@]+"${sow_umbrella_sections[@]}"}) ;;

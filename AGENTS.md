@@ -309,14 +309,16 @@ Staged delivery uses one umbrella SOW plus one SOW per step (each step a mergeab
 - Links by filename, never by queue path (paths go stale when files move). Each step records
   `Umbrella: SOW-YYYYMMDD-<family>-umbrella` in Requirements. The umbrella keeps a `## Steps` table: ordinal, step
   SOW filename, status, PR.
-- Content split: the umbrella holds the full clean end state, all user decisions, the decomposition, and cross-step
-  follow-up mapping. A step holds its own Pre-Implementation Gate and Validation and cites umbrella decisions by
-  number. A step whose end state is fixed by the approved decomposition needs no new approval round.
+- Content split: the umbrella's Pre-Implementation Gate holds the full clean end state, the decomposition (as its
+  implementation plan), and the open decisions; its `## Implications And Decisions` holds every user decision; its
+  `## Steps` section holds the step table and the cross-step follow-up mapping. An umbrella has no Validation or
+  Artifact Maintenance Gate. A step holds its own gate and Validation and cites umbrella decisions by number. A step
+  whose end state is fixed by the approved decomposition needs no new approval round.
 - Placement and status: the umbrella lives in `current/` from the first step's start until the last step completes, then
-  moves to `done/`. Its status is `planning` until the decomposition is approved, then `in-progress` while any step is
-  in flight (it skips `ready`: an umbrella is never implemented against directly). `paused` on an umbrella means the
-  initiative itself is parked, not "waiting on steps". Steps follow the normal queue rules; the assistant updates the
-  umbrella's `## Steps` table whenever a step changes status or gains a PR.
+  moves to `done/`. Its status is `planning` until the decomposition is approved (its gate `ready`), then `in-progress`
+  while any step is in flight. `paused` on an umbrella means the initiative itself is parked, not "waiting on steps".
+  Steps follow the normal queue rules; the assistant updates the umbrella's `## Steps` table whenever a step changes
+  status or gains a PR.
 - One SOW at a time applies to steps. The umbrella is never executed and does not count.
 
 ### Pre-Implementation Gate
@@ -411,9 +413,11 @@ Do not resurrect or mutate a prior SOW.
 
 ### Validation Gate
 
-A SOW cannot be completed until every field of the template's `## Validation` and `## Artifact Maintenance Gate`
-sections holds evidence. The template is the authoritative list of what Validation records; the semantics of each
-field live in its placeholder. Generic "N/A" is invalid.
+A SOW cannot be completed until every field of the template sections required for its kind holds evidence (tag
+legend at the top of the template): for a standalone or step SOW, `## Validation` and `## Artifact Maintenance Gate`;
+for an umbrella, every step completed and the cross-step follow-up mapping in `## Steps` resolved. The template is the
+authoritative list of what Validation records; the semantics of each field live in its placeholder. Generic "N/A" is
+invalid.
 
 ### Artifact Maintenance Gate
 
@@ -438,8 +442,9 @@ evidence-backed reason it is unaffected.
   sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. The audit pins, as hard failures,
   the marker line under "SOW System", the exact CRITICAL sensitive-data sentence, legacy `SOW-NNNN` references,
   relocated spec paths, missing or untracked framework files, and a `q/` or `specs/` path that is not gitignored. It
-  checks in-flight SOW files under `q/current/` (advisory) for the template's required sections for their kind (umbrella
-  or not) plus the two sensitive-data field labels. It does not scan SOW working files or specs for secrets.
+  checks in-flight SOW files under `q/current/` (advisory) for the template's required sections for their kind and, in
+  non-umbrella SOWs, the two sensitive-data field labels; a missing section is a warning, not a failure. It does not
+  scan SOW working files or specs for secrets.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and
