@@ -42,7 +42,7 @@ static bool do_terminal_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
             "PerflibTerminalServices",
             PRIO_TERMINAL_SERVICES_SESSIONS,
             update_every,
-            RRDSET_TYPE_LINE);
+            RRDSET_TYPE_STACKED);
 
         sessions.rd_active = perflib_rrddim_add(sessions.st, "active", NULL, 1, 1, &sessions.active);
         sessions.rd_inactive = perflib_rrddim_add(sessions.st, "inactive", NULL, 1, 1, &sessions.inactive);

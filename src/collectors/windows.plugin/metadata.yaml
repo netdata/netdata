@@ -1084,9 +1084,9 @@ modules:
           metrics:
             - name: terminal_services.sessions
               description: Aggregate Terminal Services sessions. Active sessions have a connected user; inactive
-                sessions remain signed in but are not actively connected.
+                sessions are not actively connected.
               unit: sessions
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: active
                 - name: inactive
