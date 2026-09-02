@@ -80,6 +80,11 @@ const (
 	tagTopoIfDuplex = "topo_if_duplex"
 	tagTopoIPAddr   = "topo_ip_addr"
 	tagTopoIPMask   = "topo_ip_netmask"
+	tagTopoIPSource = "topo_ip_source"
+	tagTopoIPType   = "topo_ip_type"
+	tagTopoIPPrefix = "topo_ip_prefix_pointer"
+	tagTopoIPStatus = "topo_ip_status"
+	tagTopoIPRow    = "topo_ip_row_status"
 
 	tagBridgeBasePort = "bridge_base_port"
 	tagBridgeIfIndex  = "bridge_if_index"

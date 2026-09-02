@@ -22,13 +22,14 @@ func TestGetSysInfoRecordsProbeDiagnostics(t *testing.T) {
 		{Name: "." + OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
 		{Name: OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1166"},
 		{Name: OidSysContact, Type: gosnmp.OctetString, Value: []byte("operations")},
-		{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.TimeTicks, Value: uint32(123)},
 		{Name: "." + OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
 		{Name: OidSysLocation, Type: gosnmp.OctetString, Value: []byte("datacenter")},
 	}
 
 	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().WalkAll(RootOidMibSystem).Return(pdus, nil)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse(pdus), nil)
 
 	si, err := GetSysInfo(client)
 	require.NoError(t, err)
@@ -36,8 +37,6 @@ func TestGetSysInfoRecordsProbeDiagnostics(t *testing.T) {
 	assert.Equal(t, "1.3.6.1.4.1.9.1.1166", si.SysObjectID)
 	assert.Equal(t, SysInfoProbe{
 		PDUCount:        len(pdus),
-		FirstOID:        OidSysDescr,
-		LastOID:         OidSysLocation,
 		SeenSysDescr:    true,
 		SeenSysObjectID: true,
 		SeenSysContact:  true,
@@ -46,15 +45,58 @@ func TestGetSysInfoRecordsProbeDiagnostics(t *testing.T) {
 	}, si.Probe)
 }
 
+func TestGetSysInfoChunksRequestsByMaxOids(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	gomock.InOrder(
+		client.EXPECT().MaxOids().Return(2),
+		client.EXPECT().Version().Return(gosnmp.Version2c),
+		client.EXPECT().Get([]string{OidSysDescr, OidSysObject}).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+			{Name: OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
+			{Name: OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1166"},
+		}), nil),
+		client.EXPECT().Get([]string{OidSysContact, OidSysName}).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+			{Name: OidSysContact, Type: gosnmp.OctetString, Value: []byte("operations")},
+			{Name: OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
+		}), nil),
+		client.EXPECT().Get([]string{OidSysLocation}).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+			{Name: OidSysLocation, Type: gosnmp.OctetString, Value: []byte("datacenter")},
+		}), nil),
+	)
+
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	require.NotNil(t, si)
+	assert.Equal(t, "1.3.6.1.4.1.9.1.1166", si.SysObjectID)
+	assert.Equal(t, 5, si.Probe.PDUCount)
+}
+
+func TestGetSysInfoRejectsInvalidMaxOids(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(0)
+
+	si, err := GetSysInfo(client)
+	require.Error(t, err)
+	assert.Nil(t, si)
+	assert.Contains(t, err.Error(), "invalid maximum OIDs per request 0")
+}
+
 func TestGetSysInfoReturnsPartialProbeWithoutIdentityError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().WalkAll(RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
 		{Name: OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
 		{Name: OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
-	}, nil)
+	}), nil)
 
 	si, err := GetSysInfo(client)
 	require.NoError(t, err)
@@ -62,8 +104,6 @@ func TestGetSysInfoReturnsPartialProbeWithoutIdentityError(t *testing.T) {
 	assert.Empty(t, si.SysObjectID)
 	assert.Equal(t, SysInfoProbe{
 		PDUCount:     2,
-		FirstOID:     OidSysDescr,
-		LastOID:      OidSysName,
 		SeenSysDescr: true,
 		SeenSysName:  true,
 	}, si.Probe)
@@ -74,7 +114,9 @@ func TestGetSysInfoReturnsEmptyProbeWithoutIdentityError(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().WalkAll(RootOidMibSystem).Return(nil, nil)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse(nil), nil)
 
 	si, err := GetSysInfo(client)
 	require.NoError(t, err)
@@ -83,19 +125,21 @@ func TestGetSysInfoReturnsEmptyProbeWithoutIdentityError(t *testing.T) {
 	assert.Equal(t, SysInfoProbe{}, si.Probe)
 }
 
-func TestGetSysInfoWrapsWalkErrorWithSystemRoot(t *testing.T) {
+func TestGetSysInfoWrapsGetError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	walkErr := errors.New("timeout")
+	getErr := errors.New("timeout")
 	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().WalkAll(RootOidMibSystem).Return(nil, walkErr)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(nil, getErr)
 
 	si, err := GetSysInfo(client)
 	require.Error(t, err)
 	assert.Nil(t, si)
-	assert.ErrorIs(t, err, walkErr)
-	assert.Contains(t, err.Error(), RootOidMibSystem)
+	assert.ErrorIs(t, err, getErr)
+	assert.Contains(t, err.Error(), "SNMP system scalars")
 }
 
 func TestGetSysInfoRejectsWrongTypedSysObjectWithoutEchoingValue(t *testing.T) {
@@ -104,9 +148,11 @@ func TestGetSysInfoRejectsWrongTypedSysObjectWithoutEchoingValue(t *testing.T) {
 
 	const rawValue = "private device identifier"
 	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().WalkAll(RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
 		{Name: OidSysObject, Type: gosnmp.OctetString, Value: []byte(rawValue)},
-	}, nil)
+	}), nil)
 
 	si, err := GetSysInfo(client)
 	require.Error(t, err)
@@ -115,13 +161,202 @@ func TestGetSysInfoRejectsWrongTypedSysObjectWithoutEchoingValue(t *testing.T) {
 	assert.NotContains(t, err.Error(), rawValue)
 }
 
+func TestGetSysInfoReturnsErrorForNilResponse(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(nil, nil)
+
+	si, err := GetSysInfo(client)
+	require.Error(t, err)
+	assert.Nil(t, si)
+	assert.Contains(t, err.Error(), "nil response")
+}
+
+func TestGetSysInfoAcceptsNoErrorWithNonzeroErrorIndex(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{
+		ErrorIndex: 1,
+		Variables: []gosnmp.SnmpPDU{
+			{Name: OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1166"},
+		},
+	}, nil)
+
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	require.NotNil(t, si)
+	assert.Equal(t, "1.3.6.1.4.1.9.1.1166", si.SysObjectID)
+}
+
+func TestGetSysInfoAcceptsExtraAndDuplicateResponseOIDs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+		{Name: "1.3.6.1.2.1.1.7.0", Type: gosnmp.Integer, Value: 72},
+		{Name: OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1"},
+		{Name: "." + OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1166"},
+	}), nil)
+
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	require.NotNil(t, si)
+	assert.Equal(t, "1.3.6.1.4.1.9.1.1166", si.SysObjectID)
+	assert.Equal(t, 3, si.Probe.PDUCount)
+}
+
+func TestGetSysInfoReturnsPacketErrors(t *testing.T) {
+	tests := map[string]struct {
+		version    gosnmp.SnmpVersion
+		status     gosnmp.SNMPError
+		errorIndex uint8
+		wantError  string
+	}{
+		"authorization error": {
+			status:     gosnmp.AuthorizationError,
+			errorIndex: 2,
+			wantError:  "AuthorizationError",
+		},
+		"general error": {
+			status:     gosnmp.GenErr,
+			errorIndex: 4,
+			wantError:  "GenErr",
+		},
+		"no such name with zero index": {
+			status:    gosnmp.NoSuchName,
+			wantError: "invalid error index 0",
+		},
+		"no such name with out-of-range index": {
+			status:     gosnmp.NoSuchName,
+			errorIndex: 6,
+			wantError:  "invalid error index 6",
+		},
+		"no such name for configured v2c": {
+			version:    gosnmp.Version2c,
+			status:     gosnmp.NoSuchName,
+			errorIndex: 2,
+			wantError:  "unexpected response error NoSuchName for requested SNMP version 2c",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			client := snmpmock.NewMockHandler(ctrl)
+			client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+			client.EXPECT().Version().Return(test.version)
+			client.EXPECT().Get(sysInfoOIDs()).Return(&gosnmp.SnmpPacket{
+				Error:      test.status,
+				ErrorIndex: test.errorIndex,
+			}, nil)
+
+			si, err := GetSysInfo(client)
+			require.Error(t, err)
+			assert.Nil(t, si)
+			assert.Contains(t, err.Error(), test.wantError)
+		})
+	}
+}
+
+func TestGetSysInfoReturnsPartialResultForExceptionPDUs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+		{Name: OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
+		{Name: OidSysObject, Type: gosnmp.NoSuchInstance},
+		{Name: OidSysContact, Type: gosnmp.NoSuchObject},
+		{Name: OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
+		{Name: OidSysLocation, Type: gosnmp.Null},
+	}), nil)
+
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	require.NotNil(t, si)
+	assert.Empty(t, si.SysObjectID)
+	assert.Equal(t, SysInfoProbe{
+		PDUCount:     5,
+		SeenSysDescr: true,
+		SeenSysName:  true,
+	}, si.Probe)
+}
+
+func TestGetSysInfoRetriesIndexedNoSuchName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	gomock.InOrder(
+		client.EXPECT().MaxOids().Return(2),
+		client.EXPECT().Version().Return(gosnmp.Version1),
+		client.EXPECT().Get([]string{OidSysDescr, OidSysObject}).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+			{Name: OidSysDescr, Type: gosnmp.OctetString, Value: []byte("network device")},
+			{Name: OidSysObject, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.1.1166"},
+		}), nil),
+		client.EXPECT().Get([]string{OidSysContact, OidSysName}).Return(&gosnmp.SnmpPacket{
+			Error:      gosnmp.NoSuchName,
+			ErrorIndex: 1,
+		}, nil),
+		client.EXPECT().Get([]string{OidSysName}).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+			{Name: OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
+		}), nil),
+		client.EXPECT().Get([]string{OidSysLocation}).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+			{Name: OidSysLocation, Type: gosnmp.OctetString, Value: []byte("datacenter")},
+		}), nil),
+	)
+
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	require.NotNil(t, si)
+	assert.Equal(t, "1.3.6.1.4.1.9.1.1166", si.SysObjectID)
+	assert.False(t, si.Probe.SeenSysContact)
+	assert.Equal(t, 4, si.Probe.PDUCount)
+}
+
+func TestGetSysInfoNoSuchNameRetriesAreBounded(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	requestCount := 0
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version1)
+	client.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
+		requestCount++
+		assert.Len(t, oids, 6-requestCount)
+		return &gosnmp.SnmpPacket{
+			Error: gosnmp.NoSuchName, ErrorIndex: 1,
+		}, nil
+	}).Times(5)
+
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	require.NotNil(t, si)
+	assert.Equal(t, 5, requestCount)
+	assert.Equal(t, SysInfoProbe{}, si.Probe)
+}
+
 func TestSysInfoProbeIsNotSerialized(t *testing.T) {
 	si := SysInfo{
 		SysObjectID: "1.3.6.1.4.1.9.1.1166",
 		Probe: SysInfoProbe{
 			PDUCount:        2,
-			FirstOID:        OidSysDescr,
-			LastOID:         OidSysObject,
 			SeenSysDescr:    true,
 			SeenSysObjectID: true,
 		},
@@ -132,4 +367,8 @@ func TestSysInfoProbeIsNotSerialized(t *testing.T) {
 	assert.NotContains(t, string(got), "Probe")
 	assert.NotContains(t, string(got), "probe")
 	assert.NotContains(t, string(got), OidSysDescr)
+}
+
+func testSysInfoResponse(pdus []gosnmp.SnmpPDU) *gosnmp.SnmpPacket {
+	return &gosnmp.SnmpPacket{Variables: pdus}
 }

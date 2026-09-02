@@ -409,7 +409,8 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 		}
 	case ddsnmp.KindIpIfIndex:
 		switch key {
-		case tagTopoIfIndex, tagTopoIPAddr, tagTopoIPMask:
+		case tagTopoIfIndex, tagTopoIPAddr, tagTopoIPMask, tagTopoIPSource,
+			tagTopoIPType, tagTopoIPPrefix, tagTopoIPStatus, tagTopoIPRow:
 			return true
 		}
 	case ddsnmp.KindBridgePortIfIndex:

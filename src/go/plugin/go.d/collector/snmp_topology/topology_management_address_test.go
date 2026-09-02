@@ -156,19 +156,21 @@ func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testi
 	}, addrs)
 }
 
-func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *testing.T) {
+func TestTopologyCacheManagementAddressIngestionRejectsAmbiguousIPMIBCandidate(t *testing.T) {
 	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{
 		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
-			tagTopoIfIndex: "7",
-			tagTopoIPAddr:  "192.0.2.10",
-			tagTopoIPMask:  "255.255.255.0",
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "7",
+			tagTopoIPAddr:   "192.0.2.10",
+			tagTopoIPMask:   "255.255.255.0",
 		}},
 		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
-			tagTopoIfIndex: "8",
-			tagTopoIPAddr:  "::ffff:192.0.2.10",
-			tagTopoIPMask:  "255.255.255.0",
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "8",
+			tagTopoIPAddr:   "::ffff:192.0.2.10",
+			tagTopoIPMask:   "255.255.255.0",
 		}},
 		{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: map[string]string{
 			tagLldpLocMgmtAddr:          "c000020a",
@@ -185,14 +187,15 @@ func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *
 			tagLldpLocMgmtAddrOID:       "1.3.6.1.2.1.2.2.1.1.99",
 		}},
 		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
-			tagTopoIfIndex: "9",
-			tagTopoIPAddr:  "198.51.100.20",
-			tagTopoIPMask:  "255.255.255.0",
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "9",
+			tagTopoIPAddr:   "198.51.100.20",
+			tagTopoIPMask:   "255.255.255.0",
 		}},
 	}}})
+	cache.finalize()
 
 	require.Equal(t, []topologymodel.ManagementAddress{
-		{Address: "192.0.2.10", AddressType: "ipv4", Source: "ip_mib"},
 		{
 			Address:     "192.0.2.10",
 			AddressType: "ipv4",
@@ -204,21 +207,21 @@ func TestTopologyCacheManagementAddressIngestionPreservesOrderSourceAndDedup(t *
 		{Address: "198.51.100.20", AddressType: "ipv4", Source: "ip_mib"},
 	}, cache.localDevice.ManagementAddresses)
 
-	cache.finalize()
 	require.Nil(t, cache.localManagementAddressKeys)
 }
 
-func BenchmarkTopologyCacheIPManagementAddressIngest(b *testing.B) {
-	for _, rows := range []int{256, 1024, 4096} {
+func BenchmarkTopologyCacheIPManagementAddressLifecycle(b *testing.B) {
+	for _, rows := range []int{256, 1024, 4096, 65536} {
 		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
 			metrics := make([]ddsnmp.Metric, rows)
 			for i := range metrics {
 				metrics[i] = ddsnmp.Metric{
 					TopologyKind: ddsnmp.KindIpIfIndex,
 					Tags: map[string]string{
-						tagTopoIfIndex: fmt.Sprintf("%d", i+1),
-						tagTopoIPAddr:  fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255),
-						tagTopoIPMask:  "255.255.255.255",
+						tagTopoIPSource: topoIPSourceLegacy,
+						tagTopoIfIndex:  fmt.Sprintf("%d", i+1),
+						tagTopoIPAddr:   fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255),
+						tagTopoIPMask:   "255.255.255.255",
 					},
 				}
 			}
@@ -228,6 +231,36 @@ func BenchmarkTopologyCacheIPManagementAddressIngest(b *testing.B) {
 			for range b.N {
 				cache := newTopologyBuilder()
 				cache.ingestTopologyProfileMetrics(pms)
+				cache.finalize()
+				runtime.KeepAlive(cache)
+			}
+		})
+	}
+}
+
+func BenchmarkTopologyCacheModernIPAddressLifecycle(b *testing.B) {
+	for _, rows := range []int{256, 1024, 4096, 65536} {
+		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
+			metrics := make([]ddsnmp.Metric, rows)
+			for i := range metrics {
+				ip := fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255)
+				ifIndex := fmt.Sprintf("%d", i+1)
+				metrics[i] = ddsnmp.Metric{
+					TopologyKind: ddsnmp.KindIpIfIndex,
+					Tags: modernIPv4Tags(
+						ip,
+						ifIndex,
+						fmt.Sprintf("%s.%s.1.4.%s.32", ipAddressPrefixOriginOID, ifIndex, ip),
+					),
+				}
+			}
+			pms := []*ddsnmp.ProfileMetrics{{TopologyMetrics: metrics}}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				cache := newTopologyBuilder()
+				cache.ingestTopologyProfileMetrics(pms)
+				cache.finalize()
 				runtime.KeepAlive(cache)
 			}
 		})

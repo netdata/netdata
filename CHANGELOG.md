@@ -192,6 +192,10 @@
 - Perf(ml): reduce memory usage with lazy model allocation ([#23710](https://github.com/netdata/netdata/issues/23710))
 - Feat(go.d/snmp_topology): add LLDP-V2 topology for PAN-OS ([#23717](https://github.com/netdata/netdata/issues/23717))
 - Chore(go.d/snmp): diagnose missing profile identity ([#23718](https://github.com/netdata/netdata/issues/23718))
+- Feat(go.d/snmp_topology): add IpAddressTable support ([#23723](https://github.com/netdata/netdata/issues/23723))
+- Fix(build): bound eBPF Go dependency discovery ([#23608](https://github.com/netdata/netdata/issues/23608))
+- Feat(go.d/snmp): query system scalars with GET requests ([#23724](https://github.com/netdata/netdata/issues/23724))
+- Health: remove unused health_log_detail indexes ([#23722](https://github.com/netdata/netdata/issues/23722))
 
 ## [2.11.0] - 2026-08-12
 
