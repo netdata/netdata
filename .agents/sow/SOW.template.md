@@ -1,9 +1,11 @@
 # SOW-YYYYMMDD-<slug> - <Title>
 
 This template is the schema of a SOW. `.agents/sow/audit.sh` derives the required sections from the `##` headings and
-their tags: untagged = required in every SOW; `<!-- sow:implementation -->` = required except in umbrella SOWs;
-`<!-- sow:umbrella-only -->` = required only in umbrella SOWs; `<!-- sow:optional -->` = never required. The audit
-checks presence; filling every field is your responsibility. Field semantics live in the placeholders.
+their tag, written exactly `<!-- sow:VALUE -->` (tags on `###` headings are ignored): no tag = required in every SOW,
+umbrellas included; `sow:implementation` = required except in umbrella SOWs; `sow:umbrella-only` = required in umbrella
+SOWs; `sow:optional` = never required. The audit also expects two field labels verbatim: `Sensitive data handling plan:`
+in every SOW and `Sensitive data gate:` in non-umbrella SOWs (renaming either needs an audit change). The check is
+advisory and covers presence only; filling every field is your responsibility. Field semantics live in the placeholders.
 
 ## Status
 
@@ -69,7 +71,7 @@ Risks:
 
 - <risk and implication>
 
-## Pre-Implementation Gate <!-- sow:implementation -->
+## Pre-Implementation Gate
 
 Gate status: blocked
 
@@ -141,8 +143,8 @@ Open decisions:
 
 ## Implications And Decisions
 
-<Numbered user decisions, options, selection, and reasoning. User decisions must be recorded before implementation.>
-
+<Numbered user decisions, options, selection, and reasoning. User decisions must be recorded before implementation.
+A step SOW cites the umbrella's decisions by number instead of restating them.>
 
 ## Steps <!-- sow:umbrella-only -->
 
@@ -151,6 +153,10 @@ See "Umbrella And Step SOWs" in `AGENTS.md`; delete this section in non-umbrella
 | # | Step SOW | Status | PR |
 |---|---|---|---|
 | 01 | SOW-YYYYMMDD-<family>-01-<step>.md | planning | |
+
+Cross-step follow-up mapping:
+
+- <every item deferred across steps: implemented in step NN, rejected with evidence, or a linked GitHub issue>
 
 ## Execution Log
 
