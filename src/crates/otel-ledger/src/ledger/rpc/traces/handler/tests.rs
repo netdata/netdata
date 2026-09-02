@@ -1186,6 +1186,42 @@ async fn the_scope_gate_suppresses_the_root_facets_while_selections_are_active()
 }
 
 #[tokio::test]
+async fn the_scope_gate_suppresses_the_root_facets_while_a_duration_bound_is_active() {
+    let h = handler_with_search_corpus().await;
+
+    // A lower bound narrows the page to the window's two long traces
+    // (envelopes 2500ns and 1500ns) while the aggregate keeps counting
+    // all five, so the same contradiction a selection would cause is
+    // here: lists enumerating durations the page excluded, counted over
+    // the population it does not show.
+    let mut body = functions_body(20);
+    body["overview_facets"] = json!(true);
+    body["min_trace_duration_ns"] = json!(1_000);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0e", "0b"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "window");
+    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert!(
+        o.get("top_root_services").is_none(),
+        "window-scoped facet lists would contradict the duration filter"
+    );
+    assert!(o.get("top_root_operations").is_none());
+
+    // The upper bound gates identically — the heatmap's cell click
+    // sends it, on its own or paired with the lower one.
+    let mut body = functions_body(20);
+    body["overview_facets"] = json!(true);
+    body["max_trace_duration_ns"] = json!(1_000);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0c", "0d", "0a"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert!(o.get("top_root_services").is_none());
+    assert!(o.get("top_root_operations").is_none());
+}
+
+#[tokio::test]
 async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() {
     let registries = make_registries();
     install_wal(
