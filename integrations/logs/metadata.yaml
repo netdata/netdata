@@ -49,8 +49,7 @@
     - logs
   overview:
     description: |
-      The Windows Events plugin by Netdata makes viewing, exploring and analyzing Windows Events simple and
-      efficient.
+      The Windows Events plugin lets you view, explore and analyze Windows events from the Netdata dashboard.
 
       The plugin automatically detects all the available channels and offers a list of "Event Channels".
 
