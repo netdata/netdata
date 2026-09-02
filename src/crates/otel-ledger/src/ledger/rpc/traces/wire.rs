@@ -301,8 +301,9 @@ pub struct FunctionsParams {
     /// nanoseconds — the "min duration" filter of the Functions view.
     /// Trace-envelope, not span, so it narrows the same quantity the
     /// overview grid bins by. Forwarded verbatim to
-    /// [`SearchParams::min_trace_duration_ns`]; the upper bound stays
-    /// the native mode's alone.
+    /// [`SearchParams::min_trace_duration_ns`] and paired with
+    /// [`Self::max_trace_duration_ns`], which this view forwards too:
+    /// the pair expresses a duration BAND, not only a floor.
     #[serde(default)]
     pub min_trace_duration_ns: Option<i64>,
     /// Inclusive upper bound on the TRACE envelope duration,
