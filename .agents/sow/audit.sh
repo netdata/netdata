@@ -83,6 +83,7 @@ required_sections=(
   "### Umbrella And Step SOWs"
   "### Pre-Implementation Gate"
   "### Git Worktrees"
+  "### Git And PR Workflow"
   "### Review"
   "### Regressions"
   "### Validation Gate"

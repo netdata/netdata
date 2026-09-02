@@ -329,6 +329,17 @@ resolve, stop and ask the user before implementation.
 Assistants MUST NOT create git worktrees on their own. Create one only when the user explicitly asks for it or
 approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
 
+### Git And PR Workflow
+
+- Work on a branch per SOW created off local `master`; never commit to `master` directly.
+- Stage only the specific files you changed. Never `git add -A`: the working copy holds untracked files that MUST
+  NOT be committed.
+- Never `git checkout <file>`, `git reset`, delete files, or rewrite history without explicit user approval. Undo a
+  change by editing it out, not by checking the file out.
+- Commit and push only when the user asks or the approved plan says so. Checkpoint commits before review rounds
+  and squashing at PR time are described under "Review".
+- Commit messages and PR bodies describe the change. A PR body links the follow-up issues tracked from its SOW.
+
 ### Local SOW Parking
 
 - Users MAY keep private paused, abandoned, or not-yet-public SOW drafts under `<repo-root>/.local/sow/`. It is
@@ -358,6 +369,9 @@ Review findings are leads until verified against the shipped code and its contra
   PR time.
 - Recurrence: if findings keep clustering in one subsystem for ~2-3 rounds, stop patching individual cases, name the
   missing invariant, and propose one class-level fix as a user decision.
+- Obtaining a review: spawn independent, full-scope reviewers with clean context, or run the external assistants
+  the user names. For performance-sensitive code at least one reviewer MUST carry an explicit hot-path performance
+  lens. Record each reviewer and its findings under Validation in the SOW.
 - One complete review round is the default. Repeat the same full scope only when a verified shipping blocker
   required a material change to shipped implementation or behavior, or when the prior review could not assess the
   complete change.
@@ -405,7 +419,8 @@ A SOW cannot be completed until Validation records:
 - workflow-friction triage: each `Workflow Friction & Rule Gaps` note resolved to a rule update (`AGENTS.md`,
   project skill, spec, or SOW template), an evidence-backed rejection, or a tracked follow-up (or an explicit "none
   arose");
-- follow-up mapping.
+- follow-up mapping;
+- `.agents/sow/audit.sh` passing, or every remaining failure explained.
 
 Generic "N/A" is invalid.
 
@@ -558,35 +573,50 @@ Public skill convention (`docs/netdata-ai/skills/`):
 Skills index (runtime input under `.agents/skills/`; each skill's frontmatter description is the authoritative
 trigger, the table is a pointer):
 
-| Skill | Trigger |
-|---|---|
-| `project-writing-collectors` | authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C, PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions |
-| `project-writing-go-modules-framework-v2` | creating or migrating a go.d collector to framework V2; `CollectorV2`, `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests |
-| `project-snmp-profiles-authoring` | SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects |
-| `project-snmp-trap-profiles-authoring` | SNMP trap profile YAMLs, trap profile-format docs, the `snmptrapprofilegen` helper, OOB trap profile regeneration; closed 8-category / 8-severity taxonomy |
-| `project-prometheus-profiles` | creating, reviewing, validating, iterating, or installing Prometheus chart profiles from exposition dumps; selector/relabel/fallback policy, coverage, NIDL, live verification |
-| `project-create-topology` | topology producers, topology Function payloads, schema fixtures, graph presentation, correlation rules, direction semantics, drilldowns, telemetry overlays, Cloud aggregation fixtures |
-| `project-health-alert-authoring` | authoring, adapting, or reviewing health alerts and templates in `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests |
-| `project-query-corpus` | running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for query-engine bugs, formatter byte-pins, validating a fix branch |
-| `project-build-static-binary` | building or testing the static self-extracting installer (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/` |
-| `integrations-lifecycle` | any `metadata.yaml` or collector `taxonomy.yaml`; `integrations/` generators, schemas, taxonomy registries, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d `contexts.yaml`; the collector-consistency rule |
-| `learn-site-structure` | adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`; `docs/.map/map.yaml`; why a Learn page looks the way it does; MDX escape rules; redirects; Netlify deploy |
-| `learn-pr-preview` | only when the user explicitly asks to build, preview, or validate `learn.netdata.cloud` locally from a PR or docs branch |
-| `query-agent-events` | investigating crashes, panics, or fatals across the fleet via the agent-events namespace; `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs |
-| `mirror-netdata-repos` | setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`; reset-to-default safety; `--repo` scoping |
-| `pr-reviews` | PR comment and review iteration |
-| `coverity-audit` | Coverity Scan defect triage |
-| `sonarqube-audit` | SonarCloud findings triage |
-| `graphql-audit` | GitHub Code Scanning / CodeQL triage |
-| `codacy-audit` | Codacy pre-push local analysis and read-only PR-issue fetching; write actions require a GitHub issue or SOW |
+- `project-writing-collectors`: authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C,
+  PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions
+- `project-writing-go-modules-framework-v2`: creating or migrating a go.d collector to framework V2; `CollectorV2`,
+  `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
+- `project-snmp-profiles-authoring`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
+  docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
+- `project-snmp-trap-profiles-authoring`: SNMP trap profile YAMLs, trap profile-format docs, the `snmptrapprofilegen`
+  helper, OOB trap profile regeneration; closed 8-category / 8-severity taxonomy
+- `project-prometheus-profiles`: creating, reviewing, validating, iterating, or installing Prometheus chart profiles
+  from exposition dumps; selector/relabel/fallback policy, coverage, NIDL, live verification
+- `project-create-topology`: topology producers, topology Function payloads, schema fixtures, graph presentation,
+  correlation rules, direction semantics, drilldowns, telemetry overlays, Cloud aggregation fixtures
+- `project-health-alert-authoring`: authoring, adapting, or reviewing health alerts and templates in
+  `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests
+- `project-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
+  query-engine bugs, formatter byte-pins, validating a fix branch
+- `project-build-static-binary`: building or testing the static self-extracting installer
+  (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
+- `integrations-lifecycle`: any `metadata.yaml` or collector `taxonomy.yaml`; `integrations/` generators, schemas,
+  taxonomy registries, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
+  `contexts.yaml`; the collector-consistency rule
+- `learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
+  `docs/.map/map.yaml`; why a Learn page looks the way it does; MDX escape rules; redirects; Netlify deploy
+- `learn-pr-preview`: only when the user explicitly asks to build, preview, or validate `learn.netdata.cloud` locally
+  from a PR or docs branch
+- `query-agent-events`: investigating crashes, panics, or fatals across the fleet via the agent-events namespace; `AE_*`
+  fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
+- `mirror-netdata-repos`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
+  reset-to-default safety; `--repo` scoping
+- `pr-reviews`: PR comment and review iteration
+- `coverity-audit`: Coverity Scan defect triage
+- `sonarqube-audit`: SonarCloud findings triage
+- `graphql-audit`: GitHub Code Scanning / CodeQL triage
+- `codacy-audit`: Codacy pre-push local analysis and read-only PR-issue fetching; write actions require a GitHub issue
+  or SOW
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
-| Skill | Trigger |
-|---|---|
-| `query-netdata-cloud` | querying the Netdata Cloud REST API: metrics, logs (systemd-journal), alerts, generic Functions on a node |
-| `query-netdata-agents` | querying Agents directly on port 19999, including auto-minting per-agent bearer tokens from a Cloud token |
-| `query-snmp-traps` | SNMP trap logs via Cloud or Agent: entries, severities, categories, senders, dedup summaries, `TRAP_*` fields, `TRAP_JSON` searches |
+- `query-netdata-cloud`: querying the Netdata Cloud REST API: metrics, logs (systemd-journal), alerts, generic Functions
+  on a node
+- `query-netdata-agents`: querying Agents directly on port 19999, including auto-minting per-agent bearer tokens from a
+  Cloud token
+- `query-snmp-traps`: SNMP trap logs via Cloud or Agent: entries, severities, categories, senders, dedup summaries,
+  `TRAP_*` fields, `TRAP_JSON` searches
 
 Output/reference skill trees, updated when the related public/operator workflow changes: `docs/netdata-ai/skills/`
 (Netdata AI skill artifacts) and `src/ai-skills/` (generated or source AI skill artifacts, when present).

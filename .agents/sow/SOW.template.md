@@ -203,22 +203,6 @@ Sensitive data gate:
 - SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed; regression-as-new-SOW handling recorded>
 - Workflow friction triaged: <each `Workflow Friction & Rule Gaps` entry resolved to a rule update (file + change), an evidence-backed rejection, or a tracked follow-up; "no workflow friction arose" if the section is empty>
 
-Specs update:
-
-- <updated spec or specific reason no update was needed>
-
-Project skills update:
-
-- <updated runtime project skill or specific reason no update was needed>
-
-End-user/operator docs update:
-
-- <updated docs or evidence-backed reason none were affected>
-
-End-user/operator skills update:
-
-- <updated output/reference skills affected by docs/spec changes, or evidence-backed reason none were affected>
-
 Lessons:
 
 - <lesson or specific reason none>
@@ -230,11 +214,3 @@ Follow-up mapping:
 ## Outcome
 
 Pending.
-
-## Lessons Extracted
-
-Pending.
-
-## Follow-up Issues
-
-None yet.
