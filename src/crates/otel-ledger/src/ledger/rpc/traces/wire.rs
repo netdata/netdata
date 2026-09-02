@@ -27,9 +27,20 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// in [`InfoResponse::accepted_params`]. The list's rule: it carries
 /// exactly the TOP-LEVEL keys — the seven mode selectors, `tenant`,
 /// and the fields the implicit view reads, both the standard Functions
-/// ones and its own `min_trace_duration_ns` filter.
-/// Per-mode body fields (windows, `limit`, `selections`, …) live inside
-/// their mode objects and are documented on the param structs.
+/// ones and its own `min_trace_duration_ns` filter. A client that
+/// builds its payload out of this list sends nothing else, so a field
+/// the implicit view honours but the list omits is unreachable —
+/// `selections` is listed for exactly that reason, being how the
+/// filter rail's picks travel.
+///
+/// `timeout` is deliberately NOT listed: the implicit view accepts it
+/// for protocol parity and ignores it (execution deadlines belong to
+/// the bridge call context), so advertising it would invite a client
+/// to believe it moved a deadline it did not move.
+///
+/// Per-mode body fields (windows, `limit`, the explicit modes' own
+/// `selections`, …) live inside their mode objects and are documented
+/// on the param structs.
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
@@ -43,6 +54,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "before",
     "last",
     "anchor",
+    "selections",
     "min_trace_duration_ns",
 ];
 
