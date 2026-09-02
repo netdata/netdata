@@ -401,7 +401,7 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
         }
     }
     else
-        nd_log(NDLS_DAEMON, NDLP_NOTICE, "Invalid bearer token '%s' received.", v);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "Invalid bearer token received (token_bytes=%zu).", strlen(v));
 
     return rc;
 }

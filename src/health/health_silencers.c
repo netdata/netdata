@@ -23,6 +23,10 @@ SILENCERS *silencers;
 
 static RW_SPINLOCK silencers_rw_spinlock = RW_SPINLOCK_INITIALIZER;
 
+static inline size_t health_silencer_field_length(const char *value) {
+    return value ? strlen(value) : 0;
+}
+
 /**
  * Create Silencer
  *
@@ -50,11 +54,11 @@ static void health_silencers_add_unsafe(SILENCER *silencer) {
     silencers->silencers = silencer;
     netdata_log_debug(
         D_HEALTH,
-        "HEALTH command API: Added silencer %s:%s:%s:%s",
-        silencer->alarms,
-        silencer->charts,
-        silencer->contexts,
-        silencer->hosts);
+        "HEALTH command API: Added silencer (alarm_bytes=%zu, chart_bytes=%zu, context_bytes=%zu, host_bytes=%zu)",
+        health_silencer_field_length(silencer->alarms),
+        health_silencer_field_length(silencer->charts),
+        health_silencer_field_length(silencer->contexts),
+        health_silencer_field_length(silencer->hosts));
 }
 
 void health_silencers_add(SILENCER *silencer) {
@@ -129,7 +133,7 @@ static int health_silencers_json_read_callback(JSON_ENTRY *e)
             e->callback_function = health_silencers_json_read_callback;
             if(strcmp(e->name,"")) {
                 // init silencer
-                netdata_log_debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
+                netdata_log_debug(D_HEALTH, "JSON: initializing named silencer (name_bytes=%zu)", strlen(e->name));
 #endif
                 e->callback_data = create_silencer();
                 if(e->callback_data) {
@@ -146,11 +150,14 @@ static int health_silencers_json_read_callback(JSON_ENTRY *e)
 
         case JSON_STRING:
             if(!strcmp(e->name,"type")) {
-                netdata_log_debug(D_HEALTH, "JSON: Processing type=%s",e->data.string);
+                netdata_log_debug(D_HEALTH, "JSON: processing silencer type (type_bytes=%zu)",
+                                  health_silencer_field_length(e->data.string));
                 if (!strcmp(e->data.string,"SILENCE")) silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
                 else if (!strcmp(e->data.string,"DISABLE")) silencers->stype = STYPE_DISABLE_ALARMS;
             } else {
-                netdata_log_debug(D_HEALTH, "JSON: Adding %s=%s", e->name, e->data.string);
+                netdata_log_debug(D_HEALTH, "JSON: adding silencer field (name_bytes=%zu, value_bytes=%zu)",
+                                  health_silencer_field_length(e->name),
+                                  health_silencer_field_length(e->data.string));
                 if (e->callback_data)
                     (void)health_silencers_addparam(e->callback_data, e->name, e->data.string);
             }
@@ -332,7 +339,10 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
         ret = HTTP_RESP_FORBIDDEN;
     } else {
-        netdata_log_debug(D_HEALTH, "HEALTH command API: Comparing secret '%s' to '%s'", w->auth_bearer_token, api_secret);
+        netdata_log_debug(D_HEALTH,
+                          "HEALTH command API: validating authorization token "
+                          "(provided_bytes=%zu, configured_bytes=%zu)",
+                          strlen(w->auth_bearer_token), health_silencer_field_length(api_secret));
         if (strcmp(w->auth_bearer_token, api_secret) != 0) {
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
             ret = HTTP_RESP_FORBIDDEN;
@@ -346,7 +356,9 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                 if (!key || !*key) continue;
                 if (!value || !*value) continue;
 
-                netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
+                netdata_log_debug(D_WEB_CLIENT,
+                                  "%llu: API v1 health query parameter (key_bytes=%zu, value_bytes=%zu)",
+                                  w->id, strlen(key), strlen(value));
 
                 // name and value are now the parameters
                 if (!strcmp(key, "cmd")) {
@@ -468,7 +480,12 @@ static SILENCE_TYPE health_silencers_check_silenced_unsafe(RRDCALC *rc, const ch
             (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern, host))) &&
             (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches_string(s->charts_pattern, rc->chart)))
         ) {
-            netdata_log_debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts);
+            netdata_log_debug(
+                D_HEALTH,
+                "Alarm matches command API silence entry "
+                "(alarm_bytes=%zu, chart_bytes=%zu, context_bytes=%zu, host_bytes=%zu)",
+                health_silencer_field_length(s->alarms), health_silencer_field_length(s->charts),
+                health_silencer_field_length(s->contexts), health_silencer_field_length(s->hosts));
             if (unlikely(silencers->stype == STYPE_NONE)) {
                 netdata_log_debug(D_HEALTH, "Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rrdcalc_name(rc));
             } else {

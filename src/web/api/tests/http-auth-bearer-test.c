@@ -33,6 +33,7 @@ struct bearer_test_io_state {
     int logged_errno;
     size_t payload_size;
     char payload[4096];
+    char log_message[512];
 };
 
 static struct bearer_test_io_state bearer_test_io;
@@ -136,10 +137,15 @@ static int bearer_test_unlink(const char *filename) {
 static void bearer_test_netdata_logger(
     ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PRIORITY priority __maybe_unused,
     const char *file __maybe_unused, const char *function __maybe_unused,
-    unsigned long line __maybe_unused, const char *fmt __maybe_unused, ...) {
+    unsigned long line __maybe_unused, const char *fmt, ...) {
     if(bearer_test_io.active) {
         bearer_test_io.logs++;
         bearer_test_io.logged_errno = errno;
+
+        va_list args;
+        va_start(args, fmt);
+        vsnprintfz(bearer_test_io.log_message, sizeof(bearer_test_io.log_message), fmt, args);
+        va_end(args);
     }
 }
 
@@ -569,13 +575,35 @@ static int bearer_test_publication(void) {
     return errors;
 }
 
+static int bearer_test_invalid_token_log(void) {
+    static const char invalid_token[] = "sentinel-invalid-bearer-value";
+    struct web_client w = { 0 };
+
+    bearer_test_io_reset(BEARER_TEST_IO_SUCCESS);
+    bool authenticated = web_client_bearer_token_auth(&w, invalid_token);
+    bearer_test_io.active = false;
+
+    int errors = 0;
+    errors += bearer_test_expect(!authenticated, "invalid bearer must not authenticate");
+    errors += bearer_test_expect(bearer_test_io.logs == 1, "invalid bearer must emit one diagnostic");
+    errors += bearer_test_expect(!strstr(bearer_test_io.log_message, invalid_token),
+                                 "invalid bearer diagnostic must not contain the credential");
+
+    char expected_length[64];
+    snprintfz(expected_length, sizeof(expected_length), "token_bytes=%zu", sizeof(invalid_token) - 1);
+    errors += bearer_test_expect(strstr(bearer_test_io.log_message, expected_length) != NULL,
+                                 "invalid bearer diagnostic must retain the credential length");
+    return errors;
+}
+
 int main(void) {
     mode_t old_umask = umask(0077); // Flawfinder: ignore - restrictive test-only creation mask.
     int persistence_errors = bearer_test_persistence();
     int publication_errors = bearer_test_publication();
+    int invalid_log_errors = bearer_test_invalid_token_log();
     umask(old_umask); // Flawfinder: ignore - restore the caller's mask.
 
-    int errors = persistence_errors + publication_errors;
+    int errors = persistence_errors + publication_errors + invalid_log_errors;
     if(errors) {
         fprintf(stderr, "bearer tests failed with %d error(s)\n", errors);
         return 1;

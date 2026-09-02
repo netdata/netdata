@@ -206,11 +206,6 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
         netdata_log_info("Registry request verification failed: URL not found for person (url_bytes=%zu)", strlen(url));
         return NULL;
     }
-    //else if (pu->machine != m) {
-    //    netdata_log_info("Registry Request Verification: Machine mismatch: person: '%s', machine requested='%s' <> loaded='%s', url '%s'", person_guid, machine_guid, pu->machine->guid, url);
-    //    return NULL;
-    //}
-
     return pu;
 }
 
@@ -262,15 +257,6 @@ REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_
 
     // normalize the url
     delete_url = registry_fix_url(delete_url, NULL);
-
-    // make sure the user is not deleting the url it uses
-    /*
-    if(!strcmp(delete_url, pu->url->url)) {
-        netdata_log_info("Registry Delete Request: delete URL is the one currently accessed, person: '%s', machine '%s', url '%s', delete url '%s'"
-             , p->guid, m->guid, pu->url->url, delete_url);
-        return NULL;
-    }
-    */
 
     STRING *d_url = string_strdupz(delete_url);
     REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, d_url);

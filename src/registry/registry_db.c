@@ -12,7 +12,7 @@ int registry_db_should_be_saved(void) {
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
 static int registry_machine_save_url(REGISTRY_MACHINE_URL *mu, FILE *fp) {
-    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_save_url('%s')", string2str(mu->url));
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saving machine URL (url_bytes=%zu)", string_strlen(mu->url));
 
     int ret = fprintf(fp, "V\t%08x\t%08x\t%08x\t%02x\t%s\n",
             mu->first_t,
@@ -32,7 +32,7 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
     REGISTRY_MACHINE *m = entry;
     FILE *fp = file;
 
-    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_save('%s')", m->guid);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saving machine (guid_bytes=%zu)", strlen(m->guid));
 
     int ret = fprintf(fp, "M\t%08x\t%08x\t%08x\t%s\n",
             m->first_t,
@@ -56,7 +56,9 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
 }
 
 static inline int registry_person_save_url(REGISTRY_PERSON_URL *pu, FILE *fp) {
-    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_person_save_url('%s')", string2str(pu->url));
+    netdata_log_debug(D_REGISTRY,
+                      "REGISTRY: saving person URL (machine_guid_bytes=%zu, name_bytes=%zu, url_bytes=%zu)",
+                      strlen(pu->machine->guid), string_strlen(pu->machine_name), string_strlen(pu->url));
 
     int ret = fprintf(fp, "U\t%08x\t%08x\t%08x\t%02x\t%s\t%s\t%s\n",
             pu->first_t,
@@ -77,7 +79,7 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
     REGISTRY_PERSON *p = entry;
     FILE *fp = file;
 
-    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_person_save('%s')", p->guid);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saving person (guid_bytes=%zu)", strlen(p->guid));
 
     int ret = fprintf(fp, "P\t%08x\t%08x\t%08x\t%s\n",
             p->first_t,
@@ -361,11 +363,12 @@ size_t registry_db_load(void) {
     while((s = fgets_trim_len(buf, 4096, fp, &len))) {
         line++;
 
-        netdata_log_debug(D_REGISTRY, "REGISTRY: read line %zu to length %zu: %s", line, len, s);
+        netdata_log_debug(D_REGISTRY, "REGISTRY: read line %zu (line_bytes=%zu)", line, len);
         switch(*s) {
             case 'U': // person URL
                 if(unlikely(!p)) {
-                    netdata_log_error("REGISTRY: ignoring line %zu, no person loaded: %s", line, s);
+                    netdata_log_error("REGISTRY: ignoring line %zu because no person is loaded (line_bytes=%zu)",
+                                      line, len);
                     continue;
                 }
 
@@ -390,7 +393,8 @@ size_t registry_db_load(void) {
                 char *machine_name = registry_fix_machine_name(&s[69], &machine_name_len);
 
                 if(*url != 'h' && *url != '*') {
-                    netdata_log_error("REGISTRY: person URL line %zu does not have a valid url: %s", line, url);
+                    netdata_log_error("REGISTRY: person URL line %zu does not have a valid URL (url_bytes=%zu)",
+                                      line, strlen(url));
                     continue;
                 }
 
@@ -416,8 +420,11 @@ size_t registry_db_load(void) {
                 pu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 pu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 pu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                netdata_log_debug(D_REGISTRY, "REGISTRY: loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
-                      string2str(u), string2str(pu->machine_name), m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
+                netdata_log_debug(D_REGISTRY,
+                                  "REGISTRY: loaded person URL (url_bytes=%zu, name_bytes=%zu, "
+                                  "machine_guid_bytes=%zu, first=%u, last=%u, usages=%u, flags=%02x)",
+                                  string_strlen(u), string_strlen(pu->machine_name), strlen(m->guid), pu->first_t,
+                                  pu->last_t, pu->usages, pu->flags);
 
                 string_freez(u);
                 break;
@@ -434,12 +441,15 @@ size_t registry_db_load(void) {
                 p = registry_person_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
                 p->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 p->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                netdata_log_debug(D_REGISTRY, "REGISTRY: loaded person '%s', first: %u, last: %u, usages: %u", p->guid, p->first_t, p->last_t, p->usages);
+                netdata_log_debug(D_REGISTRY,
+                                  "REGISTRY: loaded person (guid_bytes=%zu, first=%u, last=%u, usages=%u)",
+                                  strlen(p->guid), p->first_t, p->last_t, p->usages);
                 break;
 
             case 'V': // machine URL
                 if(unlikely(!m)) {
-                    netdata_log_error("REGISTRY: ignoring line %zu, no machine loaded: %s", line, s);
+                    netdata_log_error("REGISTRY: ignoring line %zu because no machine is loaded (line_bytes=%zu)",
+                                      line, len);
                     continue;
                 }
 
@@ -453,7 +463,8 @@ size_t registry_db_load(void) {
 
                 url = &s[32];
                 if(*url != 'h' && *url != '*') {
-                    netdata_log_error("REGISTRY: machine URL line %zu does not have a valid url: %s", line, url);
+                    netdata_log_error("REGISTRY: machine URL line %zu does not have a valid URL (url_bytes=%zu)",
+                                      line, strlen(url));
                     continue;
                 }
 
@@ -468,8 +479,10 @@ size_t registry_db_load(void) {
                 mu->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 mu->usages = (uint32_t)strtoul(&s[20], NULL, 16);
                 mu->flags = (uint8_t)strtoul(&s[29], NULL, 16);
-                netdata_log_debug(D_REGISTRY, "Registry loaded machine URL '%s', machine '%s', first: %u, last: %u, usages: %u, flags: %02x",
-                      string2str(u), m->guid, mu->first_t, mu->last_t, mu->usages, mu->flags);
+                netdata_log_debug(D_REGISTRY,
+                                  "Registry loaded machine URL (url_bytes=%zu, machine_guid_bytes=%zu, "
+                                  "first=%u, last=%u, usages=%u, flags=%02x)",
+                                  string_strlen(u), strlen(m->guid), mu->first_t, mu->last_t, mu->usages, mu->flags);
 
                 string_freez(u);
                 break;
@@ -486,7 +499,9 @@ size_t registry_db_load(void) {
                 m = registry_machine_allocate(&s[29], (time_t)strtoul(&s[2], NULL, 16));
                 m->last_t = (uint32_t)strtoul(&s[11], NULL, 16);
                 m->usages = (uint32_t)strtoul(&s[20], NULL, 16);
-                netdata_log_debug(D_REGISTRY, "REGISTRY: loaded machine '%s', first: %u, last: %u, usages: %u", m->guid, m->first_t, m->last_t, m->usages);
+                netdata_log_debug(D_REGISTRY,
+                                  "REGISTRY: loaded machine (guid_bytes=%zu, first=%u, last=%u, usages=%u)",
+                                  strlen(m->guid), m->first_t, m->last_t, m->usages);
                 break;
 
             case 'T': // totals
@@ -502,7 +517,8 @@ size_t registry_db_load(void) {
                 break;
 
             default:
-                netdata_log_error("REGISTRY: ignoring line %zu of filename '%s': %s.", line, registry.db_filename, s);
+                netdata_log_error("REGISTRY: ignoring line %zu of filename '%s' (line_bytes=%zu)",
+                                  line, registry.db_filename, len);
                 break;
         }
     }

@@ -19,6 +19,8 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 #include "database/rrd.h"
 #include "plugins.d/plugins_d.h"
 
+#define STREAM_RECEIVER_METADATA_MAX_LENGTH RRD_ID_LENGTH_MAX
+
 static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) {
     if(!value || !hops)
         return false;
@@ -32,6 +34,49 @@ static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) 
 
     *hops = (int16_t)parsed;
     return true;
+}
+
+static inline bool stream_receiver_metadata_size_is_valid(const char *value) {
+    return value && strnlen(value, STREAM_RECEIVER_METADATA_MAX_LENGTH + 1) <= STREAM_RECEIVER_METADATA_MAX_LENGTH;
+}
+
+static inline bool stream_receiver_metadata_should_reject(
+    bool recognized, size_t name_length, size_t value_length)
+{
+    return recognized &&
+           (name_length > STREAM_RECEIVER_METADATA_MAX_LENGTH ||
+            value_length > STREAM_RECEIVER_METADATA_MAX_LENGTH);
+}
+
+struct stream_receiver_unused_metadata {
+    size_t fields;
+    size_t name_bytes;
+    size_t value_bytes;
+};
+
+static inline void stream_receiver_unused_metadata_add(
+    struct stream_receiver_unused_metadata *unused, size_t name_length, size_t value_length)
+{
+    unused->fields++;
+    unused->name_bytes += name_length;
+    unused->value_bytes += value_length;
+}
+
+static inline void stream_receiver_parse_user_agent(
+    const char *user_agent, char **program_name, char **program_version)
+{
+    *program_name = NULL;
+    *program_version = NULL;
+
+    if(!user_agent || !*user_agent)
+        return;
+
+    const char *separator = strchr(user_agent, '/');
+    size_t name_length = separator ? (size_t)(separator - user_agent) : strlen(user_agent);
+    *program_name = strndupz(user_agent, MIN(name_length, (size_t)STREAM_RECEIVER_METADATA_MAX_LENGTH));
+
+    if(separator && separator[1])
+        *program_version = strndupz(separator + 1, STREAM_RECEIVER_METADATA_MAX_LENGTH);
 }
 
 struct parser;

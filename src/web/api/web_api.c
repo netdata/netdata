@@ -102,7 +102,7 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
 
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "Unsupported API command: ");
-    buffer_strcat_htmlescape(w->response.data, url_path_endpoint);
+    web_client_response_append_request_value(w->response.data, url_path_endpoint);
     return HTTP_RESP_NOT_FOUND;
 }
 

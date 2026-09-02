@@ -162,6 +162,7 @@ void web_client_set_conn_webrtc(struct web_client *w);
 
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
+#define NETDATA_WEB_RESPONSE_REQUEST_VALUE_MAX_SIZE 1024
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 #define NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE (64 * 1024)
@@ -208,6 +209,7 @@ struct web_client {
     bool request_too_large;
     bool response_data_is_response;
     size_t response_data_preserved_size;
+    size_t response_data_request_capacity;
     bool registry_person_guid_present;
     char registry_person_guid[UUID_STR_LEN];
 
@@ -283,6 +285,7 @@ ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);
 ssize_t web_client_receive_available(struct web_client *w);
 void web_client_prepare_response_data(struct web_client *w);
+void web_client_response_append_request_value(BUFFER *wb, const char *value);
 
 void web_client_process_request_from_web_server(struct web_client *w);
 void web_client_request_done(struct web_client *w);

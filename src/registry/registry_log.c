@@ -122,7 +122,8 @@ ssize_t registry_log_load(void) {
                     break;
 
                 default:
-                    netdata_log_error("Registry: ignoring line %zd of filename '%s': %s.", line, registry.log_filename, s);
+                    netdata_log_error("Registry: ignoring line %zd of filename '%s' (line_bytes=%zu)",
+                                      line, registry.log_filename, len);
                     break;
             }
         }

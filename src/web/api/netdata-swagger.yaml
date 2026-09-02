@@ -6274,7 +6274,7 @@ paths:
 
         **Connection Configuration:**
         - Maximum negotiated WebRTC transport message size: 5 MiB (local)
-        - API request messages larger than 1,048,576 bytes are rejected with 413 Payload Too Large
+        - After connection establishment, WebRTC data-channel API request messages larger than 1,048,576 bytes are rejected with 413 Payload Too Large
         - ICE transport policy: All (both UDP and TCP)
         - Automatic ICE candidate gathering
         - Support for STUN/TURN servers

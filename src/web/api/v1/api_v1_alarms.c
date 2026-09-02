@@ -133,7 +133,7 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
     RRDSET *st = rrdset_acquired_to_rrdset(rsa);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
-        buffer_strcat_htmlescape(w->response.data, chart);
+        web_client_response_append_request_value(w->response.data, chart);
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
     }

@@ -15,6 +15,23 @@ const char *web_x_frame_options = NULL;
 
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 
+void web_client_response_append_request_value(BUFFER *wb, const char *value) {
+    if(!value)
+        return;
+
+    size_t length = strlen(value);
+    if(length <= NETDATA_WEB_RESPONSE_REQUEST_VALUE_MAX_SIZE) {
+        buffer_strcat_htmlescape(wb, value);
+        return;
+    }
+
+    char prefix[NETDATA_WEB_RESPONSE_REQUEST_VALUE_MAX_SIZE + 1];
+    memcpy(prefix, value, NETDATA_WEB_RESPONSE_REQUEST_VALUE_MAX_SIZE);
+    prefix[NETDATA_WEB_RESPONSE_REQUEST_VALUE_MAX_SIZE] = '\0';
+    buffer_strcat_htmlescape(wb, prefix);
+    buffer_sprintf(wb, "... [truncated, original_length=%zu]", length);
+}
+
 void web_client_set_conn_tcp(struct web_client *w) {
     web_client_flags_clear_conn(w);
     web_client_flag_set(w, WEB_CLIENT_FLAG_CONN_TCP);
@@ -126,28 +143,39 @@ static inline void web_client_reset_or_recreate_buffer(
         buffer_reset(*wb);
 }
 
-void web_client_prepare_response_data(struct web_client *w) {
-    if(w->response.data->size > w->response_data_preserved_size) {
-        buffer_free(w->response.data);
-        w->response.data = buffer_create(w->response_data_preserved_size, w->statistics.memory_accounting);
-    }
-    else
-        buffer_reset(w->response.data);
+static inline BUFFER *web_client_create_preserved_response_data(struct web_client *w) {
+    internal_fatal(!w->response_data_preserved_size, "WEB: preserved response buffer size cannot be zero");
 
+    // BUFFER.size includes the terminator that buffer_create() adds.
+    return buffer_create(w->response_data_preserved_size - 1, w->statistics.memory_accounting);
+}
+
+void web_client_prepare_response_data(struct web_client *w) {
+    if(!w->response_data_is_response)
+        w->response_data_request_capacity =
+            w->response.data->size > w->response_data_preserved_size ? w->response.data->size : 0;
+
+    buffer_reset(w->response.data);
     w->response_data_is_response = true;
 }
 
-static inline void web_client_reset_response_data(struct web_client *w) {
+static inline void web_client_reset_response_data(struct web_client *w, bool for_cache) {
     if(w->response_data_is_response) {
-        w->response_data_preserved_size = MAX(w->response_data_preserved_size, w->response.data->size);
-        buffer_reset(w->response.data);
+        if(!w->response_data_request_capacity || w->response.data->size > w->response_data_request_capacity)
+            w->response_data_preserved_size = MAX(w->response_data_preserved_size, w->response.data->size);
+        else if(w->response.data->len >= w->response_data_preserved_size - 1)
+            w->response_data_preserved_size = w->response.data->len + 2;
     }
-    else if(w->response.data->size > w->response_data_preserved_size) {
+
+    buffer_reset(w->response.data);
+
+    if(for_cache && w->response.data->size > w->response_data_preserved_size) {
         buffer_free(w->response.data);
-        w->response.data = buffer_create(w->response_data_preserved_size, w->statistics.memory_accounting);
+        w->response.data = web_client_create_preserved_response_data(w);
     }
-    else
-        buffer_reset(w->response.data);
+
+    w->response_data_is_response = false;
+    w->response_data_request_capacity = 0;
 }
 
 typedef enum {
@@ -186,7 +214,7 @@ static void web_client_reset_allocations(struct web_client *w, WEB_CLIENT_ALLOCA
         w->payload = NULL;
     }
     else {
-        // Oversized request-derived allocations should not remain attached to a keep-alive or cached client.
+        // Auxiliary request-derived allocations should not remain attached to a keep-alive or cached client.
 
         w->registry_person_guid_present = false;
         w->registry_person_guid[0] = '\0';
@@ -216,10 +244,11 @@ static void web_client_reset_allocations(struct web_client *w, WEB_CLIENT_ALLOCA
                                             NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
                                             NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
                                             w->statistics.memory_accounting);
-        web_client_reset_response_data(w);
+        web_client_reset_response_data(w, mode == WEB_CLIENT_ALLOCATIONS_FOR_CACHE);
 
         if(w->payload) {
-            if(w->payload->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
+            if(mode == WEB_CLIENT_ALLOCATIONS_FOR_CACHE &&
+               w->payload->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
                 buffer_free(w->payload);
                 w->payload = NULL;
             }
@@ -561,20 +590,22 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     char *s;
     for(s = filename; *s ;s++) {
         if( !isalnum((uint8_t)*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
-            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
+            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File is not acceptable (filename_bytes=%zu).",
+                              w->id, strlen(filename));
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
+            web_client_response_append_request_value(w->response.data, filename);
             return HTTP_RESP_BAD_REQUEST;
         }
     }
 
     // if the filename contains a double dot refuse to serve it
     if(strstr(filename, "..") != 0) {
-        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File is not acceptable (filename_bytes=%zu).",
+                          w->id, strlen(filename));
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "Relative filenames are not supported: ");
-        buffer_strcat_htmlescape(w->response.data, filename);
+        web_client_response_append_request_value(w->response.data, filename);
         return HTTP_RESP_BAD_REQUEST;
     }
 
@@ -585,7 +616,7 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(!find_filename_to_serve(filename, web_filename, FILENAME_MAX, &statbuf, w, &is_dir)) {
         w->response.data->content_type = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-        buffer_strcat_htmlescape(w->response.data, filename);
+        web_client_response_append_request_value(w->response.data, filename);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -666,14 +697,14 @@ static int web_server_static_file(struct web_client *w, char *filename) {
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
+            web_client_response_append_request_value(w->response.data, filename);
             return HTTP_RESP_REDIR_TEMP;
         }
         else {
             netdata_log_error("%llu: Cannot open file '%s'.", w->id, web_filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
-            buffer_strcat_htmlescape(w->response.data, filename);
+            web_client_response_append_request_value(w->response.data, filename);
             return HTTP_RESP_NOT_FOUND;
         }
     }
@@ -744,7 +775,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             buffer_flush(w->response.data);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Unsupported API version: ");
-            buffer_strcat_htmlescape(w->response.data, tok);
+            web_client_response_append_request_value(w->response.data, tok);
             return HTTP_RESP_NOT_FOUND;
         }
     }
@@ -990,9 +1021,120 @@ static HTTP_VALIDATION web_client_request_complete_and_extract_payload(
     return HTTP_VALIDATION_OK;
 }
 
+typedef enum {
+    WEB_CLIENT_PATH_TOKEN_UNKNOWN,
+    WEB_CLIENT_PATH_TOKEN_API,
+    WEB_CLIENT_PATH_TOKEN_HOST,
+    WEB_CLIENT_PATH_TOKEN_NODE,
+    WEB_CLIENT_PATH_TOKEN_V0,
+    WEB_CLIENT_PATH_TOKEN_V1,
+    WEB_CLIENT_PATH_TOKEN_V2,
+    WEB_CLIENT_PATH_TOKEN_V3,
+} WEB_CLIENT_PATH_TOKEN;
+
+static bool web_client_path_starts_with_token(const char *path, const char *expected, size_t expected_length) {
+    size_t i = 0;
+    while(i < expected_length && path[i] && path[i] == expected[i])
+        i++;
+
+    return i == expected_length && (path[i] == '/' || path[i] == '\0');
+}
+
+static WEB_CLIENT_PATH_TOKEN web_client_path_next_known_token(const char **path) {
+    const char *cursor = *path;
+    while(*cursor == '/')
+        cursor++;
+
+    if(!*cursor)
+        return WEB_CLIENT_PATH_TOKEN_UNKNOWN;
+
+#define WEB_CLIENT_MATCH_PATH_TOKEN(name, text) \
+    if(web_client_path_starts_with_token(cursor, text, sizeof(text) - 1)) { \
+        cursor += sizeof(text) - 1; \
+        if(*cursor == '/') \
+            cursor++; \
+        *path = cursor; \
+        return WEB_CLIENT_PATH_TOKEN_##name; \
+    }
+
+    WEB_CLIENT_MATCH_PATH_TOKEN(API, "api")
+    WEB_CLIENT_MATCH_PATH_TOKEN(HOST, "host")
+    WEB_CLIENT_MATCH_PATH_TOKEN(NODE, "node")
+    WEB_CLIENT_MATCH_PATH_TOKEN(V0, "v0")
+    WEB_CLIENT_MATCH_PATH_TOKEN(V1, "v1")
+    WEB_CLIENT_MATCH_PATH_TOKEN(V2, "v2")
+    WEB_CLIENT_MATCH_PATH_TOKEN(V3, "v3")
+
+#undef WEB_CLIENT_MATCH_PATH_TOKEN
+
+    return WEB_CLIENT_PATH_TOKEN_UNKNOWN;
+}
+
+static bool web_client_path_skip_token(const char **path) {
+    const char *cursor = *path;
+    while(*cursor == '/')
+        cursor++;
+
+    if(!*cursor)
+        return false;
+
+    while(*cursor && *cursor != '/')
+        cursor++;
+
+    if(*cursor == '/')
+        cursor++;
+
+    *path = cursor;
+    return true;
+}
+
+static inline bool web_client_path_is_exact_token(const char *path, const char *expected, size_t expected_length) {
+    size_t i = 0;
+    while(i < expected_length && path[i] && path[i] == expected[i])
+        i++;
+
+    return i == expected_length && path[i] == '\0';
+}
+
+static bool web_client_path_is_registry(const char *path) {
+    bool dashboard_version_seen = false;
+
+    while(true) {
+        WEB_CLIENT_PATH_TOKEN token = web_client_path_next_known_token(&path);
+        if(token == WEB_CLIENT_PATH_TOKEN_V0 || token == WEB_CLIENT_PATH_TOKEN_V1 ||
+           token == WEB_CLIENT_PATH_TOKEN_V2 || token == WEB_CLIENT_PATH_TOKEN_V3) {
+            if(dashboard_version_seen)
+                return false;
+
+            dashboard_version_seen = true;
+            continue;
+        }
+
+        if(token == WEB_CLIENT_PATH_TOKEN_HOST || token == WEB_CLIENT_PATH_TOKEN_NODE) {
+            if(!web_client_path_skip_token(&path))
+                return false;
+
+            continue;
+        }
+
+        if(token != WEB_CLIENT_PATH_TOKEN_API)
+            return false;
+
+        break;
+    }
+
+    if(web_client_path_next_known_token(&path) != WEB_CLIENT_PATH_TOKEN_V1)
+        return false;
+
+    return web_client_path_is_exact_token(path, "registry", sizeof("registry") - 1);
+}
+
 static inline void web_client_extract_registry_person_guid(struct web_client *w, const char *request) {
     w->registry_person_guid_present = false;
     w->registry_person_guid[0] = '\0';
+
+    if(!web_client_path_is_registry(buffer_tostring(w->url_path_decoded)))
+        return;
 
     const char *cookie = strstr(request, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie) {
@@ -1437,7 +1579,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_TEXT_HTML;
     buffer_strcat(w->response.data, "This netdata does not maintain a database for host: ");
-    buffer_strcat_htmlescape(w->response.data, tok?tok:"");
+    web_client_response_append_request_value(w->response.data, tok ? tok : "");
     return HTTP_RESP_NOT_FOUND;
 }
 
@@ -1587,7 +1729,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 if(!st) {
                     w->response.data->content_type = CT_TEXT_HTML;
                     buffer_strcat(w->response.data, "Chart is not found: ");
-                    buffer_strcat_htmlescape(w->response.data, tok);
+                    web_client_response_append_request_value(w->response.data, tok);
                     netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Requested RRD data is not found.", w->id);
                     return HTTP_RESP_NOT_FOUND;
                 }
@@ -1599,7 +1741,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
                 w->response.data->content_type = CT_TEXT_HTML;
                 buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
-                buffer_strcat_htmlescape(w->response.data, tok);
+                web_client_response_append_request_value(w->response.data, tok);
                 netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Requested RRD data debug is %s.", w->id,
                                   rrdset_flag_check(st, RRDSET_FLAG_DEBUG) ? "enabled" : "disabled");
                 return HTTP_RESP_OK;
@@ -2864,6 +3006,24 @@ int web_client_request_unittest(void) {
        strcmp(w->registry_person_guid, registry_guid))
         errors++;
 
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /api/v1//registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || w->registry_person_guid_present ||
+       w->registry_person_guid[0])
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /api//v1/registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
+        errors++;
+
     web_client_prepare_response_data(w);
     if(buffer_strlen(w->response.data) || !w->registry_person_guid_present ||
        strcmp(w->registry_person_guid, registry_guid))
@@ -2883,6 +3043,51 @@ int web_client_request_unittest(void) {
     web_client_prepare_response_data(w);
     if(buffer_strlen(w->response.data) || !w->registry_person_guid_present ||
        w->registry_person_guid[0])
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /api/v1/info HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || w->registry_person_guid_present ||
+       w->registry_person_guid[0])
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /node/11111111-2222-3333-4444-555555555555/api/v1/registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /v3/api/v1/registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /v3/node/11111111-2222-3333-4444-555555555555/api/v1/registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /node/11111111-2222-3333-4444-555555555555/v3/api/v1/registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
         errors++;
 
     w->header_parse_last_size = 11;
@@ -2922,7 +3127,25 @@ int web_client_request_unittest(void) {
        HTTP_VALIDATION_MALFORMED_URL)
         errors++;
 
-    // Incomplete request capacity is released when a client disconnects.
+    // A maximum request-derived error value stays within the initial response buffer.
+    web_client_reuse_from_cache(w);
+    size_t response_data_baseline = w->response_data_preserved_size;
+    char *maximum_error_value = mallocz(NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    memset(maximum_error_value, '&', NETDATA_WEB_REQUEST_MAX_SIZE);
+    maximum_error_value[NETDATA_WEB_REQUEST_MAX_SIZE] = '\0';
+    web_client_prepare_response_data(w);
+    buffer_strcat(w->response.data, "Unsupported API command: ");
+    web_client_response_append_request_value(w->response.data, maximum_error_value);
+    if(w->response.data->size != response_data_baseline ||
+       buffer_strlen(w->response.data) >= NETDATA_WEB_RESPONSE_INITIAL_SIZE ||
+       !strstr(buffer_tostring(w->response.data), "original_length=1048576"))
+        errors++;
+    web_client_request_done(w);
+    if(w->response_data_preserved_size != response_data_baseline || buffer_strlen(w->response.data))
+        errors++;
+    freez(maximum_error_value);
+
+    // Incomplete request capacity remains reusable only until the client is parked in the cache.
     web_client_reuse_from_cache(w);
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_MAX_SIZE);
     size_t large_request_size = w->response.data->size;
@@ -2930,8 +3153,96 @@ int web_client_request_unittest(void) {
     w->response.data->buffer[w->response.data->len] = '\0';
     w->response_data_is_response = false;
     web_client_request_done(w);
-    if(w->response.data->size >= large_request_size || buffer_strlen(w->response.data) ||
-       w->response_data_is_response)
+    if(w->response.data->size != large_request_size || buffer_strlen(w->response.data) ||
+       w->response_data_is_response || w->response_data_request_capacity)
+        errors++;
+    web_client_reset_allocations_for_cache(w);
+    if(w->response.data->size != response_data_baseline || w->response.data->size >= large_request_size ||
+       buffer_strlen(w->response.data) || w->response_data_is_response)
+        errors++;
+
+    // A live keep-alive client reuses request capacity without promoting it to cached response capacity.
+    web_client_reuse_from_cache(w);
+    size_t keepalive_request_size = 0;
+    if(!w->payload)
+        w->payload = buffer_create(0, w->statistics.memory_accounting);
+    BUFFER *keepalive_payload = w->payload;
+    buffer_need_bytes(keepalive_payload, NETDATA_WEB_REQUEST_MAX_SIZE);
+    size_t keepalive_payload_size = keepalive_payload->size;
+    for(size_t i = 0; i < 3; i++) {
+        buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_MAX_SIZE);
+        if(!keepalive_request_size)
+            keepalive_request_size = w->response.data->size;
+        w->response_data_is_response = false;
+        web_client_prepare_response_data(w);
+        buffer_strcat(w->response.data, "ok");
+        web_client_request_done(w);
+        if(w->response.data->size != keepalive_request_size ||
+           w->response_data_preserved_size != response_data_baseline || buffer_strlen(w->response.data) ||
+           w->payload != keepalive_payload || w->payload->size != keepalive_payload_size || buffer_strlen(w->payload))
+            errors++;
+    }
+    web_client_reset_allocations_for_cache(w);
+    if(w->response.data->size != response_data_baseline ||
+       w->response_data_preserved_size != response_data_baseline || buffer_strlen(w->response.data) || w->payload)
+        errors++;
+
+    // A response one byte below preserved BUFFER.size still needs one content byte and a terminator on replay.
+    web_client_reuse_from_cache(w);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_MAX_SIZE);
+    w->response_data_is_response = false;
+    web_client_prepare_response_data(w);
+    size_t near_capacity_response_length = response_data_baseline - 1;
+    memset(w->response.data->buffer, 'x', near_capacity_response_length);
+    w->response.data->len = near_capacity_response_length;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    web_client_request_done(w);
+    size_t near_capacity_response_size = near_capacity_response_length + 2;
+    if(w->response_data_preserved_size != near_capacity_response_size)
+        errors++;
+    web_client_reset_allocations_for_cache(w);
+    BUFFER *near_capacity_response_buffer = w->response.data;
+    if(w->response.data->size != near_capacity_response_size)
+        errors++;
+    web_client_prepare_response_data(w);
+    buffer_need_bytes(w->response.data, near_capacity_response_length + 1);
+    if(w->response.data != near_capacity_response_buffer || w->response.data->size != near_capacity_response_size)
+        errors++;
+    memset(w->response.data->buffer, 'x', near_capacity_response_length);
+    w->response.data->len = near_capacity_response_length;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    web_client_request_done(w);
+    if(w->response.data->size != near_capacity_response_size ||
+       w->response_data_preserved_size != near_capacity_response_size)
+        errors++;
+    response_data_baseline = near_capacity_response_size;
+
+    // A response that fits in request capacity preserves enough space to replay without another allocation.
+    web_client_reuse_from_cache(w);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_MAX_SIZE);
+    w->response_data_is_response = false;
+    web_client_prepare_response_data(w);
+    size_t fitted_response_length = response_data_baseline;
+    memset(w->response.data->buffer, 'x', fitted_response_length);
+    w->response.data->len = fitted_response_length;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    web_client_request_done(w);
+    size_t fitted_response_size = fitted_response_length + 2;
+    if(w->response_data_preserved_size != fitted_response_size)
+        errors++;
+    web_client_reset_allocations_for_cache(w);
+    BUFFER *fitted_response_buffer = w->response.data;
+    if(w->response.data->size != fitted_response_size)
+        errors++;
+    web_client_prepare_response_data(w);
+    buffer_need_bytes(w->response.data, fitted_response_length + 1);
+    if(w->response.data != fitted_response_buffer || w->response.data->size != fitted_response_size)
+        errors++;
+    memset(w->response.data->buffer, 'x', fitted_response_length);
+    w->response.data->len = fitted_response_length;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    web_client_request_done(w);
+    if(w->response.data->size != fitted_response_size || w->response_data_preserved_size != fitted_response_size)
         errors++;
 
     // Active keep-alive clients reuse large response capacity.
@@ -2950,6 +3261,7 @@ int web_client_request_unittest(void) {
        w->url_as_received->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
         errors++;
 
+    web_client_prepare_response_data(w);
     buffer_strcat(w->response.data, "ok");
     web_client_request_done(w);
     if(w->response.data->size != large_response_size || buffer_strlen(w->response.data))

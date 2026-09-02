@@ -199,7 +199,7 @@ static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *d __maybe_unused) {
     REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
 
-    netdata_log_debug(D_REGISTRY, "Registry: registry_person_del('%s'): deleting person", p->guid);
+    netdata_log_debug(D_REGISTRY, "Registry: deleting person (guid_bytes=%zu)", strlen(p->guid));
 
     while(p->person_urls)
         registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls);
@@ -207,7 +207,7 @@ static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unus
     //debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
     //dictionary_del(registry.persons, p->guid);
 
-    netdata_log_debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
+    netdata_log_debug(D_REGISTRY, "Registry: freeing person (guid_bytes=%zu)", strlen(p->guid));
     aral_freez(registry.persons_aral, p);
 
     return 1;

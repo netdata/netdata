@@ -34,31 +34,41 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, STR
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
         ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
-        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
         ND_LOG_FIELD_I64(NDF_RESPONSE_CODE, stream_handshake_error_to_response_code(reason)),
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_ACCESS, priority, "api_key:'%s' machine_guid:'%s' node:'%s' msg:'%s' reason:'%s'"
-           , (rpt->key && *rpt->key)? rpt->key : ""
-           , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
-           , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
-           , msg
-           , stream_handshake_error_to_string(reason));
+    size_t key_length = rpt->key ? strlen(rpt->key) : 0;
+    size_t machine_guid_length = rpt->machine_guid ? strlen(rpt->machine_guid) : 0;
+    size_t hostname_length = rpt->hostname ? strlen(rpt->hostname) : 0;
 
-    nd_log(NDLS_DAEMON, priority, "STREAM RCV '%s' [from [%s]:%s]: %s %s%s%s"
-           , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
-           , rpt->remote_ip, rpt->remote_port
-           , msg
-           , reason != STREAM_HANDSHAKE_NEVER?" (":""
-           , stream_handshake_error_to_string(reason)
-           , reason != STREAM_HANDSHAKE_NEVER?")":""
-    );
+    nd_log(NDLS_ACCESS, priority,
+           "api_key_bytes:%zu machine_guid_bytes:%zu node_bytes:%zu msg:'%s' reason:'%s'",
+           key_length, machine_guid_length, hostname_length, msg, stream_handshake_error_to_string(reason));
+
+    nd_log(NDLS_DAEMON, priority,
+           "STREAM RCV [from [%s]:%s]: %s%s%s%s (api_key_bytes=%zu, machine_guid_bytes=%zu, node_bytes=%zu)",
+           rpt->remote_ip, rpt->remote_port, msg, reason != STREAM_HANDSHAKE_NEVER ? " (" : "",
+           stream_handshake_error_to_string(reason), reason != STREAM_HANDSHAKE_NEVER ? ")" : "",
+           key_length, machine_guid_length, hostname_length);
 
     if(reason < 0)
         pulse_parent_receiver_rejected(reason);
+}
+
+static void stream_receiver_log_unused_parameters(
+    struct receiver_state *rpt, const struct stream_receiver_unused_metadata *unused)
+{
+    if(!unused->fields)
+        return;
+
+    nd_log_daemon(NDLP_NOTICE,
+                  "STREAM RCV [from [%s]:%s]: request has unused parameters "
+                  "(node_bytes=%zu, fields=%zu, name_bytes=%zu, value_bytes=%zu).",
+                  rpt->remote_ip, rpt->remote_port, rpt->hostname ? strlen(rpt->hostname) : 0,
+                  unused->fields, unused->name_bytes, unused->value_bytes);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -256,12 +266,12 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    netdata_log_info("STREAM RCV '%s' [from [%s]:%s]: "
-                     "client willing to stream metrics for host '%s' with machine_guid '%s': "
+    netdata_log_info("STREAM RCV [from [%s]:%s]: "
+                     "client willing to stream metrics (request_node_bytes=%zu, host_node_bytes=%zu, "
+                     "machine_guid_bytes=%zu): "
                      "update every = %d, history = %d, memory mode = %s, health %s,%s"
-                     , rpt->hostname
-                     , rpt->remote_ip, rpt->remote_port, rrdhost_hostname(rpt->host)
-                         , rpt->host->machine_guid
+                     , rpt->remote_ip, rpt->remote_port, strlen(rpt->hostname), strlen(rrdhost_hostname(rpt->host))
+                         , strlen(rpt->host->machine_guid)
                      , rpt->host->rrd_update_every
                      , rpt->host->rrd_history_entries
                      , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
@@ -273,7 +283,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
     stream_select_receiver_compression_algorithm(rpt);
 
     {
-        // netdata_log_info("STREAM RCV %s [from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         char initial_response[HTTP_HEADER_SIZE];
         if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
             log_receiver_capabilities(rpt);
@@ -299,16 +308,16 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             // remove the non-blocking flag from the socket
             if(sock_setnonblock(rpt->sock.fd, false) != 0)
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot remove the non-blocking flag from socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+                       "STREAM RCV [from [%s]:%s]: cannot remove the non-blocking flag from socket %d (node_bytes=%zu)",
+                       rpt->remote_ip, rpt->remote_port, rpt->sock.fd, strlen(rrdhost_hostname(rpt->host)));
 
             struct timeval timeout;
             timeout.tv_sec = 600;
             timeout.tv_usec = 0;
             if (unlikely(setsockopt(rpt->sock.fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set timeout for socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
+                       "STREAM RCV [from [%s]:%s]: cannot set timeout for socket %d (node_bytes=%zu)",
+                       rpt->remote_ip, rpt->remote_port, rpt->sock.fd, strlen(rrdhost_hostname(rpt->host)));
 
             stream_receiver_reconcile_keepalive(rpt);
         }
@@ -358,6 +367,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     // parse the parameters and fill rpt and rpt->system_info
     bool invalid_hops = false;
+    bool oversized_metadata = false;
+    struct stream_receiver_unused_metadata unused_metadata = { 0 };
 
     while(decoded_query_string) {
         char *value = strsep_skip_consecutive_separators(&decoded_query_string, "&");
@@ -366,6 +377,24 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
+
+        size_t name_length = strlen(name);
+        size_t value_length = strlen(value);
+
+        if(name_length > STREAM_RECEIVER_METADATA_MAX_LENGTH) {
+            stream_receiver_unused_metadata_add(&unused_metadata, name_length, value_length);
+            continue;
+        }
+
+        bool value_oversized = value_length > STREAM_RECEIVER_METADATA_MAX_LENGTH;
+        char bounded_value[STREAM_RECEIVER_METADATA_MAX_LENGTH + 1];
+        if(value_oversized) {
+            memcpy(bounded_value, value, STREAM_RECEIVER_METADATA_MAX_LENGTH);
+            bounded_value[STREAM_RECEIVER_METADATA_MAX_LENGTH] = '\0';
+            value = bounded_value;
+        }
+
+        bool recognized = true;
 
         if(!strcmp(name, "key") && !rpt->key)
             rpt->key = strdupz(value);
@@ -441,32 +470,35 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && (rpt->capabilities & STREAM_CAP_INVALID))
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
-            if (unlikely(rrdhost_system_info_set_by_name(rpt->system_info, name, value))) {
-                nd_log_daemon(NDLP_NOTICE, "STREAM RCV '%s' [from [%s]:%s]: "
-                                           "request has parameter '%s' = '%s', which is not used."
-                              , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
-                              , rpt->remote_ip, rpt->remote_port, name, value);
-            }
+            recognized = !rrdhost_system_info_set_by_name(rpt->system_info, name, value);
+            if(unlikely(!recognized))
+                stream_receiver_unused_metadata_add(&unused_metadata, name_length, value_length);
         }
+
+        if(stream_receiver_metadata_should_reject(recognized, name_length, value_length))
+            oversized_metadata = true;
     }
+
+    stream_receiver_log_unused_parameters(rpt, &unused_metadata);
 
     if (rpt->capabilities & STREAM_CAP_INVALID)
         // no version is supplied, assume version 0;
         rpt->capabilities = convert_stream_version_to_capabilities(0, NULL, false);
 
     // find the program name and version
-    if(w->user_agent && w->user_agent[0]) {
-        char *t = strchr(w->user_agent, '/');
-        if(t && *t) {
-            *t = '\0';
-            t++;
-        }
-
-        rpt->program_name = strdupz(w->user_agent);
-        if(t && *t) rpt->program_version = strdupz(t);
-    }
+    stream_receiver_parse_user_agent(w->user_agent, &rpt->program_name, &rpt->program_version);
 
     // check if we should accept this connection
+
+    if(oversized_metadata) {
+        stream_receiver_log_status(
+            rpt,
+            "rejecting streaming connection; request metadata exceeds the per-field size limit",
+            STREAM_HANDSHAKE_PARENT_DENIED_ACCESS, NDLP_WARNING);
+
+        stream_receiver_free(rpt);
+        return stream_receiver_response_permission_denied(w);
+    }
 
     if(invalid_hops) {
         stream_receiver_log_status(
@@ -613,8 +645,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if(nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60) !=
             (ssize_t)strlen(initial_response)) {
 
-            nd_log_daemon(NDLP_ERR, "STREAM RCV '%s' [from [%s]:%s]: failed to reply.",
-                          rpt->hostname, rpt->remote_ip, rpt->remote_port);
+            nd_log_daemon(NDLP_ERR, "STREAM RCV [from [%s]:%s]: failed to reply (node_bytes=%zu).",
+                          rpt->remote_ip, rpt->remote_port, strlen(rpt->hostname));
         }
 
         stream_receiver_free(rpt);
@@ -644,8 +676,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
             if(nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60) !=
                 (ssize_t)strlen(initial_response)) {
-                nd_log_daemon(NDLP_ERR, "STREAM RCV '%s' [from [%s]:%s]: failed to reply.",
-                              rpt->hostname, rpt->remote_ip, rpt->remote_port);
+                nd_log_daemon(NDLP_ERR, "STREAM RCV [from [%s]:%s]: failed to reply (node_bytes=%zu).",
+                              rpt->remote_ip, rpt->remote_port, strlen(rpt->hostname));
             }
 
             stream_receiver_free(rpt);
@@ -732,10 +764,10 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             // we can proceed with this connection
             receiver_stale = false;
 
-            nd_log_daemon(NDLP_NOTICE, "STREAM RCV '%s' [from [%s]:%s]: "
-                                       "stopped previous stale receiver to accept this one."
-                          , rpt->hostname
-                          , rpt->remote_ip, rpt->remote_port);
+            nd_log_daemon(NDLP_NOTICE,
+                          "STREAM RCV [from [%s]:%s]: stopped previous stale receiver to accept this one "
+                          "(node_bytes=%zu).",
+                          rpt->remote_ip, rpt->remote_port, strlen(rpt->hostname));
         }
 
         if (receiver_working || receiver_stale) {
