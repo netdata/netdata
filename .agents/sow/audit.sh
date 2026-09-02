@@ -184,6 +184,7 @@ if [ -d .agents/sow/q/current ]; then
         ;;
     esac
 
+    case "$sow" in *-umbrella.md) continue ;; esac   # umbrellas hold no gate/validation by design
     for needle in \
       "## Pre-Implementation Gate" \
       "Sensitive data handling plan:" \

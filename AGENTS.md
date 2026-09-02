@@ -34,7 +34,7 @@ Roles:
 
 - **User**: purpose, scope decisions, design forks, risk acceptance, destructive approvals, final product judgment.
 - **Assistant**: investigation, evidence, implementation, tests or equivalent validation, reviews, documentation,
-  memory updates, concise reporting.
+  memory updates, concise reporting. The assistant proposes and investigates; the user approves.
 
 Communication:
 
@@ -42,8 +42,8 @@ Communication:
   questions are informed and to the point.
 - Never write walls of text unless asked. Be simple, direct, lean, ordered by importance: give the full picture
   first, start from the high level, let the user ask for details.
-- Never agree with the user when the facts contradict their understanding. Always state the risks and implications
-  of their decisions. You are helpful when you reveal the truth accurately, not when you agree.
+- Never agree with the user when the facts contradict their understanding. You MUST always describe the risks and
+  implications of their decisions clearly. You are helpful when you reveal the truth accurately, not when you agree.
 - Ask the user only for irreducible product, design, or risk decisions.
 
 When a user decision is needed:
@@ -65,7 +65,7 @@ removes debt beats a smaller one that preserves it.
 - **Trivial vs non-trivial work**: defined under "When A SOW Is Required". Trivial work has no SOW and is exempt from
   the record-the-target, disclosure, and reference-search rules below; the clean-end-state preference still applies.
 - **Approved scope**: the union of (a) the issue or user request, (b) the SOW Purpose and Acceptance Criteria as
-  approved by the user, and (c) the migration/contract surface they imply.
+  recorded in the SOW, and (c) the migration/contract surface they imply.
 - **Coupled item**: code, config, docs, or tests the current change makes redundant or leaves inconsistent (a
   replaced path, its callers, its tests).
 - **Independent work**: new work is genuinely independent only if ALL hold: (a) the approved clean end state is
@@ -76,9 +76,10 @@ removes debt beats a smaller one that preserves it.
 - **Approval bar** (used by every gate): the user explicitly accepts a trade-off, goal, or plan that you stated in
   your own words (what stays redundant or partial, and why). A bare "ok" or "sounds good" to a one-sided pitch is
   not approval.
-- **Mandatory pause**: present the evidence, STOP, and obtain approval (Approval bar) before proceeding, before
-  requesting non-draft review, and before marking the work complete. Triggered when the delivered state would fall
-  short of the recorded target for any reason other than approved staged delivery, and by any user-owned fork.
+- **Mandatory pause**: you MUST present the evidence, STOP, and obtain explicit user approval (Approval bar) before
+  proceeding, before requesting non-draft review, and before marking the work complete. It is triggered whenever the
+  delivered state would fall short of the recorded target for any reason other than approved staged delivery, and by
+  any user-owned fork.
 - **Default on doubt**: if unsure whether something is in scope, trivial, coupled, or a user-owned fork, treat it as
   in-scope, non-trivial, coupled, user-owned, and ask.
 
@@ -94,7 +95,8 @@ removes debt beats a smaller one that preserves it.
   target. Record a provisional target plus the open question and resolve it with the user first.
 - Disclose exclusions: the recorded target MUST list (i) what you remove as redundant and (ii) every coupled item
   you treat as NOT part of this clean end state, each with its reason and the scope source it rests on. Excluding
-  an in-scope or coupled item without recording it is silent scope-narrowing and is prohibited.
+  an in-scope or coupled item without recording it is silent scope-narrowing and is prohibited. The list lets a
+  reviewer or the next agent check your exclusions against their sources.
 - You are not the scope authority:
   - Coupled cleanup is in scope. You MUST NOT reclassify in-scope or coupled work as "independent" or "out of
     scope" to avoid it, and you MUST NOT silently drop it.
@@ -102,7 +104,6 @@ removes debt beats a smaller one that preserves it.
     and disclose it rather than stopping to ask.
   - Pause for the user only when inclusion would expand the blast radius, change a user-visible contract, or the
     boundary is itself a genuine scope fork.
-  - If it is unclear whether work is in scope, treat it as in-scope and raise it. Never silently exclude it.
 - Touch the mess you touch: when code you modify already contains adjacent duplication, dead code, or a clear
   pre-existing defect, you SHOULD clean it as part of this work rather than build on it, provided the cleanup is
   low-risk and confined to the code you are already modifying. Cleanup reaching into unrelated code is independent
@@ -153,12 +154,13 @@ removes debt beats a smaller one that preserves it.
   goal unilaterally.
 - End state first: you MUST establish the desired end state, including its acceptance criteria, before planning
   the steps. The goal drives the work, not a first diff. If you cannot state the end state, keep investigating;
-  do not start against an unknown target. If the end state is a user-owned design decision, record a provisional
-  target plus the open question and resolve it first.
+  do not start against an unknown target. A user-owned design decision follows the open-design-decision rule under
+  "Clean End State Over Less Churn".
 - Decompose: split the work into ordered steps, each with its own clean end state and acceptance criteria, each
   building on the previous one. A single coherent step is valid when the work is atomic; do not invent artificial
   sub-steps.
-- Large or vague deliverables: keep refining until every step is clear. Do not start while steps are still unclear.
+- Large or vague deliverables: keep refining the plan until every step has a clean end state and acceptance
+  criteria. Do not start implementation while steps are still unclear.
 - Reachability: the plan MUST reach the desired end state through its steps or produce evidence that it is not
   achievable. An unachievable goal is a pause condition for a user decision, not a silent partial result.
 - Approval is for goal-decisions, not work categories:
@@ -174,7 +176,6 @@ removes debt beats a smaller one that preserves it.
       progress rule ("SOW Lifecycle").
     - A collector's Function surface, vnode/host-scope design, and new public config options remain user-owned
       forks.
-  - When it is unclear whether a real fork exists, treat it as user-owned and seek approval.
 - Approval persists; re-check on resume: before continuing an `in-progress` or `paused` SOW you did not personally
   take through this gate (takeover, handoff), you MUST confirm the SOW records explicit approval of the current
   goal and plan. If it does not, or the plan changed materially since, treat the SOW as `planning` and re-obtain
@@ -182,12 +183,10 @@ removes debt beats a smaller one that preserves it.
 
 ### Scope Discipline At Every Step
 
-- Drift is checked at every Re-evaluation checkpoint, not only diff-vs-target.
 - New work that fails the Independent work definition, or that you are unsure about, is coupled: handle it under
   "Clean End State Over Less Churn" (do the low-risk part and disclose it; pause only for a genuine fork).
 - Genuinely independent work: do NOT silently bundle it. Submit it as a separate PR first and rebase after it
-  merges, or track it as a GitHub issue per Followup Discipline. Do NOT fold it into this SOW's steps; staged
-  stages must decompose one clean end state.
+  merges, or track it as a GitHub issue per Followup Discipline. Do NOT fold it into this SOW's steps.
 
 ## SOW System
 
@@ -201,9 +200,9 @@ global scripts. Use this `AGENTS.md`, the local SOW, project-local specs, and pr
 
 SOWs and specs are local-only working memory, never committed:
 
-- SOW working files live under `.agents/sow/q/**`, specs under `.agents/sow/specs/**`. `.gitignore` ignores
-  `/.agents/sow/q` and `/.agents/sow/specs`; neither MUST ever be committed to any branch. Specs may be
-  re-introduced to git later, reorganized, as a deliberate decision; until then treat them as local memory.
+- SOW working files live under `.agents/sow/q/**`, specs under `.agents/sow/specs/**`. Both are gitignored
+  (`/.agents/sow/q`, `/.agents/sow/specs`) and MUST NOT be committed to any branch. Specs may be re-introduced to
+  git later, reorganized, as a deliberate decision; until then treat them as local memory.
 - Committed framework files: `.agents/sow/SOW.template.md`, `.agents/sow/audit.sh`, `.agents/sow/scan-sensitive.sh`,
   `.agents/sow/worktree-link.sh`.
 - Durable knowledge that must survive a SOW belongs in project skills, docs, code, and tests (and specs once
@@ -247,7 +246,7 @@ Create or reuse a SOW for non-trivial work:
 Trivial work needs no SOW: typo fixes; formatting-only changes; mechanical renames with no behavior change; simple
 low-risk search/replace (still grep the old token to confirm no call site is missed).
 
-When unsure, treat the work as non-trivial.
+Default on doubt applies: unsure means non-trivial.
 
 ### Required First Checks
 
@@ -316,7 +315,8 @@ Staged delivery uses one umbrella SOW plus one SOW per step (each step a mergeab
 - One SOW at a time applies to steps. The umbrella is never executed and does not count.
 
 ### Pre-Implementation Gate
- Implementation MUST NOT begin until the SOW's `## Pre-Implementation Gate` section records `Gate status: ready` and the
+
+Implementation MUST NOT begin until the SOW's `## Pre-Implementation Gate` section records `Gate status: ready` and the
 SOW's top-level `Status:` is `ready` or `in-progress`. The `Gate status:` line takes only `blocked` (gate incomplete),
 `ready`, or `needs-user-decision` (blocked on a user-owned fork); it is a different key from the SOW `Status:` so the
 two are never confused. Before changing implementation files, or before continuing an existing SOW that lacks the
@@ -499,8 +499,8 @@ files, and other docs written so future AI agents can execute repository rules c
 - No dense multi-rule paragraphs. A paragraph with several requirements, exceptions, or branches becomes bullets or
   a table.
 - Tables only for matrices or comparisons with short cells. Bullets for rules, workflows, checklists, exceptions.
-- Put requirement words (`MUST`, `MUST NOT`, `SHOULD`, `MAY`) next to the action they govern. Do not hide mandatory
-  behavior in explanatory prose.
+- Put RFC-style requirement words (`MUST`, `MUST NOT`, `SHOULD`, `MAY`) next to the action they govern. Do not hide
+  mandatory behavior in explanatory prose.
 - Prefer labeled bullets for operational guardrails (`Target`, `Exception handling`, `Validation`, `Failure mode`).
   A guardrail with several requirements is a labeled parent bullet with one requirement per sub-bullet.
 - One durable idea per bullet. When a bullet needs several sentences, the first states the rule; the rest give
@@ -541,8 +541,7 @@ the team right now belong in project skills, docs, code, and tests, not in specs
 
 Project skills are memory of HOW to work here.
 
-- Runtime input skills SHOULD live under `.agents/skills/*/SKILL.md`. Before non-trivial work, inspect their
-  descriptions and load every skill whose trigger matches.
+- Runtime input skills SHOULD live under `.agents/skills/*/SKILL.md`. Required First Checks loads the matching ones.
 - Output/reference skills may also exist under product documentation or generated skill directories. Do not rename,
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
@@ -585,7 +584,7 @@ Public skill convention (`docs/netdata-ai/skills/`):
   `pr-reviews`) stay under `.agents/skills/<name>/` with no public counterpart.
 
 Skills index (runtime input under `.agents/skills/`; each skill's frontmatter description is the authoritative
-trigger, the table is a pointer):
+trigger, this list is a pointer):
 
 - `project-writing-collectors`: authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C,
   PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions
@@ -660,8 +659,8 @@ copy; inspect before use and do not assume they are tracked project interfaces.
 
 - Compilers and libcs: gcc, clang, glibc, musl.
 - `libnetdata.h` includes everything in libnetdata (a couple of exceptions); do not include individual headers.
-- `z`-suffixed allocators (`mallocz`, `reallocz`, `callocz`, `strdupz`, ...) call `fatal()` on failure. `freez()`
-  accepts NULL.
+- `z`-suffixed allocators (`mallocz`, `reallocz`, `callocz`, `strdupz`, ...) call `fatal()` on failure, exiting the
+  process. `freez()` accepts NULL.
 - Reusable, generic, module-agnostic code goes to libnetdata.
 - Doubly linked lists use the `DOUBLE_LINKED_LIST_*` macros.
 - JSON: json-c for parsing, `buffer_json_*` for manual generation.
@@ -688,5 +687,5 @@ Skill output SHOULD default to `<repo-root>/.local/audits/<topic>/`, where `<top
 scripts: API tokens, session cookies, project keys. Never commit secrets; never hard-code tokens in scripts.
 
 - Setup: copy `<repo>/.env.template` to `<repo>/.env` and fill in the keys you need.
-- Reference: `<repo>/.agents/ENV.md` documents every key (what it is, where to find it, format, common mistakes,
-  which skills need it). When a script errors with `<KEY> is empty`, check it there.
+- Reference: `<repo>/.agents/ENV.md` is the single canonical guide to every key (what it is, where to find it, format,
+  common mistakes, which skills need it). When a script errors with `<KEY> is empty`, check it there.
