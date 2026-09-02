@@ -494,6 +494,20 @@ no_include: # Info for platforms not covered in CI
   - <<: *rhel
     version: "8.x"
 
+  - &almalinux
+    distro: almalinux
+    version: "10.x"
+    support_type: Core
+    notes: ''
+    packages:
+      arches:
+        - x86_64
+        - aarch64
+  - <<: *almalinux
+    version: "9.x"
+  - <<: *almalinux
+    version: "8.x"
+
   - &freebsd
     distro: freebsd
     version: 13-STABLE
