@@ -888,7 +888,14 @@
         "scope": { "type": "string", "enum": ["window", "selection"] },
         "grid": {
           "type": "object",
-          "required": ["bucket_start_s", "bucket_width_s", "duration_bins", "cells"],
+          "required": [
+            "bucket_start_s",
+            "bucket_width_s",
+            "duration_bins",
+            "cells",
+            "error_cells",
+            "duration_percentiles_ns"
+          ],
           "properties": {
             "bucket_start_s": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
             "bucket_width_s": { "type": "integer", "minimum": 1 },
