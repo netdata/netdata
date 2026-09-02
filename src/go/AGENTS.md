@@ -16,7 +16,7 @@ This file routes Go-specific work under `src/go/`. The repo-root `AGENTS.md` app
 | IBM.d work | `src/go/plugin/ibm.d/AGENTS.md` | Generator-driven workflow; go.d V2 layout rules MUST NOT be applied there. |
 | Function handlers | `src/go/plugin/framework/functions/README.md`, `src/go/tools/functions-validation/README.md` | Collector Functions SHOULD be isolated behind narrow dependencies. |
 | Topology payloads | `.agents/skills/project-create-topology/SKILL.md`, `.agents/skills/project-create-topology/topology-function-schema.md`, `src/go/pkg/topology/v1` | New producers MUST use the production `netdata.topology.v1` schema. |
-| Host scopes / vnodes | `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`, `src/go/plugin/go.d/collector/azure_monitor/` | Use host scopes when one job emits metrics for resources that SHOULD appear as separate Netdata nodes. |
+| Host scopes / vnodes | `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`, `src/go/plugin/go.d/collector/azure_monitor/` | One job emitting metrics for resources that SHOULD appear as separate Netdata nodes MUST use host scopes. |
 | Matchers/selectors | `src/go/pkg/matcher/README.md` | Prefer existing matcher APIs over custom selector grammars. |
 | Core framework changes | `src/go/plugin/framework/docs/changing-framework-code.md` and "Core Framework Change Gate" below | The applicable approval tier MUST be satisfied before implementation. |
 
@@ -33,8 +33,9 @@ This file routes Go-specific work under `src/go/`. The repo-root `AGENTS.md` app
   Framework Change Gate".
 - Functions: put Function code in a dedicated `<name>func/` package behind a narrow `Deps` interface declared in
   that package. The Function package MUST NOT import the collector package or hold `*Collector`.
-- Topology: use `netdata.topology.v1` with the Go producer model in `src/go/pkg/topology/v1` and validate payloads
-  against `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. New producers MUST NOT use legacy topology payloads.
+- Topology: producers MUST use `netdata.topology.v1` with the Go producer model in `src/go/pkg/topology/v1` and
+  MUST validate payloads against `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. New producers MUST NOT use legacy
+  topology payloads.
 - One job emitting metrics for multiple remote resources that SHOULD appear as separate Netdata nodes MUST use V2
   host scopes/vnodes.
 
@@ -50,8 +51,8 @@ This file routes Go-specific work under `src/go/`. The repo-root `AGENTS.md` app
 
 ## Core Framework Change Gate
 
-Shared Go framework code (`metrix`, `chartengine`, `charttpl`, the job runtime, `collectorapi`) runs in EVERY
-collector, most of it on the per-cycle hot path. Before changing it, read
+Shared Go framework code (`metrix`, `chartengine`, `charttpl`, the job runtime, `collectorapi`) is
+high-blast-radius: it runs in EVERY collector, most of it on the per-cycle hot path. Before changing it, read
 `src/go/plugin/framework/docs/changing-framework-code.md`, the canonical owner of the framework-change scope list,
 required design note, validation expectations, and artifact checks. Implementation MUST NOT begin until that guide's
 applicable approval tier is satisfied.
@@ -66,9 +67,6 @@ applicable approval tier is satisfied.
   idle past `expireAfterSuccessCycles + descriptorGraceCycles` is evicted and re-registers cleanly afterward. A
   consumer that caches per-name state across cycles MUST couple its lifetime to the optional
   `metrix.DescriptorRetention` accessor. See `src/go/pkg/metrix/README.md` ("Descriptor Lifecycle and Retention").
-- Batching: changes SHOULD stay atomic; split a growing collector or framework task into coherent batches before
-  review becomes difficult. Changes MUST NOT mix framework changes, collector migrations, and integration-doc
-  regeneration unless one coherent behavior change requires them.
 
 ## Evidence Before Complexity
 
@@ -91,13 +89,14 @@ a plausible future problem is not a requirement.
 
 ## Hot-Path And Benchmark Discipline
 
-metrix commit/collect, per-sample/per-write, and per-cycle code run for every collector on every cycle.
+metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths: they run for every collector on
+every cycle.
 
 - A hot-path change MUST include before/after `go test -bench` numbers (use `git stash` for the "before"
   baseline), not just "tests pass".
-- Allocation count is the gate: assert allocs stay within the intended envelope (a sparse commit stays ~O(touched),
-  never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline and never
-  record a personal name in the file.
+- Allocation count is the gate: assert allocs stay within the intended envelope (for example a sparse commit stays
+  ~O(touched), never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline
+  and never record a personal name in the file.
 - State the complexity envelope explicitly (for example "commit is O(live-series + touched + distinct-names)") and
   prove the change introduced no O(samples), O(retained), or O(n^2) regression.
 - Keep bench comments in sync with the code they measure, in the same change, with self-contained wording (no
@@ -114,10 +113,14 @@ which keeps wrapping tight and keyed struct literals readable:
    `go/format`).
 3. `goimports -w <paths>`: order imports.
 
-Conventions encoded: a signature, call, return, or composite literal stays on ONE line when it fits ~120 columns
-and wraps only when it does not; keyed struct literals of a named type go ONE field per line. `gofmt`/`goimports`
-cannot express these, so they are not CI-enforced; re-run the pipeline if code drifts. See
-`tools/expandstructs/README.md`.
+Conventions this encodes:
+
+- A signature, call, return, or composite literal stays on ONE line when it fits within ~120 columns; wrap only when
+  it does not.
+- Keyed struct literals of a named type go ONE field per line.
+
+`gofmt`/`goimports` cannot express these two rules, so they are not CI-enforced; re-run the pipeline if code drifts.
+See `tools/expandstructs/README.md`.
 
 ## Validation For Go Changes
 
@@ -137,3 +140,13 @@ cannot express these, so they are not CI-enforced; re-run the pipeline if code d
 - Before deleting Go code as unused, check every reference form: selector reads and writes, struct literals,
   constructor arguments, method values, interface satisfaction, reflection, build-tagged and platform files,
   generated code, and test-only injection. A call-site-only search is not proof of unreachability.
+
+## Batching
+
+- Changes SHOULD stay atomic. If a collector or framework task grows, split it into coherent batches before review
+  becomes difficult.
+- Every batch boundary is a Re-evaluation checkpoint (root `AGENTS.md`): you MUST re-evaluate clean end state and
+  scope there. If a separate framework fix, collector cleanup, or docs rewrite has become necessary, split it into
+  its own step or submit it independently before continuing.
+- Changes MUST NOT mix framework changes, collector migrations, and integration-doc regeneration unless one coherent
+  behavior change requires them.
