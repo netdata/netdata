@@ -25,6 +25,8 @@ Sub-state: <short current truth>
 
 Regresses (optional): PR #NNNNN
 
+Umbrella (optional, step SOWs only): SOW-YYYYMMDD-<family>-umbrella
+
 ### Assistant Understanding
 
 Facts:
@@ -128,6 +130,14 @@ Open decisions:
 
 1. <chunk, scope, risk, dependencies>
 2. <chunk, scope, risk, dependencies>
+
+## Steps
+
+Umbrella SOWs only (see "Umbrella And Step SOWs" in `AGENTS.md`); delete this section otherwise.
+
+| # | Step SOW | Status | PR |
+|---|---|---|---|
+| 01 | SOW-YYYYMMDD-<family>-01-<step>.md | planning | |
 
 ## Execution Log
 

@@ -43,7 +43,7 @@ die()  { printf >&2 "%s\n" "${RED}ERROR:${NC} $*"; exit 1; }
 
 SOW_DIR=".agents/sow"
 NON_QUEUE=" q specs "                       # dirs under .agents/sow/ that are NOT queues
-CANON_QUEUES="pending current done active"  # queues ensured to exist inside q/
+CANON_QUEUES="pending current done"  # queues ensured to exist inside q/
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git work tree"
 
