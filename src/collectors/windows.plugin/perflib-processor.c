@@ -302,6 +302,17 @@ int perflib_processor_unittest(void)
     return errors;
 }
 
+static bool processor_information_instance_is_per_numa_total(const char *instance_name)
+{
+    const char *separator = strrchr(instance_name, ',');
+    return separator && strcasecmp(separator + 1, "_Total") == 0;
+}
+
+static bool processor_information_instance_is_total(const char *instance_name)
+{
+    return strcasecmp(instance_name, "_Total") == 0 || processor_information_instance_is_per_numa_total(instance_name);
+}
+
 static bool processor_information_instance_to_cpu_id(const char *instance_name, int *cpu_id)
 {
     char *separator;
@@ -310,7 +321,7 @@ static bool processor_information_instance_to_cpu_id(const char *instance_name, 
         return false;
 
     const char *processor_number = separator + 1;
-    if (strcmp(processor_number, "_Total") == 0)
+    if (processor_information_instance_is_total(instance_name))
         return false;
 
     char *end;
@@ -339,7 +350,7 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
             if (!getInstanceName(pDataBlock, pObjectType, topology_pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
                 strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
-            if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            if (processor_information_instance_is_total(windows_shared_buffer))
                 continue;
 
             int cpu_id;
@@ -373,6 +384,9 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
         bool is_total = false;
         struct processor *p;
         int cpu = -1;
+        if (processor_information && processor_information_instance_is_per_numa_total(windows_shared_buffer))
+            continue;
+
         if (strcasecmp(windows_shared_buffer, "_Total") == 0) {
             p = &total;
             is_total = true;
