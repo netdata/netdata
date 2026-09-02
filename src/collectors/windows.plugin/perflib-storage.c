@@ -707,40 +707,7 @@ static void logical_disk_collect_instance(
 
     logical_disk_set_space(pDataBlock, pObjectType, pi, d, resolved_name);
 
-    if (!d->st_disk_space) {
-        d->st_disk_space = rrdset_create_localhost(
-            "disk_space",
-            resolved_name,
-            NULL,
-            name,
-            "disk.space",
-            "Disk Space Usage",
-            "GiB",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibStorage",
-            NETDATA_CHART_PRIO_DISKSPACE_SPACE,
-            update_every,
-            RRDSET_TYPE_STACKED);
-
-        rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", resolved_name, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
-        rrdlabels_add(
-            d->st_disk_space->rrdlabels,
-            "filesystem",
-            d->filesystem ? string2str(d->filesystem) : "unknown",
-            RRDLABEL_SRC_AUTO);
-        rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
-
-        {
-            char buf[UINT64_HEX_MAX_LENGTH];
-            print_uint64_hex(buf, d->SerialNumber);
-            rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
-        }
-
-        d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
-        d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
-    }
-
+    // chart creation belongs to logical_disk_chart(), so both producers emit the same chart
     logical_disk_chart(d, resolved_name, update_every);
 }
 
@@ -821,8 +788,10 @@ static void do_mount_points(int update_every, usec_t now_ut)
     dfe_done(v);
 }
 
-// Must run after every producer of logical disk instances, or an instance created by one pass would
-// be evicted before the next pass had a chance to collect it.
+// Must run after every producer of logical disk instances, so it has exactly one call site, in
+// do_PerflibStorage() after do_mount_points(). Evicting from inside a single producer deletes the
+// instances the other producer has not refreshed yet: running it at the end of the perflib pass
+// obsoletes and recreates every mount-point-only instance (all CSVs) on every collection.
 static void logical_disk_evict_stale(usec_t now_ut)
 {
     struct logical_disk *d;
@@ -852,11 +821,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
         windows_shared_buffer,
         sizeof(windows_shared_buffer));
 
-    if (!collected)
-        return false;
-
-    // cleanup - delete callback will handle resource cleanup
-    logical_disk_evict_stale(now_ut);
+    // eviction is deliberately not done here - see logical_disk_evict_stale()
     return collected;
 }
 
