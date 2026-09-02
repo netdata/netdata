@@ -362,7 +362,6 @@ void web_client_request_done(struct web_client *w) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
     web_client_log_completed_request(w, true);
-    w->response_data_is_response = true;
     web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST);
 
     w->mode = HTTP_REQUEST_MODE_GET;
@@ -2923,8 +2922,21 @@ int web_client_request_unittest(void) {
        HTTP_VALIDATION_MALFORMED_URL)
         errors++;
 
-    // Active keep-alive clients reuse large response capacity; request-derived capacity is released.
+    // Incomplete request capacity is released when a client disconnects.
     web_client_reuse_from_cache(w);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_MAX_SIZE);
+    size_t large_request_size = w->response.data->size;
+    w->response.data->len = NETDATA_WEB_REQUEST_MAX_SIZE;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    w->response_data_is_response = false;
+    web_client_request_done(w);
+    if(w->response.data->size >= large_request_size || buffer_strlen(w->response.data) ||
+       w->response_data_is_response)
+        errors++;
+
+    // Active keep-alive clients reuse large response capacity.
+    web_client_reuse_from_cache(w);
+    web_client_prepare_response_data(w);
     buffer_need_bytes(w->url_as_received, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
     buffer_need_bytes(w->response.data, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
     BUFFER *large_response_buffer = w->response.data;
