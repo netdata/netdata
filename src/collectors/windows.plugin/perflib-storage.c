@@ -295,7 +295,8 @@ static bool volume_space(const char *name, uint64_t *total_bytes, uint64_t *free
 
 // Register one canonical mount path per volume; returning every alias would create duplicate
 // full-capacity charts for a single volume.
-static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first_path, size_t first_path_size)
+static void mount_points_add_volume_paths(
+    DICTIONARY *paths, const wchar_t *volumeGUID, char *first_path, size_t first_path_size)
 {
     wchar_t stack_buf[512];
     wchar_t *buf = stack_buf;
@@ -336,12 +337,12 @@ static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first
         freez(buf);
 
     if (first_path && *first_path)
-        dictionary_set(mountPoints, first_path, NULL, 0);
+        dictionary_set(paths, first_path, NULL, 0);
 }
 
 // Map the volume's NT device name (\Device\HarddiskVolumeN) to a mount path, so a perflib instance
 // named after the device can be published under a name operators recognize.
-static void mount_points_map_device(const wchar_t *volumeGUID, const char *mount_path)
+static void mount_points_map_device(DICTIONARY *devices, const wchar_t *volumeGUID, const char *mount_path)
 {
     // "\\?\Volume{guid}\" -> "Volume{guid}"
     size_t len = wcslen(volumeGUID);
@@ -370,39 +371,51 @@ static void mount_points_map_device(const wchar_t *volumeGUID, const char *mount
     if (!utf16_to_utf8(device, sizeof(device), leaf, -1, NULL) || !*device)
         return;
 
-    dictionary_set(deviceMountPaths, device, (void *)mount_path, strlen(mount_path) + 1);
+    dictionary_set(devices, device, (void *)mount_path, strlen(mount_path) + 1);
 }
 
-static void mount_points_scan_volumes(void)
+// Returns false when the enumeration could not be started at all, i.e. we learned nothing and the
+// caller must keep the snapshot it already has.
+static bool mount_points_scan_volumes(DICTIONARY *paths, DICTIONARY *devices)
 {
     wchar_t volumeGUID[MAX_PATH + 1];
 
     HANDLE h = FindFirstVolumeW(volumeGUID, _countof(volumeGUID));
-    if (h == INVALID_HANDLE_VALUE)
-        return;
+    if (h == INVALID_HANDLE_VALUE) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_DEBUG,
+            "FindFirstVolumeW() failed (error: %lu); keeping the previous mount point registry",
+            GetLastError());
+        return false;
+    }
 
     do {
         char first_path[ND_MOUNT_PATH_MAX] = "";
-        mount_points_add_volume_paths(volumeGUID, first_path, sizeof(first_path));
+        mount_points_add_volume_paths(paths, volumeGUID, first_path, sizeof(first_path));
 
         // a volume with no mount path is not reachable, so there is nothing to name it after
         if (*first_path)
-            mount_points_map_device(volumeGUID, first_path);
+            mount_points_map_device(devices, volumeGUID, first_path);
 
     } while (FindNextVolumeW(h, volumeGUID, _countof(volumeGUID)));
 
     FindVolumeClose(h);
+    return true;
 }
 
 // Cluster Shared Volumes have their stable per-node access paths below %SystemDrive%\ClusterStorage.
 // Scan that directory in addition to regular volume mount points, which need not enumerate CSVs.
-static void mount_points_scan_cluster_storage(void)
+// Returns false only on an unexpected failure. A host with no \ClusterStorage directory is the
+// normal non-cluster case and counts as a successful scan that found no CSVs - treating it as a
+// failure would freeze the registry permanently on every non-cluster Windows host.
+static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
 {
     wchar_t windir[MAX_PATH + 1];
     UINT len = GetSystemWindowsDirectoryW(windir, _countof(windir));
     if (!len || len >= _countof(windir) || windir[1] != L':' ||
         !((windir[0] >= L'A' && windir[0] <= L'Z') || (windir[0] >= L'a' && windir[0] <= L'z')))
-        return;
+        return false;
 
     static const wchar_t suffix[] = L":\\ClusterStorage\\*";
     wchar_t pattern[_countof(suffix) + 1];
@@ -411,8 +424,18 @@ static void mount_points_scan_cluster_storage(void)
 
     WIN32_FIND_DATAW fd;
     HANDLE h = FindFirstFileW(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE)
-        return;
+    if (h == INVALID_HANDLE_VALUE) {
+        DWORD err = GetLastError();
+        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+            return true; // not a cluster node, or no CSVs mounted
+
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_DEBUG,
+            "Cannot enumerate ClusterStorage (error: %lu); keeping the previous mount point registry",
+            err);
+        return false;
+    }
 
     do {
         if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
@@ -429,26 +452,62 @@ static void mount_points_scan_cluster_storage(void)
         char path[ND_MOUNT_PATH_MAX];
         snprintfz(path, sizeof(path), "%c:\\ClusterStorage\\%s", (char)windir[0], name);
         if (!logical_disk_is_excluded(path))
-            dictionary_set(mountPoints, path, NULL, 0);
+            dictionary_set(paths, path, NULL, 0);
 
     } while (FindNextFileW(h, &fd));
 
     FindClose(h);
+    return true;
 }
 
-static void mount_points_refresh(usec_t now_ut)
+struct mount_points_scan_ops {
+    bool (*scan_volumes)(DICTIONARY *paths, DICTIONARY *devices);
+    bool (*scan_cluster_storage)(DICTIONARY *paths);
+};
+
+static const struct mount_points_scan_ops mount_points_production_scan_ops = {
+    .scan_volumes = mount_points_scan_volumes,
+    .scan_cluster_storage = mount_points_scan_cluster_storage,
+};
+
+// The registry is a snapshot - volumes and CSVs are added and removed while we run - but it is
+// rebuilt into fresh dictionaries and swapped in only once the scan actually produced one.
+// Discarding the old snapshot first would make a transient enumeration failure indistinguishable
+// from "every volume disappeared": mount-point-only instances (CSVs above all) would be evicted by
+// logical_disk_evict_stale() and their charts obsoleted, and perflib instances that resolve through
+// the device map would flip to their bare HarddiskVolumeN name and back a minute later.
+static void mount_points_refresh_with_ops(usec_t now_ut, const struct mount_points_scan_ops *ops)
 {
     if (mountPointsRefreshedUT && now_ut - mountPointsRefreshedUT < MOUNT_POINTS_REFRESH_EVERY_UT)
         return;
 
+    // back off on failure too: retrying a failing enumeration every second would cost more than the
+    // stale snapshot it is trying to replace
     mountPointsRefreshedUT = now_ut;
 
-    // the registry is a snapshot - volumes and CSVs are added and removed while we run
-    dictionary_flush(mountPoints);
-    dictionary_flush(deviceMountPaths);
+    DICTIONARY *paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
-    mount_points_scan_volumes();
-    mount_points_scan_cluster_storage();
+    // both scans must run: neither short-circuits the other
+    bool volumes_ok = ops->scan_volumes(paths, devices);
+    bool cluster_ok = ops->scan_cluster_storage(paths);
+
+    if (!volumes_ok || !cluster_ok) {
+        // a partially built snapshot is worse than a slightly stale one
+        dictionary_destroy(paths);
+        dictionary_destroy(devices);
+        return;
+    }
+
+    dictionary_destroy(mountPoints);
+    dictionary_destroy(deviceMountPaths);
+    mountPoints = paths;
+    deviceMountPaths = devices;
+}
+
+static void mount_points_refresh(usec_t now_ut)
+{
+    mount_points_refresh_with_ops(now_ut, &mount_points_production_scan_ops);
 }
 
 // Perflib names a letterless volume after its device (HarddiskVolumeN). Publish it under a mount
@@ -732,9 +791,17 @@ static void do_mount_points(int update_every, usec_t now_ut)
         if (d && d->last_collected == now_ut)
             continue;
 
+        // Gone, or not ready: an existing instance ages out through the stale eviction below.
+        //
+        // A single failed cycle is enough to obsolete the chart, and unlike a perflib instance
+        // there is no "% Free Space" counter to fall back on here. That is deliberate rather than
+        // overlooked: one-cycle eviction is the established behaviour of this collector, and
+        // tolerating N consecutive misses instead would need per-instance state plus a decision on
+        // how long a volume may stay unreadable before it counts as removed. Worth revisiting if a
+        // CSV is seen flapping during failover or a redirected-access transition, when CSVFS can
+        // briefly refuse the query.
         uint64_t total_bytes, free_bytes;
         if (!volume_space(name, &total_bytes, &free_bytes))
-            // gone, or not ready - an existing instance ages out through the stale eviction below
             continue;
 
         d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
@@ -904,12 +971,145 @@ static int logical_disk_unittest_run(
     return errors;
 }
 
+// The scan stubs deliberately populate before failing: a real enumeration can add several volumes
+// and then fail part way, and a partial snapshot must be discarded rather than swapped in.
+static bool mount_points_unittest_scan_volumes_ok(DICTIONARY *paths, DICTIONARY *devices)
+{
+    dictionary_set(paths, "C:", NULL, 0);
+    dictionary_set(devices, "HarddiskVolume7", (void *)"C:", sizeof("C:"));
+    return true;
+}
+
+static bool mount_points_unittest_scan_volumes_fail(DICTIONARY *paths, DICTIONARY *devices)
+{
+    // two paths, so a leaked partial snapshot also differs from the retained one by entry count
+    dictionary_set(paths, "E:", NULL, 0);
+    dictionary_set(paths, "F:", NULL, 0);
+    dictionary_set(devices, "HarddiskVolume9", (void *)"E:", sizeof("E:"));
+    return false;
+}
+
+static bool mount_points_unittest_scan_csv_ok(DICTIONARY *paths)
+{
+    dictionary_set(paths, "C:\\ClusterStorage\\Volume1", NULL, 0);
+    return true;
+}
+
+static bool mount_points_unittest_scan_csv_fail(DICTIONARY *paths)
+{
+    dictionary_set(paths, "C:\\ClusterStorage\\Volume2", NULL, 0);
+    return false;
+}
+
+static const struct mount_points_scan_ops mount_points_unittest_ops_ok = {
+    .scan_volumes = mount_points_unittest_scan_volumes_ok,
+    .scan_cluster_storage = mount_points_unittest_scan_csv_ok,
+};
+
+static const struct mount_points_scan_ops mount_points_unittest_ops_volumes_fail = {
+    .scan_volumes = mount_points_unittest_scan_volumes_fail,
+    .scan_cluster_storage = mount_points_unittest_scan_csv_ok,
+};
+
+static const struct mount_points_scan_ops mount_points_unittest_ops_csv_fail = {
+    .scan_volumes = mount_points_unittest_scan_volumes_ok,
+    .scan_cluster_storage = mount_points_unittest_scan_csv_fail,
+};
+
+// mountPoints stores NULL values, so dictionary_get() cannot tell "present" from "absent" there;
+// the key set has to be inspected by name.
+static bool mount_points_unittest_has(DICTIONARY *paths, const char *name)
+{
+    bool found = false;
+    void *v;
+
+    dfe_start_read(paths, v)
+    {
+        if (strcmp(v_dfe.name, name) == 0) {
+            found = true;
+            break;
+        }
+    }
+    dfe_done(v);
+
+    return found;
+}
+
+static int mount_points_unittest_expect(const char *what, bool condition)
+{
+    if (condition)
+        return 0;
+
+    fprintf(stderr, "perflib storage unittest: %s\n", what);
+    return 1;
+}
+
+// A transient enumeration failure must not empty the registry: do_mount_points() would stop
+// publishing the CSV instances, logical_disk_evict_stale() would obsolete their charts, and
+// logical_disk_resolve_name() would fall back to bare device names - all of it recovering only a
+// refresh interval later.
+static int mount_points_unittest_run(void)
+{
+    DICTIONARY *previous_paths = mountPoints;
+    DICTIONARY *previous_devices = deviceMountPaths;
+    usec_t previous_refresh_ut = mountPointsRefreshedUT;
+    usec_t now_ut = MOUNT_POINTS_REFRESH_EVERY_UT;
+    int errors = 0;
+
+    mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    mountPointsRefreshedUT = 0;
+
+    mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_ok);
+    errors += mount_points_unittest_expect(
+        "a healthy scan must populate the registry", dictionary_entries(mountPoints) == 2);
+    errors += mount_points_unittest_expect(
+        "a healthy scan must map device names", dictionary_get(deviceMountPaths, "HarddiskVolume7") != NULL);
+
+    now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
+    mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_volumes_fail);
+    errors += mount_points_unittest_expect(
+        "a failed volume scan must retain the previous registry", dictionary_entries(mountPoints) == 2);
+    errors += mount_points_unittest_expect(
+        "a failed volume scan must not leak its partial results", !mount_points_unittest_has(mountPoints, "E:"));
+    errors += mount_points_unittest_expect(
+        "a failed volume scan must retain the device map",
+        dictionary_get(deviceMountPaths, "HarddiskVolume7") != NULL);
+
+    now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
+    mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_csv_fail);
+    errors += mount_points_unittest_expect(
+        "a failed ClusterStorage scan must retain the previous registry",
+        mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume1"));
+    errors += mount_points_unittest_expect(
+        "a failed ClusterStorage scan must not leak its partial results",
+        !mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume2"));
+
+    // a refresh inside the interval must not rescan at all, so an armed failure cannot be observed
+    mount_points_refresh_with_ops(now_ut + 1, &mount_points_unittest_ops_volumes_fail);
+    errors += mount_points_unittest_expect(
+        "no rescan inside the refresh interval", !mount_points_unittest_has(mountPoints, "E:"));
+
+    now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
+    mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_ok);
+    errors += mount_points_unittest_expect(
+        "the registry must still refresh after a failure", dictionary_entries(mountPoints) == 2);
+
+    dictionary_destroy(mountPoints);
+    dictionary_destroy(deviceMountPaths);
+    mountPoints = previous_paths;
+    deviceMountPaths = previous_devices;
+    mountPointsRefreshedUT = previous_refresh_ut;
+    return errors;
+}
+
 int perflib_storage_unittest(void)
 {
     int errors = 0;
 
     errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
+    errors += mount_points_unittest_run();
 
     if (errors)
         fprintf(stderr, "perflib storage unittest: %d ERROR(S)\n", errors);
