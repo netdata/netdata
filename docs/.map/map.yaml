@@ -757,6 +757,12 @@ sidebar:
               label: Troubleshooting
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/troubleshooting.md
               description: Diagnose missing rows, inactive listeners, UDP delivery, allowlist drops, SNMPv3 failures, profile issues, backend failures, and retention problems.
+      - meta:
+          label: Syslog from Network Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog-pointer.md
+          path: syslog
+          description: Where syslog ingestion is documented — through an OpenTelemetry Collector into Netdata's log store, next to the devices' SNMP metrics, traps, and flows.
+          keywords: [syslog, network devices, opentelemetry, npm]
   # Logs
   - meta:
       label: Logs Management
