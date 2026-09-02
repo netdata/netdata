@@ -64,7 +64,7 @@ func (e *Engine) advanceRetired(
 	owned *entry,
 	operations *[]contract.OperationResult,
 ) error {
-	for transitions := 0; transitions < 6; transitions++ {
+	for range 6 {
 		switch owned.Phase {
 		case phasePutIntent, phaseReconcilePut:
 			owned.Phase = phaseReconcilePut
@@ -224,7 +224,7 @@ func (e *Engine) listExact(
 ) ([]s3client.Version, error) {
 	var versions []s3client.Version
 	var keyMarker, versionMarker string
-	for pageNumber := 0; pageNumber < maxListPages; pageNumber++ {
+	for range maxListPages {
 		var page s3client.VersionPage
 		_, err := e.call(ctx, operations, endpoint, operation, func(callCtx context.Context) error {
 			var callErr error

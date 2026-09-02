@@ -828,12 +828,10 @@ func TestValidateEntryPhaseRejectsMutationWithoutRequiredProof(t *testing.T) {
 		SourceObjectID:      "source-version",
 		DestinationObjectID: "destination-version",
 		ObjectSeen:          true,
-		VisibleAt:           ptrTime(time.Unix(100, 0)),
+		VisibleAt:           new(time.Unix(100, 0)),
 	})
 	assert.ErrorContains(t, err, "source object identity")
 }
-
-func ptrTime(value time.Time) *time.Time { return &value }
 
 func newAWSEngine(t *testing.T, source, destination *testutil.S3, now *time.Time) *Engine {
 	t.Helper()

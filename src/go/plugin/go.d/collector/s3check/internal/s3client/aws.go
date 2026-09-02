@@ -305,8 +305,7 @@ func (c *awsClient) CloseIdleConnections() {
 }
 
 func isObjectNotFound(err error) bool {
-	var noSuchKey *types.NoSuchKey
-	if errors.As(err, &noSuchKey) {
+	if _, ok := errors.AsType[*types.NoSuchKey](err); ok {
 		return true
 	}
 	return hasErrorCode(err, "NoSuchKey")

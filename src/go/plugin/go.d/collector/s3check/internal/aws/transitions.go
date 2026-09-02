@@ -89,7 +89,7 @@ func (e *Engine) advanceActive(
 	owned *entry,
 	operations *[]contract.OperationResult,
 ) *contract.ProbeResult {
-	for transitions := 0; transitions < 6; transitions++ {
+	for range 6 {
 		switch owned.Phase {
 		case phasePutIntent:
 			owned.Phase = phaseReconcilePut

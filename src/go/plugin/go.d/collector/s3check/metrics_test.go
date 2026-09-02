@@ -3,6 +3,7 @@
 package s3check
 
 import (
+	"maps"
 	"testing"
 	"time"
 
@@ -162,9 +163,7 @@ func assertMetricValue(t *testing.T, reader metrix.Reader, name string, labels m
 
 func withReason(labels metrix.Labels, reason contract.Reason) metrix.Labels {
 	result := make(metrix.Labels, len(labels)+1)
-	for key, value := range labels {
-		result[key] = value
-	}
+	maps.Copy(result, labels)
 	result["reason"] = string(reason)
 	return result
 }

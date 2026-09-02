@@ -29,13 +29,11 @@ var chartTemplateYAML string
 
 func init() {
 	collectorapi.Register("s3check", collectorapi.Creator{
-		JobConfigSchema: configSchema,
-		Defaults: collectorapi.Defaults{
-			UpdateEvery:        defaultUpdateEvery,
-			AutoDetectionRetry: 0,
-		},
-		CreateV2: func() collectorapi.CollectorV2 { return New() },
-		Config:   func() any { return &Config{} },
+		JobConfigSchema:    configSchema,
+		UpdateEvery:        defaultUpdateEvery,
+		AutoDetectionRetry: 0,
+		CreateV2:           func() collectorapi.CollectorV2 { return New() },
+		Config:             func() any { return &Config{} },
 	})
 }
 

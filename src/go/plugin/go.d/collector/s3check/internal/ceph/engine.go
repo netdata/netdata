@@ -51,7 +51,7 @@ type entry struct {
 	PutAt        *time.Time `json:"put_at,omitempty"`
 	VisibleAt    *time.Time `json:"visible_at,omitempty"`
 	DeleteAt     *time.Time `json:"delete_at,omitempty"`
-	CleanupAfter time.Time  `json:"cleanup_after,omitempty"`
+	CleanupAfter time.Time  `json:"cleanup_after"`
 }
 
 type state struct {

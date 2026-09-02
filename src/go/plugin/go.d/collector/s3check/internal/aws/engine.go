@@ -172,10 +172,7 @@ func New(opts Options) (*Engine, error) {
 		return nil, fmt.Errorf("AWS queue capacity must be between 1 and %d", contract.MaxQueueCapacity)
 	}
 	if opts.CleanupBatch == 0 {
-		opts.CleanupBatch = contract.DefaultCleanupBatch
-		if opts.CleanupBatch > opts.QueueCapacity {
-			opts.CleanupBatch = opts.QueueCapacity
-		}
+		opts.CleanupBatch = min(contract.DefaultCleanupBatch, opts.QueueCapacity)
 	}
 	if opts.CleanupBatch < 1 || opts.CleanupBatch > opts.QueueCapacity {
 		return nil, errors.New("AWS cleanup batch must fit the queue capacity")
