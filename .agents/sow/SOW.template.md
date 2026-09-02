@@ -1,5 +1,8 @@
 # SOW-YYYYMMDD-<slug> - <Title>
 
+This template is the schema of a SOW. Every `##` section not marked `(optional ...)` MUST be present and filled;
+`.agents/sow/audit.sh` derives its structural check from these headings. Field semantics live in the placeholders.
+
 ## Status
 
 Status: planning
@@ -50,7 +53,7 @@ Unknowns:
 - <Outcome with verification method.>
 - <Outcome with verification method.>
 
-## Analysis
+## Analysis (optional)
 
 Sources checked:
 
@@ -138,14 +141,14 @@ Open decisions:
 
 <Numbered user decisions, options, selection, and reasoning. User decisions must be recorded before implementation.>
 
-## Plan
+## Plan (optional)
 
 1. <chunk, scope, risk, dependencies>
 2. <chunk, scope, risk, dependencies>
 
-## Steps
+## Steps (optional: umbrella SOWs only)
 
-Umbrella SOWs only (see "Umbrella And Step SOWs" in `AGENTS.md`); delete this section otherwise.
+See "Umbrella And Step SOWs" in `AGENTS.md`; delete this section in step SOWs.
 
 | # | Step SOW | Status | PR |
 |---|---|---|---|
@@ -232,6 +235,6 @@ Follow-up mapping:
 
 - <implemented/rejected/GitHub issue link>
 
-## Outcome
+## Outcome (optional)
 
 Pending.

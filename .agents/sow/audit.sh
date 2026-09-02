@@ -74,35 +74,7 @@ else
   fail "AGENTS.md is missing"
 fi
 
-section "canonical AGENTS.md sections"
-required_sections=(
-  "## Goals"
-  "## Development Principles"
-  "## SOW System"
-  "### Storage Model"
-  "### Umbrella And Step SOWs"
-  "### Pre-Implementation Gate"
-  "### Git Worktrees"
-  "### Git And PR Workflow"
-  "### Review"
-  "### Regressions"
-  "### Validation Gate"
-  "### Enforcement"
-  "### Sensitive Data In Durable Artifacts"
-  "### Durable AI-Facing Artifact Formatting"
-  "### Open-Source Reference Evidence"
-  "### Specs"
-  "### Project Skills"
-)
-
-for heading in "${required_sections[@]}"; do
-  if grep -qF "$heading" AGENTS.md 2>/dev/null; then
-    ok "$heading"
-  else
-    fail "$heading is missing"
-  fi
-done
-
+section "AGENTS.md machine contracts"
 if grep -qF "CRITICAL: Never write raw sensitive data to durable artifacts." AGENTS.md 2>/dev/null; then
   ok "CRITICAL sensitive-data warning"
 else
@@ -165,6 +137,15 @@ ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never
 
 # Structural completeness is advisory and checked only for in-flight SOWs in the
 # current queue; pending stubs and completed (done/) history are exempt.
+# Required sections come from the template (the SOW schema): every '## ' heading
+# not marked "(optional". The two sensitive-data field labels are pinned here as a
+# security contract (they also exist in the template).
+required_sow_sections=()
+while IFS= read -r h; do
+  [ -n "$h" ] && required_sow_sections+=("$h")
+done < <(grep -E '^## ' .agents/sow/SOW.template.md 2>/dev/null | grep -v -i '(optional')
+pinned_sow_fields=("Sensitive data handling plan:" "Sensitive data gate:")
+[ "${#required_sow_sections[@]}" -gt 0 ] || fail "could not derive required SOW sections from .agents/sow/SOW.template.md"
 active_count=0
 if [ -d .agents/sow/q/current ]; then
   while IFS= read -r sow; do
@@ -185,13 +166,7 @@ if [ -d .agents/sow/q/current ]; then
     esac
 
     case "$sow" in *-umbrella.md) continue ;; esac   # umbrellas hold no gate/validation by design
-    for needle in \
-      "## Pre-Implementation Gate" \
-      "Sensitive data handling plan:" \
-      "Sensitive data gate:" \
-      "## Validation" \
-      "## Artifact Maintenance Gate"
-    do
+    for needle in "${required_sow_sections[@]}" "${pinned_sow_fields[@]}"; do
       if grep -qF "$needle" "$sow"; then
         ok "$sow contains $needle"
       else

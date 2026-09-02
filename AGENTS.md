@@ -262,7 +262,9 @@ Before non-trivial work:
 
 ### SOW Lifecycle
 
-- Create new SOWs from `.agents/sow/SOW.template.md` (project-local; MAY be customized). Create the file in
+- Create new SOWs from `.agents/sow/SOW.template.md` (project-local; MAY be customized). The template is the schema
+  of a SOW: every `##` section not marked `(optional ...)` MUST be present and filled, and `audit.sh` derives its
+  structural check from those headings, so adding a field means editing the template only. Create the file in
   `pending/` when the work is queued but not started, or directly in `current/` when starting now; move it from
   `pending/` to `current/` when you begin filling the Pre-Implementation Gate.
 - Filename: `SOW-YYYYMMDD-{slug}.md`, creation date plus descriptive slug. There is no sequential counter because it
@@ -323,13 +325,10 @@ two are never confused. Before changing implementation files, or before continui
 section, fill the gate. Gate `ready` additionally requires the goal/plan approval of "Plan Before Non-Trivial Work"
 where that round applies.
 
-The gate MUST record: problem/root-cause model; evidence reviewed; affected contracts and surfaces; the
-clean-end-state target with its removed-redundant and excluded-coupled items and the reference search where a path
-or contract is replaced; existing patterns to reuse; risk and blast radius; sensitive data handling plan (covering
-SOWs, specs, documentation, project skills, agent instructions, and code comments); implementation plan; validation
-plan; artifact impact plan; open decisions. Placeholders such as `TBD`, `N/A`, or "to be checked later" are invalid
-unless the SOW explains why the item truly does not apply. If the gate exposes an unknown that investigation cannot
-resolve, stop and ask the user before implementation.
+The gate MUST fill every field of the template's `## Pre-Implementation Gate` section (the template is the SOW schema,
+see "SOW Lifecycle"; field semantics live in its placeholders). Placeholders such as `TBD`, `N/A`, or "to be checked
+later" are invalid unless the SOW explains why the item truly does not apply. If the gate exposes an unknown that
+investigation cannot resolve, stop and ask the user before implementation.
 
 ### Git Worktrees
 
@@ -409,30 +408,9 @@ Do not resurrect or mutate a prior SOW.
 
 ### Validation Gate
 
-A SOW cannot be completed until Validation records:
-
-- acceptance criteria evidence;
-- clean-end-state evidence: the delivered state matches the recorded target, including its removed-redundant and
-  excluded-coupled lists and, where a path or contract was replaced, the recorded reference search; or an explicit
-  user approval for a non-clean state is recorded and linked;
-- deferred clean-end-state remainder: any target work deferred under an approved partial (exception (d)) or
-  otherwise tracked rather than done, with why deferral was acceptable and when (or under what condition) it lands;
-- tests or equivalent validation;
-- real-use evidence when a runnable path exists;
-- reviewer findings and how they were handled;
-- same-failure search results;
-- sensitive data gate: confirmation that the durable artifacts carry no raw sensitive data, with the redactions
-  used;
-- the Artifact Maintenance Gate below, including that no SOW working file or spec was committed;
-- lessons extracted, or the specific reason there were none;
-- workflow-friction triage: each note in the SOW's `## Workflow Friction & Rule Gaps` section (template) resolved to
-  a rule update (`AGENTS.md`,
-  project skill, spec, or SOW template), an evidence-backed rejection, or a tracked follow-up (or an explicit "none
-  arose");
-- follow-up mapping;
-- `.agents/sow/audit.sh` passing, or every remaining failure explained.
-
-Generic "N/A" is invalid.
+A SOW cannot be completed until every field of the template's `## Validation` and `## Artifact Maintenance Gate`
+sections holds evidence. The template is the authoritative list of what Validation records; the semantics of each
+field live in its placeholder. Generic "N/A" is invalid.
 
 ### Artifact Maintenance Gate
 
@@ -455,10 +433,10 @@ evidence-backed reason it is unaffected.
 
 - `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files,
   and sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. The audit pins, as hard
-  failures, the marker line under "SOW System", the section headings listed in its `required_sections`, the exact
-  CRITICAL sensitive-data sentence, legacy `SOW-NNNN` references, relocated spec paths, missing or untracked
-  framework files, and a `q/` or `specs/` path that is not gitignored; renaming a pinned heading means updating
-  `audit.sh` in the same change. It does not scan SOW working files or specs for secrets.
+  failures, the marker line under "SOW System", the exact CRITICAL sensitive-data sentence, legacy `SOW-NNNN`
+  references, relocated spec paths, missing or untracked framework files, and a `q/` or `specs/` path that is not
+  gitignored. It checks in-flight SOW files (advisory) for the template's required sections plus the two
+  sensitive-data field labels. It does not scan SOW working files or specs for secrets.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and
