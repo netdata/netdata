@@ -293,7 +293,7 @@ Before non-trivial work:
   1. Finish implementation, docs, skills, validation, and follow-up mapping.
   2. Transfer all durable knowledge into project skills, docs, code, and tests (and specs once re-introduced). The
      SOW body MUST then hold nothing durable that is not captured elsewhere.
-  3. Set `Status: completed` and move the file to `.agents/sow/q/done/`.
+  3. Set `Status: completed` and move the file to `.agents/sow/q/done/` (unless the user asks to discard it).
 
 ### Umbrella And Step SOWs
 
@@ -456,8 +456,9 @@ evidence-backed reason it is unaffected.
 - `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files,
   and sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. The audit pins, as hard
   failures, the marker line under "SOW System", the section headings listed in its `required_sections`, the exact
-  CRITICAL sensitive-data sentence, legacy `SOW-NNNN` references, and relocated spec paths; renaming a pinned
-  heading means updating `audit.sh` in the same change. It does not scan SOW working files or specs for secrets.
+  CRITICAL sensitive-data sentence, legacy `SOW-NNNN` references, relocated spec paths, missing or untracked
+  framework files, and a `q/` or `specs/` path that is not gitignored; renaming a pinned heading means updating
+  `audit.sh` in the same change. It does not scan SOW working files or specs for secrets.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and
@@ -524,10 +525,10 @@ root. Never write absolute paths into SOW evidence.
 
 ### Specs
 
-Specs are memory of WHAT this project does. They live under `.agents/sow/specs/` as local-only memory (Storage
-Model); the source tree and public documentation remain the primary ground truth, and specs capture durable
-decisions, cross-cutting rules, and area contracts as they are worked. Durable contracts that must be shared with
-the team right now belong in project skills, docs, code, and tests, not in specs.
+Specs are memory of WHAT this project does (location and local-only status: Storage Model). The source tree and public
+documentation remain the primary ground truth, and specs capture durable decisions, cross-cutting rules, and area
+contracts as they are worked. Durable contracts that must be shared with the team right now belong in project skills,
+docs, code, and tests, not in specs.
 
 - Layout stays flat until scale proves hierarchy is needed. Use `<domain>-<topic>.md`, one durable contract or
   cross-cutting rule per file, organized by contract ownership, not by repository path. Update
