@@ -259,8 +259,8 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	}
 
 	// Ceph mode requires the configured prefix to be reserved for these probes.
-	// The conditional PUT detects accidental key reuse; every failure remains
-	// journal-owned because the request outcome can still be ambiguous.
+	// The client abstraction does not distinguish a definitive precondition
+	// rejection from an ambiguous completion, so every failure remains owned.
 	if _, err := e.call(
 		ctx,
 		&result.Operations,

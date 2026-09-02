@@ -21,7 +21,10 @@ const (
 	listPageSize      = 16
 )
 
-var errOwnershipInvariant = errors.New("AWS ownership invariant failed")
+var (
+	errOwnershipInvariant = errors.New("AWS ownership invariant failed")
+	errJournalPersistence = errors.New("persist AWS ownership")
+)
 
 func ownershipError(message string) error {
 	return fmt.Errorf("%w: %s", errOwnershipInvariant, message)
@@ -340,7 +343,12 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		return result
 	}
 
-	result.Cleanup = e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
+	cleanup, cleanupErr := e.cleanupBacklog(ctx, e.cleanupBatch, &result.Operations)
+	result.Cleanup = cleanup
+	if cleanupErr != nil {
+		result.Err = fmt.Errorf("cleanup AWS ownership: %w", cleanupErr)
+		return result
+	}
 	if active := e.active(); active != nil {
 		result.Probe = e.advanceActive(ctx, active, &result.Operations)
 	} else if len(e.state.Entries) < e.queueCapacity {
@@ -363,12 +371,14 @@ func (e *Engine) Cleanup(ctx context.Context) {
 			if len(keys) == 0 {
 				_ = e.persist()
 			} else if _, err := e.validateProvider(ctx, nil, keys...); err == nil {
+				canCleanup := true
 				if active := e.active(); active != nil {
 					e.state.ActiveKey = ""
-					_ = e.persist()
+					canCleanup = e.persist() == nil
 				}
-				_ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
-				_ = e.persist()
+				if canCleanup {
+					_, _ = e.cleanupBacklog(ctx, e.cleanupBatch, nil)
+				}
 			}
 		}
 		e.journal.Unlock()
@@ -427,7 +437,7 @@ func (e *Engine) persist() error {
 		return nil
 	}
 	e.state = cloneState(e.durable)
-	err = fmt.Errorf("persist AWS ownership: %w", err)
+	err = fmt.Errorf("%w: %w", errJournalPersistence, err)
 	e.diagnostic = errors.Join(e.diagnostic, err)
 	return err
 }

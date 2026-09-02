@@ -94,7 +94,12 @@ func TestCollectRetainsOwnershipWhenPutCreatesVersion(t *testing.T) {
 	assert.ErrorContains(t, result.Err, "versioning")
 	assert.Equal(t, 1, result.Cleanup.Pending)
 	assert.Zero(t, client.Count("delete"))
-	requirePersistedEntries(t, j, 1)
+	var persisted state
+	found, err := j.Load(&persisted)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Len(t, persisted.Entries, 1)
+	assert.Equal(t, result.Probe, persisted.LastTerminal)
 	engine.Cleanup(context.Background())
 }
 

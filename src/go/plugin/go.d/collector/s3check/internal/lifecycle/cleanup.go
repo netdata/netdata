@@ -72,8 +72,9 @@ func (e *Engine) cleanupBacklog(
 			}
 		}
 
-		// The confirmed quiet absence resolves ownership. If persistence fails,
-		// the old journal entry is conservative and safe to forget on a later save.
+		// The confirmed quiet absence resolves ownership. A pre-publication failure
+		// leaves only a conservative stale entry; post-publication uncertainty
+		// poisons the current runtime before another remote mutation.
 		e.state.Entries = append(e.state.Entries[:index], e.state.Entries[index+1:]...)
 		if err := e.persist(); err != nil {
 			return result, err

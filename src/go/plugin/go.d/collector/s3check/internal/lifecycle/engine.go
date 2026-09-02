@@ -60,7 +60,7 @@ type Engine struct {
 	closed     bool
 }
 
-var errVersioningSafety = errors.New("lifecycle bucket versioning changed during mutation")
+var errVersioningSafety = errors.New("lifecycle bucket versioning safety is not established during mutation")
 
 func New(opts Options) (*Engine, error) {
 	if opts.Client == nil {
@@ -221,6 +221,9 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 	if put.VersionID != "" {
 		result.Probe = e.finish(contract.FailedProbe(contract.ReasonRequest))
 		result.Err = fmt.Errorf("%w: PUT returned a version ID", errVersioningSafety)
+		if err := e.persist(); err != nil {
+			result.Err = errors.Join(result.Err, err)
+		}
 		return result
 	}
 

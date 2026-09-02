@@ -16,8 +16,14 @@ func (e *Engine) cleanupBacklog(
 	ctx context.Context,
 	limit int,
 	operations *[]contract.OperationResult,
-) contract.CleanupResult {
-	result := contract.CleanupResult{}
+) (result contract.CleanupResult, retErr error) {
+	defer func() {
+		result.Pending = len(e.state.Entries)
+		result.Backpressure = result.Pending >= e.queueCapacity
+		if retErr == nil {
+			retErr = e.journal.MutationError()
+		}
+	}()
 	keys := make([]string, 0, len(e.state.Entries))
 	for _, owned := range e.state.Entries {
 		keys = append(keys, owned.Key)
@@ -29,7 +35,14 @@ func (e *Engine) cleanupBacklog(
 		if owned == nil {
 			continue
 		}
-		if err := e.advanceRetired(ctx, owned, operations); err != nil {
+		advanceErr := e.advanceRetired(ctx, owned, operations)
+		if err := e.journal.MutationError(); err != nil {
+			return result, err
+		}
+		if advanceErr != nil {
+			if errors.Is(advanceErr, errJournalPersistence) {
+				return result, advanceErr
+			}
 			continue
 		}
 	}
@@ -38,12 +51,12 @@ func (e *Engine) cleanupBacklog(
 	} else {
 		e.state.CleanupCursor %= len(e.state.Entries)
 		if len(selected) > 0 {
-			_ = e.persist()
+			if err := e.persist(); err != nil {
+				return result, err
+			}
 		}
 	}
-	result.Pending = len(e.state.Entries)
-	result.Backpressure = result.Pending >= e.queueCapacity
-	return result
+	return result, nil
 }
 
 func (e *Engine) advanceRetired(
@@ -97,13 +110,11 @@ func (e *Engine) advanceRetired(
 			)
 			if err != nil {
 				owned.Phase = phaseReconcileDelete
-				_ = e.persist()
-				return nil
+				return e.persist()
 			}
 			if !deleted.DeleteMarker || deleted.VersionID == "" {
 				owned.Phase = phaseReconcileDelete
-				_ = e.persist()
-				return nil
+				return e.persist()
 			}
 			owned.SourceMarkerID = deleted.VersionID
 			owned.MeasureDelete = false

@@ -615,6 +615,96 @@ func TestCleanupJournalFailureReportsRuntimeError(t *testing.T) {
 	restored = true
 }
 
+func TestCollectStopsAfterBacklogJournalFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("renaming an open journal directory is not portable to Windows")
+	}
+	source, destination, _ := newAWSClients()
+	now := time.Unix(100, 0)
+	engine := newAWSEngine(t, source, destination, &now)
+	prepareActiveAndBacklog(t, engine, &now)
+
+	root := filepath.Dir(engine.journal.Path())
+	backup := root + "-backup"
+	require.NoError(t, os.Rename(root, backup))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_ = os.Remove(root)
+			_ = os.Rename(backup, root)
+		}
+		engine.Cleanup(context.Background())
+	})
+	destinationGetsBefore := destination.Count("get")
+
+	result := engine.Collect(context.Background())
+	assert.Error(t, result.Err)
+	assert.Equal(
+		t,
+		destinationGetsBefore+1,
+		destination.Count("get"),
+		"only the backlog read before the persistence failure may run; the active probe must not advance",
+	)
+
+	require.NoError(t, os.Remove(root))
+	require.NoError(t, os.Rename(backup, root))
+	restored = true
+}
+
+func TestCleanupStopsAfterActiveRetirementJournalFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("renaming an open journal directory is not portable to Windows")
+	}
+	source, destination, _ := newAWSClients()
+	now := time.Unix(100, 0)
+	engine := newAWSEngine(t, source, destination, &now)
+	prepareActiveAndBacklog(t, engine, &now)
+
+	root := filepath.Dir(engine.journal.Path())
+	backup := root + "-backup"
+	require.NoError(t, os.Rename(root, backup))
+	require.NoError(t, os.WriteFile(root, []byte("not a directory"), 0o600))
+	restored := false
+	t.Cleanup(func() {
+		if !restored {
+			_ = os.Remove(root)
+			_ = os.Rename(backup, root)
+		}
+	})
+	destinationGetsBefore := destination.Count("get")
+
+	engine.Cleanup(context.Background())
+	assert.Equal(
+		t,
+		destinationGetsBefore,
+		destination.Count("get"),
+		"backlog must not advance after active retirement fails",
+	)
+
+	require.NoError(t, os.Remove(root))
+	require.NoError(t, os.Rename(backup, root))
+	restored = true
+}
+
+func prepareActiveAndBacklog(t *testing.T, engine *Engine, now *time.Time) {
+	t.Helper()
+	waiting := engine.Collect(context.Background())
+	require.NotNil(t, waiting.Probe)
+	require.Equal(t, contract.StatusWaiting, waiting.Probe.Status)
+
+	*now = now.Add(engine.writeTimeout + time.Second)
+	timedOut := engine.Collect(context.Background())
+	require.NotNil(t, timedOut.Probe)
+	require.Equal(t, contract.ReasonVisibilityTimeout, timedOut.Probe.Reason)
+
+	next := engine.Collect(context.Background())
+	require.NotNil(t, next.Probe)
+	require.Equal(t, contract.StatusWaiting, next.Probe.Status)
+	require.Len(t, engine.state.Entries, 2)
+	require.NotNil(t, engine.active())
+}
+
 func TestExactCleanupRequiresDurablePhaseBeforeDeletingVersions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("renaming an open journal directory is not portable to Windows")
