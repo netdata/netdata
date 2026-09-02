@@ -687,6 +687,57 @@ func TestCleanupStopsAfterActiveRetirementJournalFailure(t *testing.T) {
 	restored = true
 }
 
+func TestPublicationUncertaintyPreservesCleanupResultOnLaterCollections(t *testing.T) {
+	source, destination, model := newAWSClients()
+	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
+		opts.QueueCapacity = 1
+		opts.CleanupBatch = 1
+	})
+	t.Cleanup(func() { engine.Cleanup(context.Background()) })
+
+	engine.Collect(context.Background())
+	key, sourceObjectID := model.onlySourceObject(t)
+	model.replicateObject(t, key, sourceObjectID)
+	engine.Collect(context.Background())
+	sourceMarkerID := model.onlySourceMarker(t, key)
+	model.replicateMarker(t, key, sourceMarkerID)
+
+	originalDelete := destination.DeleteFunc
+	failExactDelete := true
+	destination.DeleteFunc = func(
+		ctx context.Context,
+		bucket, objectKey string,
+		opts s3client.DeleteOptions,
+	) (s3client.DeleteResult, error) {
+		if opts.VersionID != "" && failExactDelete {
+			failExactDelete = false
+			return s3client.DeleteResult{}, errors.New("cleanup unavailable")
+		}
+		return originalDelete(ctx, bucket, objectKey, opts)
+	}
+
+	failedCleanup := engine.Collect(context.Background())
+	require.NotNil(t, failedCleanup.Probe)
+	require.Equal(t, contract.ReasonCleanup, failedCleanup.Probe.Reason)
+	require.Len(t, engine.state.Entries, 1)
+	require.Empty(t, engine.state.ActiveKey)
+	destination.DeleteFunc = originalDelete
+
+	tmpPath := engine.journal.Path() + ".tmp"
+	require.NoError(t, os.Mkdir(tmpPath, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpPath, "blocker"), []byte("block"), 0o600))
+
+	publicationFailure := engine.Collect(context.Background())
+	require.ErrorIs(t, publicationFailure.Err, journal.ErrPublicationUncertain)
+	require.Equal(t, 1, publicationFailure.Cleanup.Pending)
+	require.True(t, publicationFailure.Cleanup.Backpressure)
+
+	later := engine.Collect(context.Background())
+	require.ErrorIs(t, later.Err, journal.ErrPublicationUncertain)
+	assert.Equal(t, 1, later.Cleanup.Pending)
+	assert.True(t, later.Cleanup.Backpressure)
+}
+
 func prepareActiveAndBacklog(t *testing.T, engine *Engine, now *time.Time) {
 	t.Helper()
 	waiting := engine.Collect(context.Background())

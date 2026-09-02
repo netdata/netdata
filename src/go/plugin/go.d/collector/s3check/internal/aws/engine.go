@@ -319,6 +319,15 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 			result.Err = e.diagnostic
 		}
 	}()
+	defer func() {
+		// A state loaded before takeover may be stale while another runtime owns the journal.
+		if !e.locked {
+			return
+		}
+		result.Cleanup.Pending = len(e.state.Entries)
+		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
+		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
+	}()
 	if e.closed {
 		result.Probe = contract.FailedProbe(contract.ReasonInternal)
 		return result
@@ -328,11 +337,6 @@ func (e *Engine) Collect(ctx context.Context) (result contract.Result) {
 		result.Err = err
 		return result
 	}
-	defer func() {
-		result.Cleanup.Pending = len(e.state.Entries)
-		result.Cleanup.Backpressure = len(e.state.Entries) >= e.queueCapacity
-		result.LastTerminal = contract.CloneProbe(e.state.LastTerminal)
-	}()
 	keys := e.ownedKeys()
 	if len(keys) == 0 {
 		keys = append(keys, e.keyPrefix)
