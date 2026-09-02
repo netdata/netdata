@@ -253,6 +253,7 @@ if command -v rg >/dev/null 2>&1; then
     rg --no-filename -o '\.agents/sow/specs/[A-Za-z0-9._/-]+\.md' \
       AGENTS.md .agents/skills docs src \
       -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
+      -g '!TODO*.md' -g '!**/TODO*.md' \
       2>/dev/null | sort -u
   )
 else

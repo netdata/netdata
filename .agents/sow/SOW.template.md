@@ -6,7 +6,7 @@ Status: planning | ready | in-progress | paused | completed
 
 `planning` means analysis or decisions are incomplete. `ready` means the
 Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
-before non-trivial work") applies, the user has approved the goal and plan.
+Before Non-Trivial Work") applies, the user has approved the goal and plan.
 `completed` means work is validated and durable memory transferred. SOW files
 are local-only working memory under `.agents/sow/q/` (gitignored) and are never
 committed.
@@ -162,6 +162,16 @@ Maintenance Gate).
 Acceptance criteria evidence:
 
 - <evidence>
+
+Clean-end-state evidence:
+
+- <Delivered state vs the recorded target: (i) removed as redundant, (ii) excluded coupled items, and the recorded
+  reference search where a path or contract was replaced; or a link to the user approval for a non-clean state.>
+
+Deferred clean-end-state remainder:
+
+- <Each deferred target item with why deferral was acceptable and when (or under what condition) it lands; or
+  "none".>
 
 Tests or equivalent validation:
 

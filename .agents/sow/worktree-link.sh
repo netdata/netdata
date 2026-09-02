@@ -105,6 +105,15 @@ migrate_old_queues() {
   done
 }
 
+# Retired queue: fold any leftover q/active/ into q/current/ (collision-safe).
+retire_active_queue() {
+  local q="$1" label="$2"
+  { [ -d "$q/active" ] && [ ! -L "$q/active" ]; } || return 0
+  info "retiring $q/active -> $q/current"
+  merge_into "$q/active" "$q/current" "$label"
+  rmdir "$q/active" 2>/dev/null || warn "$q/active not empty after migration; left in place"
+}
+
 # ORIGIN: if specs were dropped because this checkout crossed the untrack commit,
 # restore them from history without touching the index.
 selfheal_specs() {
@@ -184,6 +193,7 @@ if [ "$git_dir" = "$common_dir" ]; then
   run mkdir -p "$top/$SOW_DIR/q"
   migrate_old_queues "$top/$SOW_DIR/q" "migrated"
   for q in $CANON_QUEUES; do run mkdir -p "$top/$SOW_DIR/q/$q"; done
+  retire_active_queue "$top/$SOW_DIR/q" "active"
   selfheal_specs
   run mkdir -p "$top/.local"
   info "${GREEN}SOW working memory ready under $SOW_DIR/q (origin).${NC}"

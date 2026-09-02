@@ -1,7 +1,9 @@
 # Go Area Instructions
 
 This file routes Go-specific work under `src/go/`. The repo-root `AGENTS.md` applies in full; a more specific
-`AGENTS.md` in a subdirectory overrides this file for that subtree. Paths are repo-relative unless stated otherwise.
+`AGENTS.md` in a subdirectory overrides this file where they conflict, for that subtree. Paths in the routing table
+are repo-relative; Go commands and Go package paths are relative to the module root `src/go/` (the only `go.mod`),
+so run them from there.
 
 ## Task Routing
 
