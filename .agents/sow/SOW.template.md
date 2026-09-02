@@ -141,10 +141,6 @@ Open decisions:
 
 <Numbered user decisions, options, selection, and reasoning. User decisions must be recorded before implementation.>
 
-## Plan (optional)
-
-1. <chunk, scope, risk, dependencies>
-2. <chunk, scope, risk, dependencies>
 
 ## Steps (optional: umbrella SOWs only)
 
