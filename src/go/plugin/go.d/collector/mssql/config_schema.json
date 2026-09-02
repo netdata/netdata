@@ -174,7 +174,7 @@
         "properties": {
           "top_queries": {
             "title": "Top Queries",
-            "description": "Configuration for top-queries using Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database.",
+            "description": "Configuration for top-queries. Uses Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database, and falls back to the plan cache (sys.dm_exec_query_stats) when Query Store is unavailable or disabled.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -199,7 +199,7 @@
               },
               "time_window_days": {
                 "title": "Time Window (Days)",
-                "description": "How many days of Query Store data to query. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
+                "description": "How many days of query statistics to query. On the plan-cache fallback this filters by last execution time instead of aggregating a period. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
                 "type": "integer",
                 "minimum": -1,
                 "default": 7
@@ -311,10 +311,10 @@
     "functions": {
       "top_queries": {
         "disabled": {
-          "ui:help": "WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Query text and runtime views require version-specific server and per-database performance-state permissions."
+          "ui:help": "WARNING: query text may contain unmasked PII (customer names, emails, IDs). Query text and runtime views require version-specific server and per-database performance-state permissions."
         },
         "time_window_days": {
-          "ui:help": "Limits Query Store data to recent days. Lower positive values improve performance on busy servers; 0 uses 7 days and -1 includes all available history."
+          "ui:help": "Limits query statistics to recent days. Lower positive values improve performance on busy servers; 0 uses 7 days and -1 includes all available history."
         }
       },
       "deadlock_info": {

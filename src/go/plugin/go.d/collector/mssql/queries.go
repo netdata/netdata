@@ -414,6 +414,11 @@ WHERE o.name = 'databases'
   AND c.name = 'is_query_store_on';
 `
 
+// queryPlanCacheColumns discovers which sys.dm_exec_query_stats columns this release has.
+// The DMV exists since SQL Server 2005 but gained columns over time, so top-queries probes
+// it instead of gating on a version number.
+const queryPlanCacheColumns = `SELECT TOP 0 * FROM sys.dm_exec_query_stats`
+
 // queryMSSQLErrorActiveSessionExists checks for a running configured Extended Events session.
 const queryMSSQLErrorActiveSessionExists = `
 SELECT COUNT(*)
