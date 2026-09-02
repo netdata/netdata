@@ -312,8 +312,9 @@ MCP_RETURN_CODE mcp_dispatch_method(MCP_CLIENT *mcpc, const char *method, struct
 
     if (strcmp(method, "notifications/initialized") == 0) {
         mcpc->ready = true;
-        netdata_log_debug(D_WEB_CLIENT, "MCP client %s v%s is now ready",
-                          string2str(mcpc->client_name), string2str(mcpc->client_version));
+        netdata_log_debug(D_WEB_CLIENT,
+                          "MCP client is now ready (client_name_bytes=%zu, client_version_bytes=%zu)",
+                          string_strlen(mcpc->client_name), string_strlen(mcpc->client_version));
         mcp_client_prepare_response(mcpc);
         mcp_init_success_result(mcpc, 0);
         buffer_json_finalize(mcpc->result);
@@ -321,7 +322,7 @@ MCP_RETURN_CODE mcp_dispatch_method(MCP_CLIENT *mcpc, const char *method, struct
     }
 
     if (!mcpc->ready && strcmp(method, "initialize") != 0) {
-        netdata_log_debug(D_WEB_CLIENT, "MCP method %s called before initialize", method);
+        netdata_log_debug(D_WEB_CLIENT, "MCP method called before initialize");
     }
 
     mcp_client_prepare_response(mcpc);
@@ -352,8 +353,9 @@ MCP_RETURN_CODE mcp_dispatch_method(MCP_CLIENT *mcpc, const char *method, struct
     }
     else if (strcmp(method, "initialize") == 0) {
         mcp_extract_client_info(mcpc, params);
-        netdata_log_debug(D_WEB_CLIENT, "MCP initialize request from client %s v%s",
-                          string2str(mcpc->client_name), string2str(mcpc->client_version));
+        netdata_log_debug(D_WEB_CLIENT,
+                          "MCP initialize request (client_name_bytes=%zu, client_version_bytes=%zu)",
+                          string_strlen(mcpc->client_name), string_strlen(mcpc->client_version));
         rc = mcp_method_initialize(mcpc, params, 0);
     }
     else if (strcmp(method, "ping") == 0) {

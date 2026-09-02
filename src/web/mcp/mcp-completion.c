@@ -45,7 +45,7 @@ static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct j
         return MCP_RC_BAD_REQUEST;
     }
     
-    // Extract argument name and value
+    // Validate argument name and value.
     struct json_object *name_obj = NULL;
     struct json_object *value_obj = NULL;
     
@@ -59,11 +59,10 @@ static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct j
         return MCP_RC_BAD_REQUEST;
     }
     
-    const char *name = json_object_get_string(name_obj);
-    const char *value = json_object_get_string(value_obj);
-    
-    // Log that we received this request (actual implementation would generate completion options)
-    netdata_log_info("MCP received completion/complete request for argument '%s' with value '%s'", name, value);
+    // Log receipt without copying request-provided values into the journal.
+    netdata_log_info(
+        "MCP received completion/complete request (argument_name_bytes=%zu, argument_value_bytes=%zu)",
+        (size_t)json_object_get_string_len(name_obj), (size_t)json_object_get_string_len(value_obj));
     
     // Initialize success response
     mcp_init_success_result(mcpc, id);
@@ -92,7 +91,7 @@ static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct j
 MCP_RETURN_CODE mcp_completion_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP completion method: %s", method);
+    netdata_log_debug(D_MCP, "MCP completion method received");
 
     MCP_RETURN_CODE rc;
     

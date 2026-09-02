@@ -528,8 +528,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         poll_process_tcp_read(pi, now);
                     else {
                         nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d.",
-                               i,
+                               "POLLFD: LISTENER: client fd %d connection from %s port %s using unhandled socket type %d.",
                                pi->fd,
                                pi->client_ip ? pi->client_ip : "<undefined-ip>",
                                pi->client_port ? pi->client_port : "<undefined-port>",
@@ -548,8 +547,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                     }
                     else {
                         nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d.",
-                               i,
+                               "POLLFD: LISTENER: server fd %d connection from %s port %s using unhandled socket type %d.",
                                pi->fd,
                                pi->client_ip ? pi->client_ip : "<undefined-ip>",
                                pi->client_port ? pi->client_port : "<undefined-port>",
@@ -560,8 +558,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                 }
                 else {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
-                           , i
+                           "POLLFD: LISTENER: socket fd %d data from %s port %s using flags %08X is neither client nor server."
                            , pi->fd
                            , pi->client_ip ? pi->client_ip : "<undefined-ip>"
                            , pi->client_port ? pi->client_port : "<undefined-port>"
@@ -575,8 +572,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                 unhandled_counter++;
 
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
-                       , i
+                       "POLLFD: LISTENER: socket fd %d client %s port %s unhandled event id %d."
                        , pi->fd
                        , pi->client_ip ? pi->client_ip : "<undefined-ip>"
                        , pi->client_port ? pi->client_port : "<undefined-port>"
@@ -601,8 +597,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                     if (unlikely(poll_request_ingress_timed_out(
                             pi, p.complete_request_timeout, now))) {
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not completed its current request in %zu seconds - closing it. "
-                               , i
+                               "POLLFD: LISTENER: client fd %d from %s port %s has not completed its current request in %zu seconds - closing it. "
                                , pi->fd
                                , pi->client_ip ? pi->client_ip : "<undefined-ip>"
                                , pi->client_port ? pi->client_port : "<undefined-port>"
@@ -617,8 +612,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         (now - pi->connected_t) >= p.complete_request_timeout
                     )) {
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not completed its first request in %zu seconds - closing it. "
-                               , i
+                               "POLLFD: LISTENER: client fd %d from %s port %s has not completed its first request in %zu seconds - closing it. "
                                , pi->fd
                                , pi->client_ip ? pi->client_ip : "<undefined-ip>"
                                , pi->client_port ? pi->client_port : "<undefined-port>"
@@ -628,8 +622,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                     }
                     else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
-                               , i
+                               "POLLFD: LISTENER: client fd %d from %s port %s is idle for more than %zu seconds - closing it. "
                                , pi->fd
                                , pi->client_ip ? pi->client_ip : "<undefined-ip>"
                                , pi->client_port ? pi->client_port : "<undefined-port>"

@@ -160,6 +160,7 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
         goto cleanup;
     }
 
+    web_client_prepare_response_data(w);
     web_client_timeout_checkpoint_set(w, query->timeout);
     if(web_client_timeout_checkpoint_and_check(w, &dt_ut)) {
         nd_log(NDLS_ACCESS, NDLP_ERR,

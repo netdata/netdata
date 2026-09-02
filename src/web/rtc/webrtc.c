@@ -354,8 +354,8 @@ static void webrtc_execute_api_request(
             web_client_decode_path_and_query_string(w, path, size - path_offset);
     }
 
+    web_client_prepare_response_data(w);
     if(unlikely(validation != HTTP_VALIDATION_OK)) {
-        buffer_flush(w->response.data);
         if(validation == HTTP_VALIDATION_REQUEST_TOO_LARGE)
             buffer_strcat(w->response.data, "Request is too large.");
         else

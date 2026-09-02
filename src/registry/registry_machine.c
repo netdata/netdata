@@ -7,7 +7,7 @@
 // MACHINE
 
 REGISTRY_MACHINE *registry_machine_find(const char *machine_guid) {
-    netdata_log_debug(D_REGISTRY, "REGISTRY: registry_machine_find('%s')", machine_guid);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: machine lookup (guid_bytes=%zu)", strlen(machine_guid));
     return dictionary_get(registry.machines, machine_guid);
 }
 
@@ -74,7 +74,8 @@ REGISTRY_MACHINE *registry_machine_find_or_create(const char *machine_guid, time
         // validate it is a GUID
         char buf[GUID_LEN + 1];
         if(unlikely(regenerate_guid(machine_guid, buf) == -1))
-            netdata_log_info("REGISTRY: machine guid '%s' is not a valid guid. Ignoring it.", machine_guid);
+            netdata_log_info("REGISTRY: machine GUID is not valid (guid_bytes=%zu); ignoring it.",
+                             strlen(machine_guid));
         else {
             machine_guid = buf;
             m = registry_machine_find(machine_guid);

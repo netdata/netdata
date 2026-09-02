@@ -71,7 +71,7 @@ static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_obje
 MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP prompts method: %s", method);
+    netdata_log_debug(D_MCP, "MCP prompts method received");
 
     MCP_RETURN_CODE rc;
     

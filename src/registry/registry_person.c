@@ -106,7 +106,7 @@ REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY
 // PERSON
 
 REGISTRY_PERSON *registry_person_find(const char *person_guid) {
-    netdata_log_debug(D_REGISTRY, "Registry: registry_person_find('%s')", person_guid);
+    netdata_log_debug(D_REGISTRY, "Registry: person lookup (guid_bytes=%zu)", strlen(person_guid));
     return dictionary_get(registry.persons, person_guid);
 }
 
@@ -149,7 +149,8 @@ REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) 
 // 3. if it is not valid, create a new one
 // 4. return it
 REGISTRY_PERSON *registry_person_find_or_create(const char *person_guid, time_t when, bool is_dummy) {
-    netdata_log_debug(D_REGISTRY, "Registry: registry_person_find_or_create('%s'): creating dictionary of urls", person_guid);
+    netdata_log_debug(D_REGISTRY, "Registry: person lookup or creation (guid_bytes=%zu)",
+                      person_guid ? strlen(person_guid) : 0);
 
     char buf[GUID_LEN + 1];
     REGISTRY_PERSON *p = NULL;
@@ -157,7 +158,7 @@ REGISTRY_PERSON *registry_person_find_or_create(const char *person_guid, time_t 
     if(person_guid && *person_guid) {
         // validate it is a GUID
         if(unlikely(regenerate_guid(person_guid, buf) == -1)) {
-            netdata_log_info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
+            netdata_log_info("Registry: person GUID is not valid (guid_bytes=%zu); ignoring it.", strlen(person_guid));
             person_guid = NULL;
         }
         else {

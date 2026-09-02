@@ -64,7 +64,7 @@ static void mcp_websocket_send_payload(struct websocket_server_client *wsc, BUFF
     if (!text)
         return;
 
-    netdata_log_debug(D_MCP, "SND: %s", text);
+    netdata_log_debug(D_MCP, "MCP WebSocket response sent (bytes=%zu)", buffer_strlen(payload));
     websocket_protocol_send_text(wsc, text);
 }
 
@@ -80,8 +80,7 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
         return;
     }
 
-    // Log the raw incoming message
-    netdata_log_debug(D_MCP, "RCV: %s", message);
+    netdata_log_debug(D_MCP, "MCP WebSocket request received (bytes=%zu)", length);
     
     // Silently ignore standalone "PING" messages (legacy MCP client behavior)
     if (length == 4 && strncmp(message, "PING", 4) == 0) {

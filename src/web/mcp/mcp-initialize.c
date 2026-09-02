@@ -54,8 +54,9 @@ MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *para
         mcpc->protocol_version = MCP_PROTOCOL_VERSION_2024_11_05;
     }
 
-    netdata_log_debug(D_MCP, "MCP initialize request from client %s version %s, protocol version %s",
-                      string2str(mcpc->client_name), string2str(mcpc->client_version),
+    netdata_log_debug(D_MCP,
+                      "MCP initialize request (client_name_bytes=%zu, client_version_bytes=%zu, protocol_version=%s)",
+                      string_strlen(mcpc->client_name), string_strlen(mcpc->client_version),
                       MCP_PROTOCOL_VERSION_2str(mcpc->protocol_version));
 
     // Initialize result buffer with JSON structure

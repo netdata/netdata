@@ -4,6 +4,7 @@
 #include "web/websocket/websocket.h"
 #include "web/mcp/adapters/mcp-http.h"
 #include "web/mcp/adapters/mcp-sse.h"
+#include "registry/registry.h"
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers
@@ -124,6 +125,30 @@ static inline void web_client_reset_or_recreate_buffer(
         buffer_reset(*wb);
 }
 
+void web_client_prepare_response_data(struct web_client *w) {
+    if(w->response.data->size > w->response_data_preserved_size) {
+        buffer_free(w->response.data);
+        w->response.data = buffer_create(w->response_data_preserved_size, w->statistics.memory_accounting);
+    }
+    else
+        buffer_reset(w->response.data);
+
+    w->response_data_is_response = true;
+}
+
+static inline void web_client_reset_response_data(struct web_client *w) {
+    if(w->response_data_is_response) {
+        w->response_data_preserved_size = MAX(w->response_data_preserved_size, w->response.data->size);
+        buffer_reset(w->response.data);
+    }
+    else if(w->response.data->size > w->response_data_preserved_size) {
+        buffer_free(w->response.data);
+        w->response.data = buffer_create(w->response_data_preserved_size, w->statistics.memory_accounting);
+    }
+    else
+        buffer_reset(w->response.data);
+}
+
 typedef enum {
     WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST,
     WEB_CLIENT_ALLOCATIONS_FOR_CACHE,
@@ -162,6 +187,9 @@ static void web_client_reset_allocations(struct web_client *w, WEB_CLIENT_ALLOCA
     else {
         // Oversized request-derived allocations should not remain attached to a keep-alive or cached client.
 
+        w->registry_person_guid_present = false;
+        w->registry_person_guid[0] = '\0';
+
         web_client_reset_or_recreate_buffer(&w->url_as_received,
                                             NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
                                             NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
@@ -187,16 +215,7 @@ static void web_client_reset_allocations(struct web_client *w, WEB_CLIENT_ALLOCA
                                             NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
                                             NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
                                             w->statistics.memory_accounting);
-        if(mode == WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST &&
-           w->response.data->len > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
-            // Keep large-response capacity on an active keep-alive connection to avoid reallocating it every request.
-            buffer_reset(w->response.data);
-        }
-        else
-            web_client_reset_or_recreate_buffer(&w->response.data,
-                                                NETDATA_WEB_RESPONSE_INITIAL_SIZE,
-                                                NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
-                                                w->statistics.memory_accounting);
+        web_client_reset_response_data(w);
 
         if(w->payload) {
             if(w->payload->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
@@ -342,6 +361,7 @@ void web_client_request_done(struct web_client *w) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
     web_client_log_completed_request(w, true);
+    w->response_data_is_response = true;
     web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST);
 
     w->mode = HTTP_REQUEST_MODE_GET;
@@ -706,7 +726,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING)) {
         web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
         query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
-                                       buffer_tostring(w->url_for_logging),
+                                       buffer_tostring(w->url_as_received),
                                        w->payload,
                                        w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
     }
@@ -963,11 +983,23 @@ static HTTP_VALIDATION web_client_request_complete_and_extract_payload(
         return HTTP_VALIDATION_INCOMPLETE;
 
     if(!w->payload)
-        w->payload = buffer_create(payload_length + 1, NULL);
+        w->payload = buffer_create(payload_length + 1, w->statistics.memory_accounting);
 
     buffer_contents_replace(w->payload, &request[w->request_header_length], payload_length);
     w->payload->content_type = w->request_content_type;
     return HTTP_VALIDATION_OK;
+}
+
+static inline void web_client_extract_registry_person_guid(struct web_client *w, const char *request) {
+    w->registry_person_guid_present = false;
+    w->registry_person_guid[0] = '\0';
+
+    const char *cookie = strstr(request, NETDATA_REGISTRY_COOKIE_NAME "=");
+    if(cookie) {
+        w->registry_person_guid_present = true;
+        strncpyz(w->registry_person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)],
+                 sizeof(w->registry_person_guid) - 1);
+    }
 }
 
 /**
@@ -1044,6 +1076,7 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
                     return HTTP_VALIDATION_REDIRECT;
                 }
 
+                web_client_extract_registry_person_guid(w, request);
                 web_client_request_validation_end(w);
                 return HTTP_VALIDATION_OK;
             }
@@ -1241,11 +1274,8 @@ static inline void web_client_send_http_header(struct web_client *w) {
     }
 
     // sent the HTTP header
-    netdata_log_debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"
-          , w->id
-          , buffer_strlen(w->response.header_output)
-          , buffer_tostring(w->response.header_output)
-    );
+    netdata_log_debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu.", w->id,
+                      buffer_strlen(w->response.header_output));
 
     sock_setcork(w->fd, true);
 
@@ -1359,7 +1389,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
     char *tok = strsep_skip_consecutive_separators(&url, "/");
     if(tok && *tok) {
-        netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for requested host.", w->id);
 
         if(nodeid) {
             host = rrdhost_find_by_node_id(tok);
@@ -1468,7 +1498,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
-        netdata_log_debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: Processing requested command.", w->id);
 
         if(likely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
@@ -1549,7 +1579,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             // get the name of the data to show
             tok = strsep_skip_consecutive_separators(&decoded_url_path, "&");
             if(tok && *tok) {
-                netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+                netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for requested RRD data.", w->id);
 
                 // do we have such a data set?
                 RRDSET *st = rrdset_find_byname(host, tok);
@@ -1558,7 +1588,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                     w->response.data->content_type = CT_TEXT_HTML;
                     buffer_strcat(w->response.data, "Chart is not found: ");
                     buffer_strcat_htmlescape(w->response.data, tok);
-                    netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
+                    netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Requested RRD data is not found.", w->id);
                     return HTTP_RESP_NOT_FOUND;
                 }
 
@@ -1570,7 +1600,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 w->response.data->content_type = CT_TEXT_HTML;
                 buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
                 buffer_strcat_htmlescape(w->response.data, tok);
-                netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
+                netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Requested RRD data debug is %s.", w->id,
+                                  rrdset_flag_check(st, RRDSET_FLAG_DEBUG) ? "enabled" : "disabled");
                 return HTTP_RESP_OK;
             }
 
@@ -1647,10 +1678,12 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
     switch(validation) {
         case HTTP_VALIDATION_OK:
+            web_client_prepare_response_data(w);
+
             if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING)) {
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
                 query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
-                                               buffer_tostring(w->url_for_logging),
+                                               buffer_tostring(w->url_as_received),
                                                w->payload,
                                                w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
             }
@@ -1787,7 +1820,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             web_client_prepare_request_summary(w, "request too large");
             buffer_flush(w->url_as_received);
             buffer_strcat(w->url_as_received, "request too large");
-            buffer_flush(w->response.data);
+            web_client_prepare_response_data(w);
             buffer_sprintf(w->response.data,
                            "Request is too large (received at least %zu bytes, maximum is %zu bytes).\r\n",
                            request_length,
@@ -1799,7 +1832,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
         case HTTP_VALIDATION_REDIRECT:
         {
-            buffer_flush(w->response.data);
+            web_client_prepare_response_data(w);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_strcat(w->response.data,
                           "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html>"
@@ -1818,7 +1851,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             netdata_log_debug(
                 D_WEB_CLIENT_ACCESS, "%llu: Malformed URL '%s'.", w->id, buffer_tostring(w->url_for_logging));
 
-            buffer_flush(w->response.data);
+            web_client_prepare_response_data(w);
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
             w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL);
             break;
@@ -1830,7 +1863,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 w->id,
                 buffer_tostring(w->url_for_logging));
 
-            buffer_flush(w->response.data);
+            web_client_prepare_response_data(w);
             buffer_strcat(w->response.data, "HTTP method requested is not supported...\r\n");
             w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
@@ -2206,10 +2239,10 @@ ssize_t web_client_receive(struct web_client *w) {
         bytes = -1;
 
     if(likely(bytes > 0)) {
-        w->statistics.received_bytes += bytes;
+        if(unlikely(!request_length))
+            w->response_data_is_response = false;
 
-        size_t old = w->response.data->len;
-        (void)old;
+        w->statistics.received_bytes += bytes;
 
         w->response.data->len += bytes;
         w->response.data->buffer[w->response.data->len] = '\0';
@@ -2218,7 +2251,6 @@ ssize_t web_client_receive(struct web_client *w) {
             w->request_too_large = true;
 
         netdata_log_debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
-        netdata_log_debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }
     else if(unlikely(bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))) {
         web_client_enable_wait_receive(w);
@@ -2233,6 +2265,22 @@ ssize_t web_client_receive(struct web_client *w) {
     return(bytes);
 }
 
+ssize_t web_client_receive_available(struct web_client *w) {
+    ssize_t total = 0;
+
+    do {
+        ssize_t bytes = web_client_receive(w);
+        if(bytes < 0)
+            return total ? total : bytes;
+        if(!bytes)
+            break;
+
+        total += bytes;
+    } while(!w->request_too_large && SSL_connection(&w->ssl) && netdata_ssl_has_pending(&w->ssl));
+
+    return total;
+}
+
 // Production callers must enforce web_client_request_size_validation() before invoking this decoder.
 HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string, size_t length) {
     buffer_flush(w->url_path_decoded);
@@ -2244,13 +2292,20 @@ HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, co
         buffer_content_summary(w->url_for_logging, path_and_query_string, length);
     }
 
-    CLEAN_CHAR_P *decoded = mallocz(length + 1);
+    BUFFER *decoded_buffer = w->mode == HTTP_REQUEST_MODE_STREAM ?
+        w->url_query_string_decoded : w->url_path_decoded;
+    buffer_need_bytes(decoded_buffer, length + 1);
+
+    char *decoded = decoded_buffer->buffer;
     size_t decoded_length = 0;
     URL_DECODE_STATUS decode_status =
-        url_decode_r_len(decoded, length + 1, path_and_query_string, length, &decoded_length);
+        url_decode_r_len(decoded, decoded_buffer->size, path_and_query_string, length, &decoded_length);
 
     if(unlikely(decode_status != URL_DECODE_OK))
         return HTTP_VALIDATION_MALFORMED_URL;
+
+    decoded_buffer->len = decoded_length;
+    decoded[decoded_length] = '\0';
 
     // PATH_IS_MCP is a function of the URL alone; clear and re-derive on
     // every decode so keepalived connections reusing the same web_client
@@ -2259,7 +2314,6 @@ HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, co
 
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
-        buffer_contents_replace(w->url_query_string_decoded, decoded, decoded_length);
     }
     else {
         // in non-stream mode, there is a path
@@ -2272,9 +2326,8 @@ HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, co
         if (question_mark_start) {
             size_t path_length = (size_t)(question_mark_start - decoded);
             buffer_contents_replace(w->url_query_string_decoded, question_mark_start, decoded_length - path_length);
-            buffer_contents_replace(w->url_path_decoded, decoded, path_length);
-        } else {
-            buffer_contents_replace(w->url_path_decoded, decoded, decoded_length);
+            w->url_path_decoded->len = path_length;
+            w->url_path_decoded->buffer[path_length] = '\0';
         }
 
         // Classify path: set PATH_IS_MCP when the URL addresses one of
@@ -2314,12 +2367,14 @@ void web_client_reuse_from_cache(struct web_client *w) {
 
     size_t use_count = w->use_count;
     size_t *statistics_memory_accounting = w->statistics.memory_accounting;
+    size_t response_data_preserved_size = w->response_data_preserved_size;
 
     // zero everything
     memset(w, 0, sizeof(struct web_client));
 
     w->fd = -1;
     w->statistics.memory_accounting = statistics_memory_accounting;
+    w->response_data_preserved_size = response_data_preserved_size;
     w->use_count = use_count;
 
     w->ssl = ssl;
@@ -2348,6 +2403,7 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     w->url_path_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->url_query_string_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->response_data_preserved_size = w->response.data->size;
     w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, w->statistics.memory_accounting);
     w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE, w->statistics.memory_accounting);
 
@@ -2385,8 +2441,142 @@ static void web_client_unittest_prepare_request(struct web_client *w, size_t req
     buffer_strcat(w->response.data, suffix);
 }
 
+static int web_client_unittest_tls_pending(void) {
+    int errors = 1;
+    EVP_PKEY_CTX *key_ctx = NULL;
+    EVP_PKEY *key = NULL;
+    X509 *certificate = NULL;
+    SSL_CTX *server_ctx = NULL, *client_ctx = NULL;
+    SSL *server = NULL, *client = NULL;
+    BIO *server_bio = NULL, *client_bio = NULL;
+    struct web_client *w = NULL;
+    char *request = NULL;
+    SSL_CTX *saved_web_server_ctx = netdata_ssl_web_server_ctx;
+    size_t memory_accounting = 0;
+
+    key_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+    if(!key_ctx || EVP_PKEY_keygen_init(key_ctx) <= 0 ||
+       EVP_PKEY_CTX_set_rsa_keygen_bits(key_ctx, 2048) <= 0 ||
+       EVP_PKEY_keygen(key_ctx, &key) <= 0)
+        goto cleanup;
+
+    certificate = X509_new();
+    if(!certificate || !X509_set_version(certificate, 2) ||
+       !ASN1_INTEGER_set(X509_get_serialNumber(certificate), 1) ||
+       !X509_gmtime_adj(X509_get_notBefore(certificate), 0) ||
+       !X509_gmtime_adj(X509_get_notAfter(certificate), 60) ||
+       !X509_set_pubkey(certificate, key))
+        goto cleanup;
+
+    X509_NAME *name = X509_get_subject_name(certificate);
+    if(!name || !X509_NAME_add_entry_by_txt(
+                    name, "CN", MBSTRING_ASC, (const unsigned char *)"netdata-tls-test", -1, -1, 0) ||
+       !X509_set_issuer_name(certificate, name) || !X509_sign(certificate, key, EVP_sha256()))
+        goto cleanup;
+
+#if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+    server_ctx = SSL_CTX_new(SSLv23_server_method());
+    client_ctx = SSL_CTX_new(SSLv23_client_method());
+#else
+    server_ctx = SSL_CTX_new(TLS_server_method());
+    client_ctx = SSL_CTX_new(TLS_client_method());
+#endif
+    if(!server_ctx || !client_ctx || !SSL_CTX_use_certificate(server_ctx, certificate) ||
+       !SSL_CTX_use_PrivateKey(server_ctx, key) || !SSL_CTX_check_private_key(server_ctx))
+        goto cleanup;
+
+    SSL_CTX_set_verify(client_ctx, SSL_VERIFY_NONE, NULL);
+    server = SSL_new(server_ctx);
+    client = SSL_new(client_ctx);
+    if(!server || !client || BIO_new_bio_pair(&server_bio, 1 << 20, &client_bio, 1 << 20) != 1)
+        goto cleanup;
+
+    SSL_set_bio(server, server_bio, server_bio);
+    SSL_set_bio(client, client_bio, client_bio);
+    server_bio = client_bio = NULL;
+    SSL_set_accept_state(server);
+    SSL_set_connect_state(client);
+
+    bool server_complete = false, client_complete = false;
+    for(size_t i = 0; i < 100 && (!server_complete || !client_complete); i++) {
+        if(!client_complete) {
+            int rc = SSL_do_handshake(client);
+            if(rc == 1)
+                client_complete = true;
+            else {
+                int ssl_error = SSL_get_error(client, rc);
+                if(ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE)
+                    goto cleanup;
+            }
+        }
+
+        if(!server_complete) {
+            int rc = SSL_do_handshake(server);
+            if(rc == 1)
+                server_complete = true;
+            else {
+                int ssl_error = SSL_get_error(server, rc);
+                if(ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE)
+                    goto cleanup;
+            }
+        }
+    }
+    if(!server_complete || !client_complete)
+        goto cleanup;
+
+    const size_t request_length = 16 * 1024;
+    static const char prefix[] = "GET ";
+    static const char suffix[] = " HTTP/1.1\r\n\r\n";
+    request = mallocz(request_length + 1);
+    memcpy(request, prefix, sizeof(prefix) - 1);
+    size_t target_length = request_length - (sizeof(prefix) - 1) - (sizeof(suffix) - 1);
+    memset(&request[sizeof(prefix) - 1], 'a', target_length);
+    request[sizeof(prefix) - 1] = '/';
+    memcpy(&request[request_length - (sizeof(suffix) - 1)], suffix, sizeof(suffix) - 1);
+
+    if(SSL_write(client, request, (int)request_length) != (int)request_length)
+        goto cleanup;
+
+    w = web_client_create(&memory_accounting);
+    web_client_set_conn_tcp(w);
+    w->ssl.conn = server;
+    w->ssl.state = NETDATA_SSL_STATE_COMPLETE;
+    server = NULL;
+    netdata_ssl_web_server_ctx = server_ctx;
+
+    if(web_client_receive_available(w) != (ssize_t)request_length ||
+       w->statistics.received_bytes != request_length ||
+       buffer_strlen(w->response.data) != request_length ||
+       netdata_ssl_has_pending(&w->ssl) || http_request_validate(w) != HTTP_VALIDATION_OK)
+        goto cleanup;
+
+    errors = 0;
+
+cleanup:
+    netdata_ssl_web_server_ctx = saved_web_server_ctx;
+    freez(request);
+    if(w)
+        web_client_free(w);
+    SSL_free(server);
+    SSL_free(client);
+    BIO_free(server_bio);
+    BIO_free(client_bio);
+    SSL_CTX_free(server_ctx);
+    SSL_CTX_free(client_ctx);
+    X509_free(certificate);
+    EVP_PKEY_free(key);
+    EVP_PKEY_CTX_free(key_ctx);
+
+    if(memory_accounting)
+        errors++;
+    if(errors)
+        fprintf(stderr, "WEB REQUEST: TLS pending-data test failed\n");
+
+    return errors;
+}
+
 int web_client_request_unittest(void) {
-    int errors = poll_events_unittest() + web_client_cache_unittest();
+    int errors = poll_events_unittest() + web_client_cache_unittest() + web_client_unittest_tls_pending();
     size_t memory_accounting = 0;
     struct web_client *w = web_client_create(&memory_accounting);
     w->fd = -1;
@@ -2653,6 +2843,37 @@ int web_client_request_unittest(void) {
 
     buffer_flush(w->url_for_logging);
 
+    static const char registry_guid[] = "11111111-2222-3333-4444-555555555555";
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "GET /api/v1/registry?action=search HTTP/1.1\r\n"
+                   "Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s\r\n\r\n",
+                   registry_guid);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
+        errors++;
+
+    web_client_prepare_response_data(w);
+    if(buffer_strlen(w->response.data) || !w->registry_person_guid_present ||
+       strcmp(w->registry_person_guid, registry_guid))
+        errors++;
+
+    static const char empty_registry_cookie_payload[] = NETDATA_REGISTRY_COOKIE_NAME "=";
+    web_client_reuse_from_cache(w);
+    buffer_sprintf(w->response.data,
+                   "POST /api/v1/registry?action=search HTTP/1.1\r\n"
+                   "Authorization: Bearer sentinel-auth-value\r\n"
+                   "Content-Length: %zu\r\n\r\n%s",
+                   sizeof(empty_registry_cookie_payload) - 1, empty_registry_cookie_payload);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->registry_person_guid_present ||
+       w->registry_person_guid[0])
+        errors++;
+
+    web_client_prepare_response_data(w);
+    if(buffer_strlen(w->response.data) || !w->registry_person_guid_present ||
+       w->registry_person_guid[0])
+        errors++;
+
     w->header_parse_last_size = 11;
     w->request_header_length = 22;
     w->request_content_length = 33;
@@ -2663,7 +2884,7 @@ int web_client_request_unittest(void) {
     web_client_request_done(w);
     if(w->header_parse_last_size || w->request_header_length || w->request_content_length ||
        w->request_content_type != CT_TEXT_PLAIN || w->request_content_length_valid ||
-       w->request_too_large)
+       w->request_too_large || w->registry_person_guid_present || w->registry_person_guid[0])
         errors++;
 
     buffer_strcat(w->response.data, "GET /after-post HTTP/1.1\r\n\r\n");
@@ -2675,6 +2896,13 @@ int web_client_request_unittest(void) {
     if(web_client_decode_path_and_query_string(w, "/api?x=1", 8) != HTTP_VALIDATION_OK ||
        strcmp(buffer_tostring(w->url_path_decoded), "/api") ||
        strcmp(buffer_tostring(w->url_query_string_decoded), "?x=1"))
+        errors++;
+
+    char *decoded_path_storage = w->url_path_decoded->buffer;
+    size_t decode_memory = memory_accounting;
+    web_client_reuse_from_cache(w);
+    if(web_client_decode_path_and_query_string(w, "/api?x=1", 8) != HTTP_VALIDATION_OK ||
+       w->url_path_decoded->buffer != decoded_path_storage || memory_accounting != decode_memory)
         errors++;
 
     web_client_reuse_from_cache(w);
@@ -2700,7 +2928,7 @@ int web_client_request_unittest(void) {
 
     buffer_strcat(w->response.data, "ok");
     web_client_request_done(w);
-    if(w->response.data->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE || buffer_strlen(w->response.data))
+    if(w->response.data->size != large_response_size || buffer_strlen(w->response.data))
         errors++;
 
     web_client_free(w);

@@ -236,11 +236,13 @@ static void http_header_sec_websocket_key(struct web_client *w, const char *v, s
     w->websocket.key = strdupz(v);
 }
 
-static void http_header_sec_websocket_version(struct web_client *w, const char *v, size_t len __maybe_unused) {
+static void http_header_sec_websocket_version(struct web_client *w, const char *v, size_t len) {
     // We only support version 13, which will be checked during handshake
     // No need to store this as we only accept one version
     if(strcmp(v, "13") != 0) {
-        netdata_log_debug(D_WEB_CLIENT, "%llu: WebSocket version %s not supported, only version 13 is supported", w->id, v);
+        netdata_log_debug(D_WEB_CLIENT,
+                          "%llu: WebSocket version is not supported (version_bytes=%zu); only version 13 is supported",
+                          w->id, len);
         web_client_clear_websocket(w);
     }
 }
@@ -270,7 +272,7 @@ static bool http_header_parse_websocket_window_bits(const char *value, uint8_t *
     return true;
 }
 
-static void http_header_sec_websocket_extensions(struct web_client *w, const char *v, size_t len __maybe_unused) {
+static void http_header_sec_websocket_extensions(struct web_client *w, const char *v, size_t len) {
     // Reset extension flags
     w->websocket.ext_flags = WS_EXTENSION_NONE;
 
@@ -350,9 +352,9 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
             token = strtok_r(NULL, ",", &saveptr);
         }
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: Client requested WebSocket extensions: %s, "
+        netdata_log_debug(D_WEB_CLIENT, "%llu: Client requested WebSocket extensions (bytes=%zu), "
                                         "enabled flags: %u, client_max_window_bits: %u, server_max_window_bits: %u",
-                          w->id, v, w->websocket.ext_flags,
+                          w->id, len, w->websocket.ext_flags,
                           w->websocket.client_max_window_bits,
                           w->websocket.server_max_window_bits);
     }

@@ -83,7 +83,7 @@ FILE *registry_fopen_regular(const char *filename, const char *mode) {
 int regenerate_guid(const char *guid, char *result) {
     nd_uuid_t uuid;
     if(unlikely(uuid_parse(guid, uuid) == -1)) {
-        netdata_log_info("Registry: GUID '%s' is not a valid GUID.", guid);
+        netdata_log_info("Registry: GUID is not valid (guid_bytes=%zu).", strlen(guid));
         return -1;
     }
     else {
@@ -91,7 +91,7 @@ int regenerate_guid(const char *guid, char *result) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if(strcmp(guid, result) != 0)
-            netdata_log_info("GUID '%s' and re-generated GUID '%s' differ!", guid, result);
+            netdata_log_info("Registry: normalized a valid GUID.");
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
@@ -154,7 +154,10 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
     char pbuf[GUID_LEN + 1], mbuf[GUID_LEN + 1];
 
     if(!person_guid || !*person_guid || !machine_guid || !*machine_guid || !url || !*url) {
-        netdata_log_info("Registry Request Verification: invalid request! person: '%s', machine '%s', url '%s'", person_guid?person_guid:"UNSET", machine_guid?machine_guid:"UNSET", url?url:"UNSET");
+        netdata_log_info("Registry request verification failed: missing value (person=%s, machine=%s, url=%s)",
+                         person_guid && *person_guid ? "set" : "missing",
+                         machine_guid && *machine_guid ? "set" : "missing",
+                         url && *url ? "set" : "missing");
         return NULL;
     }
 
@@ -163,14 +166,16 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
 
     // make sure the person GUID is valid
     if(regenerate_guid(person_guid, pbuf) == -1) {
-        netdata_log_info("Registry Request Verification: invalid person GUID, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
+        netdata_log_info("Registry request verification failed: invalid person GUID (person_bytes=%zu)",
+                         strlen(person_guid));
         return NULL;
     }
     person_guid = pbuf;
 
     // make sure the machine GUID is valid
     if(regenerate_guid(machine_guid, mbuf) == -1) {
-        netdata_log_info("Registry Request Verification: invalid machine GUID, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
+        netdata_log_info("Registry request verification failed: invalid machine GUID (machine_bytes=%zu)",
+                         strlen(machine_guid));
         return NULL;
     }
     machine_guid = mbuf;
@@ -178,7 +183,7 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
     // make sure the machine exists
     REGISTRY_MACHINE *m = registry_machine_find(machine_guid);
     if(!m) {
-        netdata_log_info("Registry Request Verification: machine not found, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
+        netdata_log_info("Registry request verification failed: machine not found (url_bytes=%zu)", strlen(url));
         return NULL;
     }
     if(mm) *mm = m;
@@ -186,7 +191,7 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
     // make sure the person exist
     REGISTRY_PERSON *p = registry_person_find(person_guid);
     if(!p) {
-        netdata_log_info("Registry Request Verification: person not found, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
+        netdata_log_info("Registry request verification failed: person not found (url_bytes=%zu)", strlen(url));
         return NULL;
     }
     if(pp) *pp = p;
@@ -196,7 +201,7 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
     string_freez(u);
 
     if(!pu) {
-        netdata_log_info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
+        netdata_log_info("Registry request verification failed: URL not found for person (url_bytes=%zu)", strlen(url));
         return NULL;
     }
     //else if (pu->machine != m) {
@@ -212,7 +217,10 @@ REGISTRY_PERSON_URL *registry_verify_request(const char *person_guid, char *mach
 // REGISTRY REQUESTS
 
 REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
-    netdata_log_debug(D_REGISTRY, "registry_request_access('%s', '%s', '%s'): NEW REQUEST", (person_guid)?person_guid:"", machine_guid, url);
+    netdata_log_debug(D_REGISTRY,
+                      "Registry access request (person_bytes=%zu, machine_bytes=%zu, url_bytes=%zu)",
+                      person_guid ? strlen(person_guid) : 0, machine_guid ? strlen(machine_guid) : 0,
+                      url ? strlen(url) : 0);
 
     bool is_dummy = is_dummy_person(person_guid);
 
@@ -266,8 +274,9 @@ REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_
     REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, d_url);
 
     if(!dpu) {
-        netdata_log_info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid
-             , m->guid, string2str(pu->url), delete_url);
+        netdata_log_info("Registry delete request failed: URL not found for person "
+                         "(request_url_bytes=%zu, delete_url_bytes=%zu)",
+                         string_strlen(pu->url), strlen(delete_url));
         string_freez(d_url);
         return NULL;
     }
@@ -288,14 +297,16 @@ REGISTRY_MACHINE *registry_request_machine(const char *person_guid, char *reques
 
     // make sure the person GUID is valid
     if(regenerate_guid(person_guid, pbuf) == -1) {
-        netdata_log_info("REGISTRY: %s(): invalid person GUID '%s'", __FUNCTION__ , person_guid);
+        netdata_log_info("REGISTRY: %s(): invalid person GUID (guid_bytes=%zu)",
+                         __FUNCTION__, strlen(person_guid));
         return NULL;
     }
     person_guid = pbuf;
 
     // make sure the person GUID is valid
     if(regenerate_guid(request_machine, mbuf) == -1) {
-        netdata_log_info("REGISTRY: %s(): invalid search machine GUID '%s'", __FUNCTION__ , request_machine);
+        netdata_log_info("REGISTRY: %s(): invalid search machine GUID (guid_bytes=%zu)",
+                         __FUNCTION__, strlen(request_machine));
         return NULL;
     }
     request_machine = mbuf;

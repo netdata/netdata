@@ -111,6 +111,41 @@ static inline int aclk_extract_v2_data(char *payload, char **data, bool *request
     return 0;
 }
 
+static const char *aclk_find_v2_payload_separator(const char *msg, size_t msg_len) {
+    static const char separator[] = ACLK_V2_PAYLOAD_SEPARATOR;
+    const size_t separator_length = sizeof(separator) - 1;
+
+    if(!msg || msg_len < separator_length)
+        return NULL;
+
+    for(size_t i = 0; i <= msg_len - separator_length; i++) {
+        if(!memcmp(&msg[i], separator, separator_length))
+            return &msg[i];
+    }
+
+    return NULL;
+}
+
+static char *aclk_old_proto_cmd_to_cstring(const char *msg, size_t msg_len, size_t *copied_length) {
+    static const char separator[] = ACLK_V2_PAYLOAD_SEPARATOR;
+    const char *separator_start = aclk_find_v2_payload_separator(msg, msg_len);
+    if(!separator_start)
+        return NULL;
+
+    size_t prefix_length = (size_t)(separator_start - msg) + sizeof(separator) - 1;
+    size_t request_length = msg_len - prefix_length;
+    size_t bounded_request_length = MIN(request_length, (size_t)NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    size_t length = prefix_length + bounded_request_length;
+
+    char *str = mallocz(length + 1);
+    memcpy(str, msg, length);
+    str[length] = '\0';
+    if(copied_length)
+        *copied_length = length;
+
+    return str;
+}
+
 int aclk_rx_msgs_unittest(void) {
     int errors = 0;
     static const char envelope[] = "{}" ACLK_V2_PAYLOAD_SEPARATOR;
@@ -133,6 +168,16 @@ int aclk_rx_msgs_unittest(void) {
        strlen(request) != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
         errors++;
     freez(request);
+
+    size_t copied_length = 0;
+    CLEAN_CHAR_P *bounded = aclk_old_proto_cmd_to_cstring(
+        raw, envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1, &copied_length);
+    if(!bounded || copied_length != envelope_length + NETDATA_WEB_REQUEST_MAX_SIZE + 1 ||
+       bounded[copied_length] != '\0')
+        errors++;
+
+    if(aclk_old_proto_cmd_to_cstring("no separator", 12, NULL))
+        errors++;
 
     if(errors)
         fprintf(stderr, "ACLK RX: %d test(s) failed\n", errors);
@@ -278,9 +323,12 @@ int handle_old_proto_cmd(const char *msg, size_t msg_len)
     // msg is binary payload in all other cases
     // however in this message from old legacy cloud
     // we have to convert it to C string
-    char *str = mallocz(msg_len+1);
-    memcpy(str, msg, msg_len);
-    str[msg_len] = 0;
+    char *str = aclk_old_proto_cmd_to_cstring(msg, msg_len, NULL);
+    if(!str) {
+        error_report("ACLK legacy command message has no HTTP payload separator");
+        return 1;
+    }
+
     int rc = aclk_handle_cloud_cmd_message(str);
     freez(str);
     return rc;

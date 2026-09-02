@@ -251,7 +251,7 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         (pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED) && !buffer_strlen(w->response.data);
 
     ssize_t bytes;
-    bytes = web_client_receive(w);
+    bytes = web_client_receive_available(w);
 
     if (likely(bytes > 0) || unlikely(w->request_too_large)) {
         if(bytes > 0)

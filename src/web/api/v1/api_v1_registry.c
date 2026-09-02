@@ -46,9 +46,8 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
     // The browser may send multiple cookies with our id
 
     char person_guid[UUID_STR_LEN] = "";
-    char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
-    if(cookie)
-        strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
+    if(w->registry_person_guid_present)
+        strncpyz(person_guid, w->registry_person_guid, UUID_STR_LEN - 1);
     else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
         person_guid[0] = '\0';
 

@@ -63,7 +63,8 @@ static MCP_RETURN_CODE mcp_logging_method_setLevel(MCP_CLIENT *mcpc, struct json
     mcpc->logging_level = parsed_level;
     
     // Log that we received this request and set the level
-    netdata_log_info("MCP client %s logging level set to: %s", string2str(mcpc->client_name), MCP_LOGGING_LEVEL_2str(parsed_level));
+    netdata_log_info("MCP client logging level set (client_name_bytes=%zu, level=%s)",
+                     string_strlen(mcpc->client_name), MCP_LOGGING_LEVEL_2str(parsed_level));
     
     // Initialize success' response with an empty result object
     mcp_init_success_result(mcpc, id);
@@ -76,7 +77,7 @@ static MCP_RETURN_CODE mcp_logging_method_setLevel(MCP_CLIENT *mcpc, struct json
 MCP_RETURN_CODE mcp_logging_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP logging method: %s", method);
+    netdata_log_debug(D_MCP, "MCP logging method received");
 
     MCP_RETURN_CODE rc;
     

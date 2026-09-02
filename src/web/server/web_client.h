@@ -206,6 +206,10 @@ struct web_client {
     HTTP_CONTENT_TYPE request_content_type;
     bool request_content_length_valid;
     bool request_too_large;
+    bool response_data_is_response;
+    size_t response_data_preserved_size;
+    bool registry_person_guid_present;
+    char registry_person_guid[UUID_STR_LEN];
 
     int fd;
 
@@ -277,6 +281,8 @@ int web_client_service_unavailable(struct web_client *w);
 
 ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);
+ssize_t web_client_receive_available(struct web_client *w);
+void web_client_prepare_response_data(struct web_client *w);
 
 void web_client_process_request_from_web_server(struct web_client *w);
 void web_client_request_done(struct web_client *w);

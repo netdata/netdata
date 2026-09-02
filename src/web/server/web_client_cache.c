@@ -33,6 +33,7 @@ static struct clients_cache {
         struct web_client *head;    // the cached structures, available for future clients
         size_t count;               // the number of cached structures
         size_t reserved;            // accepted for caching, currently being reset
+        bool destroying;            // shutdown has detached the cache; new releases must be freed
     } avail;
 } web_clients_cache = {
         .used = {
@@ -47,32 +48,42 @@ static struct clients_cache {
                 .head = NULL,
                 .count = 0,
                 .reserved = 0,
+                .destroying = false,
         },
 };
 
 // destroy the cache and free all the memory it uses
 void web_client_cache_destroy(void) {
-    internal_error(true, "web_client_cache has %zu used, %zu available, and %zu reserved clients, allocated %zu, reused %zu (hit %zu%%)."
-        , web_clients_cache.used.count
-        , web_clients_cache.avail.count
-        , web_clients_cache.avail.reserved
-        , web_clients_cache.used.allocated
-        , web_clients_cache.used.reused
-        , (web_clients_cache.used.allocated + web_clients_cache.used.reused)?(web_clients_cache.used.reused * 100 / (web_clients_cache.used.allocated + web_clients_cache.used.reused)):0
-        );
-
-    struct web_client *w, *t;
+    size_t used_count, allocated, reused;
+    spinlock_lock(&web_clients_cache.used.spinlock);
+    used_count = web_clients_cache.used.count;
+    allocated = web_clients_cache.used.allocated;
+    reused = web_clients_cache.used.reused;
+    spinlock_unlock(&web_clients_cache.used.spinlock);
 
     spinlock_lock(&web_clients_cache.avail.spinlock);
-    w = web_clients_cache.avail.head;
-    while(w) {
-        t = w;
-        w = w->cache.next;
-        web_client_free(t);
-    }
+    struct web_client *w = web_clients_cache.avail.head;
+    size_t available = web_clients_cache.avail.count;
+    size_t reserved = web_clients_cache.avail.reserved;
+    web_clients_cache.avail.destroying = true;
     web_clients_cache.avail.head = NULL;
     web_clients_cache.avail.count = 0;
     spinlock_unlock(&web_clients_cache.avail.spinlock);
+
+    internal_error(true, "web_client_cache has %zu used, %zu available, and %zu reserved clients, allocated %zu, reused %zu (hit %zu%%)."
+        , used_count
+        , available
+        , reserved
+        , allocated
+        , reused
+        , (allocated + reused) ? (reused * 100 / (allocated + reused)) : 0
+        );
+
+    while(w) {
+        struct web_client *t = w;
+        w = w->cache.next;
+        web_client_free(t);
+    }
 
 // DO NOT FREE THEM IF THEY ARE USED
 //    spinlock_lock(&web_clients_cache.used.spinlock);
@@ -87,6 +98,22 @@ void web_client_cache_destroy(void) {
 //    web_clients_cache.used.reused = 0;
 //    web_clients_cache.used.allocated = 0;
 //    spinlock_unlock(&web_clients_cache.used.spinlock);
+}
+
+static bool web_client_cache_publish_reserved(struct web_client *w) {
+    spinlock_lock(&web_clients_cache.avail.spinlock);
+    if(unlikely(!web_clients_cache.avail.reserved))
+        fatal("WEB CLIENT CACHE: publishing a client without a reservation");
+
+    web_clients_cache.avail.reserved--;
+    bool discard = web_clients_cache.avail.destroying;
+    if(!discard) {
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
+        web_clients_cache.avail.count++;
+    }
+    spinlock_unlock(&web_clients_cache.avail.spinlock);
+
+    return !discard;
 }
 
 struct web_client *web_client_get_from_cache(void) {
@@ -142,7 +169,8 @@ void web_client_release_to_cache(struct web_client *w) {
 
     spinlock_lock(&web_clients_cache.avail.spinlock);
     size_t available = web_clients_cache.avail.count + web_clients_cache.avail.reserved;
-    bool discard = w->use_count > 100 ||
+    bool discard = web_clients_cache.avail.destroying ||
+                   w->use_count > 100 ||
                    (used_count > 0 && available >= 2 * (size_t)used_count) ||
                    (used_count <= 10 && available >= 20);
     if(!discard)
@@ -158,13 +186,8 @@ void web_client_release_to_cache(struct web_client *w) {
     // Do not park request-sized allocations until another client needs this slot.
     web_client_reset_allocations_for_cache(w);
 
-    spinlock_lock(&web_clients_cache.avail.spinlock);
-    if(unlikely(!web_clients_cache.avail.reserved))
-        fatal("WEB CLIENT CACHE: publishing a client without a reservation");
-    web_clients_cache.avail.reserved--;
-    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
-    web_clients_cache.avail.count++;
-    spinlock_unlock(&web_clients_cache.avail.spinlock);
+    if(!web_client_cache_publish_reserved(w))
+        web_client_free(w);
 }
 
 static int web_client_cache_unittest_grow_allocations(struct web_client *w) {
@@ -244,6 +267,31 @@ int web_client_cache_unittest(void) {
     if(removed)
         web_client_free(w);
 
+    // Capacity grown by a response remains reusable in the cache.
+    w = web_client_get_from_cache();
+    web_client_prepare_response_data(w);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    w->response.data->len = NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    size_t response_size = w->response.data->size;
+    web_client_release_to_cache(w);
+
+    removed = false;
+    spinlock_lock(&web_clients_cache.avail.spinlock);
+    for(cached = web_clients_cache.avail.head; cached && cached != w; cached = cached->cache.next) {
+        ;
+    }
+    if(!cached || w->response.data->size != response_size)
+        errors++;
+    else {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
+        web_clients_cache.avail.count--;
+        removed = true;
+    }
+    spinlock_unlock(&web_clients_cache.avail.spinlock);
+    if(removed)
+        web_client_free(w);
+
     w = web_client_get_from_cache();
     errors += web_client_cache_unittest_grow_allocations(w);
     w->use_count = 101;
@@ -265,6 +313,31 @@ int web_client_cache_unittest(void) {
             break;
         }
     }
+    spinlock_unlock(&web_clients_cache.avail.spinlock);
+
+    // A release reserved before shutdown is discarded instead of being published after cache destruction.
+    w = web_client_get_from_cache();
+    spinlock_lock(&web_clients_cache.used.spinlock);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.used.head, w, cache.prev, cache.next);
+    web_clients_cache.used.count--;
+    spinlock_unlock(&web_clients_cache.used.spinlock);
+
+    spinlock_lock(&web_clients_cache.avail.spinlock);
+    available_before_discard = web_clients_cache.avail.count;
+    web_clients_cache.avail.reserved++;
+    web_clients_cache.avail.destroying = true;
+    spinlock_unlock(&web_clients_cache.avail.spinlock);
+
+    web_client_reset_allocations_for_cache(w);
+    if(web_client_cache_publish_reserved(w))
+        errors++;
+    else
+        web_client_free(w);
+
+    spinlock_lock(&web_clients_cache.avail.spinlock);
+    if(web_clients_cache.avail.count != available_before_discard || web_clients_cache.avail.reserved)
+        errors++;
+    web_clients_cache.avail.destroying = false;
     spinlock_unlock(&web_clients_cache.avail.spinlock);
 
     if(errors)
