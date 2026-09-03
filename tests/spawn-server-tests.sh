@@ -44,7 +44,13 @@ for base in "${NETDATA_SPAWN_TEST_TMPDIR:-}" /tmp "${TMPDIR:-}"; do
     [ -d "${base}" ] && [ -w "${base}" ] || continue
 
     candidate="$(mktemp -d "${base%/}/nd-spawn-test.XXXXXX" 2>/dev/null)" || continue
-    if [ "${#candidate}" -le "${MAX_RUN_DIR_LEN}" ]; then
+
+    # Bytes, not characters: sun_path is a byte buffer, while bash's ${#var} counts characters in a
+    # multibyte locale. A non-ASCII base (TMPDIR under a name with accents, say) would otherwise
+    # measure short enough here and still overflow sun_path, which is the failure being prevented.
+    candidate_len=$(printf %s "${candidate}" | wc -c | tr -d '[:space:]')
+
+    if [ "${candidate_len}" -le "${MAX_RUN_DIR_LEN}" ]; then
         run_dir="${candidate}"
         break
     fi
