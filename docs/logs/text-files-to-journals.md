@@ -34,8 +34,9 @@ require systemd, this also works on non-systemd Linux distributions: convert loc
 `systemd-journald@nginx` socket units must be active, and they start the journald instance on demand. systemd sets
 this up for any unit that sets `LogNamespace=nginx`, and inside such a unit the option is unnecessary, because the
 unit's default journal socket already belongs to the namespace. The
-namespace keeps the converted logs isolated from the system journal and shows them as a separate source in the Logs
-tab. Without a namespace, drop the option to write to the system journal.
+namespace keeps the converted logs isolated from the system journal; in the Logs tab they appear as their own journal,
+`namespace-nginx`, inside the `systemd-journal` source. Without a namespace, drop the option to write to the system
+journal.
 - The result is a first-class journal stream: query it with `journalctl`, forward it with the standard journal
 centralization mechanisms, ingest it with SIEM agents, and explore it in Netdata under the `systemd-journal` source.
 

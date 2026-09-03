@@ -157,7 +157,8 @@ root-owned setuid permission model as Netdata's other privileged Function plugin
 
 ### How to check if the plugin is running
 
-Confirm the plugin binary is present and executable:
+Confirm the plugin binary is present and executable. `/usr/local/netdata` is the install prefix the kickstart script
+uses on macOS; if Netdata is installed elsewhere, use that prefix instead:
 
 ```bash
 ls -l /usr/local/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin
