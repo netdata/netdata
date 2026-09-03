@@ -847,136 +847,74 @@ static int opentsdb_telnet_unittest_case(
     return errors;
 }
 
-int exporting_opentsdb_telnet_unittest(void) {
-    int errors = 0;
-
-    errors += opentsdb_telnet_unittest_case(
-        "ordinary metadata",
-        "netdata",
-        "localhost",
-        " label=value",
-        "put netdata.chart.name.dimension.name 42 1.5 host=localhost label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "allowed punctuation",
-        "Netdata-A_9/part.",
-        "Host-A_9/path.example",
-        " label=value",
-        "put Netdata-A_9/part..chart.name.dimension.name 42 1.5 host=Host-A_9/path.example label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "hostile metadata",
-        "pre fix\tbad\r\nput",
-        "host name\tbad\r\nput",
-        " label=value",
-        "put pre_fix_bad__put.chart.name.dimension.name 42 1.5 host=host_name_bad__put label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "all-invalid metadata",
-        " \t\r\n",
-        " \t\r\n",
-        " label=value",
-        "put ____.chart.name.dimension.name 42 1.5 host=____ label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "empty metadata",
-        "",
-        "",
-        "",
-        "put .chart.name.dimension.name 42 1.5 host=\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "colliding invalid metadata",
-        "pre fix",
-        "host name",
-        "",
-        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "colliding valid metadata",
-        "pre_fix",
-        "host_name",
-        "",
-        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n");
-
+static const struct {
+    const char *description;
+    const char *prefix;
+    const char *hostname;
+    const char *labels;
+    const char *expected;
+} opentsdb_telnet_cases[] = {
+    { "ordinary metadata", "netdata", "localhost", " label=value",
+      "put netdata.chart.name.dimension.name 42 1.5 host=localhost label=value\n" },
+    { "allowed punctuation", "Netdata-A_9/part.", "Host-A_9/path.example", " label=value",
+      "put Netdata-A_9/part..chart.name.dimension.name 42 1.5 host=Host-A_9/path.example label=value\n" },
+    { "hostile metadata", "pre fix\tbad\r\nput", "host name\tbad\r\nput", " label=value",
+      "put pre_fix_bad__put.chart.name.dimension.name 42 1.5 host=host_name_bad__put label=value\n" },
+    { "all-invalid metadata", " \t\r\n", " \t\r\n", " label=value",
+      "put ____.chart.name.dimension.name 42 1.5 host=____ label=value\n" },
+    { "empty metadata", "", "", "",
+      "put .chart.name.dimension.name 42 1.5 host=\n" },
+    { "colliding invalid metadata", "pre fix", "host name", "",
+      "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n" },
+    { "colliding valid metadata", "pre_fix", "host_name", "",
+      "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n" },
     // netdata/netdata#23684: the configured hostname must survive intact. Only what can corrupt the
     // record is replaced, so every printable byte the user configured reaches the destination.
-    errors += opentsdb_telnet_unittest_case(
-        "colon in metadata",
-        "net:data",
-        "Dev::MyHost",
-        " label=value",
-        "put net:data.chart.name.dimension.name 42 1.5 host=Dev::MyHost label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "preserved punctuation",
-        "pre=fix;a,b+c%d@e#f",
-        "host=name;a,b+c(d)e[f]!g~h*i?j&k$l|m<n>o^p{q}r'\"s\\t",
-        " label=value",
-        "put pre=fix;a,b+c%d@e#f.chart.name.dimension.name 42 1.5 "
-        "host=host=name;a,b+c(d)e[f]!g~h*i?j&k$l|m<n>o^p{q}r'\"s\\t label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "utf8 metadata",
-        "pr\xc3\xa9""fix",
-        "Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de",
-        " label=value",
-        "put pr\xc3\xa9""fix.chart.name.dimension.name 42 1.5 "
-        "host=Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de label=value\n");
-
+    { "colon in metadata", "net:data", "Dev::MyHost", " label=value",
+      "put net:data.chart.name.dimension.name 42 1.5 host=Dev::MyHost label=value\n" },
+    { "preserved punctuation", "pre=fix;a,b+c%d@e#f",
+      "host=name;a,b+c(d)e[f]!g~h*i?j&k$l|m<n>o^p{q}r'\"s\\t", " label=value",
+      "put pre=fix;a,b+c%d@e#f.chart.name.dimension.name 42 1.5 "
+      "host=host=name;a,b+c(d)e[f]!g~h*i?j&k$l|m<n>o^p{q}r'\"s\\t label=value\n" },
+    { "utf8 metadata", "pr\xc3\xa9""fix", "Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de", " label=value",
+      "put pr\xc3\xa9""fix.chart.name.dimension.name 42 1.5 "
+      "host=Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de label=value\n" },
     // an invalid sequence is copied byte for byte, so metadata we cannot interpret is not mangled,
     // except where the lone byte value is itself a control or whitespace codepoint (0x80-0xA0)
-    errors += opentsdb_telnet_unittest_case(
-        "malformed utf8 metadata",
-        "pre\xc3""fix",
-        "host\xff""name",
-        " label=value",
-        "put pre\xc3""fix.chart.name.dimension.name 42 1.5 host=host\xff""name label=value\n");
-
+    { "malformed utf8 metadata", "pre\xc3""fix", "host\xff""name", " label=value",
+      "put pre\xc3""fix.chart.name.dimension.name 42 1.5 host=host\xff""name label=value\n" },
     // non-breaking space: whitespace at the destination's splitter, replaced byte-length preserving
-    errors += opentsdb_telnet_unittest_case(
-        "unicode whitespace metadata",
-        "pre\xc2\xa0""fix",
-        "host\xe2\x80\x83name",
-        " label=value",
-        "put pre__fix.chart.name.dimension.name 42 1.5 host=host___name label=value\n");
-
+    { "unicode whitespace metadata", "pre\xc2\xa0""fix", "host\xe2\x80\x83name", " label=value",
+      "put pre__fix.chart.name.dimension.name 42 1.5 host=host___name label=value\n" },
     // C1 controls are the same hazard as C0 in their multi-byte form: U+009B is the
     // single-character CSI. Two source bytes become two underscores, keeping the length.
-    errors += opentsdb_telnet_unittest_case(
-        "c1 control in metadata",
-        "pre\xc2\x9b""fix",
-        "host\xc2\x80""name",
-        " label=value",
-        "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n");
-
+    { "c1 control in metadata", "pre\xc2\x9b""fix", "host\xc2\x80""name", " label=value",
+      "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n" },
     // a lead byte with no continuation left in the buffer is consumed one byte at a time, so a
     // truncated sequence is not silently rewritten. The orphan continuation byte in the hostname is
     // the documented exception: 0x82 decodes to its own value, which is a C1 control.
-    errors += opentsdb_telnet_unittest_case(
-        "truncated utf8 at end of metadata",
-        "prefix\xc3",
-        "hostname\xe2\x82",
-        " label=value",
-        "put prefix\xc3.chart.name.dimension.name 42 1.5 host=hostname\xe2_ label=value\n");
-
+    { "truncated utf8 at end of metadata", "prefix\xc3", "hostname\xe2\x82", " label=value",
+      "put prefix\xc3.chart.name.dimension.name 42 1.5 host=hostname\xe2_ label=value\n" },
     // same exception in its most likely form: a lone 0x85 or 0xA0 decodes to its own byte value,
     // which is the NEL and NBSP codepoint
-    errors += opentsdb_telnet_unittest_case(
-        "lone whitespace-valued bytes",
-        "pre\x85""fix",
-        "host\xa0""name",
-        " label=value",
-        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name label=value\n");
-
+    { "lone whitespace-valued bytes", "pre\x85""fix", "host\xa0""name", " label=value",
+      "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name label=value\n" },
     // control bytes cannot break our framing, but are never legitimate metadata and would be
     // interpreted by whatever consumes the record downstream
-    errors += opentsdb_telnet_unittest_case(
-        "control bytes in metadata",
-        "pre\x01\x1b""fix",
-        "host\x0b\x7f""name",
-        " label=value",
-        "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n");
+    { "control bytes in metadata", "pre\x01\x1b""fix", "host\x0b\x7f""name", " label=value",
+      "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n" },
+};
+
+int exporting_opentsdb_telnet_unittest(void) {
+    int errors = 0;
+
+    for(size_t i = 0; i < sizeof(opentsdb_telnet_cases) / sizeof(opentsdb_telnet_cases[0]); i++)
+        errors += opentsdb_telnet_unittest_case(
+            opentsdb_telnet_cases[i].description,
+            opentsdb_telnet_cases[i].prefix,
+            opentsdb_telnet_cases[i].hostname,
+            opentsdb_telnet_cases[i].labels,
+            opentsdb_telnet_cases[i].expected);
 
     char long_prefix[4097];
     char long_hostname[4097];
