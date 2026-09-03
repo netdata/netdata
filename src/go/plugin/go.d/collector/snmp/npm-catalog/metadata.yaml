@@ -6265,7 +6265,7 @@ modules:
       plugin_name: go.d.plugin
       module_name: snmp
       monitored_instance:
-        name: Mikrotik Router
+        name: MikroTik Router
         link: ''
         categories:
           - network-performance-monitoring.device-metrics
@@ -6283,7 +6283,7 @@ modules:
         description: ''
     overview:
       data_collection:
-        metrics_description: Monitor Mikrotik Router (network device) with Netdata over SNMP. Netdata recognizes the device automatically by its `sysObjectID` (recognized across 2 device identifiers) and collects the metrics this profile declares — on top of the generic SNMP baseline — with no manual OID configuration.
+        metrics_description: Monitor MikroTik Router (network device) with Netdata over SNMP. Netdata recognizes the device automatically by its `sysObjectID` (recognized across 1 device identifiers) and collects the metrics this profile declares — on top of the generic SNMP baseline — with no manual OID configuration.
         method_description: Netdata's SNMP collector matches the device to the **mikrotik-router.yaml** profile via `sysObjectID`/`sysDescr`, then polls the OIDs it declares.
       supported_platforms:
         include: []
@@ -6293,7 +6293,7 @@ modules:
         description: ''
       default_behavior:
         auto_detection:
-          description: Auto-detected as Mikrotik Router via sysObjectID/sysDescr.
+          description: Auto-detected as MikroTik Router via sysObjectID/sysDescr.
         limits:
           description: ''
         performance_impact:
@@ -6305,8 +6305,55 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: "On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Mikrotik Router profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.\n\n**40 metrics** in 8 groups; each row is a chart context usable in alerts.\n\n| Group | Metrics |\n|---|---|\n| Hardware / CPU | 1 |\n| Hardware / OpticalModule | 8 |\n| Hardware / Sensor | 1 |\n| Network / Interface | 8 |\n| Network / VPN | 8 |\n| System / CPU | 1 |\n| System / Uptime | 1 |\n| Uncategorized | 12 |\n\n### Hardware / CPU\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrHlProcessorTemperature` | `Cel` | device | The current CPU temperature |\n\n### Hardware / OpticalModule\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrOpticalRxLoss` | `{status}` | per optical_index, optical_name | Indicates whether there is a loss of received optical signal (Rx Loss) |\n| `snmp.device_prof_mtxrOpticalRxPower` | `mW` | per optical_index, optical_name | Received optical power |\n| `snmp.device_prof_mtxrOpticalSupplyVoltage` | `V` | per optical_index, optical_name | Supply voltage |\n| `snmp.device_prof_mtxrOpticalTemperature` | `Cel` | per optical_index, optical_name | Temperature at sensor chip |\n| `snmp.device_prof_mtxrOpticalTxBiasCurrent` | `mA` | per optical_index, optical_name | Transmit bias current |\n| `snmp.device_prof_mtxrOpticalTxFault` | `{status}` | per optical_index, optical_name | Indicates whether the optical transceiver is experiencing a transmit fault |\n| `snmp.device_prof_mtxrOpticalTxPower` | `mW` | per optical_index, optical_name | Transmit optical power |\n| `snmp.device_prof_mtxrOpticalWavelength` | `nm` | per optical_index, optical_name | Optical wavelength |\n\n### Hardware / Sensor\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrHlSensorValue` | — | per sensor_name, rm:sensor_type | Sensor value |\n\n### Network / Interface\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ifAdminStatus` | `{status}` | per interface, interface | Current administrative state of the interface |\n| `snmp.device_prof_ifHighSpeed` | `bit/s` | per interface, interface | Estimate of the interface's current bandwidth |\n| `snmp.device_prof_ifNumber` | `{interface}` | device | Number of network interfaces regardless of their current state present on this system |\n| `snmp.device_prof_ifOperStatus` | `{status}` | per interface, interface | Current operational state of the interface |\n| `snmp.device_prof_mtxrPOECurrent` | `mA` | per poe_interface_index, poe_name | Power over ethernet current |\n| `snmp.device_prof_mtxrPOEPower` | `W` | per poe_interface_index, poe_name | Power over ethernet |\n| `snmp.device_prof_mtxrPOEStatus` | `{status}` | per poe_interface_index, poe_name | Power over ethernet status |\n| `snmp.device_prof_mtxrPOEVoltage` | `V` | per poe_interface_index, poe_name | Power over ethernet voltage |\n\n### Network / VPN\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrIkeSACount` | `{sa}` | device | Number of active IKE Security Associations |\n| `snmp.device_prof_mtxrIkeSAPh2Count` | `{sa}` | per ike_sa_index | Number of Phase 2 child SAs for this IKE SA |\n| `snmp.device_prof_mtxrIkeSARxBytes` | `By/s` | per ike_sa_index | Number of bytes received through this IKE SA |\n| `snmp.device_prof_mtxrIkeSARxPackets` | `{packet}/s` | per ike_sa_index | Number of packets received through this IKE SA |\n| `snmp.device_prof_mtxrIkeSAState` | `{status}` | per ike_sa_index | Current state of the IKE Security Association |\n| `snmp.device_prof_mtxrIkeSATxBytes` | `By/s` | per ike_sa_index | Number of bytes transmitted through this IKE SA |\n| `snmp.device_prof_mtxrIkeSATxPackets` | `{packet}/s`
+      description: "On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this MikroTik Router profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.\n\n**40 metrics** in 8 groups; each row is a chart context usable in alerts.\n\n| Group | Metrics |\n|---|---|\n| Hardware / CPU | 1 |\n| Hardware / OpticalModule | 8 |\n| Hardware / Sensor | 1 |\n| Network / Interface | 8 |\n| Network / VPN | 8 |\n| System / CPU | 1 |\n| System / Uptime | 1 |\n| Uncategorized | 12 |\n\n### Hardware / CPU\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrHlProcessorTemperature` | `Cel` | device | The current CPU temperature |\n\n### Hardware / OpticalModule\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrOpticalRxLoss` | `{status}` | per optical_index, optical_name | Indicates whether there is a loss of received optical signal (Rx Loss) |\n| `snmp.device_prof_mtxrOpticalRxPower` | `mW` | per optical_index, optical_name | Received optical power |\n| `snmp.device_prof_mtxrOpticalSupplyVoltage` | `V` | per optical_index, optical_name | Supply voltage |\n| `snmp.device_prof_mtxrOpticalTemperature` | `Cel` | per optical_index, optical_name | Temperature at sensor chip |\n| `snmp.device_prof_mtxrOpticalTxBiasCurrent` | `mA` | per optical_index, optical_name | Transmit bias current |\n| `snmp.device_prof_mtxrOpticalTxFault` | `{status}` | per optical_index, optical_name | Indicates whether the optical transceiver is experiencing a transmit fault |\n| `snmp.device_prof_mtxrOpticalTxPower` | `mW` | per optical_index, optical_name | Transmit optical power |\n| `snmp.device_prof_mtxrOpticalWavelength` | `nm` | per optical_index, optical_name | Optical wavelength |\n\n### Hardware / Sensor\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrHlSensorValue` | — | per sensor_name, rm:sensor_type | Sensor value |\n\n### Network / Interface\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ifAdminStatus` | `{status}` | per interface, interface | Current administrative state of the interface |\n| `snmp.device_prof_ifHighSpeed` | `bit/s` | per interface, interface | Estimate of the interface's current bandwidth |\n| `snmp.device_prof_ifNumber` | `{interface}` | device | Number of network interfaces regardless of their current state present on this system |\n| `snmp.device_prof_ifOperStatus` | `{status}` | per interface, interface | Current operational state of the interface |\n| `snmp.device_prof_mtxrPOECurrent` | `mA` | per poe_interface_index, poe_name | Power over ethernet current |\n| `snmp.device_prof_mtxrPOEPower` | `W` | per poe_interface_index, poe_name | Power over ethernet |\n| `snmp.device_prof_mtxrPOEStatus` | `{status}` | per poe_interface_index, poe_name | Power over ethernet status |\n| `snmp.device_prof_mtxrPOEVoltage` | `V` | per poe_interface_index, poe_name | Power over ethernet voltage |\n\n### Network / VPN\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrIkeSACount` | `{sa}` | device | Number of active IKE Security Associations |\n| `snmp.device_prof_mtxrIkeSAPh2Count` | `{sa}` | per ike_sa_index | Number of Phase 2 child SAs for this IKE SA |\n| `snmp.device_prof_mtxrIkeSARxBytes` | `By/s` | per ike_sa_index | Number of bytes received through this IKE SA |\n| `snmp.device_prof_mtxrIkeSARxPackets` | `{packet}/s` | per ike_sa_index | Number of packets received through this IKE SA |\n| `snmp.device_prof_mtxrIkeSAState` | `{status}` | per ike_sa_index | Current state of the IKE Security Association |\n| `snmp.device_prof_mtxrIkeSATxBytes` | `By/s` | per ike_sa_index | Number of bytes transmitted through this IKE SA |\n| `snmp.device_prof_mtxrIkeSATxPackets` | `{packet}/s`
         | per ike_sa_index | Number of packets transmitted through this IKE SA |\n| `snmp.device_prof_mtxrIkeSAUptime` | `s` | per ike_sa_index | How long this IKE SA has been active |\n\n### System / CPU\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_cpu_usage` | `%` | per cpu_index | The current CPU utilization |\n\n### System / Uptime\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_systemUptime` | `s` | device | Time since the system was last rebooted or powered on. |\n\n### Uncategorized\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_lldpStatsRemTablesAgeouts` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesDeletes` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesDrops` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesInserts` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesLastChangeTime` | — | device |  |\n| `snmp.device_prof_lldpStatsRxPortAgeoutsTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortFramesDiscardedTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortFramesErrors` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortFramesTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortTLVsDiscardedTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortTLVsUnrecognizedTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsTxPortFramesTotal` | — | per lldp_loc_port_num |  |\n"
+      availability: []
+      scopes: []
+  - meta:
+      plugin_name: go.d.plugin
+      module_name: snmp
+      monitored_instance:
+        name: MikroTik Switch
+        link: ''
+        categories:
+          - network-performance-monitoring.device-metrics
+        icon_filename: mikrotik.png
+      keywords:
+        - mikrotik
+        - switch
+        - snmp
+        - switch
+        - npm
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: Monitor MikroTik Switch (switch) with Netdata over SNMP. Netdata recognizes the device automatically by its `sysObjectID` (recognized across 1 device identifiers) and collects the metrics this profile declares — on top of the generic SNMP baseline — with no manual OID configuration.
+        method_description: Netdata's SNMP collector matches the device to the **mikrotik-swos.yaml** profile via `sysObjectID`/`sysDescr`, then polls the OIDs it declares.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: Auto-detected as MikroTik Switch via sysObjectID/sysDescr.
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup: *id001
+    troubleshooting: *id002
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this MikroTik Switch profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.\n\n**19 metrics** in 5 groups; each row is a chart context usable in alerts.\n\n| Group | Metrics |\n|---|---|\n| Hardware / CPU | 1 |\n| Hardware / OpticalModule | 8 |\n| Hardware / Sensor | 1 |\n| Network / Interface | 8 |\n| System / Uptime | 1 |\n\n### Hardware / CPU\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrHlProcessorTemperature` | `Cel` | device | The current CPU temperature |\n\n### Hardware / OpticalModule\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrOpticalRxLoss` | `{status}` | per optical_index, optical_name | Indicates whether there is a loss of received optical signal (Rx Loss) |\n| `snmp.device_prof_mtxrOpticalRxPower` | `mW` | per optical_index, optical_name | Received optical power |\n| `snmp.device_prof_mtxrOpticalSupplyVoltage` | `V` | per optical_index, optical_name | Supply voltage |\n| `snmp.device_prof_mtxrOpticalTemperature` | `Cel` | per optical_index, optical_name | Temperature at sensor chip |\n| `snmp.device_prof_mtxrOpticalTxBiasCurrent` | `mA` | per optical_index, optical_name | Transmit bias current |\n| `snmp.device_prof_mtxrOpticalTxFault` | `{status}` | per optical_index, optical_name | Indicates whether the optical transceiver is experiencing a transmit fault |\n| `snmp.device_prof_mtxrOpticalTxPower` | `mW` | per optical_index, optical_name | Transmit optical power |\n| `snmp.device_prof_mtxrOpticalWavelength` | `nm` | per optical_index, optical_name | Optical wavelength |\n\n### Hardware / Sensor\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_mtxrHlSensorValue` | — | per sensor_name, rm:sensor_type | Sensor value |\n\n### Network / Interface\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ifAdminStatus` | `{status}` | per interface, interface | Current administrative state of the interface |\n| `snmp.device_prof_ifHighSpeed` | `bit/s` | per interface, interface | Estimate of the interface's current bandwidth |\n| `snmp.device_prof_ifNumber` | `{interface}` | device | Number of network interfaces regardless of their current state present on this system |\n| `snmp.device_prof_ifOperStatus` | `{status}` | per interface, interface | Current operational state of the interface |\n| `snmp.device_prof_mtxrPOECurrent` | `mA` | per poe_interface_index, poe_name | Power over ethernet current |\n| `snmp.device_prof_mtxrPOEPower` | `W` | per poe_interface_index, poe_name | Power over ethernet |\n| `snmp.device_prof_mtxrPOEStatus` | `{status}` | per poe_interface_index, poe_name | Power over ethernet status |\n| `snmp.device_prof_mtxrPOEVoltage` | `V` | per poe_interface_index, poe_name | Power over ethernet voltage |\n\n### System / Uptime\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_systemUptime` | `s` | device | Time since the system was last rebooted or powered on. |\n"
       availability: []
       scopes: []
   - meta:
@@ -9406,7 +9453,7 @@ modules:
     overview:
       data_collection:
         metrics_description: Map Layer 2 neighbor links from devices that advertise LLDP (IEEE 802.1AB). Netdata's SNMP topology collector reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system name, and management address.
-        method_description: Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the `topology:snmp` view.
+        method_description: Netdata reads the LLDP-MIB or LLDP-V2-MIB local and remote neighbor tables over SNMP and stitches the links into the `topology:snmp` view.
       supported_platforms:
         include: []
         exclude: []
@@ -9415,7 +9462,7 @@ modules:
         description: ''
       default_behavior:
         auto_detection:
-          description: Discovered automatically on devices that expose the LLDP-MIB.
+          description: Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently enabled for Palo Alto firewalls.
         limits:
           description: ''
         performance_impact:

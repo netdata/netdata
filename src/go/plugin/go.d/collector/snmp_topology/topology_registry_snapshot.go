@@ -27,11 +27,12 @@ func (c *topologyBuilder) buildObservationSnapshot() (topologymodel.ObservationS
 			local.ChassisIDType = "macAddress"
 		}
 	}
+	l3Interfaces := c.snapshotL3Interfaces(localObservation.DeviceID)
 
 	return topologymodel.ObservationSnapshot{
 		L2Observations: []topologyengine.L2Observation{localObservation},
-		L3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
-		OSPFNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID),
+		L3Interfaces:   l3Interfaces,
+		OSPFNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID, l3Interfaces),
 		BGPPeers:       c.snapshotBGPPeers(localObservation.DeviceID),
 		LocalDevice:    local,
 		LocalDeviceID:  localObservation.DeviceID,

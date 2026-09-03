@@ -106,8 +106,7 @@ func topologyInspectionMetricMatchesFamily(kind ddsnmp.TopologyKind, family stri
 	switch family {
 	case "lldp":
 		return kind == ddsnmp.KindLldpLocPort || kind == ddsnmp.KindLldpLocManAddr ||
-			kind == ddsnmp.KindLldpRem || kind == ddsnmp.KindLldpRemManAddr ||
-			kind == ddsnmp.KindLldpRemManAddrCompat
+			kind == ddsnmp.KindLldpRem || kind == ddsnmp.KindLldpRemManAddr
 	case "cdp":
 		return kind == ddsnmp.KindCdpCache
 	case "stp":

@@ -429,7 +429,7 @@ modules:
               required: false
             - name: ping.enabled
               group: Ping
-              description: Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected.
+              description: Enable ICMP round-trip measurements alongside SNMP profile metrics. This option does not enable profile-less operation; use `ping_only` for that. When disabled, no ping metrics are collected.
               default_value: true
               required: false
             - name: ping.privileged

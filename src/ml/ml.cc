@@ -884,6 +884,13 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         dim->has_received_downstream_model = true;
 
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
+        // First install: reserve exactly the final capacity, so a dimension
+        // that never gets a model never pays for the model array, and one that
+        // does still allocates only once (push_back growth would otherwise
+        // realloc its way up to 32 slots).
+        if (dim->km_contexts.empty())
+            dim->km_contexts.reserve(Cfg.num_models_to_use);
+
         dim->km_contexts.emplace_back(dim->kmeans);
     } else {
         bool can_drop_middle_km = false;

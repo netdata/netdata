@@ -218,7 +218,57 @@ func inspectTopologyLink(
 	subject topologyInspectionLinkSubject,
 ) (topologyLinkInspection, error) {
 	subject = normalizeTopologyInspectionLinkSubject(subject)
-	report := topologyLinkInspection{
+	report := newTopologyLinkInspection(diagnostics, options, subject)
+	if subject.srcIdentity == "" || subject.dstIdentity == "" || subject.family == "" {
+		return report, fmt.Errorf("topology inspection link subject is incomplete")
+	}
+
+	replay := replayTopologyDiagnosticStages(diagnostics, options)
+	if replay.graph.state != topologyInspectionPresent {
+		report.source = inspectTopologyLinkSourceContext(replay.devices, subject.family)
+		return report, nil
+	}
+	return completeTopologyLinkInspection(report, replay, inspectTopologyGraphLink(replay.data, subject)), nil
+}
+
+func inspectTopologyLinkAt(
+	diagnostics topologyDiagnostics,
+	options topologyoptions.QueryOptions,
+	index int,
+) (topologyLinkInspection, error) {
+	report := newTopologyLinkInspection(diagnostics, options, topologyInspectionLinkSubject{})
+	if index < 0 {
+		return report, fmt.Errorf("topology inspection link index must be zero or greater: %d", index)
+	}
+
+	replay := replayTopologyDiagnosticStages(diagnostics, options)
+	if replay.graph.state != topologyInspectionPresent {
+		if replay.err != nil {
+			return report, fmt.Errorf("topology inspection link index %d: replay graph: %w", index, replay.err)
+		}
+		return report, fmt.Errorf("topology inspection link index %d out of range [0,0)", index)
+	}
+	if index >= len(replay.data.Links) {
+		return report, fmt.Errorf(
+			"topology inspection link index %d out of range [0,%d)",
+			index,
+			len(replay.data.Links),
+		)
+	}
+	subject, ok := topologyInspectionSubjectFromLink(replay.data, index)
+	if !ok {
+		return report, fmt.Errorf("topology inspection link index %d has no usable endpoint identity", index)
+	}
+	report.subject = subject
+	return completeTopologyLinkInspection(report, replay, inspectTopologyGraphLinkAt(replay.data, index)), nil
+}
+
+func newTopologyLinkInspection(
+	diagnostics topologyDiagnostics,
+	options topologyoptions.QueryOptions,
+	subject topologyInspectionLinkSubject,
+) topologyLinkInspection {
+	return topologyLinkInspection{
 		subject:       subject,
 		options:       topologyoptions.NormalizeQueryOptions(options),
 		diagnosticCut: inspectTopologyDiagnosticCut(diagnostics.topology),
@@ -226,23 +276,22 @@ func inspectTopologyLink(
 		typedLink:     topologyInspectionRowResult{row: -1},
 		lastAborted:   diagnostics.lastAborted,
 	}
-	if subject.srcIdentity == "" || subject.dstIdentity == "" || subject.family == "" {
-		return report, fmt.Errorf("topology inspection link subject is incomplete")
-	}
+}
 
-	replay := replayTopologyDiagnosticStages(diagnostics, options)
-	report.source = inspectTopologyLinkSourceContext(replay.devices, subject.family)
-	if replay.graph.state != topologyInspectionPresent {
-		return report, nil
-	}
+func completeTopologyLinkInspection(
+	report topologyLinkInspection,
+	replay topologyDiagnosticReplayStages,
+	graphLink topologyInspectionGraphLinkResult,
+) topologyLinkInspection {
+	report.source = inspectTopologyLinkSourceContext(replay.devices, report.subject.family)
 	report.graphStats.state = topologyInspectionPresent
 	report.stats = replay.data.Stats
-	report.graphLink = inspectTopologyGraphLink(replay.data, subject)
+	report.graphLink = graphLink
 	report.typedLink = topologyInspectionRenderedRow(
 		replay.typed.state,
 		report.graphLink.membership,
 		report.graphLink.index,
 		replay.payload.Links.Rows,
 	)
-	return report, nil
+	return report
 }

@@ -43,7 +43,7 @@ die()  { printf >&2 "%s\n" "${RED}ERROR:${NC} $*"; exit 1; }
 
 SOW_DIR=".agents/sow"
 NON_QUEUE=" q specs "                       # dirs under .agents/sow/ that are NOT queues
-CANON_QUEUES="pending current done active"  # queues ensured to exist inside q/
+CANON_QUEUES="pending current done"  # queues ensured to exist inside q/
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git work tree"
 
@@ -103,6 +103,15 @@ migrate_old_queues() {
     merge_into "${d%/}" "$targetq/$name" "$label"
     rmdir "${d%/}" 2>/dev/null || warn "$SOW_DIR/$name not empty after migration; left in place"
   done
+}
+
+# Retired queue: fold any leftover q/active/ into q/current/ (collision-safe).
+retire_active_queue() {
+  local q="$1" label="$2"
+  { [ -d "$q/active" ] && [ ! -L "$q/active" ]; } || return 0
+  info "retiring $q/active -> $q/current"
+  merge_into "$q/active" "$q/current" "$label"
+  rmdir "$q/active" 2>/dev/null || warn "$q/active not empty after migration; left in place"
 }
 
 # ORIGIN: if specs were dropped because this checkout crossed the untrack commit,
@@ -171,6 +180,7 @@ Aborting — no files were moved, no data lost."
   # Case 4: this worktree may still carry old-style top-level queue dirs; push
   # their contents into origin's shared q/ before linking (no data loss).
   migrate_old_queues "$origin/$SOW_DIR/q" "$(basename "$top")"
+  retire_active_queue "$origin/$SOW_DIR/q" "$(basename "$top")"
 
   link_one "$SOW_DIR/q"     "$origin/$SOW_DIR/q"
   link_one "$SOW_DIR/specs" "$origin/$SOW_DIR/specs"
@@ -184,6 +194,7 @@ if [ "$git_dir" = "$common_dir" ]; then
   run mkdir -p "$top/$SOW_DIR/q"
   migrate_old_queues "$top/$SOW_DIR/q" "migrated"
   for q in $CANON_QUEUES; do run mkdir -p "$top/$SOW_DIR/q/$q"; done
+  retire_active_queue "$top/$SOW_DIR/q" "active"
   selfheal_specs
   run mkdir -p "$top/.local"
   info "${GREEN}SOW working memory ready under $SOW_DIR/q (origin).${NC}"

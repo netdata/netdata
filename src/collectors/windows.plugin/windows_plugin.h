@@ -50,6 +50,7 @@ int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
+int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -357,7 +358,9 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_WRITE_REQUESTS,
     PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
     PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
-    PRIO_SMB_SERVER_SHARES_FILES_OPENED
+    PRIO_SMB_SERVER_SHARES_FILES_OPENED,
+
+    PRIO_TERMINAL_SERVICES_SESSIONS
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H
