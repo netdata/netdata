@@ -692,7 +692,11 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
 
     int fd = spawn_popen_read_fd(pi);
     if (fd < 0) {
-        spawn_popen_kill(pi, macos_powermetrics_loop_kill_grace_ms());
+        // Short grace here, unlike the loop's normal exit below. The interval-sized grace exists to
+        // let a closed stdout deliver SIGPIPE on the child's next write; with no stdout pipe at all
+        // there is no such write and nothing to wait for, so waiting a full sample interval would
+        // only delay escalation - up to 11 minutes at the maximum configured interval and timeout.
+        spawn_popen_kill(pi, pm.command_timeout_ms);
         return false;
     }
 

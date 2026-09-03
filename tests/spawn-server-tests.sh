@@ -65,7 +65,18 @@ if [ -z "${run_dir}" ]; then
     exit 1
 fi
 
-trap 'rm -rf -- "${run_dir}"' EXIT
+# INT/TERM as well as EXIT: an interrupted run (Ctrl-C, or a CI step timeout) would otherwise
+# orphan the directory along with the AF_UNIX socket the spawn server bound inside it. SIGKILL
+# cannot be trapped, so a hard kill still leaves both behind - nothing in the script can change
+# that, and the directory name is distinctive enough to find if it happens.
+cleanup() {
+    rm -rf -- "${run_dir}"
+}
+
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+trap 'cleanup; exit 129' HUP
 
 NETDATA_RUN_DIR="${run_dir}" \
 ASAN_OPTIONS=detect_leaks=0 \
