@@ -55,6 +55,15 @@ GRACE_SECONDS="${GRACE_SECONDS:-15}"
 # below GRACE_SECONDS so the reader closes the pipe while the writer is still under the guard.
 READ_TIMEOUT="${READ_TIMEOUT:-8}"
 
+if [[ -n "$(trap -p PIPE)" ]]; then
+    printf 'SIGPIPE is ignored in the shell that invoked this script.\n' >&2
+    printf 'POSIX does not allow a signal ignored on entry to be reset from within the shell, so the\n' >&2
+    printf 'default-disposition case cannot be modelled here: both cases would run with SIGPIPE\n' >&2
+    printf 'ignored and the verdict would be a false "premise broken". Re-run from a shell with the\n' >&2
+    printf 'default disposition (a plain terminal, or the CI step directly).\n' >&2
+    exit 3
+fi
+
 if [[ "${READ_TIMEOUT}" -ge "${GRACE_SECONDS}" ]]; then
     printf 'READ_TIMEOUT (%s) must be below GRACE_SECONDS (%s), or the child is killed before the\n' \
         "${READ_TIMEOUT}" "${GRACE_SECONDS}" >&2
@@ -88,15 +97,22 @@ skip() {
 # ---------------------------------------------------------------------------------------------------
 # preconditions
 
+stream_argv=()
+
 if [[ -n "${NDPROBE_STREAM_CMD}" ]]; then
     warn "using the test-only NDPROBE_STREAM_CMD override - this is a harness self-test, NOT a probe"
-    stream_cmd="${NDPROBE_STREAM_CMD}"
+    # Word-split once, here, so the command is held as an argv array and never re-split at use.
+    # shellcheck disable=SC2206  # deliberate split of a test-only command line
+    stream_argv=( ${NDPROBE_STREAM_CMD} )
     record_delim=$'\n'        # the stand-ins emit lines, not plists
 else
     [[ "$(uname -s)" == "Darwin" ]] || skip "not macOS (uname -s = $(uname -s)); powermetrics does not exist here"
 
     powermetrics_bin="${POWERMETRICS:-/usr/bin/powermetrics}"
-    [[ -x "${powermetrics_bin}" ]] || skip "${powermetrics_bin} is not executable"
+    # -x alone would accept a directory, and executing one fails in a way that looks exactly like an
+    # unavailable sampler further down - which would skip with a misleading reason.
+    [[ -f "${powermetrics_bin}" && -r "${powermetrics_bin}" && -x "${powermetrics_bin}" ]] \
+        || skip "${powermetrics_bin} is not a readable, executable file"
 
     [[ "$(id -u)" -eq 0 ]] || skip "must run as root (powermetrics requires it) - re-run with sudo"
 
@@ -117,93 +133,82 @@ else
     [[ -n "${sampler}" ]] || skip "powermetrics produced no output for any of the collector's sampler sets here (typical on a VM)"
 
     # The exact loop-mode invocation the collector uses: stream until stopped, never self-terminate.
-    stream_cmd="${powermetrics_bin} -b 0 -i 1000 -s ${sampler} -f plist"
+    stream_argv=( "${powermetrics_bin}" -b 0 -i 1000 -s "${sampler}" -f plist )
     record_delim=""            # -f plist emits NUL-separated documents, one per sample
 fi
 
 # ---------------------------------------------------------------------------------------------------
 # the probe
 
-# Runs $stream_cmd with stdout on a pipe, waits for it to actually produce output, then closes the
-# read end. Echoes: "<outcome> <seconds> <streamed|silent>" where outcome is
-# died-sigpipe | survived | self-exited:<rc>, and the last field says whether any byte ever arrived.
+# Runs the command under test with stdout on a pipe, waits until it is demonstrably streaming,
+# then closes the read end and reports what happened to it.
+# Echoes: "<outcome> <seconds> <streamed|silent>" where outcome is
+# died-sigpipe | survived | self-exited:<rc> | harness-error.
 probe_one() {
     local disposition="$1" started elapsed rc streamed
     local flag="${work_dir}/streamed.$$"
-    rm -f "${flag}"
+    local fifo="${work_dir}/stream.$$"
+
+    rm -f "${flag}" "${fifo}"
+    if ! mkfifo "${fifo}" 2>/dev/null; then
+        printf 'harness-error 0 unknown\n'
+        return
+    fi
+
     started=$(date +%s)
 
-    # Job control puts the subshell in its own process group, so the guard below can kill the WHOLE
-    # group. Killing only the subshell would orphan powermetrics: it is deliberately immortal in the
-    # 'ignored' case, so it would be reparented to launchd and left running as root - this harness
-    # would strand exactly the process this test exists to prevent.
-    set -m
+    # The subshell `exec`s the command, so it IS the command: $! is the writer's own pid and it can
+    # be signalled directly. That is deliberate - an earlier version wrapped the writer in a
+    # pipeline and had to rely on job control to put it in its own process group, then kill the
+    # group, because the writer's pid was unknowable. Any failure of that scheme orphaned a root
+    # process, which is the very thing this test exists to catch. Knowing the pid removes the
+    # problem instead of guarding against it.
     (
         if [[ "${disposition}" == "ignored" ]]; then
-            trap '' PIPE            # SIG_IGN, inherited across fork+exec - models netdata
+            trap '' PIPE       # SIG_IGN, and it survives exec - this models netdata
         fi
-        # The reader consumes TWO complete records and then exits, closing the pipe while the
-        # writer is mid-stream. Two are required, not one: closing a pipe does not kill anything -
-        # the child's NEXT WRITE does - so a child that emits one sample and then goes quiet can
-        # never be killed this way, and treating that as a verdict is how this probe previously
-        # reported a broken premise on a runner that simply stopped producing samples. On timeout
-        # the reader exits anyway (still closing the pipe) but leaves no flag, which is how we tell
-        # "still writing, yet immortal" apart from "stopped writing, untestable".
-        # PIPESTATUS[0] is the writer's wait status, surfaced as this subshell's exit code.
-        # shellcheck disable=SC2086  # stream_cmd is a deliberately word-split command line
-        ${stream_cmd} 2>/dev/null | {
-            IFS= read -r -d "${record_delim}" -t "${READ_TIMEOUT}" _ || exit 0
-            IFS= read -r -d "${record_delim}" -t "${READ_TIMEOUT}" _ || exit 0
-            : > "${flag}"
-        }
-        exit "${PIPESTATUS[0]}"
+        # No `trap - PIPE` in the default case: it would be a no-op anyway, because POSIX forbids
+        # resetting a signal that was ignored on entry to the shell. That case is instead refused
+        # outright by the entry check above, so reaching here means the disposition is already
+        # default and inherited as such.
+        exec "${stream_argv[@]}" > "${fifo}" 2>/dev/null
     ) &
-    local probe_pid=$!
-    set +m
+    local writer_pid=$!
 
-    # Bound the wait by polling rather than with a background guard. Stock macOS has no `timeout`,
-    # and an immortal child never returns on its own. A backgrounded `sleep` guard is worse than it
-    # looks: killing the guard subshell leaves its `sleep` alive, that orphan holds this function's
-    # command-substitution pipe open until it expires, and every probe then costs the full grace
-    # even when the child died immediately - besides leaving stray processes behind.
+    # Two complete records prove the child is still writing, which is the only thing that makes a
+    # closed pipe lethal: closing a pipe does not signal anything - the child's NEXT WRITE does. A
+    # child that emits one sample and goes quiet can never be killed this way, and reporting that as
+    # a verdict is how this probe previously failed a runner that simply stopped sampling.
+    # Leaving this block closes the read end, breaking the pipe under a writer that is mid-stream.
+    {
+        if IFS= read -r -d "${record_delim}" -t "${READ_TIMEOUT}" _ &&
+           IFS= read -r -d "${record_delim}" -t "${READ_TIMEOUT}" _; then
+            : > "${flag}"
+        fi
+    } < "${fifo}"
+
+    # Bounded, wall-clock: an immortal child never returns on its own, and stock macOS has no
+    # `timeout`. A deadline rather than a sleep count, which drifted badly under load.
     local deadline=$(( started + GRACE_SECONDS ))
-    while kill -0 "${probe_pid}" 2>/dev/null && [[ "$(date +%s)" -lt "${deadline}" ]]; do
+    while kill -0 "${writer_pid}" 2>/dev/null && [[ "$(date +%s)" -lt "${deadline}" ]]; do
         sleep 0.2
     done
 
-    # Still alive: it is immortal by construction in the 'ignored' case. Kill the whole process
-    # group, so the command the subshell spawned cannot be orphaned and reparented - this harness
-    # must never strand the very kind of process the test exists to prevent.
-    #
-    # The group is resolved HERE rather than at launch: a child that dies immediately (the expected
-    # 'default' outcome) is already gone by then, and looking it up early would race with its exit.
-    # At this point it is known alive, so ps can see it.
-    if kill -0 "${probe_pid}" 2>/dev/null; then
-        local pgid own_pgid
-        pgid=$(ps -o pgid= -p "${probe_pid}" 2>/dev/null | tr -d ' ')
-        own_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
-
-        if [[ -n "${pgid}" && "${pgid}" != "${own_pgid}" ]]; then
-            kill -9 -- "-${pgid}" 2>/dev/null
-        else
-            # No distinct group to kill: the streaming child cannot be reached, and killing the
-            # subshell alone would orphan it - as root, and deliberately immortal. Report a harness
-            # error instead of a verdict; the caller refuses to draw a conclusion.
-            kill -9 "${probe_pid}" 2>/dev/null
-            wait "${probe_pid}" 2>/dev/null
-            printf 'harness-error %s %s\n' "$(( $(date +%s) - started ))" "unknown"
-            return
-        fi
+    # Still alive: immortal by construction in the 'ignored' case. Reap it so no run of this script
+    # leaves a survivor behind.
+    if kill -0 "${writer_pid}" 2>/dev/null; then
+        kill -9 "${writer_pid}" 2>/dev/null
     fi
 
-    wait "${probe_pid}"; rc=$?
+    wait "${writer_pid}"; rc=$?
+    rm -f "${fifo}"
 
     elapsed=$(( $(date +%s) - started ))
     streamed=silent
     [[ -f "${flag}" ]] && streamed=streamed
     rm -f "${flag}"
 
-    # A shell reports a signalled child as 128+signo. 13 = SIGPIPE, 9 = the guard's SIGKILL.
+    # A shell reports a signalled child as 128+signo. 13 = SIGPIPE, 9 = our own SIGKILL.
     case "${rc}" in
         141) printf 'died-sigpipe %s %s\n' "${elapsed}" "${streamed}" ;;
         137) printf 'survived %s %s\n' "${elapsed}" "${streamed}" ;;
@@ -211,7 +216,7 @@ probe_one() {
     esac
 }
 
-info "command under test: ${stream_cmd}"
+info "command under test: ${stream_argv[*]}"
 info "grace before declaring a child immortal: ${GRACE_SECONDS}s"
 
 info "case 1/2: parent SIGPIPE = DEFAULT (models netdata WITH the fix)"
