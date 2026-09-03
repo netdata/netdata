@@ -35,15 +35,20 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len)
  * Shared by the text-protocol connectors, which must decode before they can decide whether a
  * codepoint threatens their record framing. Invalid or truncated sequences are reported as their
  * single leading byte, so callers keep byte-for-byte length. A caller therefore passes such a byte
- * through unchanged, except where the byte value is itself a whitespace codepoint (0x85 NEL,
- * 0xA0 NBSP), which a Latin-1 consumer would read as whitespace anyway.
+ * through unchanged, except where the byte value is itself a codepoint the caller replaces: an orphan
+ * 0x80-0x9F is a C1 control and 0xA0 is NBSP, which is how a Latin-1 consumer would read them anyway.
  *
  * @param src the sequence to decode.
  * @param len the number of bytes available at src.
  * @param codepoint where the decoded codepoint is stored.
- * @return Returns the number of bytes consumed.
+ * @return Returns the number of bytes consumed, or 0 when len is 0.
  */
 size_t exporting_utf8_decode(const char *src, size_t len, uint32_t *codepoint) {
+    if(!len) {
+        *codepoint = 0;
+        return 0;
+    }
+
     const uint8_t *s = (const uint8_t *)src;
     uint32_t cp = s[0];
     uint32_t minimum = 0;

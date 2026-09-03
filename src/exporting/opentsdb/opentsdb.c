@@ -117,7 +117,7 @@ int init_opentsdb_http_instance(struct instance *instance)
  *
  * @param dst a destination string.
  * @param src a source string.
- * @param len the maximum number of characters copied.
+ * @param len the maximum number of bytes copied.
  */
 
 void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
@@ -140,9 +140,10 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
  * A telnet record is `put <metric> <timestamp> <value> <tagk>=<tagv> ...\n`: whitespace-delimited
  * fields, newline-terminated, with no quoting or escaping. So only whitespace (which splits a field)
  * and the record terminator can corrupt or inject a record, and this sanitizer replaces those. It
- * additionally replaces the remaining C0 controls and DEL, which cannot break our framing but are
- * never legitimate in a hostname or prefix and would be interpreted by whatever consumes the record
- * downstream. Everything else, punctuation included, is passed through byte for byte: this is metadata
+ * additionally replaces the remaining control codepoints -- C0, DEL, and C1 -- which cannot break our
+ * framing but are never legitimate in a hostname or prefix and would be interpreted by whatever consumes
+ * the record downstream. C1 belongs here for the same reason C0 does: U+009B is the single-character CSI,
+ * the same escape hazard as U+001B. Everything else, punctuation included, is passed through byte for byte: this is metadata
  * the user configured, and none of `:`, `=` or `;` can affect this record's framing. Whether the
  * destination then accepts them is the destination's tag grammar and the operator's concern: stock
  * OpenTSDB parses a tag by splitting on `=` and validates tag characters against its own allowlist.
@@ -163,7 +164,8 @@ static void sanitize_opentsdb_telnet_metadata_value(char *dst, const char *src, 
         uint32_t codepoint;
         size_t bytes = exporting_utf8_decode(src, len, &codepoint);
 
-        if(codepoint < 0x20 || codepoint == 0x7F || exporting_unicode_is_whitespace(codepoint))
+        if(codepoint < 0x20 || (codepoint >= 0x7F && codepoint <= 0x9F) ||
+           exporting_unicode_is_whitespace(codepoint))
             memset(dst, '_', bytes);
         else
             memcpy(dst, src, bytes);
@@ -920,8 +922,8 @@ int exporting_opentsdb_telnet_unittest(void) {
         " label=value",
         "put pr\xc3\xa9""fix.chart.name.dimension.name 42 1.5 host=Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de label=value\n");
 
-    // an invalid sequence is copied byte for byte, so metadata we cannot interpret is not mangled
-    // (the exception is a lone 0x85 or 0xA0, whose byte value is itself a whitespace codepoint)
+    // an invalid sequence is copied byte for byte, so metadata we cannot interpret is not mangled,
+    // except where the lone byte value is itself a control or whitespace codepoint (0x80-0xA0)
     errors += opentsdb_telnet_unittest_case(
         "malformed utf8 metadata",
         "pre\xc3""fix",
@@ -936,6 +938,34 @@ int exporting_opentsdb_telnet_unittest(void) {
         "host\xe2\x80\x83name",
         " label=value",
         "put pre__fix.chart.name.dimension.name 42 1.5 host=host___name label=value\n");
+
+    // C1 controls are the same hazard as C0 in their multi-byte form: U+009B is the
+    // single-character CSI. Two source bytes become two underscores, keeping the length.
+    errors += opentsdb_telnet_unittest_case(
+        "c1 control in metadata",
+        "pre\xc2\x9b""fix",
+        "host\xc2\x80""name",
+        " label=value",
+        "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n");
+
+    // a lead byte with no continuation left in the buffer is consumed one byte at a time, so a
+    // truncated sequence is not silently rewritten. The orphan continuation byte in the hostname is
+    // the documented exception: 0x82 decodes to its own value, which is a C1 control.
+    errors += opentsdb_telnet_unittest_case(
+        "truncated utf8 at end of metadata",
+        "prefix\xc3",
+        "hostname\xe2\x82",
+        " label=value",
+        "put prefix\xc3.chart.name.dimension.name 42 1.5 host=hostname\xe2_ label=value\n");
+
+    // same exception in its most likely form: a lone 0x85 or 0xA0 decodes to its own byte value,
+    // which is the NEL and NBSP codepoint
+    errors += opentsdb_telnet_unittest_case(
+        "lone whitespace-valued bytes",
+        "pre\x85""fix",
+        "host\xa0""name",
+        " label=value",
+        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name label=value\n");
 
     // control bytes cannot break our framing, but are never legitimate metadata and would be
     // interpreted by whatever consumes the record downstream
