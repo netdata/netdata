@@ -1,6 +1,7 @@
 # Active journal source without encryption
 
-This page will guide you through creating an active journal source without the use of encryption.
+An active journal source exposes its journals so a central point can fetch them. In this setup the traffic is not
+encrypted, so it applies only to trusted networks.
 
 Once you enable an active journal source on a server, `systemd-journal-gatewayd` will expose an REST API on TCP port 19531. This API can be used for querying the logs, exporting the logs, or monitoring new log entries, remotely.
 
@@ -14,11 +15,12 @@ DO NOT USE THIS ON NON-TRUSTED NETWORKS.
 
 ## Configuring an active journal source
 
-On the server you want to expose their logs, install `systemd-journal-gateway`.
+On the server you want to expose their logs, install `systemd-journal-gatewayd`. Debian, Ubuntu, and Fedora ship it
+in the `systemd-journal-remote` package; Arch includes it in `systemd`.
 
 ```bash
 # change this according to your distro
-sudo apt-get install systemd-journal-gateway
+sudo apt-get install systemd-journal-remote
 ```
 
 Optionally, if you want to change the port (the default is `19531`), edit `systemd-journal-gatewayd.socket`
@@ -45,9 +47,9 @@ sudo systemctl enable --now systemd-journal-gatewayd.socket
 
 ## Using the active journal source
 
-### Simple Logs Explorer
+### Logs explorer in the browser
 
-`systemd-journal-gateway` provides a simple HTML5 application to browse the logs.
+`systemd-journal-gatewayd` provides an HTML5 application to browse the logs.
 
 To use it, open your web browser and navigate to:
 
@@ -55,7 +57,7 @@ To use it, open your web browser and navigate to:
 http://server.ip:19531/browse
 ```
 
-A simple page like this will be presented:
+A page like this will be presented:
 
 ![image](https://github.com/netdata/netdata/assets/2662304/4da88bf8-6398-468b-a359-68db0c9ad419)
 

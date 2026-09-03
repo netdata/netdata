@@ -13,7 +13,7 @@
     - logs
   overview:
     description: |
-      The `systemd` journal plugin by Netdata makes viewing, exploring and analyzing `systemd` journal logs simple and efficient.
+      The `systemd` journal plugin lets you view, explore and analyze `systemd` journal logs from the Netdata dashboard.
 
       It automatically discovers available journal sources, allows advanced filtering, offers interactive visual representations and supports exploring the logs of both individual servers and the logs on infrastructure wide journal centralization servers.
 
@@ -49,8 +49,7 @@
     - logs
   overview:
     description: |
-      The Windows Events plugin by Netdata makes viewing, exploring and analyzing Windows Events simple and
-      efficient.
+      The Windows Events plugin lets you view, explore and analyze Windows events from the Netdata dashboard.
 
       The plugin automatically detects all the available channels and offers a list of "Event Channels".
 
@@ -87,7 +86,7 @@
     - logs
   overview:
     description: |
-      The macOS Logs plugin by Netdata makes viewing, exploring and analyzing macOS unified logs simple and efficient.
+      The macOS Logs plugin lets you view, explore and analyze the macOS unified log from the Netdata dashboard.
 
       It queries Apple's native OSLog framework directly and does not invoke `log show`, `log stream`, or other external log-query commands during normal query execution.
 
@@ -124,9 +123,9 @@
     - logs
   overview:
     description: |
-      The OpenTelemetry plugin by Netdata makes viewing, exploring and analyzing OpenTelemetry logs simple and efficient.
+      The OpenTelemetry plugin lets you view, explore and analyze OpenTelemetry logs from the Netdata dashboard.
 
-      It receives OTLP-formatted log data and indexes it for fast querying. The logs are explored from the "Logs" tab of the Netdata UI, using the same powerful exploration interface used for systemd journal logs.
+      It receives OTLP-formatted log data and indexes it for fast querying. The logs are explored from the "Logs" tab of the Netdata UI, using the same exploration interface used for systemd journal logs.
 
       Follow [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md) for a maintained Collector configuration and end-to-end verification steps.
     visualization:

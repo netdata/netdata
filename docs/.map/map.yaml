@@ -483,37 +483,6 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md
           description: Monitor containers and virtual machines via Linux cgroups, with friendly name resolution for Docker, Kubernetes, Podman, LXC, libvirt, Proxmox, and more.
       - meta:
-          label: OpenTelemetry
-          edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
-          description: Ingest OpenTelemetry metrics and logs with the Netdata Agent.
-          path: OpenTelemetry
-        items:
-          - meta:
-              label: OTLP Ingestion
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
-              description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
-              keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
-          - meta:
-              label: Metrics Collection
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md
-              description: Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers
-              keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
-          - meta:
-              label: Logs Collection
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md
-              description: Collect systemd journal, application file, and syslog records through OpenTelemetry Collector receivers
-              keywords: [opentelemetry, otel, journald, filelog, syslog, logs, receivers]
-          - meta:
-              label: Transformations
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md
-              description: Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata
-              keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
-          - meta:
-              label: Logs-to-Metrics
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
-              description: Count matching OpenTelemetry log records and chart their rate in Netdata
-              keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
-      - meta:
           label: Secrets Management
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SECRETS.md
           description: Use secret references to avoid storing credentials in plain text. Supports environment variables, files, commands, and secretstore backends.
@@ -792,20 +761,23 @@ sidebar:
               label: Troubleshooting
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/troubleshooting.md
               description: Diagnose missing rows, inactive listeners, UDP delivery, allowlist drops, SNMPv3 failures, profile issues, backend failures, and retention problems.
-      # Syslog from Network Devices
       - meta:
-          label: Syslog from Network Devices
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md
-          description: Ingest syslog from network devices through the OpenTelemetry Collector and explore it in the Logs tab.
-        items:
-          - meta:
-              label: OpenTelemetry Collector Setup
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md
-              description: A working syslog receiver configuration and how to make it durable.
+          label: Syslog
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog-pointer.md
+          description: Where syslog ingestion is documented — through an OpenTelemetry Collector into Netdata's log store, next to the devices' SNMP metrics, traps, and flows.
+          keywords: [syslog, network devices, opentelemetry, npm]
   # Logs
   - meta:
-      label: Logs
+      label: Logs Management
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/working-with-logs.md
+      description: Logs management with Netdata — ingestion, storage, indexing, and querying of logs from native OS stores, text files, and OpenTelemetry, distributed or centralized.
+      keywords: [logs, logs management, systemd journal, windows events, macos logs, log2journal, opentelemetry, centralization, siem]
     items:
+      - meta:
+          label: Managing Logs
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/logs-tab.md
+          description: How logs are organized, stored, queried, and explored in Netdata — sources, field filters with counters, full-text search, histograms, live tail, and sampling at scale.
+          keywords: [logs, management, full-text search, facets, histogram, live tail, sampling]
       - meta:
           label: Systemd Journal Logs
         items:
@@ -816,32 +788,121 @@ sidebar:
           - meta:
               label: Forward Secure Sealing (FSS) in Systemd-Journal
               edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md
+          - meta:
+              label: Logs Centralization Points
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md
+            items:
+              - meta:
+                  label: Passive journal centralization with encryption using self-signed certificates
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md
+              - meta:
+                  label: Passive journal centralization without encryption
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
+              - meta:
+                  label: Active journal source without encryption
+                  edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
+              - meta:
+                  label: Centralizing Journal Namespaces
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/centralizing-journal-namespaces.md
+                  description: Forward per-namespace systemd-journal logs to a central systemd-journal-remote server, including on systemd versions prior to 254.
+                  keywords: [systemd, journal, namespace, centralization, lognamespace]
       - meta:
-          label: Windows Events Plugin Reference
+          label: Windows Event Logs
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md
-          path: Windows Event Logs
+          description: View, explore and analyze Windows event channels from the Netdata dashboard, including forwarded-events channels on a Windows Event Collector.
       - meta:
-          label: log2journal
-          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/log2journal/README.md
-          path: log2journal
+          label: macOS Unified Logs
+          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/macos-logs.plugin/README.md
+          description: View, explore and analyze the macOS unified log from the Netdata dashboard.
       - meta:
-          label: systemd-cat-native
-          edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md
+          label: SNMP Trap Logs
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/snmp-trap-logs.md
+          description: SNMP traps as journal-compatible files written by Netdata — where they are stored, how they are queried in the Logs tab and with journalctl, and where the collector is documented.
+          keywords: [snmp traps, logs, journal, journalctl, network devices]
       - meta:
-          label: Logs Centralization Points with systemd-journald
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md
+          label: Network Flows
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/network-flows.md
+          description: NetFlow, sFlow, and IPFIX flows as journal-compatible files written by Netdata — the four storage tiers, retention, journalctl access, and where the plugin is documented.
+          keywords: [netflow, sflow, ipfix, network flows, logs, journal, journalctl]
+      - meta:
+          label: Text Files to Journals
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/text-files-to-journals.md
+          description: Bring application text log files under Netdata logs management — convert them to structured journal entries with log2journal, or ship them as OpenTelemetry logs, and when each path is the right one.
+          keywords: [log2journal, systemd-cat-native, text logs, nginx logs, apache logs, json logs, siem]
         items:
           - meta:
-              label: Passive journal centralization with encryption using self-signed certificates
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md
+              label: log2journal
+              edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/log2journal/README.md
+              path: log2journal
           - meta:
-              label: Passive journal centralization without encryption
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
+              label: systemd-cat-native
+              edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md
+      - meta:
+          label: Centralizing Logs with OpenTelemetry
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/centralizing-logs-with-opentelemetry.md
+          description: When to centralize a log source into Netdata's log store with OpenTelemetry, and the two things to set up — the receiving Agent and the Collector recipes per source.
+          keywords: [logs, centralization, opentelemetry, otlp, collector, tenant, object storage]
+      - meta:
+          label: Log Storage and Retention
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/log-storage-and-retention.md
+          description: Control what logs cost — journald disk limits and namespaces, Windows event channel sizing, Netdata's log store retention per tenant, and offloading to object storage.
+          keywords: [logs, retention, storage, journald, systemmaxuse, wevtutil, otel, tenant, s3, object storage, cost]
+      - meta:
+          label: Integrations
+        items:
+          - type: integration_placeholder
+            integration_kind: logs
+  # OpenTelemetry
+  - meta:
+      label: OpenTelemetry
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/opentelemetry.md
+      description: The Netdata Agent as an OTLP/gRPC receiver — metrics become charts, logs land in Netdata's indexed log store, with TLS, tenants, and Collector recipes.
+      keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector, tenant]
+    items:
+      - meta:
+          label: OTLP Ingestion
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
+          description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
+          keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
+      - meta:
+          label: Securing the OTLP Endpoint
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/securing-the-otlp-endpoint.md
+          description: Bind the OTLP endpoint safely — loopback by default, TLS and mutual TLS for remote senders, network controls, certificate rotation, and what tenant selection does and does not protect.
+          keywords: [opentelemetry, otlp, tls, mutual tls, certificates, tenants, security]
+      - meta:
+          label: Metrics Collection
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md
+          description: Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers
+          keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
+      - meta:
+          label: Logs Collection
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md
+          description: Collect systemd journal, application file, Windows event channel, Kubernetes container, macOS unified log, and syslog records through OpenTelemetry Collector receivers
+          keywords: [opentelemetry, otel, journald, filelog, windows event log, kubernetes, macos, syslog, logs, receivers]
+      - meta:
+          label: Transformations
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md
+          description: Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata
+          keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
+      - meta:
+          label: Logs-to-Metrics
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
+          description: Count matching OpenTelemetry log records and chart their rate in Netdata
+          keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
+      # Syslog from Network Devices
+      - meta:
+          label: Syslog from Network Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md
+          description: Ingest syslog from network devices through the OpenTelemetry Collector and explore it in the Logs tab.
+        items:
           - meta:
-              label: Active journal source without encryption
-              edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
-      - type: integration_placeholder
-        integration_kind: logs
+              label: OpenTelemetry Collector Setup
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md
+              description: A working syslog receiver configuration and how to make it durable.
+      - meta:
+          label: OpenTelemetry Plugin Reference
+          edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
+          description: Ingest OpenTelemetry metrics and logs with the Netdata Agent.
   # Live
   - meta:
       label: Live View
@@ -1065,9 +1126,6 @@ sidebar:
               label: Kubernetes
               edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/kubernetes-tab.md
               description: Netdata Cloud features rich, zero-configuration Kubernetes monitoring for the resource utilization and application metrics of Kubernetes (k8s) clusters.
-          - meta:
-              label: Logs
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/logs-tab.md
           - meta:
               label: Metrics
               edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md
