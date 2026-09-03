@@ -50,6 +50,19 @@ YELLOW='\033[1;33m'
 GRAY='\033[0;90m'
 NC='\033[0m'
 
+info()  { printf '%b==>%b %s\n' "${GRAY}" "${NC}" "$*" >&2; }
+ok()    { printf '%b[OK]%b %s\n' "${GREEN}" "${NC}" "$*" >&2; }
+warn()  { printf '%b[WARN]%b %s\n' "${YELLOW}" "${NC}" "$*" >&2; }
+err()   { printf '%b[ERROR]%b %s\n' "${RED}" "${NC}" "$*" >&2; }
+
+skip() {
+    printf '%b%s%b\n' "${YELLOW}" '-------------------------------------------------------------------------------' "${NC}" >&2
+    printf '%b[SKIPPED]%b %s\n' "${YELLOW}" "${NC}" "$*" >&2
+    printf '%b          This is INCONCLUSIVE, not a pass: the question is unanswered.%b\n' "${YELLOW}" "${NC}" >&2
+    printf '%b%s%b\n' "${YELLOW}" '-------------------------------------------------------------------------------' "${NC}" >&2
+    exit 0
+}
+
 GRACE_SECONDS="${GRACE_SECONDS:-15}"
 # How long to wait for the child's first byte before giving up on it streaming at all. Must stay
 # below GRACE_SECONDS so the reader closes the pipe while the writer is still under the guard.
@@ -112,19 +125,6 @@ trap 'rm -rf "${work_dir}"' EXIT
 # Test-only hook: overrides the streaming command so this harness can be exercised on a
 # non-macOS host with a stand-in writer. Leave unset for a real probe.
 NDPROBE_STREAM_CMD="${NDPROBE_STREAM_CMD:-}"
-
-info()  { printf '%b==>%b %s\n' "${GRAY}" "${NC}" "$*" >&2; }
-ok()    { printf '%b[OK]%b %s\n' "${GREEN}" "${NC}" "$*" >&2; }
-warn()  { printf '%b[WARN]%b %s\n' "${YELLOW}" "${NC}" "$*" >&2; }
-err()   { printf '%b[ERROR]%b %s\n' "${RED}" "${NC}" "$*" >&2; }
-
-skip() {
-    printf '%b%s%b\n' "${YELLOW}" '-------------------------------------------------------------------------------' "${NC}" >&2
-    printf '%b[SKIPPED]%b %s\n' "${YELLOW}" "${NC}" "$*" >&2
-    printf '%b          This is INCONCLUSIVE, not a pass: the question is unanswered.%b\n' "${YELLOW}" "${NC}" >&2
-    printf '%b%s%b\n' "${YELLOW}" '-------------------------------------------------------------------------------' "${NC}" >&2
-    exit 0
-}
 
 # ---------------------------------------------------------------------------------------------------
 # preconditions
@@ -285,6 +285,13 @@ fi
 
 if [[ "${default_outcome}" != "died-sigpipe" && "${default_outcome}" != "survived" ]]; then
     skip "powermetrics exited on its own (outcome '${default_outcome}') instead of being killed by the closed pipe, so the premise was never exercised here"
+fi
+
+# The ignored run has to have been writing too. A 'survived' from a child that never wrote proves
+# nothing about an inherited ignore - it had no next write to be killed by - so accepting it would
+# let the probe report the #23730 failure mode as reproduced when it was not.
+if [[ "${ignored_stream}" != "streamed" ]]; then
+    skip "the SIGPIPE-ignored run did not produce two consecutive samples (outcome '${ignored_outcome}', ${ignored_stream}), so its survival is not evidence of an inherited ignore"
 fi
 
 case "${default_outcome}:${ignored_outcome}" in
