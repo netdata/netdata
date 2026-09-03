@@ -830,8 +830,8 @@ func (f *funcTopQueries) buildQueryStoreSelectSQL(cols []topQueriesColumn, dbNam
 	if timeWindowDays > 0 {
 		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
 	}
-	// Canonicalize equal texts in the query catalog so the history sort and aggregation
-	// carry numeric IDs instead of repeated nvarchar(max) values through parallel exchanges.
+	// Canonicalize equal texts only for queries with matching history. The history sort
+	// then carries numeric IDs instead of repeated nvarchar(max) values through exchanges.
 	return fmt.Sprintf(`SELECT
   %s
 FROM (
@@ -845,13 +845,20 @@ FROM (
            MIN(q.query_text_id) OVER (PARTITION BY q.query_hash, qt.query_sql_text) AS query_text_id
     FROM %ssys.query_store_query q
     INNER JOIN %ssys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
+    WHERE q.query_id IN (
+      SELECT p.query_id
+      FROM %ssys.query_store_plan p
+      INNER JOIN %ssys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
+      INNER JOIN %ssys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
+      %s
+    )
   ) AS q
   INNER JOIN %ssys.query_store_plan p ON q.query_id = p.query_id
   INNER JOIN %ssys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
   INNER JOIN %ssys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
   %s
 ) AS rs
-GROUP BY rs.query_hash, rs.query_text_id`, selectExpr, prefix, prefix, prefix, prefix, prefix, timeFilter)
+GROUP BY rs.query_hash, rs.query_text_id`, selectExpr, prefix, prefix, prefix, prefix, prefix, timeFilter, prefix, prefix, prefix, timeFilter)
 }
 
 func (f *funcTopQueries) buildTopQueriesSQL(source topQueriesSource, cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
@@ -996,12 +1003,12 @@ func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQu
 
 func (c *Collector) topQueriesPermissionMessage() string {
 	if c.isAzureSQLDatabase() {
-		return "top-queries requires VIEW DATABASE PERFORMANCE STATE in the connected database"
+		return "top-queries requires VIEW DATABASE PERFORMANCE STATE for Query Store; plan-cache access requires VIEW DATABASE STATE or administrator/##MS_ServerStateReader## access, depending on the Azure SQL Database service tier"
 	}
 	if c.currentMajorVersion() >= 16 {
-		return "top-queries requires VIEW SERVER PERFORMANCE STATE and VIEW DATABASE PERFORMANCE STATE in every queried user database"
+		return "top-queries requires VIEW SERVER PERFORMANCE STATE for the plan cache, or VIEW DATABASE PERFORMANCE STATE in every queried user database for Query Store"
 	}
-	return "top-queries requires VIEW SERVER STATE and VIEW DATABASE STATE in every queried user database"
+	return "top-queries requires VIEW SERVER STATE for the plan cache, or VIEW DATABASE STATE in every queried user database for Query Store"
 }
 
 func mssqlTopQueriesScanSpec(col topQueriesColumn) sqlquery.ScanColumnSpec {
