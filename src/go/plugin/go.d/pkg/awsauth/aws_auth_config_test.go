@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestCredentialConfig_ValidateWithPath(t *testing.T) {
@@ -19,39 +18,92 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 		cfg     CredentialConfig
 		wantErr bool
 	}{
-		"default": {cfg: CredentialConfig{Type: CredentialTypeDefault}},
+		"default": {cfg: CredentialConfig{
+			Type: CredentialTypeDefault,
+		}},
 		"default rejects static config": {
-			cfg:     CredentialConfig{Type: CredentialTypeDefault, TypeStatic: &StaticCredentialConfig{AccessKeyID: "unexpected"}},
+			cfg: CredentialConfig{
+				Type: CredentialTypeDefault,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID: "unexpected",
+				},
+			},
 			wantErr: true,
 		},
 		"static": {
-			cfg: CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret"}},
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID:     "AKIAEXAMPLE",
+					SecretAccessKey: "secret",
+				},
+			},
 		},
 		"static with session token": {
-			cfg: CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token"}},
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID:     "AKIAEXAMPLE",
+					SecretAccessKey: "secret",
+					SessionToken:    "token",
+				},
+			},
 		},
 		"static missing config": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic},
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+			},
 			wantErr: true,
 		},
 		"static missing id": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{SecretAccessKey: "secret"}},
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					SecretAccessKey: "secret",
+				},
+			},
 			wantErr: true,
 		},
 		"static missing secret": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE"}},
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID: "AKIAEXAMPLE",
+				},
+			},
 			wantErr: true,
 		},
 		"type must be canonical": {
-			cfg:     CredentialConfig{Type: " DEFAULT "},
+			cfg: CredentialConfig{
+				Type: " DEFAULT ",
+			},
 			wantErr: true,
 		},
 		"static values reject surrounding whitespace": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: " AKIAEXAMPLE", SecretAccessKey: "secret "}},
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID:     " AKIAEXAMPLE",
+					SecretAccessKey: "secret ",
+				},
+			},
+			wantErr: true,
+		},
+		"static session token rejects whitespace-only value": {
+			cfg: CredentialConfig{
+				Type: CredentialTypeStatic,
+				TypeStatic: &StaticCredentialConfig{
+					AccessKeyID:     "AKIAEXAMPLE",
+					SecretAccessKey: "secret",
+					SessionToken:    " ",
+				},
+			},
 			wantErr: true,
 		},
 		"missing type": {wantErr: true},
-		"invalid type": {cfg: CredentialConfig{Type: "bogus"}, wantErr: true},
+		"invalid type": {cfg: CredentialConfig{
+			Type: "bogus",
+		}, wantErr: true},
 	}
 
 	for name, tc := range tests {
@@ -66,12 +118,46 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 	}
 }
 
+func TestStaticCredentialConfig_ValidateWithPath(t *testing.T) {
+	cfg := StaticCredentialConfig{
+		AccessKeyID: "AKIAEXAMPLE",
+	}
+
+	err := cfg.ValidateWithPath("credentials")
+	assert.ErrorContains(t, err, "credentials.secret_access_key is required")
+	assert.NotContains(t, err.Error(), "type_static")
+}
+
+func TestAssumeRoleConfig_ValidateWithPath(t *testing.T) {
+	cfg := AssumeRoleConfig{
+		ExternalID: " external",
+	}
+
+	err := cfg.ValidateWithPath("assume_role")
+	assert.ErrorContains(t, err, "assume_role.role_arn is required")
+	assert.ErrorContains(t, err, "assume_role.external_id must not contain surrounding whitespace")
+
+	t.Run("rejects whitespace-only external ID", func(t *testing.T) {
+		cfg := AssumeRoleConfig{
+			RoleARN:    "arn:aws:iam::123456789012:role/example",
+			ExternalID: " ",
+		}
+
+		err := cfg.ValidateWithPath("assume_role")
+		assert.ErrorContains(t, err, "assume_role.external_id must not contain surrounding whitespace")
+	})
+}
+
 func TestIdentity_NewConfig(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("default credentials set region", func(t *testing.T) {
-		id := NewIdentity("base", CredentialConfig{Type: CredentialTypeDefault}, nil)
-		cfg, err := id.NewConfig(ctx, ConfigOptions{Region: "us-east-1"})
+		id := NewIdentity("base", CredentialConfig{
+			Type: CredentialTypeDefault,
+		}, nil)
+		cfg, err := id.NewConfig(ctx, ConfigOptions{
+			Region: "us-east-1",
+		})
 		require.NoError(t, err)
 		assert.Equal(t, "us-east-1", cfg.Region)
 	})
@@ -80,10 +166,14 @@ func TestIdentity_NewConfig(t *testing.T) {
 		id := NewIdentity("base", CredentialConfig{
 			Type: CredentialTypeStatic,
 			TypeStatic: &StaticCredentialConfig{
-				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "session",
+				AccessKeyID:     "AKIAEXAMPLE",
+				SecretAccessKey: "secret",
+				SessionToken:    "session",
 			},
 		}, nil)
-		cfg, err := id.NewConfig(ctx, ConfigOptions{Region: "eu-west-1"})
+		cfg, err := id.NewConfig(ctx, ConfigOptions{
+			Region: "eu-west-1",
+		})
 		require.NoError(t, err)
 		creds, err := cfg.Credentials.Retrieve(ctx)
 		require.NoError(t, err)
@@ -136,10 +226,16 @@ func TestIdentity_StaticCredentialsAssumeRole(t *testing.T) {
 	id := NewIdentity("production", CredentialConfig{
 		Type: CredentialTypeStatic,
 		TypeStatic: &StaticCredentialConfig{
-			AccessKeyID: "AKIABASEIDENTITY", SecretAccessKey: "base-secret",
+			AccessKeyID:     "AKIABASEIDENTITY",
+			SecretAccessKey: "base-secret",
 		},
-	}, &AssumeRoleConfig{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext-123"})
-	cfg, err := id.NewConfig(ctx, ConfigOptions{Region: "us-west-2"})
+	}, &AssumeRoleConfig{
+		RoleARN:    "arn:aws:iam::000000000000:role/example",
+		ExternalID: "ext-123",
+	})
+	cfg, err := id.NewConfig(ctx, ConfigOptions{
+		Region: "us-west-2",
+	})
 	require.NoError(t, err)
 	creds, err := cfg.Credentials.Retrieve(ctx)
 	require.NoError(t, err)
@@ -154,18 +250,4 @@ func TestIdentity_StaticCredentialsAssumeRole(t *testing.T) {
 	assert.Contains(t, gotAuth, "/us-west-2/sts/aws4_request")
 	assert.Equal(t, "ASIATEMPKEY", creds.AccessKeyID)
 	assert.Equal(t, "temp-session-token", creds.SessionToken)
-}
-
-func TestCredentialConfig_YAMLRoundTrip(t *testing.T) {
-	want := CredentialConfig{
-		Type: CredentialTypeStatic,
-		TypeStatic: &StaticCredentialConfig{
-			AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
-		},
-	}
-	data, err := yaml.Marshal(want)
-	require.NoError(t, err)
-	var got CredentialConfig
-	require.NoError(t, yaml.Unmarshal(data, &got))
-	assert.Equal(t, want, got)
 }

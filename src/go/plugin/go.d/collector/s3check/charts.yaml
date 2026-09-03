@@ -1,221 +1,187 @@
 version: v1
 context_namespace: s3check
 groups:
-  - family: Probe
+  - family: Status
     chart_defaults:
       priority: 1100
     metrics:
-      - stage_status
+      - runtime_status
+      - probe_status
+      - payload_mismatch
     charts:
-      - id: stage_status
-        title: S3 probe stage status
-        context: stage_status
+      - id: runtime_status
+        title: S3 check runtime status
+        context: runtime_status
         units: status
         type: line
         instances:
-          by_labels: [stage]
-        label_promotion: [reason]
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
         dimensions:
-          - selector: 'stage_status{stage_status="ok"}'
-            name: ok
-          - selector: 'stage_status{stage_status="failed"}'
+          - selector: 'runtime_status{runtime_status="success"}'
+            name: success
+          - selector: 'runtime_status{runtime_status="failed"}'
             name: failed
-          - selector: 'stage_status{stage_status="skipped"}'
-            name: skipped
-  - family: Latency
+      - id: probe_status
+        title: S3 check probe status
+        context: probe_status
+        units: status
+        type: line
+        instances:
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
+        dimensions:
+          - selector: 'probe_status{probe_status="success"}'
+            name: success
+          - selector: 'probe_status{probe_status="waiting"}'
+            name: waiting
+          - selector: 'probe_status{probe_status="failed"}'
+            name: failed
+      - id: payload_mismatch
+        title: S3 payload verification mismatch
+        context: payload_mismatch
+        units: status
+        type: line
+        instances:
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
+        dimensions:
+          - selector: payload_mismatch
+            name: mismatch
+
+  - family: Replication objectives
     chart_defaults:
       priority: 1110
     metrics:
-      - stage_duration_ms
-      - stage_latency_exceeded
+      - write_visibility_lag_seconds
+      - write_visibility_objective_breached
+      - delete_visibility_lag_seconds
+      - delete_visibility_objective_breached
     charts:
-      - id: stage_duration
-        title: S3 probe stage duration
-        context: stage_duration
-        units: milliseconds
+      - id: write_visibility_lag
+        title: S3 write visibility lag
+        context: write_visibility_lag
+        units: seconds
         type: line
         instances:
-          by_labels: [stage]
-        label_promotion: [reason]
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
         dimensions:
-          - selector: stage_duration_ms
-            name: duration
+          - selector: write_visibility_lag_seconds
+            name: lag
             options:
               float: true
-      - id: stage_latency_status
-        title: S3 probe stage latency objective status
-        context: stage_latency_status
+      - id: write_visibility_objective
+        title: S3 write visibility objective status
+        context: write_visibility_objective
         units: status
         type: line
         instances:
-          by_labels: [stage]
-        label_promotion: [reason]
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
         dimensions:
-          - selector: stage_latency_exceeded
-            name: exceeded
-  - family: Requests
+          - selector: write_visibility_objective_breached
+            name: breached
+      - id: delete_visibility_lag
+        title: S3 delete visibility lag
+        context: delete_visibility_lag
+        units: seconds
+        type: line
+        instances:
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
+        dimensions:
+          - selector: delete_visibility_lag_seconds
+            name: lag
+            options:
+              float: true
+      - id: delete_visibility_objective
+        title: S3 delete visibility objective status
+        context: delete_visibility_objective
+        units: status
+        type: line
+        instances:
+          by_labels: [mode]
+        label_promotion: [source, destination, reason]
+        dimensions:
+          - selector: delete_visibility_objective_breached
+            name: breached
+
+  - family: Ownership
     chart_defaults:
       priority: 1120
     metrics:
-      - stage_operations_total
-      - stage_attempts_total
-      - stage_retries_total
-      - stage_failures_total
+      - cleanup_pending_objects
+      - mutation_backpressure
     charts:
-      - id: stage_requests
-        title: S3 probe stage requests
-        context: stage_requests
-        units: requests
+      - id: cleanup_pending_objects
+        title: S3 owned objects pending cleanup
+        context: cleanup_pending_objects
+        units: objects
         type: line
         instances:
-          by_labels: [stage]
+          by_labels: [mode]
+        label_promotion: [source, destination]
         dimensions:
-          - selector: stage_operations_total
-            name: operations
-          - selector: stage_attempts_total
-            name: attempts
-          - selector: stage_retries_total
-            name: retries
-          - selector: stage_failures_total
-            name: failures
-  - family: Multisite Probe
+          - selector: cleanup_pending_objects
+            name: pending
+      - id: mutation_backpressure
+        title: S3 mutation backpressure status
+        context: mutation_backpressure
+        units: status
+        type: line
+        instances:
+          by_labels: [mode]
+        label_promotion: [source, destination]
+        dimensions:
+          - selector: mutation_backpressure
+            name: active
+
+  - family: Operations
     chart_defaults:
       priority: 1130
     metrics:
-      - multisite_status
-      - multisite_payload_mismatch
-      - multisite_phase_failure
+      - operation_status
+      - operation_duration_seconds
+      - operation_calls_total
+      - operation_failures_total
     charts:
-      - id: multisite_status
-        title: S3 multisite probe phase status
-        context: multisite_status
+      - id: operation_status
+        title: S3 logical operation status
+        context: operation_status
         units: status
         type: line
         instances:
-          by_labels: [source_site, destination_site, phase]
-        label_promotion: [reason]
+          by_labels: [mode, endpoint, operation]
+        label_promotion: [source, destination, reason]
         dimensions:
-          - selector: 'multisite_status{multisite_status="ok"}'
-            name: ok
-          - selector: 'multisite_status{multisite_status="waiting"}'
-            name: waiting
-          - selector: 'multisite_status{multisite_status="failed"}'
+          - selector: 'operation_status{operation_status="success"}'
+            name: success
+          - selector: 'operation_status{operation_status="failed"}'
             name: failed
-          - selector: 'multisite_status{multisite_status="skipped"}'
-            name: skipped
-      - id: multisite_phase_failure
-        title: S3 multisite phase failure status
-        context: multisite_phase_failure
-        units: status
+      - id: operation_duration
+        title: S3 logical operation duration
+        context: operation_duration
+        units: seconds
         type: line
         instances:
-          by_labels: [source_site, destination_site]
+          by_labels: [mode, endpoint, operation]
+        label_promotion: [source, destination, reason]
         dimensions:
-          - selector: multisite_phase_failure
-            name: failed
-      - id: multisite_payload_mismatch
-        title: S3 multisite payload mismatch status
-        context: multisite_payload_mismatch
-        units: status
-        type: line
-        instances:
-          by_labels: [source_site, destination_site]
-        lifecycle:
-          # Keep the categorical incident chart until a verified payload emits
-          # a fresh sample; ordinary five-cycle expiry is for removable entities.
-          expire_after_cycles: 2147483647
-        dimensions:
-          - selector: multisite_payload_mismatch
-            name: mismatch
-  - family: Multisite Latency
-    chart_defaults:
-      priority: 1140
-    metrics:
-      - multisite_phase_duration_ms
-      - multisite_replication_lag_ms
-      - multisite_rpo_exceeded
-      - multisite_delete_lag_ms
-      - multisite_delete_exceeded
-    charts:
-      - id: multisite_phase_duration
-        title: S3 multisite probe phase duration
-        context: multisite_phase_duration
-        units: milliseconds
-        type: line
-        instances:
-          by_labels: [source_site, destination_site, phase]
-        label_promotion: [reason]
-        dimensions:
-          - selector: multisite_phase_duration_ms
+          - selector: operation_duration_seconds
             name: duration
             options:
               float: true
-      - id: multisite_replication_lag
-        title: S3 multisite replication lag
-        context: multisite_replication_lag
-        units: milliseconds
+      - id: operation_calls
+        title: S3 logical calls
+        context: operation_calls
+        units: calls/s
         type: line
         instances:
-          by_labels: [source_site, destination_site]
+          by_labels: [mode, endpoint, operation]
+        label_promotion: [source, destination]
         dimensions:
-          - selector: multisite_replication_lag_ms
-            name: lag
-            options:
-              float: true
-      - id: multisite_rpo_status
-        title: S3 multisite replication RPO status
-        context: multisite_rpo_status
-        units: status
-        type: line
-        instances:
-          by_labels: [source_site, destination_site]
-        dimensions:
-          - selector: multisite_rpo_exceeded
-            name: breached
-      - id: multisite_delete_lag
-        title: S3 multisite delete propagation lag
-        context: multisite_delete_lag
-        units: milliseconds
-        type: line
-        instances:
-          by_labels: [source_site, destination_site]
-        dimensions:
-          - selector: multisite_delete_lag_ms
-            name: lag
-            options:
-              float: true
-      - id: multisite_delete_status
-        title: S3 multisite delete propagation status
-        context: multisite_delete_status
-        units: status
-        type: line
-        instances:
-          by_labels: [source_site, destination_site]
-        dimensions:
-          - selector: multisite_delete_exceeded
-            name: breached
-  - family: Multisite Requests
-    chart_defaults:
-      priority: 1150
-    metrics:
-      - multisite_phase_operations_total
-      - multisite_phase_attempts_total
-      - multisite_phase_retries_total
-      - multisite_phase_failures_total
-    charts:
-      - id: multisite_phase_requests
-        title: S3 multisite probe phase requests
-        context: multisite_phase_requests
-        units: requests
-        type: line
-        instances:
-          by_labels: [source_site, destination_site, phase]
-        dimensions:
-          - selector: multisite_phase_operations_total
-            name: operations
-          - selector: multisite_phase_attempts_total
-            name: attempts
-          - selector: multisite_phase_retries_total
-            name: retries
-          - selector: multisite_phase_failures_total
+          - selector: operation_calls_total
+            name: calls
+          - selector: operation_failures_total
             name: failures

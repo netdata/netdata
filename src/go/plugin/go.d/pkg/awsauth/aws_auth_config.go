@@ -24,21 +24,20 @@ const (
 
 // StaticCredentialConfig contains explicit long-lived or temporary AWS credentials.
 type StaticCredentialConfig struct {
-	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty"`
+	AccessKeyID     string `yaml:"access_key_id,omitempty"     json:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty"`
-	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
+	SessionToken    string `yaml:"session_token,omitempty"     json:"session_token,omitempty"`
 }
 
 // CredentialConfig describes only how the base AWS credentials are acquired.
-// Which identity is monitored, including optional role assumption, is a separate
-// Identity compiled from a CloudWatch target.
+// The caller compiles it with optional role assumption into an Identity.
 type CredentialConfig struct {
-	Type       string                  `yaml:"type" json:"type"`
+	Type       string                  `yaml:"type"                  json:"type"`
 	TypeStatic *StaticCredentialConfig `yaml:"type_static,omitempty" json:"type_static,omitempty"`
 }
 
 type AssumeRoleConfig struct {
-	RoleARN    string `yaml:"role_arn,omitempty" json:"role_arn,omitempty"`
+	RoleARN    string `yaml:"role_arn,omitempty"    json:"role_arn,omitempty"`
 	ExternalID string `yaml:"external_id,omitempty" json:"external_id,omitempty"`
 }
 
@@ -46,6 +45,8 @@ type AssumeRoleConfig struct {
 type ConfigOptions struct {
 	// Region is the AWS region the resulting config targets.
 	Region string
+	// HTTPClient is shared by service clients and assume-role credential retrieval.
+	HTTPClient aws.HTTPClient
 	// STSRegion overrides the STS endpoint region for assume_role mode.
 	// Defaults to Region (a regional endpoint, which also works in gov/cn
 	// partitions where the global STS endpoint does not exist).
@@ -65,19 +66,18 @@ func (c CredentialConfig) ValidateWithPath(path string) error {
 	switch c.Type {
 	case CredentialTypeDefault:
 		if c.TypeStatic != nil {
-			return fmt.Errorf("%s is not allowed when %s is %q", fieldPath(path, "type_static"), typeField, CredentialTypeDefault)
+			return fmt.Errorf(
+				"%s is not allowed when %s is %q",
+				fieldPath(path, "type_static"),
+				typeField,
+				CredentialTypeDefault,
+			)
 		}
 	case CredentialTypeStatic:
 		if c.TypeStatic == nil {
 			return errors.New(fieldPath(path, "type_static") + " is required")
 		}
-		staticPath := fieldPath(path, "type_static")
-		errs := []error{
-			validateCredentialValue(fieldPath(staticPath, "access_key_id"), c.TypeStatic.AccessKeyID, true),
-			validateCredentialValue(fieldPath(staticPath, "secret_access_key"), c.TypeStatic.SecretAccessKey, true),
-			validateCredentialValue(fieldPath(staticPath, "session_token"), c.TypeStatic.SessionToken, false),
-		}
-		return errors.Join(errs...)
+		return c.TypeStatic.ValidateWithPath(fieldPath(path, "type_static"))
 	default:
 		return fmt.Errorf("%s %q is invalid: expected one of %q, %q",
 			typeField, c.Type, CredentialTypeDefault, CredentialTypeStatic)
@@ -85,15 +85,29 @@ func (c CredentialConfig) ValidateWithPath(path string) error {
 	return nil
 }
 
+func (c StaticCredentialConfig) ValidateWithPath(path string) error {
+	return errors.Join(
+		validateCredentialValue(fieldPath(path, "access_key_id"), c.AccessKeyID, true),
+		validateCredentialValue(fieldPath(path, "secret_access_key"), c.SecretAccessKey, true),
+		validateCredentialValue(fieldPath(path, "session_token"), c.SessionToken, false),
+	)
+}
+
+func (c AssumeRoleConfig) ValidateWithPath(path string) error {
+	return errors.Join(
+		validateCredentialValue(fieldPath(path, "role_arn"), c.RoleARN, true),
+		validateCredentialValue(fieldPath(path, "external_id"), c.ExternalID, false),
+	)
+}
+
 func validateCredentialValue(path, value string, required bool) error {
-	canonical := strings.TrimSpace(value)
-	if canonical == "" {
+	if value == "" {
 		if required {
 			return errors.New(path + " is required")
 		}
 		return nil
 	}
-	if value != canonical {
+	if value != strings.TrimSpace(value) {
 		return errors.New(path + " must not contain surrounding whitespace")
 	}
 	return nil
@@ -108,7 +122,10 @@ type Identity struct {
 }
 
 func NewIdentity(ref string, credentials CredentialConfig, role *AssumeRoleConfig) Identity {
-	id := Identity{Ref: ref, credentials: credentials}
+	id := Identity{
+		Ref:         ref,
+		credentials: credentials,
+	}
 	if role != nil {
 		v := *role
 		id.role = &v
@@ -134,14 +151,8 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 		return aws.Config{}, err
 	}
 	if id.role != nil {
-		if strings.TrimSpace(id.role.RoleARN) == "" {
-			return aws.Config{}, errors.New("assume_role.role_arn is required")
-		}
-		if id.role.RoleARN != strings.TrimSpace(id.role.RoleARN) {
-			return aws.Config{}, errors.New("assume_role.role_arn must not contain surrounding whitespace")
-		}
-		if id.role.ExternalID != strings.TrimSpace(id.role.ExternalID) {
-			return aws.Config{}, errors.New("assume_role.external_id must not contain surrounding whitespace")
+		if err := id.role.ValidateWithPath("assume_role"); err != nil {
+			return aws.Config{}, err
 		}
 	}
 
@@ -159,6 +170,9 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 	}
 	if region != "" {
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
+	}
+	if opts.HTTPClient != nil {
+		loadOpts = append(loadOpts, awsconfig.WithHTTPClient(opts.HTTPClient))
 	}
 	if id.credentials.Type == CredentialTypeStatic {
 		static := id.credentials.TypeStatic
