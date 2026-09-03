@@ -331,7 +331,7 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
                 }
 
                 if (!processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu_id))
-                    return false;
+                    continue;
             }
         }
     }
@@ -480,7 +480,7 @@ do_processors(PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool process
 
     common_interrupts(totalIPC, update_every, NULL);
 
-    return !topology_mapping_failed;
+    return true;
 }
 
 int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused)
