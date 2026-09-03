@@ -92,6 +92,7 @@ type topologyAcquisitionProfileEvidence struct {
 	outcome      ddsnmpcollector.AcquisitionProfileOutcome
 	failurePhase ddsnmpcollector.AcquisitionFailurePhase
 	stats        ddsnmp.CollectionStats
+	execution    *ddsnmpcollector.AcquisitionExecutionReport
 	routes       []ddsnmpcollector.AcquisitionRouteReport
 	values       topologyAcquisitionProfileValues
 }
@@ -255,11 +256,17 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 	for i := range report.Routes {
 		report.Routes[i].RootOID = strings.Clone(report.Routes[i].RootOID)
 	}
+	if report.Execution != nil {
+		for i := range report.Execution.Walks {
+			report.Execution.Walks[i].RootOID = strings.Clone(report.Execution.Walks[i].RootOID)
+		}
+	}
 	context.profiles = append(context.profiles, topologyAcquisitionProfileEvidence{
 		identity:     report.Identity,
 		outcome:      report.Outcome,
 		failurePhase: report.FailurePhase,
 		stats:        report.Stats,
+		execution:    report.Execution,
 		routes:       report.Routes,
 		values:       o.recorder.projectProfile(o.eventKind, report, metrics),
 	})
@@ -277,6 +284,14 @@ func topologyAcquisitionProfileShape(
 	logicalBytes := uint64(96)
 	for _, route := range report.Routes {
 		logicalBytes += uint64(64 + len(route.RootOID))
+	}
+	if report.Execution != nil {
+		records += uint64(1 + len(report.Execution.Walks))
+		// Execution header/preparation plus the two new aggregate statistics.
+		logicalBytes += 88
+		for _, walk := range report.Execution.Walks {
+			logicalBytes += uint64(32 + len(walk.RootOID))
+		}
 	}
 	if profile == nil || report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed {
 		return records, logicalBytes, nil

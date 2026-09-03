@@ -76,6 +76,59 @@ func (h *benchmarkTopologySNMPHandler) MaxOids() int {
 	return 4096
 }
 
+type benchmarkAcquisitionSNMPHandler struct{ benchmarkTopologySNMPHandler }
+
+func (*benchmarkAcquisitionSNMPHandler) MaxOids() int { return 10 }
+
+func (*benchmarkAcquisitionSNMPHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+	packet := &gosnmp.SnmpPacket{Variables: make([]gosnmp.SnmpPDU, len(oids))}
+	for i, oid := range oids {
+		packet.Variables[i] = createStringPDU(oid, "value")
+	}
+	return packet, nil
+}
+
+// Keep row count fixed while varying preparation work, executions and shared consumers.
+// Before/after ns/op is a local trend; the allocation delta must not scale with rows.
+func BenchmarkCollector_AcquisitionAccounting(b *testing.B) {
+	for name, shape := range map[string]struct{ preparation, walks, profiles int }{
+		"preparation": {preparation: 32, profiles: 1},
+		"one_walk":    {walks: 1, profiles: 1},
+		"many_walks":  {walks: 32, profiles: 1},
+		"shared_walk": {walks: 1, profiles: 8},
+	} {
+		var profiles []*ddsnmp.Profile
+		for i := range shape.profiles {
+			profile := createTestProfile(fmt.Sprintf("profile-%d.yaml", i), nil)
+			for n := range shape.preparation {
+				profile.Definition.MetricTags = append(profile.Definition.MetricTags, ddprofiledefinition.GlobalMetricTagConfig{
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+						Tag:    fmt.Sprintf("tag_%d", n),
+						Symbol: ddprofiledefinition.SymbolConfigCompat{OID: fmt.Sprintf("1.3.6.1.4.1.99999.%d.0", n+1), Name: "value"},
+					},
+				})
+			}
+			for n := range shape.walks {
+				profile.Definition.Topology = append(profile.Definition.Topology, benchmarkTopologyProfile(n).Definition.Topology...)
+			}
+			profiles = append(profiles, profile)
+		}
+		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
+			b.Run(name+"/observer="+mode.name, func(b *testing.B) {
+				cfg := Config{SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: profiles, Log: logger.New()}
+				b.ReportAllocs()
+				for b.Loop() {
+					cfg.InitialAcquisitionObserver = mode.new()
+					results, err := New(cfg).Collect()
+					if err != nil || len(results) != len(profiles) {
+						b.Fatalf("profiles=%d err=%v", len(results), err)
+					}
+				}
+			})
+		}
+	}
+}
+
 func benchmarkTopologyProfile(ordinal int) *ddsnmp.Profile {
 	tableOID := fmt.Sprintf("1.3.6.1.4.1.99999.%d", ordinal+1)
 	return &ddsnmp.Profile{

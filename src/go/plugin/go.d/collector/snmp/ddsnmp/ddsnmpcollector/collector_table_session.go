@@ -43,6 +43,7 @@ type tableCollectionScope struct {
 	profileSource  string
 	mode           tableSymbolMode
 	stats          *ddsnmp.CollectionStats
+	execution      *AcquisitionExecutionReport
 	requests       []*tableCollectionRequest
 	tableNameToOID map[string]string
 	acquisition    map[*tableCollectionRequest]*acquisitionTableObservation
@@ -451,7 +452,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 
 func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
-	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats)
+	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
 		route.state = tableRouteFailed

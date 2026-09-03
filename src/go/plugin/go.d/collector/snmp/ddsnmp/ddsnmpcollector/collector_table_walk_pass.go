@@ -14,12 +14,14 @@ type tableWalkOutcome struct {
 }
 
 type tableWalkPass struct {
+	execution  *AcquisitionExecutionReport
 	outcomes   map[string]tableWalkOutcome
 	walkedData map[string]map[string]gosnmp.SnmpPDU
 }
 
-func newTableWalkPass() *tableWalkPass {
+func newTableWalkPass(execution *AcquisitionExecutionReport) *tableWalkPass {
 	return &tableWalkPass{
+		execution:  execution,
 		outcomes:   make(map[string]tableWalkOutcome),
 		walkedData: make(map[string]map[string]gosnmp.SnmpPDU),
 	}
@@ -29,8 +31,9 @@ func walkTableWithStats(
 	tc *tableCollector,
 	oid string,
 	stats *ddsnmp.CollectionStats,
+	execution *AcquisitionExecutionReport,
 ) (map[string]gosnmp.SnmpPDU, error) {
-	pdus, err := tc.snmpWalk(oid, stats)
+	pdus, err := tc.snmpWalk(oid, stats, execution)
 	if err != nil {
 		stats.Errors.SNMP++
 		return pdus, err
@@ -49,7 +52,7 @@ func (p *tableWalkPass) walk(
 		return outcome
 	}
 
-	pdus, err := walkTableWithStats(tc, oid, stats)
+	pdus, err := walkTableWithStats(tc, oid, stats, p.execution)
 	outcome := tableWalkOutcome{pdus: pdus, err: err}
 	p.outcomes[oid] = outcome
 	if err != nil {

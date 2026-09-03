@@ -32,6 +32,10 @@ type licenseValueContext struct {
 }
 
 func (c *Collector) collectLicenseRows(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.LicenseRow, error) {
+	return c.collectLicenseRowsObserved(prof, stats, nil)
+}
+
+func (c *Collector) collectLicenseRowsObserved(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats, execution *AcquisitionExecutionReport) ([]ddsnmp.LicenseRow, error) {
 	if prof.Definition == nil || len(prof.Definition.Licensing) == 0 {
 		return nil, nil
 	}
@@ -45,7 +49,7 @@ func (c *Collector) collectLicenseRows(prof *ddsnmp.Profile, stats *ddsnmp.Colle
 	}
 	rows = append(rows, scalarRows...)
 
-	tableRows, err := c.collectTableLicenseRows(prof.Definition.Licensing, stats)
+	tableRows, err := c.collectTableLicenseRows(prof.Definition.Licensing, stats, execution)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -82,7 +86,6 @@ func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.Licen
 		if len(oids) > 0 {
 			pdus, err = c.scalarCollector.getScalarValues(oids, stats)
 			if err != nil {
-				stats.Errors.SNMP++
 				errs = append(errs, fmt.Errorf("licensing scalar row %q: %w", licensingConfigDisplayName(cfg), err))
 				continue
 			}
@@ -105,10 +108,10 @@ func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.Licen
 	return rows, nil
 }
 
-func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.LicensingConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.LicenseRow, error) {
+func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.LicensingConfig, stats *ddsnmp.CollectionStats, execution *AcquisitionExecutionReport) ([]ddsnmp.LicenseRow, error) {
 	var rows []ddsnmp.LicenseRow
 	var errs []error
-	walkPass := newTableWalkPass()
+	walkPass := newTableWalkPass(execution)
 	tableNameToOID := licensingTableNameToOID(configs)
 
 	for _, cfg := range configs {

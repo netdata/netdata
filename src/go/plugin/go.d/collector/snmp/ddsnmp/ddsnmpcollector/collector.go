@@ -135,6 +135,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 			tableSymbolModeValue,
 			&profile.metrics.Stats,
 		)
+		profile.regularScope.execution = profile.acquisition.executionReport()
 		if profile.topologyProfile != nil {
 			profile.topologyScope = session.addObservedScope(
 				profile.topologyProfile,
@@ -142,6 +143,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 				&profile.metrics.Stats,
 				profile.acquisition.topologyTableScope(),
 			)
+			profile.topologyScope.execution = profile.acquisition.executionReport()
 		}
 	}
 	session.resolve()
@@ -161,6 +163,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 		now := time.Now()
 		vmetrics := c.vmetricsCollector.collect(profile.state.profile.Definition, profile.metrics.Metrics)
+		profile.metrics.Stats.Timing.VirtualMetrics = time.Since(now)
 		if len(vmetrics) > 0 {
 			for i := range vmetrics {
 				vmetrics[i].Profile = profile.metrics
@@ -168,7 +171,6 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 			profile.metrics.Metrics = append(profile.metrics.Metrics, vmetrics...)
 			profile.metrics.Stats.Metrics.Virtual += int64(len(vmetrics))
-			profile.metrics.Stats.Timing.VirtualMetrics = time.Since(now)
 		}
 
 		profile.metrics.HiddenMetrics = collectHiddenMetrics(profile.metrics.Metrics)
@@ -280,37 +282,24 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 		)
 	}
 
-	if !ps.initialized {
-		globalTag, err := c.globalTagsCollector.collectObserved(ps.profile, prepared.acquisition)
-		if err != nil {
-			return prepared, fmt.Errorf("failed to collect global tags: %w", err)
-		}
-		ps.cache.globalTags = globalTag
-
-		deviceMeta, err := c.deviceMetadataCollector.collectObserved(ps.profile, prepared.acquisition)
-		if err != nil {
-			return prepared, fmt.Errorf("failed to collect device metadata: %w", err)
-		}
-		ps.cache.deviceMetadata = deviceMeta
-		ps.initialized = true
+	if err := c.prepareProfileInputs(prepared); err != nil {
+		return prepared, err
 	}
-
-	pm.Tags = maps.Clone(ps.cache.globalTags)
-	pm.DeviceMetadata = maps.Clone(ps.cache.deviceMetadata)
 
 	now := time.Now()
 	scalarMetrics, err := c.scalarCollector.collect(ps.profile, &pm.Stats)
+	pm.Stats.Timing.Scalar = time.Since(now)
 	if err != nil {
 		return prepared, err
 	}
 	scalarMetrics = c.keepFirstRegularScalarMetricByName(scalarMetrics)
 	pm.Metrics = append(pm.Metrics, scalarMetrics...)
-	pm.Stats.Timing.Scalar = time.Since(now)
 	pm.Stats.Metrics.Scalar += int64(len(scalarMetrics))
 
 	topologyProfile, topologyKinds := buildTopologyProfile(ps.profile)
 	if topologyProfile != nil {
 		var topologyScalars []ddsnmp.Metric
+		now = time.Now()
 		if prepared.acquisition == nil {
 			topologyScalars, err = c.scalarCollector.collect(topologyProfile, &pm.Stats)
 		} else {
@@ -320,6 +309,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 				prepared.acquisition.topologyScalarObserver(),
 			)
 		}
+		pm.Stats.Timing.Scalar += time.Since(now)
 		if err != nil {
 			return prepared, err
 		}
@@ -330,6 +320,41 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 	prepared.topologyProfile = topologyProfile
 	prepared.topologyKinds = topologyKinds
 	return prepared, nil
+}
+
+func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) error {
+	ps, pm := prepared.state, prepared.metrics
+	started := time.Now()
+	defer func() {
+		pm.Stats.Timing.Preparation = time.Since(started)
+		if execution := prepared.acquisition.executionReport(); execution != nil {
+			// Snapshot the same counters before subsequent phases add their work.
+			execution.Preparation = AcquisitionPreparationStats{
+				Elapsed:          pm.Stats.Timing.Preparation,
+				GetRequests:      pm.Stats.SNMP.GetRequests,
+				GetOIDs:          pm.Stats.SNMP.GetOIDs,
+				SNMPErrors:       pm.Stats.Errors.SNMP,
+				MissingOIDs:      pm.Stats.Errors.MissingOIDs,
+				ProcessingErrors: pm.Stats.Errors.Processing.Preparation,
+			}
+		}
+	}()
+	if !ps.initialized {
+		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		if err != nil {
+			return fmt.Errorf("failed to collect global tags: %w", err)
+		}
+		ps.cache.globalTags = globalTags
+		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		if err != nil {
+			return fmt.Errorf("failed to collect device metadata: %w", err)
+		}
+		ps.cache.deviceMetadata = metadata
+		ps.initialized = true
+	}
+	pm.Tags = maps.Clone(ps.cache.globalTags)
+	pm.DeviceMetadata = maps.Clone(ps.cache.deviceMetadata)
+	return nil
 }
 
 func (c *Collector) collectPreparedProfileTables(
@@ -364,7 +389,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	pm := profile.metrics
 
 	now := time.Now()
-	licenseRows, err := c.collectLicenseRows(ps.profile, &pm.Stats)
+	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition.executionReport())
 	if err != nil {
 		c.log.Limit(licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("failed to collect licensing rows for profile %q: %v", ps.profile.SourceFile, err)

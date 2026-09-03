@@ -1270,6 +1270,13 @@ modules:
               The **SNMP profile collection timings** chart shows how long each part of the SNMP polling takes.  
               Table metrics are usually the slowest and often determine the total collection time.
 
+              The `preparation` dimension includes profile tags and device metadata acquisition, plus cached-input copying.
+              Its GET requests and errors are also included in the profile statistics; `processing_preparation` counts
+              failures while interpreting these values. GET and walk request counts are logical client calls, not network
+              packets or retries. Profile timing totals exclude connection setup and discovery-only work, so they are not
+              a complete device-refresh wall-clock measurement. These charts publish statistics for successful profiles;
+              failed topology attempts can be examined in topology diagnostic archives.
+
               **Step 3: Increase the data collection interval**
 
               [Set `update_every`](#setup) to a value **higher than your slowest collection time**, with some extra buffer for network variability.

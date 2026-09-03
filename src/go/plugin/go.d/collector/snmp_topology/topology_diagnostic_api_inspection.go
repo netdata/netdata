@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"encoding/hex"
 	"fmt"
 	"slices"
 
@@ -22,11 +23,11 @@ func newDiagnosticDeviceInspection(
 	if err != nil {
 		return DiagnosticDeviceInspection{}, fmt.Errorf("project sweep inspection: %w", err)
 	}
-	latest, err := newDiagnosticCaptureInspection(report.latestAttempt)
+	latest, err := newDiagnosticDeviceCaptureInspection(report.latestAttempt)
 	if err != nil {
 		return DiagnosticDeviceInspection{}, fmt.Errorf("project latest-attempt inspection: %w", err)
 	}
-	retained, err := newDiagnosticCaptureInspection(report.retainedSuccess)
+	retained, err := newDiagnosticDeviceCaptureInspection(report.retainedSuccess)
 	if err != nil {
 		return DiagnosticDeviceInspection{}, fmt.Errorf("project retained-success inspection: %w", err)
 	}
@@ -173,6 +174,43 @@ func newDiagnosticCaptureInspection(
 		Evidence:   diagnosticStage(result.evidence),
 		Capture:    capture,
 	}, nil
+}
+
+func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult) (diagnosticDeviceCaptureInspection, error) {
+	capture, err := newDiagnosticCaptureInspection(result)
+	if err != nil {
+		return diagnosticDeviceCaptureInspection{}, err
+	}
+	converted := diagnosticDeviceCaptureInspection{diagnosticCaptureInspection: capture}
+	if result.capture == nil || result.capture.evidence == nil {
+		return converted, nil
+	}
+	for _, context := range result.capture.evidence.collectionContexts {
+		accounting := diagnosticContextAccounting{
+			Ordinal: context.ordinal, VLANID: context.vlanID, VLANName: context.vlanName,
+			Profiles: make([]diagnosticProfileAccounting, 0, len(context.profiles)),
+		}
+		for _, profile := range context.profiles {
+			outcome, err := topologyDiagnosticArchiveProfileOutcomeName(profile.outcome)
+			if err != nil {
+				return diagnosticDeviceCaptureInspection{}, err
+			}
+			phase, err := topologyDiagnosticArchiveProfileFailurePhaseName(profile.failurePhase)
+			if err != nil {
+				return diagnosticDeviceCaptureInspection{}, err
+			}
+			accounting.Profiles = append(accounting.Profiles, diagnosticProfileAccounting{
+				Identity: topologyDiagnosticArchiveProfileIdentityV1{
+					Ordinal: profile.identity.Ordinal, RouteDigest: hex.EncodeToString(profile.identity.RouteDigest[:]),
+				},
+				Outcome: outcome, FailurePhase: phase,
+				Stats:     newTopologyDiagnosticArchiveCollectionStatsV1(profile.stats),
+				Execution: newTopologyDiagnosticArchiveExecutionV1(profile.execution),
+			})
+		}
+		converted.CollectionContexts = append(converted.CollectionContexts, accounting)
+	}
+	return converted, nil
 }
 
 func newDiagnosticActorInspection(
