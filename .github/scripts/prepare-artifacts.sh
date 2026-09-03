@@ -72,6 +72,11 @@ create_manifest() {
     fi
 }
 
+echo "Using ${artifacts} as source directory for artifacts"
+echo "::group::Files currently in ${artifacts}"
+ls -l "${artifacts}"
+echo "::endgroup::"
+
 echo "::group::Preparing GitHub release artifacts"
 mkdir -p artifacts/github
 cd artifacts/github
