@@ -95,6 +95,7 @@ type AcquisitionProfileReport struct {
 	Outcome                 AcquisitionProfileOutcome
 	FailurePhase            AcquisitionFailurePhase
 	Stats                   ddsnmp.CollectionStats
+	Execution               *AcquisitionExecutionReport
 	Routes                  []AcquisitionRouteReport
 	TopologyValueReferences []AcquisitionValueReference
 	BGPValueReferences      []AcquisitionValueReference
@@ -131,6 +132,7 @@ func (r AcquisitionProfileReport) String() string {
 }
 
 type acquisitionProfileCollection struct {
+	execution               AcquisitionExecutionReport
 	identity                AcquisitionProfileIdentity
 	routes                  []AcquisitionRouteReport
 	topologyScalarRoutes    []int
@@ -786,10 +788,12 @@ func (c *acquisitionProfileCollection) report(
 	phase AcquisitionFailurePhase,
 	metrics *ddsnmp.ProfileMetrics,
 ) AcquisitionProfileReport {
+	execution := c.execution
 	report := AcquisitionProfileReport{
 		Identity:     c.identity,
 		Outcome:      outcome,
 		FailurePhase: phase,
+		Execution:    &execution,
 	}
 	if metrics != nil {
 		report.Stats = metrics.Stats
@@ -809,6 +813,7 @@ func (c *acquisitionProfileCollection) releaseReportStorage() {
 		return
 	}
 	c.routes = nil
+	c.execution = AcquisitionExecutionReport{}
 	c.topologyScalarRoutes = nil
 	c.topologyTableRoutes = nil
 	c.bgpRoutes = nil

@@ -220,7 +220,19 @@ root. Compact route/row/value references join the
 synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
 reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
 definitions, and error text are excluded. With no observer, profile digests, route reports, and value references are not
-built.
+built. Optional execution accounting records preparation elapsed/request/error counters and one root/duration/error
+record per actual Handler walk, owned by the same profile charged for the work. Shared consumers and memoized outcomes
+do not duplicate executions. Walk timing ends before local PDU-map/row processing; phase totals remain inclusive.
+Preparation is finalized on all exits and included in profile totals, while scalar timing covers both ordinary and
+topology scalars, including failure. Execution storage is transferred with the report and charged to existing capture
+record/logical-byte limits before retention; it has no row-proportional timing records.
+
+Archive v1 stores execution accounting as an additive optional `execution` block. Absence means not recorded and survives
+decode/re-encode; it must not be interpreted as zero or inferred from route counts. Historical aggregate statistics keep
+their historical incomplete coverage. The selected-device inspection exposes context/profile statistics and executions
+for latest attempt and retained success separately; summary and link responses remain compact. These measurements do
+not affect replay, graph identity, acquisition policy, or partial-refresh behavior. See the
+[diagnostics tool](../../../../tools/snmp-topology-diagnostics/README.md#collection-cost) for interpretation and exclusions.
 
 BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
 every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
