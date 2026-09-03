@@ -29,7 +29,36 @@ echo "Running spawn-server unit tests"
 
 # Its own run directory: the tester creates a spawn server there, and every netdata instance on the
 # host otherwise shares one (src/libnetdata/os/run_dir.c), so a concurrent agent would collide.
-run_dir="$(mktemp -d "${TMPDIR:-/tmp}/netdata-spawn-tester.XXXXXX")" || exit 1
+#
+# The directory also has to be SHORT. The spawn server binds "<run_dir>/netdata-spawn-<name>.sock",
+# AF_UNIX sun_path holds 103 usable bytes, and the tester's longest server name is "test-callback"
+# - so the run directory cannot exceed 70 bytes. $TMPDIR is fine on Linux (usually unset, so /tmp)
+# but on macOS it is a long per-user path such as
+# /var/folders/_5/zjnzxgh147qcg3bb5cg2wvqw0000gn/T/, which blows the budget on its own. Prefer a
+# short base and verify the result, rather than letting bind() fail deep inside the spawn server.
+MAX_RUN_DIR_LEN=70
+
+run_dir=""
+for base in "${NETDATA_SPAWN_TEST_TMPDIR:-}" /tmp "${TMPDIR:-}"; do
+    [ -n "${base}" ] || continue
+    [ -d "${base}" ] && [ -w "${base}" ] || continue
+
+    candidate="$(mktemp -d "${base%/}/nd-spawn-test.XXXXXX" 2>/dev/null)" || continue
+    if [ "${#candidate}" -le "${MAX_RUN_DIR_LEN}" ]; then
+        run_dir="${candidate}"
+        break
+    fi
+
+    rm -rf -- "${candidate}"
+done
+
+if [ -z "${run_dir}" ]; then
+    printf 'could not create a run directory of at most %d bytes.\n' "${MAX_RUN_DIR_LEN}" >&2
+    printf 'The spawn server binds a socket inside it and AF_UNIX allows only 103 bytes of path.\n' >&2
+    printf 'Set NETDATA_SPAWN_TEST_TMPDIR to a short writable directory.\n' >&2
+    exit 1
+fi
+
 trap 'rm -rf -- "${run_dir}"' EXIT
 
 NETDATA_RUN_DIR="${run_dir}" \
