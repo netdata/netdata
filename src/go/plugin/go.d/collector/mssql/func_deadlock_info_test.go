@@ -156,6 +156,8 @@ func TestQueryLatestDeadlock_FallsBackToRingBufferOnFileError(t *testing.T) {
 
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
 	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(
 		sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).AddRow(now, sampleDeadlockGraph),
 	)
@@ -178,6 +180,44 @@ func TestQueryLatestDeadlock_DoesNotFallbackOnContextOrPermissionError(t *testin
 	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("VIEW SERVER STATE permission was denied")))
 	assert.True(t, shouldFallbackDeadlockEventFile(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"}))
 	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("event file scan failed")))
+}
+
+func TestDeadlockInfo_RingBufferAvailability(t *testing.T) {
+	for name, tc := range map[string]struct {
+		useRingBuffer      bool
+		target, wantStatus int
+	}{
+		"fallback missing target": {wantStatus: 500},
+		"fallback empty target":   {target: 1, wantStatus: 200},
+		"explicit missing target": {useRingBuffer: true, wantStatus: 500},
+		"explicit empty target":   {useRingBuffer: true, target: 1, wantStatus: 200},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			if !tc.useRingBuffer {
+				mock.ExpectQuery("fn_xe_file_target_read_file").
+					WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
+			}
+			mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.target))
+			if tc.target > 0 {
+				mock.ExpectQuery("WITH xevents").
+					WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
+			}
+			c := New()
+			c.db = db
+			c.setServerProperties("16.0.4265.3", 3)
+			c.Functions.DeadlockInfo.UseRingBuffer = tc.useRingBuffer
+			r := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
+			assert.Equal(t, tc.wantStatus, r.Status, r.Message)
+			if tc.wantStatus == 500 {
+				assert.Contains(t, r.Message, "ring_buffer target unavailable")
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
 
 func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.T) {
@@ -222,7 +262,6 @@ func TestResolveMSSQLErrorReadTarget_RingBufferRequiresRunningSession(t *testing
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
@@ -260,7 +299,6 @@ func TestResolveMSSQLErrorReadTarget_AzureSQLDatabaseUsesDatabaseRingBufferDMVs(
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_database_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
@@ -298,7 +336,6 @@ func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *test
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_database_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_database_session_targets").
 		WillReturnRows(sqlmock.NewRows([]string{
@@ -488,8 +525,6 @@ func TestFetchMSSQLErrorRows_RetriesSystemHealthRingBufferAfterEventFileError(t 
 	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\MSSQL\Log\system_health.xel`))
 	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(errors.New("event file unavailable"))
-	mock.ExpectQuery("FROM sys.dm_xe_sessions").WithArgs("system_health").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
@@ -516,8 +551,6 @@ func TestFetchMSSQLErrorRows_UsesSystemHealthRingBufferWhenFileLookupFails(t *te
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
 	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
 		WillReturnError(errors.New("system health catalog unavailable"))
-	mock.ExpectQuery("FROM sys.dm_xe_sessions").WithArgs("system_health").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
@@ -582,9 +615,7 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-	mock.ExpectQuery("FROM sys.dm_xe_sessions").WithArgs("system_health").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
@@ -606,26 +637,20 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
 
 func TestCollectErrorInfo_SystemHealthRingBufferAvailability(t *testing.T) {
 	for name, tc := range map[string]struct {
-		running    int
 		target     int
 		wantStatus int
 	}{
-		"stopped session":        {running: 0, wantStatus: 503},
-		"missing target":         {running: 1, target: 0, wantStatus: 503},
-		"empty available target": {running: 1, target: 1, wantStatus: 200},
+		"missing target":         {target: 0, wantStatus: 503},
+		"empty available target": {target: 1, wantStatus: 200},
 	} {
 		t.Run(name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 			defer db.Close()
-			mock.ExpectQuery("dm_xe_sessions").WithArgs("netdata_errors").
+			mock.ExpectQuery("dm_xe_session_targets").WithArgs("netdata_errors").
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-			mock.ExpectQuery("dm_xe_sessions").WithArgs("system_health").
-				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.running))
-			if tc.running > 0 {
-				mock.ExpectQuery("dm_xe_session_targets").WithArgs("system_health").
-					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.target))
-			}
+			mock.ExpectQuery("dm_xe_session_targets").WithArgs("system_health").
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.target))
 			if tc.target > 0 {
 				mock.ExpectQuery("WITH xevents").WithArgs("system_health", 500).
 					WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))

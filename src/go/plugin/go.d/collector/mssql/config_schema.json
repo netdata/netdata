@@ -330,7 +330,7 @@
           "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions, or on Azure SQL Database VIEW DATABASE PERFORMANCE STATE for event_file and VIEW DATABASE STATE for ring_buffer."
         },
         "session_name": {
-          "ui:help": "The administrator-created Extended Events session must capture sqlserver.error_reported with sql_text and query_hash actions, using an event_file (default) or ring_buffer target. Use ON DATABASE for Azure SQL Database."
+          "ui:help": "For full error coverage, configure an administrator-created session capturing sqlserver.error_reported with sql_text and query_hash actions, using event_file (default) or ring_buffer. If unavailable, SQL Server and Managed Instance use system_health with reduced coverage. Azure SQL Database requires an ON DATABASE session."
         },
         "use_ring_buffer": {
           "ui:help": "Use the volatile ring buffer when persistent event_file storage is unavailable. The session must remain running and XML parsing can be slower."

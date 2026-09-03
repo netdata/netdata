@@ -354,18 +354,29 @@ func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []
 }
 
 func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, string, error) {
-	query := querySystemHealthLatestDeadlockEventFile
-	if f.router.collector.Functions.DeadlockInfo.UseRingBuffer {
-		query = querySystemHealthLatestDeadlockRingBuffer
-	}
-
+	c := f.router.collector
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
-	err := f.router.collector.db.QueryRowContext(ctx, query).Scan(&deadlockTime, &deadlockXML)
-	if err != nil && !f.router.collector.Functions.DeadlockInfo.UseRingBuffer && shouldFallbackDeadlockEventFile(err) {
-		// The file target can be unavailable while the built-in ring buffer remains usable.
-		// Retry only on a file read error to avoid parsing the ring buffer on every empty result.
-		err = f.router.collector.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
+	readRingBuffer := func() error {
+		available, err := c.mssqlRingBufferAvailable(ctx, "system_health")
+		if err != nil {
+			return err
+		}
+		if !available {
+			return errors.New("system_health ring_buffer target unavailable")
+		}
+		return c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
+	}
+
+	var err error
+	if c.Functions.DeadlockInfo.UseRingBuffer {
+		err = readRingBuffer()
+	} else {
+		err = c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile).Scan(&deadlockTime, &deadlockXML)
+		if err != nil && shouldFallbackDeadlockEventFile(err) {
+			// Retry only on a file read error, not on an available but empty file target.
+			err = readRingBuffer()
+		}
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

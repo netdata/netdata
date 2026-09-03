@@ -419,19 +419,6 @@ WHERE o.name = 'databases'
 // it instead of gating on a version number.
 const queryPlanCacheColumns = `SELECT TOP 0 * FROM sys.dm_exec_query_stats`
 
-// queryMSSQLErrorActiveSessionExists checks for a running configured Extended Events session.
-const queryMSSQLErrorActiveSessionExists = `
-SELECT COUNT(*)
-FROM sys.dm_xe_sessions
-WHERE name = @sessionName;
-`
-
-const queryMSSQLErrorActiveDatabaseSessionExists = `
-SELECT COUNT(*)
-FROM sys.dm_xe_database_sessions
-WHERE name = @sessionName;
-`
-
 // queryMSSQLErrorSessionEventFilePath returns the filename configured on the session's
 // event_file target. The on-disk name is operator-chosen and need not match the session
 // name, so it has to be read from the catalog rather than guessed.

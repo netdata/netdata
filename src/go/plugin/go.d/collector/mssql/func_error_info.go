@@ -708,26 +708,8 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 		return target, true, nil
 	}
 
-	activeSessionQuery := queryMSSQLErrorActiveSessionExists
-	ringBufferQuery := queryMSSQLErrorSessionHasRingBuffer
-	if c.isAzureSQLDatabase() {
-		activeSessionQuery = queryMSSQLErrorActiveDatabaseSessionExists
-		ringBufferQuery = queryMSSQLErrorDatabaseSessionHasRingBuffer
-	}
-	var count int
-	err := c.db.QueryRowContext(ctx, activeSessionQuery, sql.Named("sessionName", sessionName)).Scan(&count)
-	if err != nil {
-		return mssqlErrorReadTarget{}, false, err
-	}
-	if count == 0 {
-		return mssqlErrorReadTarget{}, false, nil
-	}
-
-	err = c.db.QueryRowContext(ctx, ringBufferQuery, sql.Named("sessionName", sessionName)).Scan(&count)
-	if err != nil {
-		return mssqlErrorReadTarget{}, false, err
-	}
-	return mssqlErrorReadTarget{}, count > 0, nil
+	available, err := c.mssqlRingBufferAvailable(ctx, sessionName)
+	return mssqlErrorReadTarget{}, available, err
 }
 
 // eventFileReadTarget turns the configured event_file filename into the read path and
