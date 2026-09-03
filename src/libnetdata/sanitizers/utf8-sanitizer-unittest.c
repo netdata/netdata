@@ -1424,9 +1424,12 @@ static void test_rrd_string_allowed_chars_idempotency(void) {
     // bytes, plus every start-byte/continuation pair - overlongs (c0, c1), the
     // out-of-range start bytes (f5..ff), truncated sequences, and lone
     // continuation bytes - none of which the random sweep below guarantees.
+    // No `&& all_ok` in the loop guards: text_sanitize() is cheap, and stopping at the first
+    // failure would print one input when a regression usually breaks a whole class of them.
+    // Report every failing case so one run shows which byte or pattern broke.
     all_ok = true;
-    for(unsigned i = 1; i < 256 && all_ok; i++) {
-        for(unsigned j = 0; j < 256 && all_ok; j++) {
+    for(unsigned i = 1; i < 256; i++) {
+        for(unsigned j = 0; j < 256; j++) {
             unsigned char src[3] = { (unsigned char)i, (unsigned char)j, '\0' };
             char once[16], twice[64];
 
@@ -1446,7 +1449,7 @@ static void test_rrd_string_allowed_chars_idempotency(void) {
     // deterministic randomized sweep over arbitrary byte strings
     all_ok = true;
     uint32_t seed = 0x5eed1234;
-    for(size_t iter = 0; iter < 100000 && all_ok; iter++) {
+    for(size_t iter = 0; iter < 100000; iter++) {
         unsigned char src[25];
         char once[512], twice[512];
 
