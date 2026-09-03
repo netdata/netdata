@@ -28,7 +28,7 @@ static bool bearer_parse_json_payload(json_object *jobj, void *data, BUFFER *err
 
 int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload, const char *source) {
     if(!user_auth_source_is_cloud(source))
-        return rrd_call_function_error(
+        return nrpc_call_error(
             wb, "Bearer tokens can only be provided via NC.", HTTP_RESP_BAD_REQUEST);
 
     int code;
@@ -73,10 +73,16 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
 
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction_str);
-    return rrd_function_run(host, w->response.data, 10,
-                            w->user_auth.access, RRDFUNCTIONS_BEARER_GET_TOKEN, true,
-                            transaction_str, NULL, NULL,
-                            NULL, NULL,
-                            NULL, NULL,
-                            payload, buffer_tostring(source), true);
+    return nrpc_call(&(struct nrpc_call_spec) {
+        .owner = host ? rrdhost_nrpc_owner(host) : NRPC_OWNER_NONE,
+        .result_wb = w->response.data,
+        .cmd = FUNCTION_BEARER_GET_TOKEN,
+        .source = buffer_tostring(source),
+        .user_access = w->user_auth.access,
+        .timeout_s = 10,
+        .wait = true,
+        .allow_restricted = true,
+        .call_id = transaction_str,
+        .payload = payload,
+    });
 }

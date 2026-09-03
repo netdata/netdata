@@ -49,6 +49,7 @@ void pgc_and_mrg_initialize(void);
 void pgc_open_add_hot_page(
     Word_t section,
     Word_t metric_id,
+    UUIDMAP_ID uuid_id,
     time_t start_time_s,
     time_t end_time_s,
     uint32_t update_every_s,

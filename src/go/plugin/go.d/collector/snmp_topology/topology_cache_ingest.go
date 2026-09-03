@@ -8,13 +8,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *topologyCache) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
+func (c *topologyBuilder) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 	if c == nil {
 		return
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	profileIdentity := make(map[string]ddsnmp.MetaTag, 2)
 	for _, pm := range pms {
@@ -45,27 +42,21 @@ func (c *topologyCache) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) 
 	}
 }
 
-func (c *topologyCache) updateTopologyCacheEntry(m ddsnmp.Metric) {
+func (c *topologyBuilder) updateTopologyCacheEntry(m ddsnmp.Metric) {
 	if c == nil {
 		return
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.ingestMetric(m.TopologyKind, m.Tags)
 }
 
-func (c *topologyCache) updateTopologySysUptime(value int64) {
+func (c *topologyBuilder) updateTopologySysUptime(value int64) {
 	if c == nil {
 		return
 	}
 	if value <= 0 {
 		return
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	local := c.localDevice
 	local.SysUptime = value
@@ -74,13 +65,13 @@ func (c *topologyCache) updateTopologySysUptime(value int64) {
 	c.localDevice = local
 }
 
-func (c *topologyCache) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
+func (c *topologyBuilder) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
 	for _, pm := range pms {
 		c.ingestTopologyMetricSet(pm.TopologyMetrics)
 	}
 }
 
-func (c *topologyCache) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
+func (c *topologyBuilder) ingestTopologyMetricSet(metrics []ddsnmp.Metric) {
 	for _, metric := range metrics {
 		c.updateTopologyCacheEntry(metric)
 	}

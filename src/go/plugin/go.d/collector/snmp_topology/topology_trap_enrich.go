@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"maps"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -23,6 +24,15 @@ type TrapTopologyEnrichment struct {
 	Interface       string
 	NeighborStatus  string
 	Neighbors       []string
+}
+
+type topologyTrapDeviceGeneration struct {
+	matchMethodByIP  map[string]string
+	deviceHostname   string
+	deviceVendor     string
+	sourceVnodeID    string
+	interfaceByIndex map[string]string
+	neighborsByIndex map[string][]string
 }
 
 // TrapEnrichmentHandle exposes the currently running topology registry to trap enrichment consumers.
@@ -50,7 +60,7 @@ func (c *Collector) unpublishTrapTopologyEnrichment() {
 // EnrichmentForSource returns topology enrichment data for a trap received
 // from the given source IP and, when available, the trap subject ifIndex.
 // Interface and neighbor enrichment only use the trap ifIndex after the source
-// IP matches exactly one local topology cache. The caller owns the returned
+// IP matches exactly one published device generation. The caller owns the returned
 // value and its Neighbors slice.
 func (h *TrapEnrichmentHandle) EnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
 	if h == nil {
@@ -63,8 +73,8 @@ func (h *TrapEnrichmentHandle) EnrichmentForSource(ip, trapIfIndex string) *Trap
 	return registry.trapEnrichmentForSource(ip, trapIfIndex)
 }
 
-// trapEnrichmentForSource copies active cache pointers under the registry lock,
-// reads each cache under its own lock, and never blocks on I/O.
+// trapEnrichmentForSource acquires one immutable topology generation and never
+// blocks on collection or I/O.
 func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
 	if r == nil {
 		return nil
@@ -76,14 +86,17 @@ func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *Trap
 	}
 	ip = addr.String()
 
-	caches := r.activeCaches()
-	if len(caches) == 0 {
+	generation := r.acquireGeneration()
+	if generation == nil {
 		return nil
 	}
 
 	matches := make([]*TrapTopologyEnrichment, 0, 1)
-	for _, cache := range caches {
-		if enrichment := cache.trapEnrichmentForCanonicalSource(ip, trapIfIndex); enrichment != nil {
+	for _, device := range generation.devices {
+		if device == nil {
+			continue
+		}
+		if enrichment := device.trap.enrichmentForCanonicalSource(ip, trapIfIndex); enrichment != nil {
 			matches = append(matches, enrichment)
 		}
 	}
@@ -102,19 +115,8 @@ func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *Trap
 	return matches[0]
 }
 
-func (c *topologyCache) trapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
-	addr, ok := topologyutil.ParseIPAddress(ip)
-	if !ok {
-		return nil
-	}
-	return c.trapEnrichmentForCanonicalSource(addr.String(), trapIfIndex)
-}
-
-func (c *topologyCache) trapEnrichmentForCanonicalSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	method := c.localDeviceIPMatchMethod(ip)
+func (g topologyTrapDeviceGeneration) enrichmentForCanonicalSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
+	method := g.matchMethodByIP[ip]
 	if method == "" {
 		return nil
 	}
@@ -127,17 +129,9 @@ func (c *topologyCache) trapEnrichmentForCanonicalSource(ip, trapIfIndex string)
 		DeviceMatches: 1,
 	}
 
-	if sysName := strings.TrimSpace(c.localDevice.SysName); sysName != "" {
-		enrich.DeviceHostname = sysName
-	}
-	if vendor := strings.TrimSpace(c.localDevice.Vendor); vendor != "" {
-		enrich.DeviceVendor = vendor
-	}
-	if nodeID := strings.TrimSpace(c.localDevice.NetdataHostID); nodeID != "" {
-		enrich.SourceVnodeID = nodeID
-	} else if nodeID := strings.TrimSpace(c.localDevice.AgentID); nodeID != "" {
-		enrich.SourceVnodeID = nodeID
-	}
+	enrich.DeviceHostname = g.deviceHostname
+	enrich.DeviceVendor = g.deviceVendor
+	enrich.SourceVnodeID = g.sourceVnodeID
 
 	if trapIfIndex == "" {
 		enrich.InterfaceStatus = "skipped"
@@ -147,13 +141,13 @@ func (c *topologyCache) trapEnrichmentForCanonicalSource(ip, trapIfIndex string)
 
 	enrich.InterfaceIndex = trapIfIndex
 	enrich.InterfaceStatus = "no_match"
-	if ifName, ok := c.ifNamesByIndex[trapIfIndex]; ok && strings.TrimSpace(ifName) != "" {
+	if ifName := g.interfaceByIndex[trapIfIndex]; ifName != "" {
 		enrich.Interface = ifName
 		enrich.InterfaceStatus = "matched"
 	}
 
 	enrich.NeighborStatus = "no_match"
-	enrich.Neighbors = c.trapNeighborNamesForInterface(trapIfIndex)
+	enrich.Neighbors = append([]string(nil), g.neighborsByIndex[trapIfIndex]...)
 	if len(enrich.Neighbors) > 0 {
 		enrich.NeighborStatus = "matched"
 	}
@@ -161,34 +155,61 @@ func (c *topologyCache) trapEnrichmentForCanonicalSource(ip, trapIfIndex string)
 	return enrich
 }
 
-func (c *topologyCache) trapNeighborNamesForInterface(ifIndex string) []string {
-	neighborNames := make(map[string]struct{})
-	for key, r := range c.lldpRemotes {
-		if r == nil || lldpRemoteLocalPortNum(key, r) != ifIndex {
-			continue
-		}
-		if name := strings.TrimSpace(r.sysName); name != "" {
-			neighborNames[name] = struct{}{}
-		}
-	}
-	for key, r := range c.cdpRemotes {
-		if r == nil || cdpRemoteIfIndex(key, r) != ifIndex {
-			continue
-		}
-		if name := strings.TrimSpace(r.sysName); name != "" {
-			neighborNames[name] = struct{}{}
-		}
-	}
-	if len(neighborNames) == 0 {
-		return nil
+func newTopologyTrapDeviceGeneration(builder *topologyBuilder) topologyTrapDeviceGeneration {
+	if builder == nil {
+		return topologyTrapDeviceGeneration{}
 	}
 
-	neighbors := make([]string, 0, len(neighborNames))
-	for name := range neighborNames {
-		neighbors = append(neighbors, name)
+	generation := topologyTrapDeviceGeneration{
+		matchMethodByIP:  make(map[string]string, len(builder.trapMatchMethodByIP)),
+		interfaceByIndex: make(map[string]string, len(builder.ifNamesByIndex)),
+		neighborsByIndex: make(map[string][]string),
+		deviceHostname:   strings.TrimSpace(builder.localDevice.SysName),
+		deviceVendor:     strings.TrimSpace(builder.localDevice.Vendor),
 	}
-	sort.Strings(neighbors)
-	return neighbors
+	if nodeID := strings.TrimSpace(builder.localDevice.NetdataHostID); nodeID != "" {
+		generation.sourceVnodeID = nodeID
+	} else {
+		generation.sourceVnodeID = strings.TrimSpace(builder.localDevice.AgentID)
+	}
+	maps.Copy(generation.matchMethodByIP, builder.trapMatchMethodByIP)
+	for ifIndex, ifName := range builder.ifNamesByIndex {
+		if ifName = strings.TrimSpace(ifName); ifName != "" {
+			generation.interfaceByIndex[ifIndex] = ifName
+		}
+	}
+
+	neighborSets := make(map[string]map[string]struct{})
+	addNeighbor := func(ifIndex, name string) {
+		ifIndex = strings.TrimSpace(ifIndex)
+		name = strings.TrimSpace(name)
+		if ifIndex == "" || name == "" {
+			return
+		}
+		if neighborSets[ifIndex] == nil {
+			neighborSets[ifIndex] = make(map[string]struct{})
+		}
+		neighborSets[ifIndex][name] = struct{}{}
+	}
+	for key, remote := range builder.lldpRemotes {
+		if remote != nil {
+			addNeighbor(lldpRemoteLocalPortNum(key, remote), remote.sysName)
+		}
+	}
+	for key, remote := range builder.cdpRemotes {
+		if remote != nil {
+			addNeighbor(cdpRemoteIfIndex(key, remote), remote.sysName)
+		}
+	}
+	for ifIndex, names := range neighborSets {
+		neighbors := make([]string, 0, len(names))
+		for name := range names {
+			neighbors = append(neighbors, name)
+		}
+		sort.Strings(neighbors)
+		generation.neighborsByIndex[ifIndex] = neighbors
+	}
+	return generation
 }
 
 func lldpRemoteLocalPortNum(key string, r *lldpRemote) string {
@@ -209,8 +230,4 @@ func cdpRemoteIfIndex(key string, r *cdpRemote) string {
 		return strings.TrimSpace(before)
 	}
 	return ""
-}
-
-func (c *topologyCache) localDeviceIPMatchMethod(ip string) string {
-	return c.trapMatchMethodByIP[ip]
 }

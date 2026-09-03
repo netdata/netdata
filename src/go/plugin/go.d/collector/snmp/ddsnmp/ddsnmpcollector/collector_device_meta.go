@@ -32,6 +32,14 @@ func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[strin
 }
 
 func (dc *deviceMetadataCollector) collect(prof *ddsnmp.Profile) (map[string]ddsnmp.MetaTag, error) {
+	return dc.collectObserved(prof, &ddsnmp.CollectionStats{}, nil)
+}
+
+func (dc *deviceMetadataCollector) collectObserved(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionProfileCollection,
+) (map[string]ddsnmp.MetaTag, error) {
 	if len(prof.Definition.Metadata) == 0 && len(prof.Definition.SysobjectIDMetadata) == 0 {
 		return nil, nil
 	}
@@ -47,7 +55,13 @@ func (dc *deviceMetadataCollector) collect(prof *ddsnmp.Profile) (map[string]dds
 	if dc.sysobjectid != "" {
 		for i, entry := range prof.Definition.SysobjectIDMetadata {
 			if ddprofiledefinition.SelectorOidMatches(dc.sysobjectid, entry.SysobjectID) {
-				err := dc.processMetadataFields(entry.Metadata, meta, dc.sysobjectid == entry.SysobjectID)
+				err := dc.processMetadataFieldsObserved(
+					entry.Metadata,
+					meta,
+					dc.sysobjectid == entry.SysobjectID,
+					stats,
+					acquisition.metadataObserver(entry.Metadata),
+				)
 				if err != nil {
 					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
 						i, entry.SysobjectID, err)
@@ -56,7 +70,13 @@ func (dc *deviceMetadataCollector) collect(prof *ddsnmp.Profile) (map[string]dds
 		}
 	}
 
-	if err := dc.processMetadataFields(cfg.Fields, meta, prof.Definition.Selector.HasExactOidMatch(dc.sysobjectid)); err != nil {
+	if err := dc.processMetadataFieldsObserved(
+		cfg.Fields,
+		meta,
+		prof.Definition.Selector.HasExactOidMatch(dc.sysobjectid),
+		stats,
+		acquisition.metadataObserver(cfg.Fields),
+	); err != nil {
 		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
 	}
 
@@ -65,22 +85,35 @@ func (dc *deviceMetadataCollector) collect(prof *ddsnmp.Profile) (map[string]dds
 
 // processMetadataFields processes a single metadata resource
 func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
-	oids := dc.collectStaticAndIdentifyOIDs(fields, metadata, isExactMatch)
+	return dc.processMetadataFieldsObserved(fields, metadata, isExactMatch, &ddsnmp.CollectionStats{}, nil)
+}
+
+func (dc *deviceMetadataCollector) processMetadataFieldsObserved(
+	fields map[string]ddprofiledefinition.MetadataField,
+	metadata map[string]ddsnmp.MetaTag,
+	isExactMatch bool,
+	stats *ddsnmp.CollectionStats,
+	observer *acquisitionMetadataObserver,
+) error {
+	observer.start(dc.missingOIDs)
+	oids := dc.collectStaticAndIdentifyOIDs(fields, metadata, isExactMatch, stats)
 
 	if len(oids) == 0 {
 		return nil
 	}
 
-	pdus, err := dc.fetchMetadataValues(oids)
+	pdus, err := dc.fetchMetadataValues(oids, stats)
 	if err != nil {
+		observer.failUnfinished(AcquisitionFailureClassTransport)
 		return fmt.Errorf("failed to fetch metadata values: %w", err)
 	}
+	observer.start(dc.missingOIDs)
 
-	return dc.processDynamicFields(fields, pdus, metadata, isExactMatch)
+	return dc.processDynamicFieldsObserved(fields, pdus, metadata, isExactMatch, stats, observer)
 }
 
 // collectStaticAndIdentifyOIDs collects static values and returns OIDs to fetch
-func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) []string {
+func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool, stats *ddsnmp.CollectionStats) []string {
 	var oids []string
 
 	for name, field := range fields {
@@ -90,11 +123,18 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 		case field.Symbol.OID != "":
 			if !dc.missingOIDs[trimOID(field.Symbol.OID)] {
 				oids = append(oids, field.Symbol.OID)
+			} else {
+				stats.Errors.MissingOIDs++
 			}
 		case len(field.Symbols) > 0:
 			for _, sym := range field.Symbols {
-				if sym.OID != "" && !dc.missingOIDs[trimOID(sym.OID)] {
+				if sym.OID == "" {
+					continue
+				}
+				if !dc.missingOIDs[trimOID(sym.OID)] {
 					oids = append(oids, sym.OID)
+				} else {
+					stats.Errors.MissingOIDs++
 				}
 			}
 		}
@@ -107,29 +147,22 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 	return oids
 }
 
-func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
-	maxOids := dc.snmpClient.MaxOids()
-
-	for chunk := range slices.Chunk(oids, maxOids) {
-		result, err := dc.snmpClient.Get(chunk)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				dc.missingOIDs[trimOID(pdu.Name)] = true
-				continue
-			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
-	}
-
-	return pdus, nil
+func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
+	return getSNMPValues(dc.snmpClient, oids, dc.missingOIDs, stats)
 }
 
 func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
+	return dc.processDynamicFieldsObserved(fields, pdus, metadata, isExactMatch, &ddsnmp.CollectionStats{}, nil)
+}
+
+func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
+	fields map[string]ddprofiledefinition.MetadataField,
+	pdus map[string]gosnmp.SnmpPDU,
+	metadata map[string]ddsnmp.MetaTag,
+	isExactMatch bool,
+	stats *ddsnmp.CollectionStats,
+	observer *acquisitionMetadataObserver,
+) error {
 	var errs []error
 
 	for name, field := range fields {
@@ -138,25 +171,34 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 			// Single symbol
 			v, err := dc.processSymbolValue(field.Symbol, pdus, true)
 			if err != nil {
+				stats.Errors.Processing.Preparation++
+				observer.rejected(name)
 				errs = append(errs, fmt.Errorf("failed to process metadata field '%s': %w", name, err))
 				continue
 			}
 			if v != "" {
 				ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
+				observer.value(name)
+			} else {
+				observer.empty(name)
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
 			for i, sym := range field.Symbols {
 				v, err := dc.processSymbolValue(sym, pdus, i == len(field.Symbols)-1)
 				if err != nil {
+					stats.Errors.Processing.Preparation++
+					observer.rejected(name)
 					errs = append(errs, fmt.Errorf("failed to process metadata field '%s' symbol '%s': %w",
 						name, sym.Name, err))
 					continue
 				}
 				if v != "" {
 					ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
+					observer.value(name)
 					break // Use first successful value
 				}
+				observer.empty(name)
 			}
 		}
 	}

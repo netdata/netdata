@@ -35,7 +35,6 @@ type QueryOptions struct {
 	InferenceStrategy      string
 	ManagedDeviceFocus     string
 	Depth                  int
-	ResolveDNSName         func(ip string) string
 }
 
 type ManagedFocusTarget struct {

@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -366,7 +367,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	wire := output.String()
 	templateAt := strings.Index(wire, "CONFIG go.d:collector:module create accepted template")
 	createAt := strings.Index(wire, "CONFIG go.d:collector:module:module create accepted job")
-	resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN enable 200 application/json")
+	resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN enable 202 application/json")
 	statusAt := strings.Index(wire, "CONFIG go.d:collector:module:module status running")
 	require.NotContains(t, wire, `FUNCTION GLOBAL "config"`)
 	require.NotContains(t, wire, `FUNCTION_DEL GLOBAL "config"`)
@@ -383,6 +384,254 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	}, time.Second, time.Millisecond)
 
 	closeRunTestUIDs(t, uids)
+}
+
+func TestRunGenerationAcceptedEnableDoesNotBlockDisableBehindNonCooperativeCheck(t *testing.T) {
+	checkEntered := make(chan struct{})
+	checkRelease := make(chan struct{})
+	var cleanupCalls atomic.Int32
+	modules := collectorapi.Registry{
+		"module": {
+			Create: func() collectorapi.CollectorV1 {
+				return &collectorapi.MockCollectorV1{
+					CheckFunc: func(context.Context) error {
+						close(checkEntered)
+						<-checkRelease
+						return nil
+					},
+					CleanupFunc: func(context.Context) {
+						cleanupCalls.Add(1)
+					},
+				}
+			},
+			Config: func() any {
+				return &collectorapi.MockConfiguration{}
+			},
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &runTestHandler{cleanup: func() {}}
+			},
+			JobConfigSchema: collectorapi.MockConfigSchema,
+		},
+	}
+	config := confgroup.Config{
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+	}
+	config.SetProvider(confgroup.TypeDyncfg)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("test")
+	jobs := testRunJobServices(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
+
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServicesAccepted(t, config),
+	})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(context.Background()))
+	t.Cleanup(func() {
+		select {
+		case <-checkRelease:
+		default:
+			close(checkRelease)
+		}
+		generation.Stop()
+		require.NoError(t, generation.Wait(context.Background()))
+		closeRunTestUIDs(t, uids)
+	})
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
+		return ok && record.Status == dyncfg.StatusAccepted.String()
+	}, time.Second, time.Millisecond)
+
+	require.NoError(t, generation.kernel.Submit(
+		context.Background(),
+		jobmgr.Request{
+			UID:    "slow-enable",
+			Source: lifecycle.SourceFunction,
+			Route:  "config",
+			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
+		},
+	))
+	select {
+	case <-checkEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "managed check did not enter")
+	}
+	require.Eventually(t, func() bool {
+		wire := output.String()
+		return strings.Contains(wire, "FUNCTION_RESULT_BEGIN slow-enable 202 application/json") &&
+			strings.Contains(wire, "CONFIG go.d:collector:module:job status accepted")
+	}, time.Second, time.Millisecond)
+
+	require.NoError(t, generation.kernel.Submit(
+		context.Background(),
+		jobmgr.Request{
+			UID:    "disable-during-enable",
+			Source: lifecycle.SourceFunction,
+			Route:  "config",
+			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandDisable)},
+		},
+	))
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
+		wire := output.String()
+		return ok && record.Status == dyncfg.StatusDisabled.String() &&
+			strings.Contains(wire, "FUNCTION_RESULT_BEGIN disable-during-enable 200 application/json") &&
+			strings.Contains(wire, "CONFIG go.d:collector:module:job status disabled")
+	}, time.Second, time.Millisecond)
+
+	close(checkRelease)
+	require.Eventually(t, func() bool {
+		return cleanupCalls.Load() == 1
+	}, time.Second, time.Millisecond)
+	require.NotContains(t, output.String(), "CONFIG go.d:collector:module:job status running")
+}
+
+func TestRunGenerationAcceptedEnablePublishesLateProbeFailure(t *testing.T) {
+	tests := map[string]struct {
+		sourceType string
+		wantStatus dyncfg.Status
+		wantFrame  string
+	}{
+		"dynamic config becomes failed": {
+			sourceType: confgroup.TypeDyncfg,
+			wantStatus: dyncfg.StatusFailed,
+			wantFrame:  "CONFIG go.d:collector:module:job status failed",
+		},
+		"file config becomes failed": {
+			sourceType: confgroup.TypeUser,
+			wantStatus: dyncfg.StatusFailed,
+			wantFrame:  "CONFIG go.d:collector:module:job status failed",
+		},
+		"plain stock config is removed": {
+			sourceType: confgroup.TypeStock,
+			wantFrame:  "CONFIG go.d:collector:module:job delete",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			checkEntered := make(chan struct{})
+			checkRelease := make(chan struct{})
+			var cleanupCalls atomic.Int32
+			modules := collectorapi.Registry{
+				"module": {
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							CheckFunc: func(context.Context) error {
+								close(checkEntered)
+								<-checkRelease
+								return errors.New("check failed")
+							},
+							CleanupFunc: func(context.Context) {
+								cleanupCalls.Add(1)
+							},
+						}
+					},
+					Config: func() any {
+						return &collectorapi.MockConfiguration{}
+					},
+					JobConfigSchema: collectorapi.MockConfigSchema,
+				},
+			}
+			config := confgroup.Config{
+				"module":       "module",
+				"name":         "job",
+				"update_every": 1,
+			}
+			config.SetProvider(test.sourceType)
+			config.SetSourceType(test.sourceType)
+			config.SetSource("test")
+			jobs := testRunJobServices(t)
+			jobs.Defaults = confgroup.Registry{
+				"module": {UpdateEvery: 1},
+			}
+
+			output := newProcessSynchronizedBuffer()
+			frames, err := lifecycle.NewFrameOwner(output)
+			require.NoError(t, err)
+			uids := lifecycle.NewUIDLedger()
+			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Generation:      1,
+				ShutdownTimeout: time.Second,
+				UIDs:            uids,
+				Frames:          frames,
+				Modules:         modules,
+				Jobs:            jobs,
+				Discovery:       testRunDiscoveryServicesAccepted(t, config),
+			})
+			require.NoError(t, err)
+			require.NoError(t, generation.start(context.Background()))
+			t.Cleanup(func() {
+				select {
+				case <-checkRelease:
+				default:
+					close(checkRelease)
+				}
+				generation.Stop()
+				require.NoError(t, generation.Wait(context.Background()))
+				closeRunTestUIDs(t, uids)
+			})
+			require.Eventually(t, func() bool {
+				record, ok := generation.vnodes.graph.Lookup(config.FullName())
+				return ok && record.Status == dyncfg.StatusAccepted.String()
+			}, time.Second, time.Millisecond)
+
+			require.NoError(t, generation.kernel.Submit(
+				context.Background(),
+				jobmgr.Request{
+					UID:    "late-failure",
+					Source: lifecycle.SourceFunction,
+					Route:  "config",
+					Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
+				},
+			))
+			select {
+			case <-checkEntered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "managed check did not enter")
+			}
+			require.Eventually(t, func() bool {
+				wire := output.String()
+				return strings.Contains(wire, "FUNCTION_RESULT_BEGIN late-failure 202 application/json") &&
+					strings.Contains(wire, "CONFIG go.d:collector:module:job status accepted")
+			}, time.Second, time.Millisecond)
+
+			close(checkRelease)
+			require.Eventually(t, func() bool {
+				record, exists := generation.vnodes.graph.Lookup(config.FullName())
+				if test.sourceType == confgroup.TypeStock {
+					return !exists
+				}
+				return exists && record.Status == test.wantStatus.String()
+			}, time.Second, time.Millisecond)
+			require.Eventually(t, func() bool {
+				wire := output.String()
+				resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN late-failure 202 application/json")
+				terminalAt := strings.Index(wire, test.wantFrame)
+				return resultAt >= 0 && terminalAt > resultAt
+			}, time.Second, time.Millisecond)
+			require.Eventually(t, func() bool {
+				return cleanupCalls.Load() == 1
+			}, time.Second, time.Millisecond)
+		})
+	}
 }
 
 func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testing.T) {

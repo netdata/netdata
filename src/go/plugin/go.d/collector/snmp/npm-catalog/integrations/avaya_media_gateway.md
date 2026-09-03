@@ -225,3 +225,9 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_avaya_cmgVoipDspStatus` | `{status}` | per avaya_cmg_voip_current_ip_address | Status of the DSP complex |
 | `snmp.device_prof_avaya_cmgVoipHyperactivity` | `{status}` | per avaya_cmg_voip_current_ip_address | Indicates whether hyperactivity has been detected |
 | `snmp.device_prof_avaya_cmgVoipTotalChannels` | `{channel}` | per avaya_cmg_voip_current_ip_address | Total number of channels available to the VoIP engine |
+
+
+
+### Collect Live Data for Netdata Support
+
+For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.

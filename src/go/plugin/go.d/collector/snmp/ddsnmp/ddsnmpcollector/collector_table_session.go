@@ -19,6 +19,7 @@ type tableRouteState uint8
 
 const (
 	tableRoutePending tableRouteState = iota
+	tableRouteDormant
 	tableRouteNeedsFresh
 	tableRouteCached
 	tableRouteFresh
@@ -42,8 +43,10 @@ type tableCollectionScope struct {
 	profileSource  string
 	mode           tableSymbolMode
 	stats          *ddsnmp.CollectionStats
+	execution      *AcquisitionExecutionReport
 	requests       []*tableCollectionRequest
 	tableNameToOID map[string]string
+	acquisition    map[*tableCollectionRequest]*acquisitionTableObservation
 }
 
 type tableCollectionRequest struct {
@@ -60,11 +63,12 @@ type tableCollectionRequest struct {
 }
 
 type tableCollectionRoute struct {
-	oid      string
-	requests []*tableCollectionRequest
-	state    tableRouteState
-	pdus     map[string]gosnmp.SnmpPDU
-	err      error
+	oid                    string
+	requests               []*tableCollectionRequest
+	state                  tableRouteState
+	pdus                   map[string]gosnmp.SnmpPDU
+	err                    error
+	acquisitionValueCounts map[string]uint64
 }
 
 type freshRouteWork struct {
@@ -97,6 +101,10 @@ func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency 
 
 func (g *tableRouteGraph) dependencies(req *tableCollectionRequest) []*tableCollectionRoute {
 	return g.dependenciesByRequest[req]
+}
+
+func (g *tableRouteGraph) hasDependents(route *tableCollectionRoute) bool {
+	return len(g.dependentsByRoute[route]) > 0
 }
 
 func (g *tableRouteGraph) dependents(route *tableCollectionRoute) []*tableCollectionRoute {
@@ -134,6 +142,15 @@ func (s *tableCollectionSession) addScope(
 	mode tableSymbolMode,
 	stats *ddsnmp.CollectionStats,
 ) *tableCollectionScope {
+	return s.addObservedScope(prof, mode, stats, nil)
+}
+
+func (s *tableCollectionSession) addObservedScope(
+	prof *ddsnmp.Profile,
+	mode tableSymbolMode,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionTopologyTableScope,
+) *tableCollectionScope {
 	scope := &tableCollectionScope{
 		profileSource:  prof.SourceFile,
 		mode:           mode,
@@ -145,18 +162,25 @@ func (s *tableCollectionSession) addScope(
 	if prof.Definition == nil {
 		return scope
 	}
-	for _, cfg := range prof.Definition.Metrics {
+	for configIndex, cfg := range prof.Definition.Metrics {
 		if cfg.IsScalar() || cfg.Table.OID == "" {
 			continue
 		}
 		if cfg.Table.Name != "" {
 			scope.tableNameToOID[cfg.Table.Name] = cfg.Table.OID
 		}
-		scope.requests = append(scope.requests, &tableCollectionRequest{
+		request := &tableCollectionRequest{
 			scope:         scope,
 			config:        cfg,
 			cacheEligible: mode == tableSymbolModeValue,
-		})
+		}
+		if observation := acquisition.bind(configIndex, request); observation != nil {
+			if scope.acquisition == nil {
+				scope.acquisition = make(map[*tableCollectionRequest]*acquisitionTableObservation)
+			}
+			scope.acquisition[request] = observation
+		}
+		scope.requests = append(scope.requests, request)
 	}
 	return scope
 }
@@ -172,7 +196,7 @@ func (s *tableCollectionSession) resolve() {
 	routes := s.sortedRoutes()
 	var freshQueue []freshRouteWork
 	for _, route := range routes {
-		if routeNeedsFresh(route) {
+		if s.routeNeedsFresh(route) {
 			s.requireFresh(route, freshTriggerForRoute(route), &freshQueue)
 		}
 	}
@@ -184,6 +208,8 @@ func (s *tableCollectionSession) resolve() {
 		if trigger := s.stageCached(route); trigger != nil {
 			s.requireFresh(route, trigger, &freshQueue)
 			s.resolveFreshQueue(&freshQueue)
+		} else if s.isDependencyOnlyTopologyRoute(route) {
+			route.state = tableRouteDormant
 		} else {
 			route.state = tableRouteCached
 		}
@@ -306,6 +332,25 @@ func routeNeedsFresh(route *tableCollectionRoute) bool {
 	return !hasCacheOwner
 }
 
+func (s *tableCollectionSession) routeNeedsFresh(route *tableCollectionRoute) bool {
+	if s.isDependencyOnlyTopologyRoute(route) {
+		return false
+	}
+	return routeNeedsFresh(route)
+}
+
+func (s *tableCollectionSession) isDependencyOnlyTopologyRoute(route *tableCollectionRoute) bool {
+	if !s.graph.hasDependents(route) {
+		return false
+	}
+	for _, req := range route.requests {
+		if req.scope.mode != tableSymbolModePresence || len(req.config.Symbols) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func freshTriggerForRoute(route *tableCollectionRoute) *tableCollectionRequest {
 	var cacheIneligible *tableCollectionRequest
 	var cacheOwner *tableCollectionRequest
@@ -349,6 +394,7 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 			req.scope.profileSource,
 			req.scope.mode,
 			&req.candidateStats,
+			req.scope.acquisition[req],
 		)
 		req.candidateStats.Timing.Table += time.Since(started)
 		if req.candidateMetrics == nil {
@@ -406,7 +452,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 
 func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
-	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats)
+	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
 		route.state = tableRouteFailed
@@ -485,13 +531,20 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 	failedSeen := make(map[string]bool)
 
 	for _, req := range scope.requests {
+		acquisition := scope.acquisition[req]
 		if req.missing || req.route == nil {
 			continue
 		}
 
 		switch req.route.state {
+		case tableRouteDormant:
+			// The owner had no eligible rows, so this dependency was never observed.
+			continue
 		case tableRouteCached:
 			tablesSeen[req.route.oid] = true
+			if acquisition != nil {
+				acquisition.processed = true
+			}
 			if len(req.config.Symbols) > 0 {
 				successful = true
 				metrics = append(metrics, req.candidateMetrics...)
@@ -501,6 +554,10 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			// A current WALK is successful even when it is empty or auxiliary-only.
 			successful = true
 			if len(req.config.Symbols) == 0 {
+				if acquisition != nil {
+					acquisition.processed = true
+					acquisition.values = req.route.acquisitionValuesWithin(req.config.Table.OID)
+				}
 				if req.cacheEligible && !req.sharesRouteCache {
 					s.collector.tableCache.cacheMarker(req.config)
 				}
@@ -513,8 +570,20 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 				tableNameToOID: scope.tableNameToOID,
 				symbolMode:     scope.mode,
 				cacheStructure: req.cacheEligible,
+				acquisition:    acquisition,
 			}
+			if acquisition != nil {
+				acquisition.processed = true
+				ctx.rejected = &acquisition.rejected
+				ctx.dependencyRejected = &acquisition.dependencyRejected
+			}
+			processingErrorsBefore := scope.stats.Errors.Processing.Table
 			tableMetrics, err := s.collector.processTableData(ctx, collectionCtx, scope.stats)
+			if acquisition != nil {
+				acquisition.rows = uint64(len(ctx.rows))
+				acquisition.values = uint64(len(tableMetrics))
+				acquisition.rejected += uint64(scope.stats.Errors.Processing.Table - processingErrorsBefore)
+			}
 			scope.stats.Metrics.Rows += int64(len(ctx.rows))
 			if err != nil {
 				scope.stats.Errors.Processing.Table++
@@ -539,4 +608,34 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
 	}
 	return metrics, nil
+}
+
+func (r *tableCollectionRoute) acquisitionValuesWithin(rootOID string) uint64 {
+	if r == nil {
+		return 0
+	}
+	if r.acquisitionValueCounts == nil {
+		r.acquisitionValueCounts = make(map[string]uint64)
+		for _, req := range r.requests {
+			if len(req.config.Symbols) != 0 || req.scope.acquisition[req] == nil {
+				continue
+			}
+			if oid := trimOID(req.config.Table.OID); oid != "" {
+				r.acquisitionValueCounts[oid] = 0
+			}
+		}
+		for oid := range r.pdus {
+			for oid = trimOID(oid); oid != ""; {
+				if _, ok := r.acquisitionValueCounts[oid]; ok {
+					r.acquisitionValueCounts[oid]++
+				}
+				pos := strings.LastIndexByte(oid, '.')
+				if pos < 0 {
+					break
+				}
+				oid = oid[:pos]
+			}
+		}
+	}
+	return r.acquisitionValueCounts[trimOID(rootOID)]
 }

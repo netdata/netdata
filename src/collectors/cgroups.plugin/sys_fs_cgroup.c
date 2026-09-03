@@ -1415,17 +1415,29 @@ void cgroups_main(void *ptr) {
         return;
     }
 
-    rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_CGTOP_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            cgroup_function_cgroup_top);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "containers-vms",
+        .help = FUNCTION_CGTOP_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT / 2,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = cgroup_function_cgroup_top,
+    });
 
-    rrd_function_add_inline(localhost, NULL, "systemd-services", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT / 3, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            cgroup_function_systemd_top);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "systemd-services",
+        .help = FUNCTION_SYSTEMD_SERVICES_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT / 3,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = cgroup_function_systemd_top,
+    });
 
     heartbeat_t hb;
     heartbeat_init(&hb, cgroup_update_every * USEC_PER_SEC);

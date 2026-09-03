@@ -318,3 +318,9 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
 | `snmp.device_prof_ironport_cacheThruputNow` | `{request}` | device | Request throughput in the last minute |
+
+
+
+### Collect Live Data for Netdata Support
+
+For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.

@@ -238,6 +238,11 @@ With these settings, you can configure how your Child nodes send metrics to Pare
 | `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                  |
 | `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a Parent using the H2O web server.    |
 
+The detected profile supplies the sender defaults. The `iot` and `parent` profiles use the fastest settings (ZSTD 1,
+LZ4 acceleration 9, Brotli 1, and Gzip 1); the `child` and `standalone` profiles use balanced settings (ZSTD 3, LZ4
+acceleration 1, Brotli 3, and Gzip 3). Each explicit compression option in `[stream]` overrides only its corresponding
+profile default.
+
 ### `[API_KEY]` Section (Parent Node Authentication)
 
 Here you can define settings for authentication and access control between Parents and Children.
@@ -252,6 +257,7 @@ Here you can define settings for authentication and access control between Paren
 | `health enabled`             | `auto`     | Controls alerts and notifications (`auto`, `yes`, or `no`). |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after the Child connects.         |
 | `health log retention`       | `5d`       | Duration (in seconds) to keep health log events.            |
+| `tcp keepalive idle`         | `auto`     | Parent TCP keepalive idle: `auto`, `off`, or a duration from 30 seconds through 1 hour. |
 | `proxy enabled`              | (empty)    | Enables routing metrics through a proxy.                    |
 | `proxy destination`          | (empty)    | IP and port of the proxy server.                            |
 | `proxy api key`              | (empty)    | API key for the proxy server.                               |
@@ -276,6 +282,7 @@ This area lets you customize settings for specific Child nodes by their unique I
 | `health enabled`             | `auto`     | Controls alerts (`auto`, `yes`, `no`).                   |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after connection.              |
 | `health log retention`       | `5d`       | Duration to keep health log events.                      |
+| `tcp keepalive idle`         | API-key value | Overrides the API-key Parent TCP keepalive idle for this Child. |
 | `proxy enabled`              | (empty)    | Routes metrics through a proxy if enabled.               |
 | `proxy destination`          | (empty)    | Proxy server IP and port.                                |
 | `proxy api key`              | (empty)    | API key for the proxy.                                   |
@@ -285,6 +292,20 @@ This area lets you customize settings for specific Child nodes by their unique I
 | `replication period`         | `1d`       | Maximum replication window.                              |
 | `replication step`           | `10m`      | Time interval for each replication step.                 |
 | `is ephemeral node`          | `no`       | Marks the node as ephemeral (removes after inactivity).  |
+
+#### Receiver TCP keepalive
+
+`tcp keepalive idle` is a Parent receiver setting. Configure it under `[API_KEY]`, or under `[MACHINE_GUID]` to override the API-key
+value for one Child. It is not a `[stream]` sender setting and does not require a Child update.
+
+`[MACHINE_GUID]` takes precedence over `[API_KEY]`. The default `auto` value is half of the fastest chart cadence observed on the
+connection, rounded up and bounded to 30 seconds through 1 hour. A positive duration overrides it; `0`, `off`, or `never` disables
+`SO_KEEPALIVE`. Invalid durations use `auto`.
+
+On platforms with per-socket keepalive tuning, the Parent sends three probes 10 seconds apart after the idle period. Other platforms
+retain `SO_KEEPALIVE` with the operating system's default idle, interval, and probe count. The Parent application-idle timeout is
+independently calculated as `max(10 minutes, 2 × fastest observed chart cadence)`. The observed cadence resets on reconnect and can
+only decrease while connected.
 
 ### Additional Settings
 

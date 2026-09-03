@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -18,7 +17,7 @@ import (
 
 type topologyRegistry struct {
 	mu                    sync.RWMutex
-	caches                map[*topologyCache]struct{}
+	generation            atomic.Pointer[topologyGeneration]
 	producerScopeID       string
 	reverseDNS            *reversedns.Resolver
 	reverseDNSWarmer      *topologyReverseDNSWarmer
@@ -31,57 +30,71 @@ func newTopologyRegistryWithResolver(reverseDNS *reversedns.Resolver) *topologyR
 		panic("snmp_topology registry requires a non-nil reverse DNS resolver")
 	}
 	return &topologyRegistry{
-		caches:           make(map[*topologyCache]struct{}),
 		producerScopeID:  strings.TrimSpace(pluginconfig.RegistryUniqueID()),
 		reverseDNS:       reverseDNS,
 		reverseDNSWarmer: newTopologyReverseDNSWarmer(reverseDNS),
 	}
 }
 
-func (r *topologyRegistry) register(cache *topologyCache) {
-	if r == nil || cache == nil {
+func (r *topologyRegistry) publishGeneration(generation *topologyGeneration) {
+	if r == nil {
 		return
 	}
-	r.mu.Lock()
-	r.caches[cache] = struct{}{}
-	r.mu.Unlock()
+	r.generation.Store(generation)
 }
 
-func (r *topologyRegistry) unregister(cache *topologyCache) {
-	if r == nil || cache == nil {
-		return
+func (r *topologyRegistry) acquireGeneration() *topologyGeneration {
+	if r == nil {
+		return nil
 	}
-	r.mu.Lock()
-	delete(r.caches, cache)
-	r.mu.Unlock()
+	return r.generation.Load()
 }
 
 func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+	return r.snapshotWithEnvironment(options, topologyGraphBuildEnvironment{})
+}
+
+func (r *topologyRegistry) snapshotWithEnvironment(
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
 	if r == nil {
 		return topologymodel.Data{}, false, nil
 	}
-	options = topologyoptions.NormalizeQueryOptions(options)
+	generation := r.acquireGeneration()
+	producerScopeID := ""
+	if generation != nil {
+		producerScopeID = generation.producerScopeID
+	}
+	return buildTopologyObservationSnapshot(
+		topologyObservationSnapshots(generation),
+		producerScopeID,
+		options,
+		environment,
+	)
+}
 
-	aggregate, ok := aggregateTopologyObservationSnapshots(r.observationSnapshots())
+func buildTopologyObservationSnapshot(
+	snapshots []topologymodel.ObservationSnapshot,
+	producerScopeID string,
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
+	options = topologyoptions.NormalizeQueryOptions(options)
+	aggregate, ok := aggregateTopologyObservationSnapshots(snapshots)
 	if !ok {
 		return topologymodel.Data{}, false, nil
 	}
-	aggregate.ProducerScopeID = r.producerScope()
-
-	return buildSNMPTopologySnapshot(aggregate, options)
+	aggregate.ProducerScopeID = strings.TrimSpace(producerScopeID)
+	return buildSNMPTopologySnapshot(aggregate, options, environment)
 }
 
 func (r *topologyRegistry) hasRenderableObservations() bool {
 	if r == nil {
 		return false
 	}
-	now := time.Now()
-	for _, cache := range r.activeCaches() {
-		if cache.hasRenderableObservationAt(now) {
-			return true
-		}
-	}
-	return false
+	generation := r.acquireGeneration()
+	return generation != nil && generation.hasRenderableObservations()
 }
 
 func (r *topologyRegistry) producerScope() string {
@@ -111,7 +124,8 @@ func (r *topologyRegistry) managedDeviceFocusTargets() []topologyoptions.Managed
 	if r == nil {
 		return nil
 	}
-	return buildTopologyManagedFocusTargets(r.observationSnapshots())
+	generation := r.acquireGeneration()
+	return buildTopologyManagedFocusTargets(topologyObservationSnapshots(generation))
 }
 
 func (r *topologyRegistry) setReverseDNSWarmContext(ctx context.Context) {
@@ -169,9 +183,10 @@ func (r *topologyRegistry) enqueueReverseDNSWarmFromDefaultSnapshot() bool {
 		if collector == nil {
 			return
 		}
-		options := topologyoptions.DefaultQueryOptions()
-		options.ResolveDNSName = collector.lookupCached
-		if _, ok, err := r.snapshotWithOptions(options); err != nil || !ok {
+		if _, ok, err := r.snapshotWithEnvironment(
+			topologyoptions.DefaultQueryOptions(),
+			topologyGraphBuildEnvironment{resolveDNSName: collector.lookupCached},
+		); err != nil || !ok {
 			return
 		}
 		r.reverseDNSWarmer.warm(ctx, collector.collectedCandidates())

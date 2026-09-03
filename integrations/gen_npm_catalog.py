@@ -558,7 +558,20 @@ SNMP_TRAPS_SETUP = setup_block(
     }],
 )
 
-TROUBLESHOOTING = {'problems': {'list': []}}
+TROUBLESHOOTING = {
+    'problems': {
+        'list': [{
+            'name': 'Collect Live Data for Netdata Support',
+            'description':
+                'For missing SNMP metrics or incomplete SNMP-derived topology, follow '
+                "[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) "
+                "to create "
+                'a raw SNMP data archive that omits credentials and attach it to a '
+                'restricted Freshdesk ticket.',
+        }],
+    },
+}
+EMPTY_TROUBLESHOOTING = {'problems': {'list': []}}
 METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '', 'availability': [], 'scopes': []}
 
 
@@ -579,7 +592,7 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO
         },
         'overview': ov,
         'setup': setup if setup is not None else SETUP,
-        'troubleshooting': TROUBLESHOOTING,
+        'troubleshooting': TROUBLESHOOTING if module_name in ('snmp', 'snmp_topology') else EMPTY_TROUBLESHOOTING,
         'alerts': [],
         'metrics': metrics if metrics is not None else METRICS,
     }
@@ -605,6 +618,8 @@ GENERIC_NAMES = {
     'generic-ups.yaml': 'Generic UPS (UPS-MIB)',
     'meraki-cloud-controller.yaml': 'Cisco Meraki (Cloud Controller)',
     'ubiquiti-net-snmp.yaml': 'Ubiquiti Net-SNMP Devices',
+    'mikrotik-router.yaml': 'MikroTik Router',
+    'mikrotik-swos.yaml': 'MikroTik Switch',
 }
 
 
@@ -826,10 +841,12 @@ def build_topology_modules():
          'reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system '
          'name, '
          'and management address.',
-         'Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the '
+         'Netdata reads the LLDP-MIB or LLDP-V2-MIB local and remote neighbor tables over SNMP and stitches the links '
+         'into the '
          '`topology:snmp` '
          'view.',
-         'Discovered automatically on devices that expose the LLDP-MIB.'),
+         'Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently '
+         'enabled for Palo Alto firewalls.'),
         ('CDP Topology', ['cdp', 'cisco', 'topology', 'l2', 'snmp', 'npm'],
          'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache '
          'table '

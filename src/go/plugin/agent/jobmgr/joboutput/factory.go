@@ -134,6 +134,9 @@ func (fa factoryAttachment) attach(
 	attached.vnodeStage = candidate.vnodeStage
 	attached.outputGate = candidate.outputGate
 	attached.StagedHandlers = candidate.StagedHandlers
+	attached.jobConfigIdentity = candidate.jobConfigIdentity
+	attached.jobConfigLifecycle = candidate.jobConfigLifecycle
+	attached.jobConfigSnapshot = candidate.jobConfigSnapshot
 	if candidate.runtimeStage != nil || candidate.vnodeStage != nil {
 		attached.attachProjections = func() error {
 			var runtimeErr error
@@ -291,6 +294,15 @@ func (f *Factory) build(
 	if err != nil {
 		return ConstructedJob{}, err
 	}
+	jobConfigIdentity := jobConfigIdentity(config)
+	jobConfigLifecycle := creator.JobConfigLifecycle
+	if nilInterfaceValue(jobConfigLifecycle) {
+		jobConfigLifecycle = nil
+	} else if !callJobConfigLifecycle(func() {
+		jobConfigLifecycle.Bind(jobConfigIdentity, job)
+	}) {
+		jobConfigLifecycle = nil
+	}
 	cleanup := &factoryJobCleanup{
 		job:          job,
 		runtimeStage: runtimeStage,
@@ -311,6 +323,8 @@ func (f *Factory) build(
 		vnodeStage:         vnodeStage,
 		outputGate:         outputGate,
 		storeSnapshot:      storeSnapshot,
+		jobConfigIdentity:  jobConfigIdentity,
+		jobConfigLifecycle: jobConfigLifecycle,
 	}
 	if hasFunctions && f.config.HandlerStager == nil {
 		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")

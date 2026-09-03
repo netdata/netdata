@@ -73,6 +73,11 @@ For every stock profile, also state the operator-facing profile `title` and
 when an operator will see that supporting profile. Machine condition IDs are not
 public explanations.
 
+The view `question` is internal authoring rationale used to design and review one coherent chart. It MUST NOT be projected
+into generated integration documentation. Public coverage is rendered as ordinary tables grouped by each profile's
+top-level family. Every metric-to-chart row contains the Prometheus metric, full Netdata family and chart title, dimension,
+unit, and entity scope.
+
 Do not create duplicate aggregate and detailed views when Netdata can derive the aggregate by grouping the detailed
 charts. Choose the finest operator-useful grain whose cardinality and churn remain acceptable.
 

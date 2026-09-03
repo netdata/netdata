@@ -206,7 +206,17 @@ cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROU
 cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
 cmake_dependent_option(ENABLE_CGROUP_NAME "Build the cgroup-name helper" True "OS_LINUX;ENABLE_PLUGIN_GO" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+# eBPF support is 64-bit only: the legacy BPF objects we ship are fetched with no
+# architecture dimension (see NetdataEBPFLegacy.cmake - only libc varies), 32-bit
+# kernels provide no BTF to build CO-RE programs from, and the loaders share struct
+# layouts with the BPF side. On a 32-bit userland the plugin builds and installs but
+# cannot load a single program - it exits 1 and netdata disables it.
+cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX;CMAKE_SIZEOF_VOID_P EQUAL 8" False)
+
+if(OS_LINUX AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(STATUS "eBPF plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+endif()
+
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -481,7 +491,13 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
     endif()
 
     if(GO_FOUND)
-        set(ENABLE_PLUGIN_EBPF_GO ON)
+        # The BPF side is always LP64, and the loader shares struct layouts with it,
+        # so this plugin is only built for 64-bit userlands.
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(ENABLE_PLUGIN_EBPF_GO ON)
+        else()
+            message(STATUS "eBPF Go plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+        endif()
     endif()
 endif()
 
@@ -1390,6 +1406,8 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
+        src/daemon/unit_test_bridge.c
+        src/daemon/unit_test_bridge.h
         src/daemon/dyncfg/dyncfg.c
         src/daemon/dyncfg/dyncfg.h
         src/daemon/dyncfg/dyncfg-files.c
@@ -1749,6 +1767,7 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_dyncfg.c
         src/plugins.d/pluginsd_dyncfg.h
         src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions-unittest.c
         src/plugins.d/pluginsd_functions.h
         src/plugins.d/pluginsd_internals.c
         src/plugins.d/pluginsd_internals.h
@@ -1756,6 +1775,20 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_parser.h
         src/plugins.d/pluginsd_replication.c
         src/plugins.d/pluginsd_replication.h
+)
+
+set(NRPC_FILES
+        src/nrpc/nrpc.h
+        src/nrpc/nrpc-internals.h
+        src/nrpc/nrpc-lifetime.h
+        src/nrpc/nrpc-builtin.c
+        src/nrpc/nrpc-calls.c
+        src/nrpc/nrpc-catalog.c
+        src/nrpc/nrpc-registry.c
+        src/nrpc/nrpc-serving.c
+        src/nrpc/nrpc-serving-internals.h
+        src/nrpc/nrpc-transport.h
+        src/nrpc/nrpc-unittest.c
 )
 
 set(RRD_PLUGIN_FILES
@@ -1776,13 +1809,7 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
         src/database/contexts/rrdcontext-worker.c
-        src/database/rrdcollector.c
-        src/database/rrdcollector.h
         src/database/rrddim.c
-        src/database/rrdfunctions.c
-        src/database/rrdfunctions.h
-        src/database/rrdfunctions-inline.c
-        src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
@@ -1816,13 +1843,6 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_alert.h
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
-        src/database/rrdfunctions-inflight.c
-        src/database/rrdfunctions-inflight.h
-        src/database/rrdfunctions-exporters.c
-        src/database/rrdfunctions-exporters.h
-        src/database/rrdfunctions-unittest.c
-        src/database/rrdfunctions-internals.h
-        src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
@@ -1968,7 +1988,6 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
-        src/streaming/protocol/command-function-del.c
         src/streaming/protocol/command-host-labels.c
         src/streaming/protocol/command-chart-definition.c
         src/streaming/protocol/command-begin-set-end-v2.c
@@ -2230,6 +2249,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-terminal-services.c
         src/collectors/windows.plugin/perflib-netframework.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
@@ -2307,6 +2327,7 @@ set(NETDATA_FILES
         ${IDLEJITTER_PLUGIN_FILES}
         ${ML_FILES}
         ${PLUGINSD_PLUGIN_FILES}
+        ${NRPC_FILES}
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
@@ -3298,19 +3319,23 @@ if(ENABLE_PLUGIN_EBPF)
 
     # GLOB_RECURSE descends into subdirectories, so netipc/*.go covers
     # protocol/, service/, and transport/ even though no .go files exist at
-    # netipc/'s root level.  go.mod and go.sum are listed explicitly so a
-    # Go-version bump or new transitive dep in go/plugins triggers a rebuild.
+    # netipc/'s root level. Keep fixed workspace and module files out of the
+    # recursive glob so CMake does not scan their parent trees on every build.
     file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
-            "${CMAKE_SOURCE_DIR}/go.work"
-            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
-            "${CMAKE_SOURCE_DIR}/src/go/go.sum"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
+    # go.work is optional; watch its exact path so appearance or removal regenerates the graph.
+    file(GLOB EBPF_GO_WORKSPACE_FILE CONFIGURE_DEPENDS LIST_DIRECTORIES false
+            "${CMAKE_SOURCE_DIR}/go.work")
+    list(APPEND EBPF_GO_PLUGIN_FILES
+            ${EBPF_GO_WORKSPACE_FILE}
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
+            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/go/go.sum")
 
     set(EBPF_GO_LIBBPF_LIB_DIR lib)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
@@ -3588,6 +3613,16 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
         configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+   NOT CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set_property(
+                SOURCE src/daemon/unit_test_bridge.c
+                APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        message(WARNING
+                "Netdata test bridge cannot disable IPO for unsupported C compiler '${CMAKE_C_COMPILER_ID}'")
 endif()
 
 add_executable(netdata
@@ -4562,7 +4597,6 @@ if(ENABLE_PLUGIN_PYTHON)
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.conf
           src/collectors/python.d.plugin/go_expvar/go_expvar.conf
-          src/collectors/python.d.plugin/haproxy/haproxy.conf
           src/collectors/python.d.plugin/pandas/pandas.conf
           src/collectors/python.d.plugin/traefik/traefik.conf
           COMPONENT plugin-pythond
@@ -4571,7 +4605,6 @@ if(ENABLE_PLUGIN_PYTHON)
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.chart.py
           src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
-          src/collectors/python.d.plugin/haproxy/haproxy.chart.py
           src/collectors/python.d.plugin/pandas/pandas.chart.py
           src/collectors/python.d.plugin/traefik/traefik.chart.py
           COMPONENT plugin-pythond

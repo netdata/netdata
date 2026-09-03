@@ -42,6 +42,7 @@ section() {
 
 read_sow_status() {
   awk '
+    { sub(/\r$/, "") }
     function clean(s, a) {
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
       gsub(/`/, "", s)
@@ -74,32 +75,7 @@ else
   fail "AGENTS.md is missing"
 fi
 
-section "canonical AGENTS.md sections"
-required_sections=(
-  "## Goals"
-  "## SOW System"
-  "### Roles"
-  "### Git Worktrees"
-  "### Sensitive Data In Durable Artifacts"
-  "### Durable AI-Facing Artifact Formatting"
-  "### Open-Source Reference Evidence"
-  "### Pre-Implementation Gate"
-  "### SOW Completion And Merge"
-  "### Enforcement"
-  "### Regressions"
-  "### Project Skills"
-  "### Specs"
-  "### Project-specific overrides"
-)
-
-for heading in "${required_sections[@]}"; do
-  if grep -qF "$heading" AGENTS.md 2>/dev/null; then
-    ok "$heading"
-  else
-    fail "$heading is missing"
-  fi
-done
-
+section "AGENTS.md machine contracts"
 if grep -qF "CRITICAL: Never write raw sensitive data to durable artifacts." AGENTS.md 2>/dev/null; then
   ok "CRITICAL sensitive-data warning"
 else
@@ -124,13 +100,14 @@ for path in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-se
   fi
 done
 
-for q in pending current active "done"; do
+for q in pending current "done"; do
   if [ -d ".agents/sow/q/$q" ]; then
     ok ".agents/sow/q/$q exists"
   else
     warn ".agents/sow/q/$q missing (run .agents/sow/worktree-link.sh)"
   fi
 done
+[ ! -d .agents/sow/q/active ] || warn "retired queue .agents/sow/q/active exists; run .agents/sow/worktree-link.sh to fold it into current/"
 
 section "tracking invariants"
 for f in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
@@ -161,9 +138,61 @@ total_sows=0
 ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never committed)"
 
 # Structural completeness is advisory and checked only for in-flight SOWs in the
-# active queue; pending stubs and completed (done/) history are exempt.
+# current queue; pending stubs and completed (done/) history are exempt.
+# Required sections come from the template (the SOW schema). Each '## ' heading may
+# carry one tag written exactly '<!-- sow:VALUE -->': none = required in every SOW
+# (umbrellas included); implementation = required except in umbrella SOWs;
+# umbrella-only = required in umbrella SOWs; optional = never required. Malformed,
+# unknown, or multiple tags are reported and the heading is treated as required
+# everywhere. Two field labels are pinned as a security contract: the handling plan
+# (in the gate, every SOW) and the gate label (in Validation, non-umbrella SOWs).
+sow_base_sections=(); sow_impl_sections=(); sow_umbrella_sections=()
+sow_heading_text() { printf '%s\n' "$1" | tr -d '\r' | sed -E 's/[[:space:]]*<!--.*-->[[:space:]]*$//; s/[[:space:]]+$//'; }
+while IFS= read -r h; do
+  [ -n "$h" ] || continue
+  text=$(sow_heading_text "$h")
+  # Every HTML comment mentioning sow: counts; only one, in the exact trailing form, is a valid tag.
+  ncomment=$(printf '%s\n' "$h" | grep -o -- '<!--[^>]*-->' | grep -ci -- 'sow:')
+  tag_list=$(printf '%s\n' "$h" | sed -E 's/[[:space:]]+$//' | grep -o -- '<!-- sow:[a-z-]* -->$' | sed -E 's/^<!-- sow:([a-z-]*) -->$/\1/')
+  tag=""
+  if [ "$ncomment" -gt 1 ]; then
+    warn "template heading carries several sow: tags; treated as required everywhere: $h"
+  elif [ "$ncomment" -eq 1 ] && [ -n "$tag_list" ]; then
+    tag="$tag_list"
+  elif [ "$ncomment" -eq 1 ]; then
+    warn "template heading carries a malformed sow: tag; treated as required everywhere: $h"
+  fi
+  case "$tag" in
+    optional)       ;;
+    umbrella-only)  sow_umbrella_sections+=("$text") ;;
+    implementation) sow_impl_sections+=("$text") ;;
+    "")             sow_base_sections+=("$text") ;;
+    *) warn "template heading carries unknown sow: tag '$tag'; treated as required everywhere: $h"
+       sow_base_sections+=("$text") ;;
+  esac
+done < <(awk '/^[[:space:]]*(```|~~~)/ { fence = !fence; next } !fence && /^## /' .agents/sow/SOW.template.md 2>/dev/null)
+pinned_sow_fields_all=("Sensitive data handling plan:")
+pinned_sow_fields_impl=("Sensitive data gate:")
+[ "${#sow_base_sections[@]}" -gt 0 ] || warn "no untagged '## ' heading in .agents/sow/SOW.template.md; structural SOW check skipped"
+
+# $1 needle, $2 file. A '## ' needle must equal a whole heading line; any other
+# needle ("Label:") must start a line once a list marker and bold markers are
+# dropped. Lines inside ``` or ~~~ fences are ignored. The needle travels via the environment
+# so a backslash in a heading is not reinterpreted by awk.
+sow_has_line() {
+  local mode=prefix; case "$1" in "## "*) mode=exact ;; esac
+  n="$1" awk -v m="$mode" '
+    BEGIN { n = ENVIRON["n"] }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    { sub(/[[:space:]]*<!--.*-->[[:space:]]*$/, ""); sub(/[[:space:]]+$/, "") }
+    m == "exact" && $0 == n { f = 1 }
+    m == "prefix" { l = $0; sub(/^[[:space:]]*[-*]+[[:space:]]+/, "", l); gsub(/\*\*/, "", l); gsub(/`/, "", l); if (index(l, n) == 1) f = 1 }
+    END { exit !f }' "$2"
+}
 active_count=0
-if [ -d .agents/sow/q/active ]; then
+if [ -d .agents/sow/q/current ]; then
   while IFS= read -r sow; do
     [ -n "$sow" ] || continue
     active_count=$((active_count + 1))
@@ -181,24 +210,26 @@ if [ -d .agents/sow/q/active ]; then
         ;;
     esac
 
-    for needle in \
-      "## Pre-Implementation Gate" \
-      "Sensitive data handling plan:" \
-      "Sensitive data gate:" \
-      "## Validation" \
-      "## Artifact Maintenance Gate"
-    do
-      if grep -qF "$needle" "$sow"; then
+    [ "${#sow_base_sections[@]}" -gt 0 ] || continue
+    # Every SOW: base sections + the handling-plan label. Umbrellas add the
+    # umbrella-only sections; others add implementation sections + the gate label.
+    needles=("${sow_base_sections[@]}" "${pinned_sow_fields_all[@]}")
+    case "$sow" in
+      *-umbrella.md) needles+=(${sow_umbrella_sections[@]+"${sow_umbrella_sections[@]}"}) ;;
+      *)             needles+=(${sow_impl_sections[@]+"${sow_impl_sections[@]}"} "${pinned_sow_fields_impl[@]}") ;;
+    esac
+    for needle in "${needles[@]}"; do
+      if sow_has_line "$needle" "$sow"; then
         ok "$sow contains $needle"
       else
         warn "$sow is missing $needle"
       fi
     done
-  done < <(find -L .agents/sow/q/active -type f -name 'SOW-*.md' 2>/dev/null | sort)
+  done < <(find -L .agents/sow/q/current -type f -name 'SOW-*.md' 2>/dev/null | sort)
 fi
 
 if [ "$active_count" -eq 0 ]; then
-  ok "no in-flight SOWs in .agents/sow/q/active"
+  ok "no in-flight SOWs in .agents/sow/q/current"
 fi
 
 section "spec index"
@@ -251,6 +282,7 @@ if command -v rg >/dev/null 2>&1; then
     rg --no-filename -o '\.agents/sow/specs/[A-Za-z0-9._/-]+\.md' \
       AGENTS.md .agents/skills docs src \
       -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
+      -g '!TODO*.md' -g '!**/TODO*.md' \
       2>/dev/null | sort -u
   )
 else
@@ -302,7 +334,7 @@ done
 if [ -d .agents/skills ]; then
   while IFS= read -r file; do
     scan_files+=("$file")
-  done < <(find .agents/skills -type f 2>/dev/null | sort)
+  done < <(find -L .agents/skills -type f 2>/dev/null | sort)
 fi
 
 if [ -d .agents/skill-verification ]; then

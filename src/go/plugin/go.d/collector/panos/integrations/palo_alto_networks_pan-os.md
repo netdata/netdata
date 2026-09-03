@@ -494,7 +494,7 @@ docker logs netdata 2>&1 | grep panos
 
 Verify that BGP is configured and that the account can run PAN-OS XML API operational requests.
 The collector logs when no legacy or Advanced Routing Engine BGP peer command returns peers.
-Advanced Routing Engine parsing is best-effort until validated with sanitized real PAN-OS ARE XML output.
+Advanced Routing Engine peers are parsed from the JSON payload embedded in the XML API result.
 
 
 ### Panorama proxy collection is unsupported

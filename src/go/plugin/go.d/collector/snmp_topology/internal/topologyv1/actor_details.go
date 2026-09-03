@@ -171,8 +171,8 @@ func buildSNMPTopologyV1ActorLabelsTable(
 		addSlice(actorIndex, "hostname", actor.Match.Hostnames, snmpTopologyV1ProducerSource, "match")
 		addSlice(actorIndex, "dns_name", actor.Match.DNSNames, snmpTopologyV1ProducerSource, "match")
 
-		for key, value := range actor.Labels {
-			add(actorIndex, key, value, "producer_label", "label", nil)
+		for _, key := range topologyutil.SortedMapKeys(actor.Labels) {
+			add(actorIndex, key, actor.Labels[key], "producer_label", "label", nil)
 		}
 		scalarValues := topologymodel.ActorDetailScalarLabelValues(actor)
 		for _, key := range topologyutil.SortedMapKeys(scalarValues) {

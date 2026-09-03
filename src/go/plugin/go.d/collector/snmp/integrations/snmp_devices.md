@@ -200,7 +200,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
 | **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
-|  | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
+|  | ping.enabled | Enable ICMP round-trip measurements alongside SNMP profile metrics. This option does not enable profile-less operation; use `ping_only` for that. When disabled, no ping metrics are collected. | yes | no |
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
@@ -852,6 +852,11 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep snmp
 ```
+
+### Collect Live Data for Netdata Support
+
+For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.
+
 
 ### Debugging Gaps on Charts
 

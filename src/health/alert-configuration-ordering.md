@@ -115,6 +115,11 @@ Only **one** alert can exist per (instance, alert_name) pair. When multiple defi
 
 This is why overriding works: create an alert with the same name, and yours is processed first.
 
+Definitions sharing a name are kept together as one set of rules, and **every rule in the set must be
+valid on its own**. A malformed static rule is logged and skipped before it joins the set; valid
+same-name rules remain available. This matters for the common per-OS pattern, where one alert name
+carries one rule per `host labels: _os=...` value.
+
 ## Dynamic Configuration Exception
 
 Alerts created or modified through the Netdata UI or API behave differently:

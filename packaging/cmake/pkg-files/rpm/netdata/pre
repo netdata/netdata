@@ -8,7 +8,7 @@ if ! getent passwd netdata > /dev/null; then
 fi
 
 # I am not sure that the corresponding group names are exactly the same as in Debian, but we should start somewhere, shouldn't we?
-for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+for item in docker nginx varnish adm nsd proxy squid ceph nobody I2C; do
   if getent group $item > /dev/null 2>&1; then
     usermod -a -G ${item} netdata
   fi
