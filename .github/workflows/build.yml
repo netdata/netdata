@@ -702,7 +702,7 @@ jobs:
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
-        run: .github/scripts/prepare-artifacts.sh artifacts/dist-artifacts ${{ steps.import-keys.outputs.fingerprint }}
+        run: .github/scripts/prepare-artifacts.sh dist-artifacts ${{ steps.import-keys.outputs.fingerprint }}
       - name: Store GitHub Artifacts
         id: store-github
         if: needs.file-check.outputs.run == 'true'
