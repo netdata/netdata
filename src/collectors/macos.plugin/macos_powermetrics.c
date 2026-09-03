@@ -32,9 +32,10 @@
 #define MACOS_POWERMETRICS_TIMEOUT_MS_MAX 600000
 // Margin added to one sample interval when waiting for a closed pipe to kill the loop child.
 #define MACOS_POWERMETRICS_KILL_GRACE_MARGIN_MS 1000
-// Grace used instead when we are stopping: a child that has not died yet is signalled immediately
-// rather than waited on, so a wedged one cannot hold up collector shutdown.
-#define MACOS_POWERMETRICS_SHUTDOWN_KILL_GRACE_MS 1000
+// Grace used instead when we are stopping: just enough for a child that is about to die anyway to
+// do so, rather than a full sample interval, so a wedged one cannot hold up collector shutdown.
+// Deliberately not shared with the no-pipe path above, which waits for nothing at all.
+#define MACOS_POWERMETRICS_STOPPING_KILL_GRACE_MS 1000
 #define MACOS_POWERMETRICS_READ_STEP_MS 250
 #define MACOS_POWERMETRICS_MAX_OUTPUT (1024 * 1024)
 #define MACOS_POWERMETRICS_INITIAL_BACKOFF_MS 1000
@@ -702,11 +703,13 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
 
     int fd = spawn_popen_read_fd(pi);
     if (fd < 0) {
-        // Short grace here, unlike the loop's normal exit below. The interval-sized grace exists to
-        // let a closed stdout deliver SIGPIPE on the child's next write; with no stdout pipe at all
-        // there is no such write and nothing to wait for, so waiting a full sample interval would
-        // only delay escalation - up to 11 minutes at the maximum configured interval and timeout.
-        spawn_popen_kill(pi, pm.command_timeout_ms);
+        // No grace at all: the graces below buy a voluntary exit via SIGPIPE on the child's next
+        // write, and here there is no stdout pipe for that to happen on - nor can the loop proceed
+        // without one. A zero grace makes the nofork spawn server (the backend built on macOS)
+        // skip its pre-SIGTERM wait and signal at once. NOTE the posix_spawn backend treats the
+        // value as a POST-SIGTERM grace and substitutes its own default for zero; that backend is
+        // not compiled on any platform today, and either way the child is signalled promptly.
+        spawn_popen_kill(pi, 0);
         return false;
     }
 
@@ -798,7 +801,7 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
     // stopping, signal it promptly instead; the interval-sized grace is for recycling the loop,
     // where letting the old child die on its own keeps the restart clean.
     bool stopping = nd_thread_signaled_to_cancel() || !service_running(SERVICE_COLLECTORS);
-    spawn_popen_kill(pi, stopping ? MACOS_POWERMETRICS_SHUTDOWN_KILL_GRACE_MS
+    spawn_popen_kill(pi, stopping ? MACOS_POWERMETRICS_STOPPING_KILL_GRACE_MS
                                   : macos_powermetrics_loop_kill_grace_ms());
 
     return ok && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS);
@@ -916,11 +919,11 @@ static void macos_powermetrics_init(void)
         MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS);
     if (pm.command_timeout_ms < pm.sample_window_ms + 1000)
         pm.command_timeout_ms = pm.sample_window_ms + 1000;
-    // Upper bound too: this value is added to sample_interval_ms (for the loop staleness budget and
-    // for the kill grace), and both are int - a large configured timeout would overflow that
-    // addition. A negative result would then be passed to spawn_popen_kill(), which skips the
-    // pre-SIGTERM wait entirely for a non-positive grace, i.e. exactly the abandon-a-live-child
-    // behaviour these budgets exist to prevent.
+    // Upper bound too: this value is added to sample_interval_ms for the loop's staleness budget,
+    // and both are int, so a large configured timeout would overflow that addition and yield a
+    // negative budget. (It no longer feeds any kill grace - see
+    // macos_powermetrics_loop_kill_grace_ms() - but the staleness expression still needs the
+    // bound.)
     if (pm.command_timeout_ms > MACOS_POWERMETRICS_TIMEOUT_MS_MAX)
         pm.command_timeout_ms = MACOS_POWERMETRICS_TIMEOUT_MS_MAX;
 
