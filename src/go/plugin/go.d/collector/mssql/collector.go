@@ -182,12 +182,14 @@ type Collector struct {
 	seenAGPageRepairDBs    map[string]bool // key: database_name
 	agClusterChartAdded    bool            // true after cluster quorum chart has been added
 
-	// Query Store discovery caches (per-instance to handle different SQL Server versions).
-	// Capability and column discovery use separate locks so their database probes cannot block each other.
+	// top-queries source discovery caches (per-instance to handle different SQL Server versions).
+	// Each probe has its own lock so they cannot block each other on the database round trip.
 	queryStoreColsMu      sync.RWMutex
 	queryStoreCols        map[string]bool
 	queryStoreSupportedMu sync.RWMutex
 	queryStoreSupported   *bool // nil until the capability probe has run
+	planCacheColsMu       sync.RWMutex
+	planCacheCols         map[string]bool
 
 	funcRouter *funcRouter
 }

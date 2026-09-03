@@ -4,6 +4,7 @@ package mssql
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -86,4 +87,15 @@ func mssqlFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 		return nil
 	}
 	return c.funcRouter
+}
+
+// The target query joins live sessions, so it also excludes stopped sessions.
+func (c *Collector) mssqlRingBufferAvailable(ctx context.Context, sessionName string) (bool, error) {
+	query := queryMSSQLErrorSessionHasRingBuffer
+	if c.isAzureSQLDatabase() {
+		query = queryMSSQLErrorDatabaseSessionHasRingBuffer
+	}
+	var count int
+	err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
+	return count > 0, err
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	mssqlDriver "github.com/microsoft/go-mssqldb"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -148,6 +149,77 @@ func TestQuerySystemHealthLatestDeadlockEventFile_SQLServer2014Compatible(t *tes
 	assert.Contains(t, query, "order by deadlock_time desc")
 }
 
+func TestQueryLatestDeadlock_FallsBackToRingBufferOnFileError(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
+	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(
+		sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).AddRow(now, sampleDeadlockGraph),
+	)
+
+	c := New()
+	c.db = db
+	handler := newTestDeadlockHandler(c)
+	deadlockTime, deadlockXML, err := handler.queryLatestDeadlock(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, now, deadlockTime)
+	assert.Equal(t, sampleDeadlockGraph, deadlockXML)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestQueryLatestDeadlock_DoesNotFallbackOnContextOrPermissionError(t *testing.T) {
+	assert.False(t, shouldFallbackDeadlockEventFile(sql.ErrNoRows))
+	assert.False(t, shouldFallbackDeadlockEventFile(context.Canceled))
+	assert.False(t, shouldFallbackDeadlockEventFile(context.DeadlineExceeded))
+	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("VIEW SERVER STATE permission was denied")))
+	assert.True(t, shouldFallbackDeadlockEventFile(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"}))
+	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("event file scan failed")))
+}
+
+func TestDeadlockInfo_RingBufferAvailability(t *testing.T) {
+	for name, tc := range map[string]struct {
+		useRingBuffer      bool
+		target, wantStatus int
+	}{
+		"fallback missing target": {wantStatus: 500},
+		"fallback empty target":   {target: 1, wantStatus: 200},
+		"explicit missing target": {useRingBuffer: true, wantStatus: 500},
+		"explicit empty target":   {useRingBuffer: true, target: 1, wantStatus: 200},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			if !tc.useRingBuffer {
+				mock.ExpectQuery("fn_xe_file_target_read_file").
+					WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
+			}
+			mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.target))
+			if tc.target > 0 {
+				mock.ExpectQuery("WITH xevents").
+					WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
+			}
+			c := New()
+			c.db = db
+			c.setServerProperties("16.0.4265.3", 3)
+			c.Functions.DeadlockInfo.UseRingBuffer = tc.useRingBuffer
+			r := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
+			assert.Equal(t, tc.wantStatus, r.Status, r.Message)
+			if tc.wantStatus == 500 {
+				assert.Contains(t, r.Message, "ring_buffer target unavailable")
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
@@ -160,7 +232,7 @@ func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.
 	c := New()
 	c.db = db
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors", c.Functions.ErrorInfo.UseRingBuffer)
 	require.NoError(t, err)
 	assert.True(t, available)
 	assert.Equal(t, `C:\Logs\nd_err_0_*.xel`, target.filePath)
@@ -178,7 +250,7 @@ func TestResolveMSSQLErrorReadTarget_EventFileMissingSession(t *testing.T) {
 	c := New()
 	c.db = db
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors", c.Functions.ErrorInfo.UseRingBuffer)
 	require.NoError(t, err)
 	assert.False(t, available)
 	assert.Empty(t, target.filePath)
@@ -190,14 +262,13 @@ func TestResolveMSSQLErrorReadTarget_RingBufferRequiresRunningSession(t *testing
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
 	c.db = db
 	c.Config.Functions.ErrorInfo.UseRingBuffer = true
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors", c.Functions.ErrorInfo.UseRingBuffer)
 	require.NoError(t, err)
 	assert.True(t, available)
 	assert.Empty(t, target.filePath, "ring buffer reads must not carry a file path")
@@ -216,7 +287,7 @@ func TestResolveMSSQLErrorReadTarget_AzureSQLDatabaseUsesDatabaseCatalog(t *test
 	c.db = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors", c.Functions.ErrorInfo.UseRingBuffer)
 	require.NoError(t, err)
 	assert.True(t, available)
 	assert.Equal(t, "https://storage.example/events/netdata_errors_0_", target.filePath)
@@ -228,7 +299,6 @@ func TestResolveMSSQLErrorReadTarget_AzureSQLDatabaseUsesDatabaseRingBufferDMVs(
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_database_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
@@ -236,7 +306,7 @@ func TestResolveMSSQLErrorReadTarget_AzureSQLDatabaseUsesDatabaseRingBufferDMVs(
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	c.Functions.ErrorInfo.UseRingBuffer = true
 
-	_, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	_, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors", c.Functions.ErrorInfo.UseRingBuffer)
 	require.NoError(t, err)
 	assert.True(t, available)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -254,7 +324,7 @@ func TestResolveMSSQLErrorReadTarget_AzureSQLManagedInstanceUsesServerCatalog(t 
 	c.db = db
 	c.setServerProperties("16.0.4265.3", engineEditionAzureSQLMI)
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors", c.Functions.ErrorInfo.UseRingBuffer)
 	require.NoError(t, err)
 	assert.True(t, available)
 	assert.Equal(t, `C:\Logs\nd_err_0_*.xel`, target.filePath)
@@ -266,7 +336,6 @@ func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *test
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("dm_xe_database_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("FROM sys.dm_xe_database_session_targets").
 		WillReturnRows(sqlmock.NewRows([]string{
@@ -278,7 +347,7 @@ func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *test
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	c.Functions.ErrorInfo.UseRingBuffer = true
 
-	status, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Empty(t, rows)
@@ -415,11 +484,198 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 	c := New()
 	c.db = db
 
-	status, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Empty(t, rows)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_FallsBackToSystemHealthEventFile(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\MSSQL\Log\system_health.xel`))
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+
+	status, source, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, source)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_RetriesSystemHealthRingBufferAfterEventFileError(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\MSSQL\Log\system_health.xel`))
+	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(errors.New("event file unavailable"))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_UsesSystemHealthRingBufferWhenFileLookupFails(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
+		WillReturnError(errors.New("system health catalog unavailable"))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_PreservesSystemHealthResolverErrors(t *testing.T) {
+	tests := map[string]struct {
+		err   error
+		check func(*testing.T, error)
+	}{
+		"cancellation": {
+			err:   context.Canceled,
+			check: func(t *testing.T, err error) { assert.ErrorIs(t, err, context.Canceled) },
+		},
+		"timeout": {
+			err:   context.DeadlineExceeded,
+			check: func(t *testing.T, err error) { assert.ErrorIs(t, err, context.DeadlineExceeded) },
+		},
+		"permission": {
+			err:   mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"},
+			check: func(t *testing.T, err error) { assert.True(t, isDeadlockPermissionError(err)) },
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+			require.NoError(t, err)
+			defer db.Close()
+
+			mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+			mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").WillReturnError(tc.err)
+
+			c := New()
+			c.db = db
+
+			status, source, rows, gotErr := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+			assert.Equal(t, mssqlErrorAttrNotSupported, status)
+			assert.Equal(t, mssqlErrorSourceSystemHealth, source)
+			assert.Nil(t, rows)
+			tc.check(t, gotErr)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+	c.Functions.ErrorInfo.UseRingBuffer = true
+
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectErrorInfo_SystemHealthRingBufferAvailability(t *testing.T) {
+	for name, tc := range map[string]struct {
+		target     int
+		wantStatus int
+	}{
+		"missing target":         {target: 0, wantStatus: 503},
+		"empty available target": {target: 1, wantStatus: 200},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			mock.ExpectQuery("dm_xe_session_targets").WithArgs("netdata_errors").
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+			mock.ExpectQuery("dm_xe_session_targets").WithArgs("system_health").
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.target))
+			if tc.target > 0 {
+				mock.ExpectQuery("WITH xevents").WithArgs("system_health", 500).
+					WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
+			}
+			c := New()
+			c.db = db
+			c.setServerProperties("16.0.4265.3", 3)
+			c.Functions.ErrorInfo.UseRingBuffer = true
+			r := newFuncRouter(c).Handle(context.Background(), errorInfoMethodID, funcapi.ResolvedParams{})
+			assert.Equal(t, tc.wantStatus, r.Status, r.Message)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestErrorInfoSystemHealthFallbackIsIdentified(t *testing.T) {
+	assert.Contains(t, errorInfoHelp(mssqlErrorSourceSystemHealth), "does not capture every")
+	found := false
+	for _, col := range errorInfoColumns {
+		if col.Name == "source" {
+			found = true
+			assert.True(t, col.Visible)
+		}
+	}
+	assert.True(t, found, "source column must be exposed")
 }
 
 func TestCollectErrorInfo_ResolverTimeout(t *testing.T) {
