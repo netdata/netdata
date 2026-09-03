@@ -51,6 +51,22 @@ GRAY='\033[0;90m'
 NC='\033[0m'
 
 GRACE_SECONDS="${GRACE_SECONDS:-15}"
+# How long to wait for the child's first byte before giving up on it streaming at all. Must stay
+# below GRACE_SECONDS so the reader closes the pipe while the writer is still under the guard.
+READ_TIMEOUT="${READ_TIMEOUT:-8}"
+
+if [[ "${READ_TIMEOUT}" -ge "${GRACE_SECONDS}" ]]; then
+    printf 'READ_TIMEOUT (%s) must be below GRACE_SECONDS (%s), or the child is killed before the\n' \
+        "${READ_TIMEOUT}" "${GRACE_SECONDS}" >&2
+    printf 'reader ever closes the pipe, and every run degrades into a silent skip.\n' >&2
+    exit 3
+fi
+
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/nd-spawn-termination.XXXXXX")" || {
+    printf 'cannot create a work directory\n' >&2
+    exit 3
+}
+trap 'rm -rf "${work_dir}"' EXIT
 
 # Test-only hook: overrides the streaming command so this harness can be exercised on a
 # non-macOS host with a stand-in writer. Leave unset for a real probe.
@@ -85,16 +101,19 @@ else
 
     # Pick the first sampler set that works, in the same order the collector's probe tries them
     # (src/collectors/macos.plugin/macos_powermetrics.c). A VM runner may support none of them.
+    # Exit status alone is not enough: on a VM powermetrics can exit 0 while emitting nothing, and a
+    # child that never writes can never be killed by a closed pipe - which would make this probe
+    # report a broken premise when the truth is that it cannot be tested here. Require real output.
     sampler=""
     for candidate in "thermal,smc,gpu_power" "thermal,gpu_power" "thermal,smc" "thermal"; do
         info "trying samplers: ${candidate}"
-        if "${powermetrics_bin}" -n 1 -i 1000 -s "${candidate}" -f plist >/dev/null 2>&1; then
+        if [[ -n "$("${powermetrics_bin}" -n 1 -i 1000 -s "${candidate}" -f plist 2>/dev/null)" ]]; then
             sampler="${candidate}"
             ok "samplers available: ${sampler}"
             break
         fi
     done
-    [[ -n "${sampler}" ]] || skip "powermetrics cannot sample any of the collector's sampler sets here (typical on a VM)"
+    [[ -n "${sampler}" ]] || skip "powermetrics produced no output for any of the collector's sampler sets here (typical on a VM)"
 
     # The exact loop-mode invocation the collector uses: stream until stopped, never self-terminate.
     stream_cmd="${powermetrics_bin} -b 0 -i 1000 -s ${sampler} -f plist"
@@ -103,38 +122,78 @@ fi
 # ---------------------------------------------------------------------------------------------------
 # the probe
 
-# Runs $stream_cmd with stdout on a pipe, lets it produce output, then closes the read end.
-# Echoes: "<outcome> <seconds>"  where outcome is died-sigpipe | survived | self-exited:<rc>
+# Runs $stream_cmd with stdout on a pipe, waits for it to actually produce output, then closes the
+# read end. Echoes: "<outcome> <seconds> <streamed|silent>" where outcome is
+# died-sigpipe | survived | self-exited:<rc>, and the last field says whether any byte ever arrived.
 probe_one() {
-    local disposition="$1" started elapsed rc
+    local disposition="$1" started elapsed rc streamed
+    local flag="${work_dir}/streamed.$$"
+    rm -f "${flag}"
     started=$(date +%s)
 
+    # Job control puts the subshell in its own process group, so the guard below can kill the WHOLE
+    # group. Killing only the subshell would orphan powermetrics: it is deliberately immortal in the
+    # 'ignored' case, so it would be reparented to launchd and left running as root - this harness
+    # would strand exactly the process this test exists to prevent.
+    set -m
     (
         if [[ "${disposition}" == "ignored" ]]; then
             trap '' PIPE            # SIG_IGN, inherited across fork+exec - models netdata
         fi
-        # The reader takes one byte and exits, closing the pipe while the writer is mid-stream.
+        # The reader waits for one real byte, then exits and closes the pipe while the writer is
+        # mid-stream. On timeout it exits anyway (still closing the pipe) but leaves no flag, which
+        # is how we tell "immortal child" apart from "child that never wrote".
         # PIPESTATUS[0] is the writer's wait status, surfaced as this subshell's exit code.
         # shellcheck disable=SC2086  # stream_cmd is a deliberately word-split command line
-        ${stream_cmd} 2>/dev/null | head -c 1 >/dev/null
+        ${stream_cmd} 2>/dev/null | { IFS= read -r -t "${READ_TIMEOUT}" -n 1 _ && : > "${flag}"; }
         exit "${PIPESTATUS[0]}"
     ) &
     local probe_pid=$!
+    set +m
 
-    # Bound the wait by hand: stock macOS has no `timeout`, and an immortal child never returns.
-    ( sleep "${GRACE_SECONDS}"; kill -9 "${probe_pid}" 2>/dev/null ) &
-    local guard_pid=$!
+    # Confirm job control really gave the probe its own process group BEFORE aiming a group-wide
+    # SIGKILL. This script runs as root, so a wrong pgid would kill unrelated processes; and if the
+    # group is ours, the kill would take down the script itself.
+    local pgid own_pgid target
+    pgid=$(ps -o pgid= -p "${probe_pid}" 2>/dev/null | tr -d ' ')
+    own_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+    if [[ -n "${pgid}" && "${pgid}" == "${probe_pid}" && "${pgid}" != "${own_pgid}" ]]; then
+        target="-${pgid}"      # the whole group: the subshell AND the command it spawned
+    else
+        warn "job control did not give the probe its own process group; killing only pid ${probe_pid}"
+        target="${probe_pid}"
+    fi
+
+    # Bound the wait by polling rather than with a background guard. Stock macOS has no `timeout`,
+    # and an immortal child never returns on its own. A backgrounded `sleep` guard is worse than it
+    # looks: killing the guard subshell leaves its `sleep` alive, that orphan holds this function's
+    # command-substitution pipe open until it expires, and every probe then costs the full grace
+    # even when the child died immediately - besides leaving stray processes behind.
+    local waited=0 limit=$(( GRACE_SECONDS * 5 ))
+    while kill -0 "${probe_pid}" 2>/dev/null && [[ "${waited}" -lt "${limit}" ]]; do
+        sleep 0.2
+        waited=$(( waited + 1 ))
+    done
+
+    # Still alive: it is immortal by construction in the 'ignored' case. Kill the group so the
+    # command it spawned cannot be orphaned and reparented - this harness must never strand the very
+    # kind of process the test exists to prevent.
+    if kill -0 "${probe_pid}" 2>/dev/null; then
+        kill -9 -- "${target}" 2>/dev/null
+    fi
 
     wait "${probe_pid}"; rc=$?
-    kill "${guard_pid}" 2>/dev/null
-    wait "${guard_pid}" 2>/dev/null
+
     elapsed=$(( $(date +%s) - started ))
+    streamed=silent
+    [[ -f "${flag}" ]] && streamed=streamed
+    rm -f "${flag}"
 
     # A shell reports a signalled child as 128+signo. 13 = SIGPIPE, 9 = the guard's SIGKILL.
     case "${rc}" in
-        141) printf 'died-sigpipe %s\n' "${elapsed}" ;;
-        137) printf 'survived %s\n' "${elapsed}" ;;
-        *)   printf 'self-exited:%s %s\n' "${rc}" "${elapsed}" ;;
+        141) printf 'died-sigpipe %s %s\n' "${elapsed}" "${streamed}" ;;
+        137) printf 'survived %s %s\n' "${elapsed}" "${streamed}" ;;
+        *)   printf 'self-exited:%s %s %s\n' "${rc}" "${elapsed}" "${streamed}" ;;
     esac
 }
 
@@ -142,20 +201,27 @@ info "command under test: ${stream_cmd}"
 info "grace before declaring a child immortal: ${GRACE_SECONDS}s"
 
 info "case 1/2: parent SIGPIPE = DEFAULT (models netdata WITH the fix)"
-read -r default_outcome default_secs <<<"$(probe_one default)"
-info "  -> ${default_outcome} after ${default_secs}s"
+read -r default_outcome default_secs default_stream <<<"$(probe_one default)"
+info "  -> ${default_outcome} after ${default_secs}s (${default_stream})"
 
 info "case 2/2: parent SIGPIPE = IGNORED (models netdata on master)"
-read -r ignored_outcome ignored_secs <<<"$(probe_one ignored)"
-info "  -> ${ignored_outcome} after ${ignored_secs}s"
+read -r ignored_outcome ignored_secs ignored_stream <<<"$(probe_one ignored)"
+info "  -> ${ignored_outcome} after ${ignored_secs}s (${ignored_stream})"
 
 # ---------------------------------------------------------------------------------------------------
 # verdict
 
 printf '\n'
-printf 'SIGPIPE default -> %s (%ss)\n' "${default_outcome}" "${default_secs}" >&2
-printf 'SIGPIPE ignored -> %s (%ss)\n' "${ignored_outcome}" "${ignored_secs}" >&2
+printf 'SIGPIPE default -> %s (%ss, %s)\n' "${default_outcome}" "${default_secs}" "${default_stream}" >&2
+printf 'SIGPIPE ignored -> %s (%ss, %s)\n' "${ignored_outcome}" "${ignored_secs}" "${ignored_stream}" >&2
 printf '\n'
+
+# A child that never wrote cannot be killed by a closed pipe - its next write never comes. That is
+# untestable here, NOT a broken premise, so it must skip rather than fail. Distinguishing these two
+# is why the probe tracks whether any byte arrived.
+if [[ "${default_stream}" == "silent" ]]; then
+    skip "powermetrics never wrote to its stdout within ${READ_TIMEOUT}s (outcome '${default_outcome}'), so closing the pipe cannot be exercised here - this says nothing about the premise either way"
+fi
 
 case "${default_outcome}:${ignored_outcome}" in
     died-sigpipe:survived)

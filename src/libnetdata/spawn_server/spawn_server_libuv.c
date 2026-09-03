@@ -210,6 +210,7 @@ cleanup:
         if(si_sem_init)
             uv_sem_destroy(&si->sem);
 
+        freez((void *)si->cmdline);
         freez(si);
     }
     return NULL;
@@ -400,6 +401,7 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server __maybe_
     // the semaphore is consumed - finish exactly like spawn_server_exec_wait()
     int st = si->exit_code;
     uv_sem_destroy(&si->sem);
+    freez((void *)si->cmdline);
     freez(si);
     if(status) *status = st;
     return SPAWN_TIMEDWAIT_EXITED;
@@ -417,6 +419,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     int exit_code = si->exit_code;
 
     uv_sem_destroy(&si->sem);
+    freez((void *)si->cmdline);
     freez(si);
     return exit_code;
 }

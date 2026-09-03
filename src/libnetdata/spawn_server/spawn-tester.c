@@ -548,7 +548,7 @@ void test_popen_plugin_echo_and_exit(const char *argv0) {
 // permanent leak, which is exactly how netdata/netdata#23730 stranded 624 powermetrics processes.
 
 #if !defined(OS_WINDOWS)
-int plugin_stream_until_pipe_breaks(void) {
+static int plugin_stream_until_pipe_breaks(void) {
     child_check_fds();
     child_check_environment();
 
@@ -561,15 +561,32 @@ int plugin_stream_until_pipe_breaks(void) {
             if(errno == EINTR)
                 continue;
 
-            // We survived a broken pipe: SIGPIPE was inherited as SIG_IGN. Report it distinctly so
-            // the parent can tell "the contract is broken" apart from any other failure.
-            fprintf(stderr, "child survived a broken stdout (errno %d) - SIGPIPE is not default\n", errno);
-            return 66;
+            // Distinguish the finding from noise: only EPIPE means "we survived a broken pipe",
+            // i.e. SIGPIPE was inherited as SIG_IGN or left blocked. Any other errno is an
+            // unrelated I/O failure and must not be reported as a contract regression.
+            if(errno == EPIPE) {
+                fprintf(stderr, "child survived a broken stdout - SIGPIPE is not deliverable\n");
+                return 66;
+            }
+
+            fprintf(stderr, "child's stdout write failed with errno %d, unrelated to the contract\n", errno);
+            return 67;
         }
     }
 }
 
-void test_exec_child_dies_when_stdout_closes(int argc, const char **argv) {
+// spawn_server_destroy() SIGTERMs the server then waits for it with an unbounded waitpid(), and
+// SA_RESTART can restart the server's blocked recvmsg() - see test_listener_backlog_cleanup().
+// Dedicated test servers are therefore SIGKILLed first so cleanup cannot hang.
+static void test_server_destroy(SPAWN_SERVER *server) {
+    if(server && spawn_server_pid(server) > 0)
+        (void)kill(spawn_server_pid(server), SIGKILL);
+
+    if(server)
+        spawn_server_destroy(server);
+}
+
+static void test_exec_child_dies_when_stdout_closes(int argc, const char **argv) {
     // Model the daemon: netdata ignores SIGPIPE before it creates its spawn server, and that is
     // what the child must not inherit. Without this the test would pass trivially, because the
     // tester's own SIGPIPE is already default.
@@ -597,6 +614,7 @@ void test_exec_child_dies_when_stdout_closes(int argc, const char **argv) {
     SPAWN_INSTANCE *si = spawn_server_exec(server, STDERR_FILENO, 0, params, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
     if(!si) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (spawn)");
+        test_server_destroy(server);
         exit(1);
     }
 
@@ -613,28 +631,36 @@ void test_exec_child_dies_when_stdout_closes(int argc, const char **argv) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "child did not exit after its stdout was closed - the termination contract is broken");
         spawn_server_exec_kill(server, si, 0);
+        test_server_destroy(server);
         exit(1);
     }
 
     if(r == SPAWN_TIMEDWAIT_ERROR) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_server_exec_timedwait() returned ERROR");
         spawn_server_exec_kill(server, si, 0);
+        test_server_destroy(server);
         exit(1);
     }
 
     if(!WIFSIGNALED(status) || WTERMSIG(status) != SIGPIPE) {
         if(WIFEXITED(status) && WEXITSTATUS(status) == 66)
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "child survived its broken stdout: SIGPIPE was inherited as SIG_IGN across exec");
+                   "child survived its broken stdout: SIGPIPE was not deliverable in the child "
+                   "(inherited as SIG_IGN, or left blocked, across exec)");
+        else if(WIFEXITED(status) && WEXITSTATUS(status) == 67)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "child hit an unrelated write error - this test could not assess the contract");
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "child did not die of SIGPIPE when its stdout closed (raw status %d)", status);
+        // si was already reclaimed by the EXITED result; only the server is still ours.
+        test_server_destroy(server);
         exit(1);
     }
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "child died of SIGPIPE when its stdout closed, as it must");
 
-    spawn_server_destroy(server);
+    test_server_destroy(server);
 
     if(sigaction(SIGPIPE, &previous_pipe, NULL) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot restore SIGPIPE after the termination contract test");
@@ -736,16 +762,23 @@ void test_popen_plugin_timedwait_kill(const char *argv0) {
 
 #if !defined(OS_WINDOWS)
 static int callback_wait_for_sigterm(SPAWN_REQUEST *request) {
-    struct sigaction sigterm_action, sigchld_action;
+    struct sigaction sigterm_action, sigchld_action, sigpipe_action;
     sigset_t mask;
 
+    // SIGPIPE is checked on both axes deliberately. netdata ignores it AND blocks it, and fork()
+    // inherits both; a callback child needs the disposition reset AND the signal unblocked, because
+    // a blocked SIGPIPE leaves write() returning EPIPE with the signal pending - the child then
+    // survives a closed pipe just as if it were still ignored.
     if(sigaction(SIGTERM, NULL, &sigterm_action) == -1 ||
        sigaction(SIGCHLD, NULL, &sigchld_action) == -1 ||
+       sigaction(SIGPIPE, NULL, &sigpipe_action) == -1 ||
        pthread_sigmask(SIG_BLOCK, NULL, &mask) != 0 ||
        sigterm_action.sa_handler != SIG_DFL ||
        sigchld_action.sa_handler != SIG_DFL ||
+       sigpipe_action.sa_handler != SIG_DFL ||
        sigismember(&mask, SIGTERM) != 0 ||
-       sigismember(&mask, SIGCHLD) != 0)
+       sigismember(&mask, SIGCHLD) != 0 ||
+       sigismember(&mask, SIGPIPE) != 0)
         return EXIT_FAILURE;
 
     static const char ready = 'R';

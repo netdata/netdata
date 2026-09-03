@@ -2857,7 +2857,7 @@ if(CAP_FOUND)
   set(HAVE_CAPABILITY True)
 endif()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
+set(NDRUN_FILES src/collectors/utils/nd-run.c src/collectors/utils/exec-signals.h)
 add_executable(nd-run ${NDRUN_FILES})
 if(CAP_FOUND)
   target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
@@ -3100,7 +3100,7 @@ endif()
 if(NEED_NDSUDO)
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
-    add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)
 
     install(TARGETS ndsudo
             COMPONENT netdata

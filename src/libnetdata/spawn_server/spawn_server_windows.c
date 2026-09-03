@@ -334,6 +334,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     if (pipe_stdout[PIPE_WRITE] >= 0) close(pipe_stdout[PIPE_WRITE]);
     if (pipe_stderr[PIPE_READ] >= 0) close(pipe_stderr[PIPE_READ]);
     if (pipe_stderr[PIPE_WRITE] >= 0) close(pipe_stderr[PIPE_WRITE]);
+    freez((void *)instance->cmdline);
     freez(instance);
     return NULL;
 }
@@ -516,6 +517,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     spawn_server_release_stderr_fd(server, si);
 
+    freez((void *)si->cmdline);
     freez(si);
     return map_status_code_to_signal(exit_code);
 }

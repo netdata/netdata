@@ -315,9 +315,7 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     sigemptyset(&empty_mask);
     if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
     }
 
     // POSIX_SPAWN_SETSIGDEF only forces to default the signals that are MEMBERS of the
@@ -337,17 +335,13 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     sigaddset(&default_signals, SIGPIPE);
     if (posix_spawnattr_setsigdefault(&attr, &default_signals) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigdefault() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
     }
 
     int fds_to_keep[] = {
@@ -378,6 +372,13 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
 
     nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: process created with pid %d: %s", rq->pid, rq->cmdline);
     return true;
+
+cleanup_attr:
+    // Shared by the attr-configuration failures above; they all own exactly the same two objects.
+    // The request's fds belong to the caller and are closed by request_free().
+    posix_spawn_file_actions_destroy(&file_actions);
+    posix_spawnattr_destroy(&attr);
+    return false;
 }
 
 static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN_REQUEST *rq) {
@@ -443,7 +444,15 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
             _exit(EXIT_FAILURE);
         }
 
-        mask_rc = pthread_sigmask(SIG_SETMASK, &previous_mask, NULL);
+        // The disposition alone is not enough: netdata BLOCKS SIGPIPE as well
+        // (signals_block_all_except_deadly() unblocks only the deadly signals), fork() inherits the
+        // mask, and previous_mask carries that block. A blocked SIGPIPE makes write() return EPIPE
+        // with the signal left pending, so the child would survive a closed pipe exactly as if the
+        // disposition were still SIG_IGN. Restore the inherited mask minus SIGPIPE.
+        sigset_t child_mask = previous_mask;
+        sigdelset(&child_mask, SIGPIPE);
+
+        mask_rc = pthread_sigmask(SIG_SETMASK, &child_mask, NULL);
         if(mask_rc != 0) {
             errno = mask_rc;
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to restore callback child signal mask.");

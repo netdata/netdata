@@ -611,6 +611,19 @@ static POPEN_INSTANCE *macos_powermetrics_start_loop(const struct macos_powermet
     return spawn_popen_run_argv(pm.use_ndsudo ? argv_ndsudo : argv_direct);
 }
 
+// Grace to allow a loop-mode child to exit on its own after we close its stdout.
+//
+// Closing the pipe does not signal the child - its next WRITE does, and in loop mode that is one
+// sample interval away. `command timeout` is clamped against `sample window` only, so at a legal
+// `sample every` above it (the range is 1s-60s) a plain command_timeout_ms grace can expire before
+// the child ever writes. It would then be signalled instead - and a child started through the
+// setuid-root ndsudo helper cannot be signalled by an unprivileged netdata at all, so it would be
+// abandoned while still running. Wait at least one full interval, matching the staleness budget.
+static int macos_powermetrics_loop_kill_grace_ms(void)
+{
+    return pm.sample_interval_ms + pm.command_timeout_ms;
+}
+
 static bool macos_powermetrics_process_stream_document(const char *data, size_t size)
 {
     struct macos_powermetrics_sample sample = {0};
@@ -668,7 +681,7 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
 
     int fd = spawn_popen_read_fd(pi);
     if (fd < 0) {
-        spawn_popen_kill(pi, pm.command_timeout_ms);
+        spawn_popen_kill(pi, macos_powermetrics_loop_kill_grace_ms());
         return false;
     }
 
@@ -753,7 +766,7 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
         (void)macos_powermetrics_process_stream_document(buf, used);
 
     freez(buf);
-    spawn_popen_kill(pi, pm.command_timeout_ms);
+    spawn_popen_kill(pi, macos_powermetrics_loop_kill_grace_ms());
     return ok && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS);
 }
 
