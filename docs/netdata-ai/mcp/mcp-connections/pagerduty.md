@@ -16,7 +16,7 @@ This is an [MCP Connection](/docs/netdata-ai/mcp/mcp-connections.md): Netdata Cl
 ## How it works
 
 - Netdata Cloud acts as an MCP client to PagerDuty's hosted MCP server — `https://mcp.pagerduty.com/mcp`, or `https://mcp.eu.pagerduty.com/mcp` for accounts in the EU service region — over HTTPS.
-- Each user authorizes Netdata once through PagerDuty OAuth. Netdata requests the `read` scope only, stores the token encrypted, and refreshes it as needed.
+- Each user authorizes Netdata once through PagerDuty Classic User OAuth. Netdata requests the `read` permission scope only, stores the token encrypted, and refreshes it as needed.
 - When a user starts a conversation or an investigation with this connection selected, Netdata AI calls the enabled read-only tools, such as tools for incidents, alerts and notes, services, teams and users, schedules and on-calls, escalation policies, change events and analytics, and uses the results in its analysis.
 - Any tool that modifies PagerDuty data (create an incident, add a responder, and so on) is discovered but cannot be enabled.
 
@@ -36,7 +36,7 @@ If you need help with this integration, contact Netdata support at <https://www.
 
 ### In PagerDuty
 
-There is no API key or app installation to create in PagerDuty for Netdata's OAuth flow. Confirm that your PagerDuty account has Advanced Permissions, then note your account URL — the address in your browser once you are signed in to PagerDuty — because Netdata asks for it in the next section. Accounts hosted in the EU service region use a `*.eu.pagerduty.com` address.
+Netdata uses PagerDuty Classic User OAuth, so there is no API key or Scoped OAuth app installation to create in PagerDuty. Confirm that your PagerDuty account has Advanced Permissions, then note your account URL — the address in your browser once you are signed in to PagerDuty — because Netdata asks for it in the next section. Accounts hosted in the EU service region use a `*.eu.pagerduty.com` address.
 
 ### In Netdata
 
@@ -53,7 +53,7 @@ There is no API key or app installation to create in PagerDuty for Netdata's OAu
 
    ![Connection parameters](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-connection.png)
 
-5. You are redirected to PagerDuty. Sign in if prompted, review the access requested, and click **Authorize**. PagerDuty sends you back to Netdata and the connection is established.
+5. You are redirected to PagerDuty. Sign in if prompted, review the Classic User OAuth `read` access requested, and click **Authorize**. PagerDuty sends you back to Netdata and the connection is established.
 
    ![Authorize Netdata](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-authorize.png)
 
@@ -73,4 +73,4 @@ Select the PagerDuty connection in a conversation, or when creating a report or 
 
 **In Netdata.** A Space admin deletes the PagerDuty connection under **Settings → AI → MCP Connections**. Netdata removes the stored credentials and asks PagerDuty to revoke each user's token. A single user can instead disconnect their own PagerDuty authorization, which removes their credentials and asks PagerDuty to revoke only their token, leaving the connection in place for others.
 
-**In PagerDuty.** If your account has the **OAuth Apps** page under **Integrations**, you can also revoke your own Netdata authorization there, and an Admin can revoke all users' tokens or uninstall the app. See [Scoped OAuth Apps](https://support.pagerduty.com/main/docs/scoped-oauth-apps). Revoking in PagerDuty only stops Netdata's access; the connection stays configured in Netdata until it is deleted there.
+**In PagerDuty.** If your account has the **OAuth Apps** page under **Integrations** (an Early Access feature), Netdata appears in the installed apps list once a user has authorized it — Classic User OAuth apps require no installation, but authorized ones are listed there. From that page, anyone who has authorized Netdata can revoke their own authorization, and an Admin can revoke all users' tokens or uninstall the app. Revoking in PagerDuty only stops Netdata's access for that authorization; the connection stays configured in Netdata until it is deleted there. See [Scoped OAuth Apps](https://support.pagerduty.com/main/docs/scoped-oauth-apps).
