@@ -36,7 +36,7 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len)
  * codepoint threatens their record framing. Invalid or truncated sequences are reported as their
  * single leading byte, so callers keep byte-for-byte length. A caller therefore passes such a byte
  * through unchanged, except where the byte value is itself a codepoint the caller replaces: an orphan
- * 0x80-0x9F is a C1 control and 0xA0 is NBSP, which is how a Latin-1 consumer would read them anyway.
+ * 0x80-0x9F is a C1 control and 0xA0 is NBSP.
  *
  * @param src the sequence to decode.
  * @param len the number of bytes available at src.

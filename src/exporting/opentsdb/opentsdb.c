@@ -138,27 +138,18 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
  * Copy a metric prefix or hostname, neutralizing only what must not reach an OpenTSDB telnet record
  *
  * A telnet record is `put <metric> <timestamp> <value> <tagk>=<tagv> ...\n`: whitespace-delimited
- * fields, newline-terminated, with no quoting or escaping. So only whitespace (which splits a field)
- * and the record terminator can corrupt or inject a record, and this sanitizer replaces those. It
- * additionally replaces the remaining control codepoints -- C0, DEL, and C1 -- which cannot break our
- * framing but are never legitimate in a hostname or prefix and would be interpreted by whatever consumes
- * the record downstream. C1 belongs here for the same reason C0 does: U+009B is the single-character CSI,
- * the same escape hazard as U+001B. Everything else, punctuation included, is passed through byte for
- * byte: this is metadata the user configured, and none of `:`, `=` or `;` can affect this record's
- * framing. Whether the destination then accepts them is its tag grammar and the operator's concern:
- * stock OpenTSDB parses a tag by splitting on `=` and validates tag characters against its own
- * allowlist, so it may reject values other listeners accept. We take that trade knowingly: a strict
- * destination may reject a point, leaving a gap that requires correcting the configuration and possibly
- * backfilling, whereas silently relabelling it would store it under a different host identity and split
- * the host's history -- which is what netdata/netdata#23684 reported. Normal builds do not surface such a
- * rejection: this connector drops the destination's replies (exporting_discard_response), so it appears
- * as missing data at the destination rather than a netdata log line. Builds with NETDATA_INTERNAL_CHECKS
- * log a debug sample before discarding the reply.
+ * fields, newline-terminated, with no quoting or escaping. Only whitespace and the record terminator
+ * can corrupt or inject a record, so those are replaced, along with the remaining control codepoints
+ * -- C0, DEL, and C1 -- which cannot break our framing but are never legitimate in a hostname or
+ * prefix: U+009B is the single-character CSI, the same escape hazard as U+001B.
  *
- * This extends the Graphite metric-path sanitizer rather than mirroring it: it adds the non-whitespace
- * controls Graphite passes through, and omits the `;` Graphite replaces for Carbon's tag syntax, so
- * neither replaced set contains the other. It is also NOT the OpenTSDB *label value* policy: label
- * values keep the identifier allowlist of sanitize_opentsdb_label_value().
+ * Everything else, punctuation included, is passed through byte for byte: none of `:`, `=` or `;`
+ * affects this record's framing, and relabelling metadata the user configured would store the point
+ * under a different host identity and split the host's history -- which is what netdata/netdata#23684
+ * reported. A destination with a stricter tag grammar (stock OpenTSDB has one) may reject such a point
+ * instead; that is the destination's rule and the operator's concern. This is therefore neither the Graphite
+ * metric-path policy (which passes the non-whitespace controls through, and replaces `;` for Carbon's
+ * tag syntax) nor the OpenTSDB label-value policy of sanitize_opentsdb_label_value().
  *
  * The replacement is byte-length preserving, which the callers below depend on for buffer sizing.
  *
@@ -901,8 +892,8 @@ static const struct {
     // the documented exception: 0x82 decodes to its own value, which is a C1 control.
     { "truncated utf8 at end of metadata", "prefix\xc3", "hostname\xe2\x82", " label=value",
       "put prefix\xc3.chart.name.dimension.name 42 1.5 host=hostname\xe2_ label=value\n" },
-    // same exception in its most likely form: a lone 0x85 or 0xA0 decodes to its own byte value,
-    // which is the NEL and NBSP codepoint
+    // the same exception, in the form most likely to occur: a lone 0x85 or 0xA0 decodes to its own
+    // byte value, which is the NEL and the NBSP codepoint
     { "lone whitespace-valued bytes", "pre\x85""fix", "host\xa0""name", " label=value",
       "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name label=value\n" },
     // control bytes cannot break our framing, but are never legitimate metadata and would be
