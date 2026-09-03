@@ -174,7 +174,7 @@
         "properties": {
           "top_queries": {
             "title": "Top Queries",
-            "description": "Configuration for top-queries using Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database.",
+            "description": "Configuration for top-queries. Uses Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database, and falls back to the plan cache (sys.dm_exec_query_stats) when Query Store is unavailable or disabled.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -199,7 +199,7 @@
               },
               "time_window_days": {
                 "title": "Time Window (Days)",
-                "description": "How many days of Query Store data to query. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
+                "description": "How many days of query statistics to query. On the plan-cache fallback this filters by last execution time instead of aggregating a period. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
                 "type": "integer",
                 "minimum": -1,
                 "default": 7
@@ -311,10 +311,10 @@
     "functions": {
       "top_queries": {
         "disabled": {
-          "ui:help": "WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Query text and runtime views require version-specific server and per-database performance-state permissions."
+          "ui:help": "WARNING: query text may contain unmasked PII (customer names, emails, IDs). Query text and runtime views require version-specific server and per-database performance-state permissions."
         },
         "time_window_days": {
-          "ui:help": "Limits Query Store data to recent days. Lower positive values improve performance on busy servers; 0 uses 7 days and -1 includes all available history."
+          "ui:help": "Limits query statistics to recent days. Lower positive values improve performance on busy servers; 0 uses 7 days and -1 includes all available history."
         }
       },
       "deadlock_info": {
@@ -330,7 +330,7 @@
           "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions, or on Azure SQL Database VIEW DATABASE PERFORMANCE STATE for event_file and VIEW DATABASE STATE for ring_buffer."
         },
         "session_name": {
-          "ui:help": "The administrator-created Extended Events session must capture sqlserver.error_reported with sql_text and query_hash actions, using an event_file (default) or ring_buffer target. Use ON DATABASE for Azure SQL Database."
+          "ui:help": "For full error coverage, configure an administrator-created session capturing sqlserver.error_reported with sql_text and query_hash actions, using event_file (default) or ring_buffer. If unavailable, SQL Server and Managed Instance use system_health with reduced coverage. Azure SQL Database requires an ON DATABASE session."
         },
         "use_ring_buffer": {
           "ui:help": "Use the volatile ring buffer when persistent event_file storage is unavailable. The session must remain running and XML parsing can be slower."
