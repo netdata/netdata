@@ -121,10 +121,12 @@ os.execv(sys.argv[1], sys.argv[1:])' "${BASH:-/bin/bash}" "$0" "$@"
     exit 3
 fi
 
-if [[ "${READ_TIMEOUT}" -ge "${GRACE_SECONDS}" ]]; then
-    printf 'READ_TIMEOUT (%s) must be below GRACE_SECONDS (%s), or the child is killed before the\n' \
+# These no longer constrain each other: the grace is measured from after the reader closes the pipe,
+# so however long the reads take cannot eat into it. (It used to require READ_TIMEOUT < GRACE_SECONDS,
+# and even that was wrong - it compared one read against the grace while two reads are performed.)
+if [[ "${READ_TIMEOUT}" -lt 1 || "${GRACE_SECONDS}" -lt 1 ]]; then
+    printf 'READ_TIMEOUT (%s) and GRACE_SECONDS (%s) must both be at least 1 second.\n' \
         "${READ_TIMEOUT}" "${GRACE_SECONDS}" >&2
-    printf 'reader ever closes the pipe, and every run degrades into a silent skip.\n' >&2
     exit 3
 fi
 
@@ -255,7 +257,14 @@ probe_one() {
 
     # Bounded, wall-clock: an immortal child never returns on its own, and stock macOS has no
     # `timeout`. A deadline rather than a sleep count, which drifted badly under load.
-    local deadline=$(( started + GRACE_SECONDS ))
+    #
+    # The clock starts HERE, once the reader has closed the pipe - not at launch. The two reads can
+    # take up to 2*READ_TIMEOUT, and anchoring the deadline before them spent that budget before the
+    # writer had anything to react to: on a slow producer the grace could already be expired, so the
+    # child was SIGKILLed without ever being given the chance to die of SIGPIPE and got reported as
+    # 'survived' - a false "premise broken". The grace is about how long the writer gets AFTER the
+    # pipe breaks, so it has to be measured from then.
+    local deadline=$(( $(date +%s) + GRACE_SECONDS ))
     while kill -0 "${writer_pid}" 2>/dev/null && [[ "$(date +%s)" -lt "${deadline}" ]]; do
         sleep 0.2
     done
