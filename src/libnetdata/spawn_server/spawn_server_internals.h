@@ -69,20 +69,22 @@ struct spawn_instance {
     int stderr_fd;
     pid_t child_pid;
 
-    // The command line, kept client-side so a failure to signal the child can name it. The nofork
-    // spawn server has its own copy (SPAWN_REQUEST.cmdline), but the kills are issued from this
-    // side and the server logs a command line only at child creation (DEBUG) and at child death -
-    // neither of which fires for a child that refuses to die, which is exactly when we need to
-    // report it. Common to the variants rather than repeated per variant.
-    const char *cmdline;
-
 #if defined(SPAWN_SERVER_VERSION_UV)
     uv_process_t process;
     int exit_code;
     uv_sem_t sem;
 #endif
 
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    // The command line, kept client-side so a failure to signal the child can name it. The spawn
+    // server has its own copy (SPAWN_REQUEST.cmdline), but the kills are issued from this side and
+    // the server logs a command line only at child creation (DEBUG) and at child death - neither of
+    // which fires for a child that refuses to die, which is exactly when we need to report it.
+    const char *cmdline;
+#endif
+
 #if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
+    const char *cmdline;
     bool exited;
     int waitpid_status;
     struct spawn_instance *prev, *next;

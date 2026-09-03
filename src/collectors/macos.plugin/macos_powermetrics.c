@@ -27,6 +27,9 @@
 // interval arguments; configured values are clamped so ndsudo never rejects them.
 #define MACOS_POWERMETRICS_INTERVAL_MS_MAX 60000
 #define MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS 5000
+// Ceiling for the configured command timeout. Generous for any real command, and low enough that
+// sample_interval_ms + command_timeout_ms cannot overflow an int.
+#define MACOS_POWERMETRICS_TIMEOUT_MS_MAX 600000
 #define MACOS_POWERMETRICS_READ_STEP_MS 250
 #define MACOS_POWERMETRICS_MAX_OUTPUT (1024 * 1024)
 #define MACOS_POWERMETRICS_INITIAL_BACKOFF_MS 1000
@@ -882,6 +885,13 @@ static void macos_powermetrics_init(void)
         MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS);
     if (pm.command_timeout_ms < pm.sample_window_ms + 1000)
         pm.command_timeout_ms = pm.sample_window_ms + 1000;
+    // Upper bound too: this value is added to sample_interval_ms (for the loop staleness budget and
+    // for the kill grace), and both are int - a large configured timeout would overflow that
+    // addition. A negative result would then be passed to spawn_popen_kill(), which skips the
+    // pre-SIGTERM wait entirely for a non-positive grace, i.e. exactly the abandon-a-live-child
+    // behaviour these budgets exist to prevent.
+    if (pm.command_timeout_ms > MACOS_POWERMETRICS_TIMEOUT_MS_MAX)
+        pm.command_timeout_ms = MACOS_POWERMETRICS_TIMEOUT_MS_MAX;
 
     pm.use_ndsudo = inicfg_get_boolean(&netdata_config, "plugin:macos:powermetrics", "use ndsudo", 1);
 

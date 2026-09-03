@@ -151,19 +151,6 @@ probe_one() {
     local probe_pid=$!
     set +m
 
-    # Confirm job control really gave the probe its own process group BEFORE aiming a group-wide
-    # SIGKILL. This script runs as root, so a wrong pgid would kill unrelated processes; and if the
-    # group is ours, the kill would take down the script itself.
-    local pgid own_pgid target
-    pgid=$(ps -o pgid= -p "${probe_pid}" 2>/dev/null | tr -d ' ')
-    own_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
-    if [[ -n "${pgid}" && "${pgid}" == "${probe_pid}" && "${pgid}" != "${own_pgid}" ]]; then
-        target="-${pgid}"      # the whole group: the subshell AND the command it spawned
-    else
-        warn "job control did not give the probe its own process group; killing only pid ${probe_pid}"
-        target="${probe_pid}"
-    fi
-
     # Bound the wait by polling rather than with a background guard. Stock macOS has no `timeout`,
     # and an immortal child never returns on its own. A backgrounded `sleep` guard is worse than it
     # looks: killing the guard subshell leaves its `sleep` alive, that orphan holds this function's
@@ -175,11 +162,29 @@ probe_one() {
         waited=$(( waited + 1 ))
     done
 
-    # Still alive: it is immortal by construction in the 'ignored' case. Kill the group so the
-    # command it spawned cannot be orphaned and reparented - this harness must never strand the very
-    # kind of process the test exists to prevent.
+    # Still alive: it is immortal by construction in the 'ignored' case. Kill the whole process
+    # group, so the command the subshell spawned cannot be orphaned and reparented - this harness
+    # must never strand the very kind of process the test exists to prevent.
+    #
+    # The group is resolved HERE rather than at launch: a child that dies immediately (the expected
+    # 'default' outcome) is already gone by then, and looking it up early would race with its exit.
+    # At this point it is known alive, so ps can see it.
     if kill -0 "${probe_pid}" 2>/dev/null; then
-        kill -9 -- "${target}" 2>/dev/null
+        local pgid own_pgid
+        pgid=$(ps -o pgid= -p "${probe_pid}" 2>/dev/null | tr -d ' ')
+        own_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+
+        if [[ -n "${pgid}" && "${pgid}" != "${own_pgid}" ]]; then
+            kill -9 -- "-${pgid}" 2>/dev/null
+        else
+            # No distinct group to kill: the streaming child cannot be reached, and killing the
+            # subshell alone would orphan it - as root, and deliberately immortal. Report a harness
+            # error instead of a verdict; the caller refuses to draw a conclusion.
+            kill -9 "${probe_pid}" 2>/dev/null
+            wait "${probe_pid}" 2>/dev/null
+            printf 'harness-error %s %s\n' "$(( $(date +%s) - started ))" "unknown"
+            return
+        fi
     fi
 
     wait "${probe_pid}"; rc=$?
@@ -216,11 +221,24 @@ printf 'SIGPIPE default -> %s (%ss, %s)\n' "${default_outcome}" "${default_secs}
 printf 'SIGPIPE ignored -> %s (%ss, %s)\n' "${ignored_outcome}" "${ignored_secs}" "${ignored_stream}" >&2
 printf '\n'
 
-# A child that never wrote cannot be killed by a closed pipe - its next write never comes. That is
-# untestable here, NOT a broken premise, so it must skip rather than fail. Distinguishing these two
-# is why the probe tracks whether any byte arrived.
+# Only two default-case outcomes actually exercise the premise: the child died of SIGPIPE, or it
+# outlived the closed pipe. Anything else - it never wrote (its next write never comes), or it
+# exited for its own reasons - leaves the question unanswered. That is untestable here, NOT a broken
+# premise, so it must skip rather than fail a build. Tracking whether any byte arrived is what lets
+# the probe tell these apart.
+if [[ "${default_outcome}" == "harness-error" || "${ignored_outcome}" == "harness-error" ]]; then
+    err "the probe could not isolate its child in a process group, so it cannot guarantee cleanup"
+    err "and refuses to draw a conclusion. A survivor may have been left behind - check with"
+    err "'pgrep -x powermetrics'."
+    exit 3
+fi
+
 if [[ "${default_stream}" == "silent" ]]; then
     skip "powermetrics never wrote to its stdout within ${READ_TIMEOUT}s (outcome '${default_outcome}'), so closing the pipe cannot be exercised here - this says nothing about the premise either way"
+fi
+
+if [[ "${default_outcome}" != "died-sigpipe" && "${default_outcome}" != "survived" ]]; then
+    skip "powermetrics exited on its own (outcome '${default_outcome}') instead of being killed by the closed pipe, so the premise was never exercised here"
 fi
 
 case "${default_outcome}:${ignored_outcome}" in
