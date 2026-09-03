@@ -120,7 +120,28 @@ work_dir="$(mktemp -d "${TMPDIR:-/tmp}/nd-spawn-termination.XXXXXX")" || {
     printf 'cannot create a work directory\n' >&2
     exit 3
 }
-trap 'rm -rf "${work_dir}"' EXIT
+# Kill any writer still running before we go, on any exit path including interruption. This has to
+# reach across a subshell boundary: probe_one runs inside a command substitution, so the pid it
+# holds is invisible to this trap - it is published through a file instead. Without this, an
+# interrupted run (CI cancellation, the step's timeout-minutes, Ctrl-C) leaves the writer alive, and
+# in the ignored-SIGPIPE case that writer is deliberately immortal and running as root: the exact
+# leak this test exists to detect.
+cleanup() {
+    local pid=""
+    [[ -f "${work_dir}/writer.pid" ]] && pid=$(cat "${work_dir}/writer.pid" 2>/dev/null)
+
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+        kill -9 "${pid}" 2>/dev/null
+    fi
+
+    rm -rf "${work_dir}"
+}
+
+trap cleanup EXIT
+# Explicit handlers so an interruption runs cleanup and still reports the conventional 128+signo.
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+trap 'cleanup; exit 129' HUP
 
 # Test-only hook: overrides the streaming command so this harness can be exercised on a
 # non-macOS host with a stand-in writer. Leave unset for a real probe.
@@ -206,6 +227,7 @@ probe_one() {
         exec "${stream_argv[@]}" > "${fifo}" 2>/dev/null
     ) &
     local writer_pid=$!
+    printf '%s\n' "${writer_pid}" > "${work_dir}/writer.pid"
 
     # Two complete records prove the child is still writing, which is the only thing that makes a
     # closed pipe lethal: closing a pipe does not signal anything - the child's NEXT WRITE does. A
@@ -233,7 +255,9 @@ probe_one() {
     fi
 
     wait "${writer_pid}"; rc=$?
-    rm -f "${fifo}"
+
+    # Retract the pid as soon as it is reaped, so cleanup can never signal a recycled pid.
+    rm -f "${work_dir}/writer.pid" "${fifo}"
 
     elapsed=$(( $(date +%s) - started ))
     streamed=silent
