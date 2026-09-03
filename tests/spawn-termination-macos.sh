@@ -273,9 +273,9 @@ printf '\n'
 # premise, so it must skip rather than fail a build. Tracking whether any byte arrived is what lets
 # the probe tell these apart.
 if [[ "${default_outcome}" == "harness-error" || "${ignored_outcome}" == "harness-error" ]]; then
-    err "the probe could not isolate its child in a process group, so it cannot guarantee cleanup"
-    err "and refuses to draw a conclusion. A survivor may have been left behind - check with"
-    err "'pgrep -x powermetrics'."
+    err "the probe could not set up its stdout pipe (mkfifo failed in ${work_dir}), so it never"
+    err "started a child and has nothing to report. No survivor was left behind. Check that the"
+    err "temporary directory is writable and supports fifos."
     exit 3
 fi
 

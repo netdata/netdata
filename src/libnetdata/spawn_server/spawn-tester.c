@@ -552,8 +552,10 @@ static int plugin_stream_until_pipe_breaks(void) {
     child_check_fds();
     child_check_environment();
 
-    // Deliberately keep going on EPIPE, so this child only dies if the kernel kills it with
-    // SIGPIPE. Unbuffered write() - stdio without a flush would never touch the pipe.
+    // Never exit voluntarily while writes succeed: this child must only stop when the kernel kills
+    // it with SIGPIPE. Reaching a write error at all means SIGPIPE was not deliverable, so the
+    // error is reported through a distinct exit code (below) rather than treated as normal
+    // shutdown. Unbuffered write() - stdio without a flush would never touch the pipe.
     static const char chunk[1024] = { 0 };
     for(;;) {
         ssize_t rc = write(STDOUT_FILENO, chunk, sizeof(chunk));

@@ -1309,10 +1309,13 @@ jobs:
         timeout-minutes: 5
         run: |
           # `sudo` resets PATH, so the script's `#!/usr/bin/env bash` would resolve to the system
-          # bash 3.2 instead of the one this job installs. Name the interpreter, as the
-          # `Build from source` step does, and record which one ran.
-          sudo bash -c 'echo "bash: $BASH_VERSION"'
-          sudo bash ./tests/spawn-termination-macos.sh
+          # bash 3.2 instead of the one this job installs. Resolve the interpreter BEFORE sudo and
+          # pass its absolute path: `sudo bash` would still depend on sudo's secure_path. Record
+          # which one actually ran, so the log never leaves it in doubt.
+          bash_bin="$(command -v bash)"
+          echo "interpreter: ${bash_bin}"
+          sudo "${bash_bin}" -c 'echo "bash: $BASH_VERSION"'
+          sudo "${bash_bin}" ./tests/spawn-termination-macos.sh
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
