@@ -196,6 +196,15 @@
 - Fix(build): bound eBPF Go dependency discovery ([#23608](https://github.com/netdata/netdata/issues/23608))
 - Feat(go.d/snmp): query system scalars with GET requests ([#23724](https://github.com/netdata/netdata/issues/23724))
 - Health: remove unused health_log_detail indexes ([#23722](https://github.com/netdata/netdata/issues/23722))
+- Refactor(go.d/s3check): redesign for safer and clearer S3 monitoring ([#23731](https://github.com/netdata/netdata/issues/23731))
+- Regenerate integrations docs ([#23714](https://github.com/netdata/netdata/issues/23714))
+- Raise job concurrency limits for GHA workflows. ([#23741](https://github.com/netdata/netdata/issues/23741))
+- Docs(agents): slim root AGENTS.md to one rule, one home ([#23742](https://github.com/netdata/netdata/issues/23742))
+- Fix(pulse): let the mallinfo interval separate completed measurements ([#23736](https://github.com/netdata/netdata/issues/23736))
+- Fix(aclk): do not report waived self-signed certs as verification failures ([#23732](https://github.com/netdata/netdata/issues/23732))
+- Sow: make the template the single schema for SOW structure ([#23743](https://github.com/netdata/netdata/issues/23743))
+- Chore(sow): complete the SOW schema for umbrellas and harden the audit matcher ([#23745](https://github.com/netdata/netdata/issues/23745))
+- Monitor RDP connections (Window) ([#23719](https://github.com/netdata/netdata/issues/23719))
 
 ## [2.11.0] - 2026-08-12
 
