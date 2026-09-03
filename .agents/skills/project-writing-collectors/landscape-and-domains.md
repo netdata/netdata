@@ -77,8 +77,8 @@ A collector ingests one or more of these data types. Each has its own pattern.
 
 ### Metrics (time-series numeric data)
 
-The default. Streams as `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via NIDL (§3). Storage is the
-dbengine; alerts bind to chart `context`; anomaly detection / ML jobs run continuously. Every metric travels via
+The default. Streams as `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via NIDL (`SKILL.md` §3). Storage is
+the dbengine; alerts bind to chart `context`; anomaly detection / ML jobs run continuously. Every metric travels via
 streaming to parents and to Netdata Cloud — cardinality matters everywhere.
 
 ### Logs

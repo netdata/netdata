@@ -47,8 +47,8 @@ mechanics. Keep it loaded for style; read source files for evidence.
 - New collectors MUST implement `collectorapi.CollectorV2` from
   `src/go/plugin/framework/collectorapi/collector.go` and register via
   `CreateV2`.
-- `New()` SHOULD own defaults, `metrix.NewCollectorStore()`, typed metric
-  instruments, and test seams.
+- `New()` SHOULD own scalar defaults, `metrix.NewCollectorStore()`, typed metric instruments, and test seams;
+  conditional or mode-dependent defaults follow `project-go-collector-design/operator-surface.md` §4.
 - V2 collectors MUST write metrics through `metrix.CollectorStore` during
   `Collect()` and provide chart template YAML through `ChartTemplateYAML()`;
   embedded `charts.yaml` is RECOMMENDED.
@@ -247,8 +247,8 @@ mechanics. Keep it loaded for style; read source files for evidence.
 
 ## Host Scopes
 
-- Host scopes SHOULD be used only after a product decision says the data belongs
-  on a generated vnode.
+- Host scopes SHOULD be used only after a product decision says the data belongs on a generated vnode (the decision is
+  described in `project-writing-collectors` §1.9).
 - `ScopeKey` and `GUID` MUST be deterministic.
 - Collector-generated vnodes MUST set `_vnode_type=<source>`.
 - Host-scope cardinality MUST be bounded and documented. Collectors SHOULD NOT

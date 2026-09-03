@@ -102,9 +102,10 @@ owner identity, record that a renamed job does not adopt old ownership. All of t
 **When:** every new observation, and every change to what an existing one means. **Do:** fill one row per
 observation, then map states to values, before writing metric names or `charts.yaml`. **Don't:** emit a value that
 looks like a measurement for something not measured; a skipped operation has no duration, a failed attempt is not a
-latency sample, a waiting state is not a zero. **Evidence:** the table itself, plus a test that drives each row's
-state through the real path and asserts emitted / omitted / retained. **Boundary:** human-readable configuration does
-not prohibit millisecond latency charts; the table decides units per chart.
+latency sample, a waiting state is not a zero (`project-writing-collectors` §1.4, gaps are data). **Evidence:** the
+table itself, plus a test that drives each row's state through the real path and asserts emitted / omitted / retained.
+**Boundary:** human-readable configuration does not prohibit millisecond latency charts; the table decides units per
+chart.
 
 | Column | Meaning |
 |---|---|
@@ -124,13 +125,12 @@ observations; check every early return against the table. Comparisons follow the
 
 **When:** designing `Init`, `Check`, `Collect`, `Cleanup`, and any `Run`. **Do:** review every entry point, including
 partial initialization, DynCfg `test`, autodetection, reload, and stop, not only `Collect` followed by a clean
-shutdown. Decide, per entry point, what it may do: `Check` detects only; cleanup is either caller-cancelled or detached
-with a fixed budget independent of request and retry settings (S3check: five seconds), with that deadline traced through
-cleanup I/O and unfinished ownership retained for recovery. The mechanics of these rules live in the V2 skill's Core
-Style. **Don't:** derive a shutdown budget from public tuning, or make orderly cleanup the crash-recovery mechanism.
-**Evidence:** the trace per entry point in the design note; tests for cancellation and partial init. **Boundary:** a
-read-only collector closing idle connections needs no journal or timeout machinery; background contexts are not banned,
-unbounded ones are.
+shutdown. Decide, per entry point, what it may do, and record it; the V2 skill's Core Style owns the resulting rules
+(`Check` detection-only, cleanup caller-cancelled or detached with a fixed budget independent of request and retry
+settings; S3check chose five seconds). **Don't:** derive a shutdown budget from public tuning, or make orderly cleanup
+the crash-recovery mechanism. **Evidence:** the trace per entry point in the design note; tests for cancellation and
+partial init. **Boundary:** a read-only collector closing idle connections needs no journal or timeout machinery;
+background contexts are not banned, unbounded ones are.
 
 ## Simplification As Engineering
 

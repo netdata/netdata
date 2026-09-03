@@ -85,7 +85,7 @@ user is misled about what is and isn't being collected.
 
 Mechanics:
 - C: `rrdset_is_obsolete___safe_from_collector_thread()` in `src/database/rrdset.c:116` flags `RRDSET_FLAG_OBSOLETE`.
-  Reverse with `rrdset_isnot_obsolete()` (line 140) when the entity reappears.
+  Reverse with `rrdset_isnot_obsolete___safe_from_collector_thread()` (line 155) when the entity reappears.
 - go.d V1: `c.Obsolete = true` or `MarkRemove()` on the chart marks it obsolete. go.d V2: chart lifetime is controlled
   by `charts.yaml` lifecycle policy and `chartengine`; start from `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
   for new collectors and `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` for migrations.
@@ -182,7 +182,7 @@ Don't fabricate test data the parser passes by accident. Don't skip tests "becau
 locally" — that's exactly when fixtures matter most. Standard go.d test-function names: `Test_testDataIsValid`,
 `TestCollector_ConfigurationSerialize`, `TestCollector_Init`, `TestCollector_Check`, `TestCollector_Collect` — match the
 convention in adjacent collectors. Functions get a dedicated validator at `src/go/tools/functions-validation/` (E2E plus
-schema checks).
+schema checks). Go test shape (table-driven, `map[string]struct{}`) is the root `AGENTS.md` "Go Test Style" rule.
 
 ### 2.2 Hot-path discipline
 
@@ -193,9 +193,8 @@ schema checks).
   metric-instrument pattern.
 - Hold persistent connections; reconnect only on failure, with backoff.
 - Reuse what is stable between iterations (schema, capabilities, parsed profile selections, instrument handles) only
-  when staleness is safe. A value that authorizes a dangerous or destructive operation (a bucket's versioning state, a
-  policy scope, a target's identity) is re-checked at the operation that depends on it; a small per-cycle read is often
-  clearer than a cache. Cache scope and its evidence are design decisions, not a default.
+  when staleness is safe. Cache scope and its evidence are design decisions, not a default; for values that authorize a
+  dangerous operation, `.agents/skills/project-go-collector-design/mutating-collectors.md` §5 owns the rule.
 - Bound its work per call: a per-request timeout, honored context cancellation, and bounded fan-out. The scheduling
   interval is not a completion guarantee; if the collector promises a whole-cycle deadline, that promise is an
   explicit design decision with its own test.
@@ -253,9 +252,11 @@ Public tunables are part of the collector consistency contract. When a config op
 given a new default, you MUST follow `.agents/skills/integrations-lifecycle/consistency.md`; you MUST NOT update only
 the Go struct or only the docs. The stock `.conf` shows safe, representative examples, not necessarily every tunable.
 
-Configuration holds operator decisions; internal policy stays a constant unless a recorded decision names the operator
-choice it enables. The one list of what falls on each side is the how-to guide's Config section
-(`src/go/plugin/go.d/docs/how-to-write-a-collector.md`). Stock config and schema MUST NOT contradict each other.
+Configuration holds operator decisions (connection identity, endpoints, credentials, the target request timeout,
+cardinality selectors); internal policy (retries, paging, cadence, caches, fan-out) stays a constant unless a recorded
+decision names the operator choice it enables. This applies to every collector family; the go.d item list is the how-to
+guide's Config section (`src/go/plugin/go.d/docs/how-to-write-a-collector.md`). Stock config and schema MUST NOT
+contradict each other.
 
 For go.d collectors, the config decision record, option lifecycle and compatibility, the DynCfg form as a user task,
 constructor defaults versus conditional branches, and the `config_schema.json` form rules (including which schema tests
