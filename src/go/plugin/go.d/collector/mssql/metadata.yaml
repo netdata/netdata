@@ -477,11 +477,11 @@ modules:
 
             With Query Store, this function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
 
-            Query Store was introduced in SQL Server 2016 (13.x) and is disabled by default. When it is missing or turned off everywhere, the function falls back to [`sys.dm_exec_query_stats`](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql), the plan cache, and the `Source` column reports which store answered. The plan cache differs in important ways:
+            Query Store was introduced in SQL Server 2016 (13.x). When it is missing or turned off everywhere, the function falls back to [`sys.dm_exec_query_stats`](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql), the plan cache, and the `Source` column reports which store answered. Changes to Query Store enablement are detected on subsequent requests. The plan cache differs in important ways:
 
             - It only covers plans that are cached right now. Statistics are lost on restart, recompilation, memory pressure, or `DBCC FREEPROCCACHE`, so they are not query history.
             - Rows are aggregated by query hash across the whole instance, not per database. `Database` is selected from the cached statements (currently the minimum value), so it is not reliable per-database attribution when the same query hash occurs in multiple databases, and it is empty for ad-hoc or prepared batches that carry no database context.
-            - Standard deviation, memory grant, log bytes, tempdb usage, and plan-shape metrics (hash match joins, merge joins, nested loops, sorts) are not available on the plan-cache source; their response columns remain present with empty values for compatibility.
+            - Standard deviation, memory grant, log bytes, and tempdb usage metrics are unavailable on the plan-cache source, so their columns are omitted. Plan-shape columns (hash match joins, merge joins, nested loops, sorts) remain present with empty values.
             - `time_window_days` filters on last execution time instead of aggregating a period, because the plan cache keeps no interval history.
 
             Use cases:
@@ -825,16 +825,33 @@ modules:
                 visibility: hidden
                 description: Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation.
           performance: |
-            On SQL Server and Azure SQL Managed Instance, executes dynamic SQL across all user databases with Query Store enabled.<br/>On Azure SQL Database, queries only the database selected in the DSN.<br/>• Execution time depends on Query Store workload, history window, and number of queried databases<br/>• Default limit of 500 rows balances completeness with performance
+            On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Function queries share the collector's database connection, so long scans can delay metric collection
           security: |
             Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Enable Query Store
+              - title: Plan-cache access
                 description: |
-                  Query Store must be enabled on each database you want to inspect. SQL Server and Azure SQL Managed
-                  Instance query all enabled user databases. Azure SQL Database queries only the database selected in
-                  the collector DSN.
+                  Query Store is optional. SQL Server 2008–2014, and newer instances without an enabled Query Store,
+                  use the plan cache automatically. Grant the monitoring login the server permission for its version:
+
+                  ```sql
+                  -- SQL Server 2008–2019
+                  GRANT VIEW SERVER STATE TO [netdata_user];
+
+                  -- SQL Server 2022 and later
+                  GRANT VIEW SERVER PERFORMANCE STATE TO [netdata_user];
+                  ```
+
+                  Azure SQL Database plan-cache permissions depend on the service tier. See the
+                  [Microsoft DMV permissions reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql#permissions).
+
+              - title: Enable Query Store for persistent history
+                description: |
+                  On SQL Server 2016 and later, enable Query Store on the databases whose persistent query history
+                  you want to inspect. SQL Server and Azure SQL Managed Instance query all enabled user databases.
+                  Azure SQL Database queries only the database selected in the collector DSN. These steps are not
+                  required for the plan-cache fallback.
 
                   1. Verify Query Store state:
 
@@ -882,7 +899,8 @@ modules:
 
                   - Query Store is available in SQL Server 2016+ and Azure SQL Database
                   - Requires ALTER DATABASE permission to enable Query Store
-                  - System databases (master, tempdb, model, msdb) are excluded from queries
+                  - Query Store queries exclude system databases (master, tempdb, model, msdb). The plan cache excludes
+                    statements identified as belonging to those databases, but can include statements with unknown database context
                   - `top-queries` is enabled by default; set `functions.top_queries.disabled: true` only to disable it
 
                   :::
@@ -1016,7 +1034,7 @@ modules:
                 visibility: hidden
                 description: "Query hash captured with the error event (used for mapping into top-queries)."
           performance: |
-            Executes on-demand queries against the configured Extended Events target, falling back to `system_health` when unavailable:<br/>• Not part of regular metric collection<br/>• event_file reads scan and parse all retained files before returning the newest rows<br/>• The recommended 6 MB file size and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• Existing operator-managed sessions keep their own retention settings; the collector does not alter or reject them
+            Executes on-demand queries against the configured Extended Events target, falling back to `system_health` when unavailable:<br/>• Also used for error attribution by top-queries, but not by regular metric collection<br/>• event_file reads scan retained files and parse matching errors before returning the newest rows<br/>• The recommended dedicated-session settings of 6 MB per file and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• The system_health fallback has separate retention settings: Standard/Enterprise editions can retain about 1 GB. A small response limit does not bound the files scanned<br/>• Existing sessions keep their own retention settings; the collector does not alter them. Long Function scans can delay metric queries on the shared database connection
           security: |
             Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
           prerequisites:

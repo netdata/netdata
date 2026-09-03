@@ -510,27 +510,24 @@ func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) 
 //
 // Query Store is preferred: it keeps per-database history that survives restarts and plan
 // cache eviction. The plan cache is the fallback for servers that cannot use it - Query
-// Store does not exist before SQL Server 2016 (13.x), and where it does exist it is off by
-// default - so those servers get degraded data instead of no data at all.
+// Store does not exist before SQL Server 2016 (13.x) and may be disabled on newer servers.
 func (f *funcTopQueries) resolveTopQueriesSource(ctx context.Context) (topQueriesSource, map[string]bool, error) {
 	supported, err := f.queryStoreSupported(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	var queryStoreErr error
 	if supported {
 		cols, err := f.detectQueryStoreColumns(ctx)
 		if err == nil {
 			return topQueriesSourceQueryStore, cols, nil
 		}
-		queryStoreErr = err
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", nil, err
+		}
 	}
 
 	cols, err := f.detectPlanCacheColumns(ctx)
 	if err != nil {
-		if queryStoreErr != nil && (errors.Is(queryStoreErr, context.Canceled) || errors.Is(queryStoreErr, context.DeadlineExceeded)) {
-			return "", nil, queryStoreErr
-		}
 		return "", nil, err
 	}
 	return topQueriesSourcePlanCache, cols, nil
@@ -614,15 +611,7 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 }
 
 func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
-	// Fast path: return cached result
-	f.router.collector.queryStoreColsMu.RLock()
-	if f.router.collector.queryStoreCols != nil {
-		cols := f.router.collector.queryStoreCols
-		f.router.collector.queryStoreColsMu.RUnlock()
-		return cols, nil
-	}
-	f.router.collector.queryStoreColsMu.RUnlock()
-
+	// Enablement may change between requests even though the column schema is cached.
 	var sampleDB string
 	sampleQuery := `
 		SELECT TOP 1 name
@@ -647,6 +636,13 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		}
 		return nil, fmt.Errorf("failed to find database with Query Store: %w", err)
 	}
+
+	f.router.collector.queryStoreColsMu.RLock()
+	if cols := f.router.collector.queryStoreCols; cols != nil {
+		f.router.collector.queryStoreColsMu.RUnlock()
+		return cols, nil
+	}
+	f.router.collector.queryStoreColsMu.RUnlock()
 
 	query := `SELECT TOP 0 * FROM sys.query_store_runtime_stats`
 	if !f.router.collector.isAzureSQLDatabase() {
@@ -745,7 +741,7 @@ func (f *funcTopQueries) mapAndValidateSortColumn(sortKey string, cols []topQuer
 	return ""
 }
 
-func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameExpr string) []string {
+func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameExpr, prefix string) []string {
 	var selectParts []string
 
 	for _, col := range cols {
@@ -754,9 +750,9 @@ func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameE
 		case col.IsIdentity:
 			switch col.Name {
 			case "queryHash":
-				expr = fmt.Sprintf("CONVERT(VARCHAR(64), q.query_hash, 1) AS [%s]", col.Name)
+				expr = fmt.Sprintf("CONVERT(VARCHAR(64), rs.query_hash, 1) AS [%s]", col.Name)
 			case "query":
-				expr = fmt.Sprintf("qt.query_sql_text AS [%s]", col.Name)
+				expr = fmt.Sprintf("(SELECT qt.query_sql_text FROM %ssys.query_store_query_text qt WHERE qt.query_text_id = rs.query_text_id) AS [%s]", prefix, col.Name)
 			case "database":
 				expr = fmt.Sprintf("%s AS [%s]", dbNameExpr, col.Name)
 			}
@@ -768,6 +764,8 @@ func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameE
 			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) / 1000.0 ELSE 0 END AS [%s]", col.DBColumn, col.Name)
 		case col.NeedsAvg:
 			expr = fmt.Sprintf("CASE WHEN SUM(rs.count_executions) > 0 THEN SUM(rs.%s * rs.count_executions) / SUM(rs.count_executions) ELSE 0 END AS [%s]", col.DBColumn, col.Name)
+		case strings.HasPrefix(col.DBColumn, "last_"):
+			expr = topQueriesLastValueExpression(col, "rs", col.DBColumn)
 		case col.IsMicroseconds:
 			aggFunc := "MAX"
 			if strings.HasPrefix(col.DBColumn, "min_") {
@@ -779,9 +777,6 @@ func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameE
 			if strings.HasPrefix(col.DBColumn, "min_") {
 				aggFunc = "MIN"
 			}
-			if strings.HasPrefix(col.DBColumn, "stdev_") {
-				aggFunc = "MAX"
-			}
 			expr = fmt.Sprintf("%s(rs.%s) AS [%s]", aggFunc, col.DBColumn, col.Name)
 		}
 		if expr != "" {
@@ -792,13 +787,7 @@ func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameE
 }
 
 func (f *funcTopQueries) buildDynamicSQL(cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
-	selectParts := f.buildSelectExpressions(cols, "' + QUOTENAME(name, '''') + N'")
-	selectExpr := strings.Join(selectParts, ",\n        ")
-
-	timeFilter := ""
-	if timeWindowDays > 0 {
-		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
-	}
+	selectSQL := f.buildQueryStoreSelectSQL(cols, "' + QUOTENAME(name, '''') + N'", "' + QUOTENAME(name) + N'.", timeWindowDays)
 
 	orderByExpr := sortColumn
 	if orderByExpr == "" {
@@ -810,15 +799,7 @@ DECLARE @sql NVARCHAR(MAX) = N'';
 
 SELECT @sql = @sql +
     CASE WHEN @sql = N'' THEN N'' ELSE N' UNION ALL ' END +
-    N'SELECT
-        %s
-    FROM ' + QUOTENAME(name) + N'.sys.query_store_query q
-    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
-    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_plan p ON q.query_id = p.query_id
-    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
-    INNER JOIN ' + QUOTENAME(name) + N'.sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
-    %s
-    GROUP BY q.query_hash, qt.query_sql_text'
+    N'%s'
 FROM sys.databases
 WHERE is_query_store_on = 1
   AND name NOT IN ('master', 'tempdb', 'model', 'msdb');
@@ -831,7 +812,46 @@ END
 
 SET @sql = N'SELECT TOP %d * FROM (' + @sql + N') AS combined ORDER BY [%s] DESC';
 EXEC sp_executesql @sql;
-`, selectExpr, timeFilter, limit, orderByExpr)
+`, selectSQL, limit, orderByExpr)
+}
+
+// Select every last_* value from one execution while aggregating all matching history.
+func topQueriesLastValueExpression(col topQueriesColumn, alias, dbColumn string) string {
+	expr := fmt.Sprintf("MAX(CASE WHEN %s.execution_rank = 1 THEN %s.%s END)", alias, alias, dbColumn)
+	if col.IsMicroseconds {
+		expr += " / 1000.0"
+	}
+	return fmt.Sprintf("%s AS [%s]", expr, col.Name)
+}
+
+func (f *funcTopQueries) buildQueryStoreSelectSQL(cols []topQueriesColumn, dbNameExpr, prefix string, timeWindowDays int) string {
+	selectExpr := strings.Join(f.buildSelectExpressions(cols, dbNameExpr, prefix), ",\n  ")
+	timeFilter := ""
+	if timeWindowDays > 0 {
+		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
+	}
+	// Canonicalize equal texts in the query catalog so the history sort and aggregation
+	// carry numeric IDs instead of repeated nvarchar(max) values through parallel exchanges.
+	return fmt.Sprintf(`SELECT
+  %s
+FROM (
+  SELECT rs.*, q.query_hash, q.query_text_id,
+         ROW_NUMBER() OVER (
+           PARTITION BY q.query_hash, q.query_text_id
+           ORDER BY rs.last_execution_time DESC, rs.runtime_stats_id DESC
+         ) AS execution_rank
+  FROM (
+    SELECT q.query_id, q.query_hash,
+           MIN(q.query_text_id) OVER (PARTITION BY q.query_hash, qt.query_sql_text) AS query_text_id
+    FROM %ssys.query_store_query q
+    INNER JOIN %ssys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
+  ) AS q
+  INNER JOIN %ssys.query_store_plan p ON q.query_id = p.query_id
+  INNER JOIN %ssys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
+  INNER JOIN %ssys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
+  %s
+) AS rs
+GROUP BY rs.query_hash, rs.query_text_id`, selectExpr, prefix, prefix, prefix, prefix, prefix, timeFilter)
 }
 
 func (f *funcTopQueries) buildTopQueriesSQL(source topQueriesSource, cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
@@ -870,6 +890,8 @@ func (f *funcTopQueries) buildPlanCacheSelectExpressions(cols []topQueriesColumn
 			expr = fmt.Sprintf("CASE WHEN SUM(qs.execution_count) > 0 THEN SUM(qs.%s) * 1.0 / SUM(qs.execution_count) / 1000.0 ELSE 0 END AS [%s]", col.CacheColumn, col.Name)
 		case col.NeedsAvg:
 			expr = fmt.Sprintf("CASE WHEN SUM(qs.execution_count) > 0 THEN SUM(qs.%s) * 1.0 / SUM(qs.execution_count) ELSE 0 END AS [%s]", col.CacheColumn, col.Name)
+		case strings.HasPrefix(col.CacheColumn, "last_"):
+			expr = topQueriesLastValueExpression(col, "qs", col.CacheColumn)
 		default:
 			aggFunc := "MAX"
 			if strings.HasPrefix(col.CacheColumn, "min_") {
@@ -901,7 +923,7 @@ func (f *funcTopQueries) buildPlanCacheSQL(cols []topQueriesColumn, sortColumn s
 	recencyFilter := ""
 	if timeWindowDays > 0 {
 		// last_execution_time is recorded in the server's own time zone, so compare with GETDATE().
-		recencyFilter = fmt.Sprintf("WHERE qs.last_execution_time >= DATEADD(day, -%d, GETDATE())", timeWindowDays)
+		recencyFilter = fmt.Sprintf("AND qs.last_execution_time >= DATEADD(day, -%d, GETDATE())", timeWindowDays)
 	}
 
 	orderByExpr := sortColumn
@@ -914,6 +936,10 @@ SELECT TOP %d
   %s
 FROM (
     SELECT qs.*,
+           ROW_NUMBER() OVER (
+             PARTITION BY qs.query_hash
+             ORDER BY qs.last_execution_time DESC, qs.plan_handle, qs.statement_start_offset
+           ) AS execution_rank,
            DB_NAME(qt.dbid) AS database_name,
            SUBSTRING(qt.text,
                      (qs.statement_start_offset / 2) + 1,
@@ -923,9 +949,9 @@ FROM (
                        END - qs.statement_start_offset) / 2) + 1) AS query_sql_text
     FROM sys.dm_exec_query_stats AS qs
     CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS qt
+    WHERE (DB_NAME(qt.dbid) IS NULL OR DB_NAME(qt.dbid) NOT IN ('master', 'tempdb', 'model', 'msdb'))
     %s
 ) AS qs
-WHERE (qs.database_name IS NULL OR qs.database_name NOT IN ('master', 'tempdb', 'model', 'msdb'))
 GROUP BY qs.query_hash
 ORDER BY [%s] DESC;
 `, limit, selectExpr, recencyFilter, orderByExpr)
@@ -948,24 +974,8 @@ func (f *funcTopQueries) buildQueryStoreSQL(cols []topQueriesColumn, sortColumn 
 		return f.buildDynamicSQL(cols, sortColumn, timeWindowDays, limit)
 	}
 
-	selectExpr := strings.Join(f.buildSelectExpressions(cols, "DB_NAME()"), ",\n  ")
-	timeFilter := ""
-	if timeWindowDays > 0 {
-		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
-	}
-
-	return fmt.Sprintf(`
-SELECT TOP %d
-  %s
-FROM sys.query_store_query q
-INNER JOIN sys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
-INNER JOIN sys.query_store_plan p ON q.query_id = p.query_id
-INNER JOIN sys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
-INNER JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
-%s
-GROUP BY q.query_hash, qt.query_sql_text
-ORDER BY [%s] DESC;
-`, limit, selectExpr, timeFilter, sortColumn)
+	selectSQL := f.buildQueryStoreSelectSQL(cols, "DB_NAME()", "", timeWindowDays)
+	return fmt.Sprintf("SELECT TOP %d * FROM (%s) AS combined ORDER BY [%s] DESC;", limit, selectSQL, sortColumn)
 }
 
 func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQueriesColumn) ([][]any, error) {

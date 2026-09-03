@@ -147,6 +147,41 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreDetectionFails(t *testing.
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestTopQueries_SourceFollowsQueryStoreEnablement(t *testing.T) {
+	for name, edition := range map[string]int{"server": 3, "azure database": engineEditionAzureSQLDatabase} {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+
+			availabilityQuery := "SELECT TOP 1 name"
+			if edition == engineEditionAzureSQLDatabase {
+				availabilityQuery = "FROM sys.database_query_store_options"
+			} else {
+				mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+			}
+			mock.ExpectQuery(availabilityQuery).WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("appdb"))
+			mock.ExpectQuery(`SELECT TOP 0 .*query_store_runtime_stats`).
+				WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
+			mock.ExpectQuery(availabilityQuery).WillReturnError(sql.ErrNoRows)
+			mock.ExpectQuery(`SELECT TOP 0 \* FROM sys.dm_exec_query_stats`).
+				WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
+			mock.ExpectQuery(availabilityQuery).WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("appdb"))
+
+			c := New()
+			c.db = db
+			c.setServerProperties("16.0.4265.3", edition)
+			handler := newFuncTopQueries(&funcRouter{collector: c})
+			for _, want := range []topQueriesSource{topQueriesSourceQueryStore, topQueriesSourcePlanCache, topQueriesSourceQueryStore} {
+				source, _, err := handler.resolveTopQueriesSource(context.Background())
+				require.NoError(t, err)
+				assert.Equal(t, want, source)
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 // A plan cache without query_hash (before SQL Server 2008) cannot be grouped by query, and
 // with no Query Store either there is nothing left to answer with.
 func TestTopQueries_UnavailableWhenNeitherSourceIsUsable(t *testing.T) {
@@ -169,8 +204,7 @@ func TestTopQueries_UnavailableWhenNeitherSourceIsUsable(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-// End to end on the fallback: the rows must carry the plan-cache source marker and the
-// help text must say the numbers are cache-resident.
+// The response identifies its source and preserves empty attribution from an available target.
 func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
@@ -182,6 +216,10 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 	mock.ExpectQuery(`CROSS APPLY sys\.dm_exec_sql_text`).
 		WillReturnRows(sqlmock.NewRows([]string{"queryHash", "query", "database", "calls", "totalTime", "avgTime"}).
 			AddRow("0x1122334455667788", "SELECT 1", "appdb", 7, 42.0, 6.0))
+	mock.ExpectQuery("server_event_session_fields").WithArgs("netdata_errors").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("netdata_errors.xel"))
+	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", 500).
+		WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 
 	c := New()
 	c.db = db
@@ -201,6 +239,8 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, rows, 1)
 	assert.Equal(t, string(topQueriesSourcePlanCache), rows[0][sourceIdx])
+	attrCol := response.Columns["errorAttribution"].(map[string]any)
+	assert.Equal(t, mssqlErrorAttrNoData, rows[0][attrCol["index"].(int)])
 
 	// Plan attribution reads Query Store plan XML, so its columns stay empty here.
 	for _, id := range []string{"hashMatch", "mergeJoin", "nestedLoops", "sorts"} {
@@ -315,12 +355,12 @@ func TestBuildPlanCacheSQL(t *testing.T) {
 
 	t.Run("filters by last execution when a window is configured", func(t *testing.T) {
 		query := f.buildPlanCacheSQL(cols, "calls", 3, 10)
-		assert.Contains(t, query, "WHERE qs.last_execution_time >= DATEADD(day, -3, GETDATE())")
+		assert.Contains(t, query, "qs.last_execution_time >= DATEADD(day, -3, GETDATE())")
 	})
 
 	t.Run("omits the recency filter when the window is disabled", func(t *testing.T) {
 		query := f.buildPlanCacheSQL(cols, "calls", 0, 10)
-		assert.NotContains(t, query, "last_execution_time")
+		assert.NotContains(t, query, "DATEADD")
 	})
 
 	t.Run("falls back to a real column when no sort column is given", func(t *testing.T) {
