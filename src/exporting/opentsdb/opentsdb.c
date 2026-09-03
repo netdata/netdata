@@ -145,14 +145,19 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
  * the record downstream. C1 belongs here for the same reason C0 does: U+009B is the single-character CSI,
  * the same escape hazard as U+001B. Everything else, punctuation included, is passed through byte for
  * byte: this is metadata the user configured, and none of `:`, `=` or `;` can affect this record's
- * framing. Whether the
- * destination then accepts them is the destination's tag grammar and the operator's concern: stock
- * OpenTSDB parses a tag by splitting on `=` and validates tag characters against its own allowlist.
- * Corrupting the configured host identity to pre-empt that is what netdata/netdata#23684 reported.
+ * framing. Whether the destination then accepts them is its tag grammar and the operator's concern:
+ * stock OpenTSDB parses a tag by splitting on `=` and validates tag characters against its own
+ * allowlist, so it may reject values other listeners accept. We take that trade knowingly, because
+ * corrupting the configured host identity to pre-empt it is what netdata/netdata#23684 reported: a
+ * rejected point is recoverable, a silently relabelled one splits the host's history for good. Note we
+ * do not surface the rejection -- this connector discards the destination's replies
+ * (exporting_discard_response), so it shows up as missing data at the destination, not as a netdata log
+ * line.
  *
- * This is deliberately a superset of the Graphite metric-path sanitizer, which does not replace the
- * non-whitespace controls. It is NOT the OpenTSDB *label value* policy: label values keep the
- * identifier allowlist of sanitize_opentsdb_label_value().
+ * This extends the Graphite metric-path sanitizer rather than mirroring it: it adds the non-whitespace
+ * controls Graphite passes through, and omits the `;` Graphite replaces for Carbon's tag syntax, so
+ * neither replaced set contains the other. It is also NOT the OpenTSDB *label value* policy: label
+ * values keep the identifier allowlist of sanitize_opentsdb_label_value().
  *
  * The replacement is byte-length preserving, which the callers below depend on for buffer sizing.
  *
