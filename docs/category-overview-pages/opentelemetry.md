@@ -1,4 +1,4 @@
-# OpenTelemetry
+# OpenTelemetry Overview
 
 The Netdata Agent receives OpenTelemetry telemetry over OTLP/gRPC, on port 4317: metrics become Netdata charts, logs
 are stored in Netdata's indexed log store, and traces are accepted and stored. Anything that speaks OTLP/gRPC can send to it — an OpenTelemetry
