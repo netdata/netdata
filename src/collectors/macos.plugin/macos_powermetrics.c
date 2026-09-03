@@ -622,6 +622,14 @@ static POPEN_INSTANCE *macos_powermetrics_start_loop(const struct macos_powermet
 // the child ever writes. It would then be signalled instead - and a child started through the
 // setuid-root ndsudo helper cannot be signalled by an unprivileged netdata at all, so it would be
 // abandoned while still running. Wait at least one full interval, matching the staleness budget.
+//
+// This rests on powermetrics actually dying on a broken pipe once SIGPIPE is deliverable. Measured
+// 2026-09-03 on macOS 15 / Apple Silicon, samplers thermal,gpu_power: with the default disposition
+// it died of SIGPIPE 2s after the pipe closed; with the disposition inherited as ignored it
+// survived indefinitely. Environment evidence, not a portable guarantee - re-verify with
+// tests/manual/spawn-termination-macos.sh. A build of powermetrics that handled SIGPIPE itself, or
+// one wedged without writing, would still need the privileged-child problem solved instead: netdata
+// runs unprivileged and cannot signal a setuid-root ndsudo child at all (netdata/netdata#23730).
 static int macos_powermetrics_loop_kill_grace_ms(void)
 {
     return pm.sample_interval_ms + pm.command_timeout_ms;

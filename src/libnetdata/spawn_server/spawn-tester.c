@@ -546,6 +546,12 @@ void test_popen_plugin_echo_and_exit(const char *argv0) {
 // the child inherits the ignore, gets EPIPE instead of dying, and keeps running after we stop
 // reading it. For a child we cannot signal (a setuid-root helper that exec'd its target) that is a
 // permanent leak, which is exactly how netdata/netdata#23730 stranded 624 powermetrics processes.
+//
+// This is the automated guard for that bug: it exercises netdata's own spawn path and fails if
+// SIGPIPE is not both reset to default AND deliverable in the child. It deliberately does not
+// involve powermetrics - whether Apple's tool dies on a broken pipe is an external premise,
+// measured separately (see tests/manual/spawn-termination-macos.sh and the note next to
+// macos_powermetrics_loop_kill_grace_ms()); it is not something this repository can assert.
 
 #if !defined(OS_WINDOWS)
 static int plugin_stream_until_pipe_breaks(void) {

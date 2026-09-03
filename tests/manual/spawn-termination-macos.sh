@@ -5,6 +5,18 @@
 #
 # Does a long-running powermetrics child die when netdata closes its stdout?
 #
+# MANUAL DIAGNOSTIC - deliberately not wired into CI. It measures an external premise about Apple's
+# powermetrics, not netdata's own behaviour: it never runs netdata, so it cannot catch a regression
+# in the agent. The automated guard for that is the spawn-server unit tests
+# (tests/spawn-server-tests.sh), which run on Linux and macOS. On a VM runner powermetrics tends to
+# stop producing samples, and a child that never writes again cannot be killed by a closed pipe, so
+# this probe can only report "inconclusive" there - which is why it lives under tests/manual/.
+#
+# Last run: 2026-09-03, macOS 15 on Apple Silicon, samplers thermal,gpu_power:
+#   SIGPIPE default -> died of SIGPIPE 2s after the pipe closed
+#   SIGPIPE inherited as ignored -> survived the full grace
+# i.e. the premise held on that hardware. That is environment evidence, not a portable assertion.
+#
 # WHY THIS EXISTS
 #   netdata stops a spawned child by closing its stdio: the child's next write hits a pipe with no
 #   readers and the kernel kills it with SIGPIPE. That only works if the child's SIGPIPE disposition

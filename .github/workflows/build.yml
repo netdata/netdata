@@ -1298,24 +1298,18 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
         run: |
           ./tests/ndsudo-macos.sh /usr/local/netdata/usr/libexec/netdata/plugins.d/ndsudo
-      - name: Test spawned-child termination contract
-        id: test-spawn-termination
-        # Checks that closing a long-running child's stdout still kills it, so the agent cannot
-        # strand powermetrics processes it is unable to signal (netdata/netdata#23730). Needs root
-        # for powermetrics. Reports SKIPPED (exit 0) where powermetrics cannot sample - a runner
-        # without the samplers must not fail the build.
+      - name: Test spawn-server unit tests
+        id: test-spawn-server
+        # The spawn servers depend on platform primitives: posix_spawn with POSIX_SPAWN_SETSIGDEF,
+        # and the signal disposition and mask a child inherits across exec. Passing on Linux does
+        # not establish the behaviour here, and macOS is where netdata/netdata#23730 was observed -
+        # a child that inherited an ignored SIGPIPE, so closing its stdio left it running. Until now
+        # these tests ran only on ubuntu (tests/run-unit-tests.sh), so that platform-specific
+        # behaviour was verified nowhere.
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
-        # This step is built around deliberately immortal processes, so bound it explicitly.
         timeout-minutes: 5
         run: |
-          # `sudo` resets PATH, so the script's `#!/usr/bin/env bash` would resolve to the system
-          # bash 3.2 instead of the one this job installs. Resolve the interpreter BEFORE sudo and
-          # pass its absolute path: `sudo bash` would still depend on sudo's secure_path. Record
-          # which one actually ran, so the log never leaves it in doubt.
-          bash_bin="$(command -v bash)"
-          echo "interpreter: ${bash_bin}"
-          sudo "${bash_bin}" -c 'echo "bash: $BASH_VERSION"'
-          sudo "${bash_bin}" ./tests/spawn-termination-macos.sh
+          ./tests/spawn-server-tests.sh
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
@@ -1340,7 +1334,7 @@ jobs:
               Install netdata required packages: ${{ steps.install-nd-dep.outcome }}
               Build from source: ${{ steps.build-source.outcome }}
               Test ndsudo argument validation: ${{ steps.test-ndsudo.outcome }}
-              Test spawned-child termination contract: ${{ steps.test-spawn-termination.outcome }}
+              Test spawn-server unit tests: ${{ steps.test-spawn-server.outcome }}
               Test Agent runtime: ${{ steps.test-agent.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
