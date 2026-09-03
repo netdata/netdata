@@ -80,8 +80,9 @@ aggregate `stats` and, when recorded, an `execution` block:
 
 Compare latest-attempt and retained-success accounting separately; `same_attempt` indicates when they alias the same
 capture. Do not sum them when they alias. GET/walk counts are Handler calls, not network packets or retry counts.
-`walk_pdus` counts returned varbinds. Missing-OID counts include configured sources already known unavailable as well
-as received missing-value exceptions. Processing errors can coexist with usable values or an ignored metadata rule.
+`walk_pdus` counts varbinds returned by successful walk calls. Missing-OID counts include configured sources already
+known unavailable as well as received missing-value exceptions. Processing errors can coexist with usable values or an
+ignored metadata rule.
 
 Profile phase totals are not complete device-refresh wall time: connection setup, discovery-only metadata, profile
 selection, and sysUptime work are outside them. Aggregate table/BGP/licensing timing includes local processing, so it
