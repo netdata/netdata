@@ -168,6 +168,26 @@ func TestTopologyExecutionAccountingAdmission(t *testing.T) {
 	}
 }
 
+func TestTopologyExecutionAccountingShapeIncludesExecutedRoots(t *testing.T) {
+	const firstRoot = "1.3.6.1.4.1.99999.1"
+	const secondRoot = "1.3.6.1.4.1.99999.200"
+	report := ddsnmpcollector.AcquisitionProfileReport{
+		Outcome: ddsnmpcollector.AcquisitionProfileOutcomeFailed,
+		Execution: &ddsnmpcollector.AcquisitionExecutionReport{
+			Walks: []ddsnmpcollector.AcquisitionWalkReport{
+				{RootOID: firstRoot},
+				{RootOID: secondRoot, Failed: true},
+			},
+		},
+	}
+	records, logicalBytes, err := topologyAcquisitionProfileShape(topologySemanticEventTopologyMetrics, report, nil)
+	require.NoError(t, err)
+	// Profile + execution header + two walks; no configured routes or values.
+	require.EqualValues(t, 4, records)
+	// Profile header, preparation/execution and aggregate fields, walk headers/roots.
+	require.EqualValues(t, 96+88+2*32+len(firstRoot)+len(secondRoot), logicalBytes)
+}
+
 func TestTopologyExecutionAccountingPresence(t *testing.T) {
 	for _, recorded := range []bool{false, true} {
 		t.Run(fmt.Sprint(recorded), func(t *testing.T) {
