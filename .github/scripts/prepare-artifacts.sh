@@ -27,7 +27,7 @@ copy_static_builds() {
 
 copy_source_tarball() {
     for ext in ${DISTFILE_EXTENSIONS} ; do
-        distfile="$(shopt -s nullglob; set -- "${artifacts}"/netdata-*.tar."${ext}"; echo "$1")"
+        distfile="$(shopt -s nullglob; set -- "${artifacts}"/netdata-*.tar."${ext}"; echo "${1:-}")"
         if [ -z "${distfile}" ]; then
             echo "::warning title=No ${ext} distfile matched::Failed to match any source tarball with a ${ext} extension when preparing artifacts."
             return 1
@@ -94,7 +94,7 @@ copy_msi_packages "${VERSION}"
 echo "${VERSION}" > Version
 create_manifest
 cat Manifest
-cd ../..
+cd "${TOP}"
 echo "::endgroup::"
 
 echo "::group::Preparing R2 latest release artifacts"
@@ -106,5 +106,5 @@ copy_msi_packages latest
 echo "${VERSION}" > Version
 create_manifest
 cat Manifest
-cd ../..
+cd "${TOP}"
 echo "::endgroup::"
