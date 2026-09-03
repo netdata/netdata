@@ -588,7 +588,18 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 
 func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, limit int) (string, string, []mssqlErrorRow, error) {
 	useRingBuffer := c.Functions.ErrorInfo.UseRingBuffer
-	status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(useRingBuffer), "system_health", limit, mssqlErrorSourceSystemHealth)
+	target := systemHealthErrorTarget(useRingBuffer)
+	if !useRingBuffer {
+		resolved, available, err := c.resolveMSSQLErrorReadTarget(ctx, "system_health")
+		if err != nil {
+			return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
+		}
+		if !available {
+			return c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(true), "system_health", limit, mssqlErrorSourceSystemHealth)
+		}
+		target = resolved
+	}
+	status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
 	if useRingBuffer || err == nil || !shouldFallbackErrorInfo(err) {
 		return status, source, rows, err
 	}

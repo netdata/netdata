@@ -385,10 +385,15 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 }
 
 func shouldFallbackDeadlockEventFile(err error) bool {
-	return !errors.Is(err, sql.ErrNoRows) &&
-		!errors.Is(err, context.Canceled) &&
-		!errors.Is(err, context.DeadlineExceeded) &&
-		!isDeadlockPermissionError(err)
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || isDeadlockPermissionError(err) {
+		return false
+	}
+
+	var sqlErr mssqlDriver.Error
+	if errors.As(err, &sqlErr) {
+		return sqlErr.Number == 25717 || sqlErr.Number == 25718
+	}
+	return false
 }
 
 func (f *funcDeadlockInfo) queryDatabaseNames(ctx context.Context) (map[int]string, error) {

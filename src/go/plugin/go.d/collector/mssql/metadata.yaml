@@ -480,8 +480,8 @@ modules:
             Query Store was introduced in SQL Server 2016 (13.x) and is disabled by default. When it is missing or turned off everywhere, the function falls back to [`sys.dm_exec_query_stats`](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql), the plan cache, and the `Source` column reports which store answered. The plan cache differs in important ways:
 
             - It only covers plans that are cached right now. Statistics are lost on restart, recompilation, memory pressure, or `DBCC FREEPROCCACHE`, so they are not query history.
-            - Rows are aggregated by query hash across the whole instance, not per database. `Database` is taken from the cached statement and is empty for ad-hoc or prepared batches that carry no database context.
-            - Standard deviation, memory grant, log bytes, tempdb usage, and the plan-shape columns (hash match joins, merge joins, nested loops, sorts) are not available.
+            - Rows are aggregated by query hash across the whole instance, not per database. `Database` is selected from the cached statements (currently the minimum value), so it is not reliable per-database attribution when the same query hash occurs in multiple databases, and it is empty for ad-hoc or prepared batches that carry no database context.
+            - Standard deviation, memory grant, log bytes, tempdb usage, and plan-shape metrics (hash match joins, merge joins, nested loops, sorts) are not available on the plan-cache source; their response columns remain present with empty values for compatibility.
             - `time_window_days` filters on last execution time instead of aggregating a period, because the plan cache keeps no interval history.
 
             Use cases:

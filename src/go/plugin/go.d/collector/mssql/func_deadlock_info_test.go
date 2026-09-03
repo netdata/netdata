@@ -154,7 +154,7 @@ func TestQueryLatestDeadlock_FallsBackToRingBufferOnFileError(t *testing.T) {
 	defer db.Close()
 
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
-	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(errors.New("event file is unavailable"))
+	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(
 		sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).AddRow(now, sampleDeadlockGraph),
 	)
@@ -175,7 +175,8 @@ func TestQueryLatestDeadlock_DoesNotFallbackOnContextOrPermissionError(t *testin
 	assert.False(t, shouldFallbackDeadlockEventFile(context.Canceled))
 	assert.False(t, shouldFallbackDeadlockEventFile(context.DeadlineExceeded))
 	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("VIEW SERVER STATE permission was denied")))
-	assert.True(t, shouldFallbackDeadlockEventFile(errors.New("event file is unavailable")))
+	assert.True(t, shouldFallbackDeadlockEventFile(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"}))
+	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("event file scan failed")))
 }
 
 func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.T) {
@@ -458,6 +459,8 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthEventFile(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\MSSQL\Log\system_health.xel`))
 	mock.ExpectQuery("fn_xe_file_target_read_file").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
@@ -480,6 +483,8 @@ func TestFetchMSSQLErrorRows_RetriesSystemHealthRingBufferAfterEventFileError(t 
 	defer db.Close()
 
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\MSSQL\Log\system_health.xel`))
 	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnError(errors.New("event file unavailable"))
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
 		WillReturnRows(sqlmock.NewRows([]string{
