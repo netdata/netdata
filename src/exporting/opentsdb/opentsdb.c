@@ -143,8 +143,9 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
  * additionally replaces the remaining control codepoints -- C0, DEL, and C1 -- which cannot break our
  * framing but are never legitimate in a hostname or prefix and would be interpreted by whatever consumes
  * the record downstream. C1 belongs here for the same reason C0 does: U+009B is the single-character CSI,
- * the same escape hazard as U+001B. Everything else, punctuation included, is passed through byte for byte: this is metadata
- * the user configured, and none of `:`, `=` or `;` can affect this record's framing. Whether the
+ * the same escape hazard as U+001B. Everything else, punctuation included, is passed through byte for
+ * byte: this is metadata the user configured, and none of `:`, `=` or `;` can affect this record's
+ * framing. Whether the
  * destination then accepts them is the destination's tag grammar and the operator's concern: stock
  * OpenTSDB parses a tag by splitting on `=` and validates tag characters against its own allowlist.
  * Corrupting the configured host identity to pre-empt that is what netdata/netdata#23684 reported.
@@ -920,7 +921,8 @@ int exporting_opentsdb_telnet_unittest(void) {
         "pr\xc3\xa9""fix",
         "Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de",
         " label=value",
-        "put pr\xc3\xa9""fix.chart.name.dimension.name 42 1.5 host=Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de label=value\n");
+        "put pr\xc3\xa9""fix.chart.name.dimension.name 42 1.5 "
+        "host=Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de label=value\n");
 
     // an invalid sequence is copied byte for byte, so metadata we cannot interpret is not mangled,
     // except where the lone byte value is itself a control or whitespace codepoint (0x80-0xA0)
@@ -998,7 +1000,8 @@ int exporting_opentsdb_telnet_unittest(void) {
     const size_t expected_length = strlen("put ") + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=") +
                                    strlen(long_hostname) + 1;
     const size_t prefix_offset = sizeof("put ") - 1;
-    const size_t hostname_offset = prefix_offset + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=");
+    const size_t hostname_offset =
+        prefix_offset + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=");
     if(buffer_strlen(wb) != expected_length || wb->buffer[prefix_offset + 1024] != '_' ||
        strchr(buffer_tostring(wb), '\t') || strchr(buffer_tostring(wb), '\r') ||
        strchr(buffer_tostring(wb), '\n') != &wb->buffer[wb->len - 1]) {
