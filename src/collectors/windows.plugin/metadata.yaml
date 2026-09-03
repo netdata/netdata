@@ -1006,6 +1006,92 @@ modules:
                 - name: opened
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibTerminalServices
+      monitored_instance:
+        name: Terminal Services sessions
+        link: "https://learn.microsoft.com/en-us/azure/virtual-desktop/insights-glossary"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - terminal services
+        - remote desktop services
+        - rds
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor aggregate active and inactive Terminal Services sessions on Windows hosts.
+        method_description: |
+          It queries the `Terminal Services` object from Perflib. These are aggregate Remote Desktop Services session
+          states, not a per-user inventory or a count of TCP connections.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects the `Terminal Services` performance object. It does not collect metrics
+            when the object is unavailable on the host.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibTerminalServices]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: These metrics refer to aggregate Terminal Services session states on the host.
+          labels: []
+          metrics:
+            - name: terminal_services.sessions
+              description: Aggregate Terminal Services sessions. Active sessions have a connected user; inactive
+                sessions are not actively connected.
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: inactive
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibObjects
       monitored_instance:
         name: Semaphore statistics
