@@ -1298,6 +1298,15 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
         run: |
           ./tests/ndsudo-macos.sh /usr/local/netdata/usr/libexec/netdata/plugins.d/ndsudo
+      - name: Test spawned-child termination contract
+        id: test-spawn-termination
+        # Checks that closing a long-running child's stdout still kills it, so the agent cannot
+        # strand powermetrics processes it is unable to signal (netdata/netdata#23730). Needs root
+        # for powermetrics. Reports SKIPPED (exit 0) where powermetrics cannot sample - a runner
+        # without the samplers must not fail the build.
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        run: |
+          sudo ./tests/spawn-termination-macos.sh
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'

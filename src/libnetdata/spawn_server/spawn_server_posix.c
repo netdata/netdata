@@ -149,7 +149,22 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", cmdline);
         posix_spawn_file_actions_destroy(&file_actions);
         posix_spawnattr_destroy(&attr);
-        return false;
+        return NULL;
+    }
+
+    // POSIX_SPAWN_SETSIGDEF only forces to default the signals that are MEMBERS of the
+    // spawn-sigdefault set, and posix_spawnattr_init() leaves that set empty - so the flag alone
+    // resets nothing. SIG_IGN survives execve(), and netdata ignores SIGPIPE, so without this the
+    // child inherits that ignore and closing its stdio yields EPIPE instead of killing it.
+    // See the equivalent block in spawn_server_nofork.c for the full rationale.
+    sigset_t default_signals;
+    sigemptyset(&default_signals);
+    sigaddset(&default_signals, SIGPIPE);
+    if (posix_spawnattr_setsigdefault(&attr, &default_signals) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigdefault() failed: %s", cmdline);
+        posix_spawn_file_actions_destroy(&file_actions);
+        posix_spawnattr_destroy(&attr);
+        return NULL;
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
@@ -157,7 +172,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", cmdline);
         posix_spawn_file_actions_destroy(&file_actions);
         posix_spawnattr_destroy(&attr);
-        return false;
+        return NULL;
     }
 
     spinlock_lock(&spawn_globals.spinlock);
