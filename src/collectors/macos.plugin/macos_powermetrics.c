@@ -30,6 +30,11 @@
 // Ceiling for the configured command timeout. Generous for any real command, and low enough that
 // sample_interval_ms + command_timeout_ms cannot overflow an int.
 #define MACOS_POWERMETRICS_TIMEOUT_MS_MAX 600000
+// Margin added to one sample interval when waiting for a closed pipe to kill the loop child.
+#define MACOS_POWERMETRICS_KILL_GRACE_MARGIN_MS 1000
+// Grace used instead when we are stopping: a child that has not died yet is signalled immediately
+// rather than waited on, so a wedged one cannot hold up collector shutdown.
+#define MACOS_POWERMETRICS_SHUTDOWN_KILL_GRACE_MS 1000
 #define MACOS_POWERMETRICS_READ_STEP_MS 250
 #define MACOS_POWERMETRICS_MAX_OUTPUT (1024 * 1024)
 #define MACOS_POWERMETRICS_INITIAL_BACKOFF_MS 1000
@@ -632,7 +637,12 @@ static POPEN_INSTANCE *macos_powermetrics_start_loop(const struct macos_powermet
 // runs unprivileged and cannot signal a setuid-root ndsudo child at all (netdata/netdata#23730).
 static int macos_powermetrics_loop_kill_grace_ms(void)
 {
-    return pm.sample_interval_ms + pm.command_timeout_ms;
+    // One full sample interval - which is when the child's next write, and therefore its SIGPIPE,
+    // is due - plus a small scheduling margin. Deliberately NOT interval + command_timeout_ms:
+    // that expression is the loop's staleness budget, and reusing it here padded the grace with up
+    // to 600s of timeout that the next-write reasoning does not justify, delaying SIGTERM for a
+    // child that is never going to write again.
+    return pm.sample_interval_ms + MACOS_POWERMETRICS_KILL_GRACE_MARGIN_MS;
 }
 
 static bool macos_powermetrics_process_stream_document(const char *data, size_t size)
@@ -781,7 +791,16 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
         (void)macos_powermetrics_process_stream_document(buf, used);
 
     freez(buf);
-    spawn_popen_kill(pi, macos_powermetrics_loop_kill_grace_ms());
+
+    // The loop also exits when service_running() goes false, which can happen before this thread is
+    // cancelled - and spawn_popen_kill()'s pre-SIGTERM wait only aborts early on cancellation. So
+    // waiting a full interval here would let a wedged child hold up collector shutdown. When we are
+    // stopping, signal it promptly instead; the interval-sized grace is for recycling the loop,
+    // where letting the old child die on its own keeps the restart clean.
+    bool stopping = nd_thread_signaled_to_cancel() || !service_running(SERVICE_COLLECTORS);
+    spawn_popen_kill(pi, stopping ? MACOS_POWERMETRICS_SHUTDOWN_KILL_GRACE_MS
+                                  : macos_powermetrics_loop_kill_grace_ms());
+
     return ok && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS);
 }
 
