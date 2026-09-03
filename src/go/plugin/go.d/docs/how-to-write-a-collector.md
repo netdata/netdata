@@ -11,7 +11,9 @@ the whole shape. The useful references are called out below by responsibility.
 
 ## Before Writing Code
 
-Do the design work first:
+Do the design work first. For a new collector, or a change to a public contract (config option, mode, metric meaning,
+ownership of state, Functions, vnodes), fill the collector design note from
+`.agents/skills/project-go-collector-design/SKILL.md` in the SOW gate before code; the items below are its short form.
 
 1. Read the upstream API or protocol docs. Do not infer current behavior from memory or from generated SDK types alone.
 2. Check existing helper packages before implementing parser, HTTP, selector, command-execution, SQL, ping, log-reading,
@@ -169,7 +171,8 @@ Implementation tuning SHOULD use constants:
 - retry/backoff internals;
 - API batching constraints.
 
-You MUST NOT add a config option just because it is easy to expose. Once shipped, it is hard to remove and MUST stay
+Durations are `confopt.Duration` (or `confopt.LongDuration`) written as `30m`, never `*_ms` integers; do not write
+custom parsing for units. You MUST NOT add a config option just because it is easy to expose. Once shipped, it is hard to remove and MUST stay
 synchronized across `Config`, `config_schema.json`, stock `.conf`, metadata, generated docs, and tests. A proposed
 config option MUST name the concrete operator decision it enables; "operators may want to tune it" is not enough.
 
