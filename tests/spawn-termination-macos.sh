@@ -91,6 +91,7 @@ skip() {
 if [[ -n "${NDPROBE_STREAM_CMD}" ]]; then
     warn "using the test-only NDPROBE_STREAM_CMD override - this is a harness self-test, NOT a probe"
     stream_cmd="${NDPROBE_STREAM_CMD}"
+    record_delim=$'\n'        # the stand-ins emit lines, not plists
 else
     [[ "$(uname -s)" == "Darwin" ]] || skip "not macOS (uname -s = $(uname -s)); powermetrics does not exist here"
 
@@ -117,6 +118,7 @@ else
 
     # The exact loop-mode invocation the collector uses: stream until stopped, never self-terminate.
     stream_cmd="${powermetrics_bin} -b 0 -i 1000 -s ${sampler} -f plist"
+    record_delim=""            # -f plist emits NUL-separated documents, one per sample
 fi
 
 # ---------------------------------------------------------------------------------------------------
@@ -140,12 +142,20 @@ probe_one() {
         if [[ "${disposition}" == "ignored" ]]; then
             trap '' PIPE            # SIG_IGN, inherited across fork+exec - models netdata
         fi
-        # The reader waits for one real byte, then exits and closes the pipe while the writer is
-        # mid-stream. On timeout it exits anyway (still closing the pipe) but leaves no flag, which
-        # is how we tell "immortal child" apart from "child that never wrote".
+        # The reader consumes TWO complete records and then exits, closing the pipe while the
+        # writer is mid-stream. Two are required, not one: closing a pipe does not kill anything -
+        # the child's NEXT WRITE does - so a child that emits one sample and then goes quiet can
+        # never be killed this way, and treating that as a verdict is how this probe previously
+        # reported a broken premise on a runner that simply stopped producing samples. On timeout
+        # the reader exits anyway (still closing the pipe) but leaves no flag, which is how we tell
+        # "still writing, yet immortal" apart from "stopped writing, untestable".
         # PIPESTATUS[0] is the writer's wait status, surfaced as this subshell's exit code.
         # shellcheck disable=SC2086  # stream_cmd is a deliberately word-split command line
-        ${stream_cmd} 2>/dev/null | { IFS= read -r -t "${READ_TIMEOUT}" -n 1 _ && : > "${flag}"; }
+        ${stream_cmd} 2>/dev/null | {
+            IFS= read -r -d "${record_delim}" -t "${READ_TIMEOUT}" _ || exit 0
+            IFS= read -r -d "${record_delim}" -t "${READ_TIMEOUT}" _ || exit 0
+            : > "${flag}"
+        }
         exit "${PIPESTATUS[0]}"
     ) &
     local probe_pid=$!
@@ -156,10 +166,9 @@ probe_one() {
     # looks: killing the guard subshell leaves its `sleep` alive, that orphan holds this function's
     # command-substitution pipe open until it expires, and every probe then costs the full grace
     # even when the child died immediately - besides leaving stray processes behind.
-    local waited=0 limit=$(( GRACE_SECONDS * 5 ))
-    while kill -0 "${probe_pid}" 2>/dev/null && [[ "${waited}" -lt "${limit}" ]]; do
+    local deadline=$(( started + GRACE_SECONDS ))
+    while kill -0 "${probe_pid}" 2>/dev/null && [[ "$(date +%s)" -lt "${deadline}" ]]; do
         sleep 0.2
-        waited=$(( waited + 1 ))
     done
 
     # Still alive: it is immortal by construction in the 'ignored' case. Kill the whole process
@@ -234,7 +243,7 @@ if [[ "${default_outcome}" == "harness-error" || "${ignored_outcome}" == "harnes
 fi
 
 if [[ "${default_stream}" == "silent" ]]; then
-    skip "powermetrics never wrote to its stdout within ${READ_TIMEOUT}s (outcome '${default_outcome}'), so closing the pipe cannot be exercised here - this says nothing about the premise either way"
+    skip "powermetrics did not produce two consecutive samples within ${READ_TIMEOUT}s each (outcome '${default_outcome}'), so it was not writing when the pipe closed and had no next write to be killed by - untestable here, and no evidence either way about the premise"
 fi
 
 if [[ "${default_outcome}" != "died-sigpipe" && "${default_outcome}" != "survived" ]]; then
