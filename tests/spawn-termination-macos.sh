@@ -55,12 +55,44 @@ GRACE_SECONDS="${GRACE_SECONDS:-15}"
 # below GRACE_SECONDS so the reader closes the pipe while the writer is still under the guard.
 READ_TIMEOUT="${READ_TIMEOUT:-8}"
 
+# We need SIGPIPE at its default disposition to model the fixed agent. If our own shell was entered
+# with it ignored, POSIX forbids resetting it from within the shell (`trap - PIPE` is a no-op), so
+# both probe cases would run ignored and the verdict would be a false "premise broken".
+#
+# This is not hypothetical, and it is what made this test fail on CI: the GitHub Actions runner is
+# Node-based, Node ignores SIGPIPE, and every step's shell inherits that. Which makes it the same
+# defect the agent fix is about - SIG_IGN surviving exec - showing up in the harness built to test
+# for it.
+#
+# A shell cannot undo this, but a process that sets SIG_DFL and then execs can, so re-exec ourselves
+# through one. NDPROBE_SIGPIPE_RESET makes that strictly single-shot.
 if [[ -n "$(trap -p PIPE)" ]]; then
-    printf 'SIGPIPE is ignored in the shell that invoked this script.\n' >&2
+    if [[ -z "${NDPROBE_SIGPIPE_RESET:-}" ]]; then
+        for helper in perl python3; do
+            command -v "${helper}" >/dev/null 2>&1 || continue
+            info "SIGPIPE is ignored in the invoking shell; re-executing via ${helper} with it reset"
+            export NDPROBE_SIGPIPE_RESET=1
+
+            case "${helper}" in
+                perl)
+                    exec perl -e '$SIG{PIPE} = "DEFAULT"; exec @ARGV or die "exec failed: $!\n"' \
+                        -- "${BASH:-/bin/bash}" "$0" "$@"
+                    ;;
+                python3)
+                    exec python3 -c 'import signal, os, sys
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+os.execv(sys.argv[1], sys.argv[1:])' "${BASH:-/bin/bash}" "$0" "$@"
+                    ;;
+            esac
+        done
+    fi
+
+    printf 'SIGPIPE is ignored in the shell that invoked this script, and it could not be reset.\n' >&2
     printf 'POSIX does not allow a signal ignored on entry to be reset from within the shell, so the\n' >&2
     printf 'default-disposition case cannot be modelled here: both cases would run with SIGPIPE\n' >&2
-    printf 'ignored and the verdict would be a false "premise broken". Re-run from a shell with the\n' >&2
-    printf 'default disposition (a plain terminal, or the CI step directly).\n' >&2
+    printf 'ignored and the verdict would be a false "premise broken".\n' >&2
+    printf 'Install perl or python3 so this script can re-exec with the disposition reset, or run it\n' >&2
+    printf 'from a shell that has the default disposition.\n' >&2
     exit 3
 fi
 
