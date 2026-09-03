@@ -73,8 +73,8 @@ create_manifest() {
 }
 
 echo "::group::Preparing GitHub release artifacts"
-mkdir -p github
-cd github
+mkdir -p artifacts/github
+cd artifacts/github
 copy_source_tarball "" "${VERSION}" latest
 copy_static_builds versioned latest
 copy_msi_packages "" "${VERSION}" latest
@@ -86,8 +86,8 @@ cd "${TOP}"
 echo "::endgroup::"
 
 echo "::group::Preparing R2 versioned release artifacts"
-mkdir -p "r2/${VERSION}"
-cd "r2/${VERSION}"
+mkdir -p "artifacts/r2/${VERSION}"
+cd "artifacts/r2/${VERSION}"
 copy_source_tarball "${VERSION}"
 copy_static_builds versioned
 copy_msi_packages "${VERSION}"
@@ -98,8 +98,8 @@ cd ../..
 echo "::endgroup::"
 
 echo "::group::Preparing R2 latest release artifacts"
-mkdir -p r2/latest
-cd r2/latest
+mkdir -p artifacts/r2/latest
+cd artifacts/r2/latest
 copy_source_tarball latest
 copy_static_builds latest
 copy_msi_packages latest
