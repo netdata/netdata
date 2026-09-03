@@ -1,6 +1,6 @@
 ---
 name: project-go-collector-design
-description: Early design decisions for Go go.d collectors, made before code. Use when designing a new go.d collector; when adding, renaming, or removing a config option or mode; when changing what a metric means or which entities become charts or vnodes; when a collector will write or delete remote objects, persist state across restarts, or coordinate with other jobs; when asking "should this be a config option", "who owns this state", "what does this sample mean", "should this be a vnode"; and when reviewing such a change. Not for V1-to-V2 migrations without approved enrichment, mechanical fixes, or docs-only work.
+description: Early design decisions for Go go.d collectors, made before code. Use when designing a new go.d collector; when adding, renaming, removing, or changing the default of a config option or mode; when adding or changing a Function; when changing what a metric means or which entities become charts or vnodes; when a collector will write or delete remote objects, persist state across restarts, or coordinate with other jobs; when asking "should this be a config option", "who owns this state", "what does this sample mean", "should this be a vnode"; and when reviewing such a change. Not for V1-to-V2 migrations without approved enrichment, mechanical fixes, or docs-only work.
 ---
 
 # Go Collector Design
@@ -23,7 +23,7 @@ Every rule below is written as: **When** it applies, **Do / Don't**, what counts
 | New or changed metric meaning, new entity axis, vnodes | the Metric Semantics and Identity items | the affected item only |
 | Collector that writes or deletes remotely, or persists state | this skill plus `mutating-collectors.md` | full note plus the mutating items |
 | Reviewing any of the above | the same items as review questions | — |
-| V1-to-V2 migration, mechanical fix, docs-only change | not this skill (`migrate-v1-to-v2.md`, V2 skill, `integrations-lifecycle`) | none |
+| V1-to-V2 migration without approved enrichment, mechanical fix, docs-only change | not this skill (`migrate-v1-to-v2.md`, V2 skill, `integrations-lifecycle`) | none |
 
 ## The Collector Design Note
 
@@ -101,11 +101,11 @@ owner identity, record that a renamed job does not adopt old ownership. All of t
 
 **When:** every new observation, and every change to what an existing one means. **Do:** fill one row per
 observation, then map states to values, before writing metric names or `charts.yaml`. **Don't:** emit a value that
-looks like a measurement for something not measured; a skipped operation has no duration, a failed attempt is not a
-latency sample, a waiting state is not a zero (`project-writing-collectors` §1.4, gaps are data). **Evidence:** the
-table itself, plus a test that drives each row's state through the real path and asserts emitted / omitted / retained.
-**Boundary:** human-readable configuration does not prohibit millisecond latency charts; the table decides units per
-chart.
+looks like a measurement for something not measured; a skipped operation has no duration, a failed attempt is not a lag
+or success sample (its request duration may still be a valid measurement of the request), a waiting state is not a zero
+(`project-writing-collectors` §1.4, gaps are data). **Evidence:** the table itself, plus a test that drives each row's
+state through the real path and asserts emitted / omitted / retained. **Boundary:** human-readable configuration does
+not prohibit millisecond latency charts; the table decides units per chart.
 
 | Column | Meaning |
 |---|---|

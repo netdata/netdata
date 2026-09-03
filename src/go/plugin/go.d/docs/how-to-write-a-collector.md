@@ -172,7 +172,8 @@ Implementation tuning SHOULD use constants:
 - API batching constraints.
 
 Durations are `confopt.Duration` (or `confopt.LongDuration`) written as `30m`, never `*_ms` integers; do not write
-custom parsing for units. You MUST NOT add a config option just because it is easy to expose. Once shipped, it is hard to remove and MUST stay
+custom parsing for units. You MUST NOT add a config option just because it is easy to expose. Once shipped, it is hard
+to remove and MUST stay
 synchronized across `Config`, `config_schema.json`, stock `.conf`, metadata, generated docs, and tests. A proposed
 config option MUST name the concrete operator decision it enables; "operators may want to tune it" is not enough.
 

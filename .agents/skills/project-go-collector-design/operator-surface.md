@@ -21,8 +21,8 @@ question), or delete a justified objective and a justified hard timeout merely b
 
 Rules that follow from the record:
 
-- Durations are `confopt.Duration` (or `confopt.LongDuration`) and written as `30m`, never `*_ms` integers; sizes use
-  human units. Do not write custom parsing to achieve this.
+- Durations, sizes, and their types follow the how-to guide's Config section (`confopt` types, human units, no custom
+  parsing); the decision record only names the unit.
 - Do not inherit a broad shared config type wholesale. Every field it brings (transport, TLS, HTTP/2, retry policy,
   proxy) gets its own row or is excluded; an option accepted in a mode where it has no effect is a defect.
 - What is configuration and what stays a constant is listed once, in the how-to guide's Config section; a constant
@@ -33,12 +33,13 @@ Rules that follow from the record:
 
 **When:** adding, renaming, changing the default of, or removing an option on a shipped collector. **Do:** add with a
 decision record; rename by keeping the old key working and documenting the deprecation in metadata; treat a default
-change as a behavioral change that needs a SOW and a note in the docs; remove only under an explicitly approved
-breaking decision, with `Config`, `config_schema.json`, stock `.conf`, `metadata.yaml`, generated docs, and tests in
-one PR. **Don't:** let a new collector's freedom to replace its own contract before release leak into work on a
-shipped collector; the V1-to-V2 migration guide's compatibility rules apply to shipped contracts. **Evidence:** the
-consistency checklist run against the PR. **Boundary:** a collector that has not yet shipped in a release may change its
-contract freely with the user's approval.
+change as a behavioral change that needs a SOW and a note in the docs; remove only under an explicitly approved breaking
+decision, with `Config`, `config_schema.json`, stock `.conf`, `metadata.yaml`, and tests in one PR; generated
+integration pages follow the delivery route in `consistency.md` (validated locally, committed by the post-merge
+generated-artifact PR). **Don't:** let a new collector's freedom to replace its own contract before release leak into
+work on a shipped collector; the V1-to-V2 migration guide's compatibility rules apply to shipped contracts.
+**Evidence:** the consistency checklist run against the PR. **Boundary:** a collector that has not yet shipped in a
+release may change its contract freely with the user's approval.
 
 ## 3. The DynCfg Form As A User Task
 
@@ -58,24 +59,35 @@ form; nest a second discriminator inside a mode object without inspecting how th
 
 **When:** any field whose meaning depends on absence, `false`, zero, `null`, inheritance, or the selected mode.
 
-**Do:** trace both consumer paths before choosing field types: constructor → raw decode → `Init`, and constructor →
-raw decode → `Configuration()` → serialization and supported reload. `Configuration()` can run before `Init()`
-(`src/go/plugin/agent/jobmgr/joboutput/config_factory.go`), so do not call `Init()` first and claim to have proved
-pre-Init retrieval. Keep ordinary scalar defaults in `New()`; `New()` MUST return a usable collector, because callers
-and tests construct one without `Init()`. A config normalizer (`applyDefaults`, run from `Init`) handles only what the
-constructor cannot see: an explicit sentinel the operator typed (a `0`), or a nil pointer on a config not built through
-`New()`. For mutually exclusive branches keep the constructor mode-neutral and materialize the selected branch through
-that one owned defaulting step at the boundaries that need it; preserve explicit values; never let effective-config
-retrieval mutate the raw instance. **Don't:** preallocate a branch in the constructor and unmarshal another mode into
-it; add a third read-time fallback (`if v <= 0 { v = default }`) that can never fire once constructor and normalizer
-ran; treat `omitempty` as harmless for meaningful `false` or `0`. **Evidence:** canonical wire-form fixtures
-`testdata/config.json` / `config.yaml` driven by `collecttest.TestConfigurationSerialize`, carrying meaningful `false`
-and zero values; as the one explicit exception to "no collector-local decode test", a targeted raw-input case for a
-boundary the struct round-trip cannot exercise: an explicit `null` key, which a typed nil pointer with `omitempty` never
-serializes (the case must include the key and check both schema and runtime acceptance). **Boundary:** a nil check on a
-pointer is memory safety, not defaulting, and stays. Before "simplifying" defaults, check what the constructor
-guarantees its callers: apply the change and count the test failures before recommending it; production reachability
-alone understates the blast radius.
+**Do:**
+
+- Trace both consumer paths before choosing field types: constructor → raw decode → `Init`, and constructor → raw
+  decode → `Configuration()` → serialization and supported reload. `Configuration()` can run before `Init()`
+  (`src/go/plugin/agent/jobmgr/joboutput/config_factory.go`), so do not call `Init()` first and claim to have proved
+  pre-Init retrieval.
+- Keep ordinary scalar defaults in `New()`; `New()` MUST return a usable collector, because callers and tests construct
+  one without `Init()`.
+- A config normalizer (`applyDefaults`, run from `Init`) handles only what the constructor cannot see: an explicit
+  sentinel the operator typed (a `0`), or a nil pointer on a config not built through `New()`.
+- For mutually exclusive branches keep the constructor mode-neutral and materialize the selected branch through that
+  one owned defaulting step at the boundaries that need it; preserve explicit values; never let effective-config
+  retrieval mutate the raw instance.
+
+**Don't:**
+
+- Preallocate a branch in the constructor and unmarshal another mode into it.
+- Add a third read-time fallback (`if v <= 0 { v = default }`) that can never fire once constructor and normalizer ran.
+- Treat `omitempty` as harmless for meaningful `false` or `0`.
+
+**Evidence:** canonical wire-form fixtures `testdata/config.json` / `config.yaml` driven by
+`collecttest.TestConfigurationSerialize`, carrying meaningful `false` and zero values; and, as the one explicit
+exception to "no collector-local decode test", a targeted raw-input case for a boundary the struct round-trip cannot
+exercise: an explicit `null` key, which a typed nil pointer with `omitempty` never serializes (the case MUST include
+the key and check both schema and runtime acceptance).
+
+**Boundary:** a nil check on a pointer is memory safety, not defaulting, and stays. Before "simplifying" defaults,
+check what the constructor guarantees its callers: apply the change and count the test failures before recommending
+it; production reachability alone understates the blast radius.
 
 ## 5. Schema Form Rules
 

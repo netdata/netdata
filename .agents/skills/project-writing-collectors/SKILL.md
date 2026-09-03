@@ -188,9 +188,12 @@ schema checks). Go test shape (table-driven, `map[string]struct{}`) is the root 
 
 `Collect()` runs every `update_every` seconds, multiplied by the install base (§1.1). It MUST:
 
-- Allocate buffers, maps, slices, parsed regexes, matchers, and metric instruments once at `Init()` / `New()` and
-  reuse them; reset at the top of `Collect()` only when needed. See `cato_networks/metrix.go` for the typed V2
-  metric-instrument pattern.
+- Create long-lived resources once at `Init()` / `New()` and reuse them: clients and connections, parsed regexes and
+  matchers, metric instruments, and any buffer that is large or rebuilt identically every cycle. See
+  `cato_networks/metrix.go` for the typed V2 metric-instrument pattern. A small bounded temporary that holds this
+  cycle's results in a network-bound collector is not a defect; do not add pooling or retained state to satisfy a
+  slogan. Allocation discipline for framework and per-sample code is `src/go/AGENTS.md` "Hot-Path And Benchmark
+  Discipline".
 - Hold persistent connections; reconnect only on failure, with backoff.
 - Reuse what is stable between iterations (schema, capabilities, parsed profile selections, instrument handles) only
   when staleness is safe. Cache scope and its evidence are design decisions, not a default; for values that authorize a
@@ -200,7 +203,8 @@ schema checks). Go test shape (table-driven, `map[string]struct{}`) is the root 
   explicit design decision with its own test.
 
 Anti-pattern (search and avoid): `mx := make(map[string]int64)` per `Collect()` (e.g.,
-`src/go/plugin/go.d/collector/ap/collect.go`). Don't allocate fresh structures per cycle. Don't reconnect every cycle.
+`src/go/plugin/go.d/collector/ap/collect.go`). Don't rebuild the whole metric surface, parsers, or clients every cycle.
+Don't reconnect every cycle.
 
 ### 2.3 Error handling
 
@@ -232,9 +236,12 @@ concern; see §1.5.) The bound is a per-domain decision, recorded in the design 
   as charts and let the operator choose which grouping keys to surface. Aggregations are bounded views that survive
   any selector cut and are usually what dashboards want; per-instance detail is a drill-down, not the default.
 - **A cap with an aggregated "Other" bucket.** When the application exposes all instances with no upstream filter and
-  the entity set can grow without bound, cap the count and sum what was capped into an "Other" chart so totals stay
-  truthful. A cap alone silently truncates whatever lands in the first N entries, so pair it with a selector that lets
-  the operator choose which entities survive.
+  the entity set can grow without bound, cap the count. When the observation is meaningfully mergeable (counts and
+  additive gauges, using the reducer the V2 skill's aggregation rules allow), sum what was capped into an "Other" chart
+  so totals stay truthful; for percentiles, temperatures, timestamps, or states, do not invent an aggregate: disclose
+  the excluded coverage explicitly (for example a charted-versus-reported count). A cap alone silently truncates
+  whatever lands in the first N entries, so pair it with a selector that lets the operator choose which entities
+  survive.
 
 A public `max_*` option or selector is a config option like any other: it MUST name the operator decision it enables
 (`.agents/skills/project-go-collector-design/operator-surface.md`). A bounded, low-cardinality entity set needs no knob.

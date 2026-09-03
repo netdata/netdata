@@ -1,8 +1,10 @@
 # Mutating And Stateful Collectors
 
-Load this only when a collector writes or deletes remote objects, or persists state across cycles or restarts. A
-read-only collector records "no durable remote ownership" in its design note and stops here; it needs no journal,
-queue, lock, or recovery analysis. Rules use the format When / Do / Don't / Evidence / Boundary.
+Load this when a collector writes or deletes remote objects, or persists state across cycles or restarts. A collector
+that does neither records "no durable remote ownership, no durable local state" in its design note and stops here; it
+needs no journal, queue, lock, or recovery analysis. A collector with durable local state but no remote mutation (for
+example a receiver that persists its own protocol state) reads §3 and §5 only. Rules use the format When / Do / Don't /
+Evidence / Boundary.
 
 ## 1. Mutation Ownership
 
@@ -23,12 +25,13 @@ operating model; state that boundary instead of defending against it.
 action, ambiguous outcome and how it is retained, what is persisted before and after, the permitted next action, and
 the behavior after a restart at that point. Order recovery correctly: acquire the owner lock, then load the
 authoritative state (a snapshot loaded before the lock is stale once a successor took ownership); retain uncertainty
-explicitly (an ambiguous PUT or an absence observed too soon is not resolved by forgetting); retire durably before
-deleting; after a failed publication, restore the last authoritative state rather than continuing from rolled-back
-memory. **Don't:** move an entry to cleanup in memory while its persistence failed and then delete the remote object;
-enter exact cleanup with identities (version or marker IDs) known only in memory. **Evidence:** a test per row that
-reaches the state through real transitions and asserts the next action. **Boundary:** "save before and after the
-operation" is too vague to count as a design; ordinary read-only collectors have no rows.
+explicitly (an ambiguous PUT or an absence observed too soon is not resolved by forgetting); retire an entry durably
+before its cleanup deletion (a DELETE that is itself part of the measurement happens while the probe is still active);
+after a failed publication, restore the last authoritative state rather than continuing from rolled-back memory.
+**Don't:** move an entry to cleanup in memory while its persistence failed and then delete the remote object; enter
+exact cleanup with identities (version or marker IDs) known only in memory. **Evidence:** a test per row that reaches
+the state through real transitions and asserts the next action. **Boundary:** "save before and after the operation" is
+too vague to count as a design; ordinary read-only collectors have no rows.
 
 ## 3. Persistence Semantics
 
