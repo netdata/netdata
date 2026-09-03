@@ -538,7 +538,7 @@ Usually we use `.*` to indicate that we need to match everything up to a charact
 
 In the ingestion pipeline from `tail` to `systemd-journald` or `systemd-journal-remote`, RAM usage is independent of the number of fields indexed, so ingesting high volumes of structured logs does not increase the memory footprint as the schema grows.
 
-High fields cardinality does not have a noticeable impact on systemd-journal. The amount of fields indexed and the amount of unique values per field, have a linear and predictable result in the resource utilization of `systemd-journald` and `systemd-journal-remote`.
+High field cardinality has no disproportionate impact on systemd journals: the number of indexed fields and the number of unique values per field have a linear, predictable effect on the resource utilization of `systemd-journald` and `systemd-journal-remote`.
 
 However, the number of fields added to journals influences the overall disk footprint. Less fields means more log entries per journal file, smaller overall disk footprint and faster queries.
 

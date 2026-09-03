@@ -300,8 +300,8 @@ Windows Event Logs at the time of the query.
 2. Confirm the expected channels are listed in the **Sources** selector, including `All-Forwarded` on a Windows Event
    Collector.
 3. Apply a single filter (for example `Level`) and confirm events are returned; open one event and check its fields.
-4. Click ▶️ (PLAY) and generate a test event (for example `eventcreate /T INFORMATION /ID 100 /L APPLICATION /D "netdata test"`)
-   to confirm live tail.
+4. Click ▶️ (PLAY) and generate a test event from an Administrator command prompt (for example
+   `eventcreate /T INFORMATION /ID 100 /L APPLICATION /D "netdata test"`) to confirm live tail.
 
 ## TODO
 

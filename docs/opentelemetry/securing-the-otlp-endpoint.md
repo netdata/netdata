@@ -7,8 +7,12 @@ Agent — including certificate replacements.
 
 ## Keep the default when you can
 
-The plugin listens on `127.0.0.1:4317` by default: only same-host senders can reach it, and TLS is unnecessary. If a
-Collector runs on every node and forwards to its local Agent, no endpoint hardening is needed at all.
+The plugin listens on `127.0.0.1:4317` by default: only processes on the same host can reach it, and TLS is
+unnecessary for the network path. Loopback limits reach, not identity: any local process can send records and, with
+tenants enabled, select any tenant. Keep the default on hosts where every local process is trusted, such as a node
+that runs one Collector forwarding to its local Agent. On a shared host, enable TLS with client certificates on the
+loopback listener as described below, or restrict which local users may connect to the port with the host firewall
+(netfilter's `owner` match).
 
 ## Accepting remote senders
 

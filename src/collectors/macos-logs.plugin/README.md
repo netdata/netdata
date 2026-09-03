@@ -147,7 +147,7 @@ root-owned setuid permission model as Netdata's other privileged Function plugin
 
 | Symptom | Possible cause | Solution |
 |---------|----------------|----------|
-| The `macos-logs` source is missing | The plugin is not installed or not executable | See [How to check if the plugin is running](#how-to-check-if-the-plugin-is-running) |
+| `macos-logs` is missing from the Logs tab | The plugin is not installed or not executable | See [How to check if the plugin is running](#how-to-check-if-the-plugin-is-running) |
 | Queries return no entries | The selected timeframe or filters exclude everything | Widen the timeframe, clear filters, try a full-text search for a common term |
 | Permission errors in the Agent log | The setuid permission model was not applied at install time | Reinstall or repair the Netdata package so the plugin is installed root-owned setuid |
 | Slow or cancelled broad queries | The Function timeout expired on a very wide scan | Narrow the timeframe, add filters, or keep `slice=true` so supported filters run natively in OSLog |
@@ -171,7 +171,7 @@ ps aux | grep '[m]acos-logs.plugin'
 
 ### How to test basic queries
 
-1. Open the **Logs** tab in the Netdata UI and confirm the `macos-logs` source is offered.
+1. Open the **Logs** tab in the Netdata UI and confirm `macos-logs` is offered, with its `macOS unified log` source.
 2. Apply a single filter (for example `LEVEL = Error`) and confirm entries are returned.
 3. Use full-text search for a common term and verify results.
 4. Toggle **PLAY** mode and confirm new entries stream in as they are logged.

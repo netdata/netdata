@@ -134,7 +134,7 @@ them; the files use the compact journal format, which older `journalctl` version
 fields and no `MESSAGE=`, so use a structured output:
 
 ```bash
-sudo journalctl --file=/var/cache/netdata/flows/1m/*/*.journal --output=json --no-pager | head
+sudo journalctl --file='/var/cache/netdata/flows/1m/*/*.journal' --output=json --no-pager | head
 ```
 
 Netdata reads the same files on every platform it writes them on; the Network Flows view and the `flows:netflow`

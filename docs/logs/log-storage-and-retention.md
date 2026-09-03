@@ -100,9 +100,8 @@ so do SIEM agents that ingest journal files.
 - **[Network flows](/docs/logs/network-flows.md)** (NetFlow, sFlow, IPFIX) are written under `flows/` in the Netdata cache directory
   (`/var/cache/netdata/flows` on package installs) in four tiers, `raw`, `1m`, `5m`, and `1h`; files rotate on size, and
   a file spans at most one hour.
-  Retention is set per tier: `size_of_journal_files` (`10GB` per tier by default, at least 40 GB in total) and an
-  optional
-  `duration_of_journal_files`. Query them from the Network Flows view or with `journalctl --file=<file>`. See
+  Retention is set per tier: `size_of_journal_files` (`10GB` per tier by default, about 40 GB in total) and an
+  optional `duration_of_journal_files`. Query them from the Network Flows view or with `journalctl --file=<file>`. See
   [Retention and Querying](/docs/npm/network-flows/retention-querying.md) and
   [Configuration](/docs/npm/network-flows/configuration.md).
 

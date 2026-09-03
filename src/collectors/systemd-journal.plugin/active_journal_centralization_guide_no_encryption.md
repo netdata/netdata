@@ -15,11 +15,12 @@ DO NOT USE THIS ON NON-TRUSTED NETWORKS.
 
 ## Configuring an active journal source
 
-On the server you want to expose their logs, install `systemd-journal-gateway`.
+On the server you want to expose their logs, install `systemd-journal-gatewayd`. Debian, Ubuntu, and Fedora ship it
+in the `systemd-journal-remote` package; Arch includes it in `systemd`.
 
 ```bash
 # change this according to your distro
-sudo apt-get install systemd-journal-gateway
+sudo apt-get install systemd-journal-remote
 ```
 
 Optionally, if you want to change the port (the default is `19531`), edit `systemd-journal-gatewayd.socket`
@@ -48,7 +49,7 @@ sudo systemctl enable --now systemd-journal-gatewayd.socket
 
 ### Logs explorer in the browser
 
-`systemd-journal-gateway` provides an HTML5 application to browse the logs.
+`systemd-journal-gatewayd` provides an HTML5 application to browse the logs.
 
 To use it, open your web browser and navigate to:
 

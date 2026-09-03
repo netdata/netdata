@@ -312,6 +312,8 @@ config:
         ca_file: /etc/otelcol/netdata-ca.pem
       headers:
         X-Scope-OrgID: kubernetes
+      sending_queue:
+        storage: file_storage
   service:
     pipelines:
       logs:
@@ -329,11 +331,20 @@ The `k8sattributes` processor derives `service.namespace` and `service.name` fro
 following the OpenTelemetry semantic conventions — from the `app.kubernetes.io` labels and
 `resource.opentelemetry.io` annotations, falling back to the workload name and the Kubernetes namespace — so each
 workload appears as its own service in the Logs tab; the
-container parser adds the pod, namespace, and container from the file path. `storeCheckpoints` keeps file offsets in
-`/var/lib/otelcol` on the node so a Collector restart does not replay or skip lines. The values above are validated
-by rendering them with the `opentelemetry-collector` Helm chart 0.172.0 and validating the resulting Collector
-configuration with Contrib 0.157.0. The chart deploys its own Collector build (chart 0.172.0 ships Collector
-0.159.0); pin `image.tag` to run a specific Collector version.
+container parser adds the pod, namespace, and container from the file path.
+
+`storeCheckpoints` keeps the file receiver's offsets in `/var/lib/otelcol` on the node, so a restarted Collector
+resumes where it stopped instead of starting at the end of each file (the preset's `start_at: end`). It has two
+consequences. The chart runs the Collector as root (`runAsUser: 0`) to write that host directory; to run as a
+non-root user instead, set `securityContext` yourself, which the chart then leaves untouched, and make
+`/var/lib/otelcol` writable by that user on every node. And checkpoints cover reading only: records already read but
+still in the exporter's in-memory queue are lost if the Collector is killed or crashes before the queue drains. The
+`sending_queue.storage` line above keeps that queue on the same `file_storage` extension the preset registers, so
+queued records survive that too.
+
+The values above are validated by rendering them with the `opentelemetry-collector` Helm chart 0.172.0 and
+validating the resulting Collector configuration with Contrib 0.157.0. The chart deploys its own Collector build
+(chart 0.172.0 ships Collector 0.159.0); pin `image.tag` to run a specific Collector version.
 
 The `kubernetes` tenant the exporter selects needs its own retention policy on the receiving Agent, or its records
 land under the 7-day, 1GB defaults:

@@ -173,6 +173,21 @@ def clean_string(string: str) -> str:
     )
 
 
+# The Syslog chapter lives in the OpenTelemetry section on Learn, while its
+# catalog category stays under Network Performance Monitoring. The matched
+# string comes from the 'network-performance-monitoring.syslog' category name in
+# integrations/categories.yaml; update both together.
+SYSLOG_CHAPTER_NPM_PATH = "Network Performance Monitoring/Syslog from Network Devices/Integrations"
+SYSLOG_CHAPTER_LEARN_PATH = "OpenTelemetry/Syslog from Network Devices/Integrations"
+
+
+def relocate_syslog_chapter(learn_rel_path: str) -> str:
+    """Map the NPM syslog chapter's Integrations node to its Learn location."""
+    if learn_rel_path == SYSLOG_CHAPTER_NPM_PATH:
+        return SYSLOG_CHAPTER_LEARN_PATH
+    return learn_rel_path
+
+
 def create_frontmatter(integration, meta_yaml: str, sidebar_label: str, learn_rel_path: str,
                        message: str, keywords=None) -> str:
     """Build the shared Learn metadata block used by every documentation mode."""
@@ -285,11 +300,7 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             # collectors (Collecting Metrics/...) are unaffected.
             if learn_rel_path.startswith("Network Performance Monitoring/"):
                 learn_rel_path += "/Integrations"
-            # The Syslog chapter lives in the OpenTelemetry section on Learn. The matched
-            # string comes from the 'network-performance-monitoring.syslog' category name
-            # in integrations/categories.yaml; update both together.
-            if learn_rel_path == "Network Performance Monitoring/Syslog from Network Devices/Integrations":
-                learn_rel_path = "OpenTelemetry/Syslog from Network Devices/Integrations"
+            learn_rel_path = relocate_syslog_chapter(learn_rel_path)
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = create_frontmatter(
@@ -351,9 +362,9 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             # "Integrations" sub-node of their chapter so the hundreds of vendor
             # pages do not flood the chapter sidebars. Sidebar placement only —
             # the category (website integrations browser) is unchanged.
-            learn_rel_path = generate_category_from_name(
+            learn_rel_path = relocate_syslog_chapter(generate_category_from_name(
                 integration["meta"]["monitored_instance"]["categories"][0].split("."), categories
-            ) + "/Integrations"
+            ) + "/Integrations")
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = create_frontmatter(

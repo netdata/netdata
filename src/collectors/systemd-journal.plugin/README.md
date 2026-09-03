@@ -256,14 +256,16 @@ Full-text search applies across all fields. Combine with filters for precise res
 
 ## Query performance
 
-The plugin reads journal files directly using `libsystemd`, supporting concurrent readers and one writer.
+The plugin reads journal files directly: through `libsystemd` on native packages (DEB, RPM), or through Netdata's own
+journal reader on static builds and Docker images, which do not use `libsystemd` for reading journals. Both read
+concurrently with the journal's single writer.
 
 Two mechanisms shape how a query touches the files:
 
 - Each journal file is opened with its own journal handle and queried on its own, one file at a time, instead of merging
   all files into a single interleaved handle.
-- `fstat64()` calls are cached inside the plugin process through an interposed function, so repeatedly checking the same
-  journal files during a query does not repeat the system calls.
+- In the `libsystemd` build, `fstat64()` calls are cached inside the plugin process through an interposed function, so
+  repeatedly checking the same journal files during a query does not repeat the system calls.
 
 A Netdata query costs no more than the equivalent `journalctl` query on the same journal files.
 
@@ -292,8 +294,8 @@ The plugin handles large datasets efficiently using a sampling algorithm, ensuri
 |------|-------------|
 | 1 | **Fully evaluates the latest 500,000 log entries** |
 | 2 | **Distributes evaluation** across journal files for **up to 1 million entries** |
-| 3 | **Marks additional entries** as `[unsampled]` beyond the evaluation budget |
-| 4 | **Estimates counts** as `[estimated]` once unsampled limits are hit |
+| 3 | **Counts skipped entries** in an `[unsampled]` histogram bucket beyond the evaluation budget |
+| 4 | **Stops scanning a file** when sampling no longer pays off and adds the estimated remaining entries to an `[estimated]` histogram bucket |
 | 5 | Uses sequence numbers (if available) for **precise estimation** |
 | 6 | **Continues responsive histogram generation** while managing performance |
 
@@ -314,7 +316,7 @@ Once a query goes beyond its evaluation budget, three things happen:
 |--------|----------------------------|
 | Rows in the table | Always real journal entries — nothing is synthesized |
 | Histogram | Skipped entries are added to dedicated `[unsampled]` and `[estimated]` buckets, so the bars still account for them |
-| Field filter counters | Stop counting: they reflect the evaluated entries only and are not extrapolated |
+| Field filter counters | Stop counting: they reflect the evaluated entries only and are never extrapolated. Only the field selected for the histogram gains `[unsampled]` and `[estimated]` entries, mirroring its buckets |
 
 So a filter counter is a lower bound once you see `[unsampled]` or `[estimated]` in the histogram. Narrow the timeframe,
 select fewer sources, or apply more filters to bring the query back inside the budget and get exact counters.
