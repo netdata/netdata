@@ -469,9 +469,10 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthEventFile(t *testing.T) {
 	c := New()
 	c.db = db
 
-	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, source, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, source)
 	require.Len(t, rows, 1)
 	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -524,6 +525,47 @@ func TestFetchMSSQLErrorRows_UsesSystemHealthRingBufferWhenFileLookupFails(t *te
 	require.Len(t, rows, 1)
 	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_PreservesSystemHealthResolverErrors(t *testing.T) {
+	tests := map[string]struct {
+		err   error
+		check func(*testing.T, error)
+	}{
+		"cancellation": {
+			err:   context.Canceled,
+			check: func(t *testing.T, err error) { assert.ErrorIs(t, err, context.Canceled) },
+		},
+		"timeout": {
+			err:   context.DeadlineExceeded,
+			check: func(t *testing.T, err error) { assert.ErrorIs(t, err, context.DeadlineExceeded) },
+		},
+		"permission": {
+			err:   mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"},
+			check: func(t *testing.T, err error) { assert.True(t, isDeadlockPermissionError(err)) },
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+			require.NoError(t, err)
+			defer db.Close()
+
+			mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+			mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").WillReturnError(tc.err)
+
+			c := New()
+			c.db = db
+
+			status, source, rows, gotErr := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+			assert.Equal(t, mssqlErrorAttrNotSupported, status)
+			assert.Equal(t, mssqlErrorSourceSystemHealth, source)
+			assert.Nil(t, rows)
+			tc.check(t, gotErr)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
 
 func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {

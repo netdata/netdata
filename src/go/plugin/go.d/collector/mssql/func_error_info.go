@@ -592,6 +592,9 @@ func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, lim
 	if !useRingBuffer {
 		resolved, available, err := c.resolveMSSQLErrorReadTarget(ctx, "system_health")
 		if err != nil {
+			if !shouldFallbackErrorInfo(err) {
+				return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
+			}
 			return c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(true), "system_health", limit, mssqlErrorSourceSystemHealth)
 		}
 		if !available {
