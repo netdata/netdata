@@ -125,6 +125,28 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreNotEnabledOnAnyDatabase(t 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreDetectionFails(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(errors.New("Query Store catalog unavailable"))
+	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.dm_exec_query_stats`).
+		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	source, cols, err := handler.resolveTopQueriesSource(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, topQueriesSourcePlanCache, source)
+	assert.True(t, cols["execution_count"])
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 // A plan cache without query_hash (before SQL Server 2008) cannot be grouped by query, and
 // with no Query Store either there is nothing left to answer with.
 func TestTopQueries_UnavailableWhenNeitherSourceIsUsable(t *testing.T) {

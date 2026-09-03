@@ -577,13 +577,22 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 		if c.isAzureSQLDatabase() {
 			return mssqlErrorAttrNotEnabled, "", nil, errors.New("session not found")
 		}
-		return c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(c.Functions.ErrorInfo.UseRingBuffer), "system_health", limit, mssqlErrorSourceSystemHealth)
+		return c.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
 	}
 	status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, target, sessionName, limit, mssqlErrorSourceConfigured)
 	if err == nil || c.isAzureSQLDatabase() || !shouldFallbackErrorInfo(err) {
 		return status, source, rows, err
 	}
-	return c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(c.Functions.ErrorInfo.UseRingBuffer), "system_health", limit, mssqlErrorSourceSystemHealth)
+	return c.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
+}
+
+func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, limit int) (string, string, []mssqlErrorRow, error) {
+	useRingBuffer := c.Functions.ErrorInfo.UseRingBuffer
+	status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(useRingBuffer), "system_health", limit, mssqlErrorSourceSystemHealth)
+	if useRingBuffer || err == nil || !shouldFallbackErrorInfo(err) {
+		return status, source, rows, err
+	}
+	return c.fetchMSSQLErrorRowsFromTarget(ctx, systemHealthErrorTarget(true), "system_health", limit, mssqlErrorSourceSystemHealth)
 }
 
 func shouldFallbackErrorInfo(err error) bool {

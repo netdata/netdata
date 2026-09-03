@@ -517,18 +517,20 @@ func (f *funcTopQueries) resolveTopQueriesSource(ctx context.Context) (topQuerie
 	if err != nil {
 		return "", nil, err
 	}
+	var queryStoreErr error
 	if supported {
 		cols, err := f.detectQueryStoreColumns(ctx)
-		switch {
-		case err == nil:
+		if err == nil {
 			return topQueriesSourceQueryStore, cols, nil
-		case !errors.Is(err, errQueryStoreNotEnabled):
-			return "", nil, err
 		}
+		queryStoreErr = err
 	}
 
 	cols, err := f.detectPlanCacheColumns(ctx)
 	if err != nil {
+		if queryStoreErr != nil && (errors.Is(queryStoreErr, context.Canceled) || errors.Is(queryStoreErr, context.DeadlineExceeded)) {
+			return "", nil, queryStoreErr
+		}
 		return "", nil, err
 	}
 	return topQueriesSourcePlanCache, cols, nil
