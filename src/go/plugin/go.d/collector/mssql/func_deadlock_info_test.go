@@ -502,6 +502,30 @@ func TestFetchMSSQLErrorRows_RetriesSystemHealthRingBufferAfterEventFileError(t 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestFetchMSSQLErrorRows_UsesSystemHealthRingBufferWhenFileLookupFails(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
+		WillReturnError(errors.New("system health catalog unavailable"))
+	mock.ExpectQuery("FROM sys.dm_xe_session_targets").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
+
+	c := New()
+	c.db = db
+
+	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	require.Len(t, rows, 1)
+	assert.Equal(t, mssqlErrorSourceSystemHealth, rows[0].Source)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
