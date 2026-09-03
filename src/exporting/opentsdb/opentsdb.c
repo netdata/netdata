@@ -147,12 +147,13 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
  * byte: this is metadata the user configured, and none of `:`, `=` or `;` can affect this record's
  * framing. Whether the destination then accepts them is its tag grammar and the operator's concern:
  * stock OpenTSDB parses a tag by splitting on `=` and validates tag characters against its own
- * allowlist, so it may reject values other listeners accept. We take that trade knowingly, because
- * corrupting the configured host identity to pre-empt it is what netdata/netdata#23684 reported: a
- * rejected point is recoverable, a silently relabelled one splits the host's history for good. Note we
- * do not surface the rejection -- this connector discards the destination's replies
- * (exporting_discard_response), so it shows up as missing data at the destination, not as a netdata log
- * line.
+ * allowlist, so it may reject values other listeners accept. We take that trade knowingly: a strict
+ * destination may reject a point, leaving a gap that requires correcting the configuration and possibly
+ * backfilling, whereas silently relabelling it would store it under a different host identity and split
+ * the host's history -- which is what netdata/netdata#23684 reported. Normal builds do not surface such a
+ * rejection: this connector drops the destination's replies (exporting_discard_response), so it appears
+ * as missing data at the destination rather than a netdata log line. Builds with NETDATA_INTERNAL_CHECKS
+ * log a debug sample before discarding the reply.
  *
  * This extends the Graphite metric-path sanitizer rather than mirroring it: it adds the non-whitespace
  * controls Graphite passes through, and omits the `;` Graphite replaces for Carbon's tag syntax, so
