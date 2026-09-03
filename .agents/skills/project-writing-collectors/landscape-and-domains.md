@@ -1,7 +1,8 @@
 # Plugin landscape, data types, and per-domain practices
 
-Reference for `project-writing-collectors` §5-§7. Open when choosing where a collector lives, which data type it
-produces, or how the closest existing collectors in its domain are shaped.
+Reference for `project-writing-collectors`: the plugin landscape, the ibm.d / Rust / C / PLUGINSD notes, the build and
+dev loop, the data types a collector ingests, and per-domain practices. Open when choosing where a collector lives,
+which data type it produces, or how the closest existing collectors in its domain are shaped.
 
 ## The plugin landscape
 
@@ -74,13 +75,13 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 
 A collector ingests one or more of these data types. Each has its own pattern.
 
-### 6.1 Metrics (time-series numeric data)
+### Metrics (time-series numeric data)
 
 The default. Streams as `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via NIDL (§3). Storage is the
 dbengine; alerts bind to chart `context`; anomaly detection / ML jobs run continuously. Every metric travels via
 streaming to parents and to Netdata Cloud — cardinality matters everywhere.
 
-### 6.2 Logs
+### Logs
 
 Two paths:
 
@@ -95,7 +96,7 @@ Platform-specific events: `windows-events.plugin` (Windows event log).
 Logs are **not metrics**. Don't try to derive metrics from logs in the collection loop — emit logs as logs, then build
 metrics separately if needed.
 
-### 6.3 Live snapshots (Functions)
+### Live snapshots (Functions)
 
 Interactive, on-demand tabular data: process lists, network connections, FDB tables, log entries, journal queries,
 topology snapshots, flow records. Functions complement metrics; they don't replace them.
@@ -121,7 +122,7 @@ Backend docs: `src/go/plugin/framework/functions/README.md` (Go), `src/crates/ne
 `src/plugins.d/FUNCTION_UI_REFERENCE.md`. Topology contract: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`,
 `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
 
-### 6.4 Topology / interconnections / links
+### Topology / interconnections / links
 
 Topology is its own data type — directed/undirected graphs of nodes and links. Sources and consumers:
 
@@ -138,7 +139,7 @@ Topology is its own data type — directed/undirected graphs of nodes and links.
 Topology is consumed via Functions (`topology:*` family), not via metrics. The cardinality of network edges is too high
 for time-series storage and the use case is interactive lookup.
 
-### 6.5 Data enrichment via netipc
+### Data enrichment via netipc
 
 When a collector needs data from another collector to enrich its output (a network collector wanting cgroup labels, an
 `apps` collector wanting cgroup PIDs, a flow collector wanting interface metadata), use **netipc**. Don't shell out,
@@ -157,7 +158,7 @@ metadata to other plugins. Upstream spec, tests, fuzz suite: <https://github.com
 
 These are descriptive patterns — what existing Netdata collectors do. Use them as defaults; deviate with reason.
 
-### 7.1 Database collectors
+### Database collectors
 
 DB collectors often pair metrics (uptime, connections, query rates, replication lag, lock counts, cache hit ratios) with
 **Functions for live query analysis**: top queries, slow queries, currently-running queries, locks. Real examples:
@@ -174,7 +175,7 @@ work and record the product/design decision. The operator value of seeing
 are still a feature surface, not something to add accidentally during unrelated
 metric work.
 
-### 7.2 Network and SNMP collectors
+### Network and SNMP collectors
 
 Network/SNMP collectors typically pair metrics with **topology Functions** and FDB / ARP / LLDP enrichment:
 
@@ -184,10 +185,11 @@ Network/SNMP collectors typically pair metrics with **topology Functions** and F
 - **`network-viewer.plugin`** (`src/collectors/network-viewer.plugin/`) — `topology:` Functions for live socket-level
   topology.
 
-Per-device metrics need **vnode wiring** (each managed device is a vnode). FDB/ARP/STP data lands as topology Functions,
-not metrics — the cardinality is too high for metrics and the use case is interactive lookup.
+Each managed device is normally its own job with a job-level `vnode`; emitting several virtual nodes from one job is the
+product decision described in `SKILL.md` §1.9. FDB/ARP/STP data lands as topology Functions, not metrics — the
+cardinality is too high for metrics and the use case is interactive lookup.
 
-### 7.3 Container / orchestration collectors
+### Container / orchestration collectors
 
 Container collectors pair container metrics with **enrichment via netipc**:
 
@@ -199,7 +201,7 @@ Container collectors pair container metrics with **enrichment via netipc**:
 When adding a new orchestration source (Kubernetes API, Docker events, Nomad, etc.), think about who downstream needs
 the labels and whether to expose them via netipc.
 
-### 7.4 Web servers and reverse proxies
+### Web servers and reverse proxies
 
 Web server collectors pair metrics (requests, status codes, latency, upstream errors) with **access-log Functions** when
 the access log is structured:
@@ -209,19 +211,19 @@ the access log is structured:
 
 If the application's log format is closed or unstructured, only metrics are practical.
 
-### 7.5 Flow protocols (NetFlow / sFlow / IPFIX)
+### Flow protocols (NetFlow / sFlow / IPFIX)
 
 The Rust `netflow-plugin` (`src/crates/netflow-plugin/`) ingests flows and exposes them via Functions (`flows_response`
 shape). Flows are per-record, high-cardinality, and not suitable for traditional metric storage. Reference fixtures and
 provenance discipline live under `src/crates/netflow-plugin/testdata/`. Topology enrichment (interface names, AS
 metadata) typically comes from netipc or from SNMP-collected interface data.
 
-### 7.6 Application servers and middleware
+### Application servers and middleware
 
 Java app servers, message queues, application middleware — JMX/HTTP/protobuf metrics are the default; some pair with log
 exploration via journal or OTEL log signals when the workflow benefits from it. Mirror the closest existing collector.
 
-### 7.7 OS/kernel collectors
+### OS/kernel collectors
 
 Internal C plugins under `src/collectors/`. Reuse shared metric definitions from `src/collectors/common-contexts/`;
 follow chart-priority conventions in `src/collectors/all.h`; lean on `src/libnetdata/` rather than reimplementing

@@ -3,7 +3,7 @@
 Reference for `project-writing-collectors` §3. Each mechanism feeds the NIDL model described in the skill. Open
 the subsection that matches the ingestion path you are working on.
 
-### 3.2 SNMP profiles — declarative spec → NIDL
+## SNMP profiles — declarative spec → NIDL
 
 SNMP collection is profile-driven. A profile is a YAML document declaring OIDs, metric definitions, table indexing,
 units, chart families, and selectors. Stock profiles ship from `src/go/plugin/go.d/config/go.d/snmp.profiles/default/`;
@@ -16,7 +16,7 @@ too.
 Past pain: pre-profile SNMP code required per-vendor branches that became unmaintainable. Don't hardcode OID-to-metric
 mappings inside a custom collector or vendor branch.
 
-### 3.3 statsd `synthetic_charts` — operator-curated dashboards
+## statsd `synthetic_charts` — operator-curated dashboards
 
 The statsd plugin lets the operator group raw statsd metrics into curated charts via INI configs at
 `/etc/netdata/statsd.d/*.conf`. Each config defines:
@@ -33,7 +33,7 @@ name in dictionary → fallback to original). Stock examples: `src/collectors/st
 
 This is the most operator-controllable shaping mechanism — the dashboard is whatever the operator declares.
 
-### 3.4 OTEL mappings — per-metric YAML routing
+## OTEL mappings — per-metric YAML routing
 
 Netdata's OTEL plugin (`src/crates/otel-plugin/`) accepts any OTLP gRPC metric. Mapping is **generic by default** — all
 resource attributes, scope attributes, and data point attributes become chart labels — but the operator controls routing
@@ -51,7 +51,7 @@ The plugin does **not** recognize OTel semantic conventions specifically (`host.
 `deployment.environment`) — they pass through as labels. Cardinality control is `metrics.max_new_charts_per_request` in
 `otel.yaml`. Stock examples: `src/crates/otel-ingestor/configs/otel.d/v1/metrics/`.
 
-### 3.5 Prometheus — deterministic mapping; shape with relabeling and profiles
+## Prometheus — deterministic mapping; shape with relabeling and profiles
 
 The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto-maps from the exposition format:
 

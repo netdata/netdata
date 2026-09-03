@@ -125,8 +125,7 @@ projects, use it; otherwise clone the relevant upstreams to `/tmp/` and read the
 The repo holds many go.d modules and internal C plugins. Maintainer patterns
 live there, not in any prose doc. After you've reality-checked the upstream
 protocol, pick the closest existing Netdata collector by domain and mirror its
-structure. New go.d modules MUST use framework V2 and start from the current
-V2 authoring guide — see §5.3.
+structure. New go.d modules MUST use framework V2 and start from the current V2 authoring guide — see §5.2.
 
 ### 1.9 Remote-monitored systems and vnodes
 
@@ -193,10 +192,10 @@ schema checks).
   reuse them; reset at the top of `Collect()` only when needed. See `cato_networks/metrix.go` for the typed V2
   metric-instrument pattern.
 - Hold persistent connections; reconnect only on failure, with backoff.
-- Reuse what is stable between iterations (schema, parsed profile selections, instrument handles) only when staleness
-  is safe. A value that authorizes a dangerous or destructive operation (a bucket's versioning state, a policy scope, a
-  target's identity) is re-checked at the operation that depends on it; a small per-cycle read is often clearer than a
-  cache. Cache scope and its evidence are design decisions, not a default.
+- Reuse what is stable between iterations (schema, capabilities, parsed profile selections, instrument handles) only
+  when staleness is safe. A value that authorizes a dangerous or destructive operation (a bucket's versioning state, a
+  policy scope, a target's identity) is re-checked at the operation that depends on it; a small per-cycle read is often
+  clearer than a cache. Cache scope and its evidence are design decisions, not a default.
 - Bound its work per call: a per-request timeout, honored context cancellation, and bounded fan-out. The scheduling
   interval is not a completion guarantee; if the collector promises a whole-cycle deadline, that promise is an
   explicit design decision with its own test.
@@ -254,10 +253,9 @@ Public tunables are part of the collector consistency contract. When a config op
 given a new default, you MUST follow `.agents/skills/integrations-lifecycle/consistency.md`; you MUST NOT update only
 the Go struct or only the docs. The stock `.conf` shows safe, representative examples, not necessarily every tunable.
 
-What is configuration and what is a constant: connection identity, endpoints, credentials, the target request
-timeout, `update_every`, `vnode`, and selectors that scope cardinality are operator decisions and belong in config.
-Internal policy (retry counts, page sizes, scan cadence, cache TTLs, fan-out) stays a constant unless a recorded
-decision names the operator choice it enables. Stock config and schema MUST NOT contradict each other.
+Configuration holds operator decisions; internal policy stays a constant unless a recorded decision names the operator
+choice it enables. The one list of what falls on each side is the how-to guide's Config section
+(`src/go/plugin/go.d/docs/how-to-write-a-collector.md`). Stock config and schema MUST NOT contradict each other.
 
 For go.d collectors, the config decision record, option lifecycle and compatibility, the DynCfg form as a user task,
 constructor defaults versus conditional branches, and the `config_schema.json` form rules (including which schema tests
@@ -304,8 +302,8 @@ spec, tests, fuzz suite: <https://github.com/netdata/plugin-ipc>.
 
 ## 3. Structuring dashboards
 
-The dashboard is built from charts. The way upstream data turns into charts depends on the ingestion path. Six
-mechanisms exist; pick the one that matches your collector and *learn how it shapes the result*.
+The dashboard is built from charts. The way upstream data turns into charts depends on the ingestion path. Pick the
+mechanism that matches your collector and *learn how it shapes the result*.
 
 ### 3.1 NIDL framework — the model
 
@@ -402,7 +400,7 @@ The plugin table, the ibm.d / Rust / C / PLUGINSD notes, and the build/dev loop 
 | Log ingestion (parse → journal) | `src/collectors/log2journal/` and `log2journal.d/` rules |
 | New external plugin in any language | `src/plugins.d/README.md` (PLUGINSD protocol) |
 | New internal C plugin | `src/collectors/README.md`; mirror an adjacent collector |
-| Cross-plugin data enrichment | netipc libraries (§5.4) |
+| Cross-plugin data enrichment | netipc libraries (§2.9) |
 | Privileged operations | `src/collectors/utils/ndsudo.c` |
 | Credentials in config | `src/collectors/SECRETS.md` |
 

@@ -46,12 +46,11 @@ accepted, documented limitation, not something to claim silently.
 **When:** the collector must clean up what it created. **Do:** separate active probing from unfinished cleanup so
 housekeeping never creates a monitoring blind period; bound cleanup work per call and prove progress separately (a
 persistently failing front entry must not starve a recoverable later one: persisted rotation, or a stated strict
-dependency); make backlog and backpressure visible as explicit state, not as forgotten ownership. Bound detached
-shutdown cleanup by a fixed budget independent of request tuning. **Don't:** shorten a safety interval to hide a
-stall, backdate quarantine to creation time, or use extreme chart-lifetime settings as a substitute for explicit
-result state. **Evidence:** a trace with a blocked item ahead of a recoverable one; a test that measurement continues
-while cleanup is pending. **Boundary:** strict ordering is legitimate when it is a real dependency; say so instead of
-adding round-robin.
+dependency); make backlog and backpressure visible as explicit state, not as forgotten ownership. Shutdown cleanup
+follows the fixed-budget rule in the V2 skill. **Don't:** shorten a safety interval to hide a stall, backdate quarantine
+to creation time, or use extreme chart-lifetime settings as a substitute for explicit result state. **Evidence:** a
+trace with a blocked item ahead of a recoverable one; a test that measurement continues while cleanup is pending.
+**Boundary:** strict ordering is legitimate when it is a real dependency; say so instead of adding round-robin.
 
 ## 5. Preconditions And Identities
 
@@ -70,5 +69,5 @@ Reach every state through real construction and transitions; do not populate pri
 recovery test. Cover: a crash between each persisted step; restart with a stale in-memory snapshot; an ambiguous
 provider response; a second unrelated job on the same agent (it must be unaffected); a persistently blocked backlog
 item ahead of a recoverable one; failed publication in the same call and the next; and, only when durable ownership is
-in scope, a renamed owner. Fakes model the provider from their own inputs and operation history; the collector's
-expected destination, phase, or result must never be the fake's source of truth.
+in scope, a renamed owner. The oracle rules for fakes and real-path construction are in the V2 skill's Tests section and
+apply here in full.

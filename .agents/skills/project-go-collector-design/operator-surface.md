@@ -25,8 +25,8 @@ Rules that follow from the record:
   human units. Do not write custom parsing to achieve this.
 - Do not inherit a broad shared config type wholesale. Every field it brings (transport, TLS, HTTP/2, retry policy,
   proxy) gets its own row or is excluded; an option accepted in a mode where it has no effect is a defect.
-- SDK retry counts, page sizes, scan cadence, cache TTLs, and fan-out are internal policy unless a row names the
-  operator decision (the how-to guide keeps the list).
+- What is configuration and what stays a constant is listed once, in the how-to guide's Config section; a constant
+  becomes an option only when a row names the operator decision.
 - Static-only credentials are a product limitation to decide, not a correctness defect; record the decision.
 
 ## 2. Option Lifecycle And Compatibility
@@ -61,16 +61,19 @@ form; nest a second discriminator inside a mode object without inspecting how th
 **Do:** trace both consumer paths before choosing field types: constructor → raw decode → `Init`, and constructor →
 raw decode → `Configuration()` → serialization and supported reload. `Configuration()` can run before `Init()`
 (`src/go/plugin/agent/jobmgr/joboutput/config_factory.go`), so do not call `Init()` first and claim to have proved
-pre-Init retrieval. Keep ordinary scalar defaults in `New()`. For mutually exclusive branches keep the constructor
-mode-neutral and materialize the selected branch through one owned defaulting implementation at the boundaries that
-need it; preserve explicit values; never let effective-config retrieval mutate the raw instance. **Don't:**
-preallocate a branch in the constructor and unmarshal another mode into it; add a third read-time fallback
-(`if v <= 0 { v = default }`) that can never fire once constructor and normalizer ran; treat `omitempty` as harmless
-for meaningful `false` or `0`. **Evidence:** canonical wire-form fixtures `testdata/config.json` / `config.yaml`
-driven by `collecttest.TestConfigurationSerialize`, carrying meaningful `false` and zero values; a targeted raw-input
-case only for a boundary the fixtures cannot represent, such as an explicit `null` key (the case must include the key
-and check both schema and runtime acceptance). **Boundary:** a nil check on a pointer is memory safety, not
-defaulting, and stays.
+pre-Init retrieval. Keep ordinary scalar defaults in `New()`; `New()` MUST return a usable collector, because callers
+and tests construct one without `Init()`. A config normalizer run from `Init` handles only what the constructor cannot
+see: an explicit sentinel the operator typed (a `0`), or a nil pointer on a config not built through `New()`. For
+mutually exclusive branches keep the constructor mode-neutral and materialize the selected branch through that one owned
+defaulting step at the boundaries that need it; preserve explicit values; never let effective-config retrieval mutate
+the raw instance. **Don't:** preallocate a branch in the constructor and unmarshal another mode into it; add a third
+read-time fallback (`if v <= 0 { v = default }`) that can never fire once constructor and normalizer ran; treat
+`omitempty` as harmless for meaningful `false` or `0`. **Evidence:** canonical wire-form fixtures `testdata/config.json`
+/ `config.yaml` driven by `collecttest.TestConfigurationSerialize`, carrying meaningful `false` and zero values; a
+targeted raw-input case only for a boundary the fixtures cannot represent, such as an explicit `null` key (the case must
+include the key and check both schema and runtime acceptance). **Boundary:** a nil check on a pointer is memory safety,
+not defaulting, and stays. Before "simplifying" defaults, check what the constructor guarantees its callers: apply the
+change and count the test failures before recommending it; production reachability alone understates the blast radius.
 
 ## 5. Schema Form Rules
 
@@ -83,8 +86,9 @@ runtime enforcement is the collector's own `validate()`. Write it for the operat
   `src/go/plugin/go.d/collector/config_schema_test.go` (`TestConfigSchemasDoNotMaterializeOptionalArrays`).
 - A key revealed by a `dependencies` branch MUST NOT also be a plain sibling property; declaring it twice shows it for
   every discriminator value. Enforced by `TestConfigSchemasDoNotDeclareBranchKeysAsProperties`.
-- Type an optional array or object as `["array", "null"]` / `["object", "null"]` to match the nil-able Go field; keep
-  scalar types on required lists and item schemas.
+- Type an optional array or object as `["array", "null"]` / `["object", "null"]` to match the nil-able Go field: a YAML
+  key written with no value decodes to nil, which the runtime accepts as absent, so a bare `"array"` rejects a config
+  that works. Keep scalar types on required lists and item schemas. This union is the majority convention in the tree.
 - A schema rule stricter than the runtime blocks legitimate configs in the UI; a looser one offers configs the
   collector rejects on `add`. A deliberate asymmetry is fine where only one layer can act: `minimum: 1` on an option
   whose code treats `0` as "use the default".
@@ -94,13 +98,16 @@ runtime enforcement is the collector's own `validate()`. Write it for the operat
 Tests about configuration:
 
 - Do NOT write tests that restate the schema file (its `required` list, defaults, `ui:help`, placeholders); they pin
-  mistakes as correct. Only two kinds carry weight: a **rule** (a forbidden pattern that fails on a wrong schema) and a
-  **drift check** (an expected value taken from an independent source, such as a Go constant the UI bound must equal).
+  mistakes as correct. Only two kinds carry weight: a **rule** (a forbidden pattern that fails on a wrong schema, such
+  as the repo-wide `minItems` check, or a per-collector check that a field whose omission drives runtime precedence
+  carries no `default`: `cloudwatch/config_test.go`, `TestConfigSchema_FormContract`) and a **drift check** (an expected
+  value taken from an independent source, such as a Go constant the UI bound must equal).
 - Test `validate()` by mutating a valid `Config` value per case. Do NOT hand-build `map[string]any` payloads or drive
   cases from YAML source text; both test the decoder, not the collector.
 - Where a field's shape encodes a contract, test the accessor that reads it (`cloudwatch/config_test.go`,
-  `TestRuleConfig_effectiveResourceTagFilters`). Check whether the rule already has coverage nearer its owner (a helper
-  package validates its own types).
+  `TestRuleConfig_effectiveResourceTagFilters`). Check whether the rule already has coverage nearer its owner: a helper
+  package validates its own types, and compile-stage reference rules belong with the compile tests, not the config
+  tests.
 
 ## 6. Metadata And Help In Operator Voice
 

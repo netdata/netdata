@@ -82,8 +82,8 @@ or framework infrastructure, and "this looks complex" is not a finding without a
    keys and owner identities.
 4. **Failure propagation and cost.** Can a stopped, corrupt, or unreachable job block a healthy one? State the cost
    variables: work per job per call, per retained item, remote calls, state serialization, lock scope, growth with
-   jobs and backlog. Use source-derived bounds; measure only when a claim needs it. A cache that preserves the
-   failure coupling is not a fix.
+   jobs and backlog. Use source-derived bounds at design time; a shipped hot-path change still follows
+   `src/go/AGENTS.md` "Hot-Path And Benchmark Discipline". A cache that preserves the failure coupling is not a fix.
 5. **Decision.** Necessary coordination is exposed as an operational trade-off and gets the applicable design
    approval. Unnecessary coordination is redesigned around the actual owner boundary. For durable ownership also
    state the recovery consequences: same owner versus different owner, label change, credential rotation, location
@@ -124,23 +124,23 @@ observations; check every early return against the table. Comparisons follow the
 
 **When:** designing `Init`, `Check`, `Collect`, `Cleanup`, and any `Run`. **Do:** review every entry point, including
 partial initialization, DynCfg `test`, autodetection, reload, and stop, not only `Collect` followed by a clean
-shutdown. Keep `Check` a cheap detection path with no reservation or side effect. Choose one of: caller-cancelled
-cleanup, or a detached best-effort cleanup with a fixed budget independent of request and retry settings (S3check:
-five seconds); trace that deadline through cleanup I/O and retain unfinished ownership for recovery. **Don't:** derive
-a shutdown budget from public tuning, or make orderly cleanup the crash-recovery mechanism. **Evidence:** the trace
-per entry point in the design note; tests for cancellation and partial init. **Boundary:** a read-only collector
-closing idle connections needs no journal or timeout machinery; background contexts are not banned, unbounded ones are.
+shutdown. Decide, per entry point, what it may do: `Check` detects only; cleanup is either caller-cancelled or detached
+with a fixed budget independent of request and retry settings (S3check: five seconds), with that deadline traced through
+cleanup I/O and unfinished ownership retained for recovery. The mechanics of these rules live in the V2 skill's Core
+Style. **Don't:** derive a shutdown budget from public tuning, or make orderly cleanup the crash-recovery mechanism.
+**Evidence:** the trace per entry point in the design note; tests for cancellation and partial init. **Boundary:** a
+read-only collector closing idle connections needs no journal or timeout machinery; background contexts are not banned,
+unbounded ones are.
 
 ## Simplification As Engineering
 
 **When:** throughout, and at the final pass. **Do:** prefer direct ownership, small types, clear transitions, and
 existing helpers over generic engines and defensive layers; name files by responsibility and check that the content
 matches; split along operations or state boundaries, not line counts; share only real semantics and keep distinct
-provider logic distinct; search the final diff for dead fields and helpers, duplicated defaults, unused persisted
-state, repeated finalization, and knobs whose motivating requirement disappeared. **Don't:** reject necessary state
-or boundaries to minimize the diff, or add pooling and caching to satisfy a slogan. **Evidence:** per-cycle cost
-stated from the source (a global O(N²) scan matters; a bounded map in a network-bound check does not). **Boundary:**
-file length is a signal, not a limit; splitting one function into arbitrarily named helpers is not architecture.
+provider logic distinct; run the V2 skill's Pre-PR final sweep before review. **Don't:** reject necessary state or
+boundaries to minimize the diff, or add pooling and caching to satisfy a slogan. **Evidence:** per-cycle cost stated
+from the source (a global O(N²) scan matters; a bounded map in a network-bound check does not). **Boundary:** file
+length is a signal, not a limit; splitting one function into arbitrarily named helpers is not architecture.
 
 ## Reading Sequence
 
