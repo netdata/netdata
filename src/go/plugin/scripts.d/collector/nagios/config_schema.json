@@ -266,8 +266,7 @@
       "ui:help": "**Arguments passed to the check command after macro expansion.**\n\nYou can use Nagios-style macros like `$ARG1$`, `$HOSTADDRESS$`, `$_SERVICEDBHOST$` — they are expanded before execution.\n\nOn Windows, when `plugin` points to a `.ps1`/`.bat`/`.cmd` script, these arguments are appended after the script path."
     },
     "arg_values": {
-      "ui:listFlavour": "list",
-      "ui:help": "These values are exported as `NAGIOS_ARG1` .. `NAGIOS_ARG32`."
+      "ui:listFlavour": "list"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (for example 1.5 for 1.5 seconds). String durations are also accepted in raw config files."

@@ -669,7 +669,6 @@
       "mode_combined": {
         "entries": {
           "ui:listFlavour": "list",
-          "ui:help": "Add explicit profile entries to merge with auto-discovered profiles in `combined` mode.",
           "items": {
             "name": {
               "ui:help": "Canonical profile basename.",

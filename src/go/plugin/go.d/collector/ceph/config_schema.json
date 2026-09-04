@@ -186,9 +186,6 @@
     "bearer_token_file": {
       "ui:help": "The token is sent only after credentialless active-MGR discovery and takes priority over Dashboard JSON login. Its external owner must replace it before expiry; the file is reread for every request."
     },
-    "autodetection_retry": {
-      "ui:help": "How often Netdata retries a job that failed its initial Dashboard/API check. Zero disables retries."
-    },
     "vnode": {
       "ui:placeholder": "Create a Virtual Node first, then reference its name here."
     },

@@ -700,7 +700,6 @@
             "ui:placeholder": "${env:AWS_ACCESS_KEY_ID}"
           },
           "secret_access_key": {
-            "ui:help": "AWS secret access key. Use a go.d secret reference instead of plaintext.",
             "ui:placeholder": "${env:AWS_SECRET_ACCESS_KEY}",
             "ui:widget": "password"
           },
@@ -714,7 +713,6 @@
     },
     "targets": {
       "ui:listFlavour": "list",
-      "ui:help": "Define the AWS identities to monitor. Each target references one credential source and may use it to assume one IAM role.",
       "items": {
         "name": {
           "ui:help": "Stable target name referenced by collection rules.",
@@ -740,7 +738,6 @@
       "ui:help": "Add ordered collection rules. The earliest matching rule and target own each overlapping exported metric/statistic series.",
       "items": {
         "name": {
-          "ui:help": "Stable rule name used in validation and diagnostics.",
           "ui:placeholder": "production-defaults"
         },
         "targets": {
@@ -761,7 +758,6 @@
           },
           "exclude": {
             "ui:listFlavour": "list",
-            "ui:help": "Profile basenames to remove from this rule's selection.",
             "items": {
               "ui:placeholder": "cloudfront"
             }
@@ -774,9 +770,6 @@
             "profile": {
               "ui:help": "Profile basename already selected by this rule. Add each profile at most once; other selected profiles keep their default-enabled metrics.",
               "ui:placeholder": "ec2"
-            },
-            "defaults": {
-              "ui:help": "Keep this profile's default-enabled metrics before adding the MetricNames below. Disable for an exact-only selection."
             },
             "statistics": {
               "ui:listFlavour": "list",
@@ -796,7 +789,6 @@
                 "ui:placeholder": "30m"
               },
               "publication_delay": {
-                "ui:help": "Collector wait after a period closes. This is not an AWS publication guarantee.",
                 "ui:placeholder": "10m"
               }
             },
@@ -847,12 +839,10 @@
             "ui:help": "Exact, case-sensitive AWS tag predicates. All keys must match; any value listed for one key may match. Explicitly included profiles must support safe resource-tag association.",
             "items": {
               "key": {
-                "ui:help": "Exact AWS resource tag key.",
                 "ui:placeholder": "Environment"
               },
               "values": {
                 "ui:listFlavour": "list",
-                "ui:help": "Accepted exact values for this key.",
                 "items": {
                   "ui:placeholder": "production"
                 }
@@ -871,26 +861,22 @@
             "ui:placeholder": "30m"
           },
           "publication_delay": {
-            "ui:help": "Collector wait after a period closes before querying it. This is not an AWS publication guarantee.",
             "ui:placeholder": "10m"
           }
         }
       }
     },
     "rule_defaults": {
-      "ui:help": "Defaults inherited by rules that do not provide their own value.",
       "filters": {
         "resource_tags": {
           "ui:listFlavour": "list",
           "ui:help": "Default exact AWS resource tag predicates. All keys must match; any listed value may match for one key. Unsupported default-selected profiles are skipped and reported.",
           "items": {
             "key": {
-              "ui:help": "Exact, case-sensitive AWS resource tag key.",
               "ui:placeholder": "Environment"
             },
             "values": {
               "ui:listFlavour": "list",
-              "ui:help": "Accepted exact, case-sensitive values for this key.",
               "items": {
                 "ui:placeholder": "production"
               }
@@ -917,14 +903,12 @@
     "labels": {
       "resource_tags": {
         "ui:listFlavour": "list",
-        "ui:help": "Copy selected AWS tags to Netdata chart labels. This affects presentation only and does not select resources.",
         "items": {
           "key": {
             "ui:help": "Exact AWS resource tag key.",
             "ui:placeholder": "Owner"
           },
           "label": {
-            "ui:help": "Optional Netdata label key. Leave empty to normalize the AWS tag key automatically.",
             "ui:placeholder": "resource_owner"
           }
         }
