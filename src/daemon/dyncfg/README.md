@@ -282,8 +282,8 @@ Schema files should be named after the configuration ID with `.json` extension, 
 
 If no static schema file is found, Netdata will call the plugin or module with the `DYNCFG_CMD_SCHEMA` command:
 
-1. For internal plugins, the callback function should return a JSON Schema document
-2. For external plugins, the plugin should respond to the schema command with a JSON Schema document
+1. For internal plugins, the callback function returns the schema document described below
+2. For external plugins, the plugin responds to the schema command with the same document
 
 This gives you flexibility to either:
 
@@ -441,7 +441,7 @@ This is a good example of an external plugin using the DynCfg system for a singl
 go.d.plugin uses DynCfg to manage job configurations. It:
 
 1. Registers configurations through the plugins.d protocol
-2. Generates dynamic JSON Schema based on Go struct tags
+2. Ships a hand-written `config_schema.json` per collector (the `jsonSchema`/`uiSchema` document) and returns it verbatim
 3. Handles configuration updates for collecting jobs
 
 It uses IDs like:

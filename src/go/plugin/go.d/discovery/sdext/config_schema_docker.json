@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "docker": {
             "title": "Docker",
+            "description": "Docker daemon connection used to list containers.",
             "type": "object",
             "properties": {
               "address": {
@@ -26,14 +28,12 @@
                 "minimum": 0.1,
                 "default": 2
               }
-            },
-            "description": "Docker daemon connection used to list containers."
+            }
           }
         },
         "required": [
           "docker"
-        ],
-        "description": "Where discovery candidates come from."
+        ]
       },
       "services": {
         "title": "Service rules",

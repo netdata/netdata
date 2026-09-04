@@ -294,7 +294,7 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: "Data collection interval, in seconds. Every CloudWatch series is evaluated on these ticks, never on its own timer."
+              description: "Data collection interval, in seconds, at least 60. Every CloudWatch series is evaluated on these ticks, never on its own timer."
               default_value: 60
               required: false
               group: Collection
@@ -600,12 +600,12 @@ modules:
               required: false
               group: Limits
             - name: discovery.refresh_every
-              description: "How often to rediscover matching metrics and resources, in seconds."
+              description: "How often to rediscover matching metrics and resources, in seconds, at least 60."
               default_value: 300
               required: false
               group: Discovery
             - name: discovery.recently_active_only
-              description: "Restrict discovery to metrics with activity in the last three hours, which keeps scans smaller and cheaper."
+              description: "Restrict discovery to metrics active in the last three hours where possible, which keeps scans smaller and cheaper."
               detailed_description: |
                 Profiles sharing one target, region, and namespace share one scan; the filter applies only while every participating series has `publication_delay + lookback + period` of three hours or less.
               default_value: true

@@ -79,13 +79,13 @@
           "properties": {
             "name": {
               "title": "Name",
-              "type": "string",
-              "description": "Device path, for example `/dev/sdc`."
+              "description": "Device path, for example `/dev/sdc`.",
+              "type": "string"
             },
             "type": {
               "title": "Type",
-              "type": "string",
-              "description": "Device type passed to smartctl as `-d`, for example `sat` or `jmb39x-q,3`."
+              "description": "Device type passed to smartctl as `-d`, for example `sat` or `jmb39x-q,3`.",
+              "type": "string"
             }
           }
         }

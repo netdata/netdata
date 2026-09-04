@@ -270,6 +270,11 @@
     },
     "proxy_password": {
       "ui:widget": "password"
+    },
+    "functions": {
+      "dsn": {
+        "ui:widget": "password"
+      }
     }
   }
 }

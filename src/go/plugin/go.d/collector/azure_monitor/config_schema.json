@@ -40,6 +40,7 @@
       },
       "discovery": {
         "title": "Discovery",
+        "description": "How the collector finds the Azure resources to monitor.",
         "type": "object",
         "properties": {
           "refresh_every": {
@@ -70,6 +71,7 @@
                   },
                   "mode_filters": {
                     "title": "Structured filters",
+                    "description": "Structured filters that select resources by resource group, region, and tags.",
                     "type": "object",
                     "properties": {
                       "resource_groups": {
@@ -102,8 +104,7 @@
                           "minItems": 1
                         }
                       }
-                    },
-                    "description": "Structured filters that select resources by resource group, region, and tags."
+                    }
                   }
                 }
               },
@@ -114,6 +115,7 @@
                   },
                   "mode_query": {
                     "title": "Custom query",
+                    "description": "An Azure Resource Graph query that selects the resources to monitor.",
                     "type": "object",
                     "properties": {
                       "kql": {
@@ -125,8 +127,7 @@
                     },
                     "required": [
                       "kql"
-                    ],
-                    "description": "An Azure Resource Graph query that selects the resources to monitor."
+                    ]
                   }
                 },
                 "required": [
@@ -135,11 +136,11 @@
               }
             ]
           }
-        },
-        "description": "How the collector finds the Azure resources to monitor."
+        }
       },
       "profiles": {
         "title": "Profiles",
+        "description": "Which metric profiles apply to the discovered resources.",
         "type": "object",
         "properties": {
           "mode": {
@@ -164,6 +165,7 @@
                   },
                   "mode_auto": {
                     "title": "Auto profile overrides",
+                    "description": "Overrides applied on top of the profiles selected automatically.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -186,21 +188,21 @@
                               "properties": {
                                 "resource_groups": {
                                   "title": "Resource groups",
+                                  "description": "Azure resource groups this entry applies to. Leave empty for all resource groups.",
                                   "type": "array",
                                   "items": {
                                     "type": "string",
                                     "minLength": 1
-                                  },
-                                  "description": "Azure resource groups this entry applies to. Leave empty for all resource groups."
+                                  }
                                 },
                                 "regions": {
                                   "title": "Regions",
+                                  "description": "Azure regions this entry applies to. Leave empty for all regions.",
                                   "type": "array",
                                   "items": {
                                     "type": "string",
                                     "minLength": 1
-                                  },
-                                  "description": "Azure regions this entry applies to. Leave empty for all regions."
+                                  }
                                 },
                                 "tags": {
                                   "title": "Tags",
@@ -223,8 +225,7 @@
                           ]
                         }
                       }
-                    },
-                    "description": "Overrides applied on top of the profiles selected automatically."
+                    }
                   }
                 }
               },
@@ -235,6 +236,7 @@
                   },
                   "mode_exact": {
                     "title": "Exact profiles",
+                    "description": "Only the listed profile entries apply; nothing is selected automatically.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -257,21 +259,21 @@
                               "properties": {
                                 "resource_groups": {
                                   "title": "Resource groups",
+                                  "description": "Azure resource groups this entry applies to. Leave empty for all resource groups.",
                                   "type": "array",
                                   "items": {
                                     "type": "string",
                                     "minLength": 1
-                                  },
-                                  "description": "Azure resource groups this entry applies to. Leave empty for all resource groups."
+                                  }
                                 },
                                 "regions": {
                                   "title": "Regions",
+                                  "description": "Azure regions this entry applies to. Leave empty for all regions.",
                                   "type": "array",
                                   "items": {
                                     "type": "string",
                                     "minLength": 1
-                                  },
-                                  "description": "Azure regions this entry applies to. Leave empty for all regions."
+                                  }
                                 },
                                 "tags": {
                                   "title": "Tags",
@@ -297,8 +299,7 @@
                     },
                     "required": [
                       "entries"
-                    ],
-                    "description": "Only the listed profile entries apply; nothing is selected automatically."
+                    ]
                   }
                 },
                 "required": [
@@ -312,6 +313,7 @@
                   },
                   "mode_combined": {
                     "title": "Combined profiles",
+                    "description": "Automatic profile selection plus the listed profile entries.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -334,21 +336,21 @@
                               "properties": {
                                 "resource_groups": {
                                   "title": "Resource groups",
+                                  "description": "Azure resource groups this entry applies to. Leave empty for all resource groups.",
                                   "type": "array",
                                   "items": {
                                     "type": "string",
                                     "minLength": 1
-                                  },
-                                  "description": "Azure resource groups this entry applies to. Leave empty for all resource groups."
+                                  }
                                 },
                                 "regions": {
                                   "title": "Regions",
+                                  "description": "Azure regions this entry applies to. Leave empty for all regions.",
                                   "type": "array",
                                   "items": {
                                     "type": "string",
                                     "minLength": 1
-                                  },
-                                  "description": "Azure regions this entry applies to. Leave empty for all regions."
+                                  }
                                 },
                                 "tags": {
                                   "title": "Tags",
@@ -374,8 +376,7 @@
                     },
                     "required": [
                       "entries"
-                    ],
-                    "description": "Automatic profile selection plus the listed profile entries."
+                    ]
                   }
                 },
                 "required": [
@@ -384,8 +385,7 @@
               }
             ]
           }
-        },
-        "description": "Which metric profiles apply to the discovered resources."
+        }
       },
       "query_offset": {
         "title": "Query offset",
@@ -403,6 +403,7 @@
       },
       "limits": {
         "title": "Limits",
+        "description": "Caps on request concurrency and batch sizes for the Azure Monitor API.",
         "type": "object",
         "properties": {
           "max_concurrency": {
@@ -429,8 +430,7 @@
             "maximum": 20,
             "default": 20
           }
-        },
-        "description": "Caps on request concurrency and batch sizes for the Azure Monitor API."
+        }
       },
       "auth": {
         "title": "Authentication",
@@ -523,7 +523,7 @@
         ]
       },
       "vnode": {
-        "title": "Virtual Node",
+        "title": "Virtual node",
         "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       },

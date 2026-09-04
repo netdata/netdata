@@ -33,7 +33,7 @@
         "default": "https://127.0.0.1:8443"
       },
       "timeout": {
-        "title": "HTTP timeout",
+        "title": "Timeout",
         "description": "Deadline for one Dashboard operation, in seconds, including discovery, login, retries, and decoding. At least 0.5.",
         "type": "number",
         "minimum": 0.5,
@@ -58,7 +58,7 @@
         "default": []
       },
       "vnode": {
-        "title": "Vnode",
+        "title": "Virtual node",
         "description": "Associates this once-per-cluster job with a Virtual Node. Functions stay attached to the physical Agent job.",
         "type": "string"
       },

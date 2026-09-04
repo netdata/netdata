@@ -75,6 +75,7 @@
         "properties": {
           "version": {
             "title": "SNMP version",
+            "description": "SNMP protocol version the device speaks.",
             "type": "string",
             "enum": [
               "1",
@@ -82,8 +83,7 @@
               "2c",
               "3"
             ],
-            "default": "2c",
-            "description": "SNMP protocol version the device speaks."
+            "default": "2c"
           },
           "port": {
             "title": "Port",
@@ -155,6 +155,7 @@
           },
           "auth_proto": {
             "title": "Authentication protocol",
+            "description": "Authentication protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -165,16 +166,16 @@
               "sha384",
               "sha512"
             ],
-            "default": "sha512",
-            "description": "Authentication protocol for SNMPv3 messages."
+            "default": "sha512"
           },
           "auth_key": {
             "title": "Authentication passphrase",
-            "type": "string",
-            "description": "Authentication protocol pass phrase for SNMPv3 messages."
+            "description": "Authentication protocol pass phrase for SNMPv3 messages.",
+            "type": "string"
           },
           "priv_proto": {
             "title": "Privacy protocol",
+            "description": "Privacy protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -182,15 +183,15 @@
               "aes",
               "aes192",
               "aes256",
-              "aes192c"
+              "aes192c",
+              "aes256c"
             ],
-            "default": "aes192c",
-            "description": "Privacy protocol for SNMPv3 messages."
+            "default": "aes192c"
           },
           "priv_key": {
             "title": "Privacy passphrase",
-            "type": "string",
-            "description": "Privacy protocol pass phrase for SNMPv3 messages."
+            "description": "Privacy protocol pass phrase for SNMPv3 messages.",
+            "type": "string"
           },
           "context_name": {
             "title": "Context name",
@@ -221,6 +222,7 @@
       },
       "ping": {
         "title": "Ping",
+        "description": "ICMP round-trip measurements collected alongside the SNMP metrics.",
         "type": [
           "object",
           "null"
@@ -228,9 +230,9 @@
         "properties": {
           "enabled": {
             "title": "Enable ping",
+            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that.",
             "type": "boolean",
-            "default": true,
-            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that."
+            "default": true
           },
           "network": {
             "title": "Network",
@@ -269,8 +271,7 @@
             "minimum": 0.1,
             "default": 0.1
           }
-        },
-        "description": "ICMP round-trip measurements collected alongside the SNMP metrics."
+        }
       }
     },
     "required": [
@@ -300,9 +301,6 @@
       }
     },
     "user": {
-      "name": {
-        "ui:widget": "password"
-      },
       "level": {
         "ui:widget": "radio",
         "ui:options": {

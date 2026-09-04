@@ -6,7 +6,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, in seconds. Every CloudWatch series is evaluated on these ticks, never on its own timer.",
+        "description": "Data collection interval, in seconds, at least 60. Every CloudWatch series is evaluated on these ticks, never on its own timer.",
         "type": "integer",
         "minimum": 60,
         "default": 60
@@ -19,7 +19,7 @@
         "default": 0
       },
       "vnode": {
-        "title": "Vnode",
+        "title": "Virtual node",
         "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       },
@@ -132,18 +132,19 @@
           "properties": {
             "name": {
               "title": "Name",
+              "description": "Name that collection rules use to reference this target.",
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
-              "description": "Name that collection rules use to reference this target."
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
             },
             "credentials": {
               "title": "Credential source",
+              "description": "Name of a credential source defined on the Credentials tab.",
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
-              "description": "Name of a credential source defined on the Credentials tab."
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
             },
             "assume_role": {
               "title": "Assume role",
+              "description": "IAM role to assume before collecting this target. Leave empty to use the credential source directly.",
               "type": [
                 "object",
                 "null"
@@ -151,9 +152,9 @@
               "properties": {
                 "role_arn": {
                   "title": "Role ARN",
+                  "description": "ARN of the IAM role to assume with the target's credential source.",
                   "type": "string",
-                  "pattern": "^\\S(?:.*\\S)?$",
-                  "description": "ARN of the IAM role to assume with the target's credential source."
+                  "pattern": "^\\S(?:.*\\S)?$"
                 },
                 "external_id": {
                   "title": "External ID",
@@ -164,8 +165,7 @@
               },
               "required": [
                 "role_arn"
-              ],
-              "description": "IAM role to assume before collecting this target. Leave empty to use the credential source directly."
+              ]
             }
           },
           "required": [
@@ -196,9 +196,9 @@
           "properties": {
             "name": {
               "title": "Name",
+              "description": "Unique rule name, shown in logs and diagnostics.",
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
-              "description": "Unique rule name, shown in logs and diagnostics."
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
             },
             "targets": {
               "title": "Targets",
@@ -222,11 +222,12 @@
               "properties": {
                 "defaults": {
                   "title": "Include defaults",
+                  "description": "Start from every default-enabled profile before applying the include and exclude lists.",
                   "type": "boolean",
-                  "default": true,
-                  "description": "Start from every default-enabled profile before applying the include and exclude lists."
+                  "default": true
                 },
                 "include": {
+                  "title": "Included profiles",
                   "description": "Profile basenames to add. With `defaults` off, only this list is collected, including profiles disabled by default.",
                   "type": [
                     "array",
@@ -237,10 +238,11 @@
                   "items": {
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
-                  },
-                  "title": "Included profiles"
+                  }
                 },
                 "exclude": {
+                  "title": "Excluded profiles",
+                  "description": "Profile basenames to remove from the selection. A profile cannot be both included and excluded.",
                   "type": [
                     "array",
                     "null"
@@ -250,9 +252,7 @@
                   "items": {
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
-                  },
-                  "description": "Profile basenames to remove from the selection. A profile cannot be both included and excluded.",
-                  "title": "Excluded profiles"
+                  }
                 }
               }
             },
@@ -426,20 +426,20 @@
                     "properties": {
                       "key": {
                         "title": "AWS tag key",
+                        "description": "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys.",
                         "type": "string",
-                        "minLength": 1,
-                        "description": "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys."
+                        "minLength": 1
                       },
                       "values": {
                         "title": "Accepted values",
+                        "description": "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches.",
                         "type": "array",
                         "minItems": 1,
                         "maxItems": 20,
                         "uniqueItems": true,
                         "items": {
                           "type": "string"
-                        },
-                        "description": "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches."
+                        }
                       }
                     },
                     "required": [
@@ -496,6 +496,7 @@
         "properties": {
           "filters": {
             "title": "Resource filters",
+            "description": "Resource filters inherited by every rule that does not define its own.",
             "type": [
               "object",
               "null"
@@ -514,20 +515,20 @@
                   "properties": {
                     "key": {
                       "title": "AWS tag key",
+                      "description": "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys.",
                       "type": "string",
-                      "minLength": 1,
-                      "description": "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys."
+                      "minLength": 1
                     },
                     "values": {
                       "title": "Accepted values",
+                      "description": "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches.",
                       "type": "array",
                       "minItems": 1,
                       "maxItems": 20,
                       "uniqueItems": true,
                       "items": {
                         "type": "string"
-                      },
-                      "description": "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches."
+                      }
                     }
                   },
                   "required": [
@@ -536,8 +537,7 @@
                   ]
                 }
               }
-            },
-            "description": "Resource filters inherited by every rule that does not define its own."
+            }
           },
           "query": {
             "title": "Default query policy",
@@ -555,9 +555,9 @@
               },
               "lookback": {
                 "title": "Rolling lookback",
+                "description": "Default window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods.",
                 "type": "string",
-                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$",
-                "description": "Default window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods."
+                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
               },
               "publication_delay": {
                 "title": "Publication delay",
@@ -579,6 +579,7 @@
         "properties": {
           "resource_tags": {
             "title": "AWS resource tag labels",
+            "description": "AWS resource tags copied to charts as labels. Presentation only; they never select resources.",
             "type": [
               "array",
               "null"
@@ -588,9 +589,9 @@
               "properties": {
                 "key": {
                   "title": "AWS tag key",
+                  "description": "Exact, case-sensitive AWS tag key to copy.",
                   "type": "string",
-                  "minLength": 1,
-                  "description": "Exact, case-sensitive AWS tag key to copy."
+                  "minLength": 1
                 },
                 "label": {
                   "title": "Netdata label",
@@ -602,8 +603,7 @@
               "required": [
                 "key"
               ]
-            },
-            "description": "AWS resource tags copied to charts as labels. Presentation only; they never select resources."
+            }
           }
         }
       },
@@ -634,6 +634,7 @@
       },
       "discovery": {
         "title": "Discovery",
+        "description": "How often and how widely the collector scans CloudWatch for matching metrics.",
         "type": [
           "object",
           "null"
@@ -641,19 +642,18 @@
         "properties": {
           "refresh_every": {
             "title": "Refresh interval",
+            "description": "How often to rediscover matching metrics and resources, in seconds, at least 60.",
             "type": "integer",
             "minimum": 60,
-            "default": 300,
-            "description": "How often to rediscover matching metrics and resources, in seconds."
+            "default": 300
           },
           "recently_active_only": {
             "title": "Recently active only",
+            "description": "Restrict discovery to metrics active in the last three hours where possible, which keeps scans smaller and cheaper.",
             "type": "boolean",
-            "default": true,
-            "description": "Restrict discovery to metrics with activity in the last three hours, which keeps scans smaller and cheaper."
+            "default": true
           }
-        },
-        "description": "How often and how widely the collector scans CloudWatch for matching metrics."
+        }
       },
       "timeout": {
         "title": "Timeout",
@@ -752,9 +752,6 @@
         },
         "profiles": {
           "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles. Detailed PrivateLink endpoint/service grains are opt-in. Billing is opt-in through billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
-          "defaults": {
-            "ui:help": "Include all default-enabled profiles before applying include and exclude lists."
-          },
           "include": {
             "ui:listFlavour": "list",
             "ui:help": "Additional profile basenames to include. PrivateLink detail choices are privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service; use us-east-1 and disable inherited resource-tag filters for them.",
@@ -808,7 +805,6 @@
               "ui:help": "Exact AWS MetricNames to add. A metric-level statistics list replaces the group list; if both are omitted, the profile-declared statistics are used. Repeat a MetricName only for disjoint statistics.",
               "items": {
                 "name": {
-                  "ui:help": "Exact, case-sensitive AWS MetricName from the profile.",
                   "ui:placeholder": "CPUUtilization"
                 },
                 "statistics": {
@@ -945,9 +941,6 @@
       }
     },
     "discovery": {
-      "refresh_every": {
-        "ui:help": "How often to rediscover matching CloudWatch metrics and resources."
-      },
       "recently_active_only": {
         "ui:help": "When enabled, use CloudWatch's three-hour filter only when every selected series sharing a namespace scan has publication_delay + lookback + period of three hours or less. A longer-horizon participant keeps the shared scan unfiltered."
       }

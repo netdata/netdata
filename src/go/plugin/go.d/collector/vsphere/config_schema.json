@@ -392,6 +392,14 @@
             "tls_cert",
             "tls_key"
           ]
+        },
+        {
+          "title": "Proxy",
+          "fields": [
+            "proxy_url",
+            "proxy_username",
+            "proxy_password"
+          ]
         }
       ]
     },
@@ -411,14 +419,8 @@
     "not_follow_redirects": {
       "ui:widget": "hidden"
     },
-    "proxy_url": {
-      "ui:widget": "hidden"
-    },
-    "proxy_username": {
-      "ui:widget": "hidden"
-    },
     "proxy_password": {
-      "ui:widget": "hidden"
+      "ui:widget": "password"
     },
     "headers": {
       "ui:widget": "hidden"

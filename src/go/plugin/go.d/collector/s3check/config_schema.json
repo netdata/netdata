@@ -75,8 +75,8 @@
             "minLength": 1
           },
           "credentials": {
-            "$ref": "#/definitions/credentials",
-            "description": "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain."
+            "description": "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain.",
+            "$ref": "#/definitions/credentials"
           },
           "assume_role": {
             "title": "Assume role",
@@ -174,12 +174,12 @@
           },
           "source": {
             "title": "S3 connection",
+            "description": "The S3 endpoint to check.",
             "allOf": [
               {
                 "$ref": "#/definitions/connection"
               }
-            ],
-            "description": "The S3 endpoint to check."
+            ]
           }
         },
         "required": [
@@ -202,21 +202,21 @@
           },
           "source": {
             "title": "Source connection",
+            "description": "Where probe objects are written and deleted.",
             "allOf": [
               {
                 "$ref": "#/definitions/connection"
               }
-            ],
-            "description": "Where probe objects are written and deleted."
+            ]
           },
           "destination": {
             "title": "Destination connection",
+            "description": "Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects.",
             "allOf": [
               {
                 "$ref": "#/definitions/connection"
               }
-            ],
-            "description": "Where replicated copies must appear. The collector never writes here."
+            ]
           },
           "write_objective": {
             "title": "Write visibility objective",
@@ -296,12 +296,12 @@
               },
               "mode_lifecycle": {
                 "title": "Lifecycle configuration",
+                "description": "Settings of the `lifecycle` mode. Required when `mode` is `lifecycle`.",
                 "allOf": [
                   {
                     "$ref": "#/definitions/lifecycle_mode"
                   }
-                ],
-                "description": "Settings of the `lifecycle` mode. Required when `mode` is `lifecycle`."
+                ]
               }
             },
             "required": [
@@ -330,12 +330,12 @@
               },
               "mode_ceph_multisite": {
                 "title": "Ceph multisite configuration",
+                "description": "Settings of the `ceph_multisite` mode. Required when `mode` is `ceph_multisite`.",
                 "allOf": [
                   {
                     "$ref": "#/definitions/replication_mode"
                   }
-                ],
-                "description": "Settings of the `ceph_multisite` mode. Required when `mode` is `ceph_multisite`."
+                ]
               }
             },
             "required": [
@@ -364,12 +364,12 @@
               },
               "mode_aws_replication": {
                 "title": "AWS replication configuration",
+                "description": "Settings of the `aws_replication` mode. Required when `mode` is `aws_replication`.",
                 "allOf": [
                   {
                     "$ref": "#/definitions/replication_mode"
                   }
-                ],
-                "description": "Settings of the `aws_replication` mode. Required when `mode` is `aws_replication`."
+                ]
               }
             },
             "required": [
@@ -495,7 +495,7 @@
           "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials."
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
@@ -583,7 +583,7 @@
           "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials."
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
@@ -665,7 +665,7 @@
           "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials."
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `destination` chart label. Changing it does not affect the objects the collector owns."
@@ -765,7 +765,7 @@
           "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials."
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
@@ -847,7 +847,7 @@
           "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials."
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `destination` chart label. Changing it does not affect the objects the collector owns."

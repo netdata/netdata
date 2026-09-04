@@ -5,6 +5,7 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 // These tests are rules over every hand-written DynCfg schema in the Go plugin tree. Each one forbids
@@ -38,13 +41,13 @@ var renderedUIKeys = map[string]bool{
 	"ui:flavour": true, "ui:options": true, "ui:help": true, "ui:placeholder": true, "ui:widget": true,
 	"ui:listFlavour": true, "ui:collapsible": true, "ui:order": true, "ui:descriptionPosition": true,
 	"ui:openEmptyItem": true, "ui:title": true, "ui:initiallyExpanded": true, "ui:classNames": true,
-	"ui:groups": true,
+	"ui:groups": true, "ui:creatable": true, "ui:validation": true,
 }
 
 var renderedUIOptions = map[string]bool{
 	"tabs": true, "rest": true, "inline": true, "rows": true, "collapsible": true, "flavour": true,
-	"enumNames": true, "enumOptions": true, "addable": true, "orderable": true, "removable": true,
-	"label": true,
+	"enumNames": true, "enumOptions": true, "enumOrder": true, "addable": true, "orderable": true,
+	"removable": true, "label": true,
 }
 
 // renderedWidgets are the ui:widget values with a Netdata-styled widget. An unknown value throws in
@@ -56,12 +59,17 @@ var renderedWidgets = map[string]bool{
 // secretNames matches a property name whose value is credential material. A file path is not a
 // secret even when it points at one, so names ending in _file, _path, _dir are excluded below.
 var secretNames = regexp.MustCompile(
-	`(^|_)(password|passwd|secret|token|api_key|private_key|passphrase|community|access_key|client_secret|session_token|priv_key|auth_key)($|_)`)
+	`(^|_)(password|passwd|secret|token|api_key|private_key|passphrase|community|access_key|client_secret|session_token|priv_key|auth_key|dsn|connection_string)($|_)`)
 
-// neverMasked matches names that are not secrets even when they sit next to one: identities, paths,
-// certificates, plain URLs. Masking them hides nothing and stops the operator reading back their input.
+// notCredential matches names a secret noun can appear in without the value being a secret: file
+// paths, identifiers, ARNs, and display names. They are exempt from the "must mask" rule.
+var notCredential = regexp.MustCompile(`(_file|_path|_dir|_id|_arn|_name)$`)
+
+// neverMasked matches identities, paths, certificates, and plain URLs by name, and identities by their
+// operator-facing text. Masking them hides nothing and stops the operator reading back their input.
 var neverMasked = regexp.MustCompile(
-	`(_file|_path|_dir|_id|_arn|_name)$|^(username|user|proxy_username|url|proxy_url|tls_ca|tls_cert|tls_key)$|_url$`)
+	`^(username|user|proxy_username|url|proxy_url|tls_ca|tls_cert|tls_key)$|_url$|_file$|_path$|_dir$`)
+var identityText = regexp.MustCompile(`(?i)^(user ?name|login|account( name)?)$`)
 
 // credentialShaped matches an example that embeds credentials in a URL or DSN, which the value then
 // also carries and the form must mask.
@@ -127,7 +135,7 @@ func TestConfigSchemasReachEveryProperty(t *testing.T) {
 				rest[name] = true
 			}
 		}
-		for name := range mapField(doc.schema["properties"]) {
+		for name := range reachable {
 			if onTab[name] == 0 && !rest[name] && !isHidden(mapField(doc.ui[name])) {
 				assert.Failf(t, "unreachable property",
 					"%s: %q is on no tab, not in ui:options.rest, and not hidden; the UI drops it but still submits its default", doc.file, name)
@@ -152,7 +160,7 @@ func TestConfigSchemasUseOnlyRenderedUIKeys(t *testing.T) {
 					assert.Truef(t, renderedUIKeys[key], "%s: %s is not a key the UI renders", doc.file, at)
 					switch key {
 					case "ui:widget":
-						assert.Truef(t, renderedWidgets[fmt.Sprint(raw)], "%s: %s = %v is not a widget the UI has; the form would fail to render", doc.file, at, raw)
+						assert.Truef(t, renderedWidgets[fmt.Sprint(raw)], "%s: %s = %v is not a widget Netdata styles", doc.file, at, raw)
 					case "ui:options":
 						for option := range mapField(raw) {
 							assert.Truef(t, renderedUIOptions[option], "%s: %s.%s is not an option the UI renders", doc.file, at, option)
@@ -251,13 +259,13 @@ func TestConfigSchemasMaskOnlySecrets(t *testing.T) {
 			}
 			name := path[strings.LastIndexAny(path, ".")+1:]
 			masked := ui["ui:widget"] == "password"
-			example := stringField(ui, "ui:placeholder") + " " + stringField(schema, "description")
+			example := stringField(ui, "ui:placeholder") + " " + stringField(schema, "description") + " " + stringField(ui, "ui:help")
 			switch {
-			case secretNames.MatchString(name) && !neverMasked.MatchString(name):
+			case secretNames.MatchString(name) && !notCredential.MatchString(name):
 				assert.Truef(t, masked, "%s: %s is a credential without \"ui:widget\": \"password\"; the UI shows it in clear", doc.file, path)
 			case credentialShaped.MatchString(example):
 				assert.Truef(t, masked, "%s: %s accepts embedded credentials (see its example) without \"ui:widget\": \"password\"", doc.file, path)
-			case neverMasked.MatchString(name):
+			case neverMasked.MatchString(name), identityText.MatchString(stringField(schema, "title")):
 				assert.Falsef(t, masked, "%s: %s is not a secret; masking it hides nothing and blocks read-back", doc.file, path)
 			}
 		})
@@ -348,10 +356,11 @@ func TestConfigSchemasDoNotDeclareBranchKeysAsProperties(t *testing.T) {
 
 // configSchema is one loaded schema document.
 type configSchema struct {
-	file   string
-	raw    map[string]any
-	schema map[string]any // jsonSchema
-	ui     map[string]any // uiSchema
+	file     string
+	raw      map[string]any
+	schema   map[string]any // jsonSchema
+	ui       map[string]any // uiSchema
+	resolver collecttest.SchemaResolver
 }
 
 func loadConfigSchemas(t *testing.T) []configSchema {
@@ -364,20 +373,54 @@ func loadConfigSchemas(t *testing.T) []configSchema {
 		files = append(files, matches...)
 	}
 	sort.Strings(files)
+	assertGlobsCoverEverySchema(t, files)
 	docs := make([]configSchema, 0, len(files))
 	for _, file := range files {
 		data, err := os.ReadFile(file)
 		require.NoError(t, err, file)
 		var raw map[string]any
 		require.NoError(t, json.Unmarshal(data, &raw), file)
+		schema := mapField(raw["jsonSchema"])
 		docs = append(docs, configSchema{
-			file:   filepath.ToSlash(file),
-			raw:    raw,
-			schema: mapField(raw["jsonSchema"]),
-			ui:     mapField(raw["uiSchema"]),
+			file:     filepath.ToSlash(file),
+			raw:      raw,
+			schema:   schema,
+			ui:       mapField(raw["uiSchema"]),
+			resolver: collecttest.NewSchemaResolver(schema),
 		})
 	}
 	return docs
+}
+
+// assertGlobsCoverEverySchema fails when a config_schema*.json exists under src/go/plugin that the glob
+// list does not reach, so a new form schema cannot land unchecked. The ibm.d schemas are generated by
+// docgen (fixed in the generator), and framework/charttpl validates charts.yaml rather than a form.
+func assertGlobsCoverEverySchema(t *testing.T, covered []string) {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, file := range covered {
+		abs, err := filepath.Abs(file)
+		require.NoError(t, err)
+		seen[abs] = true
+	}
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, "config_schema") || !strings.HasSuffix(name, ".json") {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		if strings.HasPrefix(rel, "ibm.d"+string(filepath.Separator)) || rel == filepath.Join("framework", "charttpl", "config_schema.json") {
+			return nil
+		}
+		assert.Truef(t, seen[path], "%s is a form schema outside configSchemaGlobs; add its location to the list", rel)
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 // forEachVisibleProperty visits every property the form renders (hidden ones and their children are
@@ -417,93 +460,12 @@ func forEachVisibleProperty(doc configSchema, visit func(path string, schema, ui
 	walk(doc.schema, doc.ui, "")
 }
 
-// propertiesOf returns a node's properties plus the properties every dependencies branch reveals,
-// each resolved through $ref and allOf, keyed by name.
+// propertiesOf returns a node's properties plus the properties every dependencies branch reveals.
 func propertiesOf(doc configSchema, node map[string]any) map[string]map[string]any {
-	node = resolve(doc, node)
-	out := map[string]map[string]any{}
-	for name, child := range mapField(node["properties"]) {
-		out[name] = resolve(doc, mapField(child))
-	}
-	for discriminator, raw := range mapField(node["dependencies"]) {
-		for _, branch := range schemaBranches(raw) {
-			for name, child := range mapField(resolve(doc, branch)["properties"]) {
-				if name == discriminator {
-					continue
-				}
-				if _, seen := out[name]; !seen {
-					out[name] = resolve(doc, mapField(child))
-				}
-			}
-		}
-	}
-	return out
+	return doc.resolver.Properties(node)
 }
 
-// resolve follows a local $ref and merges allOf members into one schema object, so callers see the
-// properties a composed node actually has. Nil in, nil out.
-func resolve(doc configSchema, node map[string]any) map[string]any {
-	if node == nil {
-		return nil
-	}
-	out := map[string]any{}
-	if ref, ok := node["$ref"].(string); ok {
-		for key, value := range resolve(doc, derefLocal(doc, ref)) {
-			out[key] = value
-		}
-	}
-	if members, ok := node["allOf"].([]any); ok {
-		for _, member := range members {
-			for key, value := range resolve(doc, mapField(member)) {
-				if key == "properties" || key == "required" {
-					out[key] = mergeSchemaField(out[key], value)
-					continue
-				}
-				out[key] = value
-			}
-		}
-	}
-	for key, value := range node {
-		if key == "$ref" || key == "allOf" {
-			continue
-		}
-		if key == "properties" || key == "required" {
-			out[key] = mergeSchemaField(out[key], value)
-			continue
-		}
-		out[key] = value
-	}
-	return out
-}
-
-func mergeSchemaField(existing, incoming any) any {
-	switch in := incoming.(type) {
-	case map[string]any:
-		merged := map[string]any{}
-		for k, v := range mapField(existing) {
-			merged[k] = v
-		}
-		for k, v := range in {
-			merged[k] = v
-		}
-		return merged
-	case []any:
-		have, _ := existing.([]any)
-		return append(append([]any{}, have...), in...)
-	}
-	return incoming
-}
-
-func derefLocal(doc configSchema, ref string) map[string]any {
-	if !strings.HasPrefix(ref, "#/") {
-		return nil
-	}
-	var node any = doc.schema
-	for _, part := range strings.Split(ref[2:], "/") {
-		node = mapField(node)[part]
-	}
-	return mapField(node)
-}
+func resolve(doc configSchema, node map[string]any) map[string]any { return doc.resolver.Resolve(node) }
 
 // lineJoiningBreaks returns the line before each single "\n" that Markdown would render as a space:
 // not a paragraph break, not adjacent to a heading, list item, table row, or blockquote, not inside
@@ -563,28 +525,7 @@ func mapField(node any) map[string]any {
 	return obj
 }
 
-// schemaBranches returns a dependency's oneOf/anyOf alternatives, or the dependency itself when it
-// applies unconditionally. A property dependency (a list of names) has no branches.
-func schemaBranches(node any) []map[string]any {
-	obj := mapField(node)
-	if obj == nil {
-		return nil
-	}
-	for _, keyword := range []string{"oneOf", "anyOf"} {
-		raw, ok := obj[keyword].([]any)
-		if !ok {
-			continue
-		}
-		branches := make([]map[string]any, 0, len(raw))
-		for _, branch := range raw {
-			if b := mapField(branch); b != nil {
-				branches = append(branches, b)
-			}
-		}
-		return branches
-	}
-	return []map[string]any{obj}
-}
+func schemaBranches(node any) []map[string]any { return collecttest.SchemaBranches(node) }
 
 func schemaAllowsArray(schemaType any) bool {
 	switch value := schemaType.(type) {

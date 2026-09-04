@@ -75,10 +75,12 @@
       },
       "functions": {
         "title": "Functions",
+        "description": "Settings of the interactive Functions this job exposes in the UI.",
         "type": "object",
         "properties": {
           "top_queries": {
             "title": "Top Queries",
+            "description": "Settings of the Top Queries function, which lists the slowest recent commands from the Redis slow log.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -101,11 +103,9 @@
                 "maximum": 5000,
                 "default": 500
               }
-            },
-            "description": "Settings of the Top Queries function, which lists the slowest recent commands from the Redis slow log."
+            }
           }
-        },
-        "description": "Settings of the interactive Functions this job exposes in the UI."
+        }
       }
     },
     "required": [

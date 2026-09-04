@@ -270,6 +270,11 @@
           ]
         }
       ]
+    },
+    "functions": {
+      "dsn": {
+        "ui:widget": "password"
+      }
     }
   }
 }

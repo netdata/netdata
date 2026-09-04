@@ -13,6 +13,7 @@
       },
       "charts": {
         "title": "Charts configuration",
+        "description": "Synthetic charts this test collector generates.",
         "type": [
           "object",
           "null"
@@ -64,11 +65,11 @@
           "contexts",
           "dimensions",
           "labels"
-        ],
-        "description": "Synthetic charts this test collector generates."
+        ]
       },
       "hidden_charts": {
         "title": "Hidden charts configuration",
+        "description": "Synthetic charts generated with the hidden flag, to exercise hidden-chart handling.",
         "type": [
           "object",
           "null"
@@ -120,8 +121,7 @@
           "contexts",
           "dimensions",
           "labels"
-        ],
-        "description": "Synthetic charts generated with the hidden flag, to exercise hidden-chart handling."
+        ]
       }
     },
     "required": [

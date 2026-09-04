@@ -134,9 +134,12 @@ When reviewing a PR that touches a collector, verify:
      `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`
      from its tests. It checks per option that the tab listing
      the option's root property is the first segment of its
-     group, and that every tab is named by some group. The call
-     is opt-in because most collectors would fail it today;
-     `cloudwatch` and `azure_monitor` are the worked examples.
+     group, that the schema declares the option with the same
+     description, that every tab is named by some group, and
+     that every visible top-level property is documented. The
+     call is opt-in because most collectors would fail it today;
+     `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the
+     worked examples.
 
 4. **Alert changes have matching `metadata.yaml.alerts`
    entries.** If `health.d/<plugin>.conf` adds, removes, or

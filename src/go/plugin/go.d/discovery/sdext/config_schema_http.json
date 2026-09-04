@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "http": {
             "title": "HTTP",
+            "description": "HTTP endpoint fetched periodically for discovery items.",
             "type": "object",
             "properties": {
               "url": {
@@ -79,23 +81,23 @@
               },
               "not_follow_redirects": {
                 "title": "Do not follow redirects",
-                "type": "boolean",
-                "description": "Treat an HTTP redirect as a failed request instead of following it."
+                "description": "Treat an HTTP redirect as a failed request instead of following it.",
+                "type": "boolean"
               },
               "proxy_url": {
                 "title": "Proxy URL",
-                "type": "string",
-                "description": "URL of the HTTP proxy to route requests through."
+                "description": "URL of the HTTP proxy to route requests through.",
+                "type": "string"
               },
               "proxy_username": {
                 "title": "Proxy username",
-                "type": "string",
-                "description": "Username for the HTTP proxy."
+                "description": "Username for the HTTP proxy.",
+                "type": "string"
               },
               "proxy_password": {
                 "title": "Proxy password",
-                "type": "string",
-                "description": "Password for the HTTP proxy."
+                "description": "Password for the HTTP proxy.",
+                "type": "string"
               },
               "tls_ca": {
                 "title": "TLS CA",
@@ -114,8 +116,8 @@
               },
               "tls_skip_verify": {
                 "title": "Skip TLS verification",
-                "type": "boolean",
-                "description": "Skip verification of the server's TLS certificate."
+                "description": "Skip verification of the server's TLS certificate.",
+                "type": "boolean"
               },
               "force_http2": {
                 "title": "Force HTTP/2",
@@ -124,14 +126,12 @@
             },
             "required": [
               "url"
-            ],
-            "description": "HTTP endpoint fetched periodically for discovery items."
+            ]
           }
         },
         "required": [
           "http"
-        ],
-        "description": "Where discovery candidates come from."
+        ]
       },
       "services": {
         "title": "Service rules",

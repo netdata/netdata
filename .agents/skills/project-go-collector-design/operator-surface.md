@@ -48,8 +48,8 @@ start from a minimal usable YAML example and a realistic DynCfg workflow, not fr
 options type. Decide "should this be public" before "which tab holds it". Keep a mode selector and its complete
 conditional configuration object together in one tab; keep common collection options (`update_every`, `vnode`,
 `timeout`) separate. Exercise the actual frontend for mode and authentication switching and verify that switching
-leaves no hidden contradictory fields or secrets in the submission. Mark secrets `sensitive` and confirm the inspected
-frontend masks them (some versions need password-style widgets). **Don't:** call a schema that validates a usable
+leaves no hidden contradictory fields or secrets in the submission. Give secrets `"ui:widget": "password"` (the
+`sensitive` flag is read by nothing) and confirm the form masks them. **Don't:** call a schema that validates a usable
 form; nest a second discriminator inside a mode object without inspecting how the frontend prunes inactive branches
 (the examined version pruned only at the root); pretend JSON Schema enforcement runs on every job when runtime
 `validate()` is the authority. **Evidence:** the exercised form flows, recorded in the SOW with the frontend version.

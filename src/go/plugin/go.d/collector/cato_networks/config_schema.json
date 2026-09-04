@@ -45,7 +45,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "HTTP request timeout.",
+        "description": "HTTP request timeout, in seconds.",
         "type": "number",
         "minimum": 0,
         "default": 30

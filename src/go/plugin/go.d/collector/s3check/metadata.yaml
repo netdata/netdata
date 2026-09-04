@@ -415,7 +415,7 @@ modules:
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.destination"
-              description: "Where replicated copies must appear. The collector never writes here."
+              description: "Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
@@ -647,7 +647,7 @@ modules:
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.destination"
-              description: "Where replicated copies must appear. The collector never writes here."
+              description: "Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"

@@ -48,10 +48,12 @@
       },
       "functions": {
         "title": "Functions",
+        "description": "Settings of the interactive Functions this job exposes in the UI.",
         "type": "object",
         "properties": {
           "running_queries": {
             "title": "Running Queries",
+            "description": "Settings of the Running Queries function, which lists the queries executing right now.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -74,11 +76,9 @@
                 "maximum": 5000,
                 "default": 500
               }
-            },
-            "description": "Settings of the Running Queries function, which lists the queries executing right now."
+            }
           }
-        },
-        "description": "Settings of the interactive Functions this job exposes in the UI."
+        }
       }
     },
     "required": [

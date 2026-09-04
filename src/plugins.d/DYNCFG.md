@@ -250,8 +250,7 @@ If no static schema file is found, Netdata will send a `schema` command to the p
         "title": "URL",
         "description": "The URL of the Nginx stub_status page.",
         "type": "string",
-        "format": "uri",
-        "default": "http://127.0.0.1/stub_status"
+        "format": "uri"
       },
       "timeout": {
         "title": "Timeout",
@@ -291,9 +290,12 @@ For templates, the schema will be used when users add new jobs based on the temp
 
 ### What The UI Renders
 
-The form is react-jsonschema-form (v6) with Netdata templates and widgets. Only the keys below have an effect; anything
-else in `uiSchema` is ignored, and an unknown `ui:widget` value throws and replaces the form with an error view. This
-section describes the UI as verified in September 2026; re-verify against the UI code when it changes.
+The form is react-jsonschema-form (v6) with Netdata templates and widgets. The table below is the vocabulary a plugin
+schema uses; a `ui:*` key outside it is silently ignored. The UI also honors `ui:groups` (grouped sections without
+tabs), `ui:classNames` (grid layout classes), `ui:initiallyExpanded`, `ui:creatable` (free text in a select), and
+`ui:validation.warning`; they exist for the health alert editor and plugin forms use tabs instead. A `ui:widget`
+value that is neither a Netdata widget nor a react-jsonschema-form alias throws and replaces the form with an error
+view. This section describes the UI as verified in September 2026; re-verify against the UI code when it changes.
 
 Text channels, per property:
 
@@ -316,7 +318,7 @@ Markdown facts that apply to `description` and `ui:help` alike:
 
 | Key | On | Effect |
 |---|---|---|
-| `ui:flavour: "tabs"` + `ui:options.tabs: [{title, fields}]` | object | renders the object's properties on tabs, in array order; `fields` lists top-level property names of that object (no dotted paths); any object at any depth may have its own tabs |
+| `ui:flavour: "tabs"` + `ui:options.tabs: [{title, fields}]` | object | renders the object's properties on tabs, tabs in array order; `fields` lists top-level property names of that object (no dotted paths); the order of fields inside a tab follows the object's property order (after `ui:order`), not the order in `fields`; any object at any depth may have its own tabs |
 | `ui:options.rest: [names]` | tabbed object | properties rendered flat above the tab strip |
 | `ui:help` | any property | info tooltip (Markdown) |
 | `ui:placeholder` | string | input placeholder |
@@ -330,6 +332,7 @@ Markdown facts that apply to `description` and `ui:help` alike:
 | `ui:descriptionPosition: "top"` | any | description above the input |
 | `ui:openEmptyItem: true` | array | adds one item when the array is empty |
 | `ui:options.addable/orderable/removable: false` | array | hides the add, move, remove controls |
+| `ui:options.collapsible`, `ui:options.flavour: "buttonGroup"`, `ui:options.enumOptions`, `ui:options.label: false` | object, radio, enum, any | collapsible alias; segmented radio; explicit option list; hides an object's title and description |
 | `ui:title` | any | overrides `title` |
 
 Behavior an author must design around:
@@ -351,8 +354,9 @@ Behavior an author must design around:
   more members collapse to the first.
 - Maps: `additionalProperties: {type: ...}` renders a key/value list with an add button; `patternProperties` alone
   renders without an add button.
-- Secrets: `ui:widget: "password"` is the ONLY signal that masks a value, in the input AND in the live YAML preview
-  pane. Any other schema flag (for example a custom `sensitive` field) is ignored.
+- Secrets: `ui:widget: "password"` masks the input and is the ONLY signal that redacts the value in the live YAML
+  preview pane. `format: "password"` masks the input but not the preview; any other schema flag (for example a custom
+  `sensitive` field) is ignored by both.
 - Unknown keys in an existing job's data are preserved and submitted; the schema is not a filter.
 
 ## Action Behavior Reference

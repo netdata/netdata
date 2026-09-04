@@ -6,7 +6,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Framework collection interval for self-metrics. Trap packet reception is event-driven and does not depend on this interval.",
+        "description": "Interval for this collector's own metrics, in seconds. Trap reception is event-driven and does not depend on it.",
         "type": "integer",
         "minimum": 1,
         "default": 1
@@ -42,6 +42,7 @@
           },
           "endpoints": {
             "title": "Endpoints",
+            "description": "UDP endpoints the trap listener binds, each an address and a port.",
             "type": "array",
             "default": [
               {
@@ -59,9 +60,7 @@
                   "title": "Protocol",
                   "description": "Transport protocol.",
                   "type": "string",
-                  "enum": [
-                    "udp"
-                  ],
+                  "enum": ["udp"],
                   "default": "udp"
                 },
                 "address": {
@@ -79,44 +78,27 @@
                   "default": 162
                 }
               },
-              "required": [
-                "protocol",
-                "address",
-                "port"
-              ]
-            },
-            "description": "UDP endpoints the trap listener binds, each an address and a port."
+              "required": ["protocol", "address", "port"]
+            }
           }
         },
-        "required": [
-          "endpoints"
-        ]
+        "required": ["endpoints"]
       },
       "versions": {
         "title": "SNMP versions",
         "description": "Accepted trap protocol versions.",
         "type": "array",
-        "default": [
-          "v1",
-          "v2c"
-        ],
+        "default": ["v1", "v2c"],
         "items": {
           "type": "string",
-          "enum": [
-            "v1",
-            "v2c",
-            "v3"
-          ]
+          "enum": ["v1", "v2c", "v3"]
         },
         "uniqueItems": true
       },
       "communities": {
         "title": "Communities",
         "description": "SNMPv1/v2c community allowlist. Empty accepts all communities.",
-        "type": [
-          "array",
-          "null"
-        ],
+        "type": ["array", "null"],
         "default": [],
         "items": {
           "type": "string"
@@ -126,10 +108,7 @@
       "usm_users": {
         "title": "USM Users",
         "description": "SNMPv3 USM users with auth and privacy protocols. Auth and privacy keys use Netdata secret references.",
-        "type": [
-          "array",
-          "null"
-        ],
+        "type": ["array", "null"],
         "default": [],
         "items": {
           "type": "object",
@@ -150,15 +129,7 @@
               "title": "Authentication protocol",
               "description": "SNMPv3 authentication protocol.",
               "type": "string",
-              "enum": [
-                "none",
-                "md5",
-                "sha",
-                "sha224",
-                "sha256",
-                "sha384",
-                "sha512"
-              ]
+              "enum": ["none", "md5", "sha", "sha224", "sha256", "sha384", "sha512"]
             },
             "auth_key": {
               "title": "Authentication key",
@@ -169,15 +140,7 @@
               "title": "Privacy protocol",
               "description": "SNMPv3 privacy (encryption) protocol.",
               "type": "string",
-              "enum": [
-                "none",
-                "des",
-                "aes",
-                "aes192",
-                "aes256",
-                "aes192c",
-                "aes256c"
-              ]
+              "enum": ["none", "des", "aes", "aes192", "aes256", "aes192c", "aes256c"]
             },
             "priv_key": {
               "title": "Privacy key",
@@ -185,18 +148,13 @@
               "type": "string"
             }
           },
-          "required": [
-            "username"
-          ]
+          "required": ["username"]
         }
       },
       "engine_id_whitelist": {
         "title": "Engine ID Whitelist",
         "description": "Static SNMPv3 engine IDs accepted by this listener for v3 Trap PDUs (hex strings). Required when v3 is enabled and dynamic_engine_id_discovery is disabled. Must be empty when dynamic_engine_id_discovery is enabled.",
-        "type": [
-          "array",
-          "null"
-        ],
+        "type": ["array", "null"],
         "default": [],
         "items": {
           "type": "string",
@@ -245,24 +203,15 @@
         "description": "Pre-decode source-IP CIDR allowlist.",
         "type": "object",
         "default": {
-          "source_cidrs": [
-            "0.0.0.0/0",
-            "::/0"
-          ]
+          "source_cidrs": ["0.0.0.0/0", "::/0"]
         },
         "additionalProperties": false,
         "properties": {
           "source_cidrs": {
             "title": "Source CIDRs",
             "description": "Source IP CIDR allowlist matched before BER decode. Empty accepts IPv4 and IPv6 from all sources.",
-            "type": [
-              "array",
-              "null"
-            ],
-            "default": [
-              "0.0.0.0/0",
-              "::/0"
-            ],
+            "type": ["array", "null"],
+            "default": ["0.0.0.0/0", "::/0"],
             "items": {
               "type": "string"
             }
@@ -281,10 +230,7 @@
           "trusted_relays": {
             "title": "Trusted relays",
             "description": "CIDR list of SNMP trap relays allowed to supply the original source through snmpTrapAddress.0. Leave empty unless the sender is a known relay that preserves original trap identity.",
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "default": [],
             "items": {
               "type": "string"
@@ -320,10 +266,7 @@
             "title": "Mode",
             "description": "Action when rate limit is exceeded: drop (discard trap) or sample (allow but count).",
             "type": "string",
-            "enum": [
-              "drop",
-              "sample"
-            ],
+            "enum": ["drop", "sample"],
             "default": "drop"
           }
         }
@@ -342,9 +285,9 @@
         "properties": {
           "enabled": {
             "title": "Enabled",
+            "description": "Summarize repeated matching traps inside the window instead of logging each one.",
             "type": "boolean",
-            "default": false,
-            "description": "Summarize repeated matching traps inside the window instead of logging each one."
+            "default": false
           },
           "window_sec": {
             "title": "Window seconds",
@@ -363,15 +306,12 @@
           },
           "key_varbinds": {
             "title": "Key varbinds",
-            "type": [
-              "array",
-              "null"
-            ],
+            "description": "Varbinds, by name or OID, whose values join the deduplication key, so traps differing in them are not merged. Leave empty to key on the sending device and trap OID only.",
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             },
-            "default": [],
-            "description": "Varbind OIDs whose values are part of the deduplication key, so traps that differ in them are not merged. Leave empty to key on the trap identity only."
+            "default": []
           }
         }
       },
@@ -422,10 +362,7 @@
           "headers": {
             "title": "Headers",
             "description": "Optional OTLP metadata headers. Values may use Netdata secret references. Header values are not emitted as trap attributes.",
-            "type": [
-              "object",
-              "null"
-            ],
+            "type": ["object", "null"],
             "default": null,
             "additionalProperties": {
               "type": "string"
@@ -474,37 +411,25 @@
           "max_size": {
             "title": "Maximum total size",
             "description": "Maximum total bytes across all journal files for this job. Set to null to disable size-based eviction.",
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "default": "10GB"
           },
           "max_duration": {
             "title": "Maximum age",
             "description": "Maximum age of the oldest journal file before deletion. Set to null to disable age-based eviction.",
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "default": null
           },
           "rotation_size": {
             "title": "Per-file rotation size",
             "description": "Maximum size of a single journal file before rotation. Set to null for automatic calculation (max_size / 20, clamped 5MB-200MB).",
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "default": null
           },
           "rotation_duration": {
             "title": "Per-file rotation duration",
             "description": "Maximum age of a single journal file before rotation. Null or 0 disables time-based rotation.",
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "default": null
           }
         }
@@ -512,10 +437,7 @@
       "overrides": {
         "title": "Per-OID overrides",
         "description": "Per-OID category, severity, and label overrides on top of profile defaults.",
-        "type": [
-          "array",
-          "null"
-        ],
+        "type": ["array", "null"],
         "default": [],
         "items": {
           "type": "object",
@@ -530,48 +452,25 @@
               "title": "Category",
               "description": "Override profile category.",
               "type": "string",
-              "enum": [
-                "state_change",
-                "config_change",
-                "security",
-                "auth",
-                "license",
-                "mobility",
-                "diagnostic",
-                "unknown"
-              ]
+              "enum": ["state_change", "config_change", "security", "auth", "license", "mobility", "diagnostic", "unknown"]
             },
             "severity": {
               "title": "Severity",
               "description": "Override profile severity.",
               "type": "string",
-              "enum": [
-                "emerg",
-                "alert",
-                "crit",
-                "err",
-                "warning",
-                "notice",
-                "info",
-                "debug"
-              ]
+              "enum": ["emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"]
             },
             "labels": {
               "title": "Labels",
               "description": "Additional labels for this OID.",
-              "type": [
-                "object",
-                "null"
-              ],
+              "type": ["object", "null"],
               "default": {},
               "additionalProperties": {
                 "type": "string"
               }
             }
           },
-          "required": [
-            "oid"
-          ]
+          "required": ["oid"]
         }
       },
       "profile_metrics": {
@@ -592,10 +491,7 @@
           "include": {
             "title": "Included rules",
             "description": "Profile metric rule names to resolve through the profile catalog and enable. At least one rule is required when profile metrics are enabled.",
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "default": [],
             "items": {
               "type": "string"
@@ -605,9 +501,7 @@
         }
       }
     },
-    "required": [
-      "listen"
-    ]
+    "required": ["listen"]
   },
   "uiSchema": {
     "ui:flavour": "tabs",

@@ -222,6 +222,7 @@
                   },
                   "mode_exact": {
                     "title": "Exact profiles",
+                    "description": "Only the listed profile entries apply; nothing is matched automatically.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -247,8 +248,7 @@
                     },
                     "required": [
                       "entries"
-                    ],
-                    "description": "Only the listed profile entries apply; nothing is matched automatically."
+                    ]
                   }
                 },
                 "required": [
@@ -262,6 +262,7 @@
                   },
                   "mode_combined": {
                     "title": "Combined profiles",
+                    "description": "Automatically matched profiles plus the listed profile entries.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -287,8 +288,7 @@
                     },
                     "required": [
                       "entries"
-                    ],
-                    "description": "Automatically matched profiles plus the listed profile entries."
+                    ]
                   }
                 },
                 "required": [

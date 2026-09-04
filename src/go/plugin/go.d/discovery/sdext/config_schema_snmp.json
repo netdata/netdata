@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "snmp": {
             "title": "SNMP",
+            "description": "SNMP network scan used to find devices.",
             "type": "object",
             "properties": {
               "rescan_interval": {
@@ -160,14 +162,12 @@
             "required": [
               "credentials",
               "networks"
-            ],
-            "description": "SNMP network scan used to find devices."
+            ]
           }
         },
         "required": [
           "snmp"
-        ],
-        "description": "Where discovery candidates come from."
+        ]
       },
       "services": {
         "title": "Service rules",
