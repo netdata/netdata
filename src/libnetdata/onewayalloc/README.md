@@ -15,7 +15,7 @@ these data can be freed immediately after the query finishes.
 
 1. The caller calls `ONEWAYALLOC *owa = onewayalloc_create(sizehint)` to create an OWA.
    Internally this allocates the first memory buffer with size >= `sizehint`.
-   If `sizehint` is zero, it will allocate 1 hardware page (usually 4kb).
+   The minimum buffer is 32 KiB, rounded up to a hardware page boundary.
    No need to check for success or failure. As with `mallocz()` in netdata, a `fatal()`
    will be called if the allocation fails - although this will never fail, since Linux
    does not really check if there is memory available for `mmap()` calls.
@@ -26,8 +26,18 @@ these data can be freed immediately after the query finishes.
    - `onewayalloc_strdupz(owa, string)`, similar to `strdupz()`
    - `onewayalloc_memdupz(owa, ptr, size)`, similar to `mallocz()` and then `memcpy()`
    
-3. Once the caller has done all the work with the allocated buffers, all memory allocated 
-   can be freed with `onewayalloc_destroy(owa)`.
+3. Once all allocated buffers are no longer needed, `onewayalloc_reset(owa)` invalidates
+   them and makes every page available for reuse. Reset takes constant time; overflow
+   pages are rewound when allocation reaches them. No pages are freed on reset, and
+   memory is not zeroed. Use `onewayalloc_callocz()` when zero initialization is required.
+
+4. `onewayalloc_destroy(owa)` releases all pages, including unused retained pages.
+   Choose the arena lifetime to bound how long its high-water capacity is retained.
+   An arena must never be shared by concurrently executing workers.
+
+Address-sanitizer builds allocate each buffer separately to detect memory errors.
+In these builds, callers must release each buffer with `onewayalloc_freez()`;
+reset is a no-op and destroy does not release those individual allocations.
 
 ## How faster it is?
 

@@ -9,7 +9,7 @@ typedef struct owa_page {
     size_t offset;              // the first free byte of the page
     bool mmap;
     struct owa_page *next;      // the next page on the list
-    struct owa_page *last;      // the last page on the list - we currently allocate on this
+    struct owa_page *current;   // the allocation cursor (used only on the head page)
 } OWA_PAGE;
 
 static size_t onewayalloc_total_memory = 0;
@@ -100,7 +100,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
 
     page->size = size;
     page->offset = natural_alignment(sizeof(OWA_PAGE));
-    page->next = page->last = NULL;
+    page->next = page->current = NULL;
 
     if(!head) {
         // this is the first time we are called
@@ -112,10 +112,10 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     }
     else {
         // link this page into our existing linked list
-        head->last->next = page;
+        head->current->next = page;
     }
 
-    head->last = page;
+    head->current = page;
     head->stats_pages++;
     head->stats_pages_size += size;
 
@@ -132,7 +132,7 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
 #endif
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
-    OWA_PAGE *page = head->last;
+    OWA_PAGE *page = head->current;
 
     // update stats
     head->stats_mallocs_made++;
@@ -142,9 +142,17 @@ void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
     size = onewayalloc_natural_alignment_or_fatal(size);
 
     if(unlikely(page->size - page->offset < size)) {
-        // we don't have enough space to fit the data
-        // let's get another page
-        page = onewayalloc_create_internal(head, (size > page->size)?size:page->size);
+        // Pages after the cursor have not been used since reset. Rewind lazily.
+        while(page->next) {
+            page = page->next;
+            page->offset = natural_alignment(sizeof(OWA_PAGE));
+            if(page->size - page->offset >= size)
+                break;
+        }
+        head->current = page;
+
+        if(page->size - page->offset < size)
+            page = onewayalloc_create_internal(head, (size > page->size)?size:page->size);
     }
 
     char *mem = (char *)page;
@@ -231,36 +239,9 @@ void onewayalloc_reset(ONEWAYALLOC *owa) {
 
     OWA_PAGE *head = (OWA_PAGE *)owa;
 
-    // Free every page except the head; we keep the head so the caller can
-    // reuse the arena without another mmap.
-    size_t freed_size = 0;
-    OWA_PAGE *page = head->next;
-    while (page) {
-        OWA_PAGE *p = page;
-        page = page->next;
-        freed_size += p->size;
-        if (p->mmap)
-            nd_munmap(p, p->size);
-        else
-            freez(p);
-    }
-
-    if (freed_size)
-        __atomic_sub_fetch(&onewayalloc_total_memory, freed_size, __ATOMIC_RELAXED);
-
-    // Roll the head page's bump cursor back to the position right after the
-    // OWA_PAGE header, and rewire the single-page list so head == last.
-    head->next = NULL;
-    head->last = head;
+    // Keep all pages until destroy; allocation rewinds the unused suffix on demand.
+    head->current = head;
     head->offset = natural_alignment(sizeof(OWA_PAGE));
-
-    // stats_pages / stats_pages_size describe the arena's *current* footprint
-    // (what is mapped right now), so they reflect the single-page post-reset
-    // state. stats_mallocs_made / stats_mallocs_size are lifetime counters
-    // (total allocations ever served by this arena) and are intentionally
-    // preserved across resets, to stay useful for diagnostics.
-    head->stats_pages = 1;
-    head->stats_pages_size = head->size;
 }
 
 void onewayalloc_destroy(ONEWAYALLOC *owa) {
@@ -288,4 +269,91 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
     }
 
     __atomic_sub_fetch(&onewayalloc_total_memory, total_size, __ATOMIC_RELAXED);
+}
+
+int onewayalloc_unittest(void) {
+    const size_t cases[][9] = {
+        {0, 1, 15, 32768, 65537, 4000, 2 * 1024 * 1024, 1, 100000},
+        {2 * 1024 * 1024, 65537, 32768, 1, 17, 3, 4000, 0, 100000},
+        {1, 3, 17, 0, 31, 64, 7, 9, 1},
+        {32768, 65537, 4 * 1024 * 1024, 17, 4000, 1, 0, 3, 100000},
+    };
+    size_t initial_memory = onewayalloc_allocated_memory();
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    int errors = 0;
+
+    onewayalloc_reset(NULL);
+    for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
+#ifndef FSANITIZE_ADDRESS
+        uintptr_t first_addresses[9];
+        size_t first_memory = 0;
+#endif
+        for (size_t repeat = 0; repeat < 8; repeat++) {
+            size_t before_reset = onewayalloc_allocated_memory();
+            onewayalloc_reset(owa);
+            onewayalloc_reset(owa);
+            if (onewayalloc_allocated_memory() != before_reset) {
+                fprintf(stderr, "OWA: reset did not retain allocated pages\n");
+                errors++;
+                goto cleanup;
+            }
+
+            unsigned char *ptrs[9];
+            for (size_t i = 0; i < 9; i++) {
+                size_t size = cases[c][i];
+                ptrs[i] = repeat % 2 ? onewayalloc_callocz(owa, size, 1) : onewayalloc_mallocz(owa, size);
+                if ((uintptr_t)ptrs[i] % SYSTEM_REQUIRED_ALIGNMENT) {
+                    fprintf(stderr, "OWA: allocation is not naturally aligned\n");
+                    errors++;
+                }
+                if (repeat % 2) {
+                    for (size_t j = 0; j < size; j++) {
+                        if (ptrs[i][j] != 0) {
+                            fprintf(stderr, "OWA: calloc did not clear reused memory\n");
+                            errors++;
+                            break;
+                        }
+                    }
+                }
+                memset(ptrs[i], (int)i + 1, size);
+#ifndef FSANITIZE_ADDRESS
+                if (!repeat)
+                    first_addresses[i] = (uintptr_t)ptrs[i];
+                else if (first_addresses[i] != (uintptr_t)ptrs[i]) {
+                    fprintf(stderr, "OWA: repeated allocation did not reuse its address\n");
+                    errors++;
+                }
+#endif
+            }
+
+            // Check all live buffers after allocation to detect overlapping bump cursors.
+            for (size_t i = 0; i < 9; i++) {
+                for (size_t j = 0; j < cases[c][i]; j++) {
+                    if (ptrs[i][j] != i + 1) {
+                        fprintf(stderr, "OWA: live allocation was overwritten\n");
+                        errors++;
+                        break;
+                    }
+                }
+                onewayalloc_freez(owa, ptrs[i]);
+            }
+#ifndef FSANITIZE_ADDRESS
+            if (!repeat)
+                first_memory = onewayalloc_allocated_memory();
+            else if (first_memory != onewayalloc_allocated_memory()) {
+                fprintf(stderr, "OWA: repeated allocation sequence grew the arena\n");
+                errors++;
+            }
+#endif
+        }
+    }
+
+cleanup:
+    onewayalloc_destroy(owa);
+    if (onewayalloc_allocated_memory() != initial_memory) {
+        fprintf(stderr, "OWA: destroy did not release all pages\n");
+        errors++;
+    }
+    fprintf(stderr, "OWA tests: %s\n", errors ? "FAILED" : "PASSED");
+    return errors ? 1 : 0;
 }

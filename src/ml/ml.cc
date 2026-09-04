@@ -1413,11 +1413,8 @@ void ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
-    // Single onewayalloc arena reused across every host and loop iteration
-    // for the whole detect thread lifetime — one mmap/munmap pair instead
-    // of one per host per second. The arena is reset between hosts inside
-    // ml_update_host_and_detection_rate_charts, so peak memory stays bounded
-    // by a single host's anomaly-rate query scratch.
+    // Reuse query scratch across hosts and iterations. Reset between hosts
+    // retains the arena's high-water capacity until this detector stops.
     ONEWAYALLOC *detect_owa = onewayalloc_create(0);
 
     while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
