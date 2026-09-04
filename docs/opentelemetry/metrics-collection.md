@@ -96,7 +96,7 @@ receivers:
               action: keep
 ```
 
-See the pinned upstream [Prometheus receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/prometheusreceiver) for unsupported Prometheus server features and the complete scrape configuration surface.
+See the upstream [Prometheus receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver) for unsupported Prometheus server features and the complete scrape configuration surface.
 
 ## Redis
 
@@ -122,7 +122,7 @@ Omit `password` when Redis does not require authentication. For Redis 6 or later
 
 Representative metrics include `redis.memory.used`, `redis.memory.rss`, `redis.clients.connected`, `redis.commands.processed`, `redis.keyspace.hits`, `redis.keyspace.misses`, `redis.keys.expired`, `redis.keys.evicted`, `redis.net.input`, `redis.net.output`, and per-database `redis.db.keys`.
 
-See the pinned upstream [Redis receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/redisreceiver) for transport, TLS, ACL, and metric details.
+See the upstream [Redis receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver) for transport, TLS, ACL, and metric details.
 
 ## NGINX
 
@@ -159,7 +159,7 @@ service:
 
 The receiver emits `nginx.connections_accepted`, `nginx.connections_handled`, `nginx.connections_current` by state, and `nginx.requests`. If no data appears, request the status URL from the Collector host and confirm that access controls allow that source address.
 
-See the pinned upstream [NGINX receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/nginxreceiver) for the complete receiver surface.
+See the upstream [NGINX receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver) for the complete receiver surface.
 
 ## PostgreSQL
 
@@ -194,7 +194,7 @@ service:
 
 The example disables database transport security for a loopback connection only. For a remote database, enable TLS verification and configure the appropriate CA. Representative metrics include `postgresql.commits`, `postgresql.rollbacks`, `postgresql.db_size`, `postgresql.rows`, `postgresql.operations`, `postgresql.blocks_read`, `postgresql.connection.max`, `postgresql.table.count`, and `postgresql.index.scans`.
 
-See the pinned upstream [PostgreSQL receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/receiver/postgresqlreceiver) for TLS, feature gates, query sampling, top-query collection, and the complete metric set.
+See the upstream [PostgreSQL receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlreceiver) for TLS, feature gates, query sampling, top-query collection, and the complete metric set.
 
 ## Troubleshoot receiver recipes
 

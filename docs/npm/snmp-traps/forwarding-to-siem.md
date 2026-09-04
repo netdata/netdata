@@ -48,7 +48,7 @@ journal:
 
 Netdata writes trap entries as journal-compatible files below the configured Netdata log directory; for the exact per-job path and how the `journalctl --directory` path is built, see [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md). Each entry carries `ND_LOG_SOURCE=snmp-trap`, and these files back the job source exposed through the Cloud-required `snmp:traps` Function; they are not the host systemd-journald service's normal journal.
 
-The host must have `journalctl` installed. Use `sudo` when the trap journal files are not readable by your user. Use `journalctl --directory` to produce JSON output that your existing log shipper or SIEM ingestion path can consume:
+Netdata reads these files on every platform it writes them on. Reading them with `journalctl` is a Linux option that needs systemd 252 or later, because the files use the compact journal format. Use `sudo` when the trap journal files are not readable by your user. Use `journalctl --directory` to produce JSON output that your existing log shipper or SIEM ingestion path can consume:
 
 ```bash
 JOB=edge-traps

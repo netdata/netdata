@@ -277,6 +277,8 @@ type CollectionStats struct {
 
 // TimingStats captures duration of each collection phase.
 type TimingStats struct {
+	// Preparation is time spent preparing profile tags and device metadata.
+	Preparation time.Duration
 	// Scalar is time spent collecting scalar (non-table) metrics.
 	Scalar time.Duration
 	// Table is time spent collecting table metrics.
@@ -290,7 +292,7 @@ type TimingStats struct {
 }
 
 func (s TimingStats) Total() time.Duration {
-	return s.Scalar + s.Table + s.Licensing + s.BGP + s.VirtualMetrics
+	return s.Preparation + s.Scalar + s.Table + s.Licensing + s.BGP + s.VirtualMetrics
 }
 
 // SNMPOperationStats captures SNMP protocol-level operations.
@@ -343,11 +345,13 @@ type ErrorStats struct {
 	SNMP int64
 	// Processing is the count of value conversion/transform errors.
 	Processing struct {
-		Scalar    int64
-		Table     int64
-		Licensing int64
-		BGP       int64
+		Preparation int64
+		Scalar      int64
+		Table       int64
+		Licensing   int64
+		BGP         int64
 	}
-	// MissingOIDs is the count of NoSuchObject/NoSuchName responses.
+	// MissingOIDs counts received missing-value exceptions and configured sources
+	// already known unavailable; it is not a count of wire responses alone.
 	MissingOIDs int64
 }

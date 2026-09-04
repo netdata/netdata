@@ -972,7 +972,8 @@ def build_topology_modules():
 def build_syslog_modules():
     """Static syslog catalog entry. Netdata has no native syslog listener; an
     OpenTelemetry Collector with a syslog receiver forwards device syslog over
-    OTLP/gRPC to the Agent's otel plugin, which stores it as journal logs."""
+    OTLP/gRPC to the Agent's otel plugin, which stores it in Netdata's indexed
+    log store."""
     return [make_entry(
         name='Syslog from Network Devices',
         link='',
@@ -984,12 +985,12 @@ def build_syslog_modules():
             'syslog '
             'receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which '
             'stores '
-            'it as structured journal logs you explore and query in the Logs tab.',
+            'it in Netdata\'s indexed log store you explore and query in the Logs tab.',
             'Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog '
             'receiver '
             'pointed at the Agent\'s OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent\'s otel plugin writes '
             'the '
-            'records to systemd-compatible journal files.',
+            'records to Netdata\'s indexed log store.',
             'Not auto-detected. Configure an OpenTelemetry Collector syslog receiver to forward to the Agent\'s OTLP '
             'endpoint.',
             # The otel plugin is built for Linux and macOS only, as a single instance
