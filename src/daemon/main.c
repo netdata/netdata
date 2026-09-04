@@ -792,13 +792,13 @@ int netdata_main(int argc, char **argv) {
 
                             if(unittest_libs_init())
                                 return 1;
-                            if(unittest_prepare_rrd(&user))
-                                return 1;
 
-                            generate_dbengine_dataset(history_seconds);
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                generate_dbengine_dataset(history_seconds);
 
                             unittest_libs_shutdown();
-                            return 0;
+                            return rc;
                         }
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
@@ -829,14 +829,14 @@ int netdata_main(int argc, char **argv) {
 
                             if(unittest_libs_init())
                                 return 1;
-                            if(unittest_prepare_rrd(&user))
-                                return 1;
 
-                            dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
-                                                 page_cache_mb, disk_space_mb);
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
+                                                     page_cache_mb, disk_space_mb);
 
                             unittest_libs_shutdown();
-                            return 0;
+                            return rc;
                         }
 #endif
                         else if(strcmp(optarg, "simple-pattern") == 0) {
