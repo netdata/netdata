@@ -248,7 +248,7 @@ If no static schema file is found, Netdata will send a `schema` command to the p
       },
       "url": {
         "title": "URL",
-        "description": "The URL of the Nginx stub_status page.",
+        "description": "URL of the Nginx stub_status page.",
         "type": "string",
         "format": "uri"
       },
@@ -291,11 +291,11 @@ For templates, the schema will be used when users add new jobs based on the temp
 ### What The UI Renders
 
 The form is react-jsonschema-form (v6) with Netdata templates and widgets. The table below is the vocabulary a plugin
-schema uses; a `ui:*` key outside it is silently ignored. The UI also honors `ui:groups` (grouped sections without
-tabs), `ui:classNames` (grid layout classes), `ui:initiallyExpanded`, `ui:creatable` (free text in a select), and
-`ui:validation.warning`; they exist for the health alert editor and plugin forms use tabs instead. A `ui:widget`
-value that is neither a Netdata widget nor a react-jsonschema-form alias throws and replaces the form with an error
-view. This section describes the UI as verified in September 2026; re-verify against the UI code when it changes.
+schema uses. The UI also honors a few keys plugin forms do not need (`ui:groups` for grouped sections without tabs,
+`ui:classNames` for grid layout, `ui:initiallyExpanded`, `ui:creatable` for free text in a select,
+`ui:validation.warning`); any other `ui:*` key is silently ignored, except that a `ui:widget` value which is neither a
+Netdata widget nor a react-jsonschema-form alias throws and replaces the form with an error view. This section
+describes the UI as verified in September 2026; re-verify against the UI code when it changes.
 
 Text channels, per property:
 
@@ -349,9 +349,10 @@ Behavior an author must design around:
 - `dependencies` with `oneOf` on a `const` discriminator reveals the matching branch's properties inline (no selector
   widget); the UI drops the form data of inactive branches for TOP-LEVEL dependencies only. A key that is both a
   branch property and a plain sibling property renders unconditionally. Avoid property-level `oneOf`/`anyOf` (rendered
-  as a numeric branch selector) and avoid `0`, `false`, and `""` as `enum` values in select-rendered fields.
-- Nullable fields: a two-member union such as `["string", "null"]` renders as the non-null type; unions with three or
-  more members collapse to the first.
+  as a branch selector whose first option cannot be selected reliably) and avoid `0`, `false`, and `""` as `enum`
+  values in select-rendered fields.
+- Nullable fields: a two-member union such as `["string", "null"]` renders as the non-null type; any other union
+  (three or more members, or two members without `null`) collapses to its first member.
 - Maps: `additionalProperties: {type: ...}` renders a key/value list with an add button; `patternProperties` alone
   renders without an add button.
 - Secrets: `ui:widget: "password"` masks the input and is the ONLY signal that redacts the value in the live YAML
@@ -450,7 +451,7 @@ FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
     "properties": {
       "url": {
         "title": "URL",
-        "description": "The URL of the Nginx stub_status page.",
+        "description": "URL of the Nginx stub_status page.",
         "type": "string",
         "format": "uri"
       }

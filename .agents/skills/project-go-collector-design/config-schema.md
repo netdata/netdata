@@ -18,7 +18,7 @@ Scope: every hand-written schema on this renderer: `go.d/collector/*/config_sche
 
 - The file MUST be `{"jsonSchema": {...}, "uiSchema": {...}}`. A bare JSON Schema renders an empty form.
 - `jsonSchema` MUST declare `"$schema": "http://json-schema.org/draft-07/schema#"`, `"type": "object"`, and a `title`
-  naming the collector (`<Product> collector configuration`, the fleet's pattern). A title copy-pasted from another
+  naming the collector (`<Product> collector configuration.`, the fleet's pattern). A title copy-pasted from another
   collector is the first defect the operator sees.
 - `uiSchema` mirrors `jsonSchema.properties` by key. A `uiSchema` entry whose key is not a property is silently
   ignored; keep the two in step when renaming. Nothing else belongs at the top level (no `uiOptions`; the UI does not
@@ -39,10 +39,11 @@ Each property has up to four texts. They have distinct jobs; do not use one to d
     prerequisites.
   - Markdown, paragraphs separated by `\n\n`.
   - MUST NOT restate the description and MUST NOT be the only text on a field.
-- `ui:placeholder` (an example value, greyed inside an empty input): OPTIONAL, string fields only.
-  - An example in the field's exact format: `5m`, `postgres://user:${env:PG_PASSWORD}@localhost:5432/db`, `production`.
-  - Never an instruction sentence, and never on a field with a `default` (the default pre-fills the field, so the
-    placeholder is invisible).
+- `ui:placeholder` (an example value, greyed inside an empty input): OPTIONAL on any input that can be left empty.
+  - An example in the field's exact format: `5m`, `postgres://user:${env:PG_PASSWORD}@localhost:5432/db`, `production`,
+    `1000`.
+  - Never an instruction sentence, and never on a field whose non-empty `default` already fills it (the placeholder
+    would be invisible).
 
 Voice, for every channel:
 
@@ -70,8 +71,10 @@ Voice, for every channel:
   listed in `ui:options.rest`, or hidden. A property missing from all of them is unreachable in the UI and still
   submitted with its default.
 - Tab titles MUST equal the `group` values in `metadata.yaml` (first segment before ` / `): the doc table and the form
-  use one vocabulary. Call `collecttest.AssertConfigSchemaMatchesMetadata` from the collector's tests; a collector you
-  touch MUST opt in. Derive groups from the collector's own keys; do not copy a neighbour's tab list.
+  use one vocabulary. Call `collecttest.AssertConfigSchemaMatchesMetadata` from the collector's tests: a tabbed
+  collector whose options or descriptions you change MUST opt in (a mechanical fleet sweep is not such a change); a
+  schema without tabs cannot opt in until the helper handles the flat layout. Derive groups from the collector's own
+  keys; do not copy a neighbour's tab list.
 - Objects (sections) MUST carry `title` and `description` like any field: the section header is the first thing the
   operator reads. Optional advanced sections MAY set `"ui:collapsible": true`.
 - Arrays of objects: set `"ui:listFlavour": "list"` (tabs mode labels every item `Rule N`); give the item schema a
@@ -126,7 +129,8 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.
 - Prefer top-level dependencies: the UI drops inactive-branch data only for top-level discriminators.
-- Do not use property-level `oneOf`/`anyOf` for alternatives; the UI renders a numeric branch selector.
+- Do not use property-level `oneOf`/`anyOf` for alternatives; the UI renders a branch selector whose first option
+  cannot be selected reliably.
 
 ## 6. Secrets
 
@@ -136,6 +140,8 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
   redacts the live YAML preview (`format: "password"` masks the input only).
 - A free key/value map (`headers`, `labels`) cannot be redacted: its values carry no widget. When a map may hold a
   token, its description MUST tell the operator to use secret indirection (`${env:...}`).
+- `proxy_url` and other `*_url` fields are identities to the rule test and MUST NOT be masked; route proxy credentials
+  through `proxy_username`/`proxy_password` or `${env:...}`, never into the URL.
 - It MUST NOT be set on usernames, file paths (`tls_key`, `bearer_token_file`), or URLs without credentials.
   Masking them hides nothing and stops the operator from reading back what they typed.
 - `sensitive: true` in `jsonSchema` is read by nothing; do not write it.
@@ -209,8 +215,9 @@ seconds.`.
   the schema `required` list.
 - `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")` checks tabs and
   descriptions in both directions: every documented option exists in the schema with the same description, and every
-  visible top-level property is documented. Nested option names (`rules[].query.period`) resolve through `items`,
-  `properties`, `dependencies` branches, `allOf`, and `$ref`.
+  visible top-level property is documented. Nested option names resolve through `properties`, `dependencies`
+  branches, `allOf`, `$ref`, and array items written as `rules[].query.period`; keys of a free map
+  (`additionalProperties`) are not documented as options.
 - The stock `.conf` and the generated integration page are the other two views; `integrations-lifecycle/consistency.md`
   owns their mechanics.
 

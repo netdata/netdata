@@ -620,7 +620,6 @@
           "ui:help": "Optional per-profile overrides applied only to profiles that auto-activate at bootstrap.",
           "items": {
             "name": {
-              "ui:help": "Canonical profile basename.",
               "ui:placeholder": "sql_database"
             },
             "filters": {
@@ -631,7 +630,6 @@
                 "ui:listFlavour": "list"
               },
               "tags": {
-                "ui:help": "Only supported when `discovery.mode` is `filters`. In `query` mode, encode per-profile tag filtering in the KQL.",
                 "additionalProperties": {
                   "ui:listFlavour": "list"
                 }
@@ -646,7 +644,6 @@
           "ui:help": "Add explicit profile entries for `exact` mode.",
           "items": {
             "name": {
-              "ui:help": "Canonical profile basename.",
               "ui:placeholder": "sql_database"
             },
             "filters": {
@@ -657,7 +654,6 @@
                 "ui:listFlavour": "list"
               },
               "tags": {
-                "ui:help": "Only supported when `discovery.mode` is `filters`. In `query` mode, encode per-profile tag filtering in the KQL.",
                 "additionalProperties": {
                   "ui:listFlavour": "list"
                 }
@@ -671,7 +667,6 @@
           "ui:listFlavour": "list",
           "items": {
             "name": {
-              "ui:help": "Canonical profile basename.",
               "ui:placeholder": "sql_database"
             },
             "filters": {
@@ -682,7 +677,6 @@
                 "ui:listFlavour": "list"
               },
               "tags": {
-                "ui:help": "Only supported when `discovery.mode` is `filters`. In `query` mode, encode per-profile tag filtering in the KQL.",
                 "additionalProperties": {
                   "ui:listFlavour": "list"
                 }
@@ -720,7 +714,6 @@
       },
       "mode_managed_identity": {
         "client_id": {
-          "ui:help": "Optional client ID of a user-assigned managed identity. Leave empty to use the system-assigned managed identity.",
           "ui:placeholder": "00000000-0000-0000-0000-000000000000"
         }
       }

@@ -302,7 +302,7 @@ hints for the form). A bare JSON Schema renders an empty form. Example:
     "properties": {
       "url": {
         "title": "URL",
-        "description": "The URL of the server to connect to.",
+        "description": "URL of the server to connect to.",
         "type": "string",
         "format": "uri"
       },
@@ -316,12 +316,12 @@ hints for the form). A bare JSON Schema renders an empty form. Example:
       },
       "username": {
         "title": "Username",
-        "description": "Username for authentication.",
+        "description": "Username for HTTP basic authentication.",
         "type": "string"
       },
       "password": {
         "title": "Password",
-        "description": "Password for authentication.",
+        "description": "Password for HTTP basic authentication.",
         "type": "string"
       }
     },

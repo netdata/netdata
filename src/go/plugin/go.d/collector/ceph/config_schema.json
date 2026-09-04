@@ -259,6 +259,11 @@
     },
     "update_every": {
       "ui:help": "This does not change the standalone ceph-exporter refresh (5 seconds by default on Reef 18 and later) or the MGR Prometheus module cache refresh (15 seconds by default)."
+    },
+    "allowed_redirect_origins": {
+      "items": {
+        "ui:placeholder": "https://mgr-b.example.com:8443"
+      }
     }
   }
 }

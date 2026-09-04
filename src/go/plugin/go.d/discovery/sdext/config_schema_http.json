@@ -199,9 +199,7 @@
                 "format",
                 "not_follow_redirects",
                 "interval",
-                "timeout",
-                "method",
-                "body"
+                "timeout"
               ]
             },
             {
@@ -226,8 +224,7 @@
               "fields": [
                 "proxy_url",
                 "proxy_username",
-                "proxy_password",
-                "force_http2"
+                "proxy_password"
               ]
             },
             {
@@ -248,11 +245,9 @@
           "ui:widget": "hidden"
         },
         "interval": {
-          "ui:placeholder": "1m",
           "ui:help": "Examples: 30s, 1m, 5m. Use 0 for one-shot fetch."
         },
         "format": {
-          "ui:placeholder": "auto",
           "ui:widget": "radio",
           "ui:options": {
             "inline": true

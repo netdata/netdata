@@ -81,8 +81,14 @@ func TestConfigSchemasHaveTheFormShape(t *testing.T) {
 			assert.Containsf(t, []string{"jsonSchema", "uiSchema"}, key,
 				"%s: top-level key %q is not part of the form document; the UI reads only jsonSchema and uiSchema", doc.file, key)
 		}
-		require.NotNilf(t, doc.schema, "%s: no jsonSchema member; the UI renders an empty form", doc.file)
-		require.NotNilf(t, doc.ui, "%s: no uiSchema member; the UI renders an empty form", doc.file)
+		if !assert.NotNilf(t, doc.schema, "%s: no jsonSchema member; the UI renders an empty form", doc.file) ||
+			!assert.NotNilf(t, doc.ui, "%s: no uiSchema member; the UI renders an empty form", doc.file) {
+			continue
+		}
+		forEachRef(doc.schema, "", func(path, ref string) {
+			assert.NotEmptyf(t, doc.resolver.Resolve(map[string]any{"$ref": ref}),
+				"%s: %s references %q, which does not resolve inside the document", doc.file, path, ref)
+		})
 		assert.Equalf(t, "http://json-schema.org/draft-07/schema#", doc.schema["$schema"],
 			"%s: jsonSchema.$schema is not draft-07", doc.file)
 		assert.Equalf(t, "object", doc.schema["type"], "%s: jsonSchema.type is not object", doc.file)
@@ -92,54 +98,67 @@ func TestConfigSchemasHaveTheFormShape(t *testing.T) {
 }
 
 // TestConfigSchemasReachEveryProperty forbids the tab mistakes that hide a field: with tabs on, a
-// top-level property that is on no tab (and not in ui:options.rest, and not hidden) is dropped from
-// the UI while its default is still submitted; a tabs flavour without a tabs list renders an empty
-// form; a field on two tabs renders two inputs bound to one value.
+// property that is on no tab (and not in ui:options.rest, and not hidden) is dropped from the UI while
+// its default is still submitted; a tabs flavour without a tabs list renders an empty form; a field on
+// two tabs renders two inputs bound to one value. Any object at any depth may carry tabs.
 func TestConfigSchemasReachEveryProperty(t *testing.T) {
 	for _, doc := range loadConfigSchemas(t) {
-		flavour, hasFlavour := doc.ui["ui:flavour"]
-		options := mapField(doc.ui["ui:options"])
-		tabs, _ := options["tabs"].([]any)
-		if !hasFlavour {
-			assert.Emptyf(t, tabs, "%s: ui:options.tabs without \"ui:flavour\": \"tabs\" is ignored", doc.file)
-			continue
-		}
-		require.Equalf(t, "tabs", flavour, "%s: unknown ui:flavour %v", doc.file, flavour)
-		require.NotEmptyf(t, tabs, "%s: \"ui:flavour\": \"tabs\" without ui:options.tabs renders an empty form", doc.file)
+		forEachObject(doc, doc.schema, doc.ui, "", func(path string, schema, ui map[string]any) {
+			assertTabsReachEveryProperty(t, doc, path, schema, ui)
+		})
+	}
+}
 
-		reachable := propertiesOf(doc, doc.schema)
-		onTab := map[string]int{}
-		titles := map[string]bool{}
-		for _, raw := range tabs {
-			tab := mapField(raw)
-			title := stringField(tab, "title")
-			assert.NotEmptyf(t, title, "%s: a tab has no title", doc.file)
-			assert.Falsef(t, titles[title], "%s: two tabs are titled %q", doc.file, title)
-			titles[title] = true
-			fields, _ := tab["fields"].([]any)
-			for _, raw := range fields {
-				field, _ := raw.(string)
-				onTab[field]++
-				assert.Containsf(t, reachable, field, "%s: tab %q lists %q, which is not a property", doc.file, title, field)
-				assert.Falsef(t, isHidden(mapField(doc.ui[field])),
-					"%s: tab %q lists %q, which is hidden; pick one", doc.file, title, field)
-			}
+func assertTabsReachEveryProperty(t *testing.T, doc configSchema, path string, schema, ui map[string]any) {
+	t.Helper()
+	where := doc.file
+	if path != "" {
+		where += ": " + path
+	}
+	flavour, hasFlavour := ui["ui:flavour"]
+	options := mapField(ui["ui:options"])
+	tabs, _ := options["tabs"].([]any)
+	if !hasFlavour {
+		assert.Emptyf(t, tabs, "%s: ui:options.tabs without \"ui:flavour\": \"tabs\" is ignored", where)
+		return
+	}
+	if !assert.Equalf(t, "tabs", flavour, "%s: unknown ui:flavour %v", where, flavour) ||
+		!assert.NotEmptyf(t, tabs, "%s: \"ui:flavour\": \"tabs\" without ui:options.tabs renders an empty form", where) {
+		return
+	}
+
+	reachable := propertiesOf(doc, schema)
+	onTab := map[string]int{}
+	titles := map[string]bool{}
+	for _, raw := range tabs {
+		tab := mapField(raw)
+		title := stringField(tab, "title")
+		assert.NotEmptyf(t, title, "%s: a tab has no title", where)
+		assert.Falsef(t, titles[title], "%s: two tabs are titled %q", where, title)
+		titles[title] = true
+		fields, _ := tab["fields"].([]any)
+		for _, raw := range fields {
+			field, _ := raw.(string)
+			onTab[field]++
+			assert.Containsf(t, reachable, field, "%s: tab %q lists %q, which is not a property", where, title, field)
+			assert.Falsef(t, isHidden(mapField(ui[field])),
+				"%s: tab %q lists %q, which is hidden; pick one", where, title, field)
 		}
-		for field, n := range onTab {
-			assert.Equalf(t, 1, n, "%s: %q is listed on %d tabs; it would render %d inputs bound to one value", doc.file, field, n, n)
+	}
+	for field, n := range onTab {
+		assert.Equalf(t, 1, n, "%s: %q is listed on %d tabs; it would render %d inputs bound to one value", where, field, n, n)
+	}
+	rest := map[string]bool{}
+	if list, ok := options["rest"].([]any); ok {
+		for _, raw := range list {
+			name, _ := raw.(string)
+			rest[name] = true
 		}
-		rest := map[string]bool{}
-		if list, ok := options["rest"].([]any); ok {
-			for _, raw := range list {
-				name, _ := raw.(string)
-				rest[name] = true
-			}
-		}
-		for name := range reachable {
-			if onTab[name] == 0 && !rest[name] && !isHidden(mapField(doc.ui[name])) {
-				assert.Failf(t, "unreachable property",
-					"%s: %q is on no tab, not in ui:options.rest, and not hidden; the UI drops it but still submits its default", doc.file, name)
-			}
+	}
+	for name := range reachable {
+		if onTab[name] == 0 && !rest[name] && !isHidden(mapField(ui[name])) {
+			assert.Failf(t, "unreachable property",
+				"%s: %q is on no tab, not in ui:options.rest, and not hidden; the UI drops it but still submits its default", where, name)
 		}
 	}
 }
@@ -253,12 +272,18 @@ func TestConfigSchemasMaskOnlySecrets(t *testing.T) {
 		}
 		walk(doc.schema, "")
 
-		forEachVisibleProperty(doc, func(path string, schema, ui map[string]any, primitiveItem bool) {
-			if primitiveItem || !isLeaf(schema) {
+		forEachProperty(doc, func(path string, schema, ui map[string]any, primitiveItem bool) {
+			if !primitiveItem && !isLeaf(schema) {
 				return
 			}
-			name := path[strings.LastIndexAny(path, ".")+1:]
+			// an array of scalars is judged by the array's name; its items entry carries the widget
+			name := strings.TrimSuffix(path[strings.LastIndexAny(path, ".")+1:], "[]")
 			masked := ui["ui:widget"] == "password"
+			if isHidden(ui) {
+				assert.Falsef(t, secretNames.MatchString(name) && !notCredential.MatchString(name),
+					"%s: %s is a hidden credential; a hidden field cannot be masked and shows in clear in the YAML preview", doc.file, path)
+				return
+			}
 			example := stringField(ui, "ui:placeholder") + " " + stringField(schema, "description") + " " + stringField(ui, "ui:help")
 			switch {
 			case secretNames.MatchString(name) && !notCredential.MatchString(name):
@@ -428,11 +453,21 @@ func assertGlobsCoverEverySchema(t *testing.T, covered []string) {
 // dependencies branch) are not fields and are skipped. primitiveItem is true for the item schema of an
 // array of scalars, which renders without its own label.
 func forEachVisibleProperty(doc configSchema, visit func(path string, schema, ui map[string]any, primitiveItem bool)) {
+	walkProperties(doc, false, visit)
+}
+
+// forEachProperty is forEachVisibleProperty including hidden properties, for rules about what a hidden
+// field may hold.
+func forEachProperty(doc configSchema, visit func(path string, schema, ui map[string]any, primitiveItem bool)) {
+	walkProperties(doc, true, visit)
+}
+
+func walkProperties(doc configSchema, includeHidden bool, visit func(path string, schema, ui map[string]any, primitiveItem bool)) {
 	var walk func(schema, ui map[string]any, path string)
 	walk = func(schema, ui map[string]any, path string) {
 		for name, child := range propertiesOf(doc, schema) {
 			childUI := mapField(ui[name])
-			if isHidden(childUI) {
+			if isHidden(childUI) && !includeHidden {
 				continue
 			}
 			if _, stub := child["const"]; stub && len(child) == 1 {
@@ -458,6 +493,42 @@ func forEachVisibleProperty(doc configSchema, visit func(path string, schema, ui
 		}
 	}
 	walk(doc.schema, doc.ui, "")
+}
+
+// forEachObject visits every object node (root included) with its uiSchema entry, so per-object
+// layout rules such as tabs apply at any depth.
+func forEachObject(doc configSchema, schema, ui map[string]any, path string, visit func(path string, schema, ui map[string]any)) {
+	visit(path, schema, ui)
+	for name, child := range propertiesOf(doc, schema) {
+		childUI := mapField(ui[name])
+		at := name
+		if path != "" {
+			at = path + "." + name
+		}
+		if mapField(child["properties"]) != nil || mapField(child["dependencies"]) != nil {
+			forEachObject(doc, child, childUI, at, visit)
+		}
+		if items := resolve(doc, mapField(child["items"])); mapField(items["properties"]) != nil || mapField(items["dependencies"]) != nil {
+			forEachObject(doc, items, mapField(childUI["items"]), at+"[]", visit)
+		}
+	}
+}
+
+// forEachRef calls visit for every $ref keyword in the document.
+func forEachRef(node any, path string, visit func(path, ref string)) {
+	switch value := node.(type) {
+	case map[string]any:
+		if ref, ok := value["$ref"].(string); ok {
+			visit(path, ref)
+		}
+		for key, child := range value {
+			forEachRef(child, path+"."+key, visit)
+		}
+	case []any:
+		for i, child := range value {
+			forEachRef(child, fmt.Sprintf("%s[%d]", path, i), visit)
+		}
+	}
 }
 
 // propertiesOf returns a node's properties plus the properties every dependencies branch reveals.

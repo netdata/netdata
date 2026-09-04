@@ -260,21 +260,6 @@
         "description": "If set, forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).",
         "type": "boolean"
       },
-      "proxy_url": {
-        "title": "Proxy URL",
-        "description": "The URL of the proxy server.",
-        "type": "string"
-      },
-      "proxy_username": {
-        "title": "Proxy username",
-        "description": "The username for proxy authentication.",
-        "type": "string"
-      },
-      "proxy_password": {
-        "title": "Proxy password",
-        "description": "The password for proxy authentication.",
-        "type": "string"
-      },
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
@@ -392,14 +377,6 @@
             "tls_cert",
             "tls_key"
           ]
-        },
-        {
-          "title": "Proxy",
-          "fields": [
-            "proxy_url",
-            "proxy_username",
-            "proxy_password"
-          ]
         }
       ]
     },
@@ -418,9 +395,6 @@
     },
     "not_follow_redirects": {
       "ui:widget": "hidden"
-    },
-    "proxy_password": {
-      "ui:widget": "password"
     },
     "headers": {
       "ui:widget": "hidden"

@@ -1,12 +1,12 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "AWS CloudWatch collector",
+    "title": "AWS CloudWatch collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, in seconds, at least 60. Every CloudWatch series is evaluated on these ticks, never on its own timer.",
+        "description": "Data collection interval, in seconds, at least 60. All CloudWatch series are collected on this interval; a shorter metric period does not make Netdata query more often.",
         "type": "integer",
         "minimum": 60,
         "default": 60
@@ -340,7 +340,7 @@
                         },
                         "statistics": {
                           "title": "Statistics",
-                          "description": "Statistics for this metric, replacing the group list. Leave empty to inherit. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`.",
+                          "description": "Statistics for this metric, replacing the group list. Leave empty to inherit.",
                           "type": [
                             "array",
                             "null"
@@ -472,7 +472,7 @@
                 },
                 "publication_delay": {
                   "title": "Publication delay",
-                  "description": "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee. Use `0s` only for metrics that publish immediately.",
+                  "description": "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee.",
                   "type": "string",
                   "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                 }
@@ -696,7 +696,6 @@
         },
         "type_static": {
           "access_key_id": {
-            "ui:help": "AWS access key ID. Prefer a go.d secret reference.",
             "ui:placeholder": "${env:AWS_ACCESS_KEY_ID}"
           },
           "secret_access_key": {
@@ -704,7 +703,6 @@
             "ui:widget": "password"
           },
           "session_token": {
-            "ui:help": "Optional session token for temporary AWS credentials.",
             "ui:placeholder": "${env:AWS_SESSION_TOKEN}",
             "ui:widget": "password"
           }
@@ -785,7 +783,6 @@
                 "ui:placeholder": "5m"
               },
               "lookback": {
-                "ui:help": "Rolling window searched for the newest eligible datapoint.",
                 "ui:placeholder": "30m"
               },
               "publication_delay": {
@@ -801,7 +798,7 @@
                 },
                 "statistics": {
                   "ui:listFlavour": "list",
-                  "ui:help": "Optional replacement statistics for this metric. Leave empty with no group statistics to inherit the profile declaration.",
+                  "ui:help": "Optional replacement statistics for this metric. Leave empty with no group statistics to inherit the profile declaration.\n\nUse `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`.",
                   "items": {
                     "ui:placeholder": "Maximum"
                   }
@@ -813,11 +810,9 @@
                     "ui:placeholder": "1m"
                   },
                   "lookback": {
-                    "ui:help": "Rolling window searched for the newest eligible datapoint.",
                     "ui:placeholder": "5m"
                   },
                   "publication_delay": {
-                    "ui:help": "Collector wait after a period closes. Explicit 0s is allowed.",
                     "ui:placeholder": "5m"
                   }
                 }
@@ -857,11 +852,11 @@
             "ui:placeholder": "5m"
           },
           "lookback": {
-            "ui:help": "Rolling window searched for the newest eligible datapoint. Longer windows increase response work.",
             "ui:placeholder": "30m"
           },
           "publication_delay": {
-            "ui:placeholder": "10m"
+            "ui:placeholder": "10m",
+            "ui:help": "Use `0s` only for metrics that publish immediately."
           }
         }
       }
@@ -916,12 +911,10 @@
     },
     "limits": {
       "max_instances": {
-        "ui:help": "Maximum distinct final resource instances that emit at least one selected series after filtering and overlap resolution. Raise this only for an intentionally larger job.",
-        "ui:placeholder": "1000"
+        "ui:help": "Maximum distinct final resource instances that emit at least one selected series after filtering and overlap resolution. Raise this only for an intentionally larger job."
       },
       "max_discovery_groups": {
-        "ui:help": "Safeguard for unique target, region, and namespace discovery groups. Compatible rules and profiles share groups. The default 64 is intended to catch accidental expansion; the hard maximum is 100 because every group needs at least one ListMetrics operation in the bounded refresh. Split larger collection across jobs.",
-        "ui:placeholder": "64"
+        "ui:help": "Safeguard for unique target, region, and namespace discovery groups. Compatible rules and profiles share groups. The default 64 is intended to catch accidental expansion; the hard maximum is 100 because every group needs at least one ListMetrics operation in the bounded refresh. Split larger collection across jobs."
       }
     },
     "discovery": {

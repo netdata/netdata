@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP topology collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -17,8 +18,7 @@
         "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
         "default": "30m"
       }
-    },
-    "title": "SNMP topology collector configuration."
+    }
   },
   "uiSchema": {}
 }

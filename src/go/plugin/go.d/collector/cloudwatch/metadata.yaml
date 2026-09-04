@@ -294,7 +294,7 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: "Data collection interval, in seconds, at least 60. Every CloudWatch series is evaluated on these ticks, never on its own timer."
+              description: "Data collection interval, in seconds, at least 60. All CloudWatch series are collected on this interval; a shorter metric period does not make Netdata query more often."
               default_value: 60
               required: false
               group: Collection
@@ -459,7 +459,7 @@ modules:
               required: true
               group: Rules
             - name: rules[].metrics[].include[].statistics
-              description: "Statistics for this metric, replacing the group list. Leave empty to inherit. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`."
+              description: "Statistics for this metric, replacing the group list. Leave empty to inherit."
               default_value: ""
               required: false
               group: Rules
@@ -532,7 +532,7 @@ modules:
               required: false
               group: Rules / Query Policy
             - name: rules[].query.publication_delay
-              description: "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee. Use `0s` only for metrics that publish immediately."
+              description: "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee."
               default_value: ""
               required: false
               group: Rules / Query Policy

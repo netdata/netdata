@@ -119,9 +119,6 @@
     }
   },
   "uiSchema": {
-    "url": {
-      "ui:placeholder": "https://127.0.0.1"
-    },
     "timeout": {
       "ui:help": "Accepts decimals for sub-second values (e.g., 0.5 = 500ms)."
     },

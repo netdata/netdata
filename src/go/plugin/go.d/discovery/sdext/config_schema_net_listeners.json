@@ -93,11 +93,9 @@
     "discoverer": {
       "net_listeners": {
         "interval": {
-          "ui:placeholder": "2m",
           "ui:help": "Examples: 30s, 2m, 5m, 1h"
         },
         "timeout": {
-          "ui:placeholder": "5",
           "ui:help": "Value in seconds. Examples: 5, 10, 0.5"
         }
       }

@@ -104,8 +104,8 @@ The design-time rules that stay here:
 - An option whose omission drives runtime precedence ("unset means inherit the rule default") MUST NOT carry a schema
   `default`: the form materializes every default into the submitted job, so the omission can never happen from the UI.
 - The form and the doc are two views of one vocabulary: tab titles equal `metadata.yaml` groups and option
-  descriptions are identical in both (`collecttest.AssertConfigSchemaMatchesMetadata`; a collector you touch MUST opt
-  in).
+  descriptions are identical in both (`collecttest.AssertConfigSchemaMatchesMetadata`; a tabbed collector whose
+  options or descriptions you change MUST opt in).
 
 Tests about configuration:
 
@@ -127,7 +127,8 @@ Tests about configuration:
 **When:** writing `metadata.yaml` descriptions, `ui:help`, and stock `.conf` comments. **Do:** explain which mode to
 choose, prerequisites, what the collector writes or deletes, permissions, objectives versus timeouts, direction,
 observation limits, and recovery expectations in plain language; keep schema descriptions short and put examples and
-consequences in `ui:help`; use headings, lists, or a compact comparison table where metadata becomes Markdown; read the
+consequences in `ui:help`; use headings, lists, or a compact comparison table in `detailed_description` and the
+overview (option descriptions are one paragraph, identical in the doc and the form); read the
 generated integration page after generation. **Don't:** ship the engine's journal or state-machine vocabulary as
 operator documentation. **Evidence:** the generated page read end to end. **Boundary:** artifact mechanics, schema
 reference, and the delivery route are owned by `.agents/skills/integrations-lifecycle/`; do not duplicate them here.

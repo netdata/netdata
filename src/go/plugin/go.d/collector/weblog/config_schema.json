@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Web server log collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -410,8 +411,7 @@
           }
         ]
       }
-    },
-    "title": "Web server log collector configuration."
+    }
   },
   "uiSchema": {
     "group_response_codes": {

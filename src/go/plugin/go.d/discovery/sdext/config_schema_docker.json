@@ -92,11 +92,9 @@
     "discoverer": {
       "docker": {
         "address": {
-          "ui:placeholder": "unix:///var/run/docker.sock",
           "ui:help": "Examples: unix:///var/run/docker.sock, tcp://localhost:2375"
         },
         "timeout": {
-          "ui:placeholder": "2",
           "ui:help": "Value in seconds. Examples: 2, 5, 0.5"
         }
       }

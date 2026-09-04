@@ -129,8 +129,9 @@ When reviewing a PR that touches a collector, verify:
      the form's extra depth goes in `ui:help`, the doc's in
      `detailed_description`. How to write the schema file is
      `.agents/skills/project-go-collector-design/config-schema.md`.
-   - Once a collector's two artifacts agree, keep them that way
-     by calling
+   - Once a tabbed collector's two artifacts agree, keep them
+     that way (a tabbed collector whose options or descriptions
+     you change MUST) by calling
      `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`
      from its tests. It checks per option that the tab listing
      the option's root property is the first segment of its

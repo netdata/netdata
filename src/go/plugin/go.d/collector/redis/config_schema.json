@@ -167,6 +167,11 @@
           ]
         }
       ]
+    },
+    "functions": {
+      "top_queries": {
+        "ui:help": "Command arguments in the results may contain unmasked literals, including personal data."
+      }
     }
   }
 }

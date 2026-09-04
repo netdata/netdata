@@ -200,10 +200,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "id",
-            "query"
-          ]
+          "required": ["id", "query"]
         }
       },
       "metrics": {
@@ -491,14 +488,7 @@
                     "title": "Type",
                     "description": "Column data type.",
                     "type": "string",
-                    "enum": [
-                      "string",
-                      "integer",
-                      "float",
-                      "boolean",
-                      "duration",
-                      "timestamp"
-                    ]
+                    "enum": ["string", "integer", "float", "boolean", "duration", "timestamp"]
                   },
                   "units": {
                     "title": "Units",
@@ -526,10 +516,7 @@
               }
             }
           },
-          "required": [
-            "id",
-            "query"
-          ]
+          "required": ["id", "query"]
         }
       },
       "vnode": {

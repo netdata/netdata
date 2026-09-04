@@ -277,9 +277,6 @@
     "retry_interval": {
       "ui:help": "Requested retry interval after non-OK results. Actual execution cannot be faster than `update_every`."
     },
-    "check_period": {
-      "ui:placeholder": "24x7"
-    },
     "time_periods": {
       "ui:listFlavour": "list"
     },
