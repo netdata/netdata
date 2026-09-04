@@ -35,20 +35,17 @@
       "api_key": {
         "title": "API key",
         "description": "PAN-OS XML API key. Takes priority over username/password key generation.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "username": {
         "title": "Username",
         "description": "PAN-OS administrator username used to generate an API key.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "PAN-OS administrator password used to generate an API key.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "vsys": {
         "title": "VSYS",
@@ -114,9 +111,6 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -163,9 +157,6 @@
       ]
     },
     "api_key": {
-      "ui:widget": "password"
-    },
-    "username": {
       "ui:widget": "password"
     },
     "password": {

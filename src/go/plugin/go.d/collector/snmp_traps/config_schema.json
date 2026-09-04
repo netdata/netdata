@@ -6,7 +6,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Framework collection interval for self-metrics. Trap packet reception is event-driven and does not depend on this interval.",
+        "description": "Interval for this collector's own metrics, in seconds. Trap reception is event-driven and does not depend on it.",
         "type": "integer",
         "minimum": 1,
         "default": 1
@@ -42,6 +42,7 @@
           },
           "endpoints": {
             "title": "Endpoints",
+            "description": "UDP endpoints the trap listener binds, each an address and a port.",
             "type": "array",
             "default": [
               {
@@ -284,6 +285,7 @@
         "properties": {
           "enabled": {
             "title": "Enabled",
+            "description": "Summarize repeated matching traps inside the window instead of logging each one.",
             "type": "boolean",
             "default": false
           },
@@ -304,6 +306,7 @@
           },
           "key_varbinds": {
             "title": "Key varbinds",
+            "description": "Varbinds, by name or OID, whose values join the deduplication key, so traps differing in them are not merged. Leave empty to key on the sending device and trap OID only.",
             "type": ["array", "null"],
             "items": {
               "type": "string"
@@ -501,9 +504,6 @@
     "required": ["listen"]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -575,7 +575,15 @@
       }
     },
     "usm_users": {
-      "ui:listFlavour": "list"
+      "ui:listFlavour": "list",
+      "items": {
+        "auth_key": {
+          "ui:widget": "password"
+        },
+        "priv_key": {
+          "ui:widget": "password"
+        }
+      }
     },
     "dedup": {
       "key_varbinds": {

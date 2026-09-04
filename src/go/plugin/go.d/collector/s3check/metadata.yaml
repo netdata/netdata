@@ -180,7 +180,7 @@ modules:
             enabled: true
           list:
             - name: "mode"
-              description: "Check to run: `lifecycle`, `ceph_multisite`, or `aws_replication`."
+              description: "Which check this job runs: `lifecycle`, `ceph_multisite`, or `aws_replication`."
               default_value: "lifecycle"
               required: false
               group: "Mode"
@@ -206,52 +206,52 @@ modules:
               required: false
               group: "Mode / Lifecycle"
             - name: "mode_lifecycle.source"
-              description: "The S3 endpoint to check. Required."
+              description: "The S3 endpoint to check."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.name"
-              description: "Label for this endpoint on charts (the `source` label)."
+              description: "Label for this endpoint on charts."
               default_value: "source"
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.endpoint"
-              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
+              description: "Service URL with scheme and host only. Leave empty for the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.region"
-              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
+              description: "Signing region, for example `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.bucket"
-              description: "Bucket that holds the probe objects. Required."
+              description: "Bucket that holds the probe objects."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.path_style"
-              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
+              description: "Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3."
               default_value: true
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials"
-              description: "Static access keys. Omit to use the AWS SDK default credential chain."
+              description: "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials.access_key_id"
-              description: "Access key ID. Required when `credentials` is set."
+              description: "Access key ID of the static credentials."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials.secret_access_key"
-              description: "Secret access key. Required when `credentials` is set."
+              description: "Secret access key of the static credentials."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.credentials.session_token"
-              description: "Session token for temporary credentials."
+              description: "Session token for temporary credentials. Leave empty for long-lived keys."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
@@ -261,42 +261,42 @@ modules:
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.assume_role.role_arn"
-              description: "ARN of the role to assume. Required when `assume_role` is set."
+              description: "ARN of the IAM role to assume."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.assume_role.external_id"
-              description: "External ID expected by the role's trust policy."
+              description: "External ID expected by the role's trust policy, if any."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.timeout"
-              description: "Maximum duration of one S3 or STS request, up to `1m`."
+              description: "Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.proxy_url"
-              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
+              description: "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_skip_verify"
-              description: "Skip TLS certificate verification. Insecure."
+              description: "Skip TLS certificate and hostname verification. Insecure."
               default_value: false
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_ca"
-              description: "Absolute path to a CA bundle for a private CA."
+              description: "Absolute path to a CA bundle for a private certificate authority."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_cert"
-              description: "Absolute path to a client certificate. Requires `tls_key`."
+              description: "Absolute path to the client certificate. Requires the client key."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
             - name: "mode_lifecycle.source.tls_key"
-              description: "Absolute path to the client certificate key. Requires `tls_cert`."
+              description: "Absolute path to the client certificate key. Requires the client certificate."
               default_value: ""
               required: false
               group: "Mode / Lifecycle connection"
@@ -320,52 +320,52 @@ modules:
               required: false
               group: "Mode / Ceph multisite"
             - name: "mode_ceph_multisite.source"
-              description: "Where probe objects are written and deleted. Required."
+              description: "Where probe objects are written and deleted."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.name"
-              description: "Label for this endpoint on charts (the `source` label)."
+              description: "Label for this endpoint on charts."
               default_value: "source"
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.endpoint"
-              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
+              description: "Service URL with scheme and host only. Leave empty for the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.region"
-              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
+              description: "Signing region, for example `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.bucket"
-              description: "Bucket that holds the probe objects. Required."
+              description: "Bucket that holds the probe objects."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.path_style"
-              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
+              description: "Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3."
               default_value: true
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials"
-              description: "Static access keys. Omit to use the AWS SDK default credential chain."
+              description: "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials.access_key_id"
-              description: "Access key ID. Required when `credentials` is set."
+              description: "Access key ID of the static credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials.secret_access_key"
-              description: "Secret access key. Required when `credentials` is set."
+              description: "Secret access key of the static credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.credentials.session_token"
-              description: "Session token for temporary credentials."
+              description: "Session token for temporary credentials. Leave empty for long-lived keys."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
@@ -375,92 +375,92 @@ modules:
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.assume_role.role_arn"
-              description: "ARN of the role to assume. Required when `assume_role` is set."
+              description: "ARN of the IAM role to assume."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.assume_role.external_id"
-              description: "External ID expected by the role's trust policy."
+              description: "External ID expected by the role's trust policy, if any."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.timeout"
-              description: "Maximum duration of one S3 or STS request, up to `1m`."
+              description: "Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.proxy_url"
-              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
+              description: "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_skip_verify"
-              description: "Skip TLS certificate verification. Insecure."
+              description: "Skip TLS certificate and hostname verification. Insecure."
               default_value: false
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_ca"
-              description: "Absolute path to a CA bundle for a private CA."
+              description: "Absolute path to a CA bundle for a private certificate authority."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_cert"
-              description: "Absolute path to a client certificate. Requires `tls_key`."
+              description: "Absolute path to the client certificate. Requires the client key."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.source.tls_key"
-              description: "Absolute path to the client certificate key. Requires `tls_cert`."
+              description: "Absolute path to the client certificate key. Requires the client certificate."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite source"
             - name: "mode_ceph_multisite.destination"
-              description: "Where replicated copies must appear. Never written by the collector. Required."
+              description: "Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.name"
-              description: "Label for this endpoint on charts (the `destination` label)."
+              description: "Label for this endpoint on charts."
               default_value: "destination"
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.endpoint"
-              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
+              description: "Service URL with scheme and host only. Leave empty for the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.region"
-              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
+              description: "Signing region, for example `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.bucket"
-              description: "Bucket that holds the probe objects. Required."
+              description: "Bucket that holds the probe objects."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.path_style"
-              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
+              description: "Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3."
               default_value: true
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials"
-              description: "Static access keys. Omit to use the AWS SDK default credential chain."
+              description: "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials.access_key_id"
-              description: "Access key ID. Required when `credentials` is set."
+              description: "Access key ID of the static credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials.secret_access_key"
-              description: "Secret access key. Required when `credentials` is set."
+              description: "Secret access key of the static credentials."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.credentials.session_token"
-              description: "Session token for temporary credentials."
+              description: "Session token for temporary credentials. Leave empty for long-lived keys."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
@@ -470,62 +470,62 @@ modules:
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.assume_role.role_arn"
-              description: "ARN of the role to assume. Required when `assume_role` is set."
+              description: "ARN of the IAM role to assume."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.assume_role.external_id"
-              description: "External ID expected by the role's trust policy."
+              description: "External ID expected by the role's trust policy, if any."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.timeout"
-              description: "Maximum duration of one S3 or STS request, up to `1m`."
+              description: "Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.proxy_url"
-              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
+              description: "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_skip_verify"
-              description: "Skip TLS certificate verification. Insecure."
+              description: "Skip TLS certificate and hostname verification. Insecure."
               default_value: false
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_ca"
-              description: "Absolute path to a CA bundle for a private CA."
+              description: "Absolute path to a CA bundle for a private certificate authority."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_cert"
-              description: "Absolute path to a client certificate. Requires `tls_key`."
+              description: "Absolute path to the client certificate. Requires the client key."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.destination.tls_key"
-              description: "Absolute path to the client certificate key. Requires `tls_cert`."
+              description: "Absolute path to the client certificate key. Requires the client certificate."
               default_value: ""
               required: false
               group: "Mode / Ceph multisite destination"
             - name: "mode_ceph_multisite.write_objective"
-              description: "Healthy propagation time for a new object. Exceeding it flags the objective chart only."
+              description: "Healthy time for a new object to appear at the destination, for example `15m`. Exceeding it flags the objective chart only."
               default_value: "15m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_ceph_multisite.write_timeout"
-              description: "Hard limit for a new object to appear at the destination. Exceeding it fails the probe."
+              description: "Hard limit for a new object to appear at the destination, for example `30m`. Exceeding it fails the probe."
               default_value: "30m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_ceph_multisite.delete_objective"
-              description: "Healthy time for a source delete to hide the destination copy."
+              description: "Healthy time for a source delete to hide the destination copy, for example `5m`."
               default_value: "5m"
               required: false
               group: "Mode / Ceph multisite objectives"
             - name: "mode_ceph_multisite.delete_timeout"
-              description: "Hard limit for the destination copy to disappear. Exceeding it fails the probe."
+              description: "Hard limit for the destination copy to disappear, for example `15m`. Exceeding it fails the probe."
               default_value: "15m"
               required: false
               group: "Mode / Ceph multisite objectives"
@@ -552,52 +552,52 @@ modules:
               required: false
               group: "Mode / AWS replication"
             - name: "mode_aws_replication.source"
-              description: "Where probe objects are written and deleted. Required."
+              description: "Where probe objects are written and deleted."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.name"
-              description: "Label for this endpoint on charts (the `source` label)."
+              description: "Label for this endpoint on charts."
               default_value: "source"
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.endpoint"
-              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
+              description: "Service URL with scheme and host only. Leave empty for the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.region"
-              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
+              description: "Signing region, for example `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.bucket"
-              description: "Bucket that holds the probe objects. Required."
+              description: "Bucket that holds the probe objects."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.path_style"
-              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
+              description: "Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3."
               default_value: true
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials"
-              description: "Static access keys. Omit to use the AWS SDK default credential chain."
+              description: "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials.access_key_id"
-              description: "Access key ID. Required when `credentials` is set."
+              description: "Access key ID of the static credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials.secret_access_key"
-              description: "Secret access key. Required when `credentials` is set."
+              description: "Secret access key of the static credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.credentials.session_token"
-              description: "Session token for temporary credentials."
+              description: "Session token for temporary credentials. Leave empty for long-lived keys."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
@@ -607,92 +607,92 @@ modules:
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.assume_role.role_arn"
-              description: "ARN of the role to assume. Required when `assume_role` is set."
+              description: "ARN of the IAM role to assume."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.assume_role.external_id"
-              description: "External ID expected by the role's trust policy."
+              description: "External ID expected by the role's trust policy, if any."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.timeout"
-              description: "Maximum duration of one S3 or STS request, up to `1m`."
+              description: "Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.proxy_url"
-              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
+              description: "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_skip_verify"
-              description: "Skip TLS certificate verification. Insecure."
+              description: "Skip TLS certificate and hostname verification. Insecure."
               default_value: false
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_ca"
-              description: "Absolute path to a CA bundle for a private CA."
+              description: "Absolute path to a CA bundle for a private certificate authority."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_cert"
-              description: "Absolute path to a client certificate. Requires `tls_key`."
+              description: "Absolute path to the client certificate. Requires the client key."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.source.tls_key"
-              description: "Absolute path to the client certificate key. Requires `tls_cert`."
+              description: "Absolute path to the client certificate key. Requires the client certificate."
               default_value: ""
               required: false
               group: "Mode / AWS replication source"
             - name: "mode_aws_replication.destination"
-              description: "Where replicated copies must appear. Never written by the collector. Required."
+              description: "Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.name"
-              description: "Label for this endpoint on charts (the `destination` label)."
+              description: "Label for this endpoint on charts."
               default_value: "destination"
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.endpoint"
-              description: "Service URL with scheme and host only. Empty uses the AWS regional endpoint."
+              description: "Service URL with scheme and host only. Leave empty for the AWS regional endpoint."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.region"
-              description: "Signing region such as `us-east-1`. Required, also for non-AWS services."
+              description: "Signing region, for example `us-east-1`. Required, also for non-AWS services."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.bucket"
-              description: "Bucket that holds the probe objects. Required."
+              description: "Bucket that holds the probe objects."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.path_style"
-              description: "Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3."
+              description: "Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3."
               default_value: true
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials"
-              description: "Static access keys. Omit to use the AWS SDK default credential chain."
+              description: "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials.access_key_id"
-              description: "Access key ID. Required when `credentials` is set."
+              description: "Access key ID of the static credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials.secret_access_key"
-              description: "Secret access key. Required when `credentials` is set."
+              description: "Secret access key of the static credentials."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.credentials.session_token"
-              description: "Session token for temporary credentials."
+              description: "Session token for temporary credentials. Leave empty for long-lived keys."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
@@ -702,72 +702,72 @@ modules:
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.assume_role.role_arn"
-              description: "ARN of the role to assume. Required when `assume_role` is set."
+              description: "ARN of the IAM role to assume."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.assume_role.external_id"
-              description: "External ID expected by the role's trust policy."
+              description: "External ID expected by the role's trust policy, if any."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.timeout"
-              description: "Maximum duration of one S3 or STS request, up to `1m`."
+              description: "Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`."
               default_value: "10s"
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.proxy_url"
-              description: "HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment."
+              description: "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_skip_verify"
-              description: "Skip TLS certificate verification. Insecure."
+              description: "Skip TLS certificate and hostname verification. Insecure."
               default_value: false
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_ca"
-              description: "Absolute path to a CA bundle for a private CA."
+              description: "Absolute path to a CA bundle for a private certificate authority."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_cert"
-              description: "Absolute path to a client certificate. Requires `tls_key`."
+              description: "Absolute path to the client certificate. Requires the client key."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.destination.tls_key"
-              description: "Absolute path to the client certificate key. Requires `tls_cert`."
+              description: "Absolute path to the client certificate key. Requires the client certificate."
               default_value: ""
               required: false
               group: "Mode / AWS replication destination"
             - name: "mode_aws_replication.write_objective"
-              description: "Healthy propagation time for a new object. Exceeding it flags the objective chart only."
+              description: "Healthy time for a new object to appear at the destination, for example `15m`. Exceeding it flags the objective chart only."
               default_value: "15m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "mode_aws_replication.write_timeout"
-              description: "Hard limit for a new object to appear at the destination. Exceeding it fails the probe."
+              description: "Hard limit for a new object to appear at the destination, for example `30m`. Exceeding it fails the probe."
               default_value: "30m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "mode_aws_replication.delete_objective"
-              description: "Healthy time for a source delete to hide the destination copy."
+              description: "Healthy time for a source delete to hide the destination copy, for example `5m`."
               default_value: "5m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "mode_aws_replication.delete_timeout"
-              description: "Hard limit for the destination copy to disappear. Exceeding it fails the probe."
+              description: "Hard limit for the destination copy to disappear, for example `15m`. Exceeding it fails the probe."
               default_value: "15m"
               required: false
               group: "Mode / AWS replication objectives"
             - name: "update_every"
-              description: "Collection interval in seconds. Replication modes poll the destination once per interval."
+              description: "Data collection interval, in seconds. Replication modes poll the destination once per interval."
               default_value: 120
               required: false
               group: "Collection"
             - name: "autodetection_retry"
-              description: "Seconds between retries when the initial bucket check fails. `0` disables retries."
+              description: "How often to retry the initial bucket check when the job fails to start, in seconds. Zero disables retries."
               default_value: 0
               required: false
               group: "Collection"

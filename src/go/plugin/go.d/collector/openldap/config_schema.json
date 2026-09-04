@@ -78,9 +78,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [

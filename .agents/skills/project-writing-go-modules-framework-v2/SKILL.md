@@ -5,8 +5,9 @@ description: Use when creating or migrating a Go go.d collector to framework V2,
 
 # Writing Go go.d Modules With Framework V2
 
-Use with `project-writing-collectors`. Keep this skill loaded for style; read
-source files for evidence.
+Use with `project-writing-collectors`. Design decisions (product boundary, ownership, options, metric semantics)
+are made first with `.agents/skills/project-go-collector-design/SKILL.md`; this skill owns the implementation
+mechanics. Keep it loaded for style; read source files for evidence.
 
 ## Read First
 
@@ -37,14 +38,17 @@ source files for evidence.
 - You MUST re-check scope after each coherent batch. If the work reveals an
   independent collector cleanup, framework fix, or integration-doc change,
   either defer it explicitly or land it separately before continuing.
+- Coupling across jobs or owners, durable state for independent reads, schedulers,
+  queues, or cleanup that would freeze measurement go through the Architecture
+  Gate in `project-go-collector-design` before code, not through this skill.
 
 ## Core Style
 
 - New collectors MUST implement `collectorapi.CollectorV2` from
   `src/go/plugin/framework/collectorapi/collector.go` and register via
   `CreateV2`.
-- `New()` SHOULD own defaults, `metrix.NewCollectorStore()`, typed metric
-  instruments, and test seams.
+- `New()` SHOULD own scalar defaults, `metrix.NewCollectorStore()`, typed metric instruments, and test seams;
+  conditional or mode-dependent defaults follow `project-go-collector-design/operator-surface.md` §4.
 - V2 collectors MUST write metrics through `metrix.CollectorStore` during
   `Collect()` and provide chart template YAML through `ChartTemplateYAML()`;
   embedded `charts.yaml` is RECOMMENDED.
@@ -57,6 +61,12 @@ source files for evidence.
   starting the runtime job.
 - Collector `Cleanup(ctx)` MUST be idempotent. The framework may call it more
   than once, including after partial `Init` / `Check` setup.
+- `Check()` MUST stay a cheap detection path: no reservation, no remote side
+  effect, no state it must later release.
+- Cleanup either honors the caller's context or uses a detached best-effort
+  context with a fixed budget that does not scale with public request or retry
+  settings; trace that deadline through every cleanup I/O and keep unfinished
+  ownership for recovery instead of blocking shutdown on it.
 - Files SHOULD stay boring: public lifecycle methods in `collector.go`, setup
   helpers in `init.go` when needed, orchestration in `collect.go`, distinct
   upstream operations in `collect_<operation>.go`, metrics in `metrix.go` /
@@ -92,10 +102,9 @@ source files for evidence.
   its initial `single` object appears in DynCfg. The framework exposes a single
   object only after a config exists; it does not publish a template placeholder,
   and plain stock enable failures can remove the stock object.
-- Public config options SHOULD stay small and justified. A proposed config
-  option MUST name the concrete operator decision it enables; "operators may
-  want to tune it" is not enough. Internal tuning SHOULD use constants unless
-  the operator has a real decision to make.
+- Public config options: decision record, lifecycle, form, and defaults rules are
+  owned by `project-go-collector-design/operator-surface.md`; the constants list
+  is in the how-to guide's Config section.
 
 ## Metrics And Charts
 
@@ -238,8 +247,8 @@ source files for evidence.
 
 ## Host Scopes
 
-- Host scopes SHOULD be used only after a product decision says the data belongs
-  on a generated vnode.
+- Host scopes SHOULD be used only after a product decision says the data belongs on a generated vnode (the decision is
+  described in `project-writing-collectors` §1.9).
 - `ScopeKey` and `GUID` MUST be deterministic.
 - Collector-generated vnodes MUST set `_vnode_type=<source>`.
 - Host-scope cardinality MUST be bounded and documented. Collectors SHOULD NOT
@@ -260,6 +269,23 @@ specific item does not apply:
 - chart coverage assertions for fixtures expected to materialize all dimensions;
 - host-scope tests when scopes/vnodes are used.
 
+Tests are evidence only when they have an independent oracle:
+
+- The oracle is a provider behavior, a supported public contract, or an approved
+  decision, named before the expectation is written. A test MUST NOT restate
+  prose, inventories, or defaults copied from the source it tests; cross-artifact
+  drift checks and forbidden-pattern rules are legitimate, agreement between two
+  files is not proof either expresses the right contract.
+- The regression path MUST reach its state through real construction and
+  transitions. Populating private state after construction, or stubbing past the
+  bug, tests the renderer, not the engine.
+- A fake MUST derive its downstream state from its own inputs and operation
+  history, never from the collector's expected destination, phase, or result.
+  Ask: where did the fake get the expected answer? An incorrect collector mapping
+  must fail the test without changing the fake. Inspect the production adapter
+  and its construction order as well as the fake (transport set before the
+  credential provider, deadlines per endpoint, error classification).
+
 ## Pre-PR Check
 
 - A finished V1-to-V2 migration MUST NOT keep a runtime
@@ -271,3 +297,6 @@ specific item does not apply:
   records an explicit breaking decision.
 - New labels and scopes MUST be bounded and documented.
 - Enrichment SHOULD be split from the V2 compatibility migration when possible.
+- Final sweep: dead fields and helpers, duplicated defaults, unused persisted
+  state, repeated finalization, interfaces or knobs whose motivating requirement
+  disappeared, and tests that pin prose are removed before review.
