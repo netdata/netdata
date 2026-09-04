@@ -126,6 +126,8 @@ func (r SchemaResolver) deref(ref string) map[string]any {
 	}
 	var node any = r.root
 	for part := range strings.SplitSeq(ref[2:], "/") {
+		// RFC 6901: "~1" encodes "/" and "~0" encodes "~", in that decoding order.
+		part = strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
 		node = asObject(node)[part]
 	}
 	return asObject(node)

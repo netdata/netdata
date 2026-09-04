@@ -250,7 +250,8 @@ If no static schema file is found, Netdata will send a `schema` command to the p
         "title": "URL",
         "description": "URL of the Nginx stub_status page.",
         "type": "string",
-        "format": "uri"
+        "format": "uri",
+        "default": "http://127.0.0.1/stub_status"
       },
       "timeout": {
         "title": "Timeout",
@@ -276,7 +277,6 @@ If no static schema file is found, Netdata will send a `schema` command to the p
       ]
     },
     "url": {
-      "ui:placeholder": "http://127.0.0.1/stub_status",
       "ui:help": "The `stub_status` page must be enabled in the Nginx configuration.\n\nExample:\n\n```\nlocation /stub_status { stub_status; }\n```"
     },
     "password": {
