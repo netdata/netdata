@@ -6,7 +6,7 @@
     "properties": {
       "hostname": {
         "title": "Hostname",
-        "description": "The hostname that identifies this virtual node in the Netdata UI and API. Must be unique within your monitoring environment.",
+        "description": "The hostname that identifies this virtual node in the Netdata UI and API. Must be unique within your monitoring environment. Leave empty to use the job name.",
         "type": "string"
       },
       "guid": {
@@ -31,11 +31,8 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "hostname": {
-      "ui:placeholder": "If not specified, the job name will be used as the hostname."
+      "ui:placeholder": "edge-router-1"
     },
     "guid": {
       "ui:help": "Generate a UUID using the command line: `uuidgen` on macOS/Linux or `[guid]::NewGuid()` in PowerShell."

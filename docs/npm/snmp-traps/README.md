@@ -61,7 +61,7 @@ A count tells you the receiver saw activity, not whether it matters. Use the res
 
 - **A listener** for SNMPv1, SNMPv2c, and SNMPv3 Trap and INFORM notifications, with USM authentication and privacy and SNMPv3 engine-ID controls. Netdata acknowledges every INFORM.
 - **A trap profile catalogue** — 800+ stock vendor profiles covering 6,000+ MIBs — that decodes OIDs into names, categories, severities, and labeled varbinds out of the box. Per-OID overrides and custom profiles cover the rest.
-- **Local journal storage** (default, Linux): structured trap entries you query with the Netdata Logs UI or `journalctl`.
+- **Local journal storage** (default): structured trap entries you query with the Netdata Logs UI or, on Linux, `journalctl`.
 - **Optional OTLP/gRPC export** to forward traps as log records to a SIEM or log pipeline. At least one output — journal or OTLP — must be enabled.
 - **Receiver self-metrics and alerts**: a per-job pipeline funnel, events by category and severity, processing errors, and deduplication.
 - **A closed taxonomy** of 8 categories (`state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, `unknown`) and 8 severities (`emerg` … `debug`), so categories and severities mean the same thing across every device.

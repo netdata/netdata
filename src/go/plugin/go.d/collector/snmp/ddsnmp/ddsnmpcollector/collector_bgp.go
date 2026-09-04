@@ -134,7 +134,6 @@ func (c *Collector) collectScalarBGPRows(
 					route.Outcome = AcquisitionRouteOutcomeFailed
 					route.FailureClass = AcquisitionFailureClassTransport
 				}
-				stats.Errors.SNMP++
 				errs = append(errs, fmt.Errorf("BGP scalar row %q: %w", bgpConfigDisplayName(cfg), err))
 				continue
 			}
@@ -204,7 +203,7 @@ func (c *Collector) collectTableBGPRows(
 ) ([]ddsnmp.BGPRow, error) {
 	var rows []ddsnmp.BGPRow
 	var errs []error
-	walkPass := newTableWalkPass()
+	walkPass := newTableWalkPass(acquisition.executionReport())
 	tableNameToOID := bgpTableNameToOID(configs)
 
 	for i, cfg := range configs {

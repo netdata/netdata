@@ -18,6 +18,9 @@ Direct-journal jobs write journal-compatible files under the configured Netdata 
 /var/log/netdata/traps/<job>/
 ```
 
+The files use the compact journal format, so reading them with `journalctl` requires systemd 252 or later on the
+host. Netdata itself reads them on every platform it writes them on, and they are written without `systemd-journald`.
+
 The effective `journalctl --directory` path is the machine-id child directory inside that job root:
 
 ```text

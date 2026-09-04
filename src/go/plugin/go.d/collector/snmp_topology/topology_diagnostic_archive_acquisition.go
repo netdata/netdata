@@ -67,6 +67,7 @@ type topologyDiagnosticArchiveProfileEvidenceV1 struct {
 	Outcome      string                                     `json:"outcome"`
 	FailurePhase string                                     `json:"failure_phase"`
 	Stats        topologyDiagnosticArchiveCollectionStatsV1 `json:"stats"`
+	Execution    *topologyDiagnosticArchiveExecutionV1      `json:"execution,omitempty"`
 	Routes       []topologyDiagnosticArchiveRouteV1         `json:"routes,omitempty"`
 	Values       topologyDiagnosticArchiveProfileValuesV1   `json:"values"`
 }
@@ -153,6 +154,7 @@ type topologyDiagnosticArchiveCollectionStatsV1 struct {
 }
 
 type topologyDiagnosticArchiveTimingStatsV1 struct {
+	PreparationNanos    int64 `json:"preparation_ns,omitempty"`
 	ScalarNanos         int64 `json:"scalar_ns"`
 	TableNanos          int64 `json:"table_ns"`
 	LicensingNanos      int64 `json:"licensing_ns"`
@@ -185,12 +187,13 @@ type topologyDiagnosticArchiveTableCacheStatsV1 struct {
 }
 
 type topologyDiagnosticArchiveErrorStatsV1 struct {
-	SNMP                int64 `json:"snmp"`
-	ProcessingScalar    int64 `json:"processing_scalar"`
-	ProcessingTable     int64 `json:"processing_table"`
-	ProcessingLicensing int64 `json:"processing_licensing"`
-	ProcessingBGP       int64 `json:"processing_bgp"`
-	MissingOIDs         int64 `json:"missing_oids"`
+	ProcessingPreparation int64 `json:"processing_preparation,omitempty"`
+	SNMP                  int64 `json:"snmp"`
+	ProcessingScalar      int64 `json:"processing_scalar"`
+	ProcessingTable       int64 `json:"processing_table"`
+	ProcessingLicensing   int64 `json:"processing_licensing"`
+	ProcessingBGP         int64 `json:"processing_bgp"`
+	MissingOIDs           int64 `json:"missing_oids"`
 }
 
 func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
@@ -318,6 +321,7 @@ func newTopologyDiagnosticArchiveProfileEvidenceV1(
 		Outcome:      outcome,
 		FailurePhase: failurePhase,
 		Stats:        newTopologyDiagnosticArchiveCollectionStatsV1(profile.stats),
+		Execution:    newTopologyDiagnosticArchiveExecutionV1(profile.execution),
 		Routes:       make([]topologyDiagnosticArchiveRouteV1, 0, len(profile.routes)),
 		Values:       newTopologyDiagnosticArchiveProfileValuesV1(profile.values),
 	}
@@ -431,6 +435,7 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 ) topologyDiagnosticArchiveCollectionStatsV1 {
 	return topologyDiagnosticArchiveCollectionStatsV1{
 		Timing: topologyDiagnosticArchiveTimingStatsV1{
+			PreparationNanos:    int64(stats.Timing.Preparation),
 			ScalarNanos:         int64(stats.Timing.Scalar),
 			TableNanos:          int64(stats.Timing.Table),
 			LicensingNanos:      int64(stats.Timing.Licensing),
@@ -459,12 +464,13 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 			Misses: stats.TableCache.Misses,
 		},
 		Errors: topologyDiagnosticArchiveErrorStatsV1{
-			SNMP:                stats.Errors.SNMP,
-			ProcessingScalar:    stats.Errors.Processing.Scalar,
-			ProcessingTable:     stats.Errors.Processing.Table,
-			ProcessingLicensing: stats.Errors.Processing.Licensing,
-			ProcessingBGP:       stats.Errors.Processing.BGP,
-			MissingOIDs:         stats.Errors.MissingOIDs,
+			ProcessingPreparation: stats.Errors.Processing.Preparation,
+			SNMP:                  stats.Errors.SNMP,
+			ProcessingScalar:      stats.Errors.Processing.Scalar,
+			ProcessingTable:       stats.Errors.Processing.Table,
+			ProcessingLicensing:   stats.Errors.Processing.Licensing,
+			ProcessingBGP:         stats.Errors.Processing.BGP,
+			MissingOIDs:           stats.Errors.MissingOIDs,
 		},
 	}
 }
@@ -607,6 +613,10 @@ func (p topologyDiagnosticArchiveProfileEvidenceV1) profile() (topologyAcquisiti
 		stats:        p.Stats.stats(),
 		routes:       make([]ddsnmpcollector.AcquisitionRouteReport, 0, len(p.Routes)),
 	}
+	result.execution, err = p.Execution.execution()
+	if err != nil {
+		return topologyAcquisitionProfileEvidence{}, err
+	}
 	routeOrdinals := make(map[uint32]struct{}, len(p.Routes))
 	for _, route := range p.Routes {
 		if _, ok := routeOrdinals[route.Ordinal]; ok {
@@ -734,6 +744,7 @@ func (v topologyDiagnosticArchiveProfileValuesV1) values(
 
 func (s topologyDiagnosticArchiveCollectionStatsV1) stats() ddsnmp.CollectionStats {
 	var result ddsnmp.CollectionStats
+	result.Timing.Preparation = time.Duration(s.Timing.PreparationNanos)
 	result.Timing.Scalar = time.Duration(s.Timing.ScalarNanos)
 	result.Timing.Table = time.Duration(s.Timing.TableNanos)
 	result.Timing.Licensing = time.Duration(s.Timing.LicensingNanos)
@@ -755,6 +766,7 @@ func (s topologyDiagnosticArchiveCollectionStatsV1) stats() ddsnmp.CollectionSta
 	result.TableCache.Hits = s.TableCache.Hits
 	result.TableCache.Misses = s.TableCache.Misses
 	result.Errors.SNMP = s.Errors.SNMP
+	result.Errors.Processing.Preparation = s.Errors.ProcessingPreparation
 	result.Errors.Processing.Scalar = s.Errors.ProcessingScalar
 	result.Errors.Processing.Table = s.Errors.ProcessingTable
 	result.Errors.Processing.Licensing = s.Errors.ProcessingLicensing

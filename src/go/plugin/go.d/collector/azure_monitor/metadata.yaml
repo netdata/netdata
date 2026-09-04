@@ -138,17 +138,17 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection interval (seconds). Must be at least 60.
+              description: "Data collection interval, in seconds. Must be at least 60."
               default_value: 60
               required: false
               group: Collection
             - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
               default_value: 0
               required: false
               group: Collection
             - name: subscription_ids
-              description: List of Azure subscription IDs to monitor. Used as the scope for resource discovery.
+              description: "Azure subscription IDs to monitor. They scope resource discovery."
               default_value: ""
               required: true
               group: Collection
@@ -158,7 +158,7 @@ modules:
               required: false
               group: Collection
             - name: query_offset
-              description: Minimum offset (seconds) subtracted from metric query windows. Increase if metrics appear incomplete.
+              description: "Minimum offset subtracted from metric query windows, in seconds. Increase it if metrics appear incomplete."
               default_value: 180
               required: false
               group: Collection
@@ -172,12 +172,12 @@ modules:
                 - **Increase to 240-300s** if you still see gaps or missing data points.
                 - **Do not set below 60s** -- metrics will likely be incomplete.
             - name: timeout
-              description: Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.
+              description: "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds."
               default_value: 30
               required: false
               group: Collection
             - name: auth.mode
-              description: "Authentication method: `service_principal`, `managed_identity`, or `default`."
+              description: "How Netdata authenticates to Azure: `service_principal`, `managed_identity`, or `default`."
               default_value: ""
               required: true
               group: Authentication
@@ -190,32 +190,32 @@ modules:
                 | `managed_identity` | Running on Azure VMs, VMSS, or AKS with a managed identity | Optionally `client_id` for user-assigned identity |
                 | `default` | Uses the Azure SDK default credential chain (environment variables, managed identity, Azure CLI, etc.) | None |
             - name: auth.mode_service_principal.tenant_id
-              description: Entra ID tenant ID (required for `service_principal` mode).
+              description: "Entra ID tenant ID. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_service_principal.client_id
-              description: Entra ID application (client) ID (required for `service_principal` mode).
+              description: "Entra ID application (client) ID. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_service_principal.client_secret
-              description: Entra ID client secret (required for `service_principal` mode).
+              description: "Entra ID client secret. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_managed_identity.client_id
-              description: Client ID for user-assigned managed identity. Leave empty for system-assigned.
+              description: "Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity."
               default_value: ""
               required: false
               group: Authentication
             - name: discovery.refresh_every
-              description: Interval (seconds) for refreshing discovered resources. Set `0` to disable runtime re-discovery after bootstrap.
+              description: "How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup."
               default_value: 300
               required: false
               group: Discovery
             - name: discovery.mode
-              description: "Resource discovery method: `filters` (structured filters) or `query` (custom KQL)."
+              description: "How resources are selected: `filters` (structured filters) or `query` (custom KQL)."
               default_value: filters
               required: false
               group: Discovery
@@ -227,22 +227,22 @@ modules:
                 | `filters` | Builds an Azure Resource Graph query from the structured `mode_filters.*` options (resource groups, regions, tags). This is the default. |
                 | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. Project `tags` too when using `virtual_nodes.by_resource_tag`. |
             - name: discovery.mode_filters.resource_groups
-              description: Optional list of Azure resource groups to include in `filters` mode.
+              description: "Azure resource groups to include. Leave empty for all."
               default_value: "[]"
               required: false
               group: Discovery
             - name: discovery.mode_filters.regions
-              description: Optional list of Azure regions to include in `filters` mode.
+              description: "Azure regions to include. Leave empty for all."
               default_value: "[]"
               required: false
               group: Discovery
             - name: discovery.mode_filters.tags
-              description: Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively.
+              description: "Exact-match tag filters. Keys match case-insensitively, values case-sensitively."
               default_value: "{}"
               required: false
               group: Discovery
             - name: discovery.mode_query.kql
-              description: Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`; project `tags` too when using `virtual_nodes.by_resource_tag`.
+              description: "Azure Resource Graph query selecting the resources. It must project `id`, `name`, `type`, `resourceGroup`, and `location`, plus `tags` for tag-based virtual nodes."
               default_value: ""
               required: false
               group: Discovery
@@ -278,7 +278,7 @@ modules:
                 | project id, name, type, resourceGroup, location, tags
                 ```
             - name: profiles.mode
-              description: "How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both)."
+              description: "How profiles are selected: `auto` (from discovered resources), `exact` (explicit list), or `combined` (both)."
               default_value: auto
               required: false
               group: Profiles
@@ -301,7 +301,7 @@ modules:
                 - Per-profile filters never widen or bypass the global discovery scope.
                 - In `discovery.mode: query`, per-profile filters can use only `resource_groups` and `regions`. If you need per-profile tag filtering there, encode it in the KQL.
             - name: profiles.mode_auto.entries
-              description: Optional per-profile overrides applied only to profiles that auto-activate at bootstrap.
+              description: "Per-profile overrides applied only to profiles that activate automatically at startup."
               default_value: "[]"
               required: false
               group: Profiles
@@ -318,7 +318,7 @@ modules:
                 Auto-mode entries do not activate profiles on their own. They only override filtering for profiles that were auto-selected at bootstrap.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: profiles.mode_exact.entries
-              description: Explicit profile entries used by `exact` mode.
+              description: "Explicit profile entries used by `exact` mode."
               default_value: "[]"
               required: false
               group: Profiles
@@ -335,7 +335,7 @@ modules:
                 Per-profile filters only narrow the globally discovered resource set. They never widen it.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: profiles.mode_combined.entries
-              description: Explicit profile entries merged with auto-discovered profiles in `combined` mode.
+              description: "Explicit profile entries merged with auto-discovered profiles in `combined` mode."
               default_value: "[]"
               required: false
               group: Profiles
@@ -352,22 +352,22 @@ modules:
                 If an explicit `combined` entry matches an auto-selected profile, the collector keeps one runtime profile and overlays the explicit entry filters onto it.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: limits.max_concurrency
-              description: Maximum concurrent batch queries to Azure Monitor.
+              description: "Maximum concurrent batch requests to Azure Monitor."
               default_value: 4
               required: false
               group: Limits
             - name: limits.max_batch_resources
-              description: Maximum resources per Azure Monitor batch request.
+              description: "Maximum resources per Azure Monitor batch request."
               default_value: 50
               required: false
               group: Limits
             - name: limits.max_metrics_per_query
-              description: Maximum metrics per Azure Monitor batch request.
+              description: "Maximum metric names per Azure Monitor batch request."
               default_value: 20
               required: false
               group: Limits
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
               default_value: ""
               required: false
               group: Virtual Node
@@ -375,7 +375,7 @@ modules:
                 This job-level virtual node is used for metrics written to the default host scope.
                 If `virtual_nodes.by_resource_tag` is also set, resources that have a safe value for the configured tag are routed to workload virtual nodes instead. Resources without that tag, with an empty value, or with an unsafe hostname value continue to use the job-level `vnode` when configured.
             - name: virtual_nodes.by_resource_tag
-              description: Creates workload virtual nodes from an Azure resource tag value.
+              description: "Azure resource tag whose value becomes the virtual node for the resources carrying it. Leave empty to keep everything on this host."
               default_value: ""
               required: false
               group: Virtual Node

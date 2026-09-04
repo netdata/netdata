@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -35,8 +36,8 @@
         "default": 3
       },
       "vnode": {
-        "title": "Configuration",
-        "description": "",
+        "title": "Virtual node",
+        "description": "Identity of the Virtual Node created for this device when `create_vnode` is enabled.",
         "type": [
           "object",
           "null"
@@ -75,6 +76,7 @@
         "properties": {
           "version": {
             "title": "SNMP version",
+            "description": "SNMP protocol version the device speaks.",
             "type": "string",
             "enum": [
               "1",
@@ -154,6 +156,7 @@
           },
           "auth_proto": {
             "title": "Authentication protocol",
+            "description": "Authentication protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -168,10 +171,12 @@
           },
           "auth_key": {
             "title": "Authentication passphrase",
+            "description": "Authentication protocol pass phrase for SNMPv3 messages.",
             "type": "string"
           },
           "priv_proto": {
             "title": "Privacy protocol",
+            "description": "Privacy protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -179,12 +184,14 @@
               "aes",
               "aes192",
               "aes256",
-              "aes192c"
+              "aes192c",
+              "aes256c"
             ],
             "default": "aes192c"
           },
           "priv_key": {
             "title": "Privacy passphrase",
+            "description": "Privacy protocol pass phrase for SNMPv3 messages.",
             "type": "string"
           },
           "context_name": {
@@ -216,6 +223,7 @@
       },
       "ping": {
         "title": "Ping",
+        "description": "ICMP round-trip measurements collected alongside the SNMP metrics.",
         "type": [
           "object",
           "null"
@@ -223,9 +231,9 @@
         "properties": {
           "enabled": {
             "title": "Enable ping",
+            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that.",
             "type": "boolean",
-            "default": true,
-            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that."
+            "default": true
           },
           "network": {
             "title": "Network",
@@ -274,9 +282,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "manual_profiles": {
       "ui:listFlavour": "list",
       "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
@@ -296,9 +301,6 @@
       }
     },
     "user": {
-      "name": {
-        "ui:widget": "password"
-      },
       "level": {
         "ui:widget": "radio",
         "ui:options": {

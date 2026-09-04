@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "http": {
             "title": "HTTP",
+            "description": "HTTP endpoint fetched periodically for discovery items.",
             "type": "object",
             "properties": {
               "url": {
@@ -79,18 +81,22 @@
               },
               "not_follow_redirects": {
                 "title": "Do not follow redirects",
+                "description": "Treat an HTTP redirect as a failed request instead of following it.",
                 "type": "boolean"
               },
               "proxy_url": {
                 "title": "Proxy URL",
+                "description": "URL of the HTTP proxy to route requests through.",
                 "type": "string"
               },
               "proxy_username": {
                 "title": "Proxy username",
+                "description": "Username for the HTTP proxy.",
                 "type": "string"
               },
               "proxy_password": {
                 "title": "Proxy password",
+                "description": "Password for the HTTP proxy.",
                 "type": "string"
               },
               "tls_ca": {
@@ -110,6 +116,7 @@
               },
               "tls_skip_verify": {
                 "title": "Skip TLS verification",
+                "description": "Skip verification of the server's TLS certificate.",
                 "type": "boolean"
               },
               "force_http2": {
@@ -128,7 +135,7 @@
       },
       "services": {
         "title": "Service rules",
-        "description": "- Match fetched HTTP discovery items and generate collector configurations.\n- Generated job configs must include `name` and `module`; `module` is the collector name, for example `httpcheck` or `ping`.\n- If a generated config omits `module`, the rule ID is used as `module`; rely on this only for curated rules where the rule ID is the intended collector.\n- `.Item` contains the fetched item. String items expose the string as `.Item`; object items expose fields under `.Item`.",
+        "description": "Rules that turn fetched HTTP discovery items into data collection jobs.",
         "type": "array",
         "minItems": 1,
         "items": {
@@ -163,9 +170,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -195,9 +199,7 @@
                 "format",
                 "not_follow_redirects",
                 "interval",
-                "timeout",
-                "method",
-                "body"
+                "timeout"
               ]
             },
             {
@@ -222,8 +224,7 @@
               "fields": [
                 "proxy_url",
                 "proxy_username",
-                "proxy_password",
-                "force_http2"
+                "proxy_password"
               ]
             },
             {
@@ -244,11 +245,9 @@
           "ui:widget": "hidden"
         },
         "interval": {
-          "ui:placeholder": "1m",
           "ui:help": "Examples: 30s, 1m, 5m. Use 0 for one-shot fetch."
         },
         "format": {
-          "ui:placeholder": "auto",
           "ui:widget": "radio",
           "ui:options": {
             "inline": true
@@ -281,7 +280,8 @@
           "ui:widget": "textarea",
           "ui:placeholder": "name: {{ .TUID }}\nmodule: httpcheck\nurl: {{ .Item }}"
         }
-      }
+      },
+      "ui:help": "- Match fetched HTTP discovery items and generate collector configurations.\n- Generated job configs must include `name` and `module`; `module` is the collector name, for example `httpcheck` or `ping`.\n- If a generated config omits `module`, the rule ID is used as `module`; rely on this only for curated rules where the rule ID is the intended collector.\n- `.Item` contains the fetched item. String items expose the string as `.Item`; object items expose fields under `.Item`."
     }
   }
 }

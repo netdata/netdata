@@ -354,14 +354,30 @@ func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []
 }
 
 func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, string, error) {
-	query := querySystemHealthLatestDeadlockEventFile
-	if f.router.collector.Functions.DeadlockInfo.UseRingBuffer {
-		query = querySystemHealthLatestDeadlockRingBuffer
-	}
-
+	c := f.router.collector
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
-	err := f.router.collector.db.QueryRowContext(ctx, query).Scan(&deadlockTime, &deadlockXML)
+	readRingBuffer := func() error {
+		available, err := c.mssqlRingBufferAvailable(ctx, "system_health")
+		if err != nil {
+			return err
+		}
+		if !available {
+			return errors.New("system_health ring_buffer target unavailable")
+		}
+		return c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
+	}
+
+	var err error
+	if c.Functions.DeadlockInfo.UseRingBuffer {
+		err = readRingBuffer()
+	} else {
+		err = c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile).Scan(&deadlockTime, &deadlockXML)
+		if err != nil && shouldFallbackDeadlockEventFile(err) {
+			// Retry only on a file read error, not on an available but empty file target.
+			err = readRingBuffer()
+		}
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, "", nil
@@ -377,6 +393,18 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 		return deadlockTime.Time, deadlockXML.String, nil
 	}
 	return time.Now().UTC(), deadlockXML.String, nil
+}
+
+func shouldFallbackDeadlockEventFile(err error) bool {
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || isDeadlockPermissionError(err) {
+		return false
+	}
+
+	var sqlErr mssqlDriver.Error
+	if errors.As(err, &sqlErr) {
+		return sqlErr.Number == 25717 || sqlErr.Number == 25718
+	}
+	return false
 }
 
 func (f *funcDeadlockInfo) queryDatabaseNames(ctx context.Context) (map[int]string, error) {

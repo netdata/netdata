@@ -44,7 +44,8 @@ collecting the rest:
 
 Core metrics — performance counters, wait statistics, locks, per-database transactions, I/O latency,
 and memory — are collected on every edition without special configuration. The top-queries function
-is available on Express 2016 SP1 and later when Query Store is enabled.
+uses Query Store where it is available and enabled, and otherwise falls back to the plan cache
+(`sys.dm_exec_query_stats`), which every edition since SQL Server 2008 provides.
 
 
 It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
@@ -259,7 +260,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
-|  | functions.top_queries.time_window_days | Number of days of Query Store data to analyze. Set to 0 to use the default (7), or -1 to include all available data. Smaller positive values improve query performance but show less history. | 7 | no |
+|  | functions.top_queries.time_window_days | Number of days of query statistics to analyze. On the plan-cache fallback this filters by last execution time rather than aggregating a period. Set to 0 to use the default (7), or -1 to include all available data. Smaller positive values improve query performance but show less history. | 7 | no |
 |  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
 |  | functions.deadlock_info.timeout | Query timeout for deadlock-info function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.deadlock_info.use_ring_buffer | Use the ring_buffer target instead of event_file for the built-in system_health session on SQL Server or Azure SQL Managed Instance.<br/><br/>WARNING:<br/>• Data is cleared on failover/restart<br/>• Capacity is limited<br/>• XML parsing can increase query CPU<br/><br/>Azure SQL Database is not supported by deadlock-info because it has no built-in system_health session. | no | no |
@@ -781,33 +782,58 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
+Retrieves aggregated SQL query performance metrics from Microsoft SQL Server, preferring [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics and falling back to the plan cache.
 
-This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+With Query Store, this function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+
+Query Store was introduced in SQL Server 2016 (13.x). When it is missing or turned off everywhere, the function falls back to [`sys.dm_exec_query_stats`](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql), the plan cache, and the `Source` column reports which store answered. Changes to Query Store enablement are detected on subsequent requests. The plan cache differs in important ways:
+
+- It only covers plans that are cached right now. Statistics are lost on restart, recompilation, memory pressure, or `DBCC FREEPROCCACHE`, so they are not query history.
+- Rows are aggregated by query hash across the whole instance, not per database. `Database` is selected from the cached statements (currently the minimum value), so it is not reliable per-database attribution when the same query hash occurs in multiple databases, and it is empty for ad-hoc or prepared batches that carry no database context.
+- Standard deviation, memory grant, log bytes, and tempdb usage metrics are unavailable on the plan-cache source, so their columns are omitted. Plan-shape columns (hash match joins, merge joins, nested loops, sorts) remain present with empty values.
+- `time_window_days` filters on last execution time instead of aggregating a period, because the plan cache keeps no interval history.
 
 Use cases:
 - Identify slow or resource-intensive queries consuming excessive CPU time or memory
 - Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
 - Monitor parallelism (DOP) and tempdb usage for capacity planning
 
-Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
+Query text is truncated at 4096 characters for display purposes. Columns are detected at runtime from the active source, so metrics that a given SQL Server release or store does not provide are omitted.
 
 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Mssql:top-queries` |
 | Require Cloud | yes |
-| Performance | On SQL Server and Azure SQL Managed Instance, executes dynamic SQL across all user databases with Query Store enabled.<br/>On Azure SQL Database, queries only the database selected in the DSN.<br/>• Execution time depends on Query Store workload, history window, and number of queried databases<br/>• Default limit of 500 rows balances completeness with performance |
+| Performance | On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Function queries share the collector's database connection, so long scans can delay metric collection |
 | Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to an engine that exposes Query Store (SQL Server 2016 (13.x) and later, Azure SQL Managed Instance, or Azure SQL Database)<br/>• On SQL Server/Managed Instance, Query Store is enabled on at least one user database; on Azure SQL Database, it is enabled in the database selected in the DSN<br/>• Returns HTTP 403 when required permissions are missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 503 if the collector is still initializing, the server does not expose Query Store, or no applicable database has Query Store enabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available when:<br/>• The collector has successfully connected<br/>• `functions.top_queries.disabled` is false<br/>• Query Store answers when the engine exposes it (SQL Server 2016 (13.x) and later, Azure SQL Managed Instance, or Azure SQL Database) and it is enabled on at least one user database; on Azure SQL Database, in the database selected in the DSN<br/>• Otherwise the plan cache (`sys.dm_exec_query_stats`) answers, which requires `query_hash`, available since SQL Server 2008<br/>• Returns HTTP 403 when required permissions are missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or neither Query Store nor the plan cache can answer<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-##### Enable Query Store
+##### Plan-cache access
 
-Query Store must be enabled on each database you want to inspect. SQL Server and Azure SQL Managed
-Instance query all enabled user databases. Azure SQL Database queries only the database selected in
-the collector DSN.
+Query Store is optional. SQL Server 2008–2014, and newer instances without an enabled Query Store,
+use the plan cache automatically. Grant the monitoring login the server permission for its version:
+
+```sql
+-- SQL Server 2008–2019
+GRANT VIEW SERVER STATE TO [netdata_user];
+
+-- SQL Server 2022 and later
+GRANT VIEW SERVER PERFORMANCE STATE TO [netdata_user];
+```
+
+Azure SQL Database plan-cache permissions depend on the service tier. See the
+[Microsoft DMV permissions reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql#permissions).
+
+
+##### Enable Query Store for persistent history
+
+On SQL Server 2016 and later, enable Query Store on the databases whose persistent query history
+you want to inspect. SQL Server and Azure SQL Managed Instance query all enabled user databases.
+Azure SQL Database queries only the database selected in the collector DSN. These steps are not
+required for the plan-cache fallback.
 
 1. Verify Query Store state:
 
@@ -855,7 +881,8 @@ the collector DSN.
 
 - Query Store is available in SQL Server 2016+ and Azure SQL Database
 - Requires ALTER DATABASE permission to enable Query Store
-- System databases (master, tempdb, model, msdb) are excluded from queries
+- Query Store queries exclude system databases (master, tempdb, model, msdb). The plan cache excludes
+  statements identified as belonging to those databases, but can include statements with unknown database context
 - `top-queries` is enabled by default; set `functions.top_queries.disabled: true` only to disable it
 
 :::
@@ -870,10 +897,11 @@ the collector DSN.
 
 #### Returns
 
-Aggregated query execution statistics from Query Store runtime views, providing comprehensive performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
+Aggregated query execution statistics from Query Store runtime views, or from the plan cache when Query Store is unavailable, providing performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
+| Source | string |  | hidden | Statistics store that produced the row: query-store or plan-cache. Hidden while Query Store answers; shown on the plan-cache fallback, where the numbers cover only currently cached plans. |
 | Query Hash | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest. |
 | Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
 | Database | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load. |
@@ -963,7 +991,7 @@ Query text and wait resource strings are truncated at 4096 characters for displa
 | Require Cloud | yes |
 | Performance | Executes on-demand queries against the selected `system_health` event_file or ring_buffer target:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
 | Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available on SQL Server and Azure SQL Managed Instance when:<br/>• The collector has successfully connected<br/>• `functions.deadlock_info.disabled` is false<br/>• SQL Server 2022+ has `VIEW SERVER PERFORMANCE STATE`; older versions have `VIEW SERVER STATE`<br/>• Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or the engine is Azure SQL Database<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available on SQL Server and Azure SQL Managed Instance when:<br/>• The collector has successfully connected<br/>• `functions.deadlock_info.disabled` is false<br/>• SQL Server 2022+ has `VIEW SERVER PERFORMANCE STATE`; older versions have `VIEW SERVER STATE`<br/>• Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails or the required ring-buffer target is unavailable<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or the engine is Azure SQL Database<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
@@ -997,10 +1025,15 @@ Parsed deadlock participants from the latest detected deadlock event. Each row r
 Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
 with both the `sql_text` and `query_hash` actions.
 
-The session must be created by an administrator and include either an `event_file` target (the default) or a
-`ring_buffer` target when `functions.error_info.use_ring_buffer` is enabled. Netdata returns recent error events
-with error number, message, and SQL text. The `query_hash` action is required for reliable mapping into
-`top-queries` (query text fallback is best-effort).
+When the configured session or target is unavailable, the function falls back to the built-in `system_health`
+session on SQL Server 2012+. The `Source` column identifies which source produced each row; `system_health`
+captures only selected errors and is not a complete replacement for a dedicated error session.
+
+The session should be created by an administrator and include either an `event_file` target (the default) or a
+`ring_buffer` target when `functions.error_info.use_ring_buffer` is enabled. If it is unavailable, Netdata uses
+the built-in `system_health` target as a reduced-coverage fallback. Netdata returns recent error events with
+error number, message, and SQL text. The `query_hash` action is required for reliable mapping into `top-queries`
+(query text fallback is best-effort).
 
 Use cases:
 - Identify recent query errors and their messages
@@ -1012,9 +1045,9 @@ Use cases:
 |:-------|:------------|
 | Name | `Mssql:error-info` |
 | Require Cloud | yes |
-| Performance | Executes on-demand queries against the configured Extended Events target:<br/>• Not part of regular metric collection<br/>• event_file reads scan and parse all retained files before returning the newest rows<br/>• The recommended 6 MB file size and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• Existing operator-managed sessions keep their own retention settings; the collector does not alter or reject them |
+| Performance | Executes on-demand queries against the configured Extended Events target, falling back to `system_health` when unavailable:<br/>• Also used for error attribution by top-queries, but not by regular metric collection<br/>• event_file reads scan retained files and parse matching errors before returning the newest rows<br/>• The recommended dedicated-session settings of 6 MB per file and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• The system_health fallback has separate retention settings: Standard/Enterprise editions can retain about 1 GB. A small response limit does not bound the files scanned<br/>• Existing sessions keep their own retention settings; the collector does not alter them. Long Function scans can delay metric queries on the shared database connection |
 | Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available on SQL Server, Azure SQL Managed Instance, and Azure SQL Database when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The session is server-scoped on SQL Server/Managed Instance and database-scoped in the Azure SQL Database selected in the DSN<br/>• When `functions.error_info.use_ring_buffer` is false, the session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`; Azure SQL Database event_file has `VIEW DATABASE PERFORMANCE STATE`, while ring_buffer has `VIEW DATABASE STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the selected target is unavailable or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available on SQL Server 2012+, Azure SQL Managed Instance, and Azure SQL Database when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The configured session is used when its selected target is available; otherwise SQL Server/Managed Instance falls back to the built-in `system_health` target, while Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• When `functions.error_info.use_ring_buffer` is false, the configured session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the configured session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`; Azure SQL Database event_file has `VIEW DATABASE PERFORMANCE STATE`, while ring_buffer has `VIEW DATABASE STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if neither the selected target nor the applicable `system_health` fallback is available, or the function is disabled<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
@@ -1143,10 +1176,11 @@ This function has no parameters.
 
 #### Returns
 
-Recent error events from the configured Extended Events session.
+Recent error events from the configured Extended Events session or the system_health fallback.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
+| Source | string |  |  | Event source: configured-session or system-health. The system-health fallback contains only selected errors. |
 | Timestamp | timestamp |  |  | Timestamp of the error event. |
 | Error Number | integer |  |  | SQL Server error number. |
 | Error State | integer |  |  | SQL Server error state. |

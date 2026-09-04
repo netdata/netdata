@@ -102,3 +102,6 @@ or virtual-node targets.
   Their GUID and `ScopeKey` are the deterministic SHA1 UUID of
   `azure_monitor:` plus the trimmed, case-preserved tag value.
 - Collectors are responsible for bounding or documenting scope cardinality risk.
+- Vnode identity MUST be carried by `metrix.HostScope`, never by ordinary metric labels.
+- Past pain: an older refactor had to retroactively split job-name validation per vnode/domain because earlier
+  collectors had not accounted for it; decide vnode placement when the collector is designed, not after.

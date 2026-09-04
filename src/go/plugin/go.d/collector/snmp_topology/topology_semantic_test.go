@@ -335,6 +335,9 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 		pms,
 	)
 	report.Routes[0].RootOID = value(512)
+	report.Execution = &ddsnmpcollector.AcquisitionExecutionReport{
+		Walks: []ddsnmpcollector.AcquisitionWalkReport{{RootOID: value(560)}},
+	}
 
 	recorder := newTopologyAcquisitionRecorder(
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
@@ -360,6 +363,7 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	requireStringOutsideBacking(t, backing, context.vlanID)
 	requireStringOutsideBacking(t, backing, context.vlanName)
 	requireStringOutsideBacking(t, backing, profile.routes[0].RootOID)
+	requireStringOutsideBacking(t, backing, profile.execution.Walks[0].RootOID)
 	requireStringOutsideBacking(t, backing, profile.values.metadata["vendor"].Value)
 	requireStringOutsideBacking(t, backing, profile.values.tags[tagLldpLocSysName])
 	requireStringOutsideBacking(t, backing, profile.values.metrics[0].tags[tagTopoIfIndex])

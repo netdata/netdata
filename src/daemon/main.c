@@ -248,6 +248,7 @@ int json_c_parser_unittest(void);
 int stream_path_json_unittest(void);
 #ifdef OS_WINDOWS
 int perflib_storage_unittest(void);
+int perflib_processor_unittest(void);
 #endif
 int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
@@ -506,6 +507,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
                             if (perflib_storage_unittest()) return 1;
+                            if (perflib_processor_unittest()) return 1;
 #endif
 
                             // No call to load the config file on this code-path

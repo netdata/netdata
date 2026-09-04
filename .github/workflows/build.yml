@@ -1190,7 +1190,7 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix: ${{ fromJson(needs.src-matrix.outputs.matrix) }}
     steps:
       - name: Skip Check
@@ -1256,7 +1256,6 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
       matrix:
         include:
           - name: macos-14-M1

@@ -59,3 +59,32 @@ archives and can be overridden for a particular invocation:
 ```
 
 Exit codes are `0` for success, `1` for archive or operation failure, and `2` for invalid command-line usage.
+
+## Collection cost
+
+`inspect-device` includes `collection_contexts` under both `latest_attempt` and `retained_success`. Each profile has
+aggregate `stats` and, when recorded, an `execution` block:
+
+- `preparation` measures profile tags/metadata acquisition and cached-input copying. It includes elapsed nanoseconds,
+  logical GET calls, requested OIDs, SNMP errors, missing OIDs, and processing errors. This work also appears in the
+  profile totals; do not add the breakdown to those totals again.
+- `walks` lists actual executed roots, elapsed nanoseconds, and whether the Handler call returned an error. Each
+  duration includes client processing, pagination, and retries inside `WalkAll`/`BulkWalkAll`, but excludes subsequent
+  local PDU-map construction and row processing. It is not network RTT or a per-packet measurement. `failed: false`
+  does not prove complete table coverage; terminal SNMP response reasons are not recorded.
+- Shared walks appear only under the profile charged for the actual operation, not under each consuming route.
+  Cached or dormant consumers add no walk. Repeated roots in separate passes or VLAN contexts are separate executions.
+- An absent `execution` block means **not recorded**, as in older archives. A present block with zero requests or an
+  empty walk list means measured no such work. Older aggregate counters exclude preparation, and older scalar timing
+  can omit failed or topology scalar work; reading an archive cannot recover those measurements.
+
+Compare latest-attempt and retained-success accounting separately; `same_attempt` indicates when they alias the same
+capture. Do not sum them when they alias. GET/walk counts are Handler calls, not network packets or retry counts.
+`walk_pdus` counts varbinds returned by successful walk calls. Missing-OID counts include configured sources already
+known unavailable as well as received missing-value exceptions. Processing errors can coexist with usable values or an
+ignored metadata rule.
+
+Profile phase totals are not complete device-refresh wall time: connection setup, discovery-only metadata, profile
+selection, and sysUptime work are outside them. Aggregate table/BGP/licensing timing includes local processing, so it
+can exceed the sum of walk durations. The existing `failure_phase: prepare` is a control-flow boundary that also covers
+scalar acquisition; use the separate timing fields to distinguish preparation from scalars.

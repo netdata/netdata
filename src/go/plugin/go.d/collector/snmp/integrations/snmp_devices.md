@@ -200,7 +200,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
 | **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
-|  | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
+|  | ping.enabled | Enable ICMP round-trip measurements alongside SNMP profile metrics. This option does not enable profile-less operation; use `ping_only` for that. When disabled, no ping metrics are collected. | yes | no |
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
@@ -882,6 +882,13 @@ For example, if a run needs ~4.4 seconds and `update_every` is 1 second, 4 cycle
 Open **SNMP → Internal → Stats** in the dashboard.  
 The **SNMP profile collection timings** chart shows how long each part of the SNMP polling takes.  
 Table metrics are usually the slowest and often determine the total collection time.
+
+The `preparation` dimension includes profile tags and device metadata acquisition, plus cached-input copying.
+Its GET requests and errors are also included in the profile statistics; `processing_preparation` counts
+failures while interpreting these values. GET and walk request counts are logical client calls, not network
+packets or retries. Profile timing totals exclude connection setup and discovery-only work, so they are not
+a complete device-refresh wall-clock measurement. These charts publish statistics for successful profiles;
+failed topology attempts can be examined in topology diagnostic archives.
 
 **Step 3: Increase the data collection interval**
 

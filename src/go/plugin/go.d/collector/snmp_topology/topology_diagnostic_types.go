@@ -206,6 +206,26 @@ type diagnosticCaptureInspection struct {
 	Capture    *diagnosticCaptureSummary `json:"capture,omitempty"`
 }
 
+type diagnosticDeviceCaptureInspection struct {
+	diagnosticCaptureInspection
+	CollectionContexts []diagnosticContextAccounting `json:"collection_contexts,omitempty"`
+}
+
+type diagnosticContextAccounting struct {
+	Ordinal  uint32                        `json:"ordinal"`
+	VLANID   string                        `json:"vlan_id"`
+	VLANName string                        `json:"vlan_name"`
+	Profiles []diagnosticProfileAccounting `json:"profiles"`
+}
+
+type diagnosticProfileAccounting struct {
+	Identity     topologyDiagnosticArchiveProfileIdentityV1 `json:"identity"`
+	Outcome      string                                     `json:"outcome"`
+	FailurePhase string                                     `json:"failure_phase"`
+	Stats        topologyDiagnosticArchiveCollectionStatsV1 `json:"stats"`
+	Execution    *topologyDiagnosticArchiveExecutionV1      `json:"execution,omitempty"`
+}
+
 type diagnosticGraphActor struct {
 	Index        int                     `json:"index"`
 	ActorID      string                  `json:"actor_id"`
@@ -250,19 +270,19 @@ type diagnosticRowInspection struct {
 }
 
 type DiagnosticDeviceInspection struct {
-	RegistrationID  uint64                        `json:"registration_id"`
-	Query           DiagnosticQueryOptions        `json:"query"`
-	Lifecycle       diagnosticLifecycleInspection `json:"lifecycle"`
-	Sweep           diagnosticSweepInspection     `json:"sweep"`
-	Removed         diagnosticRemovedInspection   `json:"removed"`
-	LatestAttempt   diagnosticCaptureInspection   `json:"latest_attempt"`
-	RetainedSuccess diagnosticCaptureInspection   `json:"retained_success"`
-	SameAttempt     bool                          `json:"same_attempt"`
-	Observation     diagnosticStageReport         `json:"observation"`
-	GraphIdentity   diagnosticActorInspection     `json:"graph_identity"`
-	TypedIdentity   diagnosticRowInspection       `json:"typed_identity"`
-	GraphStats      map[string]any                `json:"graph_stats,omitempty"`
-	LastAborted     *diagnosticAbortedSweep       `json:"last_aborted_sweep,omitempty"`
+	RegistrationID  uint64                            `json:"registration_id"`
+	Query           DiagnosticQueryOptions            `json:"query"`
+	Lifecycle       diagnosticLifecycleInspection     `json:"lifecycle"`
+	Sweep           diagnosticSweepInspection         `json:"sweep"`
+	Removed         diagnosticRemovedInspection       `json:"removed"`
+	LatestAttempt   diagnosticDeviceCaptureInspection `json:"latest_attempt"`
+	RetainedSuccess diagnosticDeviceCaptureInspection `json:"retained_success"`
+	SameAttempt     bool                              `json:"same_attempt"`
+	Observation     diagnosticStageReport             `json:"observation"`
+	GraphIdentity   diagnosticActorInspection         `json:"graph_identity"`
+	TypedIdentity   diagnosticRowInspection           `json:"typed_identity"`
+	GraphStats      map[string]any                    `json:"graph_stats,omitempty"`
+	LastAborted     *diagnosticAbortedSweep           `json:"last_aborted_sweep,omitempty"`
 }
 
 type diagnosticSourceFact struct {
