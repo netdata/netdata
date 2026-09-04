@@ -440,6 +440,7 @@ struct query_weights_data {
     DICTIONARY *results;
     DICTIONARY *host_snapshots;
     struct weights_host_snapshot *host_snapshot;
+    ONEWAYALLOC *query_owa;
     WEIGHTS_STATS stats;
     RRDHOST **hosts_array;
     size_t total_hosts;
@@ -590,6 +591,8 @@ void query_weights_worker_thread(void *arg)
         thread_data->local_examined_dimensions = local_qwd.examined_dimensions;
         thread_data->local_stats = local_qwd.stats;
     }
+
+    onewayalloc_destroy(local_qwd.query_owa);
 }
 
 // Thread-safe statistics merging - use simple addition since we're in single-threaded merge
@@ -1638,6 +1641,7 @@ cleanup:
 }
 
 static void rrdset_metric_correlations_ks2(
+        ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
@@ -1652,8 +1656,6 @@ static void rrdset_metric_correlations_ks2(
     options |= RRDR_OPTION_NATURAL_POINTS;
 
     usec_t started_ut = now_monotonic_usec();
-    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
-
     size_t high_points = 0;
     STORAGE_POINT highlighted_sp;
     NETDATA_DOUBLE *highlight = NULL, *baseline = NULL;
@@ -1700,7 +1702,7 @@ static void rrdset_metric_correlations_ks2(
 cleanup:
     onewayalloc_freez(owa, highlight);
     onewayalloc_freez(owa, baseline);
-    onewayalloc_destroy(owa);
+    onewayalloc_reset(owa);
 }
 
 // ----------------------------------------------------------------------------
@@ -1715,6 +1717,7 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
 }
 
 static void rrdset_metric_correlations_volume(
+        ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
@@ -1726,9 +1729,11 @@ static void rrdset_metric_correlations_volume(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
-                                                   options, time_group_method, time_group_options, tier, 0,
-                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE baseline_average = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, baseline_after, baseline_before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&baseline_average, stats, 1);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
@@ -1736,9 +1741,11 @@ static void rrdset_metric_correlations_volume(
         baseline_average.value = 0.0;
     }
 
-    QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
-                                                    options, time_group_method, time_group_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE highlight_average = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&highlight_average, stats, 1);
 
     if(!netdata_double_isnumber(highlight_average.value))
@@ -1756,9 +1763,11 @@ static void rrdset_metric_correlations_volume(
 
     char highlight_countif_options[50 + 1];
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
-    QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
-                                                    options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE highlight_countif = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&highlight_countif, stats, 1);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
@@ -1790,6 +1799,7 @@ static void rrdset_metric_correlations_volume(
 // VALUE / ANOMALY RATE algorithm functions
 
 static void rrdset_weights_value(
+        ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
@@ -1800,9 +1810,11 @@ static void rrdset_weights_value(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before,
-                                     options, time_group_method, time_group_options, tier, 0,
-                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE qv = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
 
     merge_query_value_to_stats(&qv, stats, 1);
 
@@ -2207,9 +2219,13 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
     __atomic_fetch_add(&qwd->examined_dimensions, 1, __ATOMIC_RELAXED);
 
+    if(unlikely(!qwd->query_owa))
+        qwd->query_owa = onewayalloc_create(16 * 1024);
+
     switch(qwr->method) {
         case WEIGHTS_METHOD_VALUE:
             rrdset_weights_value(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
@@ -2220,6 +2236,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
         case WEIGHTS_METHOD_ANOMALY_RATE:
             rrdset_weights_value(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
@@ -2231,6 +2248,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
         case WEIGHTS_METHOD_MC_VOLUME:
             rrdset_metric_correlations_volume(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
@@ -2243,6 +2261,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         default:
         case WEIGHTS_METHOD_MC_KS2:
             rrdset_metric_correlations_ks2(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
@@ -2730,6 +2749,8 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     }
 
 cleanup:
+    onewayalloc_destroy(qwd.query_owa);
+
     simple_pattern_free(qwd.scope_nodes_sp);
     simple_pattern_free(qwd.scope_contexts_sp);
     simple_pattern_free(qwd.scope_instances_sp);
