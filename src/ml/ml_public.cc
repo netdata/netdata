@@ -761,7 +761,6 @@ void ml_stop_threads()
         ml_worker_t *worker = &Cfg.workers[idx];
 
         nd_thread_join(worker->nd_thread);
-        worker->nd_thread = NULL;
     }
 }
 
