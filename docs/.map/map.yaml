@@ -1097,6 +1097,11 @@ sidebar:
           - meta:
               label: MCP Connections
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-connections.md
+            items:
+              - meta:
+                  label: PagerDuty
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-connections/pagerduty.md
+                  description: Connect Netdata AI to PagerDuty incidents, on-call schedules and change events through MCP
   # Dashboards and Charts
   - meta:
       label: Dashboards and Charts
