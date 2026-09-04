@@ -91,7 +91,7 @@ echo "::group::Preparing R2 versioned release artifacts"
 mkdir -p "artifacts/r2/${VERSION}"
 cd "artifacts/r2/${VERSION}"
 copy_source_tarball "${VERSION}"
-copy_static_builds "${VERSION}" latest
+copy_static_builds "${VERSION}"
 copy_msi_packages "${VERSION}"
 echo "${VERSION}" > Version
 create_manifest
