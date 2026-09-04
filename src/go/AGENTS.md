@@ -12,6 +12,7 @@ them from there.
 | Work area | Start here | Notes |
 |---|---|---|
 | New go.d collector, or a public-contract change (option, mode, metric meaning, ownership, Functions, vnodes) | `.agents/skills/project-go-collector-design/SKILL.md`, then `src/go/plugin/go.d/docs/how-to-write-a-collector.md` | Design note in the SOW gate first; new go.d collectors use framework V2. |
+| `config_schema.json` (the DynCfg form) | `.agents/skills/project-go-collector-design/config-schema.md`, then `src/plugins.d/DYNCFG.md` ("JSON Schema for Configuration UI") | Every visible property has a title and description; tabs equal `metadata.yaml` groups; secrets use `ui:widget: password`; the repo-wide `TestConfigSchemas*` rules must pass. |
 | Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Preserve public contracts unless a breaking change is explicitly approved. |
 | go.d V2 implementation details | `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Skill for maintainer style, READMEs for framework API contracts. Editing `metrix` or framework packages is framework-gated work. |
 | go.d helper packages | `src/go/plugin/go.d/docs/helper-packages.md` | Check existing HTTP, config-option, matcher, logger, socket, command, SQL, ping, log-file, and cloud-auth helpers before adding custom plumbing. |

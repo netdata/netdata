@@ -290,46 +290,52 @@ This gives you flexibility to either:
 - Use static schema files for simple, fixed configurations
 - Generate schemas dynamically for more complex configurations that may change based on runtime conditions
 
-Example JSON Schema:
+The schema document is an object with two members, `jsonSchema` (a draft-07 JSON Schema) and `uiSchema` (presentation
+hints for the form). A bare JSON Schema renders an empty form. Example:
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "url": {
-      "type": "string",
-      "format": "uri",
-      "title": "Server URL",
-      "description": "The URL of the server to connect to"
-    },
-    "timeout": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 60,
-      "title": "Timeout",
-      "description": "Connection timeout in seconds"
-    },
-    "auth": {
-      "type": "object",
-      "title": "Authentication",
-      "properties": {
-        "username": {
-          "type": "string",
-          "title": "Username"
-        },
-        "password": {
-          "type": "string",
-          "format": "password",
-          "title": "Password"
-        }
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Example configuration",
+    "type": "object",
+    "properties": {
+      "url": {
+        "title": "URL",
+        "description": "The URL of the server to connect to.",
+        "type": "string",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Connection timeout, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 60,
+        "default": 5
+      },
+      "username": {
+        "title": "Username",
+        "description": "Username for authentication.",
+        "type": "string"
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password for authentication.",
+        "type": "string"
       }
-    }
+    },
+    "required": ["url"]
   },
-  "required": [
-    "url"
-  ]
+  "uiSchema": {
+    "password": { "ui:widget": "password" }
+  }
 }
 ```
+
+The `ui:*` keys the UI honors, how `title`, `description`, and `ui:help` render, and the form behaviors a schema
+author must design around (tabs, defaults, validation, `dependencies`, secrets) are documented in
+[External Plugins DynCfg documentation](/src/plugins.d/DYNCFG.md), section "JSON Schema for Configuration UI".
 
 ## Action Behavior by Configuration Type
 

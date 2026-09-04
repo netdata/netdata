@@ -266,8 +266,9 @@ guide's Config section (`src/go/plugin/go.d/docs/how-to-write-a-collector.md`). 
 contradict each other.
 
 For go.d collectors, the config decision record, option lifecycle and compatibility, the DynCfg form as a user task,
-constructor defaults versus conditional branches, and the `config_schema.json` form rules (including which schema tests
-carry weight) are owned by `.agents/skills/project-go-collector-design/operator-surface.md`.
+constructor defaults versus conditional branches, and which schema tests carry weight are owned by
+`.agents/skills/project-go-collector-design/operator-surface.md`; writing `config_schema.json` itself (text channels,
+tabs, widgets, secrets, standard option wording, the repo-wide rule tests) is owned by its sibling `config-schema.md`.
 
 Credentials use the `${env:}/${file:}/${cmd:}/${store:}` indirection; see `src/collectors/SECRETS.md`. Privileged
 operations route through `src/collectors/utils/ndsudo.c`.

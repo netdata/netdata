@@ -90,9 +90,6 @@
         }
       ]
     },
-    "uiOptions": {
-      "fullPage": true
-    },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },

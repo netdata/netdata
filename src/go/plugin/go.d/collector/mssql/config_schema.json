@@ -91,8 +91,7 @@
                                   "client_secret": {
                                     "title": "Client Secret",
                                     "description": "Service principal client secret.",
-                                    "type": "string",
-                                    "sensitive": true
+                                    "type": "string"
                                   }
                                 },
                                 "required": [
@@ -274,11 +273,9 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "dsn": {
-      "ui:placeholder": "sqlserver://user:password@localhost:1433"
+      "ui:placeholder": "sqlserver://user:password@localhost:1433",
+      "ui:widget": "password"
     },
     "vnode": {
       "ui:help": "Optional: Group metrics under a virtual node for multi-instance setups."

@@ -109,7 +109,7 @@
             },
             "patterns": {
               "title": "Patterns",
-              "description": "",
+              "description": "Patterns matched against the field value. Each match is counted as its own dimension.",
               "type": [
                 "array",
                 "null"
@@ -303,7 +303,8 @@
                 "required": [
                   "format",
                   "delimiter"
-                ]
+                ],
+                "description": "Settings of the CSV log parser, used when the log type is `csv`."
               }
             },
             "required": [
@@ -331,7 +332,8 @@
                 },
                 "required": [
                   "pattern"
-                ]
+                ],
+                "description": "Settings of the regular expression log parser, used when the log type is `regexp`."
               }
             },
             "required": [
@@ -361,7 +363,8 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "description": "Settings of the JSON log parser, used when the log type is `json`."
               }
             }
           },
@@ -400,23 +403,19 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "description": "Settings of the LTSV log parser, used when the log type is `ltsv`."
               }
             }
           }
         ]
       }
-    }
+    },
+    "title": "Web server log collector configuration."
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "group_response_codes": {
       "ui:help": "When true, creates separate charts for each response code family (1xx, 2xx, 3xx, etc.), with individual response codes (200, 201, etc.) as dimensions within each family. When false, creates a single chart with all response codes as separate dimensions."
-    },
-    "fields_per_record": {
-      "ui:help": "If negative, no check is made and records may have a variable number of fields."
     },
     "log_type": {
       "ui:widget": "radio",
@@ -468,6 +467,11 @@
           ]
         }
       ]
+    },
+    "csv_config": {
+      "fields_per_record": {
+        "ui:help": "If negative, no check is made and records may have a variable number of fields."
+      }
     }
   }
 }

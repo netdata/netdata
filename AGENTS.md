@@ -585,7 +585,7 @@ trigger, this list is a pointer):
   PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions
 - `project-go-collector-design`: designing a new go.d collector or changing a public contract of one (config option,
   mode, metric meaning, ownership or durable state, Functions, vnodes), or reviewing such a change; the design note,
-  architecture gate, operator surface, and mutating-collector references.
+  architecture gate, operator surface, `config_schema.json` authoring, and mutating-collector references.
 - `project-writing-go-modules-framework-v2`: creating or migrating a go.d collector to framework V2; `CollectorV2`,
   `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
 - `project-snmp-profiles-authoring`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format

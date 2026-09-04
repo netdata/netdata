@@ -92,24 +92,20 @@ it; production reachability alone understates the blast radius.
 ## 5. Schema Form Rules
 
 `config_schema.json` is a form contract, not a validation layer; nothing in the agent validates a job against it, and
-runtime enforcement is the collector's own `validate()`. Write it for the operator filling the form.
+runtime enforcement is the collector's own `validate()`. Write it for the operator filling the form. How to write it
+(text channels, tabs, widgets, conditional sections, secrets, standard option wording, the repo-wide rule tests) is
+owned by `config-schema.md`; the renderer contract is `src/plugins.d/DYNCFG.md`, "JSON Schema for Configuration UI".
+The design-time rules that stay here:
 
-- An optional array MUST NOT declare `minItems`: the form materializes such an array with null leaves and cannot delete
-  it, producing a job that can never be saved. `minItems` belongs only on an array the parent `required` list demands
-  or one carrying a `default`. Express "non-empty when present" in `validate()`. Enforced repo-wide by
-  `src/go/plugin/go.d/collector/config_schema_test.go` (`TestConfigSchemasDoNotMaterializeOptionalArrays`).
-- A key revealed by a `dependencies` branch MUST NOT also be a plain sibling property; declaring it twice shows it for
-  every discriminator value and leaves the runtime deciding what a field from an unselected branch means. Enforced by
-  `TestConfigSchemasDoNotDeclareBranchKeysAsProperties`.
-- Type an optional array or object as `["array", "null"]` / `["object", "null"]` to match the nil-able Go field: a YAML
-  key written with no value decodes to nil, which the runtime accepts as absent, so a bare `"array"` rejects a config
-  that works. Keep scalar types on required lists and item schemas. This union is the majority convention in the tree.
 - A schema rule stricter than the runtime blocks legitimate configs in the UI; a looser one offers configs the
   collector rejects on `add`. A deliberate asymmetry is fine where only one layer can act: `minimum: 1` on an option
   whose code treats `0` as "use the default", because the form should not offer `0` while a file may legitimately
   contain it.
-- Group and tab names MUST match between `metadata.yaml` and `config_schema.json`
-  (`collecttest.AssertConfigSchemaMatchesMetadata`; see `consistency.md`).
+- An option whose omission drives runtime precedence ("unset means inherit the rule default") MUST NOT carry a schema
+  `default`: the form materializes every default into the submitted job, so the omission can never happen from the UI.
+- The form and the doc are two views of one vocabulary: tab titles equal `metadata.yaml` groups and option
+  descriptions are identical in both (`collecttest.AssertConfigSchemaMatchesMetadata`; a collector you touch MUST opt
+  in).
 
 Tests about configuration:
 

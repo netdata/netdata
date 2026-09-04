@@ -20,6 +20,7 @@ Every rule below is written as: **When** it applies, **Do / Don't**, what counts
 |---|---|---|
 | New go.d collector | this skill, then the V2 skill and the how-to guide | full note; one line per item for a small read-only collector |
 | New public config option, mode, or default change | `operator-surface.md` (the option's decision record) | the affected item only |
+| Writing or changing `config_schema.json` (the DynCfg form) | `config-schema.md` | none; it is authoring, not design |
 | New or changed metric meaning, new entity axis, vnodes | the Metric Semantics and Identity items | the affected item only |
 | Collector that writes or deletes remotely, or persists state | this skill plus `mutating-collectors.md` | full note plus the mutating items |
 | Reviewing any of the above | the same items as review questions | — |
@@ -145,7 +146,7 @@ length is a signal, not a limit; splitting one function into arbitrarily named h
 ## Reading Sequence
 
 1. This skill: fill the design note in the SOW gate.
-2. `operator-surface.md` for any option, mode, or form work; `mutating-collectors.md` only for side-effecting or
-   persistent collectors.
+2. `operator-surface.md` for any option, mode, or form work; `config-schema.md` when writing the schema file itself;
+   `mutating-collectors.md` only for side-effecting or persistent collectors.
 3. `src/go/plugin/go.d/docs/how-to-write-a-collector.md` and the V2 skill for implementation.
 4. `.agents/skills/integrations-lifecycle/consistency.md` for artifact delivery.

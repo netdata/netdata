@@ -35,7 +35,6 @@
         "title": "API key",
         "description": "Cato API key.",
         "type": "string",
-        "sensitive": true,
         "minLength": 1
       },
       "site_selector": {
@@ -68,9 +67,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "api_key": {
       "ui:widget": "password"
     },

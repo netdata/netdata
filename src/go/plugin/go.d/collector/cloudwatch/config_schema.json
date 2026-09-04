@@ -6,26 +6,26 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Shared Netdata collection interval, measured in seconds. Per-series CloudWatch eligibility is evaluated on these ticks; a shorter metric period does not create an independent timer.",
+        "description": "Data collection interval, in seconds. Every CloudWatch series is evaluated on these ticks, never on its own timer.",
         "type": "integer",
         "minimum": 60,
         "default": 60
       },
       "autodetection_retry": {
         "title": "Detection retry",
-        "description": "Recheck interval in seconds. Zero means no recheck.",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
         "default": 0
       },
       "vnode": {
         "title": "Vnode",
-        "description": "Associates this data collection job with a Virtual Node.",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       },
       "credentials": {
         "title": "Credential sources",
-        "description": "Named sources used by monitored targets. A source uses either the AWS SDK default chain or explicit static/session credentials.",
+        "description": "Named credential sources that targets reference. Each uses the AWS SDK default chain or explicit static credentials.",
         "type": "array",
         "minItems": 1,
         "maxItems": 64,
@@ -40,13 +40,13 @@
           "properties": {
             "name": {
               "title": "Name",
-              "description": "Stable credential source name referenced by monitored targets.",
+              "description": "Name that targets use to reference this credential source.",
               "type": "string",
               "pattern": "^[a-z][a-z0-9_-]{0,63}$"
             },
             "type": {
               "title": "Type",
-              "description": "How this source obtains its base AWS credentials.",
+              "description": "How this source obtains AWS credentials: the SDK default chain or explicit static credentials.",
               "type": "string",
               "enum": [
                 "default",
@@ -74,28 +74,26 @@
                     },
                     "type_static": {
                       "title": "Static credential configuration",
-                      "description": "Explicit long-lived or temporary AWS credentials. Prefer secret references instead of plaintext values.",
+                      "description": "Explicit AWS credentials, used only when the type is `static`. Prefer secret references over plaintext values.",
                       "type": "object",
                       "properties": {
                         "access_key_id": {
                           "title": "Access key ID",
-                          "description": "AWS access key ID. Use a go.d secret reference such as ${env:AWS_ACCESS_KEY_ID}.",
+                          "description": "AWS access key ID. Use a secret reference such as `${env:AWS_ACCESS_KEY_ID}`.",
                           "type": "string",
                           "pattern": "^\\S(?:.*\\S)?$"
                         },
                         "secret_access_key": {
                           "title": "Secret access key",
-                          "description": "AWS secret access key. Use a go.d secret reference; do not store plaintext credentials in the configuration.",
+                          "description": "AWS secret access key. Use a secret reference instead of a plaintext value.",
                           "type": "string",
-                          "pattern": "^\\S(?:.*\\S)?$",
-                          "sensitive": true
+                          "pattern": "^\\S(?:.*\\S)?$"
                         },
                         "session_token": {
                           "title": "Session token",
-                          "description": "Optional AWS session token when the access key identifies temporary credentials.",
+                          "description": "AWS session token, only for temporary credentials. Use a secret reference.",
                           "type": "string",
-                          "pattern": "^(?:|\\S(?:.*\\S)?)$",
-                          "sensitive": true
+                          "pattern": "^(?:|\\S(?:.*\\S)?)$"
                         }
                       },
                       "required": [
@@ -119,7 +117,7 @@
       },
       "targets": {
         "title": "Monitored targets",
-        "description": "Named AWS identities to monitor. A target uses one credential source directly or uses it to assume one role.",
+        "description": "Named AWS identities to monitor. A target uses one credential source directly or assumes one role with it.",
         "type": "array",
         "minItems": 1,
         "maxItems": 64,
@@ -135,12 +133,14 @@
             "name": {
               "title": "Name",
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+              "description": "Name that collection rules use to reference this target."
             },
             "credentials": {
               "title": "Credential source",
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+              "description": "Name of a credential source defined on the Credentials tab."
             },
             "assume_role": {
               "title": "Assume role",
@@ -152,18 +152,20 @@
                 "role_arn": {
                   "title": "Role ARN",
                   "type": "string",
-                  "pattern": "^\\S(?:.*\\S)?$"
+                  "pattern": "^\\S(?:.*\\S)?$",
+                  "description": "ARN of the IAM role to assume with the target's credential source."
                 },
                 "external_id": {
                   "title": "External ID",
-                  "description": "Value supplied by the role owner when its trust policy requires one. It is not an AWS password or access key.",
+                  "description": "External ID the role's trust policy expects, if it requires one. This is not a password or access key.",
                   "type": "string",
                   "pattern": "^(?:|\\S(?:.*\\S)?)$"
                 }
               },
               "required": [
                 "role_arn"
-              ]
+              ],
+              "description": "IAM role to assume before collecting this target. Leave empty to use the credential source directly."
             }
           },
           "required": [
@@ -174,7 +176,7 @@
       },
       "rules": {
         "title": "Collection rules",
-        "description": "Ordered target, profile, metric, region, and resource-filter selections. The earliest matching rule and target own each overlapping exported metric/statistic series.",
+        "description": "Ordered collection rules. Each selects targets, profiles, regions, and optional metric overrides and resource filters; the first matching rule owns a series.",
         "type": "array",
         "minItems": 1,
         "maxItems": 256,
@@ -195,11 +197,12 @@
             "name": {
               "title": "Name",
               "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+              "description": "Unique rule name, shown in logs and diagnostics."
             },
             "targets": {
               "title": "Targets",
-              "description": "Ordered target references. Order breaks overlap ties within this rule.",
+              "description": "Names of the targets this rule collects from, in order. Order breaks ties when rules overlap.",
               "type": "array",
               "minItems": 1,
               "maxItems": 256,
@@ -220,10 +223,11 @@
                 "defaults": {
                   "title": "Include defaults",
                   "type": "boolean",
-                  "default": true
+                  "default": true,
+                  "description": "Start from every default-enabled profile before applying the include and exclude lists."
                 },
                 "include": {
-                  "description": "Additional profile basenames. PrivateLink detail choices are privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+                  "description": "Profile basenames to add. With `defaults` off, only this list is collected, including profiles disabled by default.",
                   "type": [
                     "array",
                     "null"
@@ -233,7 +237,8 @@
                   "items": {
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
-                  }
+                  },
+                  "title": "Included profiles"
                 },
                 "exclude": {
                   "type": [
@@ -245,13 +250,15 @@
                   "items": {
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
-                  }
+                  },
+                  "description": "Profile basenames to remove from the selection. A profile cannot be both included and excluded.",
+                  "title": "Excluded profiles"
                 }
               }
             },
             "metrics": {
               "title": "Metrics",
-              "description": "Optional per-profile metric overrides. Omit this list to collect each selected profile's default-enabled metrics. Profiles without a group keep their defaults. A group keeps its profile defaults unless defaults is false, then adds its included MetricNames.",
+              "description": "Per-profile metric overrides. Leave empty to collect each selected profile's default-enabled metrics.",
               "type": [
                 "array",
                 "null"
@@ -263,19 +270,19 @@
                 "properties": {
                   "profile": {
                     "title": "Profile",
-                    "description": "Profile basename. It must already be selected by this rule's profiles option and may appear in only one metrics group. Other selected profiles keep their default-enabled metrics.",
+                    "description": "Profile basename to override. It must be selected by this rule's profiles and may appear in one metrics group only.",
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
                   },
                   "defaults": {
                     "title": "Include profile defaults",
-                    "description": "Include the profile's default-enabled metrics before adding this group's explicit MetricNames. Set false for an exact-only selection.",
+                    "description": "Keep the profile's default-enabled metrics and add the included ones. Turn off for an exact-only selection.",
                     "type": "boolean",
                     "default": true
                   },
                   "statistics": {
                     "title": "Default statistics",
-                    "description": "Optional statistics inherited by included metrics that omit their own list. When both lists are omitted, the metric inherits every statistic declared by the profile. Named AWS statistics are case-insensitive.",
+                    "description": "Statistics for included metrics that do not list their own. Leave empty to use the profile's statistics.",
                     "type": [
                       "array",
                       "null"
@@ -289,7 +296,7 @@
                   },
                   "query": {
                     "title": "Included-metric query policy",
-                    "description": "Optional field-by-field query timing applied only to series expanded from this group's include list. Unlisted profile defaults do not receive it. Omitted fields inherit the rule and lower-precedence values.",
+                    "description": "Query timing for the series this group includes explicitly. Fields left empty inherit from the rule.",
                     "type": [
                       "object",
                       "null"
@@ -297,19 +304,19 @@
                     "properties": {
                       "period": {
                         "title": "Aggregation period",
-                        "description": "CloudWatch aggregation period for explicitly included series. Must be from 1m through 1d and an exact multiple of 1m.",
+                        "description": "CloudWatch aggregation period for these series, from `1m` to `24h` in whole minutes.",
                         "type": "string",
                         "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                       },
                       "lookback": {
                         "title": "Rolling lookback",
-                        "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap.",
+                        "description": "Window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods.",
                         "type": "string",
                         "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                       },
                       "publication_delay": {
                         "title": "Publication delay",
-                        "description": "Collector policy for how long to wait after a bucket closes before querying explicitly included series. This is not an AWS publication guarantee.",
+                        "description": "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee.",
                         "type": "string",
                         "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                       }
@@ -317,7 +324,7 @@
                   },
                   "include": {
                     "title": "Included metrics",
-                    "description": "Exact, case-sensitive AWS MetricNames added by this group. A metric-level statistics list replaces the group statistics; when neither is set, the profile-declared statistics are inherited. Repeated MetricNames are allowed only when their expanded statistic sets are disjoint.",
+                    "description": "Exact, case-sensitive CloudWatch metric names this group adds. A name may repeat only with disjoint statistics.",
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 256,
@@ -333,7 +340,7 @@
                         },
                         "statistics": {
                           "title": "Statistics",
-                          "description": "Optional replacement for the group statistics. When both are omitted, inherit every statistic declared for this metric by the profile. Use Average, Minimum, Maximum, Sum, SampleCount, or p<N>; named statistics are case-insensitive.",
+                          "description": "Statistics for this metric, replacing the group list. Leave empty to inherit. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`.",
                           "type": [
                             "array",
                             "null"
@@ -347,7 +354,7 @@
                         },
                         "query": {
                           "title": "Metric/statistic query policy",
-                          "description": "Optional field-by-field query timing for this item's expanded metric/statistic series. This overrides the enclosing metric-group query.",
+                          "description": "Query timing for this metric's series, overriding the group's. Fields left empty inherit.",
                           "type": [
                             "object",
                             "null"
@@ -355,19 +362,19 @@
                           "properties": {
                             "period": {
                               "title": "Aggregation period",
-                              "description": "CloudWatch aggregation period for this item's expanded series. Must be from 1m through 1d and an exact multiple of 1m.",
+                              "description": "CloudWatch aggregation period for these series, from `1m` to `24h` in whole minutes.",
                               "type": "string",
                               "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                             },
                             "lookback": {
                               "title": "Rolling lookback",
-                              "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap.",
+                              "description": "Window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods.",
                               "type": "string",
                               "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                             },
                             "publication_delay": {
                               "title": "Publication delay",
-                              "description": "Collector policy for how long to wait after a bucket closes before querying this item's expanded series. This is not an AWS publication guarantee.",
+                              "description": "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee.",
                               "type": "string",
                               "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                             }
@@ -388,7 +395,7 @@
             },
             "regions": {
               "title": "Regions",
-              "description": "AWS regions collected by this rule. Profile-specific supported-region restrictions are applied automatically.",
+              "description": "AWS region codes this rule collects from. Profiles that support fewer regions are restricted automatically.",
               "type": "array",
               "minItems": 1,
               "maxItems": 256,
@@ -408,7 +415,7 @@
               "properties": {
                 "resource_tags": {
                   "title": "AWS resource tag filters",
-                  "description": "Replaces the job-default resource tag filters for this rule. All keys must match; any listed value may match for one key. Keys and values are exact and case-sensitive. An explicitly included profile without a safe resource-tag association is rejected.",
+                  "description": "Resource tag filters replacing the job defaults for this rule. Leave unset to inherit, or set an empty list to disable filtering.",
                   "type": [
                     "array",
                     "null"
@@ -420,7 +427,8 @@
                       "key": {
                         "title": "AWS tag key",
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "description": "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys."
                       },
                       "values": {
                         "title": "Accepted values",
@@ -430,7 +438,8 @@
                         "uniqueItems": true,
                         "items": {
                           "type": "string"
-                        }
+                        },
+                        "description": "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches."
                       }
                     },
                     "required": [
@@ -443,7 +452,7 @@
             },
             "query": {
               "title": "Query policy",
-              "description": "Optional CloudWatch query timing overrides for this rule. Omitted fields inherit rule defaults and profile values; explicit metric-group and item values take precedence.",
+              "description": "Query timing overrides for this rule. Fields left empty inherit the rule defaults; group and metric values take precedence.",
               "type": [
                 "object",
                 "null"
@@ -451,19 +460,19 @@
               "properties": {
                 "period": {
                   "title": "Aggregation period",
-                  "description": "CloudWatch aggregation period. Must be from 1m through 1d and an exact multiple of 1m. A period shorter than the metric's real publication cadence increases query frequency without making AWS publish more often.",
+                  "description": "CloudWatch aggregation period for these series, from `1m` to `24h` in whole minutes.",
                   "type": "string",
                   "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                 },
                 "lookback": {
                   "title": "Rolling lookback",
-                  "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than the collector's 1,440-bucket safety cap.",
+                  "description": "Window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods.",
                   "type": "string",
                   "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                 },
                 "publication_delay": {
                   "title": "Publication delay",
-                  "description": "Collector policy for how long to wait after a bucket closes before querying it. This is not an AWS publication guarantee. Use 0s only for metrics known to publish immediately.",
+                  "description": "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee. Use `0s` only for metrics that publish immediately.",
                   "type": "string",
                   "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                 }
@@ -494,7 +503,7 @@
             "properties": {
               "resource_tags": {
                 "title": "Default AWS resource tag filters",
-                "description": "Select only resources matching these exact tags unless a rule replaces or explicitly disables the list. All keys must match; any listed value may match for one key. Default-selected profiles without a safe resource-tag association are skipped with a diagnostic.",
+                "description": "Resource tag filters inherited by rules that define none. A resource must match every key, with any listed value per key.",
                 "type": [
                   "array",
                   "null"
@@ -506,7 +515,8 @@
                     "key": {
                       "title": "AWS tag key",
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys."
                     },
                     "values": {
                       "title": "Accepted values",
@@ -516,7 +526,8 @@
                       "uniqueItems": true,
                       "items": {
                         "type": "string"
-                      }
+                      },
+                      "description": "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches."
                     }
                   },
                   "required": [
@@ -525,11 +536,12 @@
                   ]
                 }
               }
-            }
+            },
+            "description": "Resource filters inherited by every rule that does not define its own."
           },
           "query": {
             "title": "Default query policy",
-            "description": "Shared CloudWatch query timing inherited field-by-field by collection rules.",
+            "description": "Query timing inherited by every rule, field by field. Fields left empty fall back to profile or built-in values.",
             "type": [
               "object",
               "null"
@@ -537,18 +549,19 @@
             "properties": {
               "period": {
                 "title": "Aggregation period",
-                "description": "Default CloudWatch aggregation period. A period shorter than a metric's real publication cadence increases query frequency without making AWS publish more often.",
+                "description": "Default CloudWatch aggregation period, from `1m` to `24h` in whole minutes. Rules, groups, and metrics may override it.",
                 "type": "string",
                 "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
               },
               "lookback": {
                 "title": "Rolling lookback",
                 "type": "string",
-                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$",
+                "description": "Default window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods."
               },
               "publication_delay": {
                 "title": "Publication delay",
-                "description": "Default collector wait after a bucket closes. This is a scheduling policy, not an AWS publication guarantee.",
+                "description": "Default wait after a period closes before querying it. A scheduling policy, not an AWS guarantee.",
                 "type": "string",
                 "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
               }
@@ -576,11 +589,12 @@
                 "key": {
                   "title": "AWS tag key",
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Exact, case-sensitive AWS tag key to copy."
                 },
                 "label": {
                   "title": "Netdata label",
-                  "description": "Optional label key. When omitted, the AWS tag key is normalized to a Netdata label key.",
+                  "description": "Netdata label key to use. Leave empty to derive it from the AWS key (`Name` becomes `name`).",
                   "type": "string",
                   "pattern": "^(?:|[a-z][a-z0-9_]*)$"
                 }
@@ -588,7 +602,8 @@
               "required": [
                 "key"
               ]
-            }
+            },
+            "description": "AWS resource tags copied to charts as labels. Presentation only; they never select resources."
           }
         }
       },
@@ -602,14 +617,14 @@
         "properties": {
           "max_instances": {
             "title": "Maximum instances",
-            "description": "Maximum distinct final CloudWatch resource instances. Metric and statistic fan-out is not counted. Raise this explicitly for intentionally larger jobs.",
+            "description": "Maximum distinct resource instances that emit metrics. Exceeding it rejects the plan instead of collecting a subset.",
             "type": "integer",
             "minimum": 1,
             "default": 1000
           },
           "max_discovery_groups": {
             "title": "Maximum discovery groups",
-            "description": "Maximum unique target, region, and CloudWatch namespace combinations. The default catches accidental expansion. Valid range 1–100; split larger collection across jobs.",
+            "description": "Maximum target, region, and namespace combinations discovered per job, 1 to 100. Split larger collection across jobs.",
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
@@ -628,18 +643,21 @@
             "title": "Refresh interval",
             "type": "integer",
             "minimum": 60,
-            "default": 300
+            "default": 300,
+            "description": "How often to rediscover matching metrics and resources, in seconds."
           },
           "recently_active_only": {
             "title": "Recently active only",
             "type": "boolean",
-            "default": true
+            "default": true,
+            "description": "Restrict discovery to metrics with activity in the last three hours, which keeps scans smaller and cheaper."
           }
-        }
+        },
+        "description": "How often and how widely the collector scans CloudWatch for matching metrics."
       },
       "timeout": {
         "title": "Timeout",
-        "description": "AWS operation timeout in seconds. Discovery shares one timeout across its whole refresh stage.",
+        "description": "Timeout for each AWS API operation, in seconds. Discovery shares one timeout across a whole refresh.",
         "type": "number",
         "minimum": 0,
         "default": 30
@@ -652,9 +670,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "update_every": {
       "ui:help": "How often to collect CloudWatch metrics. CloudWatch metric periods are at least 60 seconds."
     },
@@ -669,7 +684,7 @@
       "ui:help": "Define one or more named credential sources. `default` uses the AWS SDK credential chain. `static` reveals a `type_static` section for explicit long-lived or temporary credentials. Reference these names from monitored targets.",
       "items": {
         "name": {
-          "ui:help": "Stable credential source name referenced by monitored targets.",
+          "ui:help": "Referenced from the Targets tab. Names are lowercase, start with a letter, use only letters, digits, `_`, and `-`, and are at most 64 characters; target and rule names follow the same format.",
           "ui:placeholder": "sdk_default"
         },
         "type": {
@@ -706,7 +721,6 @@
           "ui:placeholder": "production"
         },
         "credentials": {
-          "ui:help": "Name of a credential source defined on the Credentials tab.",
           "ui:placeholder": "sdk_default"
         },
         "assume_role": {

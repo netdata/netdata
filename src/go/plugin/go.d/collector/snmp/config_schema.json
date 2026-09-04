@@ -35,8 +35,8 @@
         "default": 3
       },
       "vnode": {
-        "title": "Configuration",
-        "description": "",
+        "title": "Virtual node",
+        "description": "Identity of the Virtual Node created for this device when `create_vnode` is enabled.",
         "type": [
           "object",
           "null"
@@ -82,7 +82,8 @@
               "2c",
               "3"
             ],
-            "default": "2c"
+            "default": "2c",
+            "description": "SNMP protocol version the device speaks."
           },
           "port": {
             "title": "Port",
@@ -164,11 +165,13 @@
               "sha384",
               "sha512"
             ],
-            "default": "sha512"
+            "default": "sha512",
+            "description": "Authentication protocol for SNMPv3 messages."
           },
           "auth_key": {
             "title": "Authentication passphrase",
-            "type": "string"
+            "type": "string",
+            "description": "Authentication protocol pass phrase for SNMPv3 messages."
           },
           "priv_proto": {
             "title": "Privacy protocol",
@@ -181,11 +184,13 @@
               "aes256",
               "aes192c"
             ],
-            "default": "aes192c"
+            "default": "aes192c",
+            "description": "Privacy protocol for SNMPv3 messages."
           },
           "priv_key": {
             "title": "Privacy passphrase",
-            "type": "string"
+            "type": "string",
+            "description": "Privacy protocol pass phrase for SNMPv3 messages."
           },
           "context_name": {
             "title": "Context name",
@@ -264,19 +269,18 @@
             "minimum": 0.1,
             "default": 0.1
           }
-        }
+        },
+        "description": "ICMP round-trip measurements collected alongside the SNMP metrics."
       }
     },
     "required": [
       "hostname",
       "community",
       "options"
-    ]
+    ],
+    "title": "SNMP collector configuration."
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "manual_profiles": {
       "ui:listFlavour": "list",
       "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."

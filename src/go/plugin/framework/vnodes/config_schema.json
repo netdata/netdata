@@ -31,9 +31,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "hostname": {
       "ui:placeholder": "If not specified, the job name will be used as the hostname."
     },

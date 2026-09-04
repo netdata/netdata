@@ -125,6 +125,10 @@ When reviewing a PR that touches a collector, verify:
    - Most collectors predate this rule and still disagree, so do
      NOT copy grouping from a neighbouring collector; derive it
      from that collector's own keys.
+   - The option `description` MUST be identical in both files;
+     the form's extra depth goes in `ui:help`, the doc's in
+     `detailed_description`. How to write the schema file is
+     `.agents/skills/project-go-collector-design/config-schema.md`.
    - Once a collector's two artifacts agree, keep them that way
      by calling
      `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`

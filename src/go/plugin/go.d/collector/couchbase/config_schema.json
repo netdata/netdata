@@ -85,14 +85,12 @@
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "bearer_token_file": {
         "title": "Bearer Token File",
@@ -112,14 +110,12 @@
       "proxy_username": {
         "title": "Proxy username",
         "description": "The username for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "proxy_password": {
         "title": "Proxy password",
         "description": "The password for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "headers": {
         "title": "Headers",
@@ -222,9 +218,6 @@
         }
       ]
     },
-    "uiOptions": {
-      "fullPage": true
-    },
     "body": {
       "ui:widget": "hidden"
     },
@@ -246,12 +239,6 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
-    },
-    "username": {
-      "ui:widget": "password"
-    },
-    "proxy_username": {
-      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

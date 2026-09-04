@@ -71,7 +71,8 @@
                 "required": [
                   "format",
                   "delimiter"
-                ]
+                ],
+                "description": "Settings of the CSV log parser, used when the log type is `csv`."
               }
             },
             "required": [
@@ -99,7 +100,8 @@
                 },
                 "required": [
                   "pattern"
-                ]
+                ],
+                "description": "Settings of the regular expression log parser, used when the log type is `regexp`."
               }
             },
             "required": [
@@ -129,7 +131,8 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "description": "Settings of the JSON log parser, used when the log type is `json`."
               }
             }
           },
@@ -168,18 +171,17 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "description": "Settings of the LTSV log parser, used when the log type is `ltsv`."
               }
             }
           }
         ]
       }
-    }
+    },
+    "title": "Squid log collector configuration."
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "log_type": {
       "ui:widget": "radio",
       "ui:options": {

@@ -179,7 +179,8 @@ config option MUST name the concrete operator decision it enables; "operators ma
 
 For SaaS/API credentials, examples SHOULD prefer secret indirection such as `${env:COLLECTOR_API_KEY}` or
 `${file:/run/secrets/collector_api_key}` instead of realistic-looking inline credentials. Schema fields that carry
-secrets MUST be marked sensitive and use password-style UI handling where the schema supports it.
+secrets MUST use `"ui:widget": "password"` (the only flag the UI honors); writing the schema file is covered by
+`.agents/skills/project-go-collector-design/config-schema.md`.
 
 Selectors SHOULD use existing matcher packages such as `src/go/pkg/matcher` unless the upstream API forces a different
 grammar. Document the exact matching input, for example "site name when present, otherwise site ID."
