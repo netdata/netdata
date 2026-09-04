@@ -205,6 +205,15 @@
 - Sow: make the template the single schema for SOW structure ([#23743](https://github.com/netdata/netdata/issues/23743))
 - Chore(sow): complete the SOW schema for umbrellas and harden the audit matcher ([#23745](https://github.com/netdata/netdata/issues/23745))
 - Monitor RDP connections (Window) ([#23719](https://github.com/netdata/netdata/issues/23719))
+- Chore: correct stale comments and improve test diagnostics ([#23737](https://github.com/netdata/netdata/issues/23737))
+- Fix(aclk): bound how long a shutdown waits during connection setup ([#23733](https://github.com/netdata/netdata/issues/23733))
+- Fix(aclk): preserve PUBACK timeout count while offline ([#23734](https://github.com/netdata/netdata/issues/23734))
+- Fix(windows): keep the claim token out of verbose MSI logs ([#23735](https://github.com/netdata/netdata/issues/23735))
+- Add fallback to MSSQL Functions ([#23748](https://github.com/netdata/netdata/issues/23748))
+- Feat(go.d/snmp): add per-walk timing and preparation diagnostics ([#23753](https://github.com/netdata/netdata/issues/23753))
+- Docs(logs): rewrite the Logs section as the Logs Management operator's manual ([#23687](https://github.com/netdata/netdata/issues/23687))
+- Docs: give the OpenTelemetry landing page a distinct rendered title ([#23755](https://github.com/netdata/netdata/issues/23755))
+- Regenerate integrations docs ([#23746](https://github.com/netdata/netdata/issues/23746))
 
 ## [2.11.0] - 2026-08-12
 
