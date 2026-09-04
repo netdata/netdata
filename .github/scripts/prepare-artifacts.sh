@@ -16,10 +16,7 @@ copy_static_builds() {
     for ext in ${STATIC_EXTENSIONS}; do
         for arch in ${STATIC_ARCHES}; do
             for tag in "${@}"; do
-                case "${tag}" in
-                    latest) cp -v "${artifacts}/netdata-${arch}-latest.${ext}.run" .  ;;
-                    versioned) cp -v "${artifacts}/netdata-${arch}-latest.${ext}.run" "./netdata-${arch}-${VERSION}.${ext}.run" ;;
-                esac
+                cp -v "${artifacts}/netdata-${arch}-latest.${ext}.run" "./netdata-${arch}-${tag}.${ext}.run"
             done
         done
     done
@@ -81,7 +78,7 @@ echo "::group::Preparing GitHub release artifacts"
 mkdir -p artifacts/github
 cd artifacts/github
 copy_source_tarball "" "${VERSION}" latest
-copy_static_builds versioned latest
+copy_static_builds "${VERSION}" latest
 copy_msi_packages "" "${VERSION}" latest
 create_legacy_compat_files
 echo "${VERSION}" > Version
@@ -94,7 +91,7 @@ echo "::group::Preparing R2 versioned release artifacts"
 mkdir -p "artifacts/r2/${VERSION}"
 cd "artifacts/r2/${VERSION}"
 copy_source_tarball "${VERSION}"
-copy_static_builds versioned
+copy_static_builds "${VERSION}" latest
 copy_msi_packages "${VERSION}"
 echo "${VERSION}" > Version
 create_manifest
