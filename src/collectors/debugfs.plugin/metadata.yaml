@@ -164,7 +164,7 @@ modules:
       data_collection:
         metrics_description: >
           Collects zswap performance metrics on Linux systems.
-        method_description: 'Parse data from `debugfs file.'
+        method_description: 'Parse data from `debugfs` file.'
       supported_platforms:
         include:
           - Linux
@@ -306,7 +306,7 @@ modules:
       data_collection:
         metrics_description: >
           Collects power capping performance metrics on Linux systems.
-        method_description: 'Parse data from `debugfs file.'
+        method_description: 'Parse data from `debugfs` file.'
       supported_platforms:
         include:
           - Linux

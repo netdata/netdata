@@ -124,9 +124,10 @@ Tests about configuration:
 
 ## 6. Metadata And Help In Operator Voice
 
-**When:** writing `metadata.yaml` fields, `ui:help`, and stock `.conf` comments for a collector designed with sections
-1 to 5. **Do:** write what those sections decided (modes, prerequisites, what the collector writes or deletes,
-permissions, objectives versus timeouts, observation limits) in operator voice, following
+**When:** writing `metadata.yaml` fields, `ui:help`, and stock `.conf` comments for a collector designed with this
+skill. **Do:** write what the design decided (modes and options from sections 1 to 5; what the collector writes or
+deletes, its permissions, objectives versus timeouts, and observation limits from `mutating-collectors.md`) in
+operator voice, following
 `.agents/skills/project-collector-metadata/` for every `metadata.yaml` field and `config-schema.md` section 2 for the
 form's text channels. **Don't:** ship the engine's vocabulary as operator documentation. **Evidence:** the generated
 integration page read end to end. **Boundary:** the content rules live in the collector metadata skill; artifact

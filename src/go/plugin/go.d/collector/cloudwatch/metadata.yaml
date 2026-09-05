@@ -142,7 +142,8 @@ modules:
             is no service discovery for this collector.
 
             With a minimal rule (targets and regions only) the collector collects every default-enabled profile, 34 of
-            them, with each profile's default metrics and statistics, and discovers the resources itself every
+            them minus any your regions do not support (CloudFront exists only in `us-east-1`), with each profile's
+            default metrics and statistics, and discovers the resources itself every
             `discovery.refresh_every` seconds (default 300). A chart appears once a resource reports data. Opt-in profiles
             and opt-in metrics are collected only when a rule names them.
         limits:
@@ -171,7 +172,8 @@ modules:
 
             `GetMetricData` is billed per metric requested, about $0.01 per 1,000 in most regions; check
             [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for yours. Up to five statistics of one
-            metric in one request count as one metric requested, and the collector keeps them together. `ListMetrics`
+            metric in one request count as one metric requested, and the collector keeps them together as long as they
+            share the same query timing. `ListMetrics`
             discovery is within the AWS free tier for most accounts and inexpensive beyond it. Broad rules across many
             regions and services cost real money; read this section before enabling a wide selection.
 
@@ -182,7 +184,7 @@ modules:
             | Driver | Effect |
             |:-------|:-------|
             | Resources | Every discovered resource adds its profile's metrics. Tag filters and `limits.max_instances` bound it. |
-            | Metrics and statistics | Each selected metric and statistic of each resource is one series. Most default profiles select one statistic per metric, a few select two or three; up to five statistics of one metric stay one metric request. |
+            | Metrics and statistics | Each selected metric and statistic of each resource is one series. Most default profiles select one statistic per metric, a few select two or three; up to five statistics of one metric stay one metric request when they share the same query timing, and giving one statistic its own `period` or `lookback` splits the request and bills separately. |
             | Request frequency | A series is read once per CloudWatch period, and at most once per `update_every`. A 1-minute period read every minute costs five times a 5-minute period. |
             | Lookback | A longer window requests more datapoints per read and can turn off the 3-hour recently-active discovery filter, which makes `ListMetrics` scans larger. |
             | Retries | A read that fails transiently is retried after `update_every`, then with a doubling delay up to one period. Retries are billed. |
@@ -322,6 +324,9 @@ modules:
               group: Credentials
             - name: credentials[].type_static
               description: "Explicit AWS credentials, used only when the type is `static`. Prefer secret references over plaintext values."
+              detailed_description: |
+                Required when the type is `static` and not allowed otherwise. Inside it, `access_key_id` and
+                `secret_access_key` are required; `session_token` only for temporary credentials.
               default_value: ""
               required: false
               group: Credentials
@@ -509,7 +514,8 @@ modules:
               description: "Default CloudWatch aggregation period, from `1m` to `24h` in whole minutes. Rules, groups, and metrics may override it."
               detailed_description: |
                 The period that wins for a series (metric item, then group, then rule, then this default, then the
-                profile) is also the one used to normalize rate metrics to per-second values.
+                profile's metric-level query, then the profile's query) is also the one used to normalize rate metrics
+                to per-second values.
               default_value: ""
               required: false
               group: Rules / Query Policy
@@ -521,7 +527,7 @@ modules:
             - name: rule_defaults.query.publication_delay
               description: "Default wait after a period closes before querying it. A scheduling policy, not an AWS guarantee."
               detailed_description: |
-                Leaving it unset falls through to the profile value and then the built-in `10m` fallback. Setting it overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `1d`; AWS documents only that S3 storage metrics are reported once per day, so use a shorter default only after verifying each workload's publication timing.
+                Leaving it unset falls through to the profile value and then the built-in `10m` fallback. Setting it overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `24h`; AWS documents only that S3 storage metrics are reported once per day, so use a shorter default only after verifying each workload's publication timing.
               default_value: ""
               required: false
               group: Rules / Query Policy
@@ -680,12 +686,12 @@ modules:
                       - name: production
                         credentials: sdk_default
                         assume_role:
-                          role_arn: "arn:aws:iam::[ACCOUNT]:role/[ROLE]"
+                          role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch-readonly"
                           external_id: ${env:AWS_EXTERNAL_ID}
                       - name: staging
                         credentials: sdk_default
                         assume_role:
-                          role_arn: "arn:aws:iam::[ACCOUNT]:role/[ROLE]"
+                          role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch-readonly"
                     rules:
                       - name: both-defaults
                         targets: [production, staging]
@@ -797,7 +803,7 @@ modules:
                           # disables any inherited resource-tag filter.
                           resource_tags: []
             - name: AWS PrivateLink endpoints with split timing
-              description: PrivateLink endpoints tagged `environment=production`, with per-minute connection metrics, six-hour byte totals, and the per-subnet detail grain. Subnet charts inherit their endpoint's tags.
+              description: PrivateLink endpoints tagged `environment=production`, with per-minute connection metrics and six-hour byte totals for the same endpoints.
               config: |
                 jobs:
                   - name: privatelink_endpoints
@@ -839,6 +845,26 @@ modules:
                                   lookback: 6h
                                   publication_delay: 5m
                         regions: [us-east-1]
+                    labels:
+                      resource_tags:
+                        - key: Name
+            - name: AWS PrivateLink endpoints by subnet
+              description: The per-subnet detail grain for PrivateLink endpoints tagged `environment=production`. One endpoint produces one chart instance per subnet, and the subnet charts inherit the endpoint's tags.
+              config: |
+                jobs:
+                  - name: privatelink_endpoint_subnets
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      filters:
+                        resource_tags:
+                          - key: environment
+                            values: [production]
+                    rules:
                       - name: endpoint-subnets
                         targets: [base]
                         profiles:
@@ -934,7 +960,7 @@ modules:
                             - billing_linked_account_service
                         regions: [us-east-1]
             - name: Filter resources by tag and add tag labels
-              description: Only resources tagged `managed-by=platform`, with the `Name` and `owner` tags shown as chart labels. Netdata ships no resource-tag association for the CloudFront profile, so its rule disables the inherited filter.
+              description: Only resources tagged `managed-by=platform`, with the `Name` and `owner` tags shown as chart labels. Profiles Netdata ships no resource-tag association for (CloudFront, API Gateway, ElastiCache, MSK, Auto Scaling, Bedrock, the ALB and NLB target-health grains) cannot be tag-filtered and are skipped by a filtered rule; collect them from a second rule that disables the inherited filter, as the CloudFront rule does.
               config: |
                 jobs:
                   - name: tagged_resources
@@ -1111,11 +1137,12 @@ modules:
               (`CPUUtilization`, not `cpu_utilization`), with a statistic the profile declares for it.
             fix: |
               Open the profile file and copy the `metric_name` and statistics from its `metrics` list.
-          - error: "`rules[N].metrics[M].statistics[K] \"sample_count\" is not valid (use Average|Minimum|Maximum|Sum|SampleCount|p<N>)`"
+          - error: "`rules[N].metrics[M].statistics[K] is not valid (use Average|Minimum|Maximum|Sum|SampleCount|p<N>)`"
             cause: |
               In job configuration statistics use the AWS spelling, case-insensitively: `Average`, `Minimum`,
-              `Maximum`, `Sum`, `SampleCount`, or a percentile such as `p90` or `p99.9`. The profile-file spelling
-              `sample_count` is not accepted in a job.
+              `Maximum`, `Sum`, `SampleCount`, or a percentile such as `p90` or `p99.9`. The message does not echo the
+              value that failed; the common case is the profile-file spelling `sample_count`, which a job does not
+              accept.
             fix: |
               Write `SampleCount`.
           - error: "`rules[N] derives N discovery groups (unique target, region, namespace combinations); exceeds limits.max_discovery_groups=64; ...`"
@@ -1145,8 +1172,8 @@ modules:
               Narrow `regions`, `profiles`, or `metrics`, use resource tag filters, or split the collection across jobs.
           - error: "`CloudWatch discovery refresh was discarded atomically: ...`"
             when: |
-              Also `CloudWatch discovery stage timed out`, or a `CloudWatch discovery failed for N target/region
-              operation(s)` warning. Logged at most once per hour.
+              Also `CloudWatch discovery stage timed out`, or a
+              `CloudWatch discovery failed for N target/region operation(s)` warning. Logged at most once per hour.
             cause: |
               A discovery refresh exceeded `timeout` or one of its internal size bounds. The previous set of
               resources stays in use and discovery retries after `discovery.refresh_every`; on a job's first refresh
@@ -1184,8 +1211,8 @@ modules:
               and read the Performance Impact section.
           - error: "`CloudWatch collection plan: rule \"<name>\" has N metric selection(s) shadowed by earlier rules; example: ...`"
             when: |
-              Also `CloudWatch collection rules shadowed N duplicate exported series; earliest matching rule/target order
-              owns each series`.
+              Also
+              `CloudWatch collection rules shadowed N duplicate exported series; earliest matching rule/target order owns each series`.
             cause: |
               Two rules select the same series for the same target and region. The earlier rule (and, within it, the
               earlier target) owns the series; the later selection is ignored, including its query timing.
@@ -1231,7 +1258,7 @@ modules:
             when: |
               Also `credentials[N].type_static is not allowed when credentials[N].type is "default"`,
               `credentials[N].type "<value>" is invalid: expected one of "default", "static"`,
-              `credentials[N].access_key_id is required`, or `... must not contain surrounding whitespace`.
+              `credentials[N].type_static.access_key_id is required`, or `... must not contain surrounding whitespace`.
             cause: |
               The credential block does not match its `type`: `static` needs `type_static` with `access_key_id` and
               `secret_access_key`; `default` takes no `type_static`; values must not be padded with spaces.
@@ -1240,8 +1267,9 @@ modules:
               `type_static`).
           - error: "`rules[N].profiles.include must not be empty when defaults is false`"
             when: |
-              Also `rules[N].profiles selects no profiles` (exclusions removed everything) or `rules[N] compiles to no
-              collection scopes` (every selected profile was filtered away by regions or tag associations).
+              Also `rules[N].profiles selects no profiles` (exclusions removed everything) or
+              `rules[N] compiles to no collection scopes` (every selected profile was filtered away by regions or tag
+              associations).
             cause: |
               The rule ends up selecting nothing. Narrowing with `defaults: false`, `exclude`, region-restricted
               profiles, or tag filters went one step too far.
@@ -1252,8 +1280,7 @@ modules:
             when: |
               Also `... is invalid: invalid ARN syntax`.
             cause: |
-              The value is not a role ARN of the form `arn:<partition>:iam::<12-digit-account>:role/<name>`. The
-              placeholders in the examples produce this error until replaced.
+              The value is not a role ARN of the form `arn:<partition>:iam::<12-digit-account>:role/<name>`.
             fix: |
               Copy the role ARN from the IAM console; it must name the `iam` service, have no region, a 12-digit
               account id, and a `role/` resource.
@@ -1267,8 +1294,8 @@ modules:
               Split the collection across jobs, for example one job per target or per region group.
           - error: "`CloudWatch resource tag filtering reserved N exported series from lower-priority rules while membership was unknown`"
             when: |
-              Preceded by `CloudWatch resource tag lookup failed for N target/region operation(s): ... (retaining
-              fail-closed membership and last-known labels)`.
+              Preceded by
+              `CloudWatch resource tag lookup failed for N target/region operation(s): ... (retaining fail-closed membership and last-known labels)`.
             cause: |
               The tag lookup (`tag:GetResources`) failed, so the collector does not know which resources match the
               filter. It keeps the last known membership and labels, and resources whose membership is unknown stay
@@ -1547,7 +1574,7 @@ modules:
         |:--------|:--------------|:------------|
         | [ALB Target Groups](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb_target.yaml) | `cloudwatch.alb_target.*` | per-target-group host count, requests per target, response time, response codes, connection errors |
         | [DynamoDB Operations](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/dynamodb_operation.yaml) | `cloudwatch.dynamodb_operation.*` | per-operation successful request latency, system errors, throttled requests, returned items |
-        | [EBS Stalled I/O](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs_stalled_io.yaml) | `cloudwatch.ebs_stalled_io.*` | per-volume stalled I/O health check |
+        | [EBS Stalled I/O](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs_stalled_io.yaml) | `cloudwatch.ebs_stalled_io.*` | per-volume stalled I/O health check; the EBS stalled I/O alert fires only when a rule opts into this profile |
         | [S3 Request Metrics](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/s3_requests.yaml) | `cloudwatch.s3_requests.*` | requests, request errors, request latency, request data transfer; needs per-bucket request metrics enabled in AWS |
         | [AWS PrivateLink endpoints by subnet](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_endpoint_subnet.yaml) | `cloudwatch.privatelink_endpoint_subnet.*` | the endpoint metrics split by `subnet_id`; one endpoint can produce several chart instances, which inherit the endpoint's tags |
         | [AWS PrivateLink services by Availability Zone](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_az.yaml) | `cloudwatch.privatelink_service_az.*` | provider-side traffic split by `availability_zone` and `service_id` |

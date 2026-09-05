@@ -71,7 +71,8 @@ Voice, for every channel:
   listed in `ui:options.rest`, or hidden. A property missing from all of them is unreachable in the UI and still
   submitted with its default.
 - Tab titles MUST equal the `group` values in `metadata.yaml` (first segment before ` / `): the doc table and the form
-  use one vocabulary. Call `collecttest.AssertConfigSchemaMatchesMetadata` from the collector's tests: a tabbed
+  use one vocabulary. The `Tab / Subgroup` form exists because a tab can only group whole top-level properties, so a
+  doc group that refines a nested concern (query timing, tag filters) cannot be its own tab. Call `collecttest.AssertConfigSchemaMatchesMetadata` from the collector's tests: a tabbed
   collector whose options or descriptions you change MUST opt in (a mechanical fleet sweep is not such a change); a
   schema without tabs cannot opt in until the helper handles the flat layout. Derive groups from the collector's own
   keys; do not copy a neighbour's tab list.

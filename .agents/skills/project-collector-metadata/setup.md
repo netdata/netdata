@@ -5,7 +5,8 @@ The Setup section is where the reader who decided to run the collector goes to m
 UI-versus-file table and its own `:::important` admonition; `### Prerequisites` with one h4 per entry (or "No action
 required."); `### Configuration` with `#### Options` (the `options.description` intro, then the table, then one h5 per
 `detailed_description`); the fixed "via UI" and "via File" procedures built from `configuration.file`; then
-`##### Examples` with one h6 per example (name, description, fenced YAML).
+`##### Examples` with one h6 per example (name, description, fenced YAML). A non-empty `setup.description` replaces
+the whole structured section with free prose; short-form notification integrations use it, collectors do not.
 
 Shape rules for every field (structure, admonitions, terms, Markdown safety, depth boundary) are in `SKILL.md` and
 `overview.md` section 1. This file adds the per-field contract.
@@ -47,8 +48,8 @@ Renders as one h4 per entry under `### Prerequisites`. Empty renders "No action 
 
 **Question:** what does each option do, what values does it take, what is the default, must I set it?
 
-Renders as a table with columns Group, Option, Description, Default, Required. A row's `name` becomes a link when the
-row has a `detailed_description`.
+Renders as a table with columns Option, Description, Default, Required, preceded by a Group column when any row sets
+`group`. A row's `name` becomes a link when the row has a `detailed_description`.
 
 - `name` is the key as written in the config file. Nested options use the fleet's path notation
   (`credentials[].name`, `tls.skip_verify`), one row per leaf the operator can set.
@@ -109,7 +110,8 @@ Renders as one h6 per example: `name`, `description`, then the YAML.
 ## 7. Review Questions For This Family
 
 - Is every prerequisite one action with an imperative title, and is anything that is not an action routed away?
-- Is every row's description one sentence, identical to the schema's, with unit and range, and no default restated?
+- Is every row's description identical to the schema's (length per `config-schema.md` section 2), with the unit
+  named, and no default restated?
 - Does every `default_value` match the code, the schema, and the stock config?
 - Does the reader find their case from the example names alone, and is the first example the basic one?
 - Can each example be pasted as-is, and does each show only what its scenario needs?

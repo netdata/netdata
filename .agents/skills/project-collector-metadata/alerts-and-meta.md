@@ -62,7 +62,25 @@ both sides are filled in the same change.
   carried in the generated `integrations.json` but rendered on no page: the `related_resources.md` template that would
   show it is never reached by the generator. Write it for the data consumers; do not expect it on the page.
 
-## 5. Review Questions For This Family
+## 5. `functions`: Live Data
+
+**Question:** which Functions does this collector offer, what do they need, and what do they return?
+
+Rendering (`integrations/templates/functions.md`): `## Live Data`, the list `description`, then one h3 per entry with
+an aspects table (name as `<Module>:<id>`, `require_cloud`, `performance`, `security`, `availability`), h4
+Prerequisites (one h5 per entry, or "No additional configuration is required."), h4 Parameters (table), h4 Returns
+(`returns.description` and a columns table). Empty renders nothing.
+
+- Every Function the collector registers has an entry, and every entry has a Function in the code. `id`, the
+  parameters (name, type, required, default, options), and the return columns (name, type, unit, visibility) mirror
+  the implementation verbatim; they are drift checks, not prose.
+- The list `description` and each entry's `description` say what the operator gets and when to use it, one
+  paragraph each, operator voice. `returns.description` says what one row is.
+- `require_cloud`, `performance`, `security`, and `availability` state what the implementation does (a Function that
+  runs a query against the monitored system is not "low" performance impact because the author hopes so).
+- Prerequisites follow `setup.md` section 2: one operator action each, imperative title, steps, verification.
+
+## 6. Review Questions For This Family
 
 - Does every alert in the health conf for this collector's contexts have a row, and does every row's `info` match the
   conf character for character?

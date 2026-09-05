@@ -53,7 +53,8 @@ ADMONITION_FENCE = re.compile(r'^\s*:::')
 CODE_FENCE = re.compile(r'^\s*```')
 TABLE_ROW = re.compile(r'^\s*\|.*\|\s*$')
 TABLE_SEPARATOR = re.compile(r'^\s*\|[\s:|-]+\|\s*$')
-ANGLE_TAG = re.compile(r'</?([A-Za-z][A-Za-z0-9_.-]*)>')
+# `<name>` placeholders and `Vec<u32>`/`HashMap<K,V>` generics alike: an identifier after `<`, anything up to `>`.
+ANGLE_TAG = re.compile(r'</?([A-Za-z][A-Za-z0-9_.-]*)[^<>\n]*>')
 ANGLE_DIGIT = re.compile(r'<\d')
 INLINE_CODE = re.compile(r'`[^`\n]*`')
 TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\S+)', re.M)
@@ -65,10 +66,12 @@ def sd_covered_modules():
     for path in sorted(SD_RULES_DIR.glob('*.conf')):
         conf = _common.load_yaml(path)
         for rule in (conf or {}).get('services') or []:
-            if rule['id'] in SD_NON_COLLECTOR_RULE_IDS:
+            rule_id = rule.get('id')
+            if not rule_id or rule_id in SD_NON_COLLECTOR_RULE_IDS:
                 continue
             match = TEMPLATE_MODULE.search(rule.get('config_template') or '')
-            module = match.group(1) if match else rule['id']
+            module = match.group(1) if match else rule_id
+            # Every sd rule today targets a go.d module; a rule for another plugin would need its own metadata path.
             covered.setdefault(module, set()).add(path.name)
     return covered
 
@@ -108,6 +111,18 @@ def without_code(text):
     return '\n'.join(kept)
 
 
+def outside_fences(text):
+    """Lines of the text that are not inside a fenced code block (fence lines themselves excluded)."""
+    kept = []
+    in_fence = False
+    for line in text.splitlines():
+        if CODE_FENCE.match(line):
+            in_fence = not in_fence
+        elif not in_fence:
+            kept.append(line)
+    return kept
+
+
 def markdown_problems(text):
     lines = text.splitlines()
     problems = []
@@ -115,19 +130,24 @@ def markdown_problems(text):
         problems.append('unbalanced ::: admonition fence')
     if sum(1 for line in lines if CODE_FENCE.match(line)) % 2:
         problems.append('unbalanced ``` code fence')
+    prose = outside_fences(text)
     index = 0
-    while index < len(lines):
-        if not TABLE_ROW.match(lines[index]):
+    while index < len(prose):
+        if not TABLE_ROW.match(prose[index]):
             index += 1
             continue
         block = []
-        while index < len(lines) and TABLE_ROW.match(lines[index]):
-            block.append(lines[index])
+        while index < len(prose) and TABLE_ROW.match(prose[index]):
+            block.append(prose[index])
             index += 1
         if len(block) < 2 or not TABLE_SEPARATOR.match(block[1]):
             problems.append('table without a header separator row')
         elif len({row.count('|') for row in block}) > 1:
             problems.append('table rows with different cell counts')
+    # A code span may wrap onto the next line, so balance backticks per paragraph, not per line.
+    for paragraph in re.split(r'\n\s*\n', '\n'.join(prose)):
+        if paragraph.count('`') % 2:
+            problems.append(f'unbalanced backtick in paragraph: {paragraph.strip()[:60]!r}')
     plain = without_code(text)
     for match in ANGLE_TAG.finditer(plain):
         if match.group(1).lower() not in ALLOWED_HTML_TAGS:

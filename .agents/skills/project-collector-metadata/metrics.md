@@ -3,11 +3,12 @@
 The Metrics section tells the reader which charts they will get and what one instance of each scope is. It is the one
 part of the page that is a contract with the code, not prose: every row must match what the collector emits.
 
-Rendering (`integrations/templates/metrics.md`): `## Metrics`, two fixed sentences explaining scopes, then
+Rendering (`integrations/templates/metrics.md`): `## Metrics`, two fixed paragraphs explaining scopes, then
 `metrics.description`, then one `### Per <scope name>` per `metrics.scopes[]` entry with its `description`, a labels
 table (label, description), and a metrics table (Metric, Description when any row in the scope has one, Dimensions,
 Unit, plus one column per `metrics.availability` value). Every cell is flattened to one line by the generator.
-Collectors without scopes render `## Metrics` and `metrics.description` only.
+Collectors without scopes render `## Metrics` and `metrics.description` only. Prometheus profile pages with
+`profile_coverage` render a generated coverage section instead and ignore `metrics.description`.
 
 Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 

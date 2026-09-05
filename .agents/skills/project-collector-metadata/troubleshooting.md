@@ -4,7 +4,8 @@ The reader here has an error in front of them and the collector page open. The s
 error on the page and read the fix. It is written proactively, for every failure path the collector has, and it grows
 from user reports: when an operator reports an error that fits, it is added.
 
-Rendering (`integrations/templates/troubleshooting.md`): `## Troubleshooting` with three h3 groups.
+Rendering (`integrations/templates/troubleshooting.md`): `## Troubleshooting` with three h3 groups on a collector page
+(a fourth, Test Notification, exists only for agent notifications).
 
 - `### Diagnostics`: template-provided for plugins that have them (go.d, python.d, charts.d): `#### Debug Mode` (the
   plugin debug command) and `#### Getting Logs` (`journalctl` and Docker log commands). Authors never write these.
