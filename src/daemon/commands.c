@@ -868,6 +868,16 @@ static void command_thread(void *arg) {
     }
 
     const char *pipename = daemon_pipename();
+    if (!pipename) {
+        // main() exits when there is no run directory, so this is only reachable if
+        // the read-only resolution disagrees with the read-write one (a run dir we
+        // can write but not read)
+        netdata_log_error("Cannot determine the netdatacli socket path - the command server is disabled.");
+        command_thread_error = UV_EINVAL;
+        // server_pipe is initialized but not bound, the same state a bind failure
+        // leaves behind
+        goto error_after_pipe_bind;
+    }
 
     (void)uv_fs_unlink(loop, &req, pipename, NULL);
     uv_fs_req_cleanup(&req);

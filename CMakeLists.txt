@@ -1314,6 +1314,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/boottime.h
         src/libnetdata/os/boot_id.c
         src/libnetdata/os/boot_id.h
+        src/libnetdata/os/privileged_dir.c
+        src/libnetdata/os/privileged_dir.h
         src/libnetdata/os/run_dir.c
         src/libnetdata/os/run_dir.h
         src/libnetdata/os/file_lock.c
@@ -3186,6 +3188,16 @@ target_link_libraries(stream-receiver-hops-test libnetdata)
 add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-replay-endpoints-test.c)
 target_link_libraries(stream-replay-endpoints-test libnetdata)
+
+# POSIX ownership semantics only: on Windows os_run_dir_is_safe() short-circuits
+# to true once past the symlink, directory and access checks (Cygwin has no uid 0
+# and no sticky bit), so the ownership and parent-trust refusal cases here would
+# fail by design.
+if(NOT OS_WINDOWS)
+        add_executable(run-dir-safety-test EXCLUDE_FROM_ALL
+                src/libnetdata/os/tests/run-dir-safety-test.c)
+        target_link_libraries(run-dir-safety-test libnetdata)
+endif()
 
 if(OS_LINUX)
         add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
