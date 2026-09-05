@@ -43,14 +43,26 @@ func validateNotification(path string, notification map[string]any) error {
 	if err := rejectUnknownFields(path, notification, allowed); err != nil {
 		return err
 	}
-	if _, err := requiredEnum(path+".severity", notification["severity"],
+	severity, err := requiredNotificationField(path, notification, "severity")
+	if err != nil {
+		return err
+	}
+	if _, err := requiredEnum(path+".severity", severity,
 		NotificationSeverityInfo, NotificationSeverityWarning, NotificationSeverityError); err != nil {
 		return err
 	}
-	if err := validateTopologyID(path+".code", notification["code"]); err != nil {
+	code, err := requiredNotificationField(path, notification, "code")
+	if err != nil {
 		return err
 	}
-	if err := validateRequiredString(path+".message", notification["message"]); err != nil {
+	if err := validateTopologyID(path+".code", code); err != nil {
+		return err
+	}
+	message, err := requiredNotificationField(path, notification, "message")
+	if err != nil {
+		return err
+	}
+	if err := validateRequiredString(path+".message", message); err != nil {
 		return err
 	}
 	if origin, present := notification["origin"]; present {
@@ -83,12 +95,18 @@ func validateNotificationOrigin(path string, raw any) error {
 	if err := rejectUnknownFields(path, origin, allowed); err != nil {
 		return err
 	}
-	if err := validateTopologyID(path+".source", origin["source"]); err != nil {
+	source, err := requiredNotificationField(path, origin, "source")
+	if err != nil {
 		return err
 	}
-	if instance, present := origin["instance"]; !present {
-		return fmt.Errorf("%s.instance is required", path)
-	} else if _, ok := instance.(string); !ok {
+	if err := validateTopologyID(path+".source", source); err != nil {
+		return err
+	}
+	instance, err := requiredNotificationField(path, origin, "instance")
+	if err != nil {
+		return err
+	}
+	if _, ok := instance.(string); !ok {
 		return fmt.Errorf("%s.instance is not a string", path)
 	}
 	for _, field := range []string{"node_id", "machine_guid", "agent_version", "plugin"} {
@@ -110,6 +128,14 @@ func validateNotificationOrigin(path string, raw any) error {
 		}
 	}
 	return nil
+}
+
+func requiredNotificationField(path string, object map[string]any, field string) (any, error) {
+	value, present := object[field]
+	if !present {
+		return nil, fmt.Errorf("%s.%s is required", path, field)
+	}
+	return value, nil
 }
 
 func validateTopologyID(path string, raw any) error {

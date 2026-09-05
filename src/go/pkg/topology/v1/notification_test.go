@@ -100,33 +100,6 @@ func TestNotificationSchemaAndSemanticValidationAgree(t *testing.T) {
 			notifications: []any{testNotification(map[string]any{"message": " \n"})},
 			valid:         true,
 		},
-		"explicit complete origin": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{
-					"node_id":       "node-a",
-					"machine_guid":  "machine-a",
-					"agent_version": "1.99.0",
-					"plugin":        "network-viewer.plugin",
-					"capabilities":  []any{"topology", "correlation"},
-				}),
-			})},
-			valid: true,
-		},
-		"empty producer strings and capabilities": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{
-					"instance":      "",
-					"node_id":       "",
-					"machine_guid":  "",
-					"agent_version": "",
-					"plugin":        "",
-					"capabilities":  []any{},
-				}),
-			})},
-			valid: true,
-		},
 		"empty affected node": {
 			present:       true,
 			notifications: []any{testNotification(map[string]any{"affected_node_id": ""})},
@@ -155,7 +128,7 @@ func TestNotificationSchemaAndSemanticValidationAgree(t *testing.T) {
 		"missing severity": {
 			present:       true,
 			notifications: []any{map[string]any{"code": "source.unavailable", "message": "Unavailable."}},
-			want:          "data.notifications[0].severity is not a non-empty string",
+			want:          "data.notifications[0].severity is required",
 		},
 		"non-string severity": {
 			present:       true,
@@ -170,7 +143,7 @@ func TestNotificationSchemaAndSemanticValidationAgree(t *testing.T) {
 		"missing code": {
 			present:       true,
 			notifications: []any{map[string]any{"severity": "warning", "message": "Unavailable."}},
-			want:          "data.notifications[0].code is not a valid identifier",
+			want:          "data.notifications[0].code is required",
 		},
 		"non-string code": {
 			present:       true,
@@ -207,114 +180,6 @@ func TestNotificationSchemaAndSemanticValidationAgree(t *testing.T) {
 			notifications: []any{testNotification(map[string]any{"message": 7})},
 			want:          "data.notifications[0].message is required",
 		},
-		"null origin": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": nil})},
-			want:          "data.notifications[0].origin is not an object",
-		},
-		"non-object origin": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": []any{}})},
-			want:          "data.notifications[0].origin is not an object",
-		},
-		"origin missing source": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": map[string]any{"instance": "job-a"}})},
-			want:          "data.notifications[0].origin.source is not a valid identifier",
-		},
-		"origin non-string source": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": testNotificationOrigin(map[string]any{"source": 7})})},
-			want:          "data.notifications[0].origin.source is not a valid identifier",
-		},
-		"origin source contains newline": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"source": "network-connections\n"}),
-			})},
-			want: "data.notifications[0].origin.source is not a valid identifier",
-		},
-		"origin missing instance": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": map[string]any{"source": "snmp"}})},
-			want:          "data.notifications[0].origin.instance is required",
-		},
-		"origin non-string instance": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": testNotificationOrigin(map[string]any{"instance": 7})})},
-			want:          "data.notifications[0].origin.instance is not a string",
-		},
-		"unknown origin field": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": testNotificationOrigin(map[string]any{"extra": true})})},
-			want:          "data.notifications[0].origin.extra is unknown",
-		},
-		"origin null node id": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": testNotificationOrigin(map[string]any{"node_id": nil})})},
-			want:          "data.notifications[0].origin.node_id is not a string",
-		},
-		"origin non-string machine guid": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"machine_guid": 7}),
-			})},
-			want: "data.notifications[0].origin.machine_guid is not a string",
-		},
-		"origin null agent version": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"agent_version": nil}),
-			})},
-			want: "data.notifications[0].origin.agent_version is not a string",
-		},
-		"origin non-string plugin": {
-			present:       true,
-			notifications: []any{testNotification(map[string]any{"origin": testNotificationOrigin(map[string]any{"plugin": 7})})},
-			want:          "data.notifications[0].origin.plugin is not a string",
-		},
-		"origin capabilities not array": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"capabilities": "topology"}),
-			})},
-			want: "data.notifications[0].origin.capabilities is not an array",
-		},
-		"origin capabilities null": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"capabilities": nil}),
-			})},
-			want: "data.notifications[0].origin.capabilities is not an array",
-		},
-		"duplicate origin capability": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"capabilities": []any{"topology", "topology"}}),
-			})},
-			want: "data.notifications[0].origin.capabilities[1] duplicates value",
-		},
-		"invalid origin capability": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"capabilities": []any{"bad capability"}}),
-			})},
-			want: "data.notifications[0].origin.capabilities[0] is not a valid identifier",
-		},
-		"origin capability contains newline": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"capabilities": []any{"topology\n"}}),
-			})},
-			want: "data.notifications[0].origin.capabilities[0] is not a valid identifier",
-		},
-		"origin capability is not string": {
-			present: true,
-			notifications: []any{testNotification(map[string]any{
-				"origin": testNotificationOrigin(map[string]any{"capabilities": []any{7}}),
-			})},
-			want: "data.notifications[0].origin.capabilities[0] is not a non-empty string",
-		},
 		"null affected node": {
 			present:       true,
 			notifications: []any{testNotification(map[string]any{"affected_node_id": nil})},
@@ -334,21 +199,138 @@ func TestNotificationSchemaAndSemanticValidationAgree(t *testing.T) {
 				payload["data"].(map[string]any)["notifications"] = tc.notifications
 			}
 
-			payloadBytes, err := json.Marshal(payload)
-			require.NoError(t, err)
-			schemaErr := topologySchemaValidationError(t, payloadBytes)
-			semanticErr := ValidateDecodedResponse(payload)
-			assert.Equal(t, schemaErr == nil, semanticErr == nil, "schema and semantic validators disagree")
-			if tc.valid {
-				assert.NoError(t, schemaErr)
-				assert.NoError(t, semanticErr)
-				return
-			}
-			assert.Error(t, schemaErr)
-			if assert.Error(t, semanticErr) {
-				assert.Contains(t, semanticErr.Error(), tc.want)
-			}
+			assertNotificationValidation(t, payload, tc.valid, tc.want)
 		})
+	}
+}
+
+func TestNotificationOriginSchemaAndSemanticValidationAgree(t *testing.T) {
+	tests := map[string]struct {
+		origin any
+		valid  bool
+		want   string
+	}{
+		"explicit complete origin": {
+			origin: testNotificationOrigin(map[string]any{
+				"node_id":       "node-a",
+				"machine_guid":  "machine-a",
+				"agent_version": "1.99.0",
+				"plugin":        "network-viewer.plugin",
+				"capabilities":  []any{"topology", "correlation"},
+			}),
+			valid: true,
+		},
+		"empty producer strings and capabilities": {
+			origin: testNotificationOrigin(map[string]any{
+				"instance":      "",
+				"node_id":       "",
+				"machine_guid":  "",
+				"agent_version": "",
+				"plugin":        "",
+				"capabilities":  []any{},
+			}),
+			valid: true,
+		},
+		"null origin": {
+			origin: nil,
+			want:   "data.notifications[0].origin is not an object",
+		},
+		"non-object origin": {
+			origin: []any{},
+			want:   "data.notifications[0].origin is not an object",
+		},
+		"origin missing source": {
+			origin: map[string]any{"instance": "job-a"},
+			want:   "data.notifications[0].origin.source is required",
+		},
+		"origin non-string source": {
+			origin: testNotificationOrigin(map[string]any{"source": 7}),
+			want:   "data.notifications[0].origin.source is not a valid identifier",
+		},
+		"origin source contains newline": {
+			origin: testNotificationOrigin(map[string]any{"source": "network-connections\n"}),
+			want:   "data.notifications[0].origin.source is not a valid identifier",
+		},
+		"origin missing instance": {
+			origin: map[string]any{"source": "snmp"},
+			want:   "data.notifications[0].origin.instance is required",
+		},
+		"origin non-string instance": {
+			origin: testNotificationOrigin(map[string]any{"instance": 7}),
+			want:   "data.notifications[0].origin.instance is not a string",
+		},
+		"unknown origin field": {
+			origin: testNotificationOrigin(map[string]any{"extra": true}),
+			want:   "data.notifications[0].origin.extra is unknown",
+		},
+		"origin null node id": {
+			origin: testNotificationOrigin(map[string]any{"node_id": nil}),
+			want:   "data.notifications[0].origin.node_id is not a string",
+		},
+		"origin non-string machine guid": {
+			origin: testNotificationOrigin(map[string]any{"machine_guid": 7}),
+			want:   "data.notifications[0].origin.machine_guid is not a string",
+		},
+		"origin null agent version": {
+			origin: testNotificationOrigin(map[string]any{"agent_version": nil}),
+			want:   "data.notifications[0].origin.agent_version is not a string",
+		},
+		"origin non-string plugin": {
+			origin: testNotificationOrigin(map[string]any{"plugin": 7}),
+			want:   "data.notifications[0].origin.plugin is not a string",
+		},
+		"origin capabilities not array": {
+			origin: testNotificationOrigin(map[string]any{"capabilities": "topology"}),
+			want:   "data.notifications[0].origin.capabilities is not an array",
+		},
+		"origin capabilities null": {
+			origin: testNotificationOrigin(map[string]any{"capabilities": nil}),
+			want:   "data.notifications[0].origin.capabilities is not an array",
+		},
+		"duplicate origin capability": {
+			origin: testNotificationOrigin(map[string]any{"capabilities": []any{"topology", "topology"}}),
+			want:   "data.notifications[0].origin.capabilities[1] duplicates value",
+		},
+		"invalid origin capability": {
+			origin: testNotificationOrigin(map[string]any{"capabilities": []any{"bad capability"}}),
+			want:   "data.notifications[0].origin.capabilities[0] is not a valid identifier",
+		},
+		"origin capability contains newline": {
+			origin: testNotificationOrigin(map[string]any{"capabilities": []any{"topology\n"}}),
+			want:   "data.notifications[0].origin.capabilities[0] is not a valid identifier",
+		},
+		"origin capability is not string": {
+			origin: testNotificationOrigin(map[string]any{"capabilities": []any{7}}),
+			want:   "data.notifications[0].origin.capabilities[0] is not a non-empty string",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			payload := decodedNotificationTestPayload(t)
+			payload["data"].(map[string]any)["notifications"] = []any{
+				testNotification(map[string]any{"origin": tc.origin}),
+			}
+			assertNotificationValidation(t, payload, tc.valid, tc.want)
+		})
+	}
+}
+
+func assertNotificationValidation(t *testing.T, payload map[string]any, valid bool, want string) {
+	t.Helper()
+
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+	schemaErr := topologySchemaValidationError(t, payloadBytes)
+	semanticErr := ValidateDecodedResponse(payload)
+	assert.Equal(t, schemaErr == nil, semanticErr == nil, "schema and semantic validators disagree")
+	if valid {
+		assert.NoError(t, schemaErr)
+		assert.NoError(t, semanticErr)
+		return
+	}
+	assert.Error(t, schemaErr)
+	if assert.Error(t, semanticErr) {
+		assert.Contains(t, semanticErr.Error(), want)
 	}
 }
 
