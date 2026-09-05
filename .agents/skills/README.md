@@ -11,8 +11,7 @@ published contract and are exempt from the naming rule below.
 - Every runtime skill MUST be named `<area>-<topic>`: the area, one lowercase alphanumeric word (it is the text before
   the first hyphen), says where in the product or the repo process the work lands, so a sorted listing groups related
   skills; the topic, lowercase alphanumeric words joined by hyphens, says what the skill does. Within `collectors`, the
-  topic
-  starts with the sub-area when there is one (`go`, `snmp`, `prometheus`, `metadata`) or with the activity
+  topic starts with the sub-area when there is one (`go`, `snmp`, `prometheus`, `metadata`) or with the activity
   (`authoring`).
 - The frontmatter `name` MUST equal the directory name.
 - `.agents/sow/audit.sh` enforces both, and also that every skill directory has a `SKILL.md`, every public symlink
