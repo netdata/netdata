@@ -65,6 +65,12 @@ A few bullets or two short paragraphs. It never lists contexts, dimensions, or u
 repeats the overview, and never explains how metrics are collected (`method_description`). A `metrics.description`
 that grows past a screen is a sign that rows or the overview are missing content, not that it needs headings.
 
+**Profile-driven collectors** (charts come from profiles, so the scope tables cannot list them) MAY list their
+profiles once, here and nowhere else on the page: one table for the default-enabled profiles and one for the opt-in
+profiles, each row a linked profile name, its context prefix (`cloudwatch.ec2.*`), and one line of what it covers.
+The overview keeps only area-level coverage (services by area), not the profile list. This is the profile-library
+pointer done as a table; the size rule above does not count it. Exemplar: `cloudwatch/metadata.yaml`.
+
 ## 4. `dynamic_context_prefixes` And `availability`
 
 - `dynamic_context_prefixes` declares every prefix under which the collector emits contexts that have no static row
