@@ -56,6 +56,8 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "anchor",
     "selections",
     "min_trace_duration_ns",
+    "max_trace_duration_ns",
+    "overview_facets",
 ];
 
 /// The raw top-level shape: the seven mode selectors and supported
@@ -102,9 +104,17 @@ struct RawOtelTracesRequest {
     #[serde(default, deserialize_with = "present")]
     min_trace_duration_ns: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
+    max_trace_duration_ns: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
     selections: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     timeout: Option<serde_json::Value>,
+    /// The Functions view's root-facet opt-in for the embedded window
+    /// aggregate. A Functions PARAMETER, not a mode selector: the
+    /// `overview` key still selects the legacy mode, so the aggregate's
+    /// opt-in cannot share that name (see [`SearchResult::overview`]).
+    #[serde(default, deserialize_with = "present")]
+    overview_facets: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
     /// by the caller, not a security boundary; omitted/invalid falls
     /// back to the default tenant
@@ -198,8 +208,10 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.last.is_some()
             || raw.anchor.is_some()
             || raw.min_trace_duration_ns.is_some()
+            || raw.max_trace_duration_ns.is_some()
             || raw.selections.is_some()
-            || raw.timeout.is_some();
+            || raw.timeout.is_some()
+            || raw.overview_facets.is_some();
 
         match present.as_slice() {
             [] => {}
@@ -233,8 +245,10 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("last", raw.last.as_ref()),
                 ("anchor", raw.anchor.as_ref()),
                 ("min_trace_duration_ns", raw.min_trace_duration_ns.as_ref()),
+                ("max_trace_duration_ns", raw.max_trace_duration_ns.as_ref()),
                 ("selections", raw.selections.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
+                ("overview_facets", raw.overview_facets.as_ref()),
             ] {
                 if let Some(value) = value {
                     params.insert(name.to_string(), value.clone());
@@ -279,6 +293,10 @@ pub struct FunctionsParams {
     pub before: i64,
     #[serde(default = "default_limit")]
     pub last: usize,
+    /// Opaque cursor from the previous page's `anchor.next`. It also
+    /// suppresses the embedded window aggregate: the cursor freezes the
+    /// window, so the section would repeat the first page's (see
+    /// [`SearchResult::overview`]).
     #[serde(default)]
     pub anchor: Option<String>,
     #[serde(default)]
@@ -287,15 +305,34 @@ pub struct FunctionsParams {
     /// nanoseconds — the "min duration" filter of the Functions view.
     /// Trace-envelope, not span, so it narrows the same quantity the
     /// overview grid bins by. Forwarded verbatim to
-    /// [`SearchParams::min_trace_duration_ns`]; the upper bound stays
-    /// the native mode's alone.
+    /// [`SearchParams::min_trace_duration_ns`] and paired with
+    /// [`Self::max_trace_duration_ns`], which this view forwards too:
+    /// the pair expresses a duration BAND, not only a floor.
     #[serde(default)]
     pub min_trace_duration_ns: Option<i64>,
+    /// Inclusive upper bound on the TRACE envelope duration,
+    /// nanoseconds — the "max duration" filter of the Functions view,
+    /// paired with [`Self::min_trace_duration_ns`]. Forwarded verbatim
+    /// to [`SearchParams::max_trace_duration_ns`].
+    #[serde(default)]
+    pub max_trace_duration_ns: Option<i64>,
     /// Accepted for parity with the Functions protocol. Execution
     /// deadlines remain owned by the bridge call context.
     #[serde(default)]
     #[serde(rename = "timeout")]
     pub _timeout: Option<u32>,
+    /// Also compute the embedded aggregate's top-root-service/operation
+    /// facet lists. OPT-IN for the same reason the legacy mode's
+    /// [`OverviewParams::facets`] is — resolving roots costs the sealed
+    /// sources' dictionary decodes — and honoured only while the page
+    /// carries no filter at all, neither a selection nor a duration
+    /// bound (the composition site's scope gate: a window-scoped list
+    /// beside a filtered page contradicts what the page shows).
+    /// `null`, `false`, and absent all mean off; only `true` opts in.
+    /// Moot while [`Self::anchor`] is set — that page carries no
+    /// aggregate to put lists in.
+    #[serde(default)]
+    pub overview_facets: Option<bool>,
 }
 
 impl FunctionsParams {
@@ -336,7 +373,7 @@ impl FunctionsParams {
             min_duration_ns: None,
             max_duration_ns: None,
             min_trace_duration_ns: self.min_trace_duration_ns,
-            max_trace_duration_ns: None,
+            max_trace_duration_ns: self.max_trace_duration_ns,
             anchor: self.anchor.clone(),
         })
     }
@@ -546,8 +583,10 @@ pub enum OtelTracesResponse {
 }
 
 /// Functions protocol envelope for the trace-specific contract. The
-/// nested payload stays exactly the native developer-owned search
-/// response; the envelope's numeric status cannot collide with its
+/// nested payload is the native developer-owned search response, plus
+/// the full-window aggregate this view composes for it
+/// ([`SearchResult::overview`] — the legacy modes' shapes stay
+/// untouched); the envelope's numeric status cannot collide with its
 /// query-completeness `status` object.
 #[derive(Debug, Serialize)]
 pub struct FunctionsTracesResponse {
@@ -625,6 +664,30 @@ pub struct OverviewGridWire {
     /// Per time bucket, the per-duration-bin TRACE counts (each trace
     /// bins by its merged envelope).
     pub cells: Vec<Vec<u64>>,
+    /// Per cell, the binned traces' STORED ERROR-status spans —
+    /// index-parallel to `cells` in BOTH dimensions, summing to
+    /// `totals.errors`. The same ERROR-SPAN statistic as that total,
+    /// sliced by the trace's cell: a cell holding one trace with three
+    /// failed spans reads 3, not 1. Read beside `cells[bucket][bin]` to
+    /// paint one heatmap cell's count and error rate together.
+    pub error_cells: Vec<Vec<u64>>,
+    /// Per time bucket, the binned traces' EXACT envelope-duration
+    /// percentiles, nanoseconds.
+    pub duration_percentiles_ns: OverviewPercentilesWire,
+}
+
+/// The grid's per-bucket duration percentiles: one array per rank, each
+/// index-parallel to `cells`, `null` where the bucket binned no trace
+/// (zero would render as an instantaneous trace).
+///
+/// Exact nearest-rank values over each bucket's population — NEVER
+/// interpolate these from `duration_bins`, whose decade-wide edges
+/// cannot resolve better than an order of magnitude.
+#[derive(Debug, Serialize)]
+pub struct OverviewPercentilesWire {
+    pub p50: Vec<Option<i64>>,
+    pub p95: Vec<Option<i64>>,
+    pub p99: Vec<Option<i64>>,
 }
 
 /// Totals are trace-envelope-aligned, not span-window-aligned: a trace
@@ -763,6 +826,23 @@ pub struct SearchResult {
     /// the `anchor` param for the following page; treat it as opaque.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
+    /// The FULL-WINDOW aggregate, composed from a second engine pass in
+    /// this same request. The Functions view's contract only — the
+    /// legacy `search` mode never carries it — and absent (never
+    /// `null`) when not composed, so a consumer detects it by PRESENCE
+    /// and degrades to page-derived numbers without a version gate.
+    ///
+    /// Present on a FIRST page only: a request carrying an anchor
+    /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all. Such
+    /// a page reruns the same query over the cursor's frozen window, and
+    /// the aggregate applies none of the page's filters, so recomposing
+    /// it would repeat the section the first page already delivered —
+    /// one extra full-window pass per page of a walk, for identical
+    /// numbers. A consumer therefore keeps the first page's section for
+    /// the whole walk, and only re-reads it on a request without an
+    /// anchor (the only kind that can move the window).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overview: Option<OverviewSection>,
 }
 
 /// A declared coverage range, unix seconds, always present — full
@@ -784,6 +864,67 @@ pub struct SearchItems {
 pub struct AnchorWire {
     pub next: String,
 }
+
+/// The search response's embedded full-window aggregate: the legacy
+/// [`OverviewResult`] minus `mode` (the enclosing result already
+/// self-describes as `search`), plus the grid's own `coverage`, the
+/// `scope` honesty flag, and its OWN `status`.
+///
+/// Carried by a Functions FIRST page only — a request with an anchor
+/// ([`FunctionsParams::anchor`]) omits the section rather than recompute
+/// an identical one, so a paginating consumer must hold on to the
+/// section it was given. See [`SearchResult::overview`].
+///
+/// Its population is NOT the page's, in two directions that a caption
+/// must respect: the grid and totals are TRACE-ENVELOPE-aligned over
+/// the whole window (a trace whose envelope starts before the window is
+/// clipped from here even though `search` returns its in-window spans,
+/// so a returned row can have no cell), and `totals.spans` sums STORED
+/// rows where the page's per-row numbers are canonical-assembly
+/// figures. Two measurements, never a subset relation.
+#[derive(Debug, Serialize)]
+pub struct OverviewSection {
+    /// The section's own version, independent of the enclosing result's.
+    pub version: u32,
+    /// What the counts count. Always `"traces"` here — render verbatim,
+    /// never hardcode.
+    pub unit: &'static str,
+    /// The AGGREGATE's completeness. Separate from the page's because
+    /// the reasons do not overlap: `overview_ceiling` and
+    /// `rollup_absent` can only come from this pass and only ever
+    /// affect these numbers, while the page's `size_cap` can only come
+    /// from its own assembly — one merged array would name a reason
+    /// without naming the number it hit.
+    pub status: StatusWire,
+    /// The GRID's window, unix seconds: the request's window snapped
+    /// outward to wall-clock bucket multiples. Deliberately not the
+    /// page's `completion_coverage` (the same window widened by
+    /// assembly slack, ≥ 1h per side) — two derivations, two numbers,
+    /// both reported.
+    pub coverage: CoverageWire,
+    /// Which population these numbers cover, relative to the page:
+    /// [`OVERVIEW_SCOPE_WINDOW`] means the page's selections were NOT
+    /// applied. A consumer that captions the totals without reading
+    /// this lies as soon as the filter rail is non-empty.
+    pub scope: &'static str,
+    pub grid: OverviewGridWire,
+    pub totals: OverviewTotals,
+    /// The top-root facet lists over the SAME binned population as the
+    /// grid — present only when the request opted in AND the scope gate
+    /// allowed it (see `overview_facets`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_root_services: Option<FacetListWire>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_root_operations: Option<FacetListWire>,
+}
+
+/// [`OverviewSection::scope`]: the aggregate covers the whole window and
+/// applied NONE of the page's selections. The value a consumer must be
+/// ready for next is `"selection"` — the same window under the same
+/// selections — which needs an engine predicate this pass does not
+/// carry; shipping the flag from day one keeps that a data change
+/// rather than a contract change.
+pub const OVERVIEW_SCOPE_WINDOW: &str = "window";
 
 /// One returned trace summary; ids in W3C lowercase hex.
 #[derive(Debug, Serialize)]
