@@ -178,6 +178,26 @@ If you have the system `protobuf` and `protobuf-compiler` development packages i
 ./netdata-installer.sh --use-system-protobuf
 ```
 
+### Build downloads Rust/Cargo dependencies
+
+A source build can fetch Rust dependencies through Cargo while compiling. You may see output such as `Updating crates.io index` and `Updating git repository` for crates (for example `roaring-rs`), plus a `corrosion` checkout during the `cmake` configure step.
+
+This happens whenever at least one Rust-based plugin is enabled:
+
+- **OpenTelemetry plugin** (`ENABLE_PLUGIN_OTEL`). In a direct `cmake` build this is **enabled by default** on Linux and macOS (it follows Netdata's default feature state), which is the usual reason the downloads appear. The `netdata-installer.sh` wrapper disables it by default (on macOS it is auto-enabled only when a suitable Rust toolchain is found), so a normal installer run does not fetch these dependencies.
+- **NetFlow/IPFIX/sFlow plugin** (`ENABLE_PLUGIN_NETFLOW`), off by default.
+- **Journal file reader** (`ENABLE_NETDATA_JOURNAL_FILE_READER`), off by default but enabled automatically when the systemd-journal plugin is on and your system lacks `libsystemd`, in which case Cargo is required.
+
+To skip the downloads, disable the Rust plugins when configuring CMake:
+
+```sh
+cmake -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off ...
+```
+
+If you build through `netdata-installer.sh`, OpenTelemetry and NetFlow are already off by default; pass `--disable-plugin-otel --disable-plugin-netflow` to make it explicit, or `--enable-plugin-otel` to opt in.
+
+Disabling these plugins means the matching collectors are not built: OpenTelemetry, NetFlow/IPFIX/sFlow, and the fallback journal reader used when `libsystemd` is unavailable.
+
 ### Perform a cleanup in your netdata repo
 
 The Netdata repo consist of the main git tree and it's submodules. Either working on a fork or on the main repo you need to make sure that there
