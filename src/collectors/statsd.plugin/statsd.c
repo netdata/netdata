@@ -1264,6 +1264,9 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
         buffer[STATSD_CONF_LINE_MAX] = '\0';
         line++;
 
+        if(line == 1)
+            remove_utf8_bom(buffer);
+
         s = trim(buffer);
         if (!s || *s == '#') {
             netdata_log_debug(D_STATSD, "STATSD: ignoring line %zu of file '%s', it is empty.", line, filename);
