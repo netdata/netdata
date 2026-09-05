@@ -214,6 +214,10 @@
 - Docs(logs): rewrite the Logs section as the Logs Management operator's manual ([#23687](https://github.com/netdata/netdata/issues/23687))
 - Docs: give the OpenTelemetry landing page a distinct rendered title ([#23755](https://github.com/netdata/netdata/issues/23755))
 - Regenerate integrations docs ([#23746](https://github.com/netdata/netdata/issues/23746))
+- Fix(exporting): preserve OpenTSDB telnet host and prefix characters ([#23749](https://github.com/netdata/netdata/issues/23749))
+- Docs(mcp): add PagerDuty MCP Connection guide ([#23752](https://github.com/netdata/netdata/issues/23752))
+- Chore(skills): add project-go-collector-design and slim the collector entry skill ([#23754](https://github.com/netdata/netdata/issues/23754))
+- CPU charts (windows) ([#23549](https://github.com/netdata/netdata/issues/23549))
 
 ## [2.11.0] - 2026-08-12
 
