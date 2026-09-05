@@ -68,7 +68,7 @@ does the in-app integrations page get its data?".
    `description-authoring.md` owns that contract and the page
    meta-description contract. The content of every other collector
    `metadata.yaml` field is owned by
-   `.agents/skills/project-collector-metadata/SKILL.md`.
+   `.agents/skills/collectors-metadata-yaml/SKILL.md`.
 
 2. **`integrations/*.md` files are GENERATED. DO NOT EDIT.**
    Every per-integration `.md` opens with a
@@ -132,7 +132,7 @@ does the in-app integrations page get its data?".
 |---|---|
 | `pipeline.md` | The 4-stage pipeline graph, every script, every artifact, the CI workflows. |
 | `schema-reference.md` | Per-field reference for JSON Schemas under `integrations/schemas/`, including collector taxonomy schemas. |
-| `description-authoring.md` | The two cross-type description contracts: the catalog sentence (Monitor Anything table) and the generated page meta description. Collector field content is `project-collector-metadata`. |
+| `description-authoring.md` | The two cross-type description contracts: the catalog sentence (Monitor Anything table) and the generated page meta description. Collector field content is `collectors-metadata-yaml`. |
 | `per-type-matrix.md` | One-row-per-integration-type quick lookup: source paths, validator, render keys, output location. |
 | `artifacts-and-banners.md` | Every committed and gitignored artifact; banner conventions; symlink rules. |
 | `ibm-d.md` | The `contexts.yaml` -> `metadata.yaml` chain for ibm.d modules. |
@@ -183,16 +183,16 @@ This skill follows
 
 ## Related skills
 
-- `project-collector-metadata` -- what every collector
+- `collectors-metadata-yaml` -- what every collector
   `metadata.yaml` field says and how it reads (the integration
   page's content, field by field). This skill owns the pipeline
   that renders it; that one owns the words.
-- `project-writing-collectors` -- the broader collector
+- `collectors-authoring` -- the broader collector
   authoring context (NIDL contexts, dashboard shaping, plugin
   landscape). Read FIRST when authoring a brand-new collector;
   read THIS skill when working with the integration metadata
   side.
-- `learn-site-structure` -- how the per-integration `.md` files
+- `docs-learn-site-structure` -- how the per-integration `.md` files
   ultimately get published on `learn.netdata.cloud`. The
   Learn-side mapping is driven by `<repo>/docs/.map/map.yaml`;
   for integration pages, the relevant `<!--startmeta` block

@@ -18,7 +18,7 @@
 #     public wrapper with a sentinel token and asserts the
 #     sentinel never reaches captured stdout.
 #
-# Conventions mirrored from .agents/skills/coverity-audit/scripts/_lib.sh:
+# Conventions mirrored from .agents/skills/triage-coverity/scripts/_lib.sh:
 #   * set -euo pipefail at the top
 #   * color vars defined with $'...' so ESC bytes are real
 #   * <prefix>_repo_root via `git rev-parse --show-toplevel`

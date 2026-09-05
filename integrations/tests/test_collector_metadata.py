@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mechanically checkable content rules for collector metadata.yaml.
 
-The rules themselves live in `.agents/skills/project-collector-metadata/`. Only what a script can decide without
+The rules themselves live in `.agents/skills/collectors-metadata-yaml/`. Only what a script can decide without
 judgment is checked here: claims the page makes by omission, and Markdown that breaks the Learn build.
 """
 
@@ -193,7 +193,7 @@ class ServiceDiscoveryClaimsTest(unittest.TestCase):
             empty - SD_AUTO_DETECTION_BACKLOG, set(),
             'service-discovery covers these collectors but their auto_detection is empty, so the page claims they are '
             'not auto-detected; describe the discoverer and the rule file (see '
-            '.agents/skills/project-collector-metadata/overview.md, section 6)')
+            '.agents/skills/collectors-metadata-yaml/overview.md, section 6)')
         self.assertEqual(
             SD_AUTO_DETECTION_BACKLOG - empty, set(),
             'SD_AUTO_DETECTION_BACKLOG lists a collector whose auto_detection is now filled; remove it')
