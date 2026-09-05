@@ -73,12 +73,15 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     return v;
 }
 
-QUERY_VALUE rrdmetric2value(RRDHOST *host,
-                            struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria, struct rrdmetric_acquired *rma,
-                            time_t after, time_t before,
-                            RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method, const char *time_group_options,
-                            size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
+QUERY_VALUE rrdmetric2value_with_owa(ONEWAYALLOC *owa, RRDHOST *host,
+                                     struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria,
+                                     struct rrdmetric_acquired *rma, time_t after, time_t before,
+                                     RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method,
+                                     const char *time_group_options, size_t tier, time_t timeout,
+                                     QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
+    internal_fatal(!owa, "rrdmetric2value_with_owa(): owa must be non-NULL");
+
     QUERY_TARGET_REQUEST qtr = {
             .version = 1,
             .host = host,
@@ -97,7 +100,6 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .priority = priority,
     };
 
-    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
     QUERY_TARGET *qt = query_target_create(&qtr);
     RRDR *r = rrd2rrdr(owa, qt);
 
@@ -150,7 +152,19 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
 
     rrdr_free(owa, r);
     query_target_release(qt);
-    onewayalloc_destroy(owa);
 
+    return qv;
+}
+
+QUERY_VALUE rrdmetric2value(RRDHOST *host,
+                            struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria,
+                            struct rrdmetric_acquired *rma, time_t after, time_t before,
+                            RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method,
+                            const char *time_group_options, size_t tier, time_t timeout,
+                            QUERY_SOURCE query_source, STORAGE_PRIORITY priority) {
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
+    QUERY_VALUE qv = rrdmetric2value_with_owa(owa, host, rca, ria, rma, after, before, options, time_group_method,
+                                             time_group_options, tier, timeout, query_source, priority);
+    onewayalloc_destroy(owa);
     return qv;
 }

@@ -15,10 +15,15 @@ these data can be freed immediately after the query finishes.
 
 1. The caller calls `ONEWAYALLOC *owa = onewayalloc_create(sizehint)` to create an OWA.
    Internally this allocates the first memory buffer with size >= `sizehint`.
-   If `sizehint` is zero, it will allocate 1 hardware page (usually 4kb).
+   The minimum buffer is 64 KiB, including its header, rounded up to an OS page boundary.
    No need to check for success or failure. As with `mallocz()` in netdata, a `fatal()`
-   will be called if the allocation fails - although this will never fail, since Linux
-   does not really check if there is memory available for `mmap()` calls.
+   will be called if the allocation fails.
+
+   New-page targets double from 64 to 128, 256, 512, and 1024 KiB, then remain at 1024 KiB.
+   These targets include the header; a request can require a larger page. Above 1 MiB,
+   only the aligned payload, aligned header, and OS page padding are allocated. A large
+   request does not make subsequent ordinary pages exceed 1 MiB. The OS page size is
+   typically 4 KiB, but the allocator respects platforms with larger pages.
    
 2. The caller can then perform any number of the following calls to acquire memory:
    - `onewayalloc_mallocz(owa, size)`, similar to `mallocz()`
@@ -26,8 +31,23 @@ these data can be freed immediately after the query finishes.
    - `onewayalloc_strdupz(owa, string)`, similar to `strdupz()`
    - `onewayalloc_memdupz(owa, ptr, size)`, similar to `mallocz()` and then `memcpy()`
    
-3. Once the caller has done all the work with the allocated buffers, all memory allocated 
-   can be freed with `onewayalloc_destroy(owa)`.
+3. Once all allocated buffers are no longer needed, `onewayalloc_reset(owa)` invalidates
+   them and makes every page available for reuse. Reset takes constant time; overflow
+   pages are rewound only when selected for allocation. If the current page cannot fit
+   a request, the allocator searches unused pages and moves only the first fitting page
+   immediately after the current page. Skipped pages remain available for later requests.
+   A new page is allocated only when neither the current page nor an unused page fits.
+   Residual space in earlier pages containing live allocations is not revisited until reset.
+   No pages are freed on reset, and
+   memory is not zeroed. Use `onewayalloc_callocz()` when zero initialization is required.
+
+4. `onewayalloc_destroy(owa)` releases all pages, including unused retained pages.
+   Choose the arena lifetime to bound how long its high-water capacity is retained.
+   An arena must never be shared by concurrently executing workers.
+
+Address-sanitizer builds allocate each buffer separately to detect memory errors.
+In these builds, callers must release each buffer with `onewayalloc_freez()`;
+reset is a no-op and destroy does not release those individual allocations.
 
 ## How faster it is?
 
