@@ -541,6 +541,9 @@ Project skills are memory of HOW to work here.
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
 - Skill updates that close gaps or fix outdated pointers MUST ship in the same PR that exposed the issue.
+- Every change to a skill MUST end with a slimming pass over the touched files: remove restatements, merged-in
+  duplicates, and rules that now live elsewhere, keeping every rule (a removed directive is moved or superseded by a
+  recorded decision, never dropped). Skills accrete bloat with each update; report line counts before and after.
 
 Public skill convention (`docs/netdata-ai/skills/`):
 
