@@ -306,7 +306,7 @@ modules:
       data_collection:
         metrics_description: >
           Collects power capping performance metrics on Linux systems.
-        method_description: 'Parse data from `debugfs` file.'
+        method_description: 'Read Intel RAPL energy counters from the powercap `sysfs` interface under `/sys/devices/virtual/powercap`.'
       supported_platforms:
         include:
           - Linux
