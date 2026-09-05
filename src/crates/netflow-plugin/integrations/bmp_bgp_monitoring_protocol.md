@@ -367,7 +367,11 @@ enrichment:
 
 
 
-### Listener not receiving BMP sessions
+## Troubleshooting
+
+### Other Problems
+
+#### Listener not receiving BMP sessions
 
 The plugin is a passive listener -- it never dials. Check the router side:
 `show bmp` (Cisco), `show bmp connections` / `show bgp monitoring station`
@@ -377,7 +381,7 @@ with `-M bmp` -- without it, every BMP command is silently accepted but
 no connection is ever opened.
 
 
-### Convergence takes minutes after restart
+#### Convergence takes minutes after restart
 
 The trie is not persisted. After a plugin restart, routers re-send
 Initiation followed by their Adj-RIB-In as RouteMonitoring updates. FRR
@@ -387,7 +391,7 @@ take minutes. Juniper varies between seconds and minutes depending on
 station options. Schedule restarts off-peak when BGP attribution matters.
 
 
-### Memory growth without bound
+#### Memory growth without bound
 
 A full BGP feed adds ~1.2M prefixes per peer permanently -- there is no
 time-based eviction in the trie. Routes are removed only by explicit BGP
@@ -395,7 +399,7 @@ withdrawal, PeerDown, or session disconnect followed by the `keep`
 interval. Plan capacity before connecting full-table peers.
 
 
-### AS path inconsistent with the exporter's view
+#### AS path inconsistent with the exporter's view
 
 The exporter and the BMP-feeding router are usually different boxes with
 different routing tables. Different vantage points see different AS paths;
@@ -403,7 +407,7 @@ this is normal. The `routing` provider in the `asn_providers` chain decides
 which source wins (default order is `flow, routing, geoip` -- exporter first).
 
 
-### Empty BGP enrichment after enabling
+#### Empty BGP enrichment after enabling
 
 Confirm the router actually established the BMP session (vendor-side `show`
 command above). Confirm `enrichment.asn_providers` includes `routing` (or
@@ -411,7 +415,7 @@ the `bmp` alias) -- if `routing` is removed from both `asn_providers` and
 `net_providers`, the trie is built but never read.
 
 
-### Validate BGP enrichment after enabling
+#### Validate BGP enrichment after enabling
 
 BGP-derived enrichment depends on router export policy, peer state, and
 route visibility. Validate against your specific router firmware before

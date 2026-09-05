@@ -166,20 +166,24 @@ enrichment:
 
 
 
-### IPv6 country fields are empty
+## Troubleshooting
+
+### Other Problems
+
+#### IPv6 country fields are empty
 
 The current built-in IPDeny downloader source uses the IPv4
 `all-zones.tar.gz` archive. Use DB-IP, MaxMind, IP2Location, or a custom
 MMDB if IPv6 country enrichment is required.
 
 
-### ASN fields are empty
+#### ASN fields are empty
 
 IPDeny zone files carry country CIDRs only. Configure a separate ASN
 provider in the downloader.
 
 
-### Download blocked or rate-limited
+#### Download blocked or rate-limited
 
 Check IPDeny's usage limits and retry later. The plugin continues using the
 last generated MMDB file until the downloader publishes a replacement.

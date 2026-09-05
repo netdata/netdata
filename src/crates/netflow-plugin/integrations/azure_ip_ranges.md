@@ -280,7 +280,11 @@ enrichment:
 
 
 
-### 404 a week after deploy
+## Troubleshooting
+
+### Other Problems
+
+#### 404 a week after deploy
 
 You configured `url` against `ServiceTags_Public_<date>.json` directly.
 Microsoft rotates the date stamp weekly, so the URL stops resolving
@@ -290,7 +294,7 @@ each cycle, or to the Service Tag Discovery REST API
 fed into a static file.
 
 
-### Empty results from the transform
+#### Empty results from the transform
 
 The Service Tags JSON is nested two levels deep
 (`values[].properties.addressPrefixes[]`). If the jq doesn't unwrap
@@ -299,7 +303,7 @@ it errored. Test the jq locally with `jq < azure-service-tags.json` and
 confirm at least one `{prefix, tenant, ...}` object comes out.
 
 
-### Service Tag API data lags the JSON file
+#### Service Tag API data lags the JSON file
 
 Per Microsoft's note on the Service Tags overview page, "It takes up to
 four weeks for new Service Tag data to propagate in the API results
@@ -309,7 +313,7 @@ not the other way around. For prefix tagging this rarely matters; for
 firewall rules it can.
 
 
-### TLS verification cannot be disabled
+#### TLS verification cannot be disabled
 
 `tls.skip_verify: true` is rejected by validation. Use `tls.ca_file`
 for custom-CA paths (e.g., on an internal mirror with a private CA).

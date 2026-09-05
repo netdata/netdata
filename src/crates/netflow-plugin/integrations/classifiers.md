@@ -339,7 +339,11 @@ enrichment:
 
 
 
-### Plugin fails to start with a parser error
+## Troubleshooting
+
+### Other Problems
+
+#### Plugin fails to start with a parser error
 
 A rule failed to parse. The journal log includes the index in the list
 and a parser context (`unsupported rule term`, `unsupported value
@@ -350,7 +354,7 @@ single quotes (only JSON-style double quotes are accepted); regex literals
 that fail to compile.
 
 
-### Classifier rules never run for an exporter or interface
+#### Classifier rules never run for an exporter or interface
 
 Likely cause: `metadata_static` already set **any** classification field
 on that target. By design, the matching list is suppressed entirely when
@@ -358,7 +362,7 @@ the classification is non-empty. Either remove the static-metadata entry for tha
 keep static-metadata as the sole source for it.
 
 
-### A value appears differently in the dashboard than in the rule
+#### A value appears differently in the dashboard than in the rule
 
 `Classify*` actions normalise output to `[a-z0-9.+-]` only -- so
 `ClassifyRegion("EU West")` lands as `euwest`, and
@@ -367,7 +371,7 @@ keep static-metadata as the sole source for it.
 verbatim.
 
 
-### First rule always wins, later rules never fire for the same slot
+#### First rule always wins, later rules never fire for the same slot
 
 First-write-wins is by design and per slot. Order your
 rules from most-specific to least-specific. If you want a tiered
@@ -375,7 +379,7 @@ fallback, use distinct slots (e.g. `Classify` for the broad group and
 `ClassifyRole` for the tier within that group).
 
 
-### A working rule stops matching some time after startup
+#### A working rule stops matching some time after startup
 
 Cached results expire after `classifier_cache_duration` (default 5
 minutes, last-access). When you change rules, restart the plugin so the
@@ -383,7 +387,7 @@ caches clear immediately -- otherwise stale cached classifications keep
 returning until they idle out.
 
 
-### A rule with `>` or `<` aborts the rule list
+#### A rule with `>` or `<` aborts the rule list
 
 Comparing a string-typed identifier with `>` / `<` / `>=` / `<=` raises
 a runtime error, and the loop breaks out for that record. Subsequent rules in
@@ -393,7 +397,7 @@ for `Interface.Index`, `Interface.Speed`, and `Interface.VLAN` (the
 numeric identifiers).
 
 
-### ClassifyExternal fires only on one side
+#### ClassifyExternal fires only on one side
 
 Interface classifiers run twice per flow record -- once for the input
 interface, once for the output. Both invocations see the same rule list. If your rule conditions on
@@ -404,7 +408,7 @@ rule firing on the output side of a flow only sets the output side's
 boundary, and vice versa.
 
 
-### Interface fields are empty in the rule even though SNMP is configured
+#### Interface fields are empty in the rule even though SNMP is configured
 
 The plugin does not poll SNMP -- `Interface.Name`, `Description`, and
 `Speed` come exclusively from `enrichment.metadata_static.exporters.<ip>.interfaces.<index>`.
@@ -414,7 +418,7 @@ resolve to empty strings / zero, and any rule that conditions on them
 never matches.
 
 
-### Referencing Interface.* in an exporter rule silently does nothing
+#### Referencing Interface.* in an exporter rule silently does nothing
 
 Field resolution does not error when the wrong context is missing -- it
 returns the type's zero value. So `Interface.Speed >= 1` written in an `exporter_classifiers` rule

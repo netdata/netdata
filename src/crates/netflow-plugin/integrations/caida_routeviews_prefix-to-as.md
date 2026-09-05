@@ -168,20 +168,24 @@ enrichment:
 
 
 
-### AS names are empty
+## Troubleshooting
+
+### Other Problems
+
+#### AS names are empty
 
 CAIDA Prefix-to-AS contains AS numbers, not organization names. Layer a
 provider with AS organization data, such as MaxMind GeoLite2 ASN or DB-IP
 ASN Lite, after the CAIDA MMDB in `asn_database` if AS names matter.
 
 
-### Country fields are empty
+#### Country fields are empty
 
 This source is ASN-only. Configure a `--geo` provider in the downloader or
 point `enrichment.geoip.geo_database` at a separate geo MMDB.
 
 
-### Multi-origin AS simplification
+#### Multi-origin AS simplification
 
 CAIDA can represent multi-origin prefixes. The downloader uses the first
 listed AS for the generated single-value MMDB record. If you need full MOAS

@@ -199,7 +199,11 @@ enrichment:
 
 
 
-### Lookups silently return empty
+## Troubleshooting
+
+### Other Problems
+
+#### Lookups silently return empty
 
 The custom file's schema is non-standard (for example, the ASN is encoded
 as a string instead of `autonomous_system_number: uint32`, or the country
@@ -209,14 +213,14 @@ field names listed in the data-collection description. Validate with
 standard fields are present at the expected paths.
 
 
-### Plugin fails to start with optional=false
+#### Plugin fails to start with optional=false
 
 File missing, unreadable, or not a valid MMDB at the configured path.
 Check permissions (the netdata user must be able to read the file) and
 re-validate with `mmdblookup`. Set `optional: true` while iterating.
 
 
-### Custom file refresh did not take effect
+#### Custom file refresh did not take effect
 
 The plugin reloads custom databases the same way it reloads stock ones
 (signature-driven, in place). If the file was rewritten in place the

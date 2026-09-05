@@ -279,7 +279,9 @@ In the Netdata UI go to `Collectors -> go.d -> <module>` for the module your lis
 
 ## Troubleshooting
 
-### A locally-running service is not picked up
+### Other Problems
+
+#### A locally-running service is not picked up
 
 Check, in order:
 
@@ -289,11 +291,11 @@ Check, in order:
 - Is the process name truncated past 15 chars? `.Comm` is kernel-truncated; use `.Cmdline` instead.
 
 
-### Wrong module picked
+#### Wrong module picked
 
 The stock `exporter` catch-all rule (last in the file) is greedy by design — anything on a known Prometheus port gets the `prometheus` module. Add a more specific rule above it if you want a different module to win.
 
 
-### Generated jobs fail to start
+#### Generated jobs fail to start
 
 The discoverer creates jobs but does not run them. Common causes: the rendered template assumes credentials the local service rejects (e.g. RabbitMQ default `guest:guest`); a rule renders the wrong port or protocol; or the service has TLS but the template uses HTTP.

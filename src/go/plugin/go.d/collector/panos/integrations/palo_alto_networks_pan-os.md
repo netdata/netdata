@@ -425,7 +425,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -457,14 +459,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m panos -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `panos` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -472,7 +474,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep panos
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -482,7 +484,7 @@ grep panos /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -490,30 +492,32 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep panos
 ```
 
-### No BGP charts are created
+### Other Problems
+
+#### No BGP charts are created
 
 Verify that BGP is configured and that the account can run PAN-OS XML API operational requests.
 The collector logs when no legacy or Advanced Routing Engine BGP peer command returns peers.
 Advanced Routing Engine peers are parsed from the JSON payload embedded in the XML API result.
 
 
-### Panorama proxy collection is unsupported
+#### Panorama proxy collection is unsupported
 
 Configure one job per firewall management interface. This collector does not support using Panorama as a target proxy for managed firewalls in v1.
 
 
-### A metricset fails but other charts work
+#### A metricset fails but other charts work
 
 The collector keeps successful metricsets running and logs the failing metricset name and XML command context.
 
 
-### PAN-OS accepted a command but no telemetry appears
+#### PAN-OS accepted a command but no telemetry appears
 
 A "success response has no recognized telemetry payload" error means PAN-OS accepted the operational command, but the XML result did not contain the expected section for that metricset.
 Verify the account permissions and platform support for the metricset, or provide a sanitized XML sample so the parser can be updated.
 
 
-### A PAN-OS value cannot be parsed
+#### A PAN-OS value cannot be parsed
 
 The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
 It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.

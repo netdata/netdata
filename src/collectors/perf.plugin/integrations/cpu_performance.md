@@ -194,7 +194,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Other Problems
+
+#### Debug Mode
 
 You can run `perf.plugin` with the debug option enabled to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
 

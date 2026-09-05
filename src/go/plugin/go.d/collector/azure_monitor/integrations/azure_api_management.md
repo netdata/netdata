@@ -175,32 +175,32 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). Must be at least 60. | 60 | no |
-|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-|  | subscription_ids | List of Azure subscription IDs to monitor. Used as the scope for resource discovery. |  | yes |
+| **Collection** | update_every | Data collection interval, in seconds. Must be at least 60. | 60 | no |
+|  | autodetection_retry | How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries. | 0 | no |
+|  | subscription_ids | Azure subscription IDs to monitor. They scope resource discovery. |  | yes |
 |  | cloud | Azure cloud environment: `public`, `government`, or `china`. | public | no |
-|  | [query_offset](#option-collection-query-offset) | Minimum offset (seconds) subtracted from metric query windows. Increase if metrics appear incomplete. | 180 | no |
+|  | [query_offset](#option-collection-query-offset) | Minimum offset subtracted from metric query windows, in seconds. Increase it if metrics appear incomplete. | 180 | no |
 |  | timeout | Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds. | 30 | no |
-| **Authentication** | [auth.mode](#option-authentication-auth-mode) | Authentication method: `service_principal`, `managed_identity`, or `default`. |  | yes |
-|  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
-|  | auth.mode_service_principal.client_id | Entra ID application (client) ID (required for `service_principal` mode). |  | no |
-|  | auth.mode_service_principal.client_secret | Entra ID client secret (required for `service_principal` mode). |  | no |
-|  | auth.mode_managed_identity.client_id | Client ID for user-assigned managed identity. Leave empty for system-assigned. |  | no |
-| **Discovery** | discovery.refresh_every | Interval (seconds) for refreshing discovered resources. Set `0` to disable runtime re-discovery after bootstrap. | 300 | no |
-|  | [discovery.mode](#option-discovery-discovery-mode) | Resource discovery method: `filters` (structured filters) or `query` (custom KQL). | filters | no |
-|  | discovery.mode_filters.resource_groups | Optional list of Azure resource groups to include in `filters` mode. | [] | no |
-|  | discovery.mode_filters.regions | Optional list of Azure regions to include in `filters` mode. | [] | no |
-|  | discovery.mode_filters.tags | Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively. | {} | no |
-|  | [discovery.mode_query.kql](#option-discovery-discovery-mode-query-kql) | Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`; project `tags` too when using `virtual_nodes.by_resource_tag`. |  | no |
-| **Profiles** | [profiles.mode](#option-profiles-profiles-mode) | How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both). | auto | no |
-|  | [profiles.mode_auto.entries](#option-profiles-profiles-mode-auto-entries) | Optional per-profile overrides applied only to profiles that auto-activate at bootstrap. | [] | no |
+| **Authentication** | [auth.mode](#option-authentication-auth-mode) | How Netdata authenticates to Azure: `service_principal`, `managed_identity`, or `default`. |  | yes |
+|  | auth.mode_service_principal.tenant_id | Entra ID tenant ID. Required for `service_principal` mode. |  | no |
+|  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
+|  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
+|  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
+| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+|  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
+|  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
+|  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
+|  | discovery.mode_filters.tags | Exact-match tag filters. Keys match case-insensitively, values case-sensitively. | {} | no |
+|  | [discovery.mode_query.kql](#option-discovery-discovery-mode-query-kql) | Azure Resource Graph query selecting the resources. It must project `id`, `name`, `type`, `resourceGroup`, and `location`, plus `tags` for tag-based virtual nodes. |  | no |
+| **Profiles** | [profiles.mode](#option-profiles-profiles-mode) | How profiles are selected: `auto` (from discovered resources), `exact` (explicit list), or `combined` (both). | auto | no |
+|  | [profiles.mode_auto.entries](#option-profiles-profiles-mode-auto-entries) | Per-profile overrides applied only to profiles that activate automatically at startup. | [] | no |
 |  | [profiles.mode_exact.entries](#option-profiles-profiles-mode-exact-entries) | Explicit profile entries used by `exact` mode. | [] | no |
 |  | [profiles.mode_combined.entries](#option-profiles-profiles-mode-combined-entries) | Explicit profile entries merged with auto-discovered profiles in `combined` mode. | [] | no |
-| **Limits** | limits.max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
+| **Limits** | limits.max_concurrency | Maximum concurrent batch requests to Azure Monitor. | 4 | no |
 |  | limits.max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
-|  | limits.max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Virtual Node** | [vnode](#option-virtual-node-vnode) | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
-|  | [virtual_nodes.by_resource_tag](#option-virtual-node-virtual-nodes-by-resource-tag) | Creates workload virtual nodes from an Azure resource tag value. |  | no |
+|  | limits.max_metrics_per_query | Maximum metric names per Azure Monitor batch request. | 20 | no |
+| **Virtual Node** | [vnode](#option-virtual-node-vnode) | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+|  | [virtual_nodes.by_resource_tag](#option-virtual-node-virtual-nodes-by-resource-tag) | Azure resource tag whose value becomes the virtual node for the resources carrying it. Leave empty to keep everything on this host. |  | no |
 
 <a id="option-collection-query-offset"></a>
 ##### query_offset
@@ -691,7 +691,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -723,14 +725,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m azure_monitor -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `azure_monitor` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -738,7 +740,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep azure_monitor
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -748,7 +750,7 @@ grep azure_monitor /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -756,7 +758,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep azure_monitor
 ```
 
-### No metrics are collected
+### Other Problems
+
+#### No metrics are collected
 
 Check the following:
 
@@ -772,7 +776,7 @@ Check the following:
   ```
 
 
-### Missing metrics for some resource types
+#### Missing metrics for some resource types
 
 Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
 
@@ -785,7 +789,7 @@ Profiles are matched by Azure resource type. If a resource type exists but metri
 - **New resource types after startup** -- Runtime discovery does not activate new profiles. Restart the collector if new resource types were added after bootstrap.
 
 
-### Charts have gaps or incomplete data
+#### Charts have gaps or incomplete data
 
 Azure Monitor metrics have a built-in reporting delay of **1-3 minutes**.
 
@@ -794,7 +798,7 @@ Azure Monitor metrics have a built-in reporting delay of **1-3 minutes**.
 - If metrics are still missing or incomplete, increase `query_offset` to **240** or **300** seconds.
 
 
-### Workload virtual nodes are not created
+#### Workload virtual nodes are not created
 
 When `virtual_nodes.by_resource_tag` is set, check the discovered resource tags:
 
@@ -805,12 +809,12 @@ When `virtual_nodes.by_resource_tag` is set, check the discovered resource tags:
 - Azure Monitor namespaces workload GUID input with `azure_monitor:` to avoid accidental collisions with other collectors that derive virtual node GUIDs from hostnames.
 
 
-### More alerts appear after enabling workload virtual nodes
+#### More alerts appear after enabling workload virtual nodes
 
 Workload virtual nodes multiply the host scope of Azure Monitor charts. Health alerts attached to those charts evaluate per workload virtual node, so alert volume can increase with the number of distinct workload tag values.
 
 
-### Authentication errors in sovereign clouds
+#### Authentication errors in sovereign clouds
 
 For Azure Government or Azure China clouds, set the `cloud` parameter:
 

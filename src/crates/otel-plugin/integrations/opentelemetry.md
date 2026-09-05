@@ -279,26 +279,28 @@ Metrics are created dynamically from supported OpenTelemetry data. The exact cha
 
 ## Troubleshooting
 
-### The plugin does not start
+### Other Problems
+
+#### The plugin does not start
 
 Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
 
 
-### The endpoint is reachable but no data appears
+#### The endpoint is reachable but no data appears
 
 A successful TCP connection proves only that something is listening. Confirm that the sender uses OTLP/gRPC on port `4317`; OTLP/HTTP on port `4318` is unsupported. With the default endpoint, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart or log entry.
 
 
-### A metric does not create the expected chart
+#### A metric does not create the expected chart
 
 Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
 
 
-### Some exported logs are missing
+#### Some exported logs are missing
 
 By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. It reports rejected records through OTLP `partial_success`; whether this is visible depends on the sender or exporter. Check the sender's clock, backfill age, sender logs, and Netdata Agent journal.
 
 
-### Logs from the former experimental plugin are not visible
+#### Logs from the former experimental plugin are not visible
 
 A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.

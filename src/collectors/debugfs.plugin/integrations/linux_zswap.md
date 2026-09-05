@@ -25,7 +25,7 @@ Module: /sys/kernel/debug/zswap
 Collects zswap performance metrics on Linux systems.
 
 
-Parse data from `debugfs file.
+Parse data from `debugfs` file.
 
 This collector is only supported on the following platforms:
 

@@ -265,7 +265,11 @@ enrichment:
 
 
 
-### cloud.json vs goog.json -- pick the right one
+## Troubleshooting
+
+### Other Problems
+
+#### cloud.json vs goog.json -- pick the right one
 
 `cloud.json` is the Google Cloud Platform list (Compute Engine, GKE,
 Cloud Run, Cloud SQL, BigQuery, GCS, etc.) and carries `service` plus
@@ -277,7 +281,7 @@ Google" attribution but no per-region or per-service breakdown. Most
 operators want `cloud.json`; some configure both as separate sources.
 
 
-### No per-service breakdown from cloud.json
+#### No per-service breakdown from cloud.json
 
 Today every entry in `cloud.json` reports `service: "Google Cloud"` --
 the file does not split prefixes by individual GCP service (Compute
@@ -286,7 +290,7 @@ you can actually pivot on. Per-service attribution requires a different
 data source.
 
 
-### Empty result from the transform is treated as failure
+#### Empty result from the transform is treated as failure
 
 If the jq expression yields zero objects (for example, an over-narrow
 `select()` that no entry passes), the source backs off as if the fetch
@@ -294,7 +298,7 @@ had errored. Check the journal for `network-sources` warnings and verify
 your filter against a saved copy of `cloud.json`.
 
 
-### TLS verification cannot be disabled
+#### TLS verification cannot be disabled
 
 `tls.skip_verify: true` (and `tls.verify: false`) are rejected by
 validation. `gstatic.com` is publicly trusted so this is rarely an issue
@@ -302,7 +306,7 @@ for GCP; if you front the URL through an internal proxy with a private
 CA, supply it via `tls.ca_file`.
 
 
-### Update cadence is not contractual
+#### Update cadence is not contractual
 
 Google states the lists are "published and updated frequently" but does
 not guarantee a fixed cadence. The `syncToken` and `creationTime` keys

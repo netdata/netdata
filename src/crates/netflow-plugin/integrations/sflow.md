@@ -129,7 +129,11 @@ protocols:
 ```
 
 
-### Verifying sFlow is arriving and diagnosing failures
+## Troubleshooting
+
+### Other Problems
+
+#### Verifying sFlow is arriving and diagnosing failures
 
 See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
 the full diagnostic recipe. sFlow-specific gotchas: Netdata creates Network Flow rows
