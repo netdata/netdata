@@ -10,8 +10,10 @@ void onewayalloc_destroy(ONEWAYALLOC *owa);
 
 // Reset invalidates all allocations and retains every page for reuse.
 // The allocation cursor is rewound in O(1); retained overflow pages are
-// rewound lazily as needed. Capacity is released only by destroy, so the
-// caller owns the lifetime of the arena's high-water footprint.
+// rewound lazily as needed. Only a fitting unused page is moved after
+// the current page; skipped pages remain available to later allocations.
+// Capacity is released only by destroy, so the caller owns the lifetime
+// of the arena's high-water footprint.
 //
 // Important: reset does NOT zero retained pages. Subsequent
 // onewayalloc_mallocz() calls may return memory that still holds bytes
