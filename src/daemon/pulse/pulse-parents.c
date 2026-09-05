@@ -390,9 +390,23 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
     // re-apply labels + hops only when the host's labels changed (reconnect / mid-stream push), via a
     // cheap version compare - so we don't re-copy every child's labels on every pass. hops can change
     // when a child re-attaches via a different parent in a cluster; that reconnect bumps the version.
+    //
+    // This used to be OR'd with a per-chart rrdlabels_exist(st->rrdlabels, "machine_guid") probe, on
+    // every chart on every pass. That probe is O(number of labels) - the labels JudyL is keyed by
+    // the interned RRDLABEL pointer, so it walks the whole array - and it interns and frees the key
+    // string on each call. On a parent with many children it was ~23% of this thread. The version
+    // compare already covers every case we cause ourselves; labels_applied covers the one it cannot,
+    // a host whose label version is 0 because it has no labels at all.
+    //
+    // What the probe also did, and this does not: heal the identity labels if something else strips
+    // them. A plugin scoping CLABEL/CLABEL_COMMIT to one of these chart ids removes every label it
+    // did not redeclare (src/plugins.d/pluginsd_parser.c); those charts now keep the stripped set
+    // until the child's label version changes.
     uint32_t lv = rrdlabels_version(host->rrdlabels);
-    bool refresh_labels = (lv != host->stream.rcv.status.labels_applied_version);
+    bool refresh_labels = (lv != host->stream.rcv.status.labels_applied_version ||
+                           !host->stream.rcv.status.labels_applied);
     host->stream.rcv.status.labels_applied_version = lv;
+    host->stream.rcv.status.labels_applied = true;
 
     // --- traffic ---
     snprintfz(id, sizeof(id), "streaming.in.traffic.%s", guid);
@@ -400,7 +414,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.traffic",
         "Inbound Streaming Traffic", "bytes/s", "netdata", "pulse",
         130160, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-    if(unlikely(refresh_labels || !rrdlabels_exist(st_traffic->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_traffic, host);
     rrddim_set_by_pointer(st_traffic, pulse_child_dim(st_traffic, "in", 1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)single_writer_atomic_read(&host->stream.rcv.status.bytes_in));
@@ -422,7 +436,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.state",
         "Inbound Streaming State", "state", "netdata", "pulse",
         130161, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-    if(unlikely(refresh_labels || !rrdlabels_exist(st_state->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_state, host);
     for(size_t i = 0; i < PULSE_INBOUND_MAX ; i++) {
         if(!state_dim[i]) continue;
@@ -437,7 +451,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.reconnects",
         "Inbound Streaming Reconnects", "connects/s", "netdata", "pulse",
         130162, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-    if(unlikely(refresh_labels || !rrdlabels_exist(st_reconnects->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_reconnects, host);
     rrddim_set_by_pointer(st_reconnects, pulse_child_dim(st_reconnects, "connections", 1, RRD_ALGORITHM_INCREMENTAL),
         (collected_number)__atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED));
@@ -449,7 +463,7 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
         "netdata", id, NULL, "Streaming", "netdata.streaming.in.age",
         "Inbound Streaming State Age", "seconds", "netdata", "pulse",
         130163, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-    if(unlikely(refresh_labels || !rrdlabels_exist(st_age->rrdlabels, "machine_guid")))
+    if(unlikely(refresh_labels))
         pulse_child_chart_labels(st_age, host);
     time_t changed = __atomic_load_n(&host->stream.rcv.status.state_changed_s, __ATOMIC_RELAXED);
     time_t now_s = now_realtime_sec();
