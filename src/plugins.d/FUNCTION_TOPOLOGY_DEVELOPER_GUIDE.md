@@ -132,6 +132,61 @@ may advertise `accepted_params`, `required_params`, and help text without a
 `data` object. Validate only full topology responses against
 `FUNCTION_TOPOLOGY_SCHEMA.json`.
 
+## Notifications
+
+Status: implemented in the Agent JSON Schema, Go payload model, and validation.
+CTS merging and frontend presentation require corresponding consumer support;
+schema support alone does not enable notification emission or display.
+
+Optional `data.notifications` carries user-facing information about the returned
+topology. The same contract applies to every topology Function, whether its
+response comes directly from an Agent or through a Cloud aggregator.
+
+Each array entry is a closed object:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `severity` | Yes | `info`, `warning`, or `error`. |
+| `code` | Yes | Stable machine-readable code using the topology identifier grammar. |
+| `message` | Yes | Non-empty plain-text explanation for the user. |
+| `origin` | No | Full `producer` object identifying who emitted the notification; omission means the enclosing `data.producer`. |
+| `affected_node_id` | No | Agent node identifier that the issue concerns, using the same string representation as `producer.node_id`. |
+
+- `info` supplies relevant context without declaring a problem. `warning`
+  explains a limitation or uncertainty. `error` reports a failure affecting the
+  returned topology while a usable graph is still available.
+- Notifications do not change Function status or graph facts. A topology
+  response containing an `error` notification still has `status: 200`.
+  A fatal request failure continues to use the normal Function error response,
+  not a successful topology envelope without usable data.
+- Omit `notifications` or use `[]` when there is nothing to report. Explicit
+  `null` is invalid. Absence of notifications is not proof that no undetectable
+  issues exist. Notifications describe this response, not a persistent alert
+  history; consumers must clear previous notifications when a response omits them.
+- `origin` follows the existing producer schema, including required `source`
+  and `instance`. Before an aggregator replaces `data.producer`, it must make
+  inherited notification origins explicit using the input producer. Preserve
+  an already explicit origin. Do not invent producer identities for unavailable
+  sources or replace Agent origins with the aggregator identity.
+- The emitter and affected Agent are different concepts. For example, CTS can
+  report a source collection failure: its own producer is the origin, and
+  `affected_node_id` identifies the failed source Agent. Omit the affected-node
+  field when the issue is not about one known Agent.
+- Aggregators must preserve source notifications and add their own through the
+  same contract. Keep distinct source reports; do not use message text as a
+  merge key. The schema defines no occurrence count or automatic coalescing rule.
+- Treat messages as untrusted text. Do not interpret them as HTML, Markdown,
+  commands, or diagnostic instructions. Producers must not include credentials
+  or other secret values in notifications.
+- Go producers use `Data.Notifications` in `src/go/pkg/topology/v1`. C producers
+  use the same JSON contract. No general Function envelope extension is needed.
+
+CTS must accept and preserve the field before Agents begin emitting it to CTS
+deployments with strict JSON decoding. Existing payloads without notifications
+remain valid; a schema-version change is not required. The frontend notification
+renderer must work for all topology types and delivery paths, with an in-map
+indicator and a popover explaining the reported information and issues.
+
 ## Mode Requests
 
 Use the request parameter `__topology_mode` when a topology producer has a real

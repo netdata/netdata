@@ -50,6 +50,13 @@ developer-facing and must stay in this project skill, not under
 - Keep display composition in type-level and graph-level presentation metadata,
   not in high-cardinality rows.
 - Keep raw sensitive payload captures under `.local/` only.
+- Use optional `data.notifications` for topology information and issues, with `info`, `warning`, or `error`
+  severity, a stable code, and plain-text message. Do not invent Function-envelope or producer-specific channels.
+- Preserve notification origin separately from `affected_node_id`. An omitted origin inherits `data.producer`;
+  aggregators must make it explicit before changing the payload producer. Follow the canonical guide's
+  Notifications section and test schema/semantic parity, omission, and malformed entries.
+- Schema support does not enable emission or UI display. Verify CTS acceptance before enabling Agent notifications;
+  strict CTS decoders without the field reject otherwise valid topology responses.
 - The `topology:network-connections` producer also runs on Windows
   (`network-viewer.plugin/network-viewer-windows.c` registers the Function; the
   shared v1 renderer lives in `network-viewer-topology.c`). Windows payloads

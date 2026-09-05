@@ -47,6 +47,28 @@ Likely files:
 - `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`
 - `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`
 
+### Shared Topology Notifications
+
+- Implemented Agent support: optional `data.notifications` in the canonical
+  JSON Schema, topology/v1 Go types, and semantic validation. The contract uses
+  `info`, `warning`, and `error` severities, stable codes, plain-text messages,
+  optional producer origin, and optional affected Agent node identifier.
+- Producer emission is separate from schema support. Existing producers may
+  omit notifications without changing their graph or Function behavior.
+- Required CTS support: accept the field, preserve source notifications, make
+  inherited origins explicit before replacing the payload producer, and add
+  CTS notifications through the same contract. Notification severity does not
+  replace collection completeness or fatal request-error handling.
+- Required frontend support: preserve notifications during normalization and
+  display them through one topology-wide map indicator and explanatory popover,
+  independently of topology kind or direct Agent/CTS delivery. A response with
+  no notifications clears those from the previous response.
+- Compatibility gate: CTS with strict JSON decoding must gain support before
+  Agents emit notifications. This Agent schema support does not establish CTS
+  or frontend implementation or qualification.
+- Canonical field definitions and origin semantics are in
+  [Notifications](FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#notifications).
+
 ### Shared Encoding Helpers
 
 The schema uses compact columnar tables. Producers should not hand-roll table
