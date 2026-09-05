@@ -387,21 +387,34 @@ static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) 
     char id[RRD_ID_LENGTH_MAX + 1];
     const char *guid = host->machine_guid;
 
-    // re-apply labels + hops only when the host's labels changed (reconnect / mid-stream push), via a
-    // cheap version compare - so we don't re-copy every child's labels on every pass. hops can change
-    // when a child re-attaches via a different parent in a cluster; that reconnect bumps the version.
+    // re-apply labels + hops only when the host's label version changes, so we don't re-copy every
+    // child's labels on every pass. labels_applied covers the case the version compare cannot: a
+    // host whose version is 0 because it has no labels at all, which would otherwise never be
+    // labelled. A host is callocz'd, so a re-created host relabels on its first pass.
     //
-    // This used to be OR'd with a per-chart rrdlabels_exist(st->rrdlabels, "machine_guid") probe, on
-    // every chart on every pass. That probe is O(number of labels) - the labels JudyL is keyed by
-    // the interned RRDLABEL pointer, so it walks the whole array - and it interns and frees the key
-    // string on each call. On a parent with many children it was ~23% of this thread. The version
-    // compare already covers every case we cause ourselves; labels_applied covers the one it cannot,
-    // a host whose label version is 0 because it has no labels at all.
+    // This used to be OR'd with a per-chart rrdlabels_exist(st->rrdlabels, "machine_guid") probe on
+    // every chart on every pass - 4 per child per second, 22.9% of this thread in a perf profile of
+    // an 808-child parent. The probe is not just a lookup: rrdlabels_exist() interns the key to get
+    // a STRING pointer to compare against, then linearly scans the label set (rrdlabels.c) - and the
+    // scan takes the per-RRDLABELS spinlock, which health also takes on these same charts. Dropping
+    // it took this thread from 478 to 64 ms/s on that parent, far more than its own 22.9%, because
+    // most of what it cost was contention rather than work.
     //
-    // What the probe also did, and this does not: heal the identity labels if something else strips
+    // Two things the version compare does NOT detect, both pre-existing and neither introduced here:
+    //  - Label VALUE changes on a streamed child. rrdlabels_migrate_to_these() assigns the source
+    //    version to the destination instead of incrementing (rrdlabels.c), and OVERWRITE builds that
+    //    source fresh every time (pluginsd_parser.c), so the version a child produces is really its
+    //    label COUNT. Same count with different values reads as unchanged.
+    //  - hops. It comes from host->system_info (rrdhost_ingestion_hops()), which reconnect replaces
+    //    without touching rrdlabels, so a child re-attaching at a different depth keeps its old hops
+    //    here until its label count happens to change.
+    //
+    // And what the probe did that this does not: heal the identity labels if something else strips
     // them. A plugin scoping CLABEL/CLABEL_COMMIT to one of these chart ids removes every label it
-    // did not redeclare (src/plugins.d/pluginsd_parser.c); those charts now keep the stripped set
-    // until the child's label version changes.
+    // did not redeclare (pluginsd_parser.c); such a chart keeps the stripped set - and drops out of
+    // any label-matched health template - until the child's label count changes, which for a child
+    // with a static label set is never: a reconnect re-sends the same count and so reads as no
+    // change. Nothing in-tree targets these chart ids, so this needs a third party to trigger it.
     uint32_t lv = rrdlabels_version(host->rrdlabels);
     bool refresh_labels = (lv != host->stream.rcv.status.labels_applied_version ||
                            !host->stream.rcv.status.labels_applied);
