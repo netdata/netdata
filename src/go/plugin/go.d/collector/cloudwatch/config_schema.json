@@ -657,7 +657,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for each AWS API operation, in seconds. Discovery shares one timeout across a whole refresh.",
+        "description": "Timeout in seconds for AWS API calls; a whole discovery refresh and a whole resource-tag lookup each share one timeout.",
         "type": "number",
         "minimum": 0,
         "default": 30
@@ -677,7 +677,7 @@
       "ui:help": "How often to retry a failed job check. Set to `0` to disable retries."
     },
     "timeout": {
-      "ui:help": "AWS operation timeout. Identity, resource-tag, and query operations use it for their operation scope; discovery shares one timeout across its whole refresh stage. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+      "ui:help": "A whole discovery refresh and a whole resource-tag lookup each run under one timeout; each STS identity call and each GetMetricData request has its own. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
     },
     "credentials": {
       "ui:listFlavour": "list",

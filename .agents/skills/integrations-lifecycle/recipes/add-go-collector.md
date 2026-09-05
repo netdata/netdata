@@ -140,13 +140,12 @@ modules:
                 - name: <dim>
 ```
 
-The first sentence of `metrics_description` is also used as the
-description in generated catalog-style pages such as
-`src/collectors/COLLECTORS.md`. It SHOULD stay product-facing and stable:
-start with an action phrase, describe the integration, and MUST NOT
-describe configuration variables, defaults, limits, or setup steps.
-Put those details in the setup, default-behavior, examples, or
-troubleshooting fields.
+What each field says and how it reads (the catalog sentence, the
+overview, permissions, auto-detection including service discovery,
+limits and cost, prerequisites, option rows, examples, known errors,
+metrics rows, alerts, identity) is owned by
+`.agents/skills/project-collector-metadata/SKILL.md`; write the file
+with it open.
 
 Hit every REQUIRED field. The validator is strict (fatal on
 warnings). Refer to `../schema-reference.md` for the

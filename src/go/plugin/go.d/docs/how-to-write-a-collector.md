@@ -299,7 +299,8 @@ For a new collector `<name>`:
    contexts.
 7. If adding or changing service-discovery rules under `src/go/plugin/go.d/config/go.d/sd/` or `sdext`, update generated
    service-discovery documentation through the integrations lifecycle recipe.
-8. Generate `integrations/<slug>.md` and the README symlink from `metadata.yaml`. Single-integration collector
+8. Write `metadata.yaml` with `.agents/skills/project-collector-metadata/SKILL.md` open (one contract per field),
+   then generate `integrations/<slug>.md` and the README symlink from it. Single-integration collector
    directories normally use the symlinked README. Multi-integration plugin directories may keep a hand-authored umbrella
    README; follow `.agents/skills/integrations-lifecycle/consistency.md`.
 

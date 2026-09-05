@@ -1,8 +1,22 @@
-[% if entry.integration_type == 'collector' %]
-[% if entry.meta.plugin_name is in(['go.d.plugin', 'python.d.plugin', 'charts.d.plugin']) %]
+[# Jinja template: integrations/templates/troubleshooting.md
+   Renders the h2 'Troubleshooting' section as up to four h3 groups, in this order:
+   - 'Diagnostics' (collectors of go.d/python.d/charts.d only): the plugin debug command and the log commands.
+   - 'Test Notification' (agent notifications only).
+   - 'Known Errors': one h4 per `troubleshooting.errors.list[]` entry; heading = the error text, body = When / Cause / Fix.
+   - 'Other Problems': one h4 per legacy `troubleshooting.problems.list[]` entry.
+   Content rules for the entries: .agents/skills/project-collector-metadata/troubleshooting.md #]
+[% set has_diagnostics = entry.integration_type == 'collector' and entry.meta.plugin_name is in(['go.d.plugin', 'python.d.plugin', 'charts.d.plugin']) %]
+[% set has_test_notification = entry.integration_type == 'agent_notification' %]
+[% set has_errors = entry.troubleshooting is defined and entry.troubleshooting.errors is defined and entry.troubleshooting.errors.list %]
+[% set has_problems = entry.troubleshooting is defined and entry.troubleshooting.problems is defined and entry.troubleshooting.problems.list %]
+[% if has_diagnostics or has_test_notification or has_errors or has_problems %]
 ## Troubleshooting
 
-### Debug Mode
+[% endif %]
+[% if has_diagnostics %]
+### Diagnostics
+
+#### Debug Mode
 
 [% if entry.meta.plugin_name == 'go.d.plugin' %]
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
@@ -52,14 +66,14 @@ should give you clues as to why the collector isn't working.
   ```
 
 [% endif %]
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `[[ entry.meta.module_name ]]` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -67,7 +81,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep [[ entry.meta.module_name ]]
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -77,7 +91,7 @@ grep [[ entry.meta.module_name ]] /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -85,20 +99,8 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep [[ entry.meta.module_name ]]
 ```
 
-[% else %]
-[% if entry.troubleshooting.problems.list %]
-## Troubleshooting
-
 [% endif %]
-[% endif %]
-[% elif entry.integration_type == 'cloud_notification' %]
-[% if entry.troubleshooting.problems.list %]
-## Troubleshooting
-
-[% endif %]
-[% elif entry.integration_type == 'agent_notification' %]
-## Troubleshooting
-
+[% if has_test_notification %]
 ### Test Notification
 
 You can run the following command by hand, to test alerts configuration:
@@ -119,25 +121,40 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 
 Note that this will test _all_ alert mechanisms for the selected role.
 
-[% elif entry.integration_type == 'exporter' %]
-[% if entry.troubleshooting.problems.list %]
-## Troubleshooting
+[% endif %]
+[% if has_errors %]
+### Known Errors
+
+[% for item in entry.troubleshooting.errors.list %]
+#### [[ item.error ]]
+
+[% if item.when %]
+**When**
+
+[[ item.when ]]
 
 [% endif %]
-[% elif entry.integration_type == 'secretstore' %]
-[% if entry.troubleshooting.problems.list %]
-## Troubleshooting
+**Cause**
+
+[[ item.cause ]]
+
+**Fix**
+
+[[ item.fix ]]
+
+[% if item.source %]
+Reported in [[ item.source ]].
 
 [% endif %]
-[% elif entry.integration_type == 'service_discovery' %]
-[% if entry.troubleshooting.problems.list %]
-## Troubleshooting
+[% endfor %]
+[% endif %]
+[% if has_problems %]
+### Other Problems
 
-[% endif %]
-[% endif %]
 [% for item in entry.troubleshooting.problems.list %]
-### [[ item.name ]]
+#### [[ item.name ]]
 
 [[ item.description ]]
 
 [% endfor %]
+[% endif %]

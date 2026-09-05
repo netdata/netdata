@@ -18,8 +18,10 @@ as a VM or Docker container:
 - On Alpine: `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml`
 - On Fedora or RHEL (EPEL is required on RHEL systems): `dnf install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml`
 
-Those packages cover generation. Running `python3 -m unittest integrations.tests.test_descriptions` also requires
-`markdown-it-py`; `./integrations/pip.sh` installs the complete generation-and-test dependency set.
+Those packages cover generation. The tests (`python3 -m unittest integrations.tests.test_descriptions` and
+`integrations.tests.test_collector_metadata`, the collector metadata content checks) also require `markdown-it-py`;
+`./integrations/pip.sh` installs the complete generation-and-test dependency set. The legacy
+`integrations/check_collector_metadata.py` is a different, unused script.
 
 Once the environment is set up, run the documentation generators from
 the Agent repo root:

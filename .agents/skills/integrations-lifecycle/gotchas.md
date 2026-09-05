@@ -435,48 +435,14 @@ timeout is hardcoded.
 
 ## metadata.yaml prose lands in MDX -- author it MDX-safe
 
-Anything you put in `description`, `setup`, `troubleshooting`,
-related-resources blurbs, or any free-text field in
-`metadata.yaml` flows through `gen_integrations.py` -> per-
-integration `.md` -> learn ingest -> MDX 3 build on Netlify.
-The escape battery in `learn/ingest/ingest.py:1721-1799` only
-handles bare `{`, the three exact-substring operators
-(`<=`, `%<`, `<->`), and `<details><summary>`. The following
-break the MDX build silently in netdata land but loudly on
-the next learn ingest preview deploy:
+Every free-text field in `metadata.yaml` flows through `gen_integrations.py`, the per-integration `.md`, Learn ingest,
+and the MDX 3 build on Netlify. The ingest escape battery (`learn/ingest/ingest.py:1721-1799`) handles only bare `{`,
+the operators `<=`, `%<`, `<->`, and `<details><summary>`; everything else passes Netdata CI and fails the next Learn
+deploy preview. The patterns and author-side rules are in `.agents/skills/project-collector-metadata/SKILL.md`
+("Safety Of The Markdown"); `integrations/tests/test_collector_metadata.py` now checks collector metadata for them in
+CI. The MDX side is documented in `learn-site-structure/mdx-rules.md` and `pitfalls-and-gotchas.md`.
 
-| Pattern in metadata.yaml | What MDX does | Fix |
-|---|---|---|
-| `<service-name>` placeholder | parses as JSX open, demands close | wrap in backticks: `` `<service-name>` `` or `<SERVICE_NAME>` in code |
-| `<aws-region>`, `<scope>`, `<app>` | same | same |
-| `Vec<u32>`, `HashMap<K,V>` (Rust/C++/Java generics in prose) | same | wrap in backticks |
-| `<100 ms`, `<5 seconds`, `<10 connections` | `Unexpected character '1' before name` | rephrase as "under 100 ms" or escape with `&lt;` |
-| Smart quotes (`"`, `"`, `'`, `'`) in YAML auto-converted by some editors | depends on context | use ASCII quotes |
-| Unbalanced single backtick on a line | breaks code-fence detection | balance or remove |
-
-Real-world hit: 2026-05-07 netflow-plugin metadata.yaml had
-`description: Sets tenant=amazon, region=<aws-region>, role=<service-name>.`
-for the AWS IP Ranges card and similar for GCP and phpIPAM.
-Netdata CI passed (no MDX layer there), `gen_integrations.py`
-generated the `.md` files cleanly, learn ingest produced the
-`.mdx` files cleanly, the Netlify deploy preview failed with
-`Expected a closing tag for \`<service-name>\` ...`. Fix
-landed at the metadata.yaml source by wrapping placeholders
-in backticks; gen_integrations.py was re-run to regenerate
-the integration cards.
-
-Cross-reference: `learn-site-structure/mdx-rules.md` ("Patterns
-that the escape battery does NOT cover") and
-`learn-site-structure/pitfalls-and-gotchas.md` document the
-MDX side; this entry is the metadata-author-side mirror.
-
-Practical recipe when authoring metadata.yaml prose:
-
-- Wrap every angle-bracketed placeholder in backticks.
-- Wrap every code-type expression in backticks.
-- Avoid `<` immediately followed by a digit; use "under" or
-  `&lt;`.
-- Avoid generics syntax in prose; if necessary, backtick it.
-
-The integrations pipeline does not validate this on its own.
-The next learn ingest deploy preview is what will catch you.
+Real-world hit (2026-05-07): netflow-plugin `metadata.yaml` had
+`description: Sets tenant=amazon, region=<aws-region>, role=<service-name>.` for the AWS IP Ranges card (and similar
+for GCP and phpIPAM). Netdata CI passed, `gen_integrations.py` and Learn ingest ran cleanly, and the Netlify preview
+failed with `Expected a closing tag for \`<service-name>\` ...`. Fix: backticks around the placeholders at the source.

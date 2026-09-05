@@ -120,15 +120,23 @@ authentication / secretstore / service_discovery.
 
 ### `$defs.troubleshooting`
 
+Both lists are optional, so an empty object is valid. The object itself is required by `collector.json`,
+`service_discovery.json`, and `secretstore.json`, and optional in the other schemas that reference it.
+
 | Field                                         | Type   | Req | Values   | Surface        | Notes           |
 |-----------------------------------------------|--------|-----|----------|----------------|-----------------|
-| `troubleshooting.problems.list[].name`        | string | yes | --       | learn / in-app | Rendered as h3. |
+| `troubleshooting.errors.list[].error`         | string | yes | markdown | learn / in-app | Known error: the literal message (placeholders in backticks) or the symptom. Rendered as h4 under `### Known Errors`. |
+| `troubleshooting.errors.list[].when`          | string | no  | markdown | learn / in-app | Situation in which it appears. Rendered under a bold `When` caption. |
+| `troubleshooting.errors.list[].cause`         | string | yes | markdown | learn / in-app | Rendered under a bold `Cause` caption. |
+| `troubleshooting.errors.list[].fix`           | string | yes | markdown | learn / in-app | Rendered under a bold `Fix` caption. |
+| `troubleshooting.errors.list[].source`        | string | no  | URL      | learn / in-app | Link to the user report; rendered as "Reported in ...". `additionalProperties: false` on the entry. |
+| `troubleshooting.problems.list[].name`        | string | yes | --       | learn / in-app | Legacy prose entry. Rendered as h4 under `### Other Problems`. |
 | `troubleshooting.problems.list[].description` | string | yes | markdown | learn / in-app | Body.           |
 
-The `troubleshooting.md` template adds debug-mode boilerplate
-per plugin (e.g. `python.d.plugin`, `go.d.plugin`,
-`charts.d.plugin`); see
-`integrations/templates/troubleshooting.md:1-86`.
+The `troubleshooting.md` template renders the section as h3 groups: `Diagnostics` (debug-mode and log commands, for
+`go.d.plugin`, `python.d.plugin`, `charts.d.plugin` collectors), `Test Notification` (agent notifications), `Known
+Errors`, `Other Problems`. Content rules for the entries:
+`.agents/skills/project-collector-metadata/troubleshooting.md`.
 
 ### `$defs._folding`
 

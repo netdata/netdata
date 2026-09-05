@@ -113,6 +113,11 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 -m unittest integrations.tests.test_prometheus_profile_docs
 
+      - name: Test Collector Metadata Content Rules
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_collector_metadata
+
       - name: Generate Integrations Documentation
         run: |
           source ./venv/bin/activate

@@ -33,9 +33,10 @@ violation.
 | Tracing metadata sections missing from published integration pages | [tracing-missing-published-sections](tracing-missing-published-sections.md) | Traces rendered sections through Agent JSON and Markdown, Website regeneration, and Learn ingestion before treating a public-page omission as a template defect. |
 | Understanding collector taxonomy generation | [taxonomy-yaml-to-taxonomy-json](taxonomy-yaml-to-taxonomy-json.md) | General flow from collector `metadata.yaml` + `taxonomy.yaml` through validation to generated `integrations/taxonomy.json`, with references to the executable source of truth. |
 
-Description authoring rules live in `../description-authoring.md`
-because they apply to all metadata authors, not only to one
-analysis how-to.
+The two cross-type description contracts (catalog sentence, page
+meta description) live in `../description-authoring.md` because
+they apply to all metadata authors. Collector field content rules
+live in `.agents/skills/project-collector-metadata/`.
 
 ## How to add a how-to
 

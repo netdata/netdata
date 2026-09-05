@@ -537,7 +537,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for disk I/O requests. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/disk.conf"
@@ -1509,7 +1509,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for shared-memory system calls. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/shm.conf"
@@ -1740,7 +1740,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for software interrupts. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/softirq.conf"
@@ -1848,7 +1848,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for mount and unmount system calls. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/mount.conf"

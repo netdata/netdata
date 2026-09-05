@@ -31,10 +31,12 @@ and static emission, update `taxonomy.yaml` in the same PR.
 
 ## 2. Update `metadata.yaml`
 
-Keep `metrics.scopes[].metrics[].name` aligned with the collector's
-actual emitted chart contexts. Keep units and descriptions aligned with
-the code. If a collector emits runtime-only dynamic contexts, declare
-the guardrail in metadata:
+Metric rows mirror the code (context, chart title, unit, chart type,
+dimensions); option rows mirror the schema; alert rows mirror the health
+conf. The content rules for every field are in
+`.agents/skills/project-collector-metadata/SKILL.md` (`metrics.md`,
+`setup.md`, `alerts-and-meta.md`). If a collector emits runtime-only
+dynamic contexts, declare the guardrail in metadata:
 
 ```yaml
 metrics:
