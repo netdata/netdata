@@ -95,8 +95,36 @@ include(NetdataCompilerFlags)
 if(OS_MACOS)
   enable_language(OBJC)
   if(OSLOG AND FOUNDATION)
-    add_compile_definitions(HAVE_OSLOG)
+    # macos-logs.plugin needs OSLogStore, which only exists in the 10.15 SDK and later;
+    # the OSLog framework alone (10.12 SDK) is not sufficient.
+    include(CheckOBJCSourceCompiles)
+    check_objc_source_compiles("
+#import <OSLog/OSLog.h>
+int main(void) { OSLogStore *store = nil; return store != nil; }
+" HAVE_OSLOG_STORE)
+    if(HAVE_OSLOG_STORE)
+      add_compile_definitions(HAVE_OSLOG)
+    endif()
   endif()
+
+  # The oldest macOS this source tree is expected to run on (the deployment target floor,
+  # not an SDK version). Collectors that need a newer SDK guard themselves at the source
+  # level and degrade to unavailable, so raising this floor must be a deliberate change to
+  # this value rather than an accident.
+  set(NETDATA_MACOS_MINIMUM_VERSION "10.6")
+
+  # Only validated when the deployment target is explicit; an unset target means the
+  # toolchain default applies, which is always at least as new as the floor.
+  if(CMAKE_OSX_DEPLOYMENT_TARGET AND
+     CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS NETDATA_MACOS_MINIMUM_VERSION)
+    message(FATAL_ERROR
+      "CMAKE_OSX_DEPLOYMENT_TARGET is ${CMAKE_OSX_DEPLOYMENT_TARGET}, but netdata requires "
+      "macOS ${NETDATA_MACOS_MINIMUM_VERSION} or later.\n"
+      "Either raise the deployment target, or lower NETDATA_MACOS_MINIMUM_VERSION in "
+      "CMakeLists.txt and add the source-level guards the older SDK needs.")
+  endif()
+
+  message(STATUS "macOS minimum supported version: ${NETDATA_MACOS_MINIMUM_VERSION}")
 endif()
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
@@ -3262,7 +3290,7 @@ if(OS_WINDOWS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
-if(OS_MACOS AND OSLOG AND FOUNDATION)
+if(OS_MACOS AND OSLOG AND FOUNDATION AND HAVE_OSLOG_STORE)
         add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
         target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
         target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
