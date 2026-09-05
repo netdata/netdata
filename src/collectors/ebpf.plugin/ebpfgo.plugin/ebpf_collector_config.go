@@ -67,7 +67,8 @@ func applyCommonCollectorConfig(fileCfg pluginConfigFile, dst collectorCommonCon
 		*dst.LoadMethod = *fileCfg.LoadMethod
 		loadMethodApplied = true
 	}
-	if !loadMethodApplied && fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
+	legacyMethodApplied := loadMethodApplied && *fileCfg.LoadMethod == LoadLegacy
+	if !legacyMethodApplied && fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
 		*dst.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 	if fileCfg.LoadModeReturn != nil && dst.ReturnMode != nil {

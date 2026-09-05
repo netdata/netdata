@@ -13,6 +13,11 @@ import (
 // change to any id, context, unit, priority, dimension name or algorithm splits
 // every existing chart instance on upgrade, so these values are a contract and
 // not a preference.
+//
+// The priorities are NETDATA_CHART_PRIO_EBPF_FD_CHARTS (2195, src/collectors/all.h)
+// and +1, as used at ebpf_fd.c:1366,1382.  This assertion previously pinned
+// 20270/20271 — the per-application priorities from ebpf_fd.h — while claiming C
+// parity, so it asserted a false claim instead of catching the mismatch.
 func TestFDGlobalChartContract(t *testing.T) {
 	want := map[string]struct {
 		context    string
@@ -25,14 +30,14 @@ func TestFDGlobalChartContract(t *testing.T) {
 		"file_descriptor": {
 			context:    "filesystem.file_descriptor",
 			units:      "calls/s",
-			order:      20270,
+			order:      2195,
 			dimensions: []string{"open", "close"},
 			algorithm:  "incremental",
 		},
 		"file_error": {
 			context:    "filesystem.file_error",
 			units:      "calls/s",
-			order:      20271,
+			order:      2196,
 			dimensions: []string{"open", "close"},
 			algorithm:  "incremental",
 			errorChart: true,

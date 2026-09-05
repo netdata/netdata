@@ -171,16 +171,39 @@ static inline void nd_ebpf_global_snap_aggregate(
     }
 }
 
-static inline uint32_t nd_ebpf_snapshot_slot_tgid(
+/* Resolves the TGID that owns one map entry, scanning every per-CPU slot.
+ *
+ * A percpu map zero-fills the non-creating CPUs' slots (kernel
+ * pcpu_init_value(): "zero-fill element values for other cpus ... onallcpus=false
+ * always when coming from bpf prog"), and the BPF programs write tgid ONLY on the
+ * branch that creates the entry -- every later increment lands on the running
+ * CPU's slot and leaves its tgid at 0 (ebpf-co-re src/{fd,dc,cachestat}.bpf.c).
+ * Creation normally happens once per key, because bpf_map_lookup_elem() succeeds
+ * on every CPU once the key exists.  The walker nevertheless preserves any
+ * distinct non-zero identities if a map contains them, while treating zero-TGID
+ * slots as unnamed siblings whose counters still belong in the report.
+ *
+ * Consequences, both load-bearing:
+ *   - the scan must not stop at slot 0, and
+ *   - a slot whose tgid reads 0 must NOT be discarded; its counters belong to
+ *     this entry.
+ *
+ * Falls back to the map key only when every slot still reads 0, which is the race
+ * at entry creation -- counters are zero then, so the entry is harmless. */
+static inline uint32_t nd_ebpf_snapshot_tgid(
     const void *values,
+    int per_cpu_count,
     size_t value_size,
     size_t tgid_offset,
-    int slot,
     uint32_t fallback_key)
 {
-    uint32_t tgid;
-    memcpy(&tgid, (const char *)values + (size_t)slot * value_size + tgid_offset, sizeof(tgid));
-    return tgid ? tgid : fallback_key;
+    for (int i = 0; i < per_cpu_count; i++) {
+        uint32_t tgid;
+        memcpy(&tgid, (const char *)values + (size_t)i * value_size + tgid_offset, sizeof(tgid));
+        if (tgid != 0)
+            return tgid;
+    }
+    return fallback_key;
 }
 
 /* Ensures the persistent output buffer can hold one more item, doubling on
@@ -406,24 +429,36 @@ static inline size_t nd_ebpf_apps_snap_iterate(
             continue;
         }
 
+        /* Keep each named slot as a distinct identity for eviction.  Unnamed
+         * slots are kernel-zero-filled siblings of the entry; retain their
+         * counters by folding them into the first named slot's output row. */
+        uint32_t owner = nd_ebpf_snapshot_tgid(values, count, value_size, tgid_offset,
+                                               count == 1 ? next_key : 0);
         for (int i = 0; i < count; i++) {
-            uint32_t tgid = nd_ebpf_snapshot_slot_tgid(values, value_size, tgid_offset, i,
-                                                        count == 1 ? next_key : 0);
-            if (!tgid)
-                continue;
+            uint32_t slot_tgid;
+            memcpy(&slot_tgid, (const char *)values + (size_t)i * value_size + tgid_offset,
+                   sizeof(slot_tgid));
+            if (!slot_tgid) {
+                if (!owner)
+                    continue;
+                slot_tgid = owner;
+                if (count == 1) {
+                    uint64_t ct;
+                    memcpy(&ct, (const char *)values + (size_t)i * value_size + ct_offset,
+                           sizeof(ct));
+                    nd_ebpf_key_table_add(keys, next_key, slot_tgid, ct);
+                }
+            } else {
+                uint64_t ct;
+                memcpy(&ct, (const char *)values + (size_t)i * value_size + ct_offset,
+                       sizeof(ct));
+                nd_ebpf_key_table_add(keys, next_key, slot_tgid, ct);
+            }
 
             nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
-
-            /* Record each key/TGID pair BEFORE rows are merged.  In a percpu map,
-             * different CPU slots under one parent key can belong to different
-             * processes and must not be represented by the first slot's TGID. */
-            uint64_t ct;
-            memcpy(&ct, (const char *)values + (size_t)i * value_size + ct_offset, sizeof(ct));
-            nd_ebpf_key_table_add(keys, next_key, tgid, ct);
-
             void *dst = (char *)*items_buf + out_count * item_size;
             memset(dst, 0, item_size);
-            *(uint32_t *)dst = tgid;
+            *(uint32_t *)dst = slot_tgid;
             fold(dst, values, i);
             out_count++;
         }
@@ -832,9 +867,10 @@ static inline bool nd_ebpf_key_group_has_snapshot(
     return left < count && items[left].tgid == tgid && items[left].ct == ct;
 }
 
-/* A map key can contain a different process in every per-CPU slot.  It is
- * safe to delete only when every populated slot still matches the snapshot and
- * every occupant is in the confirmed-dead batch. */
+/* Re-check every slot against the confirmed-dead batch just before deleting a
+ * map key.  Named slots must still match their recorded (TGID, creation stamp).
+ * An unnamed slot with a non-zero stamp has no verifiable owner and therefore
+ * keeps the key alive; untouched zero slots are harmless. */
 static inline bool nd_ebpf_map_key_delete_eligible(
     const struct nd_ebpf_key_tgid *items,
     size_t items_count,
@@ -844,25 +880,51 @@ static inline bool nd_ebpf_map_key_delete_eligible(
     size_t value_size,
     size_t tgid_offset,
     size_t ct_offset,
-    int slots)
+    int slots,
+    uint32_t map_key)
 {
     bool populated = false;
-
+    uint64_t fallback_ct = 0;
     for (int slot = 0; slot < slots; slot++) {
         uint32_t current_tgid;
+        uint64_t current_ct;
         memcpy(&current_tgid, (const char *)values + (size_t)slot * value_size + tgid_offset,
                sizeof(current_tgid));
-        if (!current_tgid)
-            continue;
-
-        populated = true;
-        uint64_t current_ct;
         memcpy(&current_ct, (const char *)values + (size_t)slot * value_size + ct_offset,
                sizeof(current_ct));
+        if (slots == 1)
+            fallback_ct = current_ct;
+
+        if (!current_tgid) {
+            /* A zero TGID has no independently verifiable owner.  It is safe to
+             * ignore only an untouched slot; active unnamed counters must keep
+             * the key alive rather than being evicted speculatively. */
+            bool active = current_ct != 0;
+            if (!active) {
+                const unsigned char *slot_data = (const unsigned char *)values +
+                                                 (size_t)slot * value_size;
+                for (size_t byte = 0; byte < value_size; byte++) {
+                    if (slot_data[byte] != 0) {
+                        active = true;
+                        break;
+                    }
+                }
+            }
+            if (active)
+                return false;
+            continue;
+        }
+
+        populated = true;
         if (!nd_ebpf_sorted_tgid_in_batch(tgids, count, current_tgid) ||
             !nd_ebpf_key_group_has_snapshot(items, items_count, current_tgid, current_ct))
             return false;
     }
+
+    /* A single-value map may legitimately use its key as the fallback identity. */
+    if (!populated && slots == 1 && map_key != 0)
+        return nd_ebpf_sorted_tgid_in_batch(tgids, count, map_key) &&
+               nd_ebpf_key_group_has_snapshot(items, items_count, map_key, fallback_ct);
 
     return populated;
 }
@@ -939,7 +1001,7 @@ static inline int nd_ebpf_map_delete_tgids(
                         ? percpu_entries_cap : 1;
             if (nd_ebpf_map_key_delete_eligible(
                     &keys->items[start], end - start, dead, count, values, value_size,
-                    tgid_offset, ct_offset, slots)) {
+                    tgid_offset, ct_offset, slots, map_key)) {
                 int per = bpf_map_delete_elem(fd, &map_key);
                 /* Treat "not found" as success: the BPF program may have removed the
                  * bucket between snapshot and delete. */

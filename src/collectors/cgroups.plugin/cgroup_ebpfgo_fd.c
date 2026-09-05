@@ -16,9 +16,15 @@ static bool cgroup_ebpfgo_fd_errors_current = false;
 
 typedef struct {
     pid_t pid;
+    const struct cgroup *cg;
     uint64_t ct;
     uint64_t last_seen;
     uint32_t fd_update_every_s;
+    uint64_t rate_until;
+    long long open_call;
+    long long close_call;
+    long long open_err;
+    long long close_err;
 } cgroup_ebpfgo_fd_pid_token_t;
 
 static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_pid_tokens;
@@ -26,25 +32,30 @@ static size_t cgroup_ebpfgo_fd_pid_tokens_count;
 static size_t cgroup_ebpfgo_fd_pid_tokens_capacity;
 static uint64_t cgroup_ebpfgo_fd_generation;
 
-static size_t cgroup_ebpfgo_fd_token_index(pid_t pid, bool *found)
+static size_t cgroup_ebpfgo_fd_token_index(pid_t pid, const struct cgroup *cg, bool *found)
 {
     size_t left = 0;
     size_t right = cgroup_ebpfgo_fd_pid_tokens_count;
     while (left < right) {
         size_t mid = left + (right - left) / 2;
-        if (cgroup_ebpfgo_fd_pid_tokens[mid].pid < pid)
+        if (cgroup_ebpfgo_fd_pid_tokens[mid].pid < pid ||
+            (cgroup_ebpfgo_fd_pid_tokens[mid].pid == pid &&
+             (uintptr_t)cgroup_ebpfgo_fd_pid_tokens[mid].cg < (uintptr_t)cg))
             left = mid + 1;
         else
             right = mid;
     }
-    *found = left < cgroup_ebpfgo_fd_pid_tokens_count && cgroup_ebpfgo_fd_pid_tokens[left].pid == pid;
+    *found = left < cgroup_ebpfgo_fd_pid_tokens_count &&
+             cgroup_ebpfgo_fd_pid_tokens[left].pid == pid &&
+             cgroup_ebpfgo_fd_pid_tokens[left].cg == cg;
     return left;
 }
 
-static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_consumed_token(pid_t pid, uint32_t fd_update_every_s)
+static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_consumed_token(
+    pid_t pid, const struct cgroup *cg, uint32_t fd_update_every_s)
 {
     bool found;
-    size_t index = cgroup_ebpfgo_fd_token_index(pid, &found);
+    size_t index = cgroup_ebpfgo_fd_token_index(pid, cg, &found);
     if (!found) {
         if (cgroup_ebpfgo_fd_pid_tokens_count == cgroup_ebpfgo_fd_pid_tokens_capacity) {
             size_t capacity = cgroup_ebpfgo_fd_pid_tokens_capacity ? cgroup_ebpfgo_fd_pid_tokens_capacity * 2 : 16;
@@ -54,7 +65,7 @@ static cgroup_ebpfgo_fd_pid_token_t *cgroup_ebpfgo_fd_consumed_token(pid_t pid, 
         }
         memmove(&cgroup_ebpfgo_fd_pid_tokens[index + 1], &cgroup_ebpfgo_fd_pid_tokens[index],
                 (cgroup_ebpfgo_fd_pid_tokens_count - index) * sizeof(*cgroup_ebpfgo_fd_pid_tokens));
-        cgroup_ebpfgo_fd_pid_tokens[index] = (cgroup_ebpfgo_fd_pid_token_t){.pid = pid};
+        cgroup_ebpfgo_fd_pid_tokens[index] = (cgroup_ebpfgo_fd_pid_token_t){.pid = pid, .cg = cg};
         cgroup_ebpfgo_fd_pid_tokens_count++;
     }
     cgroup_ebpfgo_fd_pid_tokens[index].last_seen = cgroup_ebpfgo_fd_generation;
@@ -122,18 +133,30 @@ static void cgroup_ebpfgo_fd_sum_pids(struct cgroup *cg)
         if (!update_every_s && cgroup_update_every > 0)
             update_every_s = (uint32_t)cgroup_update_every;
 
-        cgroup_ebpfgo_fd_pid_token_t *token = cgroup_ebpfgo_fd_consumed_token(pid, update_every_s);
-        if (fd->ct <= token->ct)
+        cgroup_ebpfgo_fd_pid_token_t *token = cgroup_ebpfgo_fd_consumed_token(pid, cg, update_every_s);
+        if (fd->ct <= token->ct) {
+            if (cgroup_ebpfgo_fd_generation <= token->rate_until) {
+                open_call = cgroup_ebpfgo_fd_add_rate(open_call, token->open_call);
+                close_call = cgroup_ebpfgo_fd_add_rate(close_call, token->close_call);
+                open_err = cgroup_ebpfgo_fd_add_rate(open_err, token->open_err);
+                close_err = cgroup_ebpfgo_fd_add_rate(close_err, token->close_err);
+            }
             continue;
+        }
 
-        open_call = cgroup_ebpfgo_fd_add_rate(
-            open_call, cgroup_ebpfgo_fd_normalize_rate(fd->open_call, update_every_s));
-        close_call = cgroup_ebpfgo_fd_add_rate(
-            close_call, cgroup_ebpfgo_fd_normalize_rate(fd->close_call, update_every_s));
-        open_err = cgroup_ebpfgo_fd_add_rate(
-            open_err, cgroup_ebpfgo_fd_normalize_rate(fd->open_err, update_every_s));
-        close_err = cgroup_ebpfgo_fd_add_rate(
-            close_err, cgroup_ebpfgo_fd_normalize_rate(fd->close_err, update_every_s));
+        token->open_call = cgroup_ebpfgo_fd_normalize_rate(fd->open_call, update_every_s);
+        token->close_call = cgroup_ebpfgo_fd_normalize_rate(fd->close_call, update_every_s);
+        token->open_err = cgroup_ebpfgo_fd_normalize_rate(fd->open_err, update_every_s);
+        token->close_err = cgroup_ebpfgo_fd_normalize_rate(fd->close_err, update_every_s);
+        uint32_t chart_every = cgroup_update_every > 0 ? (uint32_t)cgroup_update_every : 1;
+        uint32_t hold_generations = update_every_s > 0
+                                        ? (uint32_t)(((uint64_t)update_every_s + chart_every - 1) / chart_every)
+                                        : 1;
+        token->rate_until = cgroup_ebpfgo_fd_generation + (hold_generations ? hold_generations : 1) - 1;
+        open_call = cgroup_ebpfgo_fd_add_rate(open_call, token->open_call);
+        close_call = cgroup_ebpfgo_fd_add_rate(close_call, token->close_call);
+        open_err = cgroup_ebpfgo_fd_add_rate(open_err, token->open_err);
+        close_err = cgroup_ebpfgo_fd_add_rate(close_err, token->close_err);
         token->ct = fd->ct;
     }
 

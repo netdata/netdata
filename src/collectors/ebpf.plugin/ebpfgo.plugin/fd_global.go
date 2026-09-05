@@ -41,13 +41,20 @@ type fdGlobalChart struct {
 // filedescriptor module.  The dimensions carry the raw cumulative BPF counters
 // and the `incremental` algorithm turns them into calls/s, exactly as before —
 // unlike dcstat, whose C global chart was already `absolute`.
+//
+// The priorities are the HOST-WIDE ones: NETDATA_CHART_PRIO_EBPF_FD_CHARTS is
+// 2195 (src/collectors/all.h), and the C module used it and +1 for these two
+// charts (ebpf_fd.c:1366,1382).  Do not reach for the 202xx values from
+// ebpf_fd.h — those were the per-application and per-service priorities, and
+// using them here sorts these charts ~18000 places away from the rest of the
+// filesystem section.
 var fdGlobalCharts = []fdGlobalChart{
 	{
 		id:      "file_descriptor",
 		title:   "Open and close calls",
 		units:   "calls/s",
 		context: "filesystem.file_descriptor",
-		order:   20270,
+		order:   2195,
 		dimensions: []fdGlobalDimension{
 			{id: "open", algorithm: "incremental"},
 			{id: "close", algorithm: "incremental"},
@@ -58,7 +65,7 @@ var fdGlobalCharts = []fdGlobalChart{
 		title:   "Open fails",
 		units:   "calls/s",
 		context: "filesystem.file_error",
-		order:   20271,
+		order:   2196,
 		dimensions: []fdGlobalDimension{
 			{id: "open", algorithm: "incremental"},
 			{id: "close", algorithm: "incremental"},

@@ -343,6 +343,18 @@ func TestApplyCommonCollectorConfigLegacyReachesFlavourlessCollectors(t *testing
 		}
 	})
 
+	t.Run("core method still accepts an explicit flavor", func(t *testing.T) {
+		flavor := "buffer"
+		method := LoadCore
+		applyCommonCollectorConfig(pluginConfigFile{
+			LoadMethod:   &method,
+			ObjectFlavor: new("arena"),
+		}, collectorCommonConfig{ObjectFlavor: &flavor, LoadMethod: &method})
+		if flavor != "arena" {
+			t.Fatalf("ObjectFlavor = %q, want arena: only legacy must suppress the flavor merge", flavor)
+		}
+	})
+
 	t.Run("blank flavor is a retraction and never applied", func(t *testing.T) {
 		flavor := "arena"
 		applyCommonCollectorConfig(
