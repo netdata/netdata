@@ -279,7 +279,7 @@ static int onewayalloc_list_unittest(OWA_PAGE *head) {
     for (; page && pages < head->stats_pages; page = page->next) {
         if (previous && page->prev != previous)
             break;
-        found_current |= page == head->current;
+        found_current = found_current || page == head->current;
         total += page->size;
         pages++;
         previous = page;
