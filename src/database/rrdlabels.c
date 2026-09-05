@@ -273,11 +273,24 @@ static bool labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 
     bool changed;
     if(*PValue) {
+        const RRDLABEL_SRC old_ls = *((RRDLABEL_SRC *)PValue);
+
         new_ls |= RRDLABEL_FLAG_OLD;
         *((RRDLABEL_SRC *)PValue) = new_ls;
 
         delete_label(new_label);
-        changed = false;
+
+        // The key=value pair is unchanged, but the SOURCE may not be - and the source is
+        // observable downstream: stream_send_clabels_callback() serializes it on the wire and
+        // exporters filter on its bits. So report a source-only change as a change, otherwise
+        // consumers keep a stale source forever.
+        //
+        // Compare with RRDLABEL_FLAG_INTERNAL masked off - the SAME mask
+        // stream_send_clabels_callback() applies before putting the source on the wire. That
+        // matters for RRDLABEL_FLAG_DONT_DELETE: a receiver stores the stripped wire value while
+        // the local copy may carry the flag, so masking only NEW|OLD would report every single
+        // CLABEL_COMMIT as a change and re-announce the chart upstream forever.
+        changed = (old_ls & ~RRDLABEL_FLAG_INTERNAL) != (new_ls & ~RRDLABEL_FLAG_INTERNAL);
     }
     else {
         new_ls |= RRDLABEL_FLAG_NEW;
@@ -294,7 +307,24 @@ static bool labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         changed = true;
     }
 
-    __atomic_add_fetch(&labels->version, 1, __ATOMIC_RELAXED);
+    // Bump only on a real change. labels->JudyL is keyed by the interned
+    // RRDLABEL pointer, which encodes BOTH key and value, so re-adding an
+    // identical key=value lands on an existing slot and only refreshes the
+    // SRC flags - nothing an observer of the label set can see.
+    //
+    // Consumers read this counter as "the labels changed", never as "the
+    // labels were touched": rrdcalc_update_info_using_rrdset_labels() re-derives
+    // every alert's info/summary text on a bump, check_and_update_chart_labels()
+    // re-persists the chart's labels to SQLite, and pulse_child_chart_labels()
+    // re-applies child labels. Bumping unconditionally made all three re-run
+    // forever on a parent, where rrdset_update_permanent_labels() re-adds the
+    // unchanged _collect_plugin/_collect_module pair on every chart
+    // re-registration.
+    //
+    // rrdlabels_copy() already bumps only inside its own mutation branches
+    // (insert, and the same-key cleanup); this brings the add path in line.
+    if(changed)
+        __atomic_add_fetch(&labels->version, 1, __ATOMIC_RELAXED);
 
 //    judy_mem = JudyAllocThreadPulseGetAndReset();
 //    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
@@ -1664,6 +1694,22 @@ static int rrdlabels_unittest_change_detection(void) {
               "add of new label should return true");
     UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_CONFIG) == false,
               "re-add of identical key+value should return false");
+    // A source-only change must be reported: the source is serialized on the streaming wire
+    // (stream_send_clabels_callback) and exporters filter on its bits, so a missed change
+    // leaves downstream consumers with a stale source. k1=v1 must still exist at this point
+    // for this to exercise the existing-slot branch rather than a fresh insert.
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_ACLK) == true,
+              "same key+value with a DIFFERENT source should return true");
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_ACLK) == false,
+              "re-add with the same source again should return false");
+    // RRDLABEL_FLAG_DONT_DELETE is part of RRDLABEL_FLAG_INTERNAL and is stripped by
+    // stream_send_clabels_callback() before the source goes on the wire. A receiver therefore
+    // stores the flag-free value while a local copy may carry it; if the comparison did not mask
+    // it, every CLABEL_COMMIT would look like a change and re-announce the chart forever.
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_ACLK | RRDLABEL_FLAG_DONT_DELETE) == false,
+              "DONT_DELETE differing from the stored value must NOT count as a source change");
+    UT_EXPECT(rrdlabels_add_changed(l, "k1", "v1", RRDLABEL_SRC_ACLK) == false,
+              "...and dropping DONT_DELETE again must NOT count as a change either");
     UT_EXPECT(rrdlabels_add_changed(l, "k1", "v2", RRDLABEL_SRC_CONFIG) == true,
               "value change for an existing key should return true");
     UT_EXPECT(rrdlabels_add_changed(l, "k2", "v2", RRDLABEL_SRC_CONFIG) == true,

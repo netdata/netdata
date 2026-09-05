@@ -13,6 +13,11 @@ import (
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 )
 
+const (
+	routeCacheHitsMetricName   = "netdata.go.plugin.framework.chartengine.route_cache_hits_total"
+	routeCacheMissesMetricName = "netdata.go.plugin.framework.chartengine.route_cache_misses_total"
+)
+
 func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
@@ -46,8 +51,8 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 2)
 				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_duration_seconds", nil, 2)
 				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_phase_duration_seconds", metrix.Labels{"phase": "scan"}, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_misses_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil, 1)
+				assertMetricValueAtLeast(t, r, routeCacheMissesMetricName, nil, 1)
+				assertMetricValueAtLeast(t, r, routeCacheHitsMetricName, nil, 1)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_entries", nil, 1)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_retained_total", nil, 1)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_scanned_total", nil, 2)
@@ -274,7 +279,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				r := store.Read(metrix.ReadRaw())
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil, 9)
+				assertMetricValueAtLeast(t, r, routeCacheHitsMetricName, nil, 9)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_scanned_total", nil, 14)
 				routeCacheEntries, ok := r.Value("netdata.go.plugin.framework.chartengine.route_cache_entries", nil)
 				require.True(t, ok)
@@ -409,6 +414,14 @@ func assertMetricValueAtLeast(t *testing.T, reader metrix.Reader, name string, l
 	value, ok := reader.Value(name, labels)
 	require.Truef(t, ok, "expected metric %s with labels %v", name, labels)
 	assert.GreaterOrEqualf(t, value, min, "unexpected metric value for %s labels %v", name, labels)
+}
+
+func engineRuntimeMetricValue(t *testing.T, engine *Engine, name string) float64 {
+	t.Helper()
+	require.NotNil(t, engine.RuntimeStore())
+	value, ok := engine.RuntimeStore().Read(metrix.ReadRaw()).Value(name, nil)
+	require.Truef(t, ok, "expected runtime metric %s", name)
+	return value
 }
 
 func assertSummaryCountAtLeast(t *testing.T, reader metrix.Reader, name string, labels metrix.Labels, min float64) {

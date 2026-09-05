@@ -6,7 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +22,14 @@ const (
 	mssqlErrorAttrNoData       = "no_data"
 )
 
+const (
+	mssqlErrorSourceConfigured   = "configured-session"
+	mssqlErrorSourceSystemHealth = "system-health"
+
+	errorInfoHelpConfigured   = "Recent SQL errors from the configured Extended Events error_reported session."
+	errorInfoHelpSystemHealth = "Recent selected SQL errors from the built-in system_health Extended Events session. This fallback does not capture every error_reported event."
+)
+
 const errorInfoMethodID = "error-info"
 
 type mssqlErrorRow struct {
@@ -29,6 +39,7 @@ type mssqlErrorRow struct {
 	Message     string
 	Query       string
 	QueryHash   string
+	Source      string
 }
 
 type mssqlPlanOps struct {
@@ -124,6 +135,17 @@ var errorInfoColumns = []errorInfoColumn{
 		},
 		Value: func(r *mssqlErrorRow) any { return r.QueryHash },
 	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "source",
+			Tooltip:  "Extended Events source that produced the row",
+			Type:     funcapi.FieldTypeString,
+			Sortable: true,
+			Visible:  true,
+			Filter:   funcapi.FieldFilterMultiselect,
+		},
+		Value: func(r *mssqlErrorRow) any { return r.Source },
+	},
 }
 
 func errorInfoFunctionConfig() funcapi.FunctionConfig {
@@ -131,7 +153,7 @@ func errorInfoFunctionConfig() funcapi.FunctionConfig {
 		ID:             errorInfoMethodID,
 		Name:           "Error Info",
 		UpdateEvery:    10,
-		Help:           "Recent SQL errors from Extended Events error_reported",
+		Help:           "Recent SQL errors from the configured Extended Events session, with system_health fallback when unavailable.",
 		RequireCloud:   true,
 		RequiredParams: []funcapi.ParamConfig{},
 	}
@@ -166,6 +188,12 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 	}
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
 	defer cancel()
+	if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
+		if response := mssqlFunctionContextError(queryCtx, err); response != nil {
+			return response
+		}
+		return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
+	}
 	return f.collectData(queryCtx)
 }
 
@@ -178,10 +206,13 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 
 	sessionName := f.router.collector.errorInfoSessionName()
 	limit := f.router.collector.topQueriesLimit()
-	status, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
+	status, source, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
 	if err != nil {
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return response
+		}
 		if isDeadlockPermissionError(err) {
-			return &funcapi.FunctionResponse{Status: 403, Message: errorInfoPermissionMessage()}
+			return &funcapi.FunctionResponse{Status: 403, Message: f.router.collector.errorInfoPermissionMessage()}
 		}
 		if status == mssqlErrorAttrNotEnabled {
 			targetName := "event_file"
@@ -206,15 +237,26 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 
 	return &funcapi.FunctionResponse{
 		Status:            200,
-		Help:              "Recent SQL errors from Extended Events error_reported",
+		Help:              errorInfoHelp(source),
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "timestamp",
 	}
 }
 
-func errorInfoPermissionMessage() string {
-	return "error-info requires VIEW SERVER STATE permission. Grant with: GRANT VIEW SERVER STATE TO [netdata_user];"
+func errorInfoHelp(source string) string {
+	if source == mssqlErrorSourceSystemHealth {
+		return errorInfoHelpSystemHealth
+	}
+	return errorInfoHelpConfigured
+}
+
+func (c *Collector) errorInfoPermissionMessage() string {
+	permission := c.xeReadPermission()
+	if c.isAzureSQLDatabase() && c.Functions.ErrorInfo.UseRingBuffer {
+		permission = "VIEW DATABASE STATE"
+	}
+	return fmt.Sprintf("error-info requires %s permission. Grant with: GRANT %s TO [netdata_user];", permission, permission)
 }
 
 func mssqlErrorAttributionColumns() []topQueriesColumn {
@@ -362,7 +404,7 @@ func nullableString(value string) any {
 // A cleaner design would be a mssqlErrorData type on funcRouter that both handlers use.
 
 func (c *Collector) collectMSSQLErrorDetails(ctx context.Context) (string, map[string]mssqlErrorRow) {
-	status, rows, err := c.fetchMSSQLErrorRows(ctx, c.errorInfoSessionName(), c.topQueriesLimit())
+	status, _, rows, err := c.fetchMSSQLErrorRows(ctx, c.errorInfoSessionName(), c.topQueriesLimit())
 	if err != nil {
 		if status == mssqlErrorAttrNotEnabled {
 			return mssqlErrorAttrNotEnabled, nil
@@ -475,20 +517,23 @@ func (c *Collector) fetchMSSQLPlanOpsForDB(ctx context.Context, dbName string, h
 		return map[string]mssqlPlanOps{}, nil
 	}
 
-	escapedDB := strings.ReplaceAll(dbName, "]", "]]")
+	queryView := "sys.query_store_query"
+	planView := "sys.query_store_plan"
+	if !c.isAzureSQLDatabase() {
+		escapedDB := strings.ReplaceAll(dbName, "]", "]]")
+		queryView = fmt.Sprintf("[%s].sys.query_store_query", escapedDB)
+		planView = fmt.Sprintf("[%s].sys.query_store_plan", escapedDB)
+	}
 	query := fmt.Sprintf(`
 SELECT
   CONVERT(VARCHAR(64), q.query_hash, 1) AS query_hash,
   CAST(p.query_plan AS NVARCHAR(MAX)) AS query_plan
-FROM [%s].sys.query_store_query q
-INNER JOIN [%s].sys.query_store_plan p ON q.query_id = p.query_id
+FROM %s q
+INNER JOIN %s p ON q.query_id = p.query_id
 WHERE q.query_hash IN (%s);
-`, escapedDB, escapedDB, strings.Join(validHashes, ","))
+`, queryView, planView, strings.Join(validHashes, ","))
 
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
-
-	rows, err := c.db.QueryContext(qctx, query)
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -519,30 +564,72 @@ WHERE q.query_hash IN (%s);
 	return out, nil
 }
 
-func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string, limit int) (string, []mssqlErrorRow, error) {
+func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string, limit int) (string, string, []mssqlErrorRow, error) {
 	if limit <= 0 {
 		limit = 500
 	}
 
-	sessionExists, err := c.mssqlErrorSessionAvailable(ctx, sessionName)
+	target, available, err := c.resolveMSSQLErrorReadTarget(ctx, sessionName, c.Functions.ErrorInfo.UseRingBuffer)
 	if err != nil {
-		return mssqlErrorAttrNotEnabled, nil, err
+		return mssqlErrorAttrNotEnabled, "", nil, err
 	}
-	if !sessionExists {
-		return mssqlErrorAttrNotEnabled, nil, fmt.Errorf("session not found")
+	if !available {
+		if c.isAzureSQLDatabase() {
+			return mssqlErrorAttrNotEnabled, "", nil, errors.New("session not found")
+		}
+		return c.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
+	}
+	status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, target, sessionName, limit, mssqlErrorSourceConfigured)
+	if err == nil || c.isAzureSQLDatabase() || !shouldFallbackErrorInfo(err) {
+		return status, source, rows, err
+	}
+	return c.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
+}
+
+func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, limit int) (string, string, []mssqlErrorRow, error) {
+	if !c.Functions.ErrorInfo.UseRingBuffer {
+		target, available, err := c.resolveMSSQLErrorReadTarget(ctx, "system_health", false)
+		if err != nil && !shouldFallbackErrorInfo(err) {
+			return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
+		}
+		if err == nil && available {
+			status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
+			if err == nil || !shouldFallbackErrorInfo(err) {
+				return status, source, rows, err
+			}
+		}
 	}
 
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
+	target, available, err := c.resolveMSSQLErrorReadTarget(ctx, "system_health", true)
+	if err != nil {
+		return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
+	}
+	if !available {
+		return mssqlErrorAttrNotEnabled, mssqlErrorSourceSystemHealth, nil, errors.New("system_health ring_buffer target unavailable")
+	}
+	return c.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
+}
 
+func shouldFallbackErrorInfo(err error) bool {
+	return !errors.Is(err, context.Canceled) &&
+		!errors.Is(err, context.DeadlineExceeded) &&
+		!isDeadlockPermissionError(err)
+}
+
+func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlErrorReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
 	query := queryMSSQLErrorInfoEventFile
-	if c.Functions.ErrorInfo.UseRingBuffer {
+	args := []any{sql.Named("filePath", target.filePath), sql.Named("filePrefix", target.filePrefix), sql.Named("limit", limit)}
+	if target.filePath == "" {
 		query = queryMSSQLErrorInfoRingBuffer
+		if c.isAzureSQLDatabase() {
+			query = queryMSSQLErrorInfoDatabaseRingBuffer
+		}
+		args = []any{sql.Named("sessionName", sessionName), sql.Named("limit", limit)}
 	}
 
-	rows, err := c.db.QueryContext(qctx, query, sql.Named("sessionName", sessionName), sql.Named("limit", limit))
+	rows, err := c.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return mssqlErrorAttrNotSupported, nil, err
+		return mssqlErrorAttrNotSupported, source, nil, err
 	}
 	defer rows.Close()
 
@@ -559,7 +646,7 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 			errStatePtr *int64
 		)
 		if err := rows.Scan(&ts, &errNo, &errState, &message, &sqlText, &queryHash); err != nil {
-			return mssqlErrorAttrNotSupported, nil, err
+			return mssqlErrorAttrNotSupported, source, nil, err
 		}
 		if errNo.Valid {
 			val := errNo.Int64
@@ -575,39 +662,97 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 			ErrorState:  errStatePtr,
 			Message:     message.String,
 			Query:       sqlText.String,
-			QueryHash:   queryHash.String,
+			QueryHash:   mssqlQueryHashToHex(queryHash.String),
+			Source:      source,
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return mssqlErrorAttrNotSupported, nil, err
+		return mssqlErrorAttrNotSupported, source, nil, err
 	}
 
-	return mssqlErrorAttrEnabled, results, nil
+	return mssqlErrorAttrEnabled, source, results, nil
 }
 
-func (c *Collector) mssqlErrorSessionAvailable(ctx context.Context, sessionName string) (bool, error) {
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
+// mssqlErrorReadTarget says where error_reported events should be read from.
+type mssqlErrorReadTarget struct {
+	// filePath is the event_file read pattern. Empty when reading the ring buffer.
+	filePath   string
+	filePrefix string
+}
 
-	var count int
-	err := c.db.QueryRowContext(qctx, queryMSSQLErrorSessionExists, sql.Named("sessionName", sessionName)).Scan(&count)
+// resolveMSSQLErrorReadTarget locates the Extended Events target for a session, reporting
+// false when the session or the requested target does not exist.
+//
+// For the event_file target the on-disk name is read from the catalog rather than derived
+// from the session name: the filename is operator-chosen and the two frequently differ.
+// The ring_buffer target only exists while the session is running, so that path still
+// goes through the runtime DMVs.
+func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName string, useRingBuffer bool) (mssqlErrorReadTarget, bool, error) {
+	if !useRingBuffer {
+		query := queryMSSQLErrorSessionEventFilePath
+		if c.isAzureSQLDatabase() {
+			query = queryMSSQLErrorDatabaseSessionEventFilePath
+		}
+		var configured sql.NullString
+		err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&configured)
+		if errors.Is(err, sql.ErrNoRows) {
+			return mssqlErrorReadTarget{}, false, nil
+		}
+		if err != nil {
+			return mssqlErrorReadTarget{}, false, err
+		}
+		target := eventFileReadTarget(configured.String)
+		if target.filePath == "" {
+			return mssqlErrorReadTarget{}, false, nil
+		}
+		return target, true, nil
+	}
+
+	available, err := c.mssqlRingBufferAvailable(ctx, sessionName)
+	return mssqlErrorReadTarget{}, available, err
+}
+
+// eventFileReadTarget turns the configured event_file filename into the read path and
+// exact generated-file prefix. Local files use a wildcard; Azure Storage uses the
+// wildcard-free blob prefix required by sys.fn_xe_file_target_read_file.
+func eventFileReadTarget(configured string) mssqlErrorReadTarget {
+	path := strings.TrimSpace(configured)
+	if path == "" {
+		return mssqlErrorReadTarget{}
+	}
+	if strings.HasSuffix(strings.ToLower(path), ".xel") {
+		path = path[:len(path)-len(".xel")]
+	}
+
+	prefix := path + "_0_"
+	base := strings.ReplaceAll(path, `\`, "/")
+	if idx := strings.LastIndex(base, "/"); idx >= 0 {
+		base = base[idx+1:]
+	}
+	filePrefix := base + "_0_"
+	lower := strings.ToLower(path)
+	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
+		return mssqlErrorReadTarget{filePath: prefix, filePrefix: filePrefix}
+	}
+	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: filePrefix}
+}
+
+// mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events
+// uses for query_hash into the 0x-prefixed form Query Store comparisons use, so error
+// attribution can join top-queries rows. Returns "" when the value is not a uint64.
+func mssqlQueryHashToHex(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		return s
+	}
+	v, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return false, err
+		return ""
 	}
-	if count == 0 {
-		return false, nil
-	}
-
-	targetQuery := queryMSSQLErrorSessionHasEventFile
-	if c.Functions.ErrorInfo.UseRingBuffer {
-		targetQuery = queryMSSQLErrorSessionHasRingBuffer
-	}
-
-	err = c.db.QueryRowContext(qctx, targetQuery, sql.Named("sessionName", sessionName)).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return fmt.Sprintf("0x%016X", v)
 }
 
 func countPlanOperators(planXML string) mssqlPlanOps {

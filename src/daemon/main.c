@@ -216,6 +216,9 @@ int log_stack_unittest(void);
 int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
+int aclk_timeout_unittest(void);
+int https_client_timeout_unittest(void);
+int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
@@ -238,6 +241,10 @@ int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
 int stream_path_json_unittest(void);
+#ifdef OS_WINDOWS
+int perflib_storage_unittest(void);
+int perflib_processor_unittest(void);
+#endif
 int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
 int exporting_json_connector_unittest(void);
@@ -484,10 +491,16 @@ int netdata_main(int argc, char **argv) {
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
+                            // summed, not short-circuited: this is the path CI runs, so one
+                            // failing suite must not hide the other two
+                            if (aclk_timeout_unittest() + https_client_timeout_unittest() +
+                                mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_virt_normalize()) return 1;
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
+                            if (perflib_storage_unittest()) return 1;
+                            if (perflib_processor_unittest()) return 1;
 #endif
 
                             // No call to load the config file on this code-path
@@ -524,6 +537,9 @@ int netdata_main(int argc, char **argv) {
                             if (unittest_waiting_queue()) return 1;
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if (mrg_unittest()) return 1;
+#endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
@@ -619,6 +635,15 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclktimeouttest") == 0) {
+                            unittest_running = true;
+                            // run all three and report the total, so one failure does not
+                            // hide the others
+                            int errors = aclk_timeout_unittest();
+                            errors += https_client_timeout_unittest();
+                            errors += mqtt_wss_client_timeout_unittest();
+                            return errors ? 1 : 0;
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;

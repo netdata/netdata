@@ -369,6 +369,39 @@ void pulse_network_do(bool extended __maybe_unused) {
             rrdset_done(st_aclk_inflight);
         }
 
+        {
+            // QoS1/2 messages the broker never acknowledged. This client does not
+            // retransmit, so anything counted here was dropped: the cloud never
+            // confirmed it. Always available (not extended) since it is the only
+            // signal that outbound messages are being lost, and it reads zero on a
+            // healthy link.
+            static RRDSET *st_aclk_timeouts = NULL;
+            static RRDDIM *rd_timed_out = NULL;
+
+            if (unlikely(!st_aclk_timeouts)) {
+                st_aclk_timeouts = rrdset_create_localhost(
+                    "netdata",
+                    "aclk_mqtt_puback_timeouts",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.aclk_mqtt_puback_timeouts",
+                    "Netdata ACLK MQTT Messages Dropped Without a PUBACK",
+                    "messages/s",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 6,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+                rrdlabels_add(st_aclk_timeouts->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+
+                rd_timed_out = rrddim_add(st_aclk_timeouts, "timed out", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_aclk_timeouts, rd_timed_out, (collected_number)t.mqtt.packets_timed_out);
+            rrdset_done(st_aclk_timeouts);
+        }
+
         if(extended) {
             static RRDSET *st_aclk_queue_size = NULL;
             static RRDDIM *rd_messages = NULL;
