@@ -52,6 +52,12 @@ sudo zypper install netdata-plugin-netflow
 sudo systemctl restart netdata
 ```
 
+:::note
+
+The `netdata-plugin-netflow` package is **not published for every distribution release**. The main Netdata packages may install successfully while this separately-packaged plugin is not yet available for your distribution's codename or version. If `apt`, `dnf`, or `zypper` reports `Unable to locate package netdata-plugin-netflow`, use the [Static install (kickstart)](#static-install-kickstart) or [Source build](#source-build) below — both include the plugin on supported architectures.
+
+:::
+
 ## Static install (kickstart)
 
 If you installed Netdata using:
