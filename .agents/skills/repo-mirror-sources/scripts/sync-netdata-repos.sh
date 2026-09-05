@@ -198,8 +198,8 @@ get_uncommitted_details() {
     fi
     cd "$repo" || { echo "cannot access"; return; }
     local staged unstaged
-    staged=$(git diff --cached --numstat | wc -l)
-    unstaged=$(git diff --numstat | wc -l)
+    staged=$(git diff --cached --numstat 2>/dev/null | wc -l)
+    unstaged=$(git diff --numstat 2>/dev/null | wc -l)
     cd "$MIRROR_DIR" 2>/dev/null || true  # Try to return to script directory
     
     # Report details - note that untracked files are shown but don't block updates
@@ -374,7 +374,12 @@ clone_new_repos() {
     # Get list of all repos from GitHub
     print_status "Fetching repository list from GitHub..."
     local repos_list
-    repos_list=$(gh repo list "$ORG" --limit 1000 --json name,sshUrl,defaultBranchRef --source --no-archived)
+    if ! repos_list=$(gh repo list "$ORG" --limit 1000 --json name,sshUrl,defaultBranchRef --source --no-archived) \
+        || [ -z "$repos_list" ]; then
+        # An auth or rate-limit failure must not read as "nothing new to clone".
+        print_status "${RED}✗ gh repo list failed; skipping discovery (check gh auth and rate limits)${NC}"
+        return 1
+    fi
     
     # Process substitution keeps the loop in this shell; a pipeline would run it in a
     # subshell and discard new_repos_count.
@@ -383,14 +388,10 @@ clone_new_repos() {
             new_repos_count=$((new_repos_count + 1))
             print_status "${GREEN}→ Cloning new repo: $name (default branch: $default_branch, with submodules)${NC}"
             if git clone --quiet --recursive "$url" "$name" 2>/dev/null; then
-                # Set up tracking for default branch
-                # Safety: validate we can enter the directory
-                if cd "$name" 2>/dev/null; then
-                    git symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default_branch" 2>/dev/null || true
-                    cd "$MIRROR_DIR" 2>/dev/null || true
-                else
-                    print_status "  ${YELLOW}⚠️  Warning: Could not enter cloned directory${NC}"
-                fi
+                # Set up tracking for the default branch without changing this shell's
+                # directory (the loop now runs in the caller's shell).
+                git -C "$name" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default_branch" 2>/dev/null \
+                    || print_status "  ${YELLOW}⚠️  Warning: could not set origin/HEAD for $name${NC}"
                 print_status "  ${GREEN}✓ Cloned successfully${NC}"
             else
                 print_status "  ${RED}✗ Clone failed${NC}"

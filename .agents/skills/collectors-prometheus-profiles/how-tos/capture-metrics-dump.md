@@ -10,8 +10,8 @@ surface.
 For a local unprotected endpoint:
 
 ```bash
-mkdir -p .local/prometheus-dumps
-DUMP=".local/prometheus-dumps/APP-$(date -u +%Y%m%dT%H%M%SZ).prom"
+DUMP="$(git rev-parse --show-toplevel)/.local/audits/prometheus-dumps/APP-$(date -u +%Y%m%dT%H%M%SZ).prom"
+mkdir -p "$(dirname "$DUMP")"
 curl -fsS "http://127.0.0.1:PORT/metrics" -o "$DUMP"
 ```
 

@@ -76,6 +76,10 @@ while [ $# -gt 0 ]; do
 done
 
 [ -z "$BY" ] && { usage >&2; exit 2; }
+case "$FORMAT" in
+    text|json) ;;
+    *) echo "Unknown --format '$FORMAT' (expected text or json)" >&2; exit 2 ;;
+esac
 
 FIELD="$(field_for_dim "$BY")"
 
@@ -153,9 +157,5 @@ case "$FORMAT" in
         echo "----------------------------------------"
         total=$(echo "$result" | jq '[.[].count] | add // 0')
         echo "  Total in top: $total"
-        ;;
-    *)
-        echo "Unknown --format '$FORMAT' (expected text or json)" >&2
-        exit 2
         ;;
 esac

@@ -50,8 +50,12 @@ while IFS=$'\t' read -r cid defect_instance_id; do
     fi
     out_file="${OUT_DIR}/cid-${cid}.json"
     if [[ -s "${out_file}" ]]; then
-        skipped=$((skipped + 1))
-        continue
+        # A cache entry written before the shape guard below existed may hold a login page.
+        if jq -e 'type=="object" and has("occurrences")' "${out_file}" >/dev/null 2>&1; then
+            skipped=$((skipped + 1))
+            continue
+        fi
+        rm -f "${out_file}"
     fi
     sleep 0.3
 

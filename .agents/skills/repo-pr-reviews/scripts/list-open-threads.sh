@@ -19,6 +19,10 @@ SHORT=0
 
 DIR="$(pr_state_dir "${PR}")"
 FILE="${DIR}/review-threads.json"
+if [[ -e "${DIR}/FETCH-INCOMPLETE" ]]; then
+    echo "[list-open-threads] the last fetch-all.sh run for PR ${PR} did not complete; re-run it before reading threads" >&2
+    exit 1
+fi
 if [[ ! -f "${FILE}" || ! -r "${FILE}" || ! -s "${FILE}" ]]; then
     echo -e "${PR_RED}Missing ${FILE}. Run fetch-all.sh ${PR} first.${PR_NC}" >&2
     exit 1

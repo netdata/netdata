@@ -194,7 +194,11 @@ def warnings(root: Node, app_name: str | None = None) -> list[str]:
             # CephFS-style product names legitimately begin with the same letters as the
             # application; only flag an exact application token, not a longer product word.
             exact_application_prefix = name.casefold() == lowered or name.casefold().startswith(lowered + " ")
-            if exact_application_prefix:
+            if name.casefold() == lowered:
+                results.append(
+                    f"top-level family {name!r} equals the application name: name the product area it holds instead"
+                )
+            elif exact_application_prefix:
                 results.append(
                     f"top-level family {name!r} starts with application name {application!r}: remove the redundant prefix"
                 )
@@ -221,7 +225,11 @@ def warnings(root: Node, app_name: str | None = None) -> list[str]:
 def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("profile", type=Path, help="profile YAML path")
-    parser.add_argument("--app", help="application name used to detect redundant application prefixes")
+    parser.add_argument(
+        "--app",
+        help="resolved job application (default: the profile's app:); drops the root context_namespace segment when it"
+        " equals the app, as the collector does, and detects redundant application prefixes in family names",
+    )
     parser.add_argument("--quiet", action="store_true", help="print ToC without warnings")
     return parser.parse_args(argv)
 

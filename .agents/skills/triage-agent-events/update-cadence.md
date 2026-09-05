@@ -170,8 +170,9 @@ that still matter.
 
 `--version all` skips the auto filter for "when did X
 start?" investigations.
-`--version <regex>` overrides with a custom pattern, applied client-side to the fetched dump;
-`--versions <list>` overrides with explicit server-side values.
+`--version <regex>` overrides with a custom pattern, applied client-side to the fetched dump: it narrows the page
+`--last` returned, it does not widen the query, so raise `--last` when a rare version matters. `--versions <list>`
+overrides with explicit server-side values.
 
 ## What this means in practice
 

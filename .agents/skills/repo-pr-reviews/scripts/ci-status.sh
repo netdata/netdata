@@ -44,10 +44,10 @@ jq -r '
     # carry .state, not .conclusion/.status, and gh reports an in-progress CheckRun with
     # conclusion "". Empty strings are truthy in jq, so // alone picks the wrong field.
     def nz: if . == null or . == "" then empty else . end;
-    .statusCheckRollup
+    (.statusCheckRollup // [])
     | map(. + {key: ((.conclusion|nz) // (.state|nz) // (.status|nz) // "PENDING")})
     | group_by(.key)
-    | map({key: .[0].key, count: length, names: [.[].name // .[].context]})
+    | map({key: .[0].key, count: length, names: [.[] | .name // .context]})
     | sort_by(.key)
     | .[]
     | "\(.key)\t\(.count)\t\((.names | sort | unique | join(", ")[0:200]))"
@@ -56,7 +56,7 @@ jq -r '
 echo
 total=$(jq '.statusCheckRollup | length' <<< "${data}")
 fail=$(jq '[.statusCheckRollup[] | select(((.conclusion // "")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE")) or ((.state // "")|test("^(FAILURE|ERROR)$")))] | length' <<< "${data}")
-running=$(jq '[.statusCheckRollup[] | select((.status // "")=="IN_PROGRESS" or (.status // "")=="QUEUED" or (.state // "")=="PENDING")] | length' <<< "${data}")
+running=$(jq '[.statusCheckRollup[] | select((.status // "")=="IN_PROGRESS" or (.status // "")=="QUEUED" or ((.state // "")|test("^(PENDING|EXPECTED)$")))] | length' <<< "${data}")
 echo "Total checks: ${total}   Failing: ${fail}   Running: ${running}"
 
 # Failures are decided first: a PR with failures and running checks must exit 3, because

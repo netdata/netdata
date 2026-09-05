@@ -1,7 +1,7 @@
 # Handle Malformed Local Codacy JSON
 
-Use this when `analyze-local.sh` writes a `local-*.json` file but `jq` cannot
-parse it.
+Use this when `analyze-local.sh` exits 4 (it now detects this itself: the dump
+is not JSON, or the CLI failed with zero findings) or an older dump does not parse.
 
 1. Verify the dump before reading it as findings:
 

@@ -96,6 +96,7 @@ it during a triage session).
 | `CODACY_HOST` | API host. Defaults to `https://api.codacy.com`; set only if Codacy moves the API host. | n/a | URL |
 | `CODACY_PROVIDER` | git provider. Defaults to `gh` (GitHub). | n/a | `gh` |
 | `CODACY_ORG` | Codacy organization (matches the GitHub org). Defaults to `netdata`. | n/a | short string |
+| `CODACY_CLI_VERSION` | Docker image tag for `analyze-local.sh`. Defaults to `latest`; set to pin the analyzer. Not a secret. | n/a | image tag |
 | `CODACY_REPO` | Codacy repository name. Defaults to `netdata`. | n/a | short string |
 
 `CODACY_TOKEN` is required by `pr-issues.sh` and any wrapper that

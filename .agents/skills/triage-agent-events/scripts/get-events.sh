@@ -259,15 +259,26 @@ echo "[get-events] fetching via $VIA (output: $OUTPUT)..." >&2
 agentevents_query_function "$VIA" "$PAYLOAD" > "$OUTPUT"
 
 if [ -n "$VERSION_REGEX" ]; then
-    jq --arg re "$VERSION_REGEX" '
-        if (type == "object" and has("columns") and has("data")) then
+    # The facet API takes explicit values only, so the pattern is applied to the fetched
+    # page. Every failure path says so instead of claiming a filter that was not applied.
+    if ! jq -e '.columns.AE_AGENT_VERSION.index != null' "$OUTPUT" >/dev/null 2>&1; then
+        echo "[get-events] --version regex NOT applied: the response has no AE_AGENT_VERSION column" >&2
+    else
+        pre_rows="$(jq '(.data // []) | length' "$OUTPUT")"
+        if ! jq --arg re "$VERSION_REGEX" '
             (.columns.AE_AGENT_VERSION.index) as $i
-            | if $i == null then .
-              else .data = [ .data[] | select(((.[$i] // "") | tostring) | test($re)) ]
-              end
-        else . end
-    ' "$OUTPUT" > "$OUTPUT.tmp" && mv "$OUTPUT.tmp" "$OUTPUT"
-    echo "[get-events] applied client-side --version regex: $VERSION_REGEX" >&2
+            | .data = [ (.data // [])[] | select(((.[$i] // "") | tostring) | test($re)) ]
+        ' "$OUTPUT" > "$OUTPUT.tmp"; then
+            rm -f "$OUTPUT.tmp"
+            echo "[get-events] --version regex '$VERSION_REGEX' failed; the dump at $OUTPUT is NOT filtered" >&2
+            exit 2
+        fi
+        mv "$OUTPUT.tmp" "$OUTPUT"
+        echo "[get-events] applied client-side --version regex: $VERSION_REGEX" >&2
+        if [ "$pre_rows" -ge "$LAST" ]; then
+            echo "[get-events] the fetched page was full ($pre_rows rows, --last $LAST): the regex narrowed that page only; raise --last or use --versions for a server-side filter" >&2
+        fi
+    fi
 fi
 
 rows="$(jq '.data | length // 0' "$OUTPUT" 2>/dev/null || echo 0)"

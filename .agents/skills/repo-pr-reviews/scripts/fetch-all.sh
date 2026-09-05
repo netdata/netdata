@@ -35,6 +35,10 @@ PR="${1:?usage: $0 <pr-number>}"
 pr_require_numeric "${PR}"
 SLUG="$(pr_require_slug)"
 DIR="$(pr_state_dir "${PR}")"
+# A marker that survives an abort: readers of the state dir must not treat a partial
+# fetch (an earlier run's files next to this run's) as a complete snapshot.
+touch "${DIR}/FETCH-INCOMPLETE"
+rm -f "${DIR}/summary.txt"
 
 echo -e "${PR_GRAY}[fetch-all] PR ${SLUG}#${PR} -> ${DIR}${PR_NC}" >&2
 
@@ -93,8 +97,9 @@ fetch_paranoid() {
         # identical to "no more pages" and the cache would be reported complete while
         # truncated. fetch_paranoid runs under set -e, so return 1 aborts the script.
         local probe
-        if ! probe="$(gh api "${path}${sep}per_page=100&page=${next_page}" 2>/dev/null)"; then
-            echo -e "${PR_RED}[fetch-all] ${kind}: page ${next_page} probe FAILED (auth? rate limit?); the cache would be incomplete${PR_NC}" >&2
+        if ! probe="$(gh api "${path}${sep}per_page=100&page=${next_page}")" \
+            || ! jq -e 'type=="array"' <<< "${probe}" >/dev/null 2>&1; then
+            echo -e "${PR_RED}[fetch-all] ${kind}: page ${next_page} probe FAILED or was not an array (see gh output above); the cache would be incomplete${PR_NC}" >&2
             return 1
         fi
         local extra
@@ -106,8 +111,9 @@ fetch_paranoid() {
             mv "${out}.merged" "${out}"
             local p=$(( next_page + 1 ))
             while true; do
-                if ! probe="$(gh api "${path}${sep}per_page=100&page=${p}" 2>/dev/null)"; then
-                    echo -e "${PR_RED}[fetch-all] ${kind}: page ${p} FAILED (auth? rate limit?); the cache would be incomplete${PR_NC}" >&2
+                if ! probe="$(gh api "${path}${sep}per_page=100&page=${p}")" \
+                    || ! jq -e 'type=="array"' <<< "${probe}" >/dev/null 2>&1; then
+                    echo -e "${PR_RED}[fetch-all] ${kind}: page ${p} FAILED or was not an array (see gh output above); the cache would be incomplete${PR_NC}" >&2
                     return 1
                 fi
                 extra="$(jq 'length' <<< "${probe}")"
@@ -249,6 +255,7 @@ echo -e "${PR_GRAY}[fetch-all] review-threads: ${n_threads} threads total${PR_NC
         + "  by=" + (.comments.nodes[0].author.login // "?")' \
         "${DIR}/review-threads.json"
 } > "${DIR}/summary.txt"
+rm -f "${DIR}/FETCH-INCOMPLETE"
 
 echo
 cat "${DIR}/summary.txt"

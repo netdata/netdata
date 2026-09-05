@@ -50,6 +50,7 @@ Out of scope until a real use case creates a GitHub issue or branch-local SOW:
 | `CODACY_TOKEN` | Account API token, header `api-token: <value>`. Required by `pr-issues.sh` and any wrapper that calls `_codacyaudit_run`. NOT required by `analyze-local.sh` (the CLI runs anonymously). |
 | `CODACY_HOST` | Defaults to `https://api.codacy.com`. Override only if Codacy moves the API host. |
 | `CODACY_PROVIDER` | Defaults to `gh` (GitHub). |
+| `CODACY_CLI_VERSION` | Optional, not a secret. Docker image tag for `analyze-local.sh`; defaults to `latest`. Set to pin the analyzer. |
 | `CODACY_ORG` | Defaults to `netdata`. |
 | `CODACY_REPO` | Defaults to `netdata`. |
 

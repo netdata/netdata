@@ -78,6 +78,11 @@ if [ -z "$OUTPUT" ]; then
     OUTPUT="${audit_dir}/local${suffix}-$(date -u +%Y%m%dT%H%M%SZ).${FORMAT}"
 fi
 
+case "$FORMAT" in
+    json|sarif) ;;
+    *) echo -e "${CA_RED}[ERROR]${CA_NC} unknown --format '${FORMAT}' (expected json or sarif)" >&2; exit 2 ;;
+esac
+
 # Pick a runner.
 if [ "$RUNNER" = "auto" ]; then
     if command -v codacy-analysis-cli >/dev/null 2>&1; then
@@ -142,7 +147,11 @@ if [ "$FORMAT" = "json" ]; then
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not JSON (tool-runner logs?); the analysis did not complete" >&2
         exit 4
     fi
-    n="$(jq 'if type=="array" then length elif type=="object" and has("issues") then (.issues|length) else 0 end' "$OUTPUT")"
+    if ! jq -e 'type=="array" or (type=="object" and has("issues"))' "$OUTPUT" >/dev/null 2>&1; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is JSON but not a findings array or an {issues} object" >&2
+        exit 4
+    fi
+    n="$(jq 'if type=="array" then length else (.issues|length) end' "$OUTPUT")"
     if [ "$rc" -ne 0 ] && [ "$n" -eq 0 ]; then
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc} with 0 findings: a failed analysis, not a clean tree" >&2
         exit 4
@@ -152,11 +161,17 @@ if [ "$FORMAT" = "json" ]; then
     fi
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
 else
-    if [ "$rc" -ne 0 ]; then
-        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}; ${FORMAT} output cannot be validated, rerun with --format json" >&2
+    # SARIF is JSON too; count results across runs so the same failed-versus-clean rule applies.
+    if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not parseable ${FORMAT}; the analysis did not complete" >&2
         exit 4
     fi
-    echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${OUTPUT} (${FORMAT} format)" >&2
+    n="$(jq '[.runs[]?.results[]?] | length' "$OUTPUT")"
+    if [ "$rc" -ne 0 ] && [ "$n" -eq 0 ]; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc} with 0 findings: a failed analysis, not a clean tree" >&2
+        exit 4
+    fi
+    echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT} (${FORMAT} format)" >&2
 fi
 
 # Last line on stdout: the path. Pipe-friendly.

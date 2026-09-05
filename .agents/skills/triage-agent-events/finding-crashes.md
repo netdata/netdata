@@ -128,6 +128,9 @@ For wider investigations, scope to stable releases only:
 get-events.sh --health crash --version '^v2\.\d+\.\d+$'
 ```
 
+The regex filters the page the server returned (`--last`, default 500); raise `--last` or pass the releases with
+`--versions` when you need every stable-release row.
+
 ## Related recipes
 
 - `recipes/find-by-function.md` -- when you have a function

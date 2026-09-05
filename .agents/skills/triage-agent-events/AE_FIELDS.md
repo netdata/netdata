@@ -308,7 +308,7 @@ exist in producer source.)
 
 ### `AE_EXIT_CAUSE` (top-level)
 
-Source: `src/daemon/status-file.c:1097-1286`. Computed by the
+Source: `src/daemon/status-file.c:1349-1524`. Computed by the
 **agent**, NOT the ingestion server. The most useful field for
 classifying records.
 
