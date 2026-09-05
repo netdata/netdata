@@ -45,7 +45,7 @@ default value.
 
 1. **Code changes have matching `metadata.yaml` changes.** A chart, dimension, label, or unit change in the code
    appears in `metadata.yaml`; a renamed metric changes both files. Row content (rows mirror the code's context,
-   title, unit, type, and dimensions): `.agents/skills/project-collector-metadata/metrics.md`.
+   title, unit, type, and dimensions): `.agents/skills/collectors-metadata-yaml/metrics.md`.
 2. **Chart-context changes have matching `taxonomy.yaml` changes.** Structural `items:` entries and widget `contexts:`
    references name real contexts in the collector's `metadata.yaml`. Dynamic contexts use `type: selector` or
    selector objects with `context_prefix:` or `collect_plugin:` and the corresponding
@@ -56,11 +56,11 @@ default value.
    thing and the option `description` MUST be identical in both files. The rules (tab and group naming, the
    `Tab / Subgroup` form, order, deriving groups from the collector's own keys, the opt-in
    `collecttest.AssertConfigSchemaMatchesMetadata` call) are owned by
-   `.agents/skills/project-go-collector-design/config-schema.md` sections 3 and 8; the metadata side of a row by
-   `.agents/skills/project-collector-metadata/setup.md`.
+   `.agents/skills/collectors-go-design/config-schema.md` sections 3 and 8; the metadata side of a row by
+   `.agents/skills/collectors-metadata-yaml/setup.md`.
 4. **Alert changes have matching `metadata.yaml.alerts` entries.** An alert added, removed, or renamed in
    `health.d/<plugin>.conf` changes `metadata.yaml.modules.<m>.alerts[]`. Row content (name, `on:` context, `info`
-   verbatim, link, `os`): `.agents/skills/project-collector-metadata/alerts-and-meta.md`.
+   verbatim, link, `os`): `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`.
 5. **README handling.** A plugin directory with one integration has a README symlinked to the generated
    `integrations/<slug>.md`, which follows `metadata.yaml`. A directory with several integrations has a hand-written
    README the author updates. `agent_notification` is special: the README itself is the generated artifact (no

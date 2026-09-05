@@ -24,7 +24,7 @@ go run ./tools/prometheus-profile-proof verify --repo-root ../..
 All commands accept `--profile <name>`. A targeted verification still compiles the complete proof catalog because support
 composition is resolved from that catalog, but it replays and checks coverage only for the requested candidate profile.
 
-The authoring-skill launcher `.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py` resolves repository and Go
+The authoring-skill launcher `.agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py` resolves repository and Go
 tool paths, so it can be called from any directory.
 
 ## Verification contract

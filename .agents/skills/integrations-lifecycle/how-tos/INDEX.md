@@ -36,7 +36,7 @@ violation.
 The two cross-type description contracts (catalog sentence, page
 meta description) live in `../description-authoring.md` because
 they apply to all metadata authors. Collector field content rules
-live in `.agents/skills/project-collector-metadata/`.
+live in `.agents/skills/collectors-metadata-yaml/`.
 
 ## How to add a how-to
 

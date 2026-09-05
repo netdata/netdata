@@ -438,9 +438,9 @@ timeout is hardcoded.
 Every free-text field in `metadata.yaml` flows through `gen_integrations.py`, the per-integration `.md`, Learn ingest,
 and the MDX 3 build on Netlify. The ingest escape battery (`learn/ingest/ingest.py:1721-1799`) handles only bare `{`,
 the operators `<=`, `%<`, `<->`, and `<details><summary>`; everything else passes Netdata CI and fails the next Learn
-deploy preview. The patterns and author-side rules are in `.agents/skills/project-collector-metadata/SKILL.md`
+deploy preview. The patterns and author-side rules are in `.agents/skills/collectors-metadata-yaml/SKILL.md`
 ("Safety Of The Markdown"); `integrations/tests/test_collector_metadata.py` now checks collector metadata for them in
-CI. The MDX side is documented in `learn-site-structure/mdx-rules.md` and `pitfalls-and-gotchas.md`.
+CI. The MDX side is documented in `docs-learn-site-structure/mdx-rules.md` and `pitfalls-and-gotchas.md`.
 
 Real-world hit (2026-05-07): netflow-plugin `metadata.yaml` had
 `description: Sets tenant=amazon, region=<aws-region>, role=<service-name>.` for the AWS IP Ranges card (and similar

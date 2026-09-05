@@ -4,7 +4,7 @@
    - 'Test Notification' (agent notifications only).
    - 'Known Errors': one h4 per `troubleshooting.errors.list[]` entry; heading = the error text, body = When / Cause / Fix.
    - 'Other Problems': one h4 per legacy `troubleshooting.problems.list[]` entry.
-   Content rules for the entries: .agents/skills/project-collector-metadata/troubleshooting.md #]
+   Content rules for the entries: .agents/skills/collectors-metadata-yaml/troubleshooting.md #]
 [% set has_diagnostics = entry.integration_type == 'collector' and entry.meta.plugin_name is in(['go.d.plugin', 'python.d.plugin', 'charts.d.plugin']) %]
 [% set has_test_notification = entry.integration_type == 'agent_notification' %]
 [% set has_errors = entry.troubleshooting is defined and entry.troubleshooting.errors is defined and entry.troubleshooting.errors.list %]

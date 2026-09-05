@@ -4,7 +4,7 @@ Metadata descriptions are public product copy: they appear on Learn, in integrat
 and in some in-app surfaces. Write them for an operator scanning a catalog, not for a developer reading implementation
 notes. This file owns the two contracts that apply to every integration type: the catalog sentence and the generated
 page meta description. The content of every collector `metadata.yaml` field is owned by
-`.agents/skills/project-collector-metadata/`.
+`.agents/skills/collectors-metadata-yaml/`.
 
 ## Catalog Description Contract
 
@@ -134,5 +134,5 @@ Before committing `metadata.yaml` changes:
 2. Regenerate `src/collectors/COLLECTORS.md`.
 3. Read the table row description and generated page frontmatter for the integration. Both must answer "what is this
    integration?" without relying on setup context and stay useful when rendered alone in a list, card, or search result.
-4. For a collector, run the review checklist in `.agents/skills/project-collector-metadata/SKILL.md` over the rest of
+4. For a collector, run the review checklist in `.agents/skills/collectors-metadata-yaml/SKILL.md` over the rest of
    the page.

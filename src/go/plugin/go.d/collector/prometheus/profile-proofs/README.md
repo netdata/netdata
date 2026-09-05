@@ -76,8 +76,8 @@ git -C src/go/testdata switch --detach FETCH_HEAD
 From the repository root:
 
 ```bash
-.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py evidence-dirs
-.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py verify
+.agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py evidence-dirs
+.agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py verify
 ```
 
 From `src/go`, replay every declared case and its semantic reconciliation:

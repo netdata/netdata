@@ -136,7 +136,7 @@ Both lists are optional, so an empty object is valid. The object itself is requi
 The `troubleshooting.md` template renders the section as h3 groups: `Diagnostics` (debug-mode and log commands, for
 `go.d.plugin`, `python.d.plugin`, `charts.d.plugin` collectors), `Test Notification` (agent notifications), `Known
 Errors`, `Other Problems`. Content rules for the entries:
-`.agents/skills/project-collector-metadata/troubleshooting.md`.
+`.agents/skills/collectors-metadata-yaml/troubleshooting.md`.
 
 ### `$defs._folding`
 

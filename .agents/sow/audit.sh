@@ -302,11 +302,11 @@ if command -v rg >/dev/null 2>&1; then
     -g '!**/TODO*.md' \
     -g '!**/.agents/sow/q/**' \
     -g '!**/.agents/sow/specs/**' \
-    -g '!**/project-snmp-trap-profiles-authoring/netdata.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/trap-metrics-profiles.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/netdata-snmp-hub-architecture.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/pipeline-internals.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/decisions/**' \
+    -g '!**/collectors-snmp-trap-profiles/netdata.md' \
+    -g '!**/collectors-snmp-trap-profiles/trap-metrics-profiles.md' \
+    -g '!**/collectors-snmp-trap-profiles/netdata-snmp-hub-architecture.md' \
+    -g '!**/collectors-snmp-trap-profiles/pipeline-internals.md' \
+    -g '!**/collectors-snmp-trap-profiles/decisions/**' \
     2>/dev/null || true)
 
   if [ -n "$legacy_refs" ]; then

@@ -612,7 +612,7 @@ scripts directly during active development.
    `gen_integrations.py` against the new master and copies
    `integrations.js` into its source. See `in-app-contract.md`.
 8. Learn's ingest pulls the new `integrations/foo.md` on its
-   3-hourly schedule. See the `learn-site-structure` skill.
+   3-hourly schedule. See the `docs-learn-site-structure` skill.
 
 ## End-to-end: Monitor Anything / `COLLECTORS.md`
 

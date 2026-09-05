@@ -11,7 +11,7 @@ metadata therefore becomes a user-visible broken link on multiple surfaces.
 
 Learn routes are not derived from source filenames. They are derived from
 `docs/.map/map.yaml` labels and hierarchy, while source-relative `/docs/... .md`
-links can be rewritten by Learn ingest (`../../learn-site-structure/mapping.md:219`).
+links can be rewritten by Learn ingest (`../../docs-learn-site-structure/mapping.md:219`).
 For example, `docs/network-flows/visualization/summary-sankey.md` is published
 as `/docs/network-flows/visualization/sankey-and-table` because the map label is
 `Sankey and Table` (`docs/.map/map.yaml:515`).
@@ -90,7 +90,7 @@ PY
 Files read:
 
 - `../SKILL.md`
-- `../../learn-site-structure/mapping.md`
+- `../../docs-learn-site-structure/mapping.md`
 - `docs/.map/map.yaml`
 
 Commands run:

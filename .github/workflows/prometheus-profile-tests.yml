@@ -7,7 +7,7 @@ on:
       - master
     paths:
       - '.github/workflows/prometheus-profile-tests.yml'
-      - '.agents/skills/project-prometheus-profiles/**'
+      - '.agents/skills/collectors-prometheus-profiles/**'
       - 'src/go/**'
   pull_request: null
 
@@ -45,7 +45,7 @@ jobs:
             }
             const relevant = (path) =>
               path === '.github/workflows/prometheus-profile-tests.yml' ||
-              path.startsWith('.agents/skills/project-prometheus-profiles/') ||
+              path.startsWith('.agents/skills/collectors-prometheus-profiles/') ||
               path.startsWith('src/go/');
             return files.some((file) =>
               relevant(file.filename) ||
@@ -97,7 +97,7 @@ jobs:
         if: steps.check-files.outputs.result == 'true'
         run: >-
           python3 -m unittest discover
-          -s .agents/skills/project-prometheus-profiles/scripts
+          -s .agents/skills/collectors-prometheus-profiles/scripts
           -p 'test_*.py'
 
       - name: Verify Prometheus profile proofs
