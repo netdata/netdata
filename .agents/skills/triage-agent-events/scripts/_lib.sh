@@ -41,6 +41,7 @@ agentevents_load_env() {
 
 agentevents_audit_dir() {
     local d
+    # Kept across the skill rename so per-user caches survive; see AGENTS.md, Local-Only Working Directory.
     d="$(agents_audit_dir)/../query-agent-events"
     mkdir -p "$d"
     (cd "$d" && pwd)

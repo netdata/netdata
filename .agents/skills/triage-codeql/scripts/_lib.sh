@@ -67,6 +67,7 @@ gh_require_slug() {
 gh_audit_dir() {
     local root dir
     root="$(gh_repo_root)"
+    # Kept across the skill rename so per-user caches survive; see AGENTS.md, Local-Only Working Directory.
     dir="${root}/.local/audits/graphql"
     mkdir -p "${dir}"
     echo "${dir}"

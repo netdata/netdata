@@ -23,7 +23,7 @@
 #   * color vars defined with $'...' so ESC bytes are real
 #   * <prefix>_repo_root via `git rev-parse --show-toplevel`
 #   * <prefix>_load_env sources <repo>/.env, validates required keys
-#   * <prefix>_audit_dir creates <repo>/.local/audits/<topic>/
+#   * <prefix>_audit_dir creates <repo>/.local/audits/<dir>/
 #
 # Audit topic: "query-netdata-agents".
 

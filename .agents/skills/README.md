@@ -8,12 +8,17 @@ published contract and are exempt from the naming rule below.
 
 ## Naming
 
-- Every runtime skill MUST be named `<area>-<topic>`: the area says where in the product or the repo process the work
-  lands, so a sorted listing groups related skills; the topic says what the skill does. Within `collectors`, the topic
+- Every runtime skill MUST be named `<area>-<topic>`: the area, one lowercase alphanumeric word (it is the text before
+  the first hyphen), says where in the product or the repo process the work lands, so a sorted listing groups related
+  skills; the topic, lowercase alphanumeric words joined by hyphens, says what the skill does. Within `collectors`, the
+  topic
   starts with the sub-area when there is one (`go`, `snmp`, `prometheus`, `metadata`) or with the activity
   (`authoring`).
 - The frontmatter `name` MUST equal the directory name.
-- `.agents/sow/audit.sh` enforces both, and that every `.agents/skills/` path named in a tracked file exists.
+- `.agents/sow/audit.sh` enforces both, and also that every skill directory has a `SKILL.md`, every public symlink
+  points into `docs/netdata-ai/skills/` and resolves, every skill is in the `AGENTS.md` skills index and every index
+  entry has a directory, and every `.agents/skills/` path named in a tracked file (or relative `../` path in a skill
+  file) exists.
 
 ## Areas
 
@@ -31,8 +36,8 @@ published contract and are exempt from the naming rule below.
 
 - An area MUST name a product component or a repo-wide process. A language (`go`, `rust`, `c`) or a vendor or protocol
   (`snmp`, `aws`) is the start of the topic under its component, never an area.
-- Adding an area: add its row to this table in the same change. The audit reads the first cell of every row in this
-  section (a lowercase word in backticks) as the allowed prefixes.
+- An area's row MUST be added to this table in the same change that introduces it. The audit reads the first cell of
+  every row in this section (a lowercase word in backticks) as the allowed prefixes.
 
 ## Finding A Skill
 

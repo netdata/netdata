@@ -444,19 +444,22 @@ evidence-backed reason it is unaffected.
 
 ### Enforcement
 
-- `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files, and
-  sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. The audit pins, as hard failures,
-  the marker line under "SOW System", the exact CRITICAL sensitive-data sentence, legacy `SOW-NNNN` references,
-  relocated spec paths, missing or untracked framework files, a `q/` or `specs/` path that is not gitignored, a
-  `current/` SOW with a missing or invalid `Status:`, a committed SOW or spec working file, a skill directory that lacks
-  `SKILL.md`, is not named `<area>-<topic>` with an area from `.agents/skills/README.md`, or whose frontmatter `name`
-  differs from its directory, a public skill symlink that does not resolve, a `.agents/skills/` path named in a tracked
-  file that does not exist, and a sensitive-data hit in the committed durable artifacts it scans (`AGENTS.md`,
-  `CLAUDE.md`, `GEMINI.md`, `.agents/ENV.md`, the framework files, `.agents/skills/**`,
-  `.agents/skill-verification/**`). It checks in-flight SOW files under `q/current/` (advisory) for the template's
-  required sections for their kind, the `Sensitive data handling plan:` label in every SOW, and `Sensitive data gate:`
-  in non-umbrella SOWs; a missing section or label there is a warning, not a failure. It does not scan SOW working files
-  or specs for secrets.
+- `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files,
+  the skills layout, and sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. Hard
+  failures:
+  - the marker line under "SOW System"; the exact CRITICAL sensitive-data sentence; legacy `SOW-NNNN` references;
+    relocated spec paths; missing or untracked framework files; a `q/` or `specs/` path that is not gitignored;
+  - a `current/` SOW with a missing or invalid `Status:`; a committed SOW or spec working file;
+  - skills: no area table under `## Areas` in `.agents/skills/README.md`; a skill directory that lacks `SKILL.md`, is
+    not named `<area>-<topic>` with a listed area, or whose frontmatter `name` differs from its directory; a public
+    skill symlink that does not point into `docs/netdata-ai/skills/` or does not resolve; a skill directory missing
+    from the `AGENTS.md` skills index, or an index entry with no directory; a `.agents/skills/` path named in a tracked
+    file, or a relative `../` path in a skill file, that does not exist; a failed reference scan;
+  - a sensitive-data hit in the committed durable artifacts it scans (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
+    `.agents/ENV.md`, the framework files, `.agents/skills/**`, `.agents/skill-verification/**`).
+  Advisory: in-flight SOW files under `q/current/` are checked for the template's required sections for their kind,
+  the `Sensitive data handling plan:` label in every SOW, and `Sensitive data gate:` in non-umbrella SOWs; a missing
+  section or label there is a warning. It does not scan SOW working files or specs for secrets.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and
@@ -541,8 +544,8 @@ docs, code, and tests, not in specs.
 Project skills are memory of HOW to work here.
 
 - Runtime input skills MUST live under `.agents/skills/<area>-<topic>/SKILL.md` and follow `.agents/skills/README.md`
-  (areas, naming, frontmatter `name`); `.agents/sow/audit.sh` enforces it. Required First Checks loads the matching
-  ones.
+  (areas, naming, frontmatter `name`); the public skill symlinks are exempt (Public skill convention below);
+  `.agents/sow/audit.sh` enforces it. Required First Checks loads the matching ones.
 - Output/reference skills may also exist under product documentation or generated skill directories. Do not rename,
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
@@ -716,8 +719,10 @@ renames:
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
+| `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
+| `query-snmp-traps` (public) | `query-snmp-traps/` | saved trap query results from its how-tos |
 
-A new skill picks a `<dir>` equal to its topic and records it here.
+A new runtime skill picks a `<dir>` equal to its topic; a public skill uses its skill name. Both record the row here.
 
 ### Per-User Secrets
 
