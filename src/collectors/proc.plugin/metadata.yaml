@@ -2184,19 +2184,99 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
-          description: ""
+          section_name: "plugin:proc:/proc/diskstats"
+          name: "netdata.conf"
+          description: "Netdata main configuration file."
         options:
-          description: ""
+          description: "You can also add a per-disk section `[plugin:proc:/proc/diskstats:DEVICE]` (for example `[plugin:proc:/proc/diskstats:sda]`) with `enable = no` to turn off all metrics for a single disk."
           folding:
-            title: ""
+            title: "Config options"
             enabled: true
-          list: []
+          list:
+            - name: exclude disks
+              description: Do not show metrics for disks whose name matches this netdata simple pattern. Prefix a name with `!` to keep that disk instead, so `!sda !sdb *` monitors only `sda` and `sdb` and excludes everything else.
+              default_value: loop* ram*
+              required: false
+            - name: enable new disks detected at runtime
+              description: Add metrics for disks that appear after Netdata starts.
+              default_value: yes
+              required: false
+            - name: performance metrics for physical disks
+              description: Enable performance metrics for block devices classified as physical disks. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: performance metrics for virtual disks
+              description: Enable performance metrics for block devices classified as virtual disks (such as RAID or device-mapper). Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: performance metrics for partitions
+              description: Enable performance metrics for disk partitions. Accepts `auto`, `yes`, or `no`.
+              default_value: no
+              required: false
+            - name: performance metrics for disks with major N
+              description: Enable or disable performance metrics for every disk sharing a kernel major number, where `N` is the major number. For example `performance metrics for disks with major 7 = no` disables all loop devices. Find the major number for a device in the first column of `/proc/diskstats`.
+              default_value: yes
+              required: false
+            - name: bandwidth for all disks
+              description: Disk I/O bandwidth chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: operations for all disks
+              description: Disk completed I/O operations chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: merged operations for all disks
+              description: Disk merged I/O operations chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: i/o time for all disks
+              description: Disk total I/O time chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: queued operations for all disks
+              description: Disk currently queued I/O operations chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: utilization percentage for all disks
+              description: Disk utilization time chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: extended operations for all disks
+              description: Disk extended I/O operations (discards, flushes) charts. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: backlog for all disks
+              description: Disk backlog chart. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: bcache for all disks
+              description: bcache charts for bcache-backed devices. Accepts `auto`, `yes`, or `no`.
+              default_value: auto
+              required: false
+            - name: name disks by id
+              description: Name disks using stable IDs from `/dev/disk/by-id` instead of kernel device names. Use with the `preferred disk ids` simple pattern to choose which IDs take precedence.
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
-            title: ""
-          list: []
+            title: "Config examples"
+          list:
+            - name: Monitor only specific disks
+              description: Use a simple pattern negation in `exclude disks` to keep only the named disks and exclude everything else. This replaces the default `loop* ram*` exclusion.
+              config: |
+                [plugin:proc:/proc/diskstats]
+                    exclude disks = !sda !sdb *
+            - name: Disable an individual disk
+              description: Turn off all metrics for a single disk using its per-disk section.
+              config: |
+                [plugin:proc:/proc/diskstats:sda]
+                    enable = no
+            - name: Disable all devices of one type
+              description: Disable performance metrics for every device sharing a kernel major number (for example all loop devices, which use major 7).
+              config: |
+                [plugin:proc:/proc/diskstats]
+                    performance metrics for disks with major 7 = no
     troubleshooting:
       problems:
         list: []
