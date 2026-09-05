@@ -165,6 +165,12 @@ static void rrdhost_load_config_labels(void) {
 // the previously-loaded k8s labels (see reload_host_labels()) so a transient
 // script failure does not silently delete them.
 static bool rrdhost_load_kubernetes_labels(void) {
+#if defined(OS_WINDOWS)
+    // Windows agents never run inside a Kubernetes pod, and the loader is a
+    // shell script the package does not guarantee a shell for. Report "not
+    // loaded" so the caller preserves whatever a previous run added.
+    return false;
+#else
     char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
@@ -200,6 +206,7 @@ static bool rrdhost_load_kubernetes_labels(void) {
     }
 
     return true;
+#endif
 }
 
 static void rrdhost_load_auto_labels(void) {

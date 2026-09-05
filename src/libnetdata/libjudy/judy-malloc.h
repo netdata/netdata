@@ -13,5 +13,6 @@ void JudyAllocThreadPulseReset(void);
 int64_t JudyAllocThreadPulseGetAndReset(void);
 
 void libjudy_malloc_init(void);
+int judy_unittest(void);
 
 #endif //NETDATA_JUDY_MALLOC_H

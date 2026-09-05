@@ -74,7 +74,7 @@ elseif(OS_WINDOWS)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(_go_candidates C:/go/bin/${_go_executable_name} "C:/Program Files/go/bin/${_go_executable_name}")
   else()
-    set(_go_candidates /c/go/bin/${_go_executable_name} "/c/Program Files/go/bin/${_go_executable_name}" /mingw64/lib/go/bin/${_go_executable_name} /ucrt64/lib/go/bin/${_go_executable_name} /clang64/lib/go/bin/${_go_executable_name})
+    set(_go_candidates /c/go/bin/${_go_executable_name} "/c/Program Files/go/bin/${_go_executable_name}" /ucrt64/lib/go/bin/${_go_executable_name} /clang64/lib/go/bin/${_go_executable_name})
   endif()
 else()
   file(GLOB _go_versioned_candidates LIST_DIRECTORIES FALSE
