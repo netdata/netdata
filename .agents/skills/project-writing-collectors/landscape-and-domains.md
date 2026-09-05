@@ -71,6 +71,72 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
     It compiles wherever CO-RE is on and fails everywhere else with `has no member named '<field>'`, which
     surfaces as a distro build break (EL8 ships libbpf 0.x) long after the Go job went green.
 
+## Migrating a C ebpf.plugin module to ebpfgo.plugin
+
+The migrations land one module at a time and each reproduces the same five layers.
+`git show b150ca2712` (dcstat, PR #23451) is the reference diff; fd followed it.
+
+- **Layers**: Go collector (`<mod>_{config,plan,global,targets,shared_memory}.go`,
+  `<mod>_loader_{libbpf,other}.go`) -> CGO runtime (`libbpfloader/<mod>_libbpf.{c,go}`,
+  `<mod>_types.go`) -> shared-memory producer (a new `EBPFGO_SHM_FLAG_*` bit plus per-module maps in
+  `ebpf_shared_memory_store.go`) -> C consumers (`apps.plugin`, `cgroups.plugin/cgroup_ebpfgo_<mod>.c`)
+  -> removal of the C module and everything it alone kept alive.
+- **Do not trust the C module's attach-target list.** It is a plain symbol list resolved against
+  `/proc/kallsyms` (`ebpf_load_addresses`, exact `strcmp` + `T/t/W/w` filter), and it goes stale silently:
+  when the kernel moves a syscall onto a different inner function, the old symbol usually still EXISTS,
+  so the probe attaches, the module loads, and the counter sits at zero forever. fd hit exactly this —
+  `close(2)` stopped calling `close_fd()` once `file_close_fd()` appeared, and both the C module and its
+  first Go port reported zero closes on every affected kernel. Before porting a target list, read the
+  current `SYSCALL_DEFINE*` in the kernel source and confirm the symbol is still on the path.
+- **Prefer the syscall wrapper for syscall-shaped metrics.** `__x64_sys_<name>` / `__arm64_sys_<name>` /
+  ... and the unprefixed `sys_<name>` on architectures without `CONFIG_ARCH_HAS_SYSCALL_WRAPPER` (32-bit
+  arm, powerpc) return exactly what userspace sees, so both the call count and the `PT_REGS_RC < 0` error
+  test are correct on every kernel version. Inner helpers are a fallback for kernels predating the
+  wrappers. Watch the return TYPE: a helper returning `struct file *` makes the shipped program's
+  `(int)ret < 0` error test meaningless. Known trade-off: the wrapper is per-ABI, so on x86_64 it misses
+  32-bit processes.
+- **Object prefix is not the run mode.** Legacy objects come in `p`/`r` pairs
+  (`BuildObjectPathWithFlavor`'s `isReturn`). The prefix selects which BPF *programs* the object
+  contains, not what the operator asked for: a module whose upstream buffer/arena programs read
+  `PT_REGS_RC` (fd) MUST load the `r` family in every mode, because those are the only programs that
+  exist. Decide this from the upstream `*_buffer.bpf.c`, never from `ebpf load mode`.
+- **`ebpf load mode` gates charts, not attachment.** The C modules attached both entry and return
+  probes unconditionally and only branched on `em->mode` when creating charts. Reproduce that split.
+- **A producer-side option needs a header flag to reach out-of-process consumers.** `apps.plugin` and
+  `cgroups.plugin` cannot see the collector's config, so anything that changes which charts they may
+  create has to travel as an `EBPFGO_SHM_FLAG_*` bit — see `EBPFGO_SHM_FLAG_FD_ERRORS`. A new bit in the
+  existing header `flags` word is not a layout change and needs no `_vN` segment rename.
+- **Match the chart algorithm, not the previous module you ported.** The row's `ct` gate makes both
+  shapes possible, so pick per module: dcstat's C charts were `absolute`, so its Go port publishes
+  interval totals; cachestat's and fd's are `incremental`, so their ports publish per-interval deltas
+  and the *consumer* accumulates them into monotonic totals
+  (`apps_ebpf_accumulate_cachestat` / `apps_ebpf_accumulate_fd`). Getting this backwards silently
+  rescales every existing chart.
+- **Retain the `enum ebpf_pids_index` slot.** It indexes the legacy ebpf.plugin SHM `threads` bitmask,
+  so renumbering changes what every surviving module's bit means. Delete the struct field, keep the slot.
+- **Resolve attach targets in candidate order**, using `ebpf_kallsyms.go` (`selectKallsymsPrefix` for a
+  compiler-suffixed static symbol, `selectKallsymsCandidateSets` for ordered exact names, one pass for
+  several targets). Candidate order encodes a kernel-version preference; symbol-table order is address
+  order and picks arbitrarily when two candidates coexist.
+- **Cap the base-flavor selector.** Base objects stop earlier than buffer/arena
+  (`<mod>MaxBaseSelector`), and some modules skip a rung entirely — fd ships no `.5.10.` base object.
+  Use the wide `(1 << 12) - 1` kernels mask so buffer/arena can reach selector 11 and let the cap bound
+  the base flavor.
+- **Generated integration docs are a separate post-merge PR** — do not regenerate
+  `integrations/*.md` or `integrations.{js,json}` in the migration PR.
+- **Taxonomy has two separate obligations, and only one of them fails loudly.**
+  - Every collector directory whose `metadata.yaml` taxonomy signature changes must contain a
+    `taxonomy.yaml` in THAT directory — including the C `ebpf.plugin` directory you are removing the
+    module from. `check_collector_taxonomy.py` enforces this (TAX030); a per-module file one level down
+    does not satisfy the parent. For a heterogeneous plugin directory,
+    `taxonomy_optout: {reason: ...}` is the established pattern (`debugfs.plugin`, `macos.plugin`,
+    `ebpfgo.plugin`).
+  - The new `ebpfgo.plugin/<module>/taxonomy.yaml` must ALSO be added to `TAXONOMY_SOURCES` in
+    `integrations/_common.py`. The recursive `src/collectors` entry only globs `<plugin>/taxonomy.yaml`
+    one level deep, so an unregistered per-module file is silently ignored and nothing complains.
+  - Reproduce CI locally before pushing:
+    `python3 integrations/check_collector_taxonomy.py --pr-diff "<base>...HEAD"`.
+
 ## Dealing with data types
 
 A collector ingests one or more of these data types. Each has its own pattern.

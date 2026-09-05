@@ -129,18 +129,67 @@ static inline void nd_ebpf_destroy_links(struct bpf_link ***links, size_t count)
 /* ------------------------------------------------------------------------
  * Per-PID map-walk helpers
  *
- * cachestat and dcstat walk their per-PID BPF map identically; only the counter
- * fields differ.  The field-agnostic steps live here so the per-module loop keeps
- * typed field access, which is where readability actually matters.
+ * cachestat, dcstat and fd walk their per-PID BPF map identically; only the
+ * counter fields differ.  The field-agnostic steps live here so the per-module
+ * loop keeps typed field access, which is where readability actually matters.
  * ------------------------------------------------------------------------ */
 
-/* Resolves the TGID for one map entry.
+/* One global-counter slot to read from the `tbl_*_global` map.  The key is the
+ * BPF-side enum value; the dst is the field of the per-collector output struct
+ * the sum is written into. */
+struct nd_ebpf_snap_global_entry {
+    uint64_t *dst;
+    uint32_t key;
+};
+
+/* Reads a list of global counters from a PERCPU_ARRAY map (or a non-percpu map
+ * — the post-load map type is re-queried for the actual layout) and writes
+ * nd_ebpf_sum_percpu_u64 into each entry's dst.  Caller is responsible for
+ * pre-zeroing dst so a missing key produces a clean zero rather than an
+ * undefined previous-cycle value.
  *
- * With ND_EBPF_APPS_LEVEL_ALL the BPF key is the thread ID and the process TGID
- * lives in the per-CPU values.  Shared memory must be keyed by TGID so
- * cgroup.procs lookups succeed.  Falls back to the map key only when every
- * per-CPU copy still reads 0, which is the race at entry creation — counters are
- * zero then, so the entry is harmless. */
+ * entries_count is sizeof(entries)/sizeof(entries[0]) at the call site; we
+ * pass it explicitly to avoid the macro dependency. */
+static inline void nd_ebpf_global_snap_aggregate(
+    struct bpf_map *map,
+    int map_fd,
+    uint64_t *percpu_u64,
+    int percpu_u64_cap,
+    const struct nd_ebpf_snap_global_entry *entries,
+    size_t entries_count)
+{
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && percpu_u64_cap > 0)
+                ? percpu_u64_cap : 1;
+
+    for (size_t i = 0; i < entries_count; i++) {
+        uint32_t key = entries[i].key;
+        *entries[i].dst = 0;
+
+        if (bpf_map_lookup_elem(map_fd, &key, percpu_u64) == 0)
+            *entries[i].dst = nd_ebpf_sum_percpu_u64(percpu_u64, count);
+    }
+}
+
+/* Resolves the TGID that owns one map entry, scanning every per-CPU slot.
+ *
+ * A percpu map zero-fills the non-creating CPUs' slots (kernel
+ * pcpu_init_value(): "zero-fill element values for other cpus ... onallcpus=false
+ * always when coming from bpf prog"), and the BPF programs write tgid ONLY on the
+ * branch that creates the entry -- every later increment lands on the running
+ * CPU's slot and leaves its tgid at 0 (ebpf-co-re src/{fd,dc,cachestat}.bpf.c).
+ * Creation normally happens once per key, because bpf_map_lookup_elem() succeeds
+ * on every CPU once the key exists.  The walker nevertheless preserves any
+ * distinct non-zero identities if a map contains them, while treating zero-TGID
+ * slots as unnamed siblings whose counters still belong in the report.
+ *
+ * Consequences, both load-bearing:
+ *   - the scan must not stop at slot 0, and
+ *   - a slot whose tgid reads 0 must NOT be discarded; its counters belong to
+ *     this entry.
+ *
+ * Falls back to the map key only when every slot still reads 0, which is the race
+ * at entry creation -- counters are zero then, so the entry is harmless. */
 static inline uint32_t nd_ebpf_snapshot_tgid(
     const void *values,
     int per_cpu_count,
@@ -170,15 +219,16 @@ static inline void nd_ebpf_snapshot_reserve(void **items, size_t *cap, size_t it
     *cap = new_cap;
 }
 
-/* Folds one already-accumulated item into another with the same pid. */
-typedef void (*nd_ebpf_snapshot_merge_fn)(void *dst, const void *src);
-
 /* Collapses per-thread rows into one row per process.
  *
  * Threads of the same process produce separate map entries carrying the same
  * TGID, so the buffer is sorted by pid and consecutive duplicates are merged in
  * place.  Requires pid to be the first member of the item type — callers assert
  * that with ND_EBPF_ASSERT_PID_FIRST.  Returns the surviving item count. */
+
+/* Folds one already-accumulated item into another with the same pid. */
+typedef void (*nd_ebpf_snapshot_merge_fn)(void *dst, const void *src);
+
 static inline size_t nd_ebpf_snapshot_merge_same_pid(
     void *items,
     size_t count,
@@ -243,6 +293,188 @@ static inline int nd_ebpf_alloc_percpu_buffers(
     *percpu_entries_cap = ncpu;
 
     return 0;
+}
+
+/* Fold step for the apps snapshot iterator: take one per-CPU slot at
+ * values[cpu_index] (the underlying entry struct is module-specific) and add
+ * it into the pre-zeroed dst snapshot slot.  The iterator already wrote
+ * dst->pid = tgid; everything else is the caller's responsibility. */
+typedef void (*nd_ebpf_apps_snap_fold_fn)(void *dst, const void *values, int cpu_index);
+
+/* Walks the per-PID BPF map, accumulates one snapshot slot per TGID via the
+ * caller's fold callback, then runs the shared sort/merge-by-pid tail.  The
+ * resulting count is returned; the caller assigns out->items / out->count.
+ *
+ * pre-condition:
+ *   - dst_item has `pid` as its first field (use ND_EBPF_ASSERT_PID_FIRST).
+ *   - values points at percpu_entries_cap × entry_size bytes (the caller
+ *     owns the allocation).
+ *   - items_buf / items_cap is the persistent growable output buffer.
+ *   - fold copies the module's per-CPU counters into dst and updates comm/ct
+ *     as needed.
+ *
+ * Returns the merged item count, or 0 if the map is empty. */
+/* ------------------------------------------------------------------------
+ * BPF map key <-> TGID translation
+ * ------------------------------------------------------------------------ */
+
+/* One row of the per-cycle translation table built while the apps snapshot walks
+ * the per-PID BPF map.
+ *
+ * The map key is NOT the TGID, at any apps level.  Upstream
+ * netdata_get_pid(ctrl_tbl, tgid) in netdata/kernel-collector
+ * includes/netdata_common.h decides the key:
+ *   REAL_PARENT (the default) -> key = real parent PID,  *tgid = current TGID
+ *   PARENT                    -> key = parent PID,       *tgid = current TGID
+ *   ALL                       -> key = current TID,      *tgid = current TGID
+ * so the two coincide only by accident (a single-threaded process that is its
+ * own real parent).
+ *
+ * The snapshot deliberately reports the TGID, because shared memory has to be
+ * indexed by TGID for cgroup.procs lookups to resolve.  Eviction therefore
+ * cannot reuse that value as a map key: doing so made bpf_map_delete_elem()
+ * return ENOENT (swallowed as success), so entries were never removed and the
+ * fixed-size BPF_MAP_TYPE_HASH eventually filled, at which point new processes
+ * stopped being accounted at all.  Worse, a TGID that happens to equal some
+ * other bucket's key would evict a LIVE entry.
+ *
+ * This table records the (key, tgid) pair for every bucket the snapshot visited,
+ * so eviction can map a dead TGID back to the key(s) that actually hold it.  The
+ * relation is many-to-one at level ALL (every thread of a process), so all
+ * matching keys must be deleted, not just the first. */
+struct nd_ebpf_key_tgid {
+    uint32_t key;
+    uint32_t tgid;
+    uint64_t ct;
+};
+
+/* Per-runtime, rebuilt on every apps snapshot and consumed by the eviction that
+ * follows it in the same collection cycle.  Owned by the runtime; freed in
+ * close(). */
+struct nd_ebpf_key_table {
+    struct nd_ebpf_key_tgid *items;
+    size_t count;
+    size_t cap;
+};
+
+static inline void nd_ebpf_key_table_reset(struct nd_ebpf_key_table *t)
+{
+    if (t)
+        t->count = 0;
+}
+
+static inline void nd_ebpf_key_table_add(struct nd_ebpf_key_table *t, uint32_t key, uint32_t tgid, uint64_t ct)
+{
+    if (!t)
+        return;
+
+    if (t->count == t->cap) {
+        size_t cap = t->cap ? t->cap * 2 : 256;
+        t->items = reallocz(t->items, cap * sizeof(*t->items));
+        t->cap = cap;
+    }
+
+    t->items[t->count].key = key;
+    t->items[t->count].tgid = tgid;
+    t->items[t->count].ct = ct;
+    t->count++;
+}
+
+static inline void nd_ebpf_key_table_free(struct nd_ebpf_key_table *t)
+{
+    if (!t)
+        return;
+
+    freez(t->items);
+    t->items = NULL;
+    t->count = 0;
+    t->cap = 0;
+}
+
+static inline size_t nd_ebpf_apps_snap_iterate(
+    struct bpf_map *map,
+    int map_fd,
+    int percpu_entries_cap,
+    const void *values,
+    size_t value_size,
+    size_t tgid_offset,
+    size_t ct_offset,
+    void **items_buf,
+    size_t *items_cap,
+    size_t item_size,
+    nd_ebpf_apps_snap_fold_fn fold,
+    nd_ebpf_snapshot_merge_fn merge_same_pid,
+    struct nd_ebpf_key_table *keys)
+{
+    /* Rebuilt every cycle: the eviction that consumes it runs immediately after
+     * this snapshot, so a stale pair could delete a bucket that has since been
+     * recreated for a different process. */
+    nd_ebpf_key_table_reset(keys);
+
+    /* Re-query the actual post-load map type; bpf_map__set_type can silently
+     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
+                ? percpu_entries_cap : 1;
+
+    size_t out_count = 0;
+    uint32_t key = 0, next_key = 0;
+    bool first_iter = true;
+
+    while (bpf_map_get_next_key(map_fd, first_iter ? NULL : &key, &next_key) == 0) {
+        first_iter = false;
+        if (bpf_map_lookup_elem(map_fd, &next_key, (void *)values)) {
+            key = next_key;
+            memset((void *)values, 0, (size_t)count * value_size);
+            continue;
+        }
+
+        /* Keep each named slot as a distinct identity for eviction.  Unnamed
+         * slots are kernel-zero-filled siblings of the entry; retain their
+         * counters by folding them into the first named slot's output row. */
+        uint32_t owner = nd_ebpf_snapshot_tgid(values, count, value_size, tgid_offset,
+                                               count == 1 ? next_key : 0);
+        for (int i = 0; i < count; i++) {
+            uint32_t slot_tgid;
+            memcpy(&slot_tgid, (const char *)values + (size_t)i * value_size + tgid_offset,
+                   sizeof(slot_tgid));
+            if (!slot_tgid) {
+                if (!owner)
+                    continue;
+                slot_tgid = owner;
+                if (count == 1) {
+                    uint64_t ct;
+                    memcpy(&ct, (const char *)values + (size_t)i * value_size + ct_offset,
+                           sizeof(ct));
+                    nd_ebpf_key_table_add(keys, next_key, slot_tgid, ct);
+                }
+            } else {
+                uint64_t ct;
+                memcpy(&ct, (const char *)values + (size_t)i * value_size + ct_offset,
+                       sizeof(ct));
+                nd_ebpf_key_table_add(keys, next_key, slot_tgid, ct);
+            }
+
+            nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
+            void *dst = (char *)*items_buf + out_count * item_size;
+            memset(dst, 0, item_size);
+            *(uint32_t *)dst = slot_tgid;
+            fold(dst, values, i);
+            out_count++;
+        }
+        key = next_key;
+        memset((void *)values, 0, (size_t)count * value_size);
+    }
+
+    if (out_count == 0)
+        return 0;
+
+    /*
+     * Multiple threads of the same process produce separate BPF entries with the
+     * same TGID.  Sort by pid (TGID) and merge consecutive same-pid entries so
+     * each shared-memory slot represents one process.
+     */
+    return nd_ebpf_snapshot_merge_same_pid(*items_buf, out_count, item_size, merge_same_pid);
 }
 
 /* ------------------------------------------------------------------------
@@ -431,10 +663,20 @@ static inline void nd_ebpf_acc_free(struct nd_ebpf_acc_table *t)
  * ------------------------------------------------------------------------ */
 
 /* Event layout emitted by the buffer and arena BPF programs.  It is shared:
- * netdata_cachestat_event_t and netdata_dc_event_t are byte-identical (48
- * bytes), verified against the arena skeletons' _Static_assert on the state size
- * and against the field offsets in the compiled objects.  action is interpreted
- * per module. */
+ * netdata_cachestat_event_t, netdata_dc_event_t and netdata_fd_event_t are
+ * byte-identical (48 bytes), verified against the arena skeletons'
+ * _Static_assert on the state size and against the field offsets in the
+ * compiled objects.  action is interpreted per module.
+ *
+ * `error` is the one field that is NOT universal.  fd writes it (0 = the traced
+ * syscall succeeded, 1 = it returned < 0); cachestat, dcstat and dns have no
+ * error notion and explicitly zero the same byte as padding, so reading it is
+ * safe for every producer but only meaningful for fd.  Upstream keeps this
+ * deliberate:
+ *   ebpf-co-re src/fd_buffer.bpf.c: ev->pad[0] = ev->pad[1] = 0; ... ev->error = ...
+ *   ebpf-co-re src/dc_buffer.bpf.c: ev->pad[0] = ev->pad[1] = ev->pad[2] = 0;
+ * Do NOT give `error` a module-specific meaning: a second consumer would then
+ * disagree with the producers that treat it as padding. */
 struct nd_ebpf_pid_event {
     uint64_t ct;
     uint32_t pid;
@@ -443,7 +685,8 @@ struct nd_ebpf_pid_event {
     uint32_t gid;
     char     name[16]; /* TASK_COMM_LEN */
     uint8_t  action;
-    uint8_t  pad[3];
+    uint8_t  error;
+    uint8_t  pad[2];
 };
 
 _Static_assert(sizeof(struct nd_ebpf_pid_event) == 48, "nd_ebpf_pid_event must match the BPF-side event layout");
@@ -578,68 +821,140 @@ static inline int nd_ebpf_update_controller(
     return 0;
 }
 
-/*
- * Bulk-deletes PIDs from a per-PID map.  Prefers bpf_map_delete_batch
- * (kernel >= 5.6) and falls back to a tight loop of bpf_map_delete_elem.
- *
- * map_missing is set when the object has no such map, which is the normal case
- * for the buffer/arena flavors: the caller then evicts from its userspace
- * accumulator instead.
- */
-static inline int nd_ebpf_map_delete_pids(
-    struct bpf_object *obj,
-    const char *map_name,
-    uint32_t *pids,
-    size_t count,
-    bool *map_missing)
+static inline int nd_ebpf_u32_cmp(const void *left, const void *right)
 {
-    *map_missing = false;
-
-    if (!obj || !pids || count == 0)
-        return 0;
-
-    struct bpf_map *map = bpf_object__find_map_by_name(obj, map_name);
-    if (!map) {
-        *map_missing = true;
-        return 0;
-    }
-
-    int fd = bpf_map__fd(map);
-    if (fd < 0)
-        return -1;
-
-    /* Fall back to per-key delete on ENOSYS (older kernels) or
-     * EINVAL/EOPNOTSUPP (the kernel rejected the batch shape).  ENOENT also
-     * falls through because htab_map_delete_batch stops at the first missing
-     * key — the remaining PIDs are still deletable individually.
-     *
-     * bpf_map_delete_batch takes __u32 count, not size_t; on overflow we skip
-     * the batch and go straight to the loop. */
-    if (count <= UINT32_MAX) {
-        uint32_t batch_count = (uint32_t)count;
-        int rc = bpf_map_delete_batch(fd, pids, &batch_count, NULL);
-        if (rc == 0)
-            return 0;
-        if (rc != -ENOSYS && rc != -EINVAL && rc != -EOPNOTSUPP && rc != -ENOENT)
-            return rc;
-    }
-
-    for (size_t i = 0; i < count; i++) {
-        int per = bpf_map_delete_elem(fd, &pids[i]);
-        /* Treat "not found" as success: the PID may have been removed by the
-         * BPF program between snapshot and delete. */
-        if (per != 0 && per != -ENOENT)
-            return per;
-    }
-    return 0;
+    const uint32_t a = *(const uint32_t *)left;
+    const uint32_t b = *(const uint32_t *)right;
+    return (a > b) - (a < b);
 }
 
-/* Deletes one PID from a per-PID map; see nd_ebpf_map_delete_pids for
- * map_missing. */
-static inline int nd_ebpf_map_delete_pid(
+static inline int nd_ebpf_key_tgid_cmp(const void *left, const void *right)
+{
+    const struct nd_ebpf_key_tgid *a = left;
+    const struct nd_ebpf_key_tgid *b = right;
+    if (a->key != b->key)
+        return a->key > b->key ? 1 : -1;
+    if (a->tgid != b->tgid)
+        return a->tgid > b->tgid ? 1 : -1;
+    return a->ct > b->ct ? 1 : a->ct < b->ct ? -1 : 0;
+}
+
+static inline bool nd_ebpf_sorted_tgid_in_batch(const uint32_t *tgids, size_t count, uint32_t tgid)
+{
+    return bsearch(&tgid, tgids, count, sizeof(*tgids), nd_ebpf_u32_cmp) != NULL;
+}
+
+static inline bool nd_ebpf_key_group_has_snapshot(
+    const struct nd_ebpf_key_tgid *items,
+    size_t count,
+    uint32_t tgid,
+    uint64_t ct)
+{
+    if (!ct)
+        return false;
+
+    size_t left = 0;
+    size_t right = count;
+    while (left < right) {
+        size_t mid = left + (right - left) / 2;
+        const struct nd_ebpf_key_tgid *item = &items[mid];
+        if (item->tgid < tgid || (item->tgid == tgid && item->ct < ct))
+            left = mid + 1;
+        else
+            right = mid;
+    }
+
+    return left < count && items[left].tgid == tgid && items[left].ct == ct;
+}
+
+/* Re-check every slot against the confirmed-dead batch just before deleting a
+ * map key.  Named slots must still match their recorded (TGID, creation stamp).
+ * An unnamed slot with a non-zero stamp has no verifiable owner and therefore
+ * keeps the key alive; untouched zero slots are harmless. */
+static inline bool nd_ebpf_map_key_delete_eligible(
+    const struct nd_ebpf_key_tgid *items,
+    size_t items_count,
+    const uint32_t *tgids,
+    size_t count,
+    const void *values,
+    size_t value_size,
+    size_t tgid_offset,
+    size_t ct_offset,
+    int slots,
+    uint32_t map_key)
+{
+    bool populated = false;
+    uint64_t fallback_ct = 0;
+    for (int slot = 0; slot < slots; slot++) {
+        uint32_t current_tgid;
+        uint64_t current_ct;
+        memcpy(&current_tgid, (const char *)values + (size_t)slot * value_size + tgid_offset,
+               sizeof(current_tgid));
+        memcpy(&current_ct, (const char *)values + (size_t)slot * value_size + ct_offset,
+               sizeof(current_ct));
+        if (slots == 1)
+            fallback_ct = current_ct;
+
+        if (!current_tgid) {
+            /* A zero TGID has no independently verifiable owner.  It is safe to
+             * ignore only an untouched slot; active unnamed counters must keep
+             * the key alive rather than being evicted speculatively. */
+            bool active = current_ct != 0;
+            if (!active) {
+                const unsigned char *slot_data = (const unsigned char *)values +
+                                                 (size_t)slot * value_size;
+                for (size_t byte = 0; byte < value_size; byte++) {
+                    if (slot_data[byte] != 0) {
+                        active = true;
+                        break;
+                    }
+                }
+            }
+            if (active)
+                return false;
+            continue;
+        }
+
+        populated = true;
+        if (!nd_ebpf_sorted_tgid_in_batch(tgids, count, current_tgid) ||
+            !nd_ebpf_key_group_has_snapshot(items, items_count, current_tgid, current_ct))
+            return false;
+    }
+
+    /* A single-value map may legitimately use its key as the fallback identity. */
+    if (!populated && slots == 1 && map_key != 0)
+        return nd_ebpf_sorted_tgid_in_batch(tgids, count, map_key) &&
+               nd_ebpf_key_group_has_snapshot(items, items_count, map_key, fallback_ct);
+
+    return populated;
+}
+
+/* Evicts the buckets belonging to a set of dead TGIDs.
+ *
+ * This is the eviction entry point every per-PID collector must use.  Deleting
+ * the TGIDs directly does not work — see struct nd_ebpf_key_tgid for why the map
+ * key is not the TGID — so each dead TGID is translated back through the pairs
+ * the last snapshot recorded.  A TGID maps to several keys at apps level ALL (one
+ * per thread), so the scan does not stop at the first hit.
+ *
+ * The cost is O(keys x tgids), but tgids is an eviction batch confirmed dead by
+ * kill(pid, 0) and is typically a handful, so this stays far cheaper than the
+ * alternative of re-walking the BPF map once per eviction.
+ *
+ * map_missing is set when the object has no such map at all (the buffer and arena
+ * flavors publish events instead), which the caller handles by evicting from its
+ * userspace accumulator instead. */
+static inline int nd_ebpf_map_delete_tgids(
     struct bpf_object *obj,
     const char *map_name,
-    uint32_t pid,
+    struct nd_ebpf_key_table *keys,
+    const uint32_t *tgids,
+    size_t count,
+    void *values,
+    size_t value_size,
+    size_t tgid_offset,
+    size_t ct_offset,
+    int percpu_entries_cap,
     bool *map_missing)
 {
     *map_missing = false;
@@ -657,7 +972,50 @@ static inline int nd_ebpf_map_delete_pid(
     if (fd < 0)
         return -1;
 
-    return bpf_map_delete_elem(fd, &pid);
+    if (!keys || !keys->items || keys->count == 0 || !tgids || count == 0)
+        return 0;
+
+    uint32_t *dead = mallocz(count * sizeof(*dead));
+    memcpy(dead, tgids, count * sizeof(*dead));
+    qsort(dead, count, sizeof(*dead), nd_ebpf_u32_cmp);
+    qsort(keys->items, keys->count, sizeof(*keys->items), nd_ebpf_key_tgid_cmp);
+
+    int rc = 0;
+    for (size_t start = 0; start < keys->count;) {
+        size_t end = start + 1;
+        uint32_t map_key = keys->items[start].key;
+        while (end < keys->count && keys->items[end].key == map_key)
+            end++;
+
+        bool candidate = false;
+        for (size_t i = start; i < end; i++) {
+            if (keys->items[i].ct && nd_ebpf_sorted_tgid_in_batch(dead, count, keys->items[i].tgid)) {
+                candidate = true;
+                break;
+            }
+        }
+
+        if (candidate && values && value_size && bpf_map_lookup_elem(fd, &map_key, values) == 0) {
+            enum bpf_map_type mtype = bpf_map__type(map);
+            int slots = (mtype == BPF_MAP_TYPE_PERCPU_HASH && percpu_entries_cap > 0)
+                        ? percpu_entries_cap : 1;
+            if (nd_ebpf_map_key_delete_eligible(
+                    &keys->items[start], end - start, dead, count, values, value_size,
+                    tgid_offset, ct_offset, slots, map_key)) {
+                int per = bpf_map_delete_elem(fd, &map_key);
+                /* Treat "not found" as success: the BPF program may have removed the
+                 * bucket between snapshot and delete. */
+                if (per != 0 && per != -ENOENT)
+                    rc = per;
+            }
+        }
+
+        start = end;
+    }
+
+    freez(dead);
+
+    return rc;
 }
 
 /* Converts the requested per-core preference into the map types the object must

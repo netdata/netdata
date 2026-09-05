@@ -2157,6 +2157,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_fd.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -3129,6 +3130,9 @@ if(OS_LINUX)
             src/collectors/cgroups.plugin/tests/test_cgroup_name_config.c
             src/collectors/cgroups.plugin/cgroup-name-config.c)
 
+    add_executable(cgroup-ebpfgo-fd-rate-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_ebpfgo_fd_rate.c)
+
     add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)
@@ -3278,8 +3282,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.h
             src/collectors/ebpf.plugin/ebpf_disk.c
             src/collectors/ebpf.plugin/ebpf_disk.h
-            src/collectors/ebpf.plugin/ebpf_fd.c
-            src/collectors/ebpf.plugin/ebpf_fd.h
             src/collectors/ebpf.plugin/ebpf_hardirq.c
             src/collectors/ebpf.plugin/ebpf_hardirq.h
             src/collectors/ebpf.plugin/ebpf_mdflush.c

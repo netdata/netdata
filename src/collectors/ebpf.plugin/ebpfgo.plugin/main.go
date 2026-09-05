@@ -13,16 +13,16 @@ import (
 )
 
 func main() {
-	// Cap the Go scheduler to 6 OS threads: one per active collector goroutine
-	// (cachestat, dcstat, socket, dns), one for the signal handler, and one for
-	// the stdin dispatcher goroutine that blocks on os.Stdin reads.  The default
+	// Cap the Go scheduler to 7 OS threads: one per active collector goroutine
+	// (cachestat, dcstat, fd, socket, dns), one for the signal handler, and one
+	// for the stdin dispatcher goroutine that blocks on os.Stdin reads.  The default
 	// GOMAXPROCS = NumCPU allocates O(ncpus) scheduler threads, and CGO calls
 	// on blocked goroutines cause the runtime to create up to O(ncpus)
 	// additional threads — each carrying an 8 MB Linux stack.  On a 64-core
 	// host that is ~130 threads and ~1 GB of stack RSS for no benefit.
-	runtime.GOMAXPROCS(6)
+	runtime.GOMAXPROCS(7)
 
-	updateEvery, dcstatOnly := parsePluginArgs(os.Args[1:])
+	updateEvery, only, fdOverrides := parsePluginArgs(os.Args[1:])
 
 	cachestatCfg, err := resolveCachestatLegacyConfig()
 	if err != nil {
@@ -42,28 +42,63 @@ func main() {
 		os.Exit(1)
 	}
 
+	fdCfg, fdConfigSkipped, err := resolveFDConfigForSelection(only, resolveFDLegacyConfig)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: fd config load failed: %v\n", err)
+		os.Exit(1)
+	}
+	if fdConfigSkipped {
+		fmt.Fprintln(os.Stderr, "ebpf-go.plugin: fd config load failed; skipping fd for --dcstat")
+	}
+	if fdOverrides.reportErrors != nil {
+		fdCfg.ReportErrors = *fdOverrides.reportErrors
+	}
+	if fdOverrides.loadMethod != nil {
+		fdCfg.LoadMethod = *fdOverrides.loadMethod
+	}
+
 	dnsCfg, err := resolveDNSLegacyConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns config load failed: %v\n", err)
 		os.Exit(1)
 	}
-	if dcstatOnly {
-		// The legacy C plugin treated --dcstat as a module-selection flag: it
-		// disabled every other collector and enabled dcstat regardless of config.
+
+	// The legacy C plugin treated --dcstat / --fd as module-selection flags: each
+	// disabled every other collector and enabled its own regardless of config.
+	if only != moduleSelectionNone {
 		cachestatCfg.Enabled = false
+		dcstatCfg.Enabled = false
+		fdCfg.Enabled = false
 		socketCfg.Enabled = false
 		dnsCfg.Enabled = false
-		dcstatCfg.Enabled = true
-		// resolveDCStatLegacyConfig() skips /proc/kallsyms when the module is
-		// disabled in config, so --dcstat has to resolve the targets itself or it
-		// keeps the hardcoded lookup_fast name.  lookup_fast is a static kernel
-		// function and is frequently emitted suffixed (lookup_fast.isra.0), and
-		// legacy mode has no attach fallback, so skipping this makes --dcstat fail
-		// to load on those kernels.  The C module resolved names unconditionally.
-		dcstatCfg.Targets = resolveDCStatTargets()
+
+		// The resolve*Config functions skip /proc/kallsyms when their module is
+		// disabled in config, so a selection flag has to resolve the targets
+		// itself or the module keeps unusable placeholder names.
+		switch only {
+		case moduleSelectionDCStat:
+			dcstatCfg.Enabled = true
+			// lookup_fast is a static kernel function and is frequently emitted
+			// suffixed (lookup_fast.isra.0), and legacy mode has no attach
+			// fallback, so skipping this makes --dcstat fail to load on those
+			// kernels.  The C module resolved names unconditionally.
+			dcstatCfg.Targets = resolveDCStatTargets()
+		case moduleSelectionFD:
+			fdCfg.Enabled = true
+			// Unlike dcstat, fd has no usable default target name at all: the
+			// symbol differs by kernel (do_sys_openat2 vs do_sys_open, close_fd vs
+			// __close_fd).  A resolution failure is reported here and leaves the
+			// module disabled rather than failing an unrelated collector.
+			targets, terr := resolveFDTargets()
+			if terr != nil {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %v\n", terr)
+				os.Exit(1)
+			}
+			fdCfg.Targets = targets
+		}
 	}
 
-	if !anyProgramEnabled(cachestatCfg, dcstatCfg, socketCfg, dnsCfg) {
+	if !anyProgramEnabled(cachestatCfg, dcstatCfg, fdCfg, socketCfg, dnsCfg) {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all eBPF programs disabled by configuration\n")
 		os.Exit(0)
 	}
@@ -92,7 +127,8 @@ func main() {
 	var store *ebpfSharedMemoryStore
 	needsStore := socketCfg.Enabled ||
 		(cachestatCfg.Enabled && (cachestatCfg.AppsEnabled || cachestatCfg.CgroupsEnabled)) ||
-		(dcstatCfg.Enabled && (dcstatCfg.AppsEnabled || dcstatCfg.CgroupsEnabled))
+		(dcstatCfg.Enabled && (dcstatCfg.AppsEnabled || dcstatCfg.CgroupsEnabled)) ||
+		(fdCfg.Enabled && (fdCfg.AppsEnabled || fdCfg.CgroupsEnabled))
 	if needsStore {
 		store = NewEbpfSharedMemoryStore()
 	}
@@ -102,11 +138,12 @@ func main() {
 	var fnStore *socketFunctionStore
 
 	// Exactly one module owns the shared-memory segment; the others only
-	// contribute rows to the shared store.  Ownership order is cachestat,
-	// then dcstat, then socket, so a module's cgroup/apps charts keep working
+	// contribute rows to the shared store.  Ownership order is cachestat, then
+	// dcstat, then fd, then socket, so a module's cgroup/apps charts keep working
 	// whichever subset of modules the operator enabled.
 	var cachestatWillPublish bool
 	var dcstatWillPublish bool
+	var fdWillPublish bool
 
 	// ---- cachestat ----
 	if cachestatCfg.Enabled {
@@ -164,6 +201,38 @@ func main() {
 		}
 	}
 
+	// ---- fd ----
+	if fdCfg.Enabled {
+		ue := resolveUpdateEvery(updateEvery, fdCfg.UpdateEvery, fdDefaultUpdateEvery)
+		fdCfg.UpdateEvery = ue
+
+		handle, herr := LoadFDLegacy(fdCfg)
+		if herr != nil {
+			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: fd load failed: %v\n", herr)
+		} else if handle != nil && handle.Runtime != nil {
+			// Only propagate store to fd when it has apps/cgroups consumers;
+			// that is what triggers per-PID collection and SHM publishing.
+			var fdStore *ebpfSharedMemoryStore
+			if handle.AppsEnabled || handle.CgroupsEnabled {
+				fdStore = store
+				fdWillPublish = !cachestatWillPublish && !dcstatWillPublish
+			} else {
+				// fd is opt-in, so reaching here means an operator enabled it and
+				// will otherwise wonder why only the global charts appeared.
+				warnIntegrationDisabled("fd")
+			}
+			shouldPublish := fdWillPublish
+			anyStarted = true
+			wg.Go(func() {
+				runFDGlobalCollector(api, handle, stop, fdStore, ue, shouldPublish)
+				if fdStore != nil {
+					fdStore.MarkFDInactive()
+				}
+				handle.Close()
+			})
+		}
+	}
+
 	// ---- socket ----
 	if socketCfg.Enabled {
 		ue := resolveUpdateEvery(updateEvery, socketCfg.UpdateEvery, socketDefaultUpdateEvery)
@@ -189,10 +258,10 @@ func main() {
 
 			anyStarted = true
 
-			// Socket owns the SHM publisher only when neither cachestat nor
-			// dcstat is publishing; this lets socket cgroup charts work
-			// independently of the other two modules.
-			socketShouldPublish := store != nil && !cachestatWillPublish && !dcstatWillPublish
+			// Socket owns the SHM publisher only when no earlier module is
+			// publishing; this lets socket cgroup charts work independently of the
+			// other modules.
+			socketShouldPublish := store != nil && !cachestatWillPublish && !dcstatWillPublish && !fdWillPublish
 
 			wg.Go(func() {
 				runSocketGlobalCollector(api, handle, stop, ue, store, fnStore, socketShouldPublish)
@@ -231,21 +300,62 @@ func main() {
 	wg.Wait()
 }
 
-// parsePluginArgs keeps the legacy numeric pluginsd interval and dcstat's
-// module-selection flag. Unknown arguments remain ignored as they were before
+// moduleSelection identifies a legacy `--<module>` flag: the old C plugin used
+// them to run exactly one module, ignoring config.
+type moduleSelection uint8
+
+const (
+	moduleSelectionNone moduleSelection = iota
+	moduleSelectionDCStat
+	moduleSelectionFD
+)
+
+// parsePluginArgs keeps the legacy numeric pluginsd interval and the
+// module-selection flags. Unknown arguments remain ignored as they were before
 // this compatibility parser was added.
-func parsePluginArgs(args []string) (updateEvery int, dcstatOnly bool) {
+//
+// The flags are mutually exclusive because each means "run only this module"; the
+// last one on the command line wins, matching how the C plugin's getopt loop
+// behaved when several were passed.
+type fdCLIOverrides struct {
+	reportErrors *bool
+	loadMethod   *LoadMethod
+}
+
+type fdConfigResolver func() (FDLegacyConfig, error)
+
+// resolveFDConfigForSelection keeps an unrelated malformed fd.conf from
+// preventing the legacy --dcstat-only invocation. All other startup modes need
+// the FD configuration and retain its error.
+func resolveFDConfigForSelection(only moduleSelection, resolve fdConfigResolver) (FDLegacyConfig, bool, error) {
+	cfg, err := resolve()
+	if err != nil && only == moduleSelectionDCStat {
+		return defaultFDLegacyConfig(), true, nil
+	}
+
+	return cfg, false, err
+}
+
+func parsePluginArgs(args []string) (updateEvery int, only moduleSelection, fd fdCLIOverrides) {
 	for _, arg := range args {
 		switch arg {
 		case "--dcstat", "-dcstat":
-			dcstatOnly = true
+			only = moduleSelectionDCStat
+		case "--fd", "-fd", "--filedescriptor", "-filedescriptor":
+			only = moduleSelectionFD
+		case "--return", "-return":
+			fd.reportErrors = new(true)
+		case "--legacy", "-legacy":
+			fd.loadMethod = new(LoadLegacy)
+		case "--core", "-core":
+			fd.loadMethod = new(LoadCore)
 		default:
 			if parsed, err := strconv.Atoi(arg); err == nil && parsed > 0 && updateEvery == 0 {
 				updateEvery = parsed
 			}
 		}
 	}
-	return updateEvery, dcstatOnly
+	return updateEvery, only, fd
 }
 
 // resolveUpdateEvery returns the first positive value from: config file, CLI arg, fallback.
@@ -267,8 +377,9 @@ func resolveUpdateEvery(cliArg, cfgVal, fallback int) int {
 func anyProgramEnabled(
 	cachestatCfg CachestatLegacyConfig,
 	dcstatCfg DCStatLegacyConfig,
+	fdCfg FDLegacyConfig,
 	socketCfg SocketLegacyConfig,
 	dnsCfg DNSLegacyConfig,
 ) bool {
-	return cachestatCfg.Enabled || dcstatCfg.Enabled || socketCfg.Enabled || dnsCfg.Enabled
+	return cachestatCfg.Enabled || dcstatCfg.Enabled || fdCfg.Enabled || socketCfg.Enabled || dnsCfg.Enabled
 }

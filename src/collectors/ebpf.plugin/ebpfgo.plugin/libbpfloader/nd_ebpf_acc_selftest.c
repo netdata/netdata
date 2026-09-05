@@ -97,6 +97,110 @@ static int nd_ebpf_snapshot_merge_selftest(void)
     return 0;
 }
 
+/* Verify growing a caller-owned buffer updates the caller's pointer. */
+static int nd_ebpf_snapshot_reserve_selftest(void)
+{
+    void *items = NULL;
+    size_t cap = 0;
+
+    nd_ebpf_snapshot_reserve(&items, &cap, sizeof(struct nd_ebpf_snapshot_selftest_item), 0);
+    if (!items || cap != 64)
+        return 37;
+
+    nd_ebpf_snapshot_reserve(&items, &cap, sizeof(struct nd_ebpf_snapshot_selftest_item), cap);
+    if (!items || cap != 128)
+        return 38;
+
+    freez(items);
+    return 0;
+}
+
+struct nd_ebpf_key_delete_selftest_slot {
+    uint32_t tgid;
+    uint64_t ct;
+    uint64_t counter;
+};
+
+static int nd_ebpf_key_delete_selftest(void)
+{
+    const size_t slot_size = sizeof(struct nd_ebpf_key_delete_selftest_slot);
+    const size_t tgid_off = offsetof(struct nd_ebpf_key_delete_selftest_slot, tgid);
+    const size_t ct_off = offsetof(struct nd_ebpf_key_delete_selftest_slot, ct);
+
+    /* Realistic percpu shape: the creating CPU's slot carries the tgid and the
+     * newest ct, every other slot holds live counters with tgid == 0.  The old
+     * fixtures gave EVERY slot a distinct non-zero tgid, which the kernel and the
+     * BPF programs never produce -- see nd_ebpf_snapshot_tgid. */
+    struct nd_ebpf_key_tgid keys[] = {
+        {.key = 7, .tgid = 100, .ct = 30},
+    };
+    const uint32_t dead[] = {100};
+    struct nd_ebpf_key_delete_selftest_slot slots[] = {
+        {.tgid = 0, .ct = 0},
+        {.tgid = 100, .ct = 30},
+    };
+
+    /* Dead occupant plus an untouched unnamed slot: evict. */
+    if (!nd_ebpf_map_key_delete_eligible(
+            keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 40;
+
+    /* An active unnamed slot has no verifiable owner and must keep the key. */
+    slots[0] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 0, .ct = 0, .counter = 5};
+    if (nd_ebpf_map_key_delete_eligible(
+            keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 41;
+
+    /* Recreated between snapshot and delete (newer stamp): leave it alone. */
+    slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 100, .ct = 40};
+    if (nd_ebpf_map_key_delete_eligible(
+            keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 42;
+
+    /* Occupant is not in the confirmed-dead batch: keep. */
+    slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 300, .ct = 30};
+    if (nd_ebpf_map_key_delete_eligible(
+            keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 43;
+
+    /* No stamp at all: the entry is mid-creation, so it is never evictable. */
+    slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 100, .ct = 0};
+    if (nd_ebpf_map_key_delete_eligible(
+            keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 44;
+
+    /* Multiple named TGIDs in one key are all validated. */
+    slots[0] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 100, .ct = 30};
+    slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 200, .ct = 20};
+    struct nd_ebpf_key_tgid mixed[] = {
+        {.key = 7, .tgid = 100, .ct = 30},
+        {.key = 7, .tgid = 200, .ct = 20},
+    };
+    const uint32_t mixed_dead[] = {100, 200};
+    if (!nd_ebpf_map_key_delete_eligible(
+            mixed, 2, mixed_dead, 2, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 45;
+
+    slots[1] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 300, .ct = 20};
+    if (nd_ebpf_map_key_delete_eligible(
+            mixed, 2, mixed_dead, 2, slots, slot_size, tgid_off, ct_off, 2, 7))
+        return 46;
+
+    /* Every slot unnamed and active is not safely evictable. */
+    struct nd_ebpf_key_tgid key_fallback[] = {
+        {.key = 100, .tgid = 100, .ct = 30},
+    };
+    struct nd_ebpf_key_delete_selftest_slot unnamed[] = {
+        {.tgid = 0, .ct = 30},
+        {.tgid = 0, .ct = 10},
+    };
+    if (nd_ebpf_map_key_delete_eligible(
+            key_fallback, 1, dead, 1, unnamed, slot_size, tgid_off, ct_off, 2, 100))
+        return 47;
+
+    return 0;
+}
+
 static int acc_selftest_body(void)
 {
     int rc = 0;
@@ -215,6 +319,14 @@ cleanup:
     int merge_rc = nd_ebpf_snapshot_merge_selftest();
     if (merge_rc)
         return merge_rc;
+
+    int reserve_rc = nd_ebpf_snapshot_reserve_selftest();
+    if (reserve_rc)
+        return reserve_rc;
+
+    int delete_rc = nd_ebpf_key_delete_selftest();
+    if (delete_rc)
+        return delete_rc;
 
     return 0;
 }

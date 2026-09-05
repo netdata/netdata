@@ -894,6 +894,8 @@ int main(int argc, char **argv) {
             apps_ebpf_accumulate_cachestat();
         if (apps_ebpf_dcstat_is_available())
             apps_ebpf_accumulate_dcstat();
+        if (apps_ebpf_fd_is_available())
+            apps_ebpf_accumulate_fd();
 #endif
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
