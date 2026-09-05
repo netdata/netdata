@@ -34,7 +34,7 @@ and static emission, update `taxonomy.yaml` in the same PR.
 Metric rows mirror the code (context, chart title, unit, chart type,
 dimensions); option rows mirror the schema; alert rows mirror the health
 conf. The content rules for every field are in
-`.agents/skills/project-collector-metadata/SKILL.md` (`metrics.md`,
+`.agents/skills/collectors-metadata-yaml/SKILL.md` (`metrics.md`,
 `setup.md`, `alerts-and-meta.md`). If a collector emits runtime-only
 dynamic contexts, declare the guardrail in metadata:
 

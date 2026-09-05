@@ -302,11 +302,11 @@ if command -v rg >/dev/null 2>&1; then
     -g '!**/TODO*.md' \
     -g '!**/.agents/sow/q/**' \
     -g '!**/.agents/sow/specs/**' \
-    -g '!**/project-snmp-trap-profiles-authoring/netdata.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/trap-metrics-profiles.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/netdata-snmp-hub-architecture.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/pipeline-internals.md' \
-    -g '!**/project-snmp-trap-profiles-authoring/decisions/**' \
+    -g '!**/collectors-snmp-trap-profiles/netdata.md' \
+    -g '!**/collectors-snmp-trap-profiles/trap-metrics-profiles.md' \
+    -g '!**/collectors-snmp-trap-profiles/netdata-snmp-hub-architecture.md' \
+    -g '!**/collectors-snmp-trap-profiles/pipeline-internals.md' \
+    -g '!**/collectors-snmp-trap-profiles/decisions/**' \
     2>/dev/null || true)
 
   if [ -n "$legacy_refs" ]; then
@@ -317,6 +317,100 @@ if command -v rg >/dev/null 2>&1; then
   fi
 else
   warn "ripgrep not available; skipped legacy SOW reference audit"
+fi
+
+section "skills layout"
+if [ -d .agents/skills ]; then
+  # .agents/skills/README.md, section "## Areas", owns the allowed prefixes: the first cell of each table row.
+  skill_areas=$(awk '
+    /^## / { in_areas = ($0 == "## Areas") }
+    in_areas && /^\|/ { split($0, c, "|"); gsub(/[` \t]/, "", c[2]); if (c[2] ~ /^[a-z][a-z0-9]*$/) print c[2] }
+  ' .agents/skills/README.md 2>/dev/null)
+  skills_bad=0
+  if [ -z "$skill_areas" ]; then
+    fail "no area table found under '## Areas' in .agents/skills/README.md"
+    skills_bad=1
+  fi
+  index_block=$(awk '/^Skills index \(/ { p = 1 } /^Public skills \(/ { p = 0 } p' AGENTS.md)
+  for dir in .agents/skills/*; do
+    name=$(basename "$dir")
+    if [ -L "$dir" ]; then
+      case "$(readlink "$dir")" in
+        ../../docs/netdata-ai/skills/*/..*|../../docs/netdata-ai/skills/*/*)
+          fail "public skill symlink $name must point at a directory directly under docs/netdata-ai/skills/"; skills_bad=1 ;;
+        ../../docs/netdata-ai/skills/*) ;;
+        *) fail "public skill symlink $name does not point into docs/netdata-ai/skills/"; skills_bad=1 ;;
+      esac
+      if [ ! -f "$dir/SKILL.md" ]; then
+        fail "public skill symlink $name does not resolve to a SKILL.md"
+        skills_bad=1
+      fi
+      continue
+    fi
+    [ -d "$dir" ] || continue
+    if [ ! -f "$dir/SKILL.md" ]; then
+      fail "skill $name has no SKILL.md"
+      skills_bad=1
+      continue
+    fi
+    area=${name%%-*}
+    case " $(printf '%s ' $skill_areas)" in
+      *" $area "*) ;;
+      *) fail "skill $name: prefix '$area' is not an area listed in .agents/skills/README.md"; skills_bad=1 ;;
+    esac
+    if ! printf '%s' "$name" | grep -Eq "^${area}-[a-z0-9]+(-[a-z0-9]+)*$"; then
+      fail "skill $name: name is not <area>-<topic>"
+      skills_bad=1
+    fi
+    fm_name=$(awk '{ sub(/\r$/, "") } NR == 1 { sub(/^\357\273\277/, "") } NR == 1 && $0 != "---" { exit } NR > 1 && /^---/ { exit }
+      /^name:/ { sub(/^name:[ \t]*/, ""); sub(/[ \t]+$/, ""); print; exit }' "$dir/SKILL.md" | sed "s/^[\"']//; s/[\"']\$//")
+    if [ "$fm_name" != "$name" ]; then
+      fail "skill $name: frontmatter name '$fm_name' differs from the directory name"
+      skills_bad=1
+    fi
+    if ! printf '%s\n' "$index_block" | grep -Fq "\`$name\`"; then
+      fail "skill $name is not in the AGENTS.md skills index"
+      skills_bad=1
+    fi
+  done
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    if [ ! -e ".agents/skills/$entry" ]; then
+      fail "the AGENTS.md skills index names $entry, which has no directory"
+      skills_bad=1
+    fi
+  done < <(printf '%s\n' "$index_block" | grep -oE '^ *- `[a-z0-9-]+`:' | sed -E 's/^ *- `([a-z0-9-]+)`:/\1/')
+  # Every .agents/skills/... path named in tracked files must exist; renames leave stale pointers otherwise.
+  # A capture ending in "-" is a glob prefix such as .agents/skills/collectors-*/ and is skipped.
+  skill_refs=$(git grep -h -o -E '\.agents/skills/[A-Za-z0-9_./-]+' -- . ':!CHANGELOG.md') && refs_rc=0 || refs_rc=$?
+  if [ "$refs_rc" -gt 1 ]; then
+    fail "git grep failed while collecting .agents/skills/ path references (exit $refs_rc)"
+    skills_bad=1
+  fi
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in *-) continue ;; esac
+    if [ ! -e "$ref" ]; then
+      fail "reference to a missing skill path: $ref"
+      skills_bad=1
+    fi
+  done < <(printf '%s\n' "$skill_refs" | sed 's/[.,;:)]*$//' | sort -u)
+  # Relative ../ paths in skill files (source lines and markdown links), runtime and public, must resolve from the
+  # file's directory.
+  while IFS='|' read -r file ref; do
+    [ -n "$ref" ] || continue
+    if [ ! -e "$(dirname "$file")/$ref" ]; then
+      fail "$file points at a missing relative path: $ref"
+      skills_bad=1
+    fi
+  done < <(git grep -n -o -E '(source "([^/.]*/)?|\]\()(\.\./)+[A-Za-z0-9_./-]+' \
+             -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
+             | sed -E 's/^([^:]*):[0-9]+:(source "([^/.]*\/)?|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
+  if [ "$skills_bad" -eq 0 ]; then
+    ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, and every skill path reference resolves"
+  fi
+else
+  warn "no .agents/skills directory"
 fi
 
 section "sensitive data"

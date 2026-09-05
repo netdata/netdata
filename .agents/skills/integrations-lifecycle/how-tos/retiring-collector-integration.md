@@ -75,7 +75,7 @@ Before delivery, ensure gitignored `integrations/integrations.js`, `integrations
 ## 6. Route deleted Learn pages
 
 Integration pages are inserted into Learn by the integration pipeline. Deleting their source does not automatically
-retarget historical redirects. Follow `.agents/skills/learn-site-structure/recipes/delete-doc-page.md`:
+retarget historical redirects. Follow `.agents/skills/docs-learn-site-structure/recipes/delete-doc-page.md`:
 
 1. identify every redirect anchored to the deleted GitHub source;
 2. choose a live replacement or explicitly accept 404 behavior;

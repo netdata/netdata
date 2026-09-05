@@ -358,8 +358,8 @@ existing owner cannot express the required invariant and that limitation is demo
 - [Stock proof artifact and checkout contract](../../plugin/go.d/collector/prometheus/profile-proofs/README.md)
 - [Proof CLI behavior](../../tools/prometheus-profile-proof/README.md)
 - [Standalone validator behavior and findings](../../tools/prometheus-profile-validation/README.md)
-- [Profile and proof authoring workflow](../../../../.agents/skills/project-prometheus-profiles/SKILL.md)
-- [Strict proof authoring reference](../../../../.agents/skills/project-prometheus-profiles/proof-authoring.md)
+- [Profile and proof authoring workflow](../../../../.agents/skills/collectors-prometheus-profiles/SKILL.md)
+- [Strict proof authoring reference](../../../../.agents/skills/collectors-prometheus-profiles/proof-authoring.md)
 - [Testdata-side artifact and generator operation](https://github.com/netdata/testdata/blob/master/prometheus/README.md)
 
 Executable field authorities are the strict types and validators in `proof`, `semantics`, and `validation`, plus the

@@ -221,7 +221,7 @@ Sensitive data gate:
 ## Artifact Maintenance Gate <!-- sow:implementation -->
 
 - AGENTS.md: <updated path or evidence-backed reason no update was needed>
-- Runtime project skills: <updated .agents/skills/project-*/ path or evidence-backed reason no update was needed>
+- Runtime project skills: <updated .agents/skills/ path or evidence-backed reason no update was needed>
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>

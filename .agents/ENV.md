@@ -31,7 +31,7 @@ state if you forget a key.
 |---|---|---|---|
 | `NETDATA_CLOUD_TOKEN` | long-lived Cloud REST token | app.netdata.cloud -> user menu -> Settings -> API Tokens -> Create. `scope:all` (full) or `scope:grafana-plugin` (read-only data). | 36-char UUID-shaped token |
 | `NETDATA_CLOUD_HOSTNAME` | Cloud REST API host | Almost always `app.netdata.cloud` | `app.netdata.cloud` |
-| `NETDATA_REPOS_DIR` | local Netdata-org repos mirror dir | Pick or create. Will be populated by `mirror-netdata-repos` skill's sync script. | `$HOME/src/netdata` |
+| `NETDATA_REPOS_DIR` | local Netdata-org repos mirror dir | Pick or create. Will be populated by `repo-mirror-sources` skill's sync script. | `$HOME/src/netdata` |
 
 ### Netdata Cloud claiming (build-MCP auto-claim)
 
@@ -57,7 +57,7 @@ forward calls into a running agent's own `/mcp`.
 
 The `agent-events` node is the Netdata-operated ingestion
 host that receives status submissions from every Netdata
-agent in the wild. The query-agent-events skill triages
+agent in the wild. The triage-agent-events skill triages
 crashes / panics / fatals from it.
 
 | Key | Role | Where to find it | Sample format |
@@ -66,7 +66,7 @@ crashes / panics / fatals from it.
 | `AGENT_EVENTS_NODE_ID` | Cloud node UUID for that node | Visit the node in app.netdata.cloud and copy the UUID from the URL; or list nodes via the Cloud API and pick the matching one. | UUID |
 | `AGENT_EVENTS_MACHINE_GUID` | Netdata machine GUID for that node | On the host: `sudo cat /var/lib/netdata/registry/netdata.public.unique.id` | UUID |
 
-### Coverity Scan (coverity-audit skill)
+### Coverity Scan (triage-coverity skill)
 
 | Key | Role | Where to find it | Sample format |
 |---|---|---|---|
@@ -76,10 +76,10 @@ crashes / panics / fatals from it.
 | `COVERITY_VIEW_OUTSTANDING` | integer viewId for the "Outstanding" view | URL query param `?viewId=...` when you open that view | small integer |
 
 The cookie expires; refresh by re-pasting from the browser
-(or run `coverity-audit/scripts/keepalive.sh` to extend
+(or run `triage-coverity/scripts/keepalive.sh` to extend
 it during a triage session).
 
-### SonarCloud (sonarqube-audit skill)
+### SonarCloud (triage-sonarqube skill)
 
 | Key | Role | Where to find it | Sample format |
 |---|---|---|---|
@@ -88,7 +88,7 @@ it during a triage session).
 | `SONAR_PROJECT` | projectKey on SonarCloud | For Netdata: `netdata_netdata` | `org_repo` form |
 | `SONAR_TOKEN` | personal access token | https://sonarcloud.io/account/security -> Generate | long opaque token |
 
-### Codacy Cloud (codacy-audit skill)
+### Codacy Cloud (triage-codacy skill)
 
 | Key | Role | Where to find it | Sample format |
 |---|---|---|---|
@@ -116,7 +116,7 @@ auth` instead.
   `AGENT_EVENTS_HOSTNAME`, `AGENT_EVENTS_NODE_ID`,
   `AGENT_EVENTS_MACHINE_GUID`.)
 
-### query-agent-events
+### triage-agent-events
 
 - `NETDATA_CLOUD_TOKEN`
 - `NETDATA_CLOUD_HOSTNAME`
@@ -131,36 +131,36 @@ auth` instead.
 - `NETDATA_CLAIM_ROOMS` / `NETDATA_CLAIM_URL` (optional)
 - `NETDATA_CLOUD_HOSTNAME` (optional; defaults to `app.netdata.cloud`)
 
-### mirror-netdata-repos
+### repo-mirror-sources
 
 - `NETDATA_REPOS_DIR`
 
-### integrations-lifecycle / learn-site-structure
+### integrations-lifecycle / docs-learn-site-structure
 
 - `NETDATA_REPOS_DIR` (for cross-repo path references in
   examples / recipes)
 
-### coverity-audit
+### triage-coverity
 
 - `COVERITY_HOST`
 - `COVERITY_PROJECT_ID`
 - `COVERITY_COOKIE`
 - `COVERITY_VIEW_OUTSTANDING`
 
-### sonarqube-audit
+### triage-sonarqube
 
 - `SONAR_HOST_URL`
 - `SONAR_ORG`
 - `SONAR_PROJECT`
 - `SONAR_TOKEN`
 
-### codacy-audit
+### triage-codacy
 
 - `CODACY_TOKEN` (required by `pr-issues.sh`; not by `analyze-local.sh`)
 - `CODACY_HOST` (optional; defaults to `https://api.codacy.com`)
 - `CODACY_PROVIDER` / `CODACY_ORG` / `CODACY_REPO` (optional; default to `gh` / `netdata` / `netdata`)
 
-### pr-reviews / graphql-audit
+### repo-pr-reviews / triage-codeql
 
 - No `.env` keys required. Both rely on `gh auth login`
   having been run.
@@ -178,7 +178,7 @@ auth` instead.
 - **Expired Coverity cookie**: re-paste from the browser.
   The script's error message will tell you when this
   happens.
-- **Wrong `gh` org**: `pr-reviews` and `graphql-audit` use
+- **Wrong `gh` org**: `repo-pr-reviews` and `triage-codeql` use
   `gh` against the current repo's remote. Make sure your
   remote points to the right repo (`git remote -v`).
 - **Cloud token scope too narrow**: some endpoints require
