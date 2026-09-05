@@ -261,8 +261,12 @@ agentevents_query_function "$VIA" "$PAYLOAD" > "$OUTPUT"
 if [ -n "$VERSION_REGEX" ]; then
     # The facet API takes explicit values only, so the pattern is applied to the fetched
     # page. Every failure path says so instead of claiming a filter that was not applied.
-    if ! jq -e '.columns.AE_AGENT_VERSION.index != null' "$OUTPUT" >/dev/null 2>&1; then
-        echo "[get-events] --version regex NOT applied: the response has no AE_AGENT_VERSION column" >&2
+    if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
+        echo "[get-events] --version regex NOT applied: the response at $OUTPUT is not JSON" >&2
+        exit 2
+    elif ! jq -e '.columns.AE_AGENT_VERSION.index != null' "$OUTPUT" >/dev/null 2>&1; then
+        echo "[get-events] --version regex NOT applied: the response has no AE_AGENT_VERSION column (dump kept unfiltered at $OUTPUT)" >&2
+        exit 2
     else
         pre_rows="$(jq '(.data // []) | length' "$OUTPUT")"
         if ! jq --arg re "$VERSION_REGEX" '

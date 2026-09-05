@@ -71,8 +71,8 @@ done
 # 1. NETDATA_REPOS_DIR set and points to an existing directory.
 if [ -z "${NETDATA_REPOS_DIR:-}" ]; then
     echo "ERROR: NETDATA_REPOS_DIR is not set." >&2
-    echo "       Set it in <repo>/.env (or your shell env) to the directory" >&2
-    echo "       that holds (or will hold) your Netdata-org repos mirror." >&2
+    echo "       Export it (for example: set -a; source <repo>/.env; set +a); this script does" >&2
+    echo "       not read .env. It names the directory that holds your Netdata-org repos mirror." >&2
     exit 2
 fi
 MIRROR_DIR="$NETDATA_REPOS_DIR"

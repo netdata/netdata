@@ -65,7 +65,7 @@ class ProfileTocContextNamespaceTest(unittest.TestCase):
         root = tree_from_yaml(NAMESPACED_PROFILE, app="exporter")
         self.assertEqual({"availability", "requests.rate"}, all_contexts(root))
 
-    def test_application_prefix_warning_fires_for_an_exact_token(self) -> None:
+    def test_application_prefix_warning_fires_for_a_prefixed_family(self) -> None:
         root = tree_from_yaml(
             """
 app: ceph
@@ -81,6 +81,23 @@ template:
         flagged = [w for w in profile_toc.warnings(root, "ceph") if "application name" in w]
         self.assertEqual(1, len(flagged))
         self.assertIn("'Ceph Cluster'", flagged[0])
+
+    def test_family_equal_to_the_application_gets_its_own_message(self) -> None:
+        root = tree_from_yaml(
+            """
+app: ceph
+template:
+  family: Ceph
+  groups:
+    - family: Ceph
+      charts: [{context: health, title: H}]
+    - family: Pools
+      charts: [{context: pools, title: P}]
+"""
+        )
+        flagged = [w for w in profile_toc.warnings(root, "ceph") if "application name" in w]
+        self.assertEqual(1, len(flagged))
+        self.assertIn("equals the application name", flagged[0])
 
 
 class ProfileTocWarningsTest(unittest.TestCase):

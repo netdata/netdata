@@ -239,7 +239,7 @@ exist in the producer source.)
 
 ### `AE_AGENT_HEALTH`
 
-Source: `src/daemon/status-file.c:929-952`. Computed by the
+Source: `src/daemon/status-file.c:1167-1189` (`agent_health()`). Computed by the
 **agent** (not the ingestion server) at POST time across
 restart history. Used to isolate crash classes.
 

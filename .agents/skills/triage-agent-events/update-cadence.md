@@ -159,7 +159,7 @@ fixed. Filtering to recent versions focuses triage on bugs
 that still matter.
 
 `get-events.sh --version auto` (the default) computes:
-1. Quick discovery query: 24h window, no version filter,
+1. Quick discovery query: the same time window as the main query, no version filter,
    `AE_AGENT_VERSION` as a facet.
 2. From the facet result, pick the latest stable
    (`v\d+\.\d+\.\d+` matching `^v2\.([89]|\d\d)\.\d+$` or the

@@ -29,7 +29,8 @@ Options:
   -h, --help
 
 Required tools: docker (default) OR a local codacy-analysis-cli binary.
-Set CODACY_CLI_VERSION to pin the docker image tag (default: latest).
+CODACY_CLI_VERSION=<tag> in the environment pins the docker image tag (default: latest);
+this script does not read .env.
 EOF
 }
 
@@ -106,7 +107,7 @@ case "$RUNNER" in
         local_args=(analyze --directory "$SUBDIR" --format "$FORMAT")
         [ -n "$TOOL" ] && local_args+=(--tool "$TOOL")
         rc=0
-        codacy-analysis-cli "${local_args[@]}" > "$OUTPUT" 2>/dev/null || rc=$?
+        codacy-analysis-cli "${local_args[@]}" > "$OUTPUT" 2> "$OUTPUT.log" || rc=$?
         ;;
     docker)
         # Per https://github.com/codacy/codacy-analysis-cli the CLI
@@ -125,7 +126,7 @@ case "$RUNNER" in
                 --volume /var/run/docker.sock:/var/run/docker.sock \
                 --volume "$SUBDIR":"$SUBDIR" \
                 "codacy/codacy-analysis-cli:${CODACY_CLI_VERSION:-latest}" \
-                "${cli_args[@]}" > "$OUTPUT" 2>/dev/null || rc=$?
+                "${cli_args[@]}" > "$OUTPUT" 2> "$OUTPUT.log" || rc=$?
         ;;
     *)
         echo -e "${CA_RED}[ERROR]${CA_NC} unknown --runner '${RUNNER}'" >&2
@@ -144,7 +145,7 @@ fi
 # that produced no results must never be reported as a clean tree.
 if [ "$FORMAT" = "json" ]; then
     if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
-        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not JSON (tool-runner logs?); the analysis did not complete" >&2
+        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not JSON; the analysis did not complete (stderr: ${OUTPUT}.log)" >&2
         exit 4
     fi
     if ! jq -e 'type=="array" or (type=="object" and has("issues"))' "$OUTPUT" >/dev/null 2>&1; then
@@ -163,7 +164,11 @@ if [ "$FORMAT" = "json" ]; then
 else
     # SARIF is JSON too; count results across runs so the same failed-versus-clean rule applies.
     if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
-        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not parseable ${FORMAT}; the analysis did not complete" >&2
+        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not parseable ${FORMAT}; the analysis did not complete (stderr: ${OUTPUT}.log)" >&2
+        exit 4
+    fi
+    if ! jq -e 'type=="object" and has("runs")' "$OUTPUT" >/dev/null 2>&1; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is JSON but not a SARIF document (stderr: ${OUTPUT}.log)" >&2
         exit 4
     fi
     n="$(jq '[.runs[]?.results[]?] | length' "$OUTPUT")"

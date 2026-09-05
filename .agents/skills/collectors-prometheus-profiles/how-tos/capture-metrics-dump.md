@@ -10,9 +10,10 @@ surface.
 For a local unprotected endpoint:
 
 ```bash
-DUMP="$(git rev-parse --show-toplevel)/.local/audits/prometheus-dumps/APP-$(date -u +%Y%m%dT%H%M%SZ).prom"
+DUMP="$(git rev-parse --show-toplevel)/.local/audits/prometheus-profiles/APP-$(date -u +%Y%m%dT%H%M%SZ).prom"
 mkdir -p "$(dirname "$DUMP")"
 curl -fsS "http://127.0.0.1:PORT/metrics" -o "$DUMP"
+echo "$DUMP"   # keep this path; the checks below read it
 ```
 
 For an authenticated endpoint, use the operator's existing secret-safe curl or
@@ -23,6 +24,8 @@ Do not pipe through `grep` or another transformation during capture. `# HELP`
 and `# TYPE` lines are part of the evidence.
 
 ## Check the evidence
+
+In the same shell (or set `DUMP` to the path printed above):
 
 ```bash
 grep -c '^# TYPE ' "$DUMP"

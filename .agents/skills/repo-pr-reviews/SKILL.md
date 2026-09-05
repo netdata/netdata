@@ -156,6 +156,8 @@ State for each PR is cached under `<repo-root>/.local/audits/pr-reviews/pr-<N>/`
 - `reviews.json` -- review submissions with body (REST)
 - `review-threads.json` -- per-thread, with `isResolved` (GraphQL)
 - `summary.txt` -- human-readable triage summary
+- `FETCH-INCOMPLETE` -- present only while a fetch is running or after one aborted; the snapshot is partial, re-run
+  `fetch-all.sh` before reading anything else here
 
 ## Workflow
 
