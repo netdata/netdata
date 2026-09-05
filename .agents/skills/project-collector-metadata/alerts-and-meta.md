@@ -45,7 +45,9 @@ integration.", which MUST be true.
 **Question:** what will an operator type into the search box to find this?
 
 - Five to ten terms: the product name and its aliases and abbreviations, the vendor, the protocol or API, the file or
-  service name operators know (`pgsql`, `postgres`, `rds`). All lowercase unless the term is a proper name.
+  service name operators know (`pgsql`, `postgres`, `rds`). All lowercase unless the term is a proper name. A
+  multi-service or multi-device collector (cloud monitoring, SNMP) MAY add the service or vendor names operators search
+  for; the cap applies to single-product collectors.
 - Not marketing words ("monitoring", "observability", "performance"), not words already in the name, not the category.
 - Zero keywords is a defect: the page is then reachable only by its name.
 
@@ -85,5 +87,6 @@ Prerequisites (one h5 per entry, or "No additional configuration is required."),
 - Does every alert in the health conf for this collector's contexts have a row, and does every row's `info` match the
   conf character for character?
 - Is `name` the vendor's spelling, and is `link` the product page (or justifiably empty)?
-- Is there one primary category, an existing icon, and five to ten real search terms?
+- Is there one primary category, an existing icon, and five to ten real search terms (plus service or vendor names
+  only for a multi-service collector)?
 - If `related_resources` is set, does the other integration refer back, and is the referring sentence filled?
