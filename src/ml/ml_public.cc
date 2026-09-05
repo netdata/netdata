@@ -746,7 +746,7 @@ void ml_stop_threads()
     // for the detection thread can fail while the training threads below were
     // created fine; bailing out here would leave them running for the rest of
     // the shutdown, and would leave ml_workers_free() freeing state still in use.
-    // nd_thread_join() is a no-op on a NULL thread.
+    // nd_thread_join() returns ESRCH on NULL and does not log; calling it unconditionally here is safe.
     nd_thread_join(Cfg.detection_thread);
     Cfg.detection_thread = 0;
 
