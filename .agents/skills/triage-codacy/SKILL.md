@@ -11,7 +11,8 @@ Drives Codacy Cloud for `netdata/netdata`:
 2. **Read-only PR triage** -- list Codacy issues for any PR, cluster by tool / pattern / severity / file, drop the JSON dump under `<repo>/.local/audits/codacy/`.
 
 This skill is the fourth in the static-analysis triage family in this repo:
-`triage-coverity/`, `triage-sonarqube/`, `triage-codeql/`, `triage-codacy/`. Same shape, same conventions, same artifact directory.
+`triage-coverity/`, `triage-sonarqube/`, `triage-codeql/`, `triage-codacy/` share one shape and one set of conventions;
+each keeps its own `.local/audits/<dir>/` (root `AGENTS.md`, Local-Only Working Directory).
 
 ## MANDATORY -- keep this skill alive
 

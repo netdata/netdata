@@ -403,7 +403,8 @@ The plugin table, the ibm.d / Rust / C / PLUGINSD notes, and the build/dev loop 
 | Migrating existing go.d collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`; V2 mechanics: `.agents/skills/collectors-go-framework-v2/SKILL.md` |
 | New IBM workload integration (CGO) | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
 | New Rust plugin | SDK at `src/crates/netdata-plugin/`; reference: `src/crates/netflow-plugin/` |
-| New SNMP profile (no code change) | `src/go/plugin/go.d/collector/snmp/profile-format.md` |
+| New SNMP profile (no code change) | `.agents/skills/collectors-snmp-profiles/SKILL.md`; format spec: `src/go/plugin/go.d/collector/snmp/profile-format.md` |
+| New or changed SNMP trap profile | `.agents/skills/collectors-snmp-trap-profiles/SKILL.md` |
 | New interactive Function | `src/go/plugin/framework/functions/README.md`, `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` |
 | Topology work | `.agents/skills/topology-authoring/SKILL.md`, `src/go/pkg/topology/v1`, `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` |
 | Auto-discovery for a new go.d module | rules under `src/go/plugin/go.d/config/go.d/sd/`; engine: `src/go/plugin/agent/discovery/` |
@@ -473,7 +474,7 @@ in `src/go/plugin/go.d/config/go.d.conf`, stock job config at `src/go/plugin/go.
 | Rust plugin SDK | new Rust plugin | `src/crates/netdata-plugin/` (`rt/`, `protocol/`, `bridge/`, `charts-derive/`, `schema/`, `types/`, `error/`) |
 | Rust NetFlow plugin | NetFlow / sFlow / IPFIX work | `src/crates/netflow-plugin/` |
 | OTEL ingestion mappings | per-metric YAML routing | `src/crates/otel-ingestor/` (configs under `configs/otel.d/v1/metrics/`) |
-| SNMP profile format | adding/extending an SNMP profile | `src/go/plugin/go.d/collector/snmp/profile-format.md` |
+| SNMP profiles | adding/extending an SNMP profile or trap profile | `.agents/skills/collectors-snmp-profiles/SKILL.md`, `.agents/skills/collectors-snmp-trap-profiles/SKILL.md`; format spec: `src/go/plugin/go.d/collector/snmp/profile-format.md` |
 | SNMP stock profiles | starting from a known device | `src/go/plugin/go.d/config/go.d/snmp.profiles/default/` |
 | statsd synthetic_charts | operator-curated dashboards | `src/collectors/statsd.plugin/README.md` (lines 397-639) |
 | Prometheus mapping | generic exposition scrape | `src/go/plugin/go.d/collector/prometheus/README.md` |

@@ -41,7 +41,7 @@ agentevents_load_env() {
 
 agentevents_audit_dir() {
     local d
-    d="$(agents_audit_dir)/../triage-agent-events"
+    d="$(agents_audit_dir)/../query-agent-events"
     mkdir -p "$d"
     (cd "$d" && pwd)
 }

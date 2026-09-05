@@ -321,17 +321,26 @@ fi
 
 section "skills layout"
 if [ -d .agents/skills ]; then
-  # The area table in .agents/skills/README.md is the single owner of the allowed prefixes.
-  skill_areas=$(awk -F'|' '/^\| `[a-z]+` \|/ { gsub(/[` ]/, "", $2); print $2 }' .agents/skills/README.md 2>/dev/null)
+  # .agents/skills/README.md, section "## Areas", owns the allowed prefixes: the first cell of each table row.
+  skill_areas=$(awk '
+    /^## / { in_areas = ($0 == "## Areas") }
+    in_areas && /^\|/ { split($0, c, "|"); gsub(/[` \t]/, "", c[2]); if (c[2] ~ /^[a-z][a-z0-9]*$/) print c[2] }
+  ' .agents/skills/README.md 2>/dev/null)
   skills_bad=0
   if [ -z "$skill_areas" ]; then
-    fail "no area table found in .agents/skills/README.md"
+    fail "no area table found under '## Areas' in .agents/skills/README.md"
     skills_bad=1
   fi
-  for dir in .agents/skills/*/; do
-    dir=${dir%/}
+  for dir in .agents/skills/*; do
     name=$(basename "$dir")
-    [ -L "$dir" ] && continue
+    if [ -L "$dir" ]; then
+      if [ ! -f "$dir/SKILL.md" ]; then
+        fail "public skill symlink $name does not resolve to a SKILL.md"
+        skills_bad=1
+      fi
+      continue
+    fi
+    [ -d "$dir" ] || continue
     if [ ! -f "$dir/SKILL.md" ]; then
       fail "skill $name has no SKILL.md"
       skills_bad=1
@@ -342,22 +351,32 @@ if [ -d .agents/skills ]; then
       *" $area "*) ;;
       *) fail "skill $name: prefix '$area' is not an area listed in .agents/skills/README.md"; skills_bad=1 ;;
     esac
-    fm_name=$(awk 'NR > 1 && /^---/ { exit } /^name:/ { sub(/^name:[ \t]*/, ""); print; exit }' "$dir/SKILL.md")
+    if ! printf '%s' "$name" | grep -Eq "^${area}-[a-z0-9]+(-[a-z0-9]+)*$"; then
+      fail "skill $name: name is not <area>-<topic>"
+      skills_bad=1
+    fi
+    fm_name=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && /^---/ { exit } /^name:/ { sub(/^name:[ \t]*/, ""); print; exit }' \
+      "$dir/SKILL.md" | sed "s/^[\"']//; s/[\"']\$//")
     if [ "$fm_name" != "$name" ]; then
       fail "skill $name: frontmatter name '$fm_name' differs from the directory name"
       skills_bad=1
     fi
   done
-  # Every .agents/skills/<name> path named in tracked files must exist (renames leave stale pointers otherwise).
+  # Every .agents/skills/... path named in tracked files must exist; renames leave stale pointers otherwise.
+  skill_refs=$(git grep -h -o -E '\.agents/skills/[A-Za-z0-9_./-]+' -- . ':!CHANGELOG.md' 2>/dev/null) && refs_rc=0 || refs_rc=$?
+  if [ "$refs_rc" -gt 1 ]; then
+    fail "git grep failed while collecting .agents/skills/ path references (exit $refs_rc)"
+    skills_bad=1
+  fi
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
-    if [ ! -e "$ref" ] && ! ls "$ref".* >/dev/null 2>&1; then
+    if [ ! -e "$ref" ]; then
       fail "reference to a missing skill path: $ref"
       skills_bad=1
     fi
-  done < <(git grep -h -o -E '\.agents/skills/[A-Za-z0-9_-]+' -- . ':!CHANGELOG.md' 2>/dev/null | sort -u)
+  done < <(printf '%s\n' "$skill_refs" | sed 's/[.,;:)]*$//' | sort -u)
   if [ "$skills_bad" -eq 0 ]; then
-    ok "skills are area-prefixed, frontmatter names match, and every skill path reference resolves"
+    ok "skills are area-prefixed, frontmatter names match, public symlinks resolve, and every skill path reference resolves"
   fi
 else
   warn "no .agents/skills directory"

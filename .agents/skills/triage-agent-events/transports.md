@@ -42,18 +42,9 @@ predicate to use, what `__logs_sources` value to set.
 
 Auth: `Authorization: Bearer ${NETDATA_CLOUD_TOKEN}`.
 
-### Helper (from query-netdata-cloud)
+### Helper
 
-```bash
-source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-cloud/scripts/_lib.sh"
-cloud_load_env
-cloud_query \
-  "/api/v2/nodes/${AGENT_EVENTS_NODE_ID}/function?function=systemd-journal" \
-  "$PAYLOAD"
-```
-
-Or the `query-netdata-agents` skill's wrapper, which works
-identically and routes through Cloud when configured:
+The `query-netdata-agents` skill's wrapper routes through Cloud when configured:
 
 ```bash
 source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
