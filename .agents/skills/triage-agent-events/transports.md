@@ -49,7 +49,7 @@ The `query-netdata-agents` skill's wrapper routes through Cloud when configured:
 ```bash
 source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
-agents_call_function "$AGENT_EVENTS_NODE_ID" systemd-journal "$PAYLOAD"
+agents_call_function --via cloud --node "$AGENT_EVENTS_NODE_ID" --function systemd-journal --body "$PAYLOAD"
 ```
 
 ### Pros / cons

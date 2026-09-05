@@ -336,6 +336,8 @@ if [ -d .agents/skills ]; then
     name=$(basename "$dir")
     if [ -L "$dir" ]; then
       case "$(readlink "$dir")" in
+        ../../docs/netdata-ai/skills/*/..*|../../docs/netdata-ai/skills/*/*)
+          fail "public skill symlink $name must point at a directory directly under docs/netdata-ai/skills/"; skills_bad=1 ;;
         ../../docs/netdata-ai/skills/*) ;;
         *) fail "public skill symlink $name does not point into docs/netdata-ai/skills/"; skills_bad=1 ;;
       esac
@@ -360,7 +362,7 @@ if [ -d .agents/skills ]; then
       fail "skill $name: name is not <area>-<topic>"
       skills_bad=1
     fi
-    fm_name=$(awk '{ sub(/\r$/, "") } NR == 1 && $0 != "---" { exit } NR > 1 && /^---/ { exit }
+    fm_name=$(awk '{ sub(/\r$/, "") } NR == 1 { sub(/^\357\273\277/, "") } NR == 1 && $0 != "---" { exit } NR > 1 && /^---/ { exit }
       /^name:/ { sub(/^name:[ \t]*/, ""); sub(/[ \t]+$/, ""); print; exit }' "$dir/SKILL.md" | sed "s/^[\"']//; s/[\"']\$//")
     if [ "$fm_name" != "$name" ]; then
       fail "skill $name: frontmatter name '$fm_name' differs from the directory name"
@@ -393,15 +395,17 @@ if [ -d .agents/skills ]; then
       skills_bad=1
     fi
   done < <(printf '%s\n' "$skill_refs" | sed 's/[.,;:)]*$//' | sort -u)
-  # Relative ../ paths in skill files (source lines and markdown links) must resolve from the file's directory.
+  # Relative ../ paths in skill files (source lines and markdown links), runtime and public, must resolve from the
+  # file's directory.
   while IFS='|' read -r file ref; do
     [ -n "$ref" ] || continue
     if [ ! -e "$(dirname "$file")/$ref" ]; then
       fail "$file points at a missing relative path: $ref"
       skills_bad=1
     fi
-  done < <(git grep -n -o -E '(source "[^/]*/|\]\()(\.\./)+[A-Za-z0-9_./-]+' -- '.agents/skills/**' \
-             | sed -E 's/^([^:]*):[0-9]+:(source "[^/]*\/|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
+  done < <(git grep -n -o -E '(source "([^/.]*/)?|\]\()(\.\./)+[A-Za-z0-9_./-]+' \
+             -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
+             | sed -E 's/^([^:]*):[0-9]+:(source "([^/.]*\/)?|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
   if [ "$skills_bad" -eq 0 ]; then
     ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, and every skill path reference resolves"
   fi
