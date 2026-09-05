@@ -89,8 +89,14 @@ fetch_paranoid() {
         local next_page=$(( n / 100 + 1 ))
         echo -e "${PR_YELLOW}[fetch-all] ${kind}: count is exactly ${n} (multiple of 100). Verifying with explicit page=${next_page}...${PR_NC}" >&2
 
+        # Never substitute [] for a failed call: an auth or rate-limit error would look
+        # identical to "no more pages" and the cache would be reported complete while
+        # truncated. fetch_paranoid runs under set -e, so return 1 aborts the script.
         local probe
-        probe="$(gh api "${path}${sep}per_page=100&page=${next_page}" 2>/dev/null || echo '[]')"
+        if ! probe="$(gh api "${path}${sep}per_page=100&page=${next_page}" 2>/dev/null)"; then
+            echo -e "${PR_RED}[fetch-all] ${kind}: page ${next_page} probe FAILED (auth? rate limit?); the cache would be incomplete${PR_NC}" >&2
+            return 1
+        fi
         local extra
         extra="$(jq 'length' <<< "${probe}")"
         if (( extra > 0 )); then
@@ -100,7 +106,10 @@ fetch_paranoid() {
             mv "${out}.merged" "${out}"
             local p=$(( next_page + 1 ))
             while true; do
-                probe="$(gh api "${path}${sep}per_page=100&page=${p}" 2>/dev/null || echo '[]')"
+                if ! probe="$(gh api "${path}${sep}per_page=100&page=${p}" 2>/dev/null)"; then
+                    echo -e "${PR_RED}[fetch-all] ${kind}: page ${p} FAILED (auth? rate limit?); the cache would be incomplete${PR_NC}" >&2
+                    return 1
+                fi
                 extra="$(jq 'length' <<< "${probe}")"
                 (( extra == 0 )) && break
                 echo -e "${PR_YELLOW}[fetch-all] ${kind}: page ${p} had ${extra} more.${PR_NC}" >&2

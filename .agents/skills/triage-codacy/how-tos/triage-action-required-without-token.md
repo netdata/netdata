@@ -14,6 +14,7 @@ GitHub exposes no annotations and the local checkout has no `.env` with
 2. Fetch public PR issue details from Codacy v3:
 
    ```bash
+   mkdir -p .local/audits/codacy
    curl -fsS \
      "https://api.codacy.com/api/v3/analysis/organizations/gh/netdata/repositories/netdata/pull-requests/<PR>/issues?limit=100" \
      -o .local/audits/codacy/pr-<PR>-public-issues.json

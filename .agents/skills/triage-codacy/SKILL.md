@@ -73,10 +73,10 @@ $ .agents/skills/triage-codacy/scripts/analyze-local.sh
 
 Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
 
-Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
-results, the output file may have a `.json` suffix but contain tool-runner logs
-instead of JSON. Always verify with `jq empty <dump>` before treating a local
-dump as finding evidence. If GitHub check-run annotations are empty too, use
+Failed analyses are not clean trees: when the CLI dies before a tool can emit
+results, the dump holds tool-runner logs instead of JSON, and the script exits 4
+(also when the CLI exits non-zero with zero findings). Treat exit 4 as "no
+evidence", not as green. If GitHub check-run annotations are empty too, use
 `pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
 and re-check after the next push.
 

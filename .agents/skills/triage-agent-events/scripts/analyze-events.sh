@@ -144,7 +144,7 @@ case "$FORMAT" in
     json)
         echo "$result" | jq .
         ;;
-    text|*)
+    text)
         echo
         echo "Top $TOP by $BY ($FIELD):"
         printf '%s\n' "----------------------------------------"
@@ -153,5 +153,9 @@ case "$FORMAT" in
         echo "----------------------------------------"
         total=$(echo "$result" | jq '[.[].count] | add // 0')
         echo "  Total in top: $total"
+        ;;
+    *)
+        echo "Unknown --format '$FORMAT' (expected text or json)" >&2
+        exit 2
         ;;
 esac

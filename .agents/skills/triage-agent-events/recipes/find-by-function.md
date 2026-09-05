@@ -9,7 +9,7 @@ Use case: "Is anyone hitting a crash in `function_name` /
 .agents/skills/triage-agent-events/scripts/get-events.sh \
     --function 'rrdcontext_release,rrdcontext_dispatch_updates_to_main' \
     --since '7d ago' \
-    --versions auto \
+    --version auto \
     --last 200 \
     --output /tmp/by-function.json
 ```
@@ -62,7 +62,7 @@ callee):
     --health crash \
     --query 'inlined_callee_name' \
     --since '7d ago' \
-    --versions auto \
+    --version auto \
     --output /tmp/by-symbol.json
 ```
 

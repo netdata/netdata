@@ -15,7 +15,7 @@ anti-patterns to avoid.
 
 ## The hard rule
 
-```
+```text
 selections (structured, indexable)  -->  query (FTS, residual narrower)
 ```
 

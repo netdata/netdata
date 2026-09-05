@@ -77,6 +77,16 @@ while IFS=$'\t' read -r cid defect_instance_id; do
         continue
     fi
 
+    # A 200 body is not proof of a defect payload (an expired session can return a
+    # login page with 200). Anything cached here is skipped forever by the -s guard
+    # above, and prepare-defect.sh then dies on an opaque jq parse error.
+    if ! jq -e 'type=="object" and has("occurrences")' "${out_file}" >/dev/null 2>&1; then
+        failed=$((failed + 1))
+        echo -e "${COV_RED}[${i}/${TOTAL}] cid=${cid} HTTP=200 but the body is not a defect-details object; discarding${COV_NC}" >&2
+        rm -f "${out_file}"
+        continue
+    fi
+
     fetched=$((fetched + 1))
     if (( i % 20 == 0 )); then
         echo -e "${COV_GRAY}[${i}/${TOTAL}] fetched=${fetched} skipped=${skipped} failed=${failed}${COV_NC}" >&2

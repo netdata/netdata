@@ -85,7 +85,7 @@ Check if the count drops to ~zero in nightly N+1 and beyond.
 - **Old version events from unupdated agents are normal**.
   Don't conclude "the bug is back" from a single old-version
   record -- check the date.
-- **`--versions auto` masks regressions** because it filters
+- **`--version auto` masks regressions** because it filters
   to recent versions. Use `--version all` for "when did this
   start?" investigations.
 - **Nightly numbers are commits-since-tag**. Higher number =

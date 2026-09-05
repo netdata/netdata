@@ -222,7 +222,7 @@ intact.
 - `< ` or ` <` with spaces around the `<`.
 - Closing-brace-only sequences if they're standalone.
 
-## Onbroken-links policy
+## onBrokenLinks policy
 
 `docusaurus.config.js:22`: `onBrokenLinks: 'warn'`. Broken
 links never fail the Docusaurus build at the parse level; they

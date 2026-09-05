@@ -70,6 +70,7 @@ EXIT_CAUSE=all
 SIGNAL=
 FUNCTION=
 VERSION=auto
+VERSION_REGEX=
 VERSIONS_EXPLICIT=
 ARCH=
 OS_FAMILY=
@@ -196,9 +197,9 @@ elif [ "$VERSION" = "auto" ]; then
 elif [ "$VERSION" = "all" ]; then
     : # no filter
 else
-    # Pattern -- best-effort: not multi-value selection, leave it
-    # to the caller to client-side-filter the dump after fetch.
-    echo "[get-events] --version <regex> is not pushed to the server; filter the resulting JSON with jq" >&2
+    # A regex cannot be pushed to the server (the facet API takes explicit values), so it is
+    # applied to AE_AGENT_VERSION after the dump is written (see below).
+    VERSION_REGEX="$VERSION"
 fi
 
 # ---------------------------------------------------------------
@@ -256,6 +257,18 @@ fi
 
 echo "[get-events] fetching via $VIA (output: $OUTPUT)..." >&2
 agentevents_query_function "$VIA" "$PAYLOAD" > "$OUTPUT"
+
+if [ -n "$VERSION_REGEX" ]; then
+    jq --arg re "$VERSION_REGEX" '
+        if (type == "object" and has("columns") and has("data")) then
+            (.columns.AE_AGENT_VERSION.index) as $i
+            | if $i == null then .
+              else .data = [ .data[] | select(((.[$i] // "") | tostring) | test($re)) ]
+              end
+        else . end
+    ' "$OUTPUT" > "$OUTPUT.tmp" && mv "$OUTPUT.tmp" "$OUTPUT"
+    echo "[get-events] applied client-side --version regex: $VERSION_REGEX" >&2
+fi
 
 rows="$(jq '.data | length // 0' "$OUTPUT" 2>/dev/null || echo 0)"
 echo "[get-events] wrote $rows row(s) to $OUTPUT" >&2

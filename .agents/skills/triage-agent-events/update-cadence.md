@@ -158,7 +158,7 @@ because many unupdated agents report crashes that have been
 fixed. Filtering to recent versions focuses triage on bugs
 that still matter.
 
-`get-events.sh --versions auto` (the default) computes:
+`get-events.sh --version auto` (the default) computes:
 1. Quick discovery query: 24h window, no version filter,
    `AE_AGENT_VERSION` as a facet.
 2. From the facet result, pick the latest stable
@@ -168,9 +168,10 @@ that still matter.
 3. Re-run the main query with `selections.AE_AGENT_VERSION`
    set to that list.
 
-`--all-versions` skips the auto filter for "when did X
+`--version all` skips the auto filter for "when did X
 start?" investigations.
-`--versions <regex>` overrides with a custom pattern.
+`--version <regex>` overrides with a custom pattern, applied client-side to the fetched dump;
+`--versions <list>` overrides with explicit server-side values.
 
 ## What this means in practice
 
@@ -181,5 +182,5 @@ start?" investigations.
   within 23h, OR the version filter excluded it".
 - High-cardinality crashes from old versions are mostly
   noise; default-version-filtering keeps triage focused.
-- For "is this fixed in v2.X?", run `--versions auto` and
+- For "is this fixed in v2.X?", run `--version auto` and
   compare crash counts across the auto-selected versions.
