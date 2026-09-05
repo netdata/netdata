@@ -135,9 +135,12 @@ main() {
       ;;
     prepare-offline)
       prepare_offline_install_source "${OFFLINE_TARGET}"
+      offline_status="$?"
       deferred_warnings
       trap - EXIT
-      exit 0
+      # Report the real result: automation must not be told an offline source
+      # was prepared when it was not.
+      exit "${offline_status}"
       ;;
   esac
 
@@ -753,7 +756,10 @@ handle_wget_result() {
   case "${ret}" in
     0) return 0 ;;
     8)
-      status="$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')"
+      # Anchor on the status line: a `Server:` header can also contain "HTTP/"
+      # (for example "Server: BaseHTTP/0.6"), and an unanchored match picks that
+      # up instead, yielding a nonsense status.
+      status="$(grep -E '^[[:space:]]*HTTP/' "${dl_log}" | tail -n 1 | awk '{ print $2 }')"
       [ -n "${dest}" ] && rm -f "${dest}"
       handle_http_status "${status}" "${url}" "${action}"
       return "$?"
@@ -872,44 +878,92 @@ get_redirect() {
   cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
   output="${tmpdir}/download.log"
   rm -f "${output}"
+  redirect=''
+
+  # Note: a mirror may legitimately serve a real `latest/` directory, in which
+  # case there is no redirect and `latest` itself is the correct answer. Our own
+  # artifact verification jobs are built that way. Only an HTTP error or an
+  # empty result means resolution failed.
 
   if [ -n "${CURL}" ]; then
-    run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
+    # Invoked directly rather than through run(), matching check_for_remote_file:
+    # this is a read-only query whose answer the caller needs, so it must still
+    # happen during a dry run.
+    #
+    # --fail is required for correctness, not tidiness: an HTTP error is not a
+    # redirect, so without it curl exits 0 with url_effective still set to the
+    # requested URL and the caller silently builds a download URL from it.
+    # --retry covers the transient cases (5xx, 408, 429, timeouts). The status
+    # code is written last so handle_curl_result's `tail -n 1` reads a status
+    # rather than a URL.
+    "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 -I --output /dev/null --write-out "%{url_effective}\n%{http_code}" "${url}" > "${output}"
 
     ret="$?"
 
-    case "${ret}" in
-      0)
-        grep -Eo '[^/]+/?$' "${output}" | grep -Eo '^[^/]+'
-        rm -f "${output}"
-        return 0
-        ;;
-      *)
-        handle_curl_result "${ret}" "${url}" "${output}" "checking redirects for"
-        return "$?"
-        ;;
-    esac
+    if [ "${ret}" -ne 0 ]; then
+      handle_curl_result "${ret}" "${url}" "${output}" "checking redirects for"
+      ret="$?"
+      rm -f "${output}"
+      # Never report success: callers must be able to tell resolution failed.
+      [ "${ret}" -eq 0 ] && ret=1
+      return "${ret}"
+    fi
+
+    redirect="$(head -n 1 "${output}" | grep -Eo '[^/]+/?$' | grep -Eo '^[^/]+')"
+    rm -f "${output}"
+  elif [ -n "${WGET}" ]; then
+    # Retry in the shell rather than with wget options, because implementations
+    # differ: GNU wget treats a 5xx as fatal unless given --retry-on-http-error,
+    # and BusyBox wget has no HTTP-level retry at all. This keeps parity with
+    # curl's --retry on every wget we may be handed. The status set matches the
+    # one curl retries.
+    wget_attempt=1
+    while :; do
+      "${WGET}" -S -T 15 -o "${output}" -O /dev/null "${url}"
+      ret="$?"
+
+      [ "${ret}" -eq 0 ] && break
+      [ "${wget_attempt}" -ge 3 ] && break
+
+      # An empty status means no response at all (connection or DNS failure),
+      # which is also worth another attempt.
+      wget_status="$(grep -E '^[[:space:]]*HTTP/' "${output}" 2>/dev/null | tail -n 1 | awk '{ print $2 }')"
+      case "${wget_status}" in
+        408|429|500|502|503|504|'') ;;
+        *) break ;;
+      esac
+
+      wget_attempt=$((wget_attempt + 1))
+      sleep 1
+    done
+
+    if [ "${ret}" -ne 0 ]; then
+      handle_wget_result "${ret}" "${url}" "${output}" "checking redirects for"
+      ret="$?"
+      rm -f "${output}"
+      [ "${ret}" -eq 0 ] && ret=1
+      return "${ret}"
+    fi
+
+    # With no Location header the request was served directly; fall back to the
+    # requested URL's own final segment, which is what curl reports via
+    # url_effective in the same situation.
+    redirect="$(grep -m 1 Location "${output}" | grep -Eo '[^/]+/?$' | grep -Eo '[^/]+$')"
+    if [ -z "${redirect}" ]; then
+      redirect="$(echo "${url}" | grep -Eo '[^/]+/?$' | grep -Eo '^[^/]+')"
+    fi
+    rm -f "${output}"
+  else
+    fatal "${ERROR_F0003}" F0003
   fi
 
-  if [ -n "${WGET}" ]; then
-    run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
-
-    ret="$?"
-
-    case "${ret}" in
-      0)
-        grep -m 1 Location "${output}" | grep -Eo '[^/]+/?$' | grep -Eo '[^/]+$'
-        rm -f "${output}"
-        return 0
-        ;;
-      *)
-        handle_wget_result "${ret}" "${url}" "${output}" "checking redirects for"
-        return "$?"
-        ;;
-    esac
+  if [ -z "${redirect}" ]; then
+    warning "Could not determine which release ${url} points to."
+    return 1
   fi
 
-  fatal "${ERROR_F0003}" F0003
+  printf '%s\n' "${redirect}"
+  return 0
 }
 
 safe_sha256sum() {
@@ -2050,7 +2104,7 @@ set_static_archive_urls() {
       export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")" || return 1
       export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${arch}-latest.gz.run"
       export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
@@ -2063,7 +2117,7 @@ set_static_archive_urls() {
       export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")" || return 1
       export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-${arch}-latest.gz.run"
       export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
       export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
@@ -2072,7 +2126,10 @@ set_static_archive_urls() {
 }
 
 try_static_install() {
-  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  if ! set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}"; then
+    warning "Unable to determine which static build to download. ${GITHUB_BADNET_MSG}"
+    return 1
+  fi
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using static build..."
   else
@@ -2164,7 +2221,7 @@ set_source_archive_urls() {
       export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.tar.gz"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")" || return 1
       export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${latest}.tar.gz"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
     fi
@@ -2173,7 +2230,7 @@ set_source_archive_urls() {
       export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-latest.tar.gz"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")" || return 1
       export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-latest.tar.gz"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
     fi
@@ -2264,7 +2321,9 @@ try_build_install() {
     return 1
   fi
 
-  set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  if ! set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"; then
+    fatal "Failed to determine which source tarball to download. ${BADNET_MSG}." F000B
+  fi
 
   if [ -n "${INSTALL_VERSION}" ]; then
     if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-v${INSTALL_VERSION}.tar.gz"; then
@@ -2332,7 +2391,10 @@ prepare_offline_install_source() {
 
   case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
     static|auto|any)
-      set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
+      if ! set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"; then
+        warning "Unable to determine which static build to fetch. ${GITHUB_BADNET_MSG}"
+        return 1
+      fi
 
       check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
 
@@ -2346,8 +2408,16 @@ prepare_offline_install_source() {
       esac
 
       if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+        # A single architecture failing is tolerated, matching how a failed
+        # download below is handled, but every architecture failing means no
+        # offline source was produced at all and must not report success.
+        resolved_any=0
         for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
-          set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+          if ! set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"; then
+            warning "Unable to determine which static build to fetch for ${arch}. ${GITHUB_BADNET_MSG}"
+            continue
+          fi
+          resolved_any=1
 
           if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
             progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
@@ -2358,6 +2428,12 @@ prepare_offline_install_source() {
             progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
           fi
         done
+
+        if [ "${resolved_any}" -eq 0 ]; then
+          warning "Could not determine which static builds to fetch for any architecture. ${GITHUB_BADNET_MSG}"
+          return 1
+        fi
+
         legacy=0
       else
         warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
