@@ -1,7 +1,6 @@
 ---
 name: collectors-authoring
 description: Entry point and routing for authoring or modifying any Netdata data-collection plugin or module (internal C plugins, go.d and ibm.d Go modules, Rust plugins, external PLUGINSD plugins). Read before adding a collector, changing one, or working on logs, topology, NetFlow/sFlow/IPFIX, OTEL ingestion, SNMP profiles, statsd, Prometheus scraping, or interactive Functions. Covers the mental model, universal practices, the production quality bar, routing by task, and canonical pointers; dashboard-shaping mechanisms and the plugin landscape live in its reference files.
-type: project
 ---
 
 # Writing Netdata data collection plugins and modules

@@ -430,7 +430,8 @@ reason no update was needed (an umbrella records nothing here: its gate's `Artif
 and each step's Artifact Maintenance Gate records the actual updates):
 
 - `AGENTS.md`: workflow, responsibilities, local framework, project-wide guardrails.
-- Runtime project skills: `.agents/skills/project-*/SKILL.md`, HOW to work here.
+- Runtime project skills: every non-symlink directory under `.agents/skills/` (`<area>-<topic>/SKILL.md` and its
+  topic files), HOW to work here.
 - Specs: `.agents/sow/specs/`, WHAT the project does.
 - End-user/operator docs: README, docs site, runbooks, published guides, help text, other human-facing docs.
 - End-user/operator skills: output/reference skills copied or consumed outside normal repo work.
@@ -554,8 +555,10 @@ Public skill convention (`docs/netdata-ai/skills/`):
   metrics/logs/topology/alerts, and running safe operational commands. They MUST NOT contain developer-contract
   validation, schema migration plans, producer authoring workflows, UI adapter work, aggregator implementation
   notes, SOW handoff instructions, fixture maintenance, PR-review tasks, or codebase-internal recipes.
-- Developer-facing skills MUST live under `.agents/skills/`, preferably with a `project-` prefix when they are runtime
-  input. A workflow that reads source files, updates schemas, validates fixtures, changes collectors/producers, or
+- Developer-facing skills MUST live under `.agents/skills/` as `<area>-<topic>`, where `<area>` is a row of the area
+  table in `.agents/skills/README.md` (a product component or a repo-wide process; a language, vendor, or protocol is
+  the second token, never an area) and the frontmatter `name` equals the directory; `.agents/sow/audit.sh` checks
+  both. A workflow that reads source files, updates schemas, validates fixtures, changes collectors/producers, or
   coordinates frontend/backend/aggregator code is a project developer skill, not a public one.
 - Skill verification harness inputs (seed questions, grader rubrics, runner scripts, transcript-generation prompts)
   live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`.
@@ -581,51 +584,66 @@ Public skill convention (`docs/netdata-ai/skills/`):
 - Skills without an operator audience (for example `triage-coverity`, `triage-sonarqube`, `triage-codeql`,
   `repo-pr-reviews`) stay under `.agents/skills/<name>/` with no public counterpart.
 
-Skills index (runtime input under `.agents/skills/`; each skill's frontmatter description is the authoritative
-trigger, this list is a pointer):
+Skills index (runtime input under `.agents/skills/`, grouped by area; `.agents/skills/README.md` owns the area list
+and the rule for adding one; each skill's frontmatter description is the authoritative trigger, this list is a pointer):
 
-- `collectors-authoring`: authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C,
-  PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions
-- `collectors-go-design`: designing a new go.d collector or changing a public contract of one (config option,
-  mode, metric meaning, ownership or durable state, Functions, vnodes), or reviewing such a change; the design note,
-  architecture gate, operator surface, `config_schema.json` authoring, and mutating-collector references.
-- `collectors-go-framework-v2`: creating or migrating a go.d collector to framework V2; `CollectorV2`,
-  `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
-- `collectors-snmp-profiles`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
-  docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
-- `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs, trap profile-format docs, the `snmptrapprofilegen`
-  helper, OOB trap profile regeneration; closed 8-category / 8-severity taxonomy
-- `collectors-prometheus-profiles`: creating, reviewing, validating, iterating, or installing Prometheus chart profiles
-  from exposition dumps; selector/relabel/fallback policy, coverage, NIDL, live verification
-- `topology-authoring`: topology producers, topology Function payloads, schema fixtures, graph presentation,
-  correlation rules, direction semantics, drilldowns, telemetry overlays, Cloud aggregation fixtures
-- `health-alert-authoring`: authoring, adapting, or reviewing health alerts and templates in
-  `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests
-- `tests-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
-  query-engine bugs, formatter byte-pins, validating a fix branch
-- `packaging-static-installer`: building or testing the static self-extracting installer
-  (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
-- `collectors-metadata-yaml`: what every collector `metadata.yaml` field says and how it reads: overview,
-  permissions, auto-detection (including service discovery), limits and cost, prerequisites, option rows, examples,
-  the known-errors troubleshooting catalog, metrics scopes, alerts, identity and keywords; a page that reads as a wall
-  of text or claims something false
-- `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` and collector `taxonomy.yaml` schemas and
-  validation, `integrations/` generators, taxonomy registries, templates, generated outputs,
-  `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d `contexts.yaml`; the collector-consistency rule
-- `docs-learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
-  `docs/.map/map.yaml`; why a Learn page looks the way it does; MDX escape rules; redirects; Netlify deploy
-- `docs-learn-pr-preview`: only when the user explicitly asks to build, preview, or validate `learn.netdata.cloud` locally
-  from a PR or docs branch
-- `triage-agent-events`: investigating crashes, panics, or fatals across the fleet via the agent-events namespace; `AE_*`
-  fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
-- `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
-  reset-to-default safety; `--repo` scoping
-- `repo-pr-reviews`: PR comment and review iteration
-- `triage-coverity`: Coverity Scan defect triage
-- `triage-sonarqube`: SonarCloud findings triage
-- `triage-codeql`: GitHub Code Scanning / CodeQL triage
-- `triage-codacy`: Codacy pre-push local analysis and read-only PR-issue fetching; write actions require a GitHub issue
-  or SOW
+- Collectors, any plugin family. START HERE: `collectors-authoring`.
+  - `collectors-authoring`: authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C,
+    PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions; routes
+    to every skill below
+  - `collectors-go-design`: designing a new go.d collector or changing a public contract of one (config option, mode,
+    metric meaning, ownership or durable state, Functions, vnodes), or reviewing such a change; the design note,
+    architecture gate, operator surface, `config_schema.json` authoring, and mutating-collector references
+  - `collectors-go-framework-v2`: creating or migrating a go.d collector to framework V2; `CollectorV2`,
+    `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
+  - `collectors-metadata-yaml`: what every collector `metadata.yaml` field says and how it reads: overview,
+    permissions, auto-detection (including service discovery), limits and cost, prerequisites, option rows, examples,
+    the known-errors troubleshooting catalog, metrics scopes, alerts, identity and keywords; a page that reads as a
+    wall of text or claims something false
+  - `collectors-snmp-profiles`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
+    docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
+  - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs, trap profile-format docs, the `snmptrapprofilegen`
+    helper, OOB trap profile regeneration; closed 8-category / 8-severity taxonomy
+  - `collectors-prometheus-profiles`: creating, reviewing, validating, iterating, or installing Prometheus chart
+    profiles from exposition dumps; selector/relabel/fallback policy, coverage, NIDL, live verification
+  - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
+    `health-alert-authoring` (alerts on a collector's contexts).
+- Integrations (`integrations/`).
+  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` and collector `taxonomy.yaml` schemas and
+    validation, `integrations/` generators, taxonomy registries, templates, generated outputs,
+    `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d `contexts.yaml`; the collector-consistency rule
+  - Also relevant: `collectors-metadata-yaml` (what the fields say) and `docs-learn-site-structure` (where the
+    generated pages land).
+- Health (`src/health/`).
+  - `health-alert-authoring`: authoring, adapting, or reviewing health alerts and templates in
+    `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests
+- Topology.
+  - `topology-authoring`: topology producers, topology Function payloads, schema fixtures, graph presentation,
+    correlation rules, direction semantics, drilldowns, telemetry overlays, Cloud aggregation fixtures
+- Tests (`tests/`).
+  - `tests-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
+    query-engine bugs, formatter byte-pins, validating a fix branch
+- Packaging (`packaging/`).
+  - `packaging-static-installer`: building or testing the static self-extracting installer
+    (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
+- Docs (`learn.netdata.cloud`).
+  - `docs-learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
+    `docs/.map/map.yaml`; why a Learn page looks the way it does; MDX escape rules; redirects; Netlify deploy
+  - `docs-learn-pr-preview`: only when the user explicitly asks to build, preview, or validate `learn.netdata.cloud`
+    locally from a PR or docs branch; loads `docs-learn-site-structure` first
+- Triage (defects reported by external systems or the fleet).
+  - `triage-coverity`: Coverity Scan defect triage
+  - `triage-sonarqube`: SonarCloud findings triage
+  - `triage-codeql`: GitHub Code Scanning / CodeQL triage
+  - `triage-codacy`: Codacy pre-push local analysis and read-only PR-issue fetching; write actions require a GitHub
+    issue or SOW
+  - `triage-agent-events`: investigating crashes, panics, or fatals across the fleet via the agent-events namespace;
+    `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
+  - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
+- Repo-wide process and workstation setup.
+  - `repo-pr-reviews`: PR comment and review iteration
+  - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
+    reset-to-default safety; `--repo` scoping
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
@@ -681,10 +699,19 @@ copy; inspect before use and do not assume they are tracked project interfaces.
 data, scratch notes, queue files, intermediate triage decisions. Nothing under it is committed; treat it as
 ephemeral between users and machines, not a shared source of truth.
 
-Skill output SHOULD default to `<repo-root>/.local/audits/<topic>/`, where `<topic>` is the skill name minus a trailing
-`-audit` (so `triage-coverity` writes under `coverity/`, `repo-pr-reviews` under `repo-pr-reviews/`). Existing directories:
-`coverity/` (raw fetches, per-defect details, triage), `sonarqube/` (finding queues, FP templates), `graphql/`
-(Code Scanning fetches and dismissals), `repo-pr-reviews/` (per-PR comment and review caches).
+Skill output SHOULD default to `<repo-root>/.local/audits/<dir>/`, where each skill's `_lib.sh` pins its `<dir>`. The
+directories predate the area-prefixed skill names and are kept as they are, so per-user caches survive renames:
+
+| Skill | `.local/audits/<dir>/` | Holds |
+|---|---|---|
+| `triage-coverity` | `coverity/` | raw fetches, per-defect details, triage |
+| `triage-sonarqube` | `sonarqube/` | finding queues, FP templates |
+| `triage-codacy` | `codacy/` | local analysis output, PR issue fetches |
+| `triage-codeql` | `graphql/` | Code Scanning fetches and dismissals |
+| `triage-agent-events` | `query-agent-events/` | fetched event batches |
+| `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
+
+A new skill picks a `<dir>` equal to its topic and records it here.
 
 ### Per-User Secrets
 

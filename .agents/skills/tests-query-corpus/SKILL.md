@@ -1,7 +1,6 @@
 ---
 name: tests-query-corpus
 description: Developer contract for the query contract corpus (tests/query-corpus) — the black-box correctness suite for the Netdata query engine. Use when running the corpus, adding or extending corpus cases, authoring fixtures, changing an oracle or a byte-pin, adding a case for a query-engine bug, recording the fixing PR after it merges, or validating a query-engine fix branch against the corpus.
-type: project
 ---
 
 # Query Contract Corpus — developer contract

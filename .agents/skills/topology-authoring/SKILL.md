@@ -1,7 +1,6 @@
 ---
 name: topology-authoring
 description: Developer workflow for creating or updating Netdata topology producers and topology Function payloads using the production netdata.topology.v1 schema. Use when adding or migrating topology:network-connections, topology:streaming, topology:snmp, vSphere topology, correlation rules, graph presentation, drilldowns, direction semantics, telemetry overlays, or Cloud topology aggregation fixtures.
-type: project
 ---
 
 # Create Netdata Topologies

@@ -319,6 +319,50 @@ else
   warn "ripgrep not available; skipped legacy SOW reference audit"
 fi
 
+section "skills layout"
+if [ -d .agents/skills ]; then
+  # The area table in .agents/skills/README.md is the single owner of the allowed prefixes.
+  skill_areas=$(awk -F'|' '/^\| `[a-z]+` \|/ { gsub(/[` ]/, "", $2); print $2 }' .agents/skills/README.md 2>/dev/null)
+  skills_bad=0
+  if [ -z "$skill_areas" ]; then
+    fail "no area table found in .agents/skills/README.md"
+    skills_bad=1
+  fi
+  for dir in .agents/skills/*/; do
+    dir=${dir%/}
+    name=$(basename "$dir")
+    [ -L "$dir" ] && continue
+    if [ ! -f "$dir/SKILL.md" ]; then
+      fail "skill $name has no SKILL.md"
+      skills_bad=1
+      continue
+    fi
+    area=${name%%-*}
+    case " $(printf '%s ' $skill_areas)" in
+      *" $area "*) ;;
+      *) fail "skill $name: prefix '$area' is not an area listed in .agents/skills/README.md"; skills_bad=1 ;;
+    esac
+    fm_name=$(awk 'NR > 1 && /^---/ { exit } /^name:/ { sub(/^name:[ \t]*/, ""); print; exit }' "$dir/SKILL.md")
+    if [ "$fm_name" != "$name" ]; then
+      fail "skill $name: frontmatter name '$fm_name' differs from the directory name"
+      skills_bad=1
+    fi
+  done
+  # Every .agents/skills/<name> path named in tracked files must exist (renames leave stale pointers otherwise).
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    if [ ! -e "$ref" ] && ! ls "$ref".* >/dev/null 2>&1; then
+      fail "reference to a missing skill path: $ref"
+      skills_bad=1
+    fi
+  done < <(git grep -h -o -E '\.agents/skills/[A-Za-z0-9_-]+' -- . ':!CHANGELOG.md' 2>/dev/null | sort -u)
+  if [ "$skills_bad" -eq 0 ]; then
+    ok "skills are area-prefixed, frontmatter names match, and every skill path reference resolves"
+  fi
+else
+  warn "no .agents/skills directory"
+fi
+
 section "sensitive data"
 scan_files=()
 
