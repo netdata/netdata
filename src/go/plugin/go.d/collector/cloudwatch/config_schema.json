@@ -657,7 +657,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for each AWS API operation, in seconds. Discovery shares one timeout across a whole refresh.",
+        "description": "Timeout in seconds for AWS API calls; a whole discovery refresh and a whole resource-tag lookup each share one timeout.",
         "type": "number",
         "minimum": 0,
         "default": 30
