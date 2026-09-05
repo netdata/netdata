@@ -93,7 +93,7 @@ bash .agents/skills/triage-sonarqube/scripts/sonar-search.sh issues --rule cpp:S
 ```
 
 Hotspots:
-```
+```sh
 bash .agents/skills/triage-sonarqube/scripts/sonar-search.sh hotspots --status=TO_REVIEW \
   | jq '.hotspots[] | select(.ruleKey=="c:S5443")'
 ```
@@ -114,7 +114,7 @@ bash .agents/skills/triage-sonarqube/scripts/sonar-mark.sh fixed <HOTSPOT_KEY> "
 
 #### Family mode (every open finding for a rule)
 
-```
+```sh
 bash .agents/skills/triage-sonarqube/scripts/sonar-mark.sh family-fp   <RULE_ID> "<COMMENT>"
 bash .agents/skills/triage-sonarqube/scripts/sonar-mark.sh family-safe <RULE_ID> "<COMMENT>"
 ```

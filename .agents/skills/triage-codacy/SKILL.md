@@ -107,13 +107,13 @@ be treated as current-head blockers.
 
 To restrict to a single tool (matches what Codacy reported on a CI run):
 
-```
-$ .agents/skills/triage-codacy/scripts/analyze-local.sh --tool markdownlint
+```sh
+.agents/skills/triage-codacy/scripts/analyze-local.sh --tool markdownlint
 ```
 
 ## Workflow -- PR triage
 
-```
+```console
 $ .agents/skills/triage-codacy/scripts/pr-issues.sh 22423
 [pr-issues] fetching issues for PR #22423 ...
 [pr-issues] wrote 0 issue(s) to <repo>/.local/audits/codacy/pr-22423-<ts>.json
@@ -146,7 +146,7 @@ This skill follows `<repo>/.agents/sensitive-data-discipline.md`:
 
 Before trusting wrappers in a long-running session, run the self-test:
 
-```
+```console
 $ source .agents/skills/triage-codacy/scripts/_lib.sh
 $ codacyaudit_load_env
 $ codacyaudit_selftest_no_token_leak

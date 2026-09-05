@@ -60,8 +60,8 @@ def alphabet:
 | reduce (redact_fields[]) as $f (
     {state: {map: {}, idx: 0}, root: $root};
     . as {state: $st, root: $r}
-    | ($r | .. | objects | select(has($f)) | .[$f] | tostring) as $vals
-    | reduce $vals as $v (
+    | [$r | .. | objects | select(has($f)) | .[$f] | tostring] as $vals
+    | reduce $vals[] as $v (
         .;
         if (.state.map | has($v)) then
           .
