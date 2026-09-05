@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <errno.h>
+#include "exec-signals.h"
 
 #define MAX_SEARCH 3
 #define MAX_PARAMETERS 128
@@ -732,6 +733,13 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     else {
+        // Restore default signal dispositions before exec. SIG_IGN survives execve(), so an ignored
+        // signal in our caller would be inherited by the command we run. netdata ignores SIGPIPE,
+        // and a command that gets EPIPE instead of dying keeps running after netdata closes its
+        // stdout - which, for a command we exec with root privileges, netdata can no longer signal.
+        // The spawn server resets this too; doing it here as well covers any other caller.
+        reset_signal_dispositions();
+
         char *clean_env[] = {NULL};
         execve(filename, params, clean_env);
         perror("execve"); // execve only returns on error
