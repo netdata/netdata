@@ -20,13 +20,12 @@ Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
   exactly as defined in the code (V2 `charts.yaml` `title`, V1 chart definition): title case, no trailing period, no
   added sentence. `unit` is the code's unit string verbatim. `chart_type` is the code's type. `dimensions[].name` are
   the code's dimension names, all of them, in the code's order.
-- The row is a drift check, not a place to explain. Anything a reader needs beyond the title (what a dimension means,
-  how a value is derived, why it can be empty) goes to `metrics.description` when it applies to every chart, or to a
-  `detailed_description` of the option that controls it, or nowhere.
-- Unit vocabulary is decided where charts are designed (the collector design and V2 skills), not here. The metadata
-  copies the code; if the code's unit is wrong, fix the code and then the row.
-- Descriptions that are sentences ("Attempted CloudWatch SDK method invocations in the interval since...") are a defect
-  when the code's title is shorter; the table cell is a title cell.
+- The row is a drift check, not a place to explain: a description that is a sentence rather than the code's title is
+  a defect. Anything a reader needs beyond the title (what a dimension means, how a value is derived, why it can be
+  empty) goes to `metrics.description` when it applies to every chart, to the `detailed_description` of the option
+  that controls it, or nowhere.
+- Unit vocabulary is decided where charts are designed (the collector design and V2 skills), not here. If the code's
+  unit is wrong, fix the code and then the row.
 - Every context the collector emits with a static definition has a row, and every row has a context in the code.
   Contexts generated at runtime from profiles or discovered data are covered by `dynamic_context_prefixes` (section 4),
   not by rows.

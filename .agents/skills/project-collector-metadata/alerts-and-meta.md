@@ -1,7 +1,8 @@
-# Alerts And Meta Fields: Identity And Cross-References
+# Alerts, Meta, And Functions: Identity, Cross-References, Live Data
 
-Two small families with one thing in common: they are data that other artifacts define, copied into `metadata.yaml`
-so the page and the catalog can show them. Nothing here is authored prose.
+Small families with one thing in common: they are data that other artifacts define (the health configuration, the
+product, the Function implementation), copied into `metadata.yaml` so the page and the catalog can show them. Almost
+nothing here is authored prose.
 
 Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 
@@ -58,9 +59,8 @@ both sides are filled in the same change.
   template renders them at the end of the Overview as "<Name> can be monitored further using the following other
   integrations:" followed by the linked names only.
 - `info_provided_to_referring_integrations.description` is one sentence about what this collector adds for the pages
-  that refer to it ("collects runtime metrics from the CloudWatch API"), operator voice, no option names. Today it is
-  carried in the generated `integrations.json` but rendered on no page: the `related_resources.md` template that would
-  show it is never reached by the generator. Write it for the data consumers; do not expect it on the page.
+  that refer to it ("collects runtime metrics from the CloudWatch API"), operator voice, no option names. It reaches
+  the generated `integrations.json` but no page: the generator never renders the template that would show it.
 
 ## 5. `functions`: Live Data
 

@@ -1,8 +1,7 @@
 # Troubleshooting Fields: The Known Errors Catalog
 
-The reader here has an error in front of them and the collector page open. The section exists so that they find that
-error on the page and read the fix. It is written proactively, for every failure path the collector has, and it grows
-from user reports: when an operator reports an error that fits, it is added.
+The reader has an error in front of them and the collector page open; the section exists so they find that error and
+read the fix. It is written proactively for every failure path the collector has and grows from user reports.
 
 Rendering (`integrations/templates/troubleshooting.md`): `## Troubleshooting` with three h3 groups on a collector page
 (a fourth, Test Notification, exists only for agent notifications).

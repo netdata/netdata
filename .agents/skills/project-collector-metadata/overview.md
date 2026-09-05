@@ -12,7 +12,7 @@ field means.
 
 ## 1. Structure Inside A Field
 
-- No Markdown headings inside a field. The template owns h2 to h4 and the page table of contents; an author heading
+- No Markdown headings inside a field. The template owns h2 to h6 and the page table of contents; an author heading
   breaks both.
 - A bold lead-in line MAY caption a list or a table (`**Timing**` above a list). At most two or three per field. A field
   that needs more sections is over-scoped: apply the depth boundary, do not add structure.
@@ -30,10 +30,8 @@ field means.
 
 ## 2. `metrics_description`: The Overview Proper
 
-**Question:** what is this and what do I get?
-
-This is the general overview of the collector, not a list of metrics. It is the first text on the page and the only
-text most visitors read.
+**Question:** what is this and what do I get? This is the general overview, not a list of metrics, and the only text
+most visitors read.
 
 - Sentence one is the catalog row and the meta description (`integrations-lifecycle/description-authoring.md` owns its
   mechanics). It MUST say what the collector monitors in an action phrase and MUST NOT mention options, defaults,
@@ -141,10 +139,9 @@ metric), cost is the most important content on the page and this field MUST be e
 - Then, structured: what drives cost (a table or list: instances, metrics, statistics, request frequency, lookback);
   how to estimate it before running (a formula with one worked example is welcome); how to observe it while running
   (the collector's own activity charts, one sentence each); and the options that reduce it, each with its effect.
-- Verbosity is required here; the structure rules of section 1 still apply (lists, tables, short paragraphs, one
-  admonition), except the caption cap: the four blocks above are the required structure, one bold caption each.
-  Internal accounting details that change no operator decision (how estimates are attributed across profiles,
-  non-additivity proofs) still leave the page.
+- Section 1 still applies except the caption cap: the four blocks above are the required structure, one bold caption
+  each. Internal accounting that changes no operator decision (estimate attribution across profiles, non-additivity
+  proofs) still leaves the page.
 
 ## 9. Review Questions For This Family
 

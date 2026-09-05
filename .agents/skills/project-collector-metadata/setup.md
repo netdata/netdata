@@ -72,7 +72,7 @@ Renders as a table with columns Option, Description, Default, Required, preceded
 Renders as an h5 below the table, reached by the link on the option name. This is the only place on the page for
 option depth.
 
-- Use it when the one-sentence description cannot carry a consequence, an interaction with another option, an
+- Use it when the description cannot carry a consequence, an interaction with another option, an
   allowed-values table, a format with an example, or a mode-specific meaning. One paragraph or one short list or one
   small table; if it needs sections, the option is over-scoped for one row and probably wants sub-options.
 - Do NOT restate the description, the default, or the schema's `ui:help`; the three channels carry different content
