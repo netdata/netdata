@@ -59,6 +59,8 @@ ANGLE_DIGIT = re.compile(r'<\d')
 INLINE_CODE = re.compile(r'`[^`\n]*`')
 # A CommonMark code span: a run of N backticks, content without a run of exactly N backticks, the same run again.
 CODE_SPAN = re.compile(r'(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)', re.S)
+# A backtick preceded by an odd run of backslashes is an escaped literal, not a delimiter; keep the even part.
+ESCAPED_BACKTICK = re.compile(r'(?<!\\)((?:\\\\)*)\\`')
 TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\S+)', re.M)
 
 
@@ -149,7 +151,8 @@ def markdown_problems(text):
     # A code span may wrap onto the next line and may be delimited by a run of backticks when it contains a literal
     # backtick (CommonMark), so strip well-formed spans per paragraph and flag any backtick that survives.
     for paragraph in re.split(r'\n\s*\n', '\n'.join(prose)):
-        if '`' in CODE_SPAN.sub('', paragraph):
+        unescaped = ESCAPED_BACKTICK.sub(r'\1', paragraph)
+        if '`' in CODE_SPAN.sub('', unescaped):
             problems.append(f'unbalanced backtick in paragraph: {paragraph.strip()[:60]!r}')
     plain = without_code(text)
     for match in ANGLE_TAG.finditer(plain):
