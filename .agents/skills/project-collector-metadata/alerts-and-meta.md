@@ -54,11 +54,13 @@ Two fields link integration pages to each other. Both are empty unless a real re
 both sides are filled in the same change.
 
 - `related_resources.integrations.list` names other integrations that monitor the same product from another angle
-  (metrics from the API here, logs there; this collector and a Prometheus exporter for the same product). The template
-  renders "You can further monitor this integration by using:" with each related integration and its sentence.
-- `info_provided_to_referring_integrations.description` is that one sentence, shown on the pages that refer to this
-  collector: what this collector adds for them ("collects runtime metrics from the CloudWatch API"). One sentence,
-  operator voice, no option names.
+  (metrics from the API here, logs there; this collector and a Prometheus exporter for the same product). The overview
+  template renders them at the end of the Overview as "<Name> can be monitored further using the following other
+  integrations:" followed by the linked names only.
+- `info_provided_to_referring_integrations.description` is one sentence about what this collector adds for the pages
+  that refer to it ("collects runtime metrics from the CloudWatch API"), operator voice, no option names. Today it is
+  carried in the generated `integrations.json` but rendered on no page: the `related_resources.md` template that would
+  show it is never reached by the generator. Write it for the data consumers; do not expect it on the page.
 
 ## 5. Review Questions For This Family
 

@@ -29,6 +29,8 @@ Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 - Every context the collector emits with a static definition has a row, and every row has a context in the code.
   Contexts generated at runtime from profiles or discovered data are covered by `dynamic_context_prefixes` (section 4),
   not by rows.
+- `dimensions[].description` is accepted by the schema but rendered nowhere (the table shows dimension names only).
+  Leave it out, or treat it as a source comment that no reader sees.
 
 ## 2. Scopes
 
@@ -36,8 +38,8 @@ Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 
 - `name` is the entity in operator words, using the same words the charts and labels use: "database", "replication
   application", "AWS account and region", "device licensing". Not the code's struct name, not "global" for anything
-  that has labels. `global` is the fleet's name for the instance-less scope; the template rewrites it to
-  "<Collector> instance".
+  that has labels. `global` is the fleet's name for the instance-less scope; the generator rewrites it to
+  "<Collector> instance" before rendering.
 - `description` is required and is one sentence: what one instance of this scope is, and when the scope appears at
   all if it is conditional (a mode, an opt-in option, a matched profile). Exemplar: `s3check/metadata.yaml`
   ("Replication modes only.").

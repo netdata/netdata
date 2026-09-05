@@ -52,13 +52,12 @@ row has a `detailed_description`.
 
 - `name` is the key as written in the config file. Nested options use the fleet's path notation
   (`credentials[].name`, `tls.skip_verify`), one row per leaf the operator can set.
-- `description` is a table cell: one sentence, no lists, tables, or paragraphs; inline code is fine. The generator
-  joins line breaks into one line and turns every `|` into `/`, so write it as one line and avoid pipes (write "a or
-  b", not "a | b"). It says what the option does, its unit, and its range or allowed values ("Data
-  collection interval, in seconds, at least 60."). It MUST be identical to the option's `description` in
-  `config_schema.json`; the wording and the standard option block (`update_every`, `autodetection_retry`, `timeout`,
-  `vnode`, credentials) are owned by `.agents/skills/project-go-collector-design/config-schema.md` sections 7 and 8,
-  and the alignment test there checks tabs and descriptions both ways. Write it once, there, and copy it here.
+- `description` is a table cell: no lists, tables, or paragraphs; inline code is fine. The generator joins line
+  breaks into one line and turns every `|` into `/`, so write it as one line and avoid pipes (write "a or b", not
+  "a | b"). It MUST be identical to the option's `description` in `config_schema.json`, and that text has one owner:
+  `.agents/skills/project-go-collector-design/config-schema.md` section 2 states what it says and how long it is,
+  section 7 the standard option wording (`update_every`, `autodetection_retry`, `timeout`, `vnode`, credentials), and
+  section 8 the alignment test that checks tabs and descriptions both ways. Write it once, there, and copy it here.
 - `default_value` is what the code uses when the option is absent, written as the operator would write it (`60`,
   `yes`, `/var/run/redis.sock`, empty when there is none). It MUST agree with the schema `default` and the stock
   configuration file. A description never restates the default.

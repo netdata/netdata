@@ -217,7 +217,8 @@ seconds.`.
   descriptions in both directions: every documented option exists in the schema with the same description, and every
   visible top-level property is documented. Nested option names resolve through `properties`, `dependencies`
   branches, `allOf`, `$ref`, and array items written as `rules[].query.period`; keys of a free map
-  (`additionalProperties`) are not documented as options.
+  (`additionalProperties`) are not documented as options. The call is opt-in because most collectors predate the
+  alignment rule and would fail it today; `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the worked examples.
 - The stock `.conf` and the generated integration page are the other two views; `integrations-lifecycle/consistency.md`
   owns their mechanics.
 

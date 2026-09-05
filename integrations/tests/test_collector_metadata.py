@@ -36,10 +36,12 @@ SD_AUTO_DETECTION_BACKLOG = frozenset({
     'proxysql', 'rabbitmq', 'supervisord', 'tengine', 'traefik', 'unbound', 'upsd', 'vernemq',
 })
 
-# Fields whose text is rendered as Markdown prose on the page (not as code, a link, an identifier, or a table cell
-# escaped by the generator). Only these are checked for MDX-unsafe constructs.
+# Fields whose text reaches the page as Markdown or as a heading or table cell that the generator does not escape
+# (its table-cell helper joins lines and replaces pipes but leaves `<` alone). Only these are checked for MDX-unsafe
+# constructs. `name` is deliberately absent: it is mostly identifiers (options, dimensions, labels) and the vsphere
+# label names carry pre-escaped angle brackets; example and scope names are therefore not covered.
 PROSE_KEYS = frozenset({
-    'metrics_description', 'method_description', 'description', 'detailed_description', 'info',
+    'metrics_description', 'method_description', 'description', 'detailed_description', 'info', 'title',
     'error', 'when', 'cause', 'fix',
 })
 
@@ -54,7 +56,7 @@ TABLE_SEPARATOR = re.compile(r'^\s*\|[\s:|-]+\|\s*$')
 ANGLE_TAG = re.compile(r'</?([A-Za-z][A-Za-z0-9_.-]*)>')
 ANGLE_DIGIT = re.compile(r'<\d')
 INLINE_CODE = re.compile(r'`[^`\n]*`')
-TEMPLATE_MODULE = re.compile(r'^\s*module:\s*(\S+)', re.M)
+TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\S+)', re.M)
 
 
 def sd_covered_modules():

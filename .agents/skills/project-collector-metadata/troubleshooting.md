@@ -15,7 +15,8 @@ Rendering (`integrations/templates/troubleshooting.md`): `## Troubleshooting` wi
 
 Schema (`integrations/schemas/shared.json`, `$defs.troubleshooting`): `errors.list[]` has `error` (required), `cause`
 (required), `fix` (required), `when` (optional), `source` (optional link to the report). `problems` is optional and
-legacy. Both lists are optional; a collector with no known errors has an empty section.
+legacy. Both lists are optional: a go.d, python.d, or charts.d collector with no entries still renders the Diagnostics
+group; any other collector with no entries renders no Troubleshooting section at all.
 
 Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 

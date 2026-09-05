@@ -2,8 +2,9 @@
 
 The Overview is the top of the integration page. The template (`integrations/templates/overview/collector.md`) renders,
 in this order: `metrics_description`, `method_description`, a platform sentence from `supported_platforms`, an instance
-sentence from `multi_instance`, `additional_permissions`, then a "Default Behavior" h3 with three h4s: Auto-Detection,
-Limits, Performance Impact. The reader has not scrolled yet. Everything here is decided in the first screen.
+sentence from `multi_instance`, `additional_permissions`, the related integrations list when `related_resources` names
+any (linked names only), then a "Default Behavior" h3 with three h4s: Auto-Detection, Limits, Performance Impact. The
+reader has not scrolled yet. Everything here is decided in the first screen.
 
 Shape rules that apply to every field on this page are in `SKILL.md` (reading model, depth boundary, Markdown safety).
 This file adds the per-field contract: the question the field answers, what belongs, what does not, and what an empty
@@ -54,7 +55,8 @@ text most visitors read.
   (firewall rules, audit logs, permissions). Exemplar: `azure_monitor/metadata.yaml` (three sentences: API, discovery
   source, authentication).
 - For a collector that writes, deletes, or creates remote objects, this field states the boundary of what it touches
-  in one paragraph; the safety details belong to Setup prerequisites. Exemplar: `s3check/metadata.yaml`.
+  and the direction of the work (which side is written, which is only read) in one paragraph; the safety details
+  belong to Setup prerequisites. Exemplar: `s3check/metadata.yaml`, first paragraph of the field.
 - Do NOT describe internal stages, caching, ownership resolution, or state handling. Those are `ARCHITECTURE.md`
   content (developer documentation, never linked from the page). "Plan, discover, query" is how the code is organized,
   not how the operator experiences it.
@@ -139,9 +141,10 @@ metric), cost is the most important content on the page and this field MUST be e
 - Then, structured: what drives cost (a table or list: instances, metrics, statistics, request frequency, lookback);
   how to estimate it before running (a formula with one worked example is welcome); how to observe it while running
   (the collector's own activity charts, one sentence each); and the options that reduce it, each with its effect.
-- Verbosity is required here; the structure rules of section 1 still apply (captions, lists, tables, short
-  paragraphs). Internal accounting details that change no operator decision (how estimates are attributed across
-  profiles, non-additivity proofs) still leave the page.
+- Verbosity is required here; the structure rules of section 1 still apply (lists, tables, short paragraphs, one
+  admonition), except the caption cap: the four blocks above are the required structure, one bold caption each.
+  Internal accounting details that change no operator decision (how estimates are attributed across profiles,
+  non-additivity proofs) still leave the page.
 
 ## 9. Review Questions For This Family
 

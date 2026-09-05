@@ -171,6 +171,7 @@ Before committing `metadata.yaml` changes:
    python3 integrations/gen_integrations.py
    python3 integrations/gen_docs_integrations.py --check
    python3 -m unittest integrations.tests.test_descriptions
+   python3 -m unittest integrations.tests.test_collector_metadata
    ```
 
 2. Regenerate `src/collectors/COLLECTORS.md`.

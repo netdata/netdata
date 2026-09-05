@@ -120,7 +120,8 @@ authentication / secretstore / service_discovery.
 
 ### `$defs.troubleshooting`
 
-Both lists are optional; the object itself is required by the schemas that reference it (an empty object is valid).
+Both lists are optional, so an empty object is valid. The object itself is required by `collector.json`,
+`service_discovery.json`, and `secretstore.json`, and optional in the other schemas that reference it.
 
 | Field                                         | Type   | Req | Values   | Surface        | Notes           |
 |-----------------------------------------------|--------|-----|----------|----------------|-----------------|
