@@ -238,6 +238,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
     ml_stop_threads();
+    // ml_stop_threads() only stops and joins the ML threads. It deliberately does
+    // NOT free the per-worker queues: the collector stop above is bounded to 20s,
+    // so a slow collector can still reach ml_queue_push() from here on. The free
+    // happens in ml_workers_free(), from the FSANITIZE_ADDRESS block below.
+    //
     // ml_fini() (which closes ml_db) is deferred until after
     // metadata_sync_shutdown() drains the metasync workers below. Those
     // workers call ml_dimension_load_models() which uses ml_db; closing it
@@ -361,6 +366,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     health_plugin_destroy();
     cgroup_netdev_link_destroy();
     bearer_tokens_destroy();
+
+    // Deferred from ml_stop_threads(): the ML worker queues must outlive every
+    // collector that can reach ml_queue_push(), and the collector stop above is
+    // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
+    ml_workers_free();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
     size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
