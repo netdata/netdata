@@ -57,6 +57,8 @@ TABLE_SEPARATOR = re.compile(r'^\s*\|[\s:|-]+\|\s*$')
 ANGLE_TAG = re.compile(r'</?([A-Za-z][A-Za-z0-9_.-]*)[^<>\n]*>')
 ANGLE_DIGIT = re.compile(r'<\d')
 INLINE_CODE = re.compile(r'`[^`\n]*`')
+# A CommonMark code span: a run of N backticks, content without a run of exactly N backticks, the same run again.
+CODE_SPAN = re.compile(r'(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)', re.S)
 TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\S+)', re.M)
 
 
@@ -144,9 +146,10 @@ def markdown_problems(text):
             problems.append('table without a header separator row')
         elif len({row.count('|') for row in block}) > 1:
             problems.append('table rows with different cell counts')
-    # A code span may wrap onto the next line, so balance backticks per paragraph, not per line.
+    # A code span may wrap onto the next line and may be delimited by a run of backticks when it contains a literal
+    # backtick (CommonMark), so strip well-formed spans per paragraph and flag any backtick that survives.
     for paragraph in re.split(r'\n\s*\n', '\n'.join(prose)):
-        if paragraph.count('`') % 2:
+        if '`' in CODE_SPAN.sub('', paragraph):
             problems.append(f'unbalanced backtick in paragraph: {paragraph.strip()[:60]!r}')
     plain = without_code(text)
     for match in ANGLE_TAG.finditer(plain):

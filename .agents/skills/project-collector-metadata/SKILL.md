@@ -99,7 +99,8 @@ Before committing a collector `metadata.yaml` (or an ibm.d `module.yaml`) change
 1. Regenerate and read the page: `python3 integrations/gen_integrations.py`, then
    `python3 integrations/gen_docs_integrations.py -c <plugin>/<module>` (for example `go.d.plugin/cloudwatch`), open
    the collector's file under `integrations/`, read it as the operator top to bottom once, then `git restore` the
-   regenerated page. The first script writes only the gitignored `integrations.js`; the second writes the page.
+   regenerated page. The first script writes only gitignored outputs (`integrations.js`, `integrations.json`); the
+   second writes the page.
 2. Every field answers its own question (the family file's contract), leads with what matters, and would survive the
    reader stopping after its first paragraph.
 3. No field is over-scoped: no headings, at most two or three bold captions, at most one admonition, no glossary

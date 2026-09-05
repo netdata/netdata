@@ -686,12 +686,12 @@ modules:
                       - name: production
                         credentials: sdk_default
                         assume_role:
-                          role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch-readonly"
+                          role_arn: "arn:aws:iam::111111111111:role/netdata-cloudwatch-readonly"
                           external_id: ${env:AWS_EXTERNAL_ID}
                       - name: staging
                         credentials: sdk_default
                         assume_role:
-                          role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch-readonly"
+                          role_arn: "arn:aws:iam::222222222222:role/netdata-cloudwatch-readonly"
                     rules:
                       - name: both-defaults
                         targets: [production, staging]
