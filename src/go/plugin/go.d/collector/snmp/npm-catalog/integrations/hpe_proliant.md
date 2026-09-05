@@ -416,6 +416,10 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 
 
-### Collect Live Data for Netdata Support
+## Troubleshooting
+
+### Other Problems
+
+#### Collect Live Data for Netdata Support
 
 For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.

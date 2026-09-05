@@ -155,30 +155,44 @@ Core Functions run on demand with internal execution and response limits.
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Base** | update_every | Periodic metric interval in seconds; it does not change the 5-second ceph-exporter default on Reef 18 and later or the MGR Prometheus module's 15-second default cache refresh. | 10 | no |
-|  | autodetection_retry | Retry interval in seconds for a failed auto-detected job; zero disables retries. | 60 | no |
-|  | function_only | Run only on-demand Functions, without charts or periodic metric requests. | no | no |
+| **Base** | [update_every](#option-base-update-every) | Data collection interval, in seconds. It does not change the ceph-exporter or MGR Prometheus module refresh rates. | 10 | no |
+|  | autodetection_retry | How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries. | 60 | no |
+|  | function_only | Run only on-demand Functions, without creating charts or making periodic metric requests. | no | no |
 | **Metrics** | osd_selector | Simple-pattern selector matched against `osd.<id>` or OSD UUID before the cap. | * | no |
 |  | max_osds | Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no per-OSD metrics are collected. | 100 | no |
 |  | pool_selector | Simple-pattern selector matched against pool names before the cap. | * | no |
 |  | max_pools | Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no per-pool metrics are collected. | 100 | no |
-| **Base** | url | Base URL of a Ceph Dashboard API endpoint. | https://127.0.0.1:8443 | yes |
-|  | timeout | Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and response decoding; must be at least 0.5. | 2 | no |
-| **Auth** | username | Username for Ceph Dashboard JSON login; required with `password` unless a bearer-token file is used. |  | no |
-|  | password | Password for Ceph Dashboard JSON login; required with `username` unless a bearer-token file is used. |  | no |
-|  | bearer_token_file | Externally managed bearer-token file; takes priority over username/password. Its owner must replace the token before it expires. The collector rereads the file for every request, so replacements take effect without a restart. |  | no |
-| **Base** | not_follow_redirects | Reject redirects instead of performing secure active-MGR discovery. | no | no |
-|  | [allowed_redirect_origins](#option-base-allowed-redirect-origins) | Exact trusted active-MGR origins; the configured URL origin is always trusted. | [] | no |
-| **Headers** | headers | Additional HTTP headers; Authorization, Cookie, and Host are rejected. |  | no |
+| **Base** | url | Base URL of the Ceph Dashboard API. Redirects from a standby to the active MGR are followed securely. | https://127.0.0.1:8443 | yes |
+|  | timeout | Deadline for one Dashboard operation, in seconds, including discovery, login, retries, and decoding. At least 0.5. | 2 | no |
+| **Auth** | username | Username for the Ceph Dashboard JSON login, not HTTP basic authentication. Required with `password` unless a bearer token file is used. |  | no |
+|  | password | Password for the Ceph Dashboard JSON login. Required with `username` unless a bearer token file is used. |  | no |
+|  | [bearer_token_file](#option-auth-bearer-token-file) | Path to a bearer token file managed outside Netdata. It takes priority over username and password and is reread on every request. |  | no |
+| **Base** | not_follow_redirects | Reject Dashboard redirects instead of following them to the active MGR. | no | no |
+|  | [allowed_redirect_origins](#option-base-allowed-redirect-origins) | Scheme and host origins that may receive credentials after active-MGR discovery. The configured URL's origin is always trusted. | [] | no |
+| **Headers** | headers | Additional HTTP headers. `Authorization`, `Cookie`, and `Host` are managed by the collector and rejected here. |  | no |
 | **Base** | force_http2 | Force HTTP/2, including h2c over plain TCP. | no | no |
-| **TLS** | tls_skip_verify | Skip server certificate and hostname verification; insecure. | yes | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification. Insecure; on by default only for self-signed Dashboard deployments. | yes | no |
 |  | tls_ca | Absolute path to a CA bundle used to validate the Dashboard certificate. |  | no |
 |  | tls_cert | Absolute path to a client certificate for mTLS. |  | no |
 |  | tls_key | Absolute path to the client private key for mTLS. |  | no |
-| **Proxy** | proxy_url | HTTP proxy URL; empty uses standard proxy environment variables. |  | no |
-|  | proxy_username | Proxy authentication username. |  | no |
-|  | proxy_password | Proxy authentication password. |  | no |
-| **Base** | vnode | Associate charts with a Virtual Node; Functions stay on the physical Agent job. |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. Leave empty to use the proxy environment variables. |  | no |
+|  | proxy_username | Username for proxy authentication. |  | no |
+|  | proxy_password | Password for proxy authentication. |  | no |
+| **Base** | vnode | Associates this once-per-cluster job with a Virtual Node. Functions stay attached to the physical Agent job. |  | no |
+
+<a id="option-base-update-every"></a>
+##### update_every
+
+The standalone ceph-exporter refreshes every 5 seconds by default on Reef 18 and later, and the MGR Prometheus module
+caches for 15 seconds by default; neither follows this interval.
+
+
+<a id="option-auth-bearer-token-file"></a>
+##### bearer_token_file
+
+The file owner must replace the token before it expires. Because the collector rereads the file for every request,
+a replacement takes effect without a restart.
+
 
 <a id="option-base-allowed-redirect-origins"></a>
 ##### allowed_redirect_origins
@@ -590,7 +604,9 @@ One row per orchestrator daemon. If the complete inventory exceeds the selected 
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -622,14 +638,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m ceph -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `ceph` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -637,7 +653,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep ceph
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -647,7 +663,7 @@ grep ceph /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -655,7 +671,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep ceph
 ```
 
-### Dashboard job follows a redirect but returns HTML
+### Other Problems
+
+#### Dashboard job follows a redirect but returns HTML
 
 Do not put a generic reverse-proxy login page in front of the job. Configure `url` to a Ceph Dashboard
 endpoint. Leave `not_follow_redirects: false`, list every possible active MGR under
@@ -663,7 +681,7 @@ endpoint. Leave `not_follow_redirects: false`, list every possible active MGR un
 rejects untrusted origins, HTTPS downgrade, URL credentials, and redirect loops.
 
 
-### Charts or Functions are missing
+#### Charts or Functions are missing
 
 Confirm that the Dashboard user has read permission for the corresponding scope. Permission-filtered
 sections are treated as unavailable; they are not emitted as healthy-looking zero values. The daemon
@@ -671,7 +689,7 @@ Function also requires a configured Ceph orchestrator. When an OSD or pool selec
 cap, the collector deliberately emits no metrics for that entity set.
 
 
-### Long retention or capacity planning is required
+#### Long retention or capacity planning is required
 
 Retention and Agent capacity are Netdata deployment concerns, not Ceph collector settings. Use the
 [Agent sizing guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md) and the
@@ -682,7 +700,7 @@ The collector reports current capacity; it does not emit a pool-fill forecast. U
 the presentation/query layer for projections, and validate the model against planned growth and rebalance.
 
 
-### Existing Prometheus or Grafana monitoring must remain
+#### Existing Prometheus or Grafana monitoring must remain
 
 Keep Ceph Prometheus exporters and existing dashboards until equivalent coverage is verified. This native
 collector adds Dashboard metrics, Functions, and alerts; it does not replace every Ceph Prometheus series.
@@ -690,7 +708,7 @@ Netdata metric names are context-based, so Grafana dashboards that expect origin
 automatically compatible. On-demand Function tables are not Prometheus time series.
 
 
-### More preconfigured Ceph alerts are expected
+#### More preconfigured Ceph alerts are expected
 
 This integration ships a notifying collection-failure alert and a silent-by-default native capacity-utilization
 policy. Existing installations that relied on automatic capacity notifications must explicitly route the

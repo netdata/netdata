@@ -1192,7 +1192,9 @@ Recent error events from the configured Extended Events session or the system_he
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -1224,14 +1226,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m mssql -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `mssql` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -1239,7 +1241,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep mssql
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -1249,7 +1251,7 @@ grep mssql /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -1257,19 +1259,21 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep mssql
 ```
 
-### Connection refused
+### Other Problems
+
+#### Connection refused
 
 Ensure SQL Server is running and accepting TCP connections on the configured port.
 Check that the SQL Server Browser service is running if using named instances.
 
 
-### Login failed
+#### Login failed
 
 Verify the username and password in the DSN are correct.
 Ensure SQL Server is configured for mixed mode authentication if using SQL logins.
 
 
-### Permission denied
+#### Permission denied
 
 Base metric collection needs `VIEW SERVER STATE`. Functions can require additional version-specific
 permissions; see each Function's prerequisites below.

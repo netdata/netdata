@@ -257,7 +257,11 @@ enrichment:
 
 
 
-### License key missing or expired
+## Troubleshooting
+
+### Other Problems
+
+#### License key missing or expired
 
 `geoipupdate` fails (often silently from the plugin's perspective) and the
 MMDB files become stale. Check the `geoipupdate` exit status and its log;
@@ -265,7 +269,7 @@ regenerate the key under "Account > Manage License Keys" if needed and
 update `/etc/GeoIP.conf`.
 
 
-### GeoLite2 attribution requirement
+#### GeoLite2 attribution requirement
 
 The GeoLite2 EULA requires attribution to MaxMind. If you redistribute
 dashboards or screenshots that include GeoLite2-derived data, follow the
@@ -273,7 +277,7 @@ upstream guidance at <https://dev.maxmind.com/geoip/geolite2-free-geolocation-da
 GeoIP2 (commercial) does not have the same attribution requirement.
 
 
-### Schema differences between GeoLite2 and GeoIP2
+#### Schema differences between GeoLite2 and GeoIP2
 
 Both share the standard MMDB structure for the fields the plugin reads
 (country, subdivisions, city, location, autonomous_system_number,
@@ -283,7 +287,7 @@ Use `City` for geographic enrichment and `ASN` (GeoLite2) or `ISP` (GeoIP2) for
 AS data.
 
 
-### Mixing MaxMind with the bundled DB-IP files
+#### Mixing MaxMind with the bundled DB-IP files
 
 The plugin loads every configured MMDB. If you list both, the per-field
 "last non-empty wins" rule applies (see the

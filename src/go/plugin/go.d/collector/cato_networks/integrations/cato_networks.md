@@ -284,7 +284,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -316,14 +318,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m cato_networks -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `cato_networks` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -331,7 +333,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep cato_networks
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -341,7 +343,7 @@ grep cato_networks /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -349,11 +351,13 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep cato_networks
 ```
 
-### API rate limits
+### Other Problems
+
+#### API rate limits
 
 Increase `update_every` or narrow `site_selector` if the Cato API reports rate limiting.
 
 
-### Connection, TLS, or proxy failures
+#### Connection, TLS, or proxy failures
 
 Check DNS, firewall egress, TLS inspection, proxy settings, endpoint region, and the collector logs.
