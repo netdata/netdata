@@ -5,6 +5,14 @@ Learn, in integration cards, in generated umbrella pages, and in
 some in-app surfaces. Write them for an operator scanning a catalog,
 not for a developer reading implementation notes.
 
+This file owns the two contracts that apply to every integration type:
+the catalog sentence and the generated page meta description. The
+content of every collector `metadata.yaml` field (overview, permissions,
+default behavior, prerequisites, option rows, examples, troubleshooting,
+metrics, alerts, identity) is owned by
+`.agents/skills/project-collector-metadata/`; read it for anything beyond
+these two contracts.
+
 ## Catalog Description Contract
 
 The Monitor Anything table does not read a dedicated
@@ -56,6 +64,10 @@ Avoid leading with the provider's publication mechanism (`AWS publishes ...`,
 the full page, but the catalog sentence should first tell users what Netdata
 does for them.
 
+Where the rest of a collector's content goes (which field answers which
+question, and what an empty field claims) is the collector metadata skill's
+job; the catalog sentence only has to stand alone.
+
 ## Generated Page Meta Description Contract
 
 `integrations/gen_docs_integrations.py` emits one `description:` frontmatter field for every generated page in all ten
@@ -105,25 +117,6 @@ Do not duplicate every overview sentence into metadata: the fallback is the norm
 The Monitor Anything catalog deliberately retains its existing overview-first precedence. Adding an explicit meta override
 MUST NOT silently change a catalog table row.
 
-## Where Details Belong
-
-Use the right metadata field for the job:
-
-| Content                                         | Field                                                                                       |
-|-------------------------------------------------|---------------------------------------------------------------------------------------------|
-| What the integration is / what data it provides | First sentence of `overview.data_collection.metrics_description`                            |
-| How collection works                            | `overview.data_collection.method_description`                                               |
-| Defaults and auto-detection                     | `overview.default_behavior.auto_detection.description`                                      |
-| Limits, retention, sizing, and cardinality      | `overview.default_behavior.limits.description`                                              |
-| CPU, memory, disk, or network impact            | `overview.default_behavior.performance_impact.description`                                  |
-| Metric chart title                              | `metrics.scopes[].metrics[].description`; copy the code-defined chart title when one exists |
-| Configuration settings                          | `setup.configuration.options.list[].description`                                            |
-| Example-specific behavior                       | `setup.configuration.examples.list[].description`                                           |
-| Failure modes and fixes                         | `troubleshooting.problems.list[].description`                                               |
-
-Configuration option descriptions are allowed to describe settings.
-Catalog descriptions are not.
-
 ## Good And Bad Examples
 
 Bad catalog description:
@@ -168,7 +161,7 @@ metrics_description: |
   Collect network flow records from NetFlow exporters such as routers, switches, and firewalls.
 ```
 
-## Review Checklist
+## Validation
 
 Before committing `metadata.yaml` changes:
 
@@ -181,11 +174,7 @@ Before committing `metadata.yaml` changes:
    ```
 
 2. Regenerate `src/collectors/COLLECTORS.md`.
-3. Read the table row description and generated page frontmatter for the integration.
-4. Confirm both answer "what is this integration?" without relying on
-   setup context.
-5. Move option names, defaults, variables, and limits out of the
-   catalog sentence and into the proper setup or default-behavior
-   field.
-6. Keep the first sentence useful even when rendered alone in a list,
-   card, search result, or generated catalog.
+3. Read the table row description and generated page frontmatter for the integration. Both must answer "what is this
+   integration?" without relying on setup context and stay useful when rendered alone in a list, card, or search result.
+4. For a collector, run the review checklist in `.agents/skills/project-collector-metadata/SKILL.md` over the rest of
+   the page.

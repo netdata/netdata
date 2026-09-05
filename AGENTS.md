@@ -602,9 +602,13 @@ trigger, this list is a pointer):
   query-engine bugs, formatter byte-pins, validating a fix branch
 - `project-build-static-binary`: building or testing the static self-extracting installer
   (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
-- `integrations-lifecycle`: any `metadata.yaml` or collector `taxonomy.yaml`; `integrations/` generators, schemas,
-  taxonomy registries, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
-  `contexts.yaml`; the collector-consistency rule
+- `project-collector-metadata`: what every collector `metadata.yaml` field says and how it reads: overview,
+  permissions, auto-detection (including service discovery), limits and cost, prerequisites, option rows, examples,
+  the known-errors troubleshooting catalog, metrics scopes, alerts, identity and keywords; a page that reads as a wall
+  of text or claims something false
+- `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` and collector `taxonomy.yaml` schemas and
+  validation, `integrations/` generators, taxonomy registries, templates, generated outputs,
+  `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d `contexts.yaml`; the collector-consistency rule
 - `learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
   `docs/.map/map.yaml`; why a Learn page looks the way it does; MDX escape rules; redirects; Netlify deploy
 - `learn-pr-preview`: only when the user explicitly asks to build, preview, or validate `learn.netdata.cloud` locally

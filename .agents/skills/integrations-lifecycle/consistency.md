@@ -84,7 +84,8 @@ When reviewing a PR that touches a collector, verify:
    the diff adds a chart, dimension, label, or unit change in
    the code, the corresponding entry must appear in
    `metadata.yaml`. If a metric is renamed, both files must
-   change.
+   change. Row content (rows mirror the code's context, title, unit,
+   type, and dimensions): `.agents/skills/project-collector-metadata/metrics.md`.
 
 2. **Chart-context changes have matching `taxonomy.yaml`
    changes.** Structural `items:` entries that own contexts and
@@ -106,46 +107,23 @@ When reviewing a PR that touches a collector, verify:
      `setup.configuration.options.list`.
 
    The option's `group` and the DynCfg tab that shows it MUST
-   name the same thing. `metadata.yaml` `group` becomes the
-   doc's Group column; `config_schema.json`
-   `uiSchema.ui:options.tabs[].title` becomes the UI tab. When
-   the two vocabularies differ, an operator reading the doc
-   cannot find the option in the UI. Rules:
-   - Every `group` MUST equal a tab title, or take the
-     `Tab / Subgroup` form whose first segment is a tab title.
-     `Tab / Subgroup` exists because tabs can only group whole
-     top-level schema properties, so a doc group refining a
-     nested concern (query timing, tag filters) cannot be its
-     own tab.
-   - Every tab title MUST be named by at least one `group`, or
-     the doc can never point at that tab.
-   - Name the section after the config key the operator types,
-     so the doc column, the UI tab, and the YAML key read alike.
-   - List tabs in the order the doc lists the groups.
-   - Most collectors predate this rule and still disagree, so do
-     NOT copy grouping from a neighbouring collector; derive it
-     from that collector's own keys.
-   - The option `description` MUST be identical in both files;
-     the form's extra depth goes in `ui:help`, the doc's in
-     `detailed_description`. How to write the schema file is
-     `.agents/skills/project-go-collector-design/config-schema.md`.
-   - Once a tabbed collector's two artifacts agree, keep them
-     that way (a tabbed collector whose options or descriptions
-     you change MUST) by calling
-     `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`
-     from its tests. It checks per option that the tab listing
-     the option's root property is the first segment of its
-     group, that the schema declares the option with the same
-     description, that every tab is named by some group, and
-     that every visible top-level property is documented. The
-     call is opt-in because most collectors would fail it today;
-     `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the
-     worked examples.
+   name the same thing, and the option `description` MUST be
+   identical in both files: the doc's Group column and the UI tab
+   are one vocabulary, the doc row and the form field one
+   sentence. The rules (tab and group naming, the `Tab / Subgroup`
+   form, order, deriving groups from the collector's own keys, the
+   opt-in `collecttest.AssertConfigSchemaMatchesMetadata` call and
+   what it checks) are owned by
+   `.agents/skills/project-go-collector-design/config-schema.md`
+   sections 3 and 8; the metadata side of a row (one sentence,
+   `default_value`, `required`, `group`, `detailed_description`) by
+   `.agents/skills/project-collector-metadata/setup.md`.
 
 4. **Alert changes have matching `metadata.yaml.alerts`
    entries.** If `health.d/<plugin>.conf` adds, removes, or
    renames an alert, `metadata.yaml.modules.<m>.alerts[]` must
-   reflect the change.
+   reflect the change. Row content (name, `on:` context, `info`
+   verbatim, link, `os`): `.agents/skills/project-collector-metadata/alerts-and-meta.md`.
 
 5. **README.md handling.** If the plugin directory has a
    single integration, the README is a symlink to the

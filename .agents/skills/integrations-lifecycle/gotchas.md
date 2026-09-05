@@ -441,18 +441,12 @@ related-resources blurbs, or any free-text field in
 integration `.md` -> learn ingest -> MDX 3 build on Netlify.
 The escape battery in `learn/ingest/ingest.py:1721-1799` only
 handles bare `{`, the three exact-substring operators
-(`<=`, `%<`, `<->`), and `<details><summary>`. The following
-break the MDX build silently in netdata land but loudly on
-the next learn ingest preview deploy:
-
-| Pattern in metadata.yaml | What MDX does | Fix |
-|---|---|---|
-| `<service-name>` placeholder | parses as JSX open, demands close | wrap in backticks: `` `<service-name>` `` or `<SERVICE_NAME>` in code |
-| `<aws-region>`, `<scope>`, `<app>` | same | same |
-| `Vec<u32>`, `HashMap<K,V>` (Rust/C++/Java generics in prose) | same | wrap in backticks |
-| `<100 ms`, `<5 seconds`, `<10 connections` | `Unexpected character '1' before name` | rephrase as "under 100 ms" or escape with `&lt;` |
-| Smart quotes (`"`, `"`, `'`, `'`) in YAML auto-converted by some editors | depends on context | use ASCII quotes |
-| Unbalanced single backtick on a line | breaks code-fence detection | balance or remove |
+(`<=`, `%<`, `<->`), and `<details><summary>`. Everything else
+breaks the MDX build silently in netdata land but loudly on
+the next learn ingest preview deploy. The patterns and the
+author-side rules are in
+`.agents/skills/project-collector-metadata/SKILL.md`
+("Safety Of The Markdown"); this entry keeps the incident.
 
 Real-world hit: 2026-05-07 netflow-plugin metadata.yaml had
 `description: Sets tenant=amazon, region=<aws-region>, role=<service-name>.`
@@ -469,14 +463,6 @@ Cross-reference: `learn-site-structure/mdx-rules.md` ("Patterns
 that the escape battery does NOT cover") and
 `learn-site-structure/pitfalls-and-gotchas.md` document the
 MDX side; this entry is the metadata-author-side mirror.
-
-Practical recipe when authoring metadata.yaml prose:
-
-- Wrap every angle-bracketed placeholder in backticks.
-- Wrap every code-type expression in backticks.
-- Avoid `<` immediately followed by a digit; use "under" or
-  `&lt;`.
-- Avoid generics syntax in prose; if necessary, backtick it.
 
 The integrations pipeline does not validate this on its own.
 The next learn ingest deploy preview is what will catch you.

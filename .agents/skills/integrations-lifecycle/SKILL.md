@@ -61,19 +61,14 @@ does the in-app integrations page get its data?".
    metadata/categories or the generator, then run
    `gen_integrations.py` and `gen_doc_collector_page.py`.
 
-   Treat short descriptions as public product copy. Catalog
-   descriptions must say what the integration is and what it
-   monitors, enriches, exports, authenticates, or discovers.
-   For collector-like metadata, the first sentence of
+   Treat short descriptions as public product copy. For
+   collector-like metadata, the first sentence of
    `overview.data_collection.metrics_description` is the catalog
-   sentence used by generated pages such as `COLLECTORS.md`.
-   Start that sentence with a user-facing action phrase such as
-   `Monitor...`, `Collect...`, `Enrich network flows with...`, or
-   `Annotate network flows with...`.
-   Do not use the catalog description for variables, defaults,
-   option names, setup instructions, limits, or troubleshooting.
-   Put those details in setup, default-behavior, examples, or
-   troubleshooting fields. See `description-authoring.md`.
+   sentence used by generated pages such as `COLLECTORS.md`;
+   `description-authoring.md` owns that contract and the page
+   meta-description contract. The content of every other collector
+   `metadata.yaml` field is owned by
+   `.agents/skills/project-collector-metadata/SKILL.md`.
 
 2. **`integrations/*.md` files are GENERATED. DO NOT EDIT.**
    Every per-integration `.md` opens with a
@@ -137,7 +132,7 @@ does the in-app integrations page get its data?".
 |---|---|
 | `pipeline.md` | The 4-stage pipeline graph, every script, every artifact, the CI workflows. |
 | `schema-reference.md` | Per-field reference for JSON Schemas under `integrations/schemas/`, including collector taxonomy schemas. |
-| `description-authoring.md` | Product-copy rules for `metadata.yaml` descriptions and the Monitor Anything table text. |
+| `description-authoring.md` | The two cross-type description contracts: the catalog sentence (Monitor Anything table) and the generated page meta description. Collector field content is `project-collector-metadata`. |
 | `per-type-matrix.md` | One-row-per-integration-type quick lookup: source paths, validator, render keys, output location. |
 | `artifacts-and-banners.md` | Every committed and gitignored artifact; banner conventions; symlink rules. |
 | `ibm-d.md` | The `contexts.yaml` -> `metadata.yaml` chain for ibm.d modules. |
@@ -188,6 +183,10 @@ This skill follows
 
 ## Related skills
 
+- `project-collector-metadata` -- what every collector
+  `metadata.yaml` field says and how it reads (the integration
+  page's content, field by field). This skill owns the pipeline
+  that renders it; that one owns the words.
 - `project-writing-collectors` -- the broader collector
   authoring context (NIDL contexts, dashboard shaping, plugin
   landscape). Read FIRST when authoring a brand-new collector;

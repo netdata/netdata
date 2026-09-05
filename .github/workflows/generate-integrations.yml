@@ -121,6 +121,11 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 -m unittest integrations.tests.test_prometheus_profile_docs
+      - name: Test Collector Metadata Content Rules
+        id: test-collector-metadata
+        run: |
+          source ./virtualenv/bin/activate
+          python3 -m unittest integrations.tests.test_collector_metadata
       - name: Generate Integrations Documentation
         id: generate-integrations-documentation
         run: |

@@ -32,6 +32,9 @@ rest of this skill as background:
 - Existing go.d collector update: read `src/go/AGENTS.md`, the collector's
   local files, `.agents/skills/integrations-lifecycle/consistency.md`, and
   `.agents/skills/integrations-lifecycle/recipes/update-collector.md`.
+- Writing or reviewing any collector's `metadata.yaml` (the integration
+  page): `.agents/skills/project-collector-metadata/SKILL.md`, field by
+  field.
 - V1-to-V2 migration: read `src/go/AGENTS.md`,
   `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`, and the V2 skill before
   changing code.
@@ -483,6 +486,7 @@ in `src/go/plugin/go.d/config/go.d.conf`, stock job config at `src/go/plugin/go.
 | netipc cross-plugin enrichment | C / Go / Rust | `src/libnetdata/netipc/`, `src/go/pkg/netipc/`, `src/crates/netipc/` |
 | DYNCFG protocol | dynamic configuration | `src/plugins.d/DYNCFG.md`, `docs/developer-and-contributor-corner/dyncfg.md` |
 | Health alerts | adding, changing, or reviewing an alert/template | `.agents/skills/project-health-alert-authoring/SKILL.md` |
+| Integration page content | what each `metadata.yaml` field says and how it reads | `.agents/skills/project-collector-metadata/SKILL.md` |
 | Integrations pipeline | doc generation from `metadata.yaml` | `integrations/README.md` |
 | Go framework changes | changing shared Go collector/runtime framework code | `src/go/plugin/framework/docs/changing-framework-code.md` |
 | Credentials in config | `${env:}/${file:}/${cmd:}/${store:}` | `src/collectors/SECRETS.md` |

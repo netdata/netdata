@@ -124,11 +124,10 @@ Tests about configuration:
 
 ## 6. Metadata And Help In Operator Voice
 
-**When:** writing `metadata.yaml` descriptions, `ui:help`, and stock `.conf` comments. **Do:** explain which mode to
-choose, prerequisites, what the collector writes or deletes, permissions, objectives versus timeouts, direction,
-observation limits, and recovery expectations in plain language; keep schema descriptions short and put examples and
-consequences in `ui:help`; use headings, lists, or a compact comparison table in `detailed_description` and the
-overview (option descriptions are one paragraph, identical in the doc and the form); read the
-generated integration page after generation. **Don't:** ship the engine's journal or state-machine vocabulary as
-operator documentation. **Evidence:** the generated page read end to end. **Boundary:** artifact mechanics, schema
-reference, and the delivery route are owned by `.agents/skills/integrations-lifecycle/`; do not duplicate them here.
+**When:** writing `metadata.yaml` fields, `ui:help`, and stock `.conf` comments for a collector designed with sections
+1 to 5. **Do:** write what those sections decided (modes, prerequisites, what the collector writes or deletes,
+permissions, objectives versus timeouts, observation limits) in operator voice, following
+`.agents/skills/project-collector-metadata/` for every `metadata.yaml` field and `config-schema.md` section 2 for the
+form's text channels. **Don't:** ship the engine's vocabulary as operator documentation. **Evidence:** the generated
+integration page read end to end. **Boundary:** the content rules live in the collector metadata skill; artifact
+mechanics and the delivery route in `.agents/skills/integrations-lifecycle/`; do not duplicate either here.

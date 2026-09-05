@@ -149,4 +149,5 @@ length is a signal, not a limit; splitting one function into arbitrarily named h
 2. `operator-surface.md` for any option, mode, or form work; `config-schema.md` when writing the schema file itself;
    `mutating-collectors.md` only for side-effecting or persistent collectors.
 3. `src/go/plugin/go.d/docs/how-to-write-a-collector.md` and the V2 skill for implementation.
-4. `.agents/skills/integrations-lifecycle/consistency.md` for artifact delivery.
+4. `.agents/skills/project-collector-metadata/SKILL.md` for the integration page (`metadata.yaml`), then
+   `.agents/skills/integrations-lifecycle/consistency.md` for artifact delivery.
