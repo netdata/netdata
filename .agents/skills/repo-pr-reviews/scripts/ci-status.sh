@@ -55,7 +55,7 @@ jq -r '
 
 echo
 total=$(jq '(.statusCheckRollup // []) | length' <<< "${data}")
-fail=$(jq '[(.statusCheckRollup // [])[] | select(((.conclusion // "")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE")) or ((.state // "")|test("^(FAILURE|ERROR)$")))] | length' <<< "${data}")
+fail=$(jq '[(.statusCheckRollup // [])[] | select(((.conclusion // "")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE|STALE")) or ((.state // "")|test("^(FAILURE|ERROR)$")))] | length' <<< "${data}")
 running=$(jq '[(.statusCheckRollup // [])[] | select(((.status // "")|test("^(IN_PROGRESS|QUEUED|WAITING|PENDING|REQUESTED)$")) or ((.state // "")|test("^(PENDING|EXPECTED)$")))] | length' <<< "${data}")
 echo "Total checks: ${total}   Failing: ${fail}   Running: ${running}"
 

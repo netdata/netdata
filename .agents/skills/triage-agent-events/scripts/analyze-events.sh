@@ -81,7 +81,7 @@ case "$FORMAT" in
     *) echo "Unknown --format '$FORMAT' (expected text or json)" >&2; exit 2 ;;
 esac
 case "$TOP" in
-    ''|*[!0-9]*) echo "--top must be a positive integer, got '$TOP'" >&2; exit 2 ;;
+    ''|*[!0-9]*|0*) echo "--top must be a positive integer, got '$TOP'" >&2; exit 2 ;;
 esac
 
 FIELD="$(field_for_dim "$BY")"

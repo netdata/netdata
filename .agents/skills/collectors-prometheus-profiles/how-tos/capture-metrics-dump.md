@@ -25,9 +25,8 @@ and `# TYPE` lines are part of the evidence.
 
 ## Check the evidence
 
-In the same shell (or set `DUMP` to the path printed above):
-
 ```bash
+DUMP="${DUMP:?set DUMP to the path printed by the capture}"
 grep -c '^# TYPE ' "$DUMP"
 grep -c '^# HELP ' "$DUMP"
 wc -l "$DUMP"

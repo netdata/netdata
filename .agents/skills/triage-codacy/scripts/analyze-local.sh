@@ -148,7 +148,7 @@ if [ "$FORMAT" = "json" ]; then
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not JSON; the analysis did not complete (stderr: ${OUTPUT}.log)" >&2
         exit 4
     fi
-    if ! jq -e 'type=="array" or (type=="object" and has("issues"))' "$OUTPUT" >/dev/null 2>&1; then
+    if ! jq -e 'type=="array" or (type=="object" and (.issues|type)=="array")' "$OUTPUT" >/dev/null 2>&1; then
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is JSON but not a findings array or an {issues} object" >&2
         exit 4
     fi
@@ -160,6 +160,7 @@ if [ "$FORMAT" = "json" ]; then
     if [ "$rc" -ne 0 ]; then
         echo -e "${CA_YELLOW}[analyze-local] cli exit ${rc} (expected when findings are present)${CA_NC}" >&2
     fi
+    rm -f "$OUTPUT.log"  # the CLI's stderr is kept only when the run failed
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
 else
     # SARIF is JSON too; count results across runs so the same failed-versus-clean rule applies.
@@ -167,7 +168,7 @@ else
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is not parseable ${FORMAT}; the analysis did not complete (stderr: ${OUTPUT}.log)" >&2
         exit 4
     fi
-    if ! jq -e 'type=="object" and has("runs")' "$OUTPUT" >/dev/null 2>&1; then
+    if ! jq -e 'type=="object" and (.runs|type)=="array"' "$OUTPUT" >/dev/null 2>&1; then
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc}: ${OUTPUT} is JSON but not a SARIF document (stderr: ${OUTPUT}.log)" >&2
         exit 4
     fi
@@ -176,6 +177,7 @@ else
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc} with 0 findings: a failed analysis, not a clean tree" >&2
         exit 4
     fi
+    rm -f "$OUTPUT.log"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT} (${FORMAT} format)" >&2
 fi
 
