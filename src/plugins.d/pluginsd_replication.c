@@ -165,7 +165,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
                 st->replay.after, st->replay.before);
 #endif
 
-        if(start_time && end_time && start_time < wall_clock_time + tolerance && end_time < wall_clock_time + tolerance && start_time < end_time) {
+        if(pluginsd_replay_timestamps_valid(start_time, end_time, wall_clock_time, tolerance)) {
             if (unlikely(end_time - start_time != st->update_every))
                 rrdset_set_update_every_s(st, end_time - start_time);
 
