@@ -538,6 +538,7 @@ If a new AI reviewer appears in the project, classify it by adding to
 | `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
 | `trigger-copilot.sh` succeeds but no new review        | Expected. The org has no Copilot review credits, which is why it is not in the loop. Do not wait on it. |
 | `trigger-cubic.sh` succeeds but no new review          | cubic ignores comments without an explicit `@cubic-dev-ai` mention. The script always prepends it. |
+| `ci-status.sh` exits 3 (failing)                       | At least one check failed or a commit status is in FAILURE/ERROR. Fix before pushing; 3 wins over 2 when checks are also running. |
 | `ci-status.sh` exits 2 (running)                       | CI hasn't finished. Push anyway -- waiting on CI between iterations destroys throughput. The next push triggers a fresh CI run on the new code, which is what matters. (See Step 4b.) |
 | Bot keeps re-flagging the same line after a fix push   | The bot didn't see the new commit because it wasn't re-triggered.    |
 | `wait-for-activity.sh` 124 timeout                     | Bots are silent -- could be done, could be quota-limited. Check `summary.txt`; if all threads resolved, you're done. |

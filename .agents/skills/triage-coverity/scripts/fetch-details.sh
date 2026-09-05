@@ -6,7 +6,9 @@
 #
 # Reads cookies/XSRF/UA from .env via _lib.sh.
 # For each row, calls /sourcebrowser/defectdetails.json?defectInstanceId=<lastDefectInstanceId>.
-# Skips rows whose output file already exists (idempotent; safe to re-run).
+# Skips rows whose cached output is a defect-details object; anything else cached (for
+# example a login page fetched with an expired session) is discarded and refetched, so
+# partial runs are safe to re-run.
 
 set -euo pipefail
 

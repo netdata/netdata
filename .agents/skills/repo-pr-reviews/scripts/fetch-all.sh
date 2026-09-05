@@ -11,6 +11,7 @@
 #   reviews.json           -- /repos/{slug}/pulls/{n}/reviews         (review submissions with body)
 #   review-threads.json    -- GraphQL reviewThreads (per-thread isResolved + comments[])
 #   summary.txt            -- human-readable triage summary
+#   FETCH-INCOMPLETE       -- present while a run is in progress or after it aborted; the snapshot is partial
 #
 # Pagination paranoia:
 #   GitHub paginates everything. Default page size is 30, max 100. The skill's

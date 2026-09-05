@@ -269,6 +269,7 @@ if [ -n "$VERSION_REGEX" ]; then
         exit 2
     else
         pre_rows="$(jq '(.data // []) | length' "$OUTPUT")"
+        trap 'rm -f "$OUTPUT.tmp"' EXIT
         if ! jq --arg re "$VERSION_REGEX" '
             (.columns.AE_AGENT_VERSION.index) as $i
             | .data = [ (.data // [])[] | select(((.[$i] // "") | tostring) | test($re)) ]

@@ -1,7 +1,8 @@
 # Handle Malformed Local Codacy JSON
 
-Use this when `analyze-local.sh` exits 4 (it now detects this itself: the dump
-is not JSON, or the CLI failed with zero findings) or an older dump does not parse.
+Use this when `analyze-local.sh` exits 4 (the dump is not JSON, or the CLI failed
+with zero findings; the script's `<dump>.log` holds the CLI's stderr) or a dump from
+another source does not parse.
 
 1. Verify the dump before reading it as findings:
 

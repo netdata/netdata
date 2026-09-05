@@ -387,7 +387,8 @@ clone_new_repos() {
         if [ ! -d "$name" ]; then
             new_repos_count=$((new_repos_count + 1))
             print_status "${GREEN}→ Cloning new repo: $name (default branch: $default_branch, with submodules)${NC}"
-            if git clone --quiet --recursive "$url" "$name" 2>/dev/null; then
+            # stdin is the repo list (process substitution): keep ssh or credential prompts from eating it.
+            if git clone --quiet --recursive "$url" "$name" </dev/null 2>/dev/null; then
                 # Set up tracking for the default branch without changing this shell's
                 # directory (the loop now runs in the caller's shell).
                 git -C "$name" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default_branch" 2>/dev/null \
