@@ -48,7 +48,8 @@ integration.", which MUST be true.
   service name operators know (`pgsql`, `postgres`, `rds`). All lowercase unless the term is a proper name. A
   multi-service or multi-device collector (cloud monitoring, SNMP) MAY add the service or vendor names operators search
   for; the cap applies to single-product collectors.
-- Not marketing words ("monitoring", "observability", "performance"), not words already in the name, not the category.
+- The full product name is always one of them. Not marketing words ("monitoring", "observability", "performance"),
+  not generic words the integration name already carries ("server", "database"), not the category.
 - Zero keywords is a defect: the page is then reachable only by its name.
 
 ## 4. Cross-References

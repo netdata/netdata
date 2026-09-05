@@ -42,7 +42,7 @@ SD_AUTO_DETECTION_BACKLOG = frozenset({
 # label names carry pre-escaped angle brackets; example and scope names are therefore not covered.
 PROSE_KEYS = frozenset({
     'metrics_description', 'method_description', 'description', 'detailed_description', 'info', 'title',
-    'error', 'when', 'cause', 'fix',
+    'default_value', 'error', 'when', 'cause', 'fix', 'source',
 })
 
 # HTML tags Learn's ingest escapes or renders; everything else in angle brackets outside code is treated as JSX.
@@ -126,11 +126,11 @@ def outside_fences(text):
 def markdown_problems(text):
     lines = text.splitlines()
     problems = []
-    if sum(1 for line in lines if ADMONITION_FENCE.match(line)) % 2:
-        problems.append('unbalanced ::: admonition fence')
     if sum(1 for line in lines if CODE_FENCE.match(line)) % 2:
         problems.append('unbalanced ``` code fence')
     prose = outside_fences(text)
+    if sum(1 for line in prose if ADMONITION_FENCE.match(line)) % 2:
+        problems.append('unbalanced ::: admonition fence')
     index = 0
     while index < len(prose):
         if not TABLE_ROW.match(prose[index]):
