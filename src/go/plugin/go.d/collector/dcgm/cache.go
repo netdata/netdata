@@ -9,9 +9,13 @@ const (
 	maxNotSeenDims   = 10
 )
 
+type chartKey struct {
+	context, instance string
+}
+
 type (
 	cache struct {
-		charts map[string]*cacheChart
+		charts map[chartKey]*cacheChart
 	}
 
 	cacheChart struct {
@@ -28,7 +32,9 @@ type (
 )
 
 func newCache() *cache {
-	return &cache{charts: make(map[string]*cacheChart)}
+	return &cache{
+		charts: make(map[chartKey]*cacheChart),
+	}
 }
 
 func (c *cache) reset() {
@@ -40,7 +46,7 @@ func (c *cache) reset() {
 	}
 }
 
-func (c *cache) getChart(key string) (*cacheChart, bool) {
+func (c *cache) getChart(key chartKey) (*cacheChart, bool) {
 	v, ok := c.charts[key]
 	if !ok {
 		return nil, false
@@ -50,8 +56,12 @@ func (c *cache) getChart(key string) (*cacheChart, bool) {
 	return v, true
 }
 
-func (c *cache) putChart(key string, chart *collectorapi.Chart) *cacheChart {
-	v := &cacheChart{chart: chart, seen: true, dims: make(map[string]*cacheDim)}
+func (c *cache) putChart(key chartKey, chart *collectorapi.Chart) *cacheChart {
+	v := &cacheChart{
+		chart: chart,
+		seen:  true,
+		dims:  make(map[string]*cacheDim),
+	}
 	c.charts[key] = v
 	return v
 }
@@ -62,7 +72,9 @@ func (ch *cacheChart) touchDim(dimID string) (exists bool) {
 		d.notSeenTimes = 0
 		return true
 	}
-	ch.dims[dimID] = &cacheDim{seen: true}
+	ch.dims[dimID] = &cacheDim{
+		seen: true,
+	}
 	return false
 }
 
