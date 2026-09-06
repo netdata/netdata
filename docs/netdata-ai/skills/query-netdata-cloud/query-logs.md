@@ -189,7 +189,7 @@ discriminator). Verified live against the agent-events node:
 | `status` | HTTP-style status integer (200 on success) |
 | `v` | Function schema version |
 | `type` | Family discriminator (carries `logs`-family value) |
-| `help` / `accepted_params` / `required_params` | Discovery metadata (see [query-functions.md](./query-functions.md#info-true-discovery)) |
+| `help` / `accepted_params` / `required_params` | Discovery metadata (see [query-functions.md](./query-functions.md#infotrue-discovery)) |
 | `data` | **Array** of row arrays -- this is the result rows |
 | `columns` | Object keyed by column name; per-column metadata: `index` (position in each row of `data`), `name` (display label), `type` (string / timestamp / integer / ...), `visible`, `unique_key`, `sort`, `summary` (`count` / `min` / `max` / `sum` / ...), `filter` (e.g. `range`), `visualization`, `value_options` (for transforms like `datetime_usec`) |
 | `facets` | Array of facet records: `{id, name, options[]}` where each option is `{id, name, count}`. Use to drill down by field value. |

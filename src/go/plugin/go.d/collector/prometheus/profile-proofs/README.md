@@ -2,6 +2,11 @@
 
 # Stock Prometheus profile proofs
 
+**Place in the documentation set.** The project skill `.agents/skills/collectors-prometheus-profiles/SKILL.md` names
+this document as the owner of the proof artifact contract and cites its sections by heading anchor;
+`.agents/sow/audit.sh` fails when a cited heading no longer exists, so renaming or removing a heading here updates the
+skill in the same change.
+
 This directory contains compact proofs for stock Prometheus profiles whose supported source surface cannot be established
 from one live endpoint. Bulky machine-readable evidence lives in [`netdata/testdata`](https://github.com/netdata/testdata)
 under `prometheus/profiles/<profile>/`.

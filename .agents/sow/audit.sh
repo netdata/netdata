@@ -64,6 +64,25 @@ read_sow_status() {
 
 echo "${BLUE}=== SOW audit (cwd=$(pwd)) ===${NC}"
 
+# GitHub heading slugs of one markdown file, one per line, in document order: lowercase; letters, digits, spaces,
+# hyphens, and underscores kept, everything else dropped; spaces become hyphens; a repeated heading gets -1, -2, ...
+# Headings inside fenced code blocks are ignored.
+md_heading_slugs() {
+  awk '
+    /^(```|~~~)/ { infence = !infence; next }
+    infence { next }
+    /^#{1,6}[ \t]/ {
+      h = $0
+      sub(/^#+[ \t]+/, "", h)
+      sub(/[ \t]+#+[ \t]*$/, "", h)
+      sub(/[ \t]+$/, "", h)
+      h = tolower(h)
+      gsub(/[^a-z0-9 _-]/, "", h)
+      gsub(/ /, "-", h)
+      if (h in seen) { seen[h]++; print h "-" seen[h] } else { seen[h] = 0; print h }
+    }' "$1"
+}
+
 section "initialization marker"
 if [ -f AGENTS.md ]; then
   if grep -q "^Project SOW status: initialized$" AGENTS.md; then
@@ -397,8 +416,32 @@ if [ -d .agents/skills ]; then
   done < <(git grep -n -o -E '(source "([^/.]*/)?|\]\()(\.\./)+[A-Za-z0-9_./-]+' \
              -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
              | sed -E 's/^([^:]*):[0-9]+:(source "([^/.]*\/)?|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
+  # Owner-section anchors. A skill cites a section of the document that owns a fact as `path/to/doc.md#anchor`
+  # (GitHub heading slug, see md_heading_slugs). The file must exist and a heading with that slug must exist, so
+  # renaming or removing a heading in an owner document fails here until every skill that cites it is updated.
+  # Paths are repo-relative, or relative to the citing file when they start with ./ or ../; tokens starting with /
+  # (URLs, absolute placeholders) are not citations.
+  while IFS='|' read -r file ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in /*) continue ;; esac
+    path=${ref%%#*}
+    anchor=${ref#*#}
+    case "$path" in
+      ./*|../*) target="$(dirname "$file")/$path" ;;
+      *) target="$path" ;;
+    esac
+    if [ ! -f "$target" ]; then
+      fail "$file cites $ref but $target does not exist"
+      skills_bad=1
+    elif ! md_heading_slugs "$target" | grep -Fxq -- "$anchor"; then
+      fail "$file cites $ref but no heading in $target has the anchor #$anchor"
+      skills_bad=1
+    fi
+  done < <(git grep -n -o -E '[A-Za-z0-9_./-]+\.md#[A-Za-z0-9_-]+' \
+             -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
+             | sed -E 's/^([^:]*):[0-9]+:/\1|/' | sort -u)
   if [ "$skills_bad" -eq 0 ]; then
-    ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, and every skill path reference resolves"
+    ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, every skill path reference resolves, and every owner-section anchor resolves to a heading"
   fi
 else
   warn "no .agents/skills directory"

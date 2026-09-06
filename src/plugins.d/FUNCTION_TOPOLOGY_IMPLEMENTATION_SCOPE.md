@@ -10,6 +10,14 @@ and [FUNCTION_TOPOLOGY_SCHEMA.json](/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json
 It is not an implementation plan for one commit. It is the work map for the
 backend, frontend, producer, and aggregator changes.
 
+**Place in the documentation set.** This document owns migration state, the
+Cloud aggregator and frontend scope, and design that is not yet in the schema.
+The payload contract itself is the developer guide. The project skill
+`.agents/skills/topology-authoring/SKILL.md` cites sections of this document by
+heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer
+exists, so renaming or removing a heading here updates the skill in the same
+change.
+
 ## Ground Rules
 
 - New topology producers emit only the new schema.
@@ -518,7 +526,37 @@ Required test classes:
 - generic schema-conformant custom topology passthrough;
 - synthetic scale benchmark near and above current corpus scale;
 - sanitized real-corpus replay from `.local/` promoted only as non-sensitive
-  fixtures when safe.
+  fixtures when safe;
+- `__topology_mode=aggregated` rewritten to `detailed` on fan-out only for
+  producers that advertise the mode, and never added for the others;
+- schema-valid unknown fields preserved through aggregation.
+
+### Design Not Yet In The Schema
+
+These aggregator requirements are agreed design, not shipped contract. The
+schema has no fields for them, its type definitions reject unknown properties,
+and a producer must not emit them until the schema and the developer guide
+carry them.
+
+- Four-dimension table merge policy. Today a table type declares one flat
+  `aggregation` value. The target policy has four dimensions: `key` (the
+  columns that identify equivalent rows), `action` (`deduplicate`, `append`,
+  `set_union`, `merge_metrics`, `latest`, or `preserve`), `metrics` (a per
+  numeric column operation such as `sum`, `min`, `max`, `avg_weighted`, or
+  `latest`), and `conflicts` (how non-key scalar conflicts resolve:
+  `prefer_claim`, `prefer_newest_agent`, `preserve_all`, or `diagnostic`).
+  Until it lands, the aggregator applies the per-role defaults in the developer
+  guide's Aggregator Behavior section, and merged actor scalars prefer the
+  non-empty value from the newest comparable Agent version, otherwise the
+  conflict is preserved in diagnostics or expanded labels.
+- Loose-side materialization policy. A detailed network-connections row whose
+  remote side has endpoint facts but no actor would let the producer skip one
+  visible `endpoint` actor per remote peer; the table would declare how such a
+  loose side is grouped into a presentation actor when nothing claims it. The
+  shipped producer instead materializes visible `endpoint` correlation-point
+  actors and every graph link has two actor references. This stronger
+  loose-side model needs one Agent, UI, and aggregator pass before it becomes
+  contract.
 
 ## Rollout Plan
 

@@ -12,6 +12,10 @@ Use this skill before editing files under:
 - `src/go/plugin/go.d/collector/snmp/profile-format.md`
 - `src/go/plugin/go.d/collector/snmp_topology/`
 
+Boundary: this skill owns the profile `topology:` rows, which OIDs feed the SNMP topology producer and how they are
+extracted. What the producer emits from those observations (actors, links, evidence, modals) is
+`.agents/skills/topology-authoring/SKILL.md`.
+
 ## Required Checks
 
 1. Identify the source MIB object for every profile field being added or changed.

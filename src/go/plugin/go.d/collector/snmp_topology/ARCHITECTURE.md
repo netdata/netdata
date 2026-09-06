@@ -4,6 +4,17 @@ This is a maintainer-oriented map of `snmp_topology`. It explains the main
 runtime path and package boundaries. It intentionally avoids per-OID and
 per-protocol details; those live in the profile definitions and focused tests.
 
+**Place in the documentation set.** This document owns the collector's
+internals: runtime order, package boundaries, the graph build, the diagnostic
+tooling, and the validation commands. What the emitted payload means is owned
+by `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` (its SNMP/L2 Shape
+section); the SNMP profile `topology:` rows are owned by the SNMP profile format
+and the `collectors-snmp-profiles` project skill. The project skill
+`.agents/skills/topology-authoring/SKILL.md` cites sections of this document by
+heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer
+exists, so renaming or removing a heading here updates the skill in the same
+change.
+
 ## Short Version
 
 `snmp_topology` is a single-instance go.d collector that periodically builds an
@@ -533,7 +544,15 @@ Current L3 subnet segments are single-routing-context. `L3Interface` has no
 VRF/routing-context field, so segment identity is producer scope plus
 subnet/prefix. Identical subnet/prefix values in multiple VRFs inside the same
 producer scope are therefore one logical segment until collection adds routing
-context and segment identity includes it.
+context and segment identity includes it. Nothing downstream may present these
+segments as VRF-aware before that happens.
+
+The producer scope in a segment id is a stable identifier of the emitting
+producer (the parent Agent registry id). When no stable scope id is available,
+`applyTopologyL3SubnetSegments` drops every candidate segment
+(`SuppressedNoProducerScope`) rather than falling back to a process-local or
+random id, so identical private subnets seen by different Agents cannot collide
+after Cloud aggregation.
 
 ## Internal Packages
 
@@ -896,3 +915,16 @@ git diff -- src/go/plugin/go.d/collector/snmp_topology/testdata/topology_v1_norm
 ```
 
 An unchanged golden is expected for internal ownership and generation refactors.
+
+### Scenario Golden Suite
+
+`TestSNMPTopologyScenarioGoldens` starts from synthetic SNMP-shaped `ddsnmp`
+inputs, runs the real cache, registry, and Function rendering path, validates
+the final `topology.v1` payload, and compares it with one full-payload oracle
+per scenario. The oracles are bulky and live in the external `netdata/testdata`
+repository under `snmp/topology-scenarios/`, checked out at
+`src/go/testdata/` (gitignored); `NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR`
+overrides that location. When neither is present the suite calls `t.Skip`, so a
+green `go test` run without the checkout says nothing about the scenario
+payloads; check the test output for the skip line before trusting it. The
+per-render normalized golden above stays tracked in this repository.

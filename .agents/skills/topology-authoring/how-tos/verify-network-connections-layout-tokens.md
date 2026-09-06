@@ -12,8 +12,10 @@ topology skill, not to the public/operator query skills.
 
 ## Inputs
 
-- Local Agent URL, usually `http://127.0.0.1:19999`; set `AGENT_URL` when
-  using a non-default address.
+- A local Agent reachable over plain HTTP, usually `http://127.0.0.1:19999`;
+  set `AGENT_URL` for a non-default address. The direct-agent wrapper
+  (`agents_query_agent`) speaks HTTP only, so an HTTPS-only Agent cannot be
+  used with this recipe.
 - `NETDATA_CLOUD_TOKEN` and `NETDATA_CLOUD_HOSTNAME` in `<repo>/.env`.
 - A local Agent that exposes `topology:network-connections`.
 
@@ -26,15 +28,9 @@ topology skill, not to the public/operator query skills.
    AGENT_URL="${AGENT_URL:-http://127.0.0.1:19999}"
    AGENT_URL="${AGENT_URL%/}"
    AGENT_HOST="${AGENT_URL#http://}"
-   AGENT_HOST="${AGENT_HOST#https://}"
    AGENT_HOST="${AGENT_HOST%%/*}"
-   AGENT_SCHEME="http"
-   case "$AGENT_URL" in
-     https://*) AGENT_SCHEME="https" ;;
-   esac
-   AGENT_ORIGIN="${AGENT_SCHEME}://${AGENT_HOST}"
 
-   INFO_JSON="$(curl --fail -sS --max-time 10 "${AGENT_ORIGIN}/api/v3/info")"
+   INFO_JSON="$(curl --fail -sS --max-time 10 "http://${AGENT_HOST}/api/v3/info")"
 
    jq '{
      agent_count: (.agents | length),
@@ -149,17 +145,21 @@ topology skill, not to the public/operator query skills.
 
 ## Output
 
-For the current network-connections v1 contract, expect these link
-types:
+For the current network-connections v1 contract (owner:
+`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`;
+emitter: `topology_v1_emit_link_type` calls in
+`src/collectors/network-viewer.plugin/network-viewer-topology.c`), expect
+`layout.strength: normal` on all four link types and:
 
-- `endpoint_socket`: visible unresolved endpoint links, weakest
-  strength, normal distance.
+- `endpoint_socket`: visible unresolved endpoint links, `primary` color,
+  solid, thin, normal distance, no variable channel.
 - `correlated_socket`: Cloud aggregator output after exact absorption,
-  weakest strength, farthest distance.
-- `socket`: local/resolved process links, stronger strength, farther
+  `primary` color, solid, thin, `farthest` distance, variable width by
+  `socket_count`.
+- `socket`: local/resolved process links, `gray`, solid, thin, normal
   distance, variable width by `socket_count`.
-- `ownership`: graph-coherence node-to-process links, dotted/faded,
-  normal strength, normal distance.
+- `ownership`: graph-coherence node-to-process links, `dim` color,
+  dotted, `faded` opacity, thin, no arrow, normal distance.
 
 The `socket_exact` correlation rule should consume `endpoint_socket`
 through `correlation_link_types` and emit `correlated_socket` through

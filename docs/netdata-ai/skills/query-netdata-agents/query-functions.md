@@ -33,7 +33,7 @@ Most agents expose a function-listing surface through the same
 generic Function call with `function=info`-like discovery. To
 enumerate by name, query each Function with `{"info":true}`. For
 a top-level list, use the Cloud-side functions endpoint via
-[../query-netdata-cloud/query-functions.md#list-available-functions](../query-netdata-cloud/query-functions.md#list-available-functions);
+[List Functions in a room](../query-netdata-cloud/query-functions.md#list-functions-on-the-nodes-in-a-room);
 the Cloud listing is authoritative even when you ultimately call
 the agent directly.
 

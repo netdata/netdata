@@ -20,7 +20,8 @@ This skill holds only what the documents below lack. Point at them; do not resta
   categories, severities, cardinality, operator overrides, generated stock profiles). It ships with the pack under
   `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/`, so it is operator-facing and must stay true to the loader.
 - `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md`: how the collector works (life of a trap, journal field
-  contract, package map, "Where To Change Things", validation commands). Collector code changes start there, not here.
+  contract, package map, `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md#where-to-change-things`,
+  `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md#validation`). Collector code changes start there, not here.
 - `docs/npm/snmp-traps/` (published operator docs): `trap-profiles.md` (override versus new profile), `configuration.md`
   (every job option), `field-reference.md` (every `TRAP_*` field), `metrics.md` (built-in charts and dimensions).
 - Sibling skills: `collectors-snmp-profiles` for polling profiles; `query-snmp-traps` for reading trap logs.
@@ -259,4 +260,4 @@ go test -count=1 ./plugin/go.d/collector/snmp_traps/internal/catalog/...
 ```
 
 The catalog tests load all shipped profiles and verify the manifest. For collector code changes run the full
-`snmp_traps` suite with `-race` as `ARCHITECTURE.md`, "Validation", describes.
+`snmp_traps` suite with `-race` as `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md#validation` describes.

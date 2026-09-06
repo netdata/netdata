@@ -236,7 +236,7 @@ See `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`.
 ### topology
 
 See `.agents/skills/topology-authoring/SKILL.md` and
-`.agents/skills/topology-authoring/topology-function-schema.md`.
+`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
 
 - New topology producers MUST use `src/go/pkg/topology/v1`.
 - Payload changes MUST validate against
