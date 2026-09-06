@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,8 +40,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
 	}
-	selected := make(map[string]collectedValue)
-	nextCounters := make(map[string]counterSample)
+	selected := make(map[metricKey]collectedValue)
+	nextCounters := make(map[metricKey]counterSample)
 	now := c.now()
 	for _, mf := range mfs {
 		if !isDCGMMetricName(mf.Name()) {
@@ -71,7 +72,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 				}
 				instance.chartLabels = labels
 			}
-			key := mf.Name() + "|" + instance.key + "|" + spec.DimName
+			key := metricKey{
+				name:      mf.Name(),
+				instance:  instance.key,
+				dimension: spec.DimName,
+			}
 			value, ok = c.normalizeValue(value, spec, key, now, nextCounters)
 			if !ok {
 				continue
@@ -88,7 +93,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	c.counterSamples = nextCounters
 	c.cache.reset()
 	mx := make(map[string]int64)
-	display := make(map[string]collectedValue)
+	display := make(map[metricKey]collectedValue)
 	for _, v := range selected {
 		if v.spec.RateSource == "" {
 			c.emitValue(mx, v)
@@ -216,7 +221,7 @@ func resolveEntityInstance(lbls promlabels.Labels) entityInstance {
 		if !ok || v == "" {
 			continue
 		}
-		parts = append(parts, key+"="+v)
+		parts = append(parts, key+"="+url.QueryEscape(v))
 	}
 
 	if len(parts) == 0 {
@@ -309,17 +314,20 @@ func buildChartLabels(idx map[string]string) []collectorapi.Label {
 	return labels
 }
 
+// Display normalization is lossy, so identity uses the framed original parts.
 func makeID(parts ...string) string {
-	raw := strings.Join(parts, "_")
-	id := sanitizeID(raw)
-	if len(id) <= 180 {
-		return id
-	}
-
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(id))
-	checksum := strconv.FormatUint(h.Sum64(), 36)
-	return id[:140] + "_" + checksum
+	var length [20]byte
+	for _, part := range parts {
+		_, _ = h.Write(strconv.AppendInt(length[:0], int64(len(part)), 10))
+		_, _ = h.Write([]byte{':'})
+		_, _ = h.Write([]byte(part))
+	}
+	id := sanitizeID(strings.Join(parts, "_"))
+	if len(id) > 140 {
+		id = id[:140]
+	}
+	return id + "_" + strconv.FormatUint(h.Sum64(), 36)
 }
 
 func sanitizeID(s string) string {

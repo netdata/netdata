@@ -40,7 +40,7 @@ memory, multiplied by 100; it does not use BAR1 capacity.
   by `1e-7` to express percentage of elapsed time. Causes overlap and are not stacked. The software power-cap duration and
   legacy power-violation duration select one source because they refer to the same NVML counter.
 - Power smoothing separates watts, percentages, watts/second, milliseconds, enablement, privilege, profile identity and
-  profile capacity. Ramp rates are converted from milliwatts/second. Circuit lifetime remaining is separate from power-floor percentages.
+  profile capacity. TMP means Total Module Power; its ceiling and floor are watts. Ramp rates are converted from milliwatts/second. Circuit lifetime remaining is separate from power-floor percentages.
 - Reported fan speed is the vendor's percentage, not RPM.
 
 ## Reliability and categorical values
@@ -98,6 +98,11 @@ case preserved to prevent collisions. Unsupported sentinels, non-finite values a
 
 ## Chart migration
 
+Chart and dimension IDs now include a hash of the length-framed original identity components. Entity label values are
+escaped before key construction, so punctuation and delimiter characters cannot merge distinct devices or workloads.
+This changes all DCGM instance IDs, including contexts whose names stay the same. New instances start new history;
+old history is retained under its previous IDs. Prefer context-and-label queries, and update any saved chart-ID references.
+
 Existing stored history is not rewritten. Update custom dashboards, exports and alert overrides that reference the
 following contexts or renamed dimensions. Prefixes below use `dcgm.gpu`; the corresponding entity-specific changes also apply.
 
@@ -127,6 +132,18 @@ The remapped-row alert reports an average event rate rather than a sum mislabele
 thresholds, windows, evaluation intervals, recipients and notification delays are preserved. Their policy remains detection
 of any positive observation in the window. Missing data uses Netdata's existing lookup and obsoletion behavior.
 A user-owned `health.d/dcgm.conf` shadows the stock file and must be migrated separately.
+
+## Historical duration wording
+
+Some older DCGM headers describe power-violation duration as microseconds. The actual
+[v3.0.4 field mapping](https://github.com/NVIDIA/DCGM/blob/f6fe5654b780873da528b84cb3d7de10d7abe0d1/dcgmlib/src/dcgm_fields.cpp#L1657-L1666)
+selects the NVML power-policy counter, and the
+[bulk collection path](https://github.com/NVIDIA/DCGM/blob/f6fe5654b780873da528b84cb3d7de10d7abe0d1/dcgmlib/src/DcgmCacheManager.cpp#L5751-L5759)
+stores the value without a unit conversion. The
+[v4.1.0 header](https://github.com/NVIDIA/DCGM/blob/37b325dee7e166a0fce7da8261432d760d4e9fc7/dcgmlib/dcgm_fields.h#L763-L776)
+corrected the wording to nanoseconds without changing that conversion behavior. Netdata therefore uses the nanosecond
+counter semantics rather than introducing a version multiplier based on the old wording. This is source verification;
+not every historical driver/exporter combination has been exercised.
 
 ## Sources
 

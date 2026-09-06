@@ -120,6 +120,7 @@ func buildFieldCatalog() map[string]fieldDefinition {
 		dev(field, "power.limits", dim, sampleGauge, 1)
 	}
 	dev("TOTAL_ENERGY_CONSUMPTION", "power.energy_rate", "power", sampleCounter, 1e-3)
+	// NVML duration counters are nanoseconds; old DCGM headers had stale usec comments.
 	for field, dim := range map[string]string{"POWER_VIOLATION": "power_violation", "THERMAL_VIOLATION": "thermal_violation", "SYNC_BOOST_VIOLATION": "sync_boost", "BOARD_LIMIT_VIOLATION": "board_limit", "LOW_UTIL_VIOLATION": "low_utilization", "RELIABILITY_VIOLATION": "reliability"} {
 		dev(field, "throttle.duration", dim, sampleCounter, 1e-7)
 	}
@@ -367,6 +368,7 @@ func buildFieldCatalog() map[string]fieldDefinition {
 	}
 	dev("NVSWITCH_TEMPERATURE_CURRENT", "interconnect.nvswitch.temperature", "current", sampleGauge, 1)
 
+	// TMP is Total Module Power: its ceiling and floor are Watts, not temperatures.
 	for suffix, group := range map[string]string{
 		"APPLIED_TMP_CEIL": "bounds", "APPLIED_TMP_FLOOR": "bounds",
 		"MAX_PERCENT_TMP_FLOOR_SETTING": "floor", "MIN_PERCENT_TMP_FLOOR_SETTING": "floor", "PROFILE_PERCENT_TMP_FLOOR": "floor", "ADMIN_OVERRIDE_PERCENT_TMP_FLOOR": "floor",

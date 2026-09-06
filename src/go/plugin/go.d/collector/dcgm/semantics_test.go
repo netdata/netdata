@@ -446,3 +446,68 @@ func TestCollector_CanonicalAliasesShareDimensions(t *testing.T) {
 		})
 	}
 }
+
+func TestCollector_IdentityCollisions(t *testing.T) {
+	for name, labels := range map[string][]string{
+		"punctuation":          {`,job="a-b"`, `,job="a_b"`},
+		"entity delimiter":     {`,namespace="a|pod=b"`, `,namespace="a",pod="b"`},
+		"encoded delimiter":    {`,namespace="a|pod=b"`, `,namespace="a%7Cpod%3Db"`},
+		"dimension separators": {`,channel="a",lane="b"`, `,channel_a="lane_b"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := exposition("DCGM_FI_DEV_UNKNOWN", "gauge", 3, labels[0]) + exposition("DCGM_FI_DEV_UNKNOWN", "gauge", 7, labels[1])
+			c := collectorWithMetrics(t, body)
+			mx := c.Collect(context.Background())
+			require.Len(t, mx, 2, "distinct source series must survive chart/dimension ID generation")
+			values := []int64{}
+			for _, value := range mx {
+				values = append(values, value)
+			}
+			assert.ElementsMatch(t, []int64{3000, 7000}, values)
+			other := collectorWithMetrics(t, body)
+			assert.Equal(t, mx, other.Collect(context.Background()), "identities must be stable across restarts")
+		})
+	}
+}
+
+func TestMakeIDPreservesComponents(t *testing.T) {
+	for name, parts := range map[string][2][]string{
+		"punctuation":          {{"dcgm.gpu.compute.utilization", "job=a-b"}, {"dcgm.gpu.compute.utilization", "job=a_b"}},
+		"component boundaries": {{"a_b", "c"}, {"a", "b_c"}},
+		"long punctuation":     {{"context", strings.Repeat("a-b", 100)}, {"context", strings.Repeat("a_b", 100)}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			first, second := makeID(parts[0]...), makeID(parts[1]...)
+			assert.NotEqual(t, first, second)
+			assert.LessOrEqual(t, len(first), 180)
+			assert.LessOrEqual(t, len(second), 180)
+		})
+	}
+}
+
+func TestCollector_CounterIdentityBoundaries(t *testing.T) {
+	body := func(a, b float64) string {
+		return exposition("DCGM_FI_PROF_PCIE_RX_BYTES_TOTAL", "counter", a, `,namespace="a|pod=b"`) + exposition("DCGM_FI_PROF_PCIE_RX_BYTES_TOTAL", "counter", b, `,namespace="a",pod="b"`)
+	}
+	c := collectorWithMetrics(t, body(100, 500))
+	now := time.Unix(1, 0)
+	c.now = func() time.Time { return now }
+	assert.Empty(t, c.Collect(context.Background()))
+	setStaticMetrics(t, c, body(130, 570))
+	now = now.Add(time.Second)
+	mx := c.Collect(context.Background())
+	require.Len(t, mx, 2)
+	values := []int64{}
+	for _, v := range mx {
+		values = append(values, v)
+	}
+	assert.ElementsMatch(t, []int64{30000, 70000}, values)
+}
+
+func TestCollector_HostIdentityPunctuation(t *testing.T) {
+	body := "# TYPE DCGM_FI_DEV_COUNT gauge\nDCGM_FI_DEV_COUNT{Hostname=\"host-a\"} 2\nDCGM_FI_DEV_COUNT{Hostname=\"host_a\"} 3\n"
+	c := collectorWithMetrics(t, body)
+	mx := c.Collect(context.Background())
+	require.Len(t, mx, 2)
+	assert.Len(t, *c.Charts(), 2)
+}

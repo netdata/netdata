@@ -69,7 +69,7 @@ type Collector struct {
 	cache          *cache
 	checkMetrics   bool
 	now            func() time.Time
-	counterSamples map[string]counterSample
+	counterSamples map[metricKey]counterSample
 }
 
 func (c *Collector) Configuration() any {

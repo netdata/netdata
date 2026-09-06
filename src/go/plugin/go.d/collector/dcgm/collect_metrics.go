@@ -4,6 +4,7 @@ package dcgm
 
 import (
 	"math"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 )
+
+type metricKey struct {
+	name, instance, dimension, source string
+}
+
+type transportKey struct {
+	entity              metricEntity
+	instance, transport string
+}
 
 type counterSample struct {
 	value float64
@@ -23,7 +33,7 @@ type collectedValue struct {
 	source           string
 }
 
-func (c *Collector) normalizeValue(value float64, spec metricSpec, key string, now time.Time, next map[string]counterSample) (float64, bool) {
+func (c *Collector) normalizeValue(value float64, spec metricSpec, key metricKey, now time.Time, next map[metricKey]counterSample) (float64, bool) {
 	if spec.DecodeBER {
 		if value < 0 || value > 65535 || math.Trunc(value) != value {
 			return 0, false
@@ -63,7 +73,7 @@ func metricInstances(lbls promlabels.Labels, def fieldDefinition) (entityInstanc
 		}
 		key := "global"
 		if host != "" {
-			key = "hostname=" + host
+			key = "hostname=" + url.QueryEscape(host)
 		}
 		return entityInstance{
 			entity: entityHost,
@@ -116,7 +126,7 @@ func metricInstances(lbls promlabels.Labels, def fieldDefinition) (entityInstanc
 	if def.Window {
 		for _, l := range lbls {
 			if l.Name == "window_size_in_ms" {
-				instance.key += "|window_size_in_ms=" + l.Value
+				instance.key += "|window_size_in_ms=" + url.QueryEscape(l.Value)
 				break
 			}
 		}
@@ -177,8 +187,13 @@ func isIdentityOrMetadataLabel(key string) bool {
 	return strings.HasPrefix(key, "dcgm_fi_")
 }
 
-func selectValue(selected map[string]collectedValue, v collectedValue) {
-	key := v.spec.Context.ID + "|" + v.instance.key + "|" + v.spec.DimName + "|" + v.spec.RateSource
+func selectValue(selected map[metricKey]collectedValue, v collectedValue) {
+	key := metricKey{
+		name:      v.spec.Context.ID,
+		instance:  v.instance.key,
+		dimension: v.spec.DimName,
+		source:    v.spec.RateSource,
+	}
 	old, ok := selected[key]
 	// Aliases and duplicated exporter samples are alternatives, never additive.
 	if !ok || v.spec.Priority > old.spec.Priority || v.spec.Priority == old.spec.Priority && (v.source < old.source || v.source == old.source && v.value > old.value) {
@@ -243,8 +258,11 @@ func (c *Collector) emitValue(mx map[string]int64, v collectedValue) {
 	}
 }
 
-func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (string, *collectorapi.Chart) {
-	key := spec.ID + "|" + instance.key
+func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (chartKey, *collectorapi.Chart) {
+	key := chartKey{
+		context:  spec.ID,
+		instance: instance.key,
+	}
 	if ch, ok := c.cache.getChart(key); ok {
 		return key, ch.chart
 	}
@@ -263,7 +281,7 @@ func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (stri
 	}
 	return key, c.cache.putChart(key, chart).chart
 }
-func (c *Collector) ensureDim(key string, chart *collectorapi.Chart, spec metricSpec) string {
+func (c *Collector) ensureDim(key chartKey, chart *collectorapi.Chart, spec metricSpec) string {
 	dimID := makeID(chart.ID, spec.DimName)
 	ch := c.cache.charts[key]
 	if !ch.touchDim(dimID) {
@@ -320,13 +338,17 @@ type transportValues struct {
 	links     map[string]map[string]directionValues
 }
 
-func (c *Collector) emitInterconnectTotals(mx map[string]int64, selected map[string]collectedValue) {
-	totals := make(map[string]*transportValues)
+func (c *Collector) emitInterconnectTotals(mx map[string]int64, selected map[metricKey]collectedValue) {
+	totals := make(map[transportKey]*transportValues)
 	for _, v := range selected {
 		if v.spec.Transport == "" || v.parent.entity == "" {
 			continue
 		}
-		key := string(v.parent.entity) + "|" + v.parent.key + "|" + v.spec.Transport
+		key := transportKey{
+			entity:    v.parent.entity,
+			instance:  v.parent.key,
+			transport: v.spec.Transport,
+		}
 		total := totals[key]
 		if total == nil {
 			total = &transportValues{
