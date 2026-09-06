@@ -39,7 +39,7 @@ published contract and are exempt from the naming rule below.
 | `collectors` | any data-collection plugin or module, across plugin families |
 | `integrations` | the `integrations/` pipeline: schemas, generators, generated pages |
 | `health` | `src/health/`: alerts and alert templates |
-| `topology` | topology producers, payload schema, correlation, Cloud aggregation fixtures |
+| `topology` | topology producers, the `netdata.topology.v1` payload contract, correlation, the aggregator contract |
 | `tests` | repository test suites under `tests/` |
 | `packaging` | installers, packages, and images under `packaging/` |
 | `docs` | `learn.netdata.cloud` and the docs pipeline |
