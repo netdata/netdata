@@ -18,13 +18,12 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -32,29 +31,30 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-// Register registers the SNMP topology collector with shared SNMP-family state.
-func Register(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) {
-	collectorapi.Register("snmp_topology", newCreator(deviceStore, trapEnrichment, reverseDNS))
-}
-
-func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
+// Creator constructs registration with explicit SNMP-family dependencies.
+func Creator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver, publisher *snmpdiag.Publisher) collectorapi.Creator {
 	if deviceStore == nil {
-		panic("snmp_topology Register requires a non-nil device store")
+		panic("snmp_topology Creator requires a non-nil device store")
 	}
 	if trapEnrichment == nil {
-		panic("snmp_topology Register requires a non-nil trap enrichment handle")
+		panic("snmp_topology Creator requires a non-nil trap enrichment handle")
 	}
 	if reverseDNS == nil {
-		panic("snmp_topology Register requires a non-nil reverse DNS resolver")
+		panic("snmp_topology Creator requires a non-nil reverse DNS resolver")
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		UpdateEvery:     60,
-		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, reverseDNS) },
-		Config:          func() any { return &Config{} },
-		InstancePolicy:  collectorapi.InstancePolicySingle,
-		SharedFunctions: topologyMethods,
-		MethodHandler:   topologyFunctionHandler,
+		CreateV2: func() collectorapi.CollectorV2 {
+			c := newCollector(deviceStore, trapEnrichment, reverseDNS)
+			c.diagnosticPublisher = publisher
+			return c
+		},
+		JobConfigLifecycle: &topologyJobConfigLifecycle{publisher: publisher},
+		Config:             func() any { return &Config{} },
+		InstancePolicy:     collectorapi.InstancePolicySingle,
+		SharedFunctions:    topologyMethods,
+		MethodHandler:      topologyFunctionHandler,
 	}
 }
 
@@ -74,7 +74,7 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		panic("snmp_topology New requires a non-nil reverse DNS resolver")
 	}
 	metricStore := metrix.NewCollectorStore()
-	return &Collector{
+	c := &Collector{
 		deviceStates:          make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
 		topologyRegistry:      newTopologyRegistryWithResolver(reverseDNS),
 		deviceSource:          deviceStore,
@@ -91,12 +91,11 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		acquisitionLimits:            defaultTopologyAcquisitionLimits,
 		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
 		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
-		publishDiagnosticArchive:     !terminal.IsTerminal(),
-		diagnosticArchivePath:        defaultTopologyDiagnosticArchivePath(),
-		publishDiagnosticArchiveFile: publishTopologyDiagnosticArchiveFile,
 		store:                        metricStore,
 		metrics:                      newCollectorMetrics(metricStore),
 	}
+	c.diagnosticProvider = &topologyDiagnosticProvider{registry: c.topologyRegistry, aborted: &c.lastAbortedTopologyDiagnostic, source: deviceStore, limits: defaultTopologyDiagnosticGlobalLimits}
+	return c
 }
 
 type (
@@ -128,9 +127,8 @@ type (
 		acquisitionLimits            topologyAcquisitionLimits
 		diagnosticGlobalLimits       topologyAcquisitionLimits
 		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
-		publishDiagnosticArchive     bool
-		diagnosticArchivePath        string
-		publishDiagnosticArchiveFile func(string, topologyDiagnostics) error
+		diagnosticPublisher          *snmpdiag.Publisher
+		diagnosticProvider           *topologyDiagnosticProvider
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -170,16 +168,6 @@ func (c *Collector) Run(ctx context.Context) error {
 
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
-	var diagnosticArchiveRefreshes chan struct{}
-	if c.publishDiagnosticArchive {
-		diagnosticArchiveRefreshes = make(chan struct{}, 1)
-		publisherDone := make(chan struct{})
-		go func() {
-			defer close(publisherDone)
-			c.runTopologyDiagnosticArchivePublisher(ctx, diagnosticArchiveRefreshes)
-		}()
-		defer func() { <-publisherDone }()
-	}
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()
@@ -191,12 +179,6 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
 			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
-			if diagnosticArchiveRefreshes != nil {
-				select {
-				case diagnosticArchiveRefreshes <- struct{}{}:
-				default:
-				}
-			}
 		}
 	}
 }
@@ -448,6 +430,9 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		limits:         c.currentTopologyDiagnosticGlobalLimits(),
 	})
 	c.topologyRegistry.publishGeneration(generation)
+	if c.diagnosticPublisher != nil {
+		c.diagnosticPublisher.TopologyUpdated(c.diagnosticProvider)
+	}
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()
 	stats.duration = stats.completedAt.Sub(start)

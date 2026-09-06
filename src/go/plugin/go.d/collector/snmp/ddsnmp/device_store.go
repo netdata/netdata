@@ -119,6 +119,7 @@ type deviceLifecycleRecord struct {
 // NewDeviceStore returns an empty SNMP device connection-state store.
 func NewDeviceStore() *DeviceStore {
 	return &DeviceStore{
+		changes:            make(chan struct{}, 1),
 		ownerRegistrations: make(map[string]DeviceRegistrationID),
 		devices:            make(map[DeviceRegistrationID]DeviceConnectionInfo),
 		lifecycles:         make(map[DeviceRegistrationID]deviceLifecycleRecord),
@@ -128,13 +129,16 @@ func NewDeviceStore() *DeviceStore {
 
 // DeviceStore holds SNMP device connection state shared between SNMP-family modules.
 type DeviceStore struct {
-	mu                 sync.RWMutex
-	ownerRegistrations map[string]DeviceRegistrationID
-	devices            map[DeviceRegistrationID]DeviceConnectionInfo
-	lifecycles         map[DeviceRegistrationID]deviceLifecycleRecord
-	byHostname         map[string]map[string]struct{}
-	lastRegistrationID DeviceRegistrationID
-	lifecycleSequence  uint64
+	mu                    sync.RWMutex
+	changes               chan struct{}
+	writers               map[string]*DeviceWriter
+	ownerRegistrations    map[string]DeviceRegistrationID
+	devices               map[DeviceRegistrationID]DeviceConnectionInfo
+	lifecycles            map[DeviceRegistrationID]deviceLifecycleRecord
+	byHostname            map[string]map[string]struct{}
+	lastRegistrationID    DeviceRegistrationID
+	configurationRevision uint64
+	lifecycleSequence     uint64
 }
 
 // RegisterJob starts or updates the credential-free lifecycle row for a
@@ -201,15 +205,16 @@ func (s *DeviceStore) LifecycleCut() DeviceLifecycleCut {
 
 // ReplaceJob atomically removes a prior configuration incarnation, when
 // different, and publishes the current lifecycle plus any topology-ready state.
+// The returned writer replaces the prior runtime's update authority.
 func (s *DeviceStore) ReplaceJob(
 	previousOwnerKey string,
 	ownerKey string,
 	info DeviceLifecycleInfo,
 	status DeviceLifecycleStatus,
 	device *DeviceConnectionInfo,
-) {
+) *DeviceWriter {
 	if ownerKey == "" {
-		return
+		return nil
 	}
 	s.mu.Lock()
 	s.ensureMapsLocked()
@@ -234,7 +239,15 @@ func (s *DeviceStore) ReplaceJob(
 		s.addHostnameIndexLocked(ownerKey, cloned.Hostname)
 	}
 	s.lifecycleSequence++
+	s.configurationRevision++
+	s.notifyConfigurationChangedLocked()
+	writer := &DeviceWriter{store: s, owner: ownerKey}
+	if s.writers == nil {
+		s.writers = make(map[string]*DeviceWriter)
+	}
+	s.writers[ownerKey] = writer
 	s.mu.Unlock()
+	return writer
 }
 
 // Register adds or updates a device by its caller-owned lookup key. An update
@@ -242,6 +255,11 @@ func (s *DeviceStore) ReplaceJob(
 // Reference types are deep-copied to prevent data races with the caller.
 func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.registerLocked(ownerKey, info)
+}
+
+func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo) {
 	s.ensureMapsLocked()
 	registrationID, exists := s.ownerRegistrations[ownerKey]
 	if exists {
@@ -256,7 +274,6 @@ func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	s.lifecycles[registrationID] = record
 	s.addHostnameIndexLocked(ownerKey, info.Hostname)
 	s.lifecycleSequence++
-	s.mu.Unlock()
 }
 
 // Unregister removes a complete job incarnation from the store.
@@ -264,6 +281,8 @@ func (s *DeviceStore) Unregister(ownerKey string) {
 	s.mu.Lock()
 	if _, ok := s.ownerRegistrations[ownerKey]; ok {
 		s.removeRegistrationLocked(ownerKey)
+		s.configurationRevision++
+		s.notifyConfigurationChangedLocked()
 		s.lifecycleSequence++
 	}
 	s.mu.Unlock()
@@ -280,6 +299,7 @@ func (s *DeviceStore) removeRegistrationLocked(ownerKey string) {
 	delete(s.devices, registrationID)
 	delete(s.lifecycles, registrationID)
 	delete(s.ownerRegistrations, ownerKey)
+	delete(s.writers, ownerKey)
 }
 
 // Entries returns a deterministic, deep-copied snapshot of all registered jobs.
@@ -442,4 +462,55 @@ func deviceHostnameIndexKey(hostname string) string {
 	}
 
 	return strings.ToLower(hostname)
+}
+
+// DeviceWriter is authority for one accepted runtime. Replacement/removal
+// revokes old writers even when the exact configuration identity is reused.
+type DeviceWriter struct {
+	store *DeviceStore
+	owner string
+}
+
+func (w *DeviceWriter) UpdateDevice(info DeviceConnectionInfo) {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] == w {
+		s.registerLocked(w.owner, info)
+	}
+}
+
+func (w *DeviceWriter) RecordLifecycle(status DeviceLifecycleStatus) {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] != w {
+		return
+	}
+	id := s.ownerRegistrations[w.owner]
+	record := s.lifecycles[id]
+	record.lastCompleted = status
+	s.lifecycles[id] = record
+	s.lifecycleSequence++
+}
+
+// ConfigurationRevision fences snapshots across accepted job replacement/removal.
+func (s *DeviceStore) ConfigurationRevision() uint64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.configurationRevision
+}
+
+func (s *DeviceStore) ConfigurationChanges() <-chan struct{} { return s.changes }
+func (s *DeviceStore) notifyConfigurationChangedLocked() {
+	select {
+	case s.changes <- struct{}{}:
+	default:
+	}
 }

@@ -209,3 +209,17 @@ func (dcjc *DynCfgJobController) jobConfigLifecycleHook(
 	}
 	return creator.JobConfigLifecycle
 }
+
+// FinalizeJobConfigLifecycles retires committed projections after all jobs and
+// graph mutations in this run have joined. Successor runs must not inherit them.
+func (dcjc *DynCfgJobController) FinalizeJobConfigLifecycles() {
+	if dcjc == nil || dcjc.graph == nil {
+		return
+	}
+	for _, id := range dcjc.graph.IDs() {
+		state := dcjc.currentJobConfigLifecycleGraphState(id)
+		if state.valid && state.hook != nil {
+			callJobConfigLifecycle(func() { state.hook.Remove(state.identity) })
+		}
+	}
+}

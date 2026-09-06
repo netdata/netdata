@@ -7,39 +7,20 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 // Presence distinguishes recorded zero work from archives predating accounting.
 // This allowlist is shared by the archive and selected-device inspection.
-type topologyDiagnosticArchiveExecutionV1 struct {
-	Preparation topologyDiagnosticArchivePreparationV1 `json:"preparation"`
-	Walks       []topologyDiagnosticArchiveWalkV1      `json:"walks"`
-}
-
-type topologyDiagnosticArchivePreparationV1 struct {
-	ElapsedNanos     int64 `json:"elapsed_ns"`
-	GetRequests      int64 `json:"get_requests"`
-	GetOIDs          int64 `json:"get_oids"`
-	SNMPErrors       int64 `json:"snmp_errors"`
-	MissingOIDs      int64 `json:"missing_oids"`
-	ProcessingErrors int64 `json:"processing_errors"`
-}
-
-type topologyDiagnosticArchiveWalkV1 struct {
-	RootOID      string `json:"root_oid"`
-	ElapsedNanos int64  `json:"elapsed_ns"`
-	Failed       bool   `json:"failed"`
-}
-
 func newTopologyDiagnosticArchiveExecutionV1(
 	execution *ddsnmpcollector.AcquisitionExecutionReport,
-) *topologyDiagnosticArchiveExecutionV1 {
+) *snmpdiag.Execution {
 	if execution == nil {
 		return nil
 	}
 	p := execution.Preparation
-	result := &topologyDiagnosticArchiveExecutionV1{
-		Preparation: topologyDiagnosticArchivePreparationV1{
+	result := &snmpdiag.Execution{
+		Preparation: snmpdiag.Preparation{
 			ElapsedNanos:     int64(p.Elapsed),
 			GetRequests:      p.GetRequests,
 			GetOIDs:          p.GetOIDs,
@@ -47,10 +28,10 @@ func newTopologyDiagnosticArchiveExecutionV1(
 			MissingOIDs:      p.MissingOIDs,
 			ProcessingErrors: p.ProcessingErrors,
 		},
-		Walks: make([]topologyDiagnosticArchiveWalkV1, 0, len(execution.Walks)),
+		Walks: make([]snmpdiag.Walk, 0, len(execution.Walks)),
 	}
 	for _, walk := range execution.Walks {
-		result.Walks = append(result.Walks, topologyDiagnosticArchiveWalkV1{
+		result.Walks = append(result.Walks, snmpdiag.Walk{
 			RootOID:      walk.RootOID,
 			ElapsedNanos: int64(walk.Elapsed),
 			Failed:       walk.Failed,
@@ -59,7 +40,7 @@ func newTopologyDiagnosticArchiveExecutionV1(
 	return result
 }
 
-func (e *topologyDiagnosticArchiveExecutionV1) execution() (*ddsnmpcollector.AcquisitionExecutionReport, error) {
+func restoreArchiveExecution(e *snmpdiag.Execution) (*ddsnmpcollector.AcquisitionExecutionReport, error) {
 	if e == nil {
 		return nil, nil
 	}

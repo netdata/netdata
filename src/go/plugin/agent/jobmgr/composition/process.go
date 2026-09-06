@@ -54,6 +54,7 @@ type processCoreConfig struct {
 	Jobs            runJobServices            // process-lifetime job services (resolver, catalogs, vnodes)
 	Secrets         runSecretServices         // process-lifetime secret services
 	Discovery       runDiscoveryServices      // discovery services (providers, build context)
+	StopServices    func()                    // cancels and joins before retiring final run evidence
 	FinalizeOutput  func()                    // stops the runtime service at process teardown
 	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
 }
@@ -615,6 +616,9 @@ func processRestartRequiresProcessExit(err error) bool {
 }
 
 func (pc *processCore) finalize(current *runGeneration, cause error) error {
+	if pc.config.StopServices != nil {
+		pc.config.StopServices()
+	}
 	generation := uint64(0)
 	if current != nil && current.run != nil {
 		generation = current.run.Generation()

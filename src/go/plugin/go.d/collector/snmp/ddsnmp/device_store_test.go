@@ -3,6 +3,7 @@
 package ddsnmp
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -265,4 +266,41 @@ func TestDeviceStoreRegistrationIdentityChangesOnlyAfterUnregister(t *testing.T)
 	entries = store.Entries()
 	require.Len(t, entries, 1)
 	require.Greater(t, entries[0].RegistrationID, initialIdentity, "replacement registrations must receive a new identity")
+}
+
+func TestDeviceWriterCannotReviveRemovedOrReplaceSuccessor(t *testing.T) {
+	store := NewDeviceStore()
+	first := store.ReplaceJob("", "same-config", DeviceLifecycleInfo{Hostname: "first"}, DeviceLifecycleStatus{}, nil)
+	first.UpdateDevice(DeviceConnectionInfo{Hostname: "first"})
+	require.Len(t, store.Entries(), 1)
+	successor := store.ReplaceJob("same-config", "same-config", DeviceLifecycleInfo{Hostname: "successor"}, DeviceLifecycleStatus{}, nil)
+	first.UpdateDevice(DeviceConnectionInfo{Hostname: "retired"})
+	first.RecordLifecycle(DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeFailed})
+	require.Empty(t, store.Entries())
+	require.Equal(t, "successor", store.LifecycleCut().Entries[0].Info.Hostname)
+	require.Equal(t, DeviceLifecyclePhaseUnknown, store.LifecycleCut().Entries[0].LastCompleted.Phase)
+	successor.UpdateDevice(DeviceConnectionInfo{Hostname: "successor"})
+	require.Equal(t, "successor", store.Entries()[0].Info.Hostname)
+	store.Unregister("same-config")
+	successor.UpdateDevice(DeviceConnectionInfo{Hostname: "retired"})
+	successor.RecordLifecycle(DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect})
+	require.Empty(t, store.Entries())
+	require.Empty(t, store.LifecycleCut().Entries)
+}
+
+func BenchmarkDeviceWriterLifecycle(b *testing.B) {
+	for _, count := range []int{1, 10000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			store := NewDeviceStore()
+			var writer *DeviceWriter
+			for i := range count {
+				writer = store.ReplaceJob("", strconv.Itoa(i), DeviceLifecycleInfo{Hostname: "switch.example"}, DeviceLifecycleStatus{}, nil)
+			}
+			status := DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeSuccess}
+			b.ReportAllocs()
+			for b.Loop() {
+				writer.RecordLifecycle(status)
+			}
+		})
+	}
 }
