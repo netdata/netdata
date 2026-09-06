@@ -295,13 +295,14 @@ contain only `1`.
 
 ## Untyped families and fallback
 
-The precedence chain (declared type, job classification, profile `fallback_type`,
-the implicit `_total` counter, otherwise skipped) is owned by `profile-format.md`
-under `fallback_type`. Use fallback only with authoritative semantic evidence. It restores scalar type
-behavior; it does not make an ambiguous suffix-only family a distribution.
-Histogram/summary inference, when possible, happens earlier from structural
-witnesses. A broad fallback pattern can silently convert unrelated families to
-the wrong algorithm, so prefer the narrowest stable family set.
+The precedence chain (declared type, job classification, profile
+`fallback_type`, the implicit `_total` counter, otherwise skipped) is owned by
+`profile-format.md` under `fallback_type`. Use fallback only with authoritative
+semantic evidence. It restores scalar type behavior; it does not make an
+ambiguous suffix-only family a distribution. Histogram/summary inference, when
+possible, happens earlier from structural witnesses. A broad fallback pattern
+can silently convert unrelated families to the wrong algorithm, so prefer the
+narrowest stable family set.
 
 ## Writer rejection and schema drift
 
