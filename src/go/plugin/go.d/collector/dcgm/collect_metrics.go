@@ -153,7 +153,8 @@ func dimensionName(spec metricSpec, lbls promlabels.Labels) string {
 			if spec.Raw {
 				key = escapeDimensionLabel(l.Name)
 			}
-			tokens = append(tokens, key+"_"+escapeDimensionLabel(l.Value))
+			// Equals is outside the escaped alphabet, keeping the key/value boundary unambiguous.
+			tokens = append(tokens, key+"="+escapeDimensionLabel(l.Value))
 		}
 	}
 	sort.Strings(tokens)

@@ -599,13 +599,13 @@ modules:
               unit: samples
               chart_type: line
               dimensions:
-                - name: value_clock_event_*
+                - name: value_clock_event=*
             - name: dcgm.gpu.throttle.event_rate
               description: GPU Clock Event Rate
               unit: events/s
               chart_type: line
               dimensions:
-                - name: value_clock_event_*
+                - name: value_clock_event=*
             - name: dcgm.gpu.thermal.temperature
               description: GPU Temperature and Limits
               unit: Celsius
@@ -807,7 +807,7 @@ modules:
               unit: state
               chart_type: line
               dimensions:
-                - name: value_peer_gpu_*
+                - name: value_peer_gpu=*
             - name: dcgm.gpu.interconnect.c2c.capacity
               description: GPU C2C Link Capacity
               unit: bytes/s
@@ -860,19 +860,19 @@ modules:
               unit: samples
               chart_type: line
               dimensions:
-                - name: value_xid_*
+                - name: value_xid=*
             - name: dcgm.gpu.reliability.xid_rate
               description: GPU XID Record Rate
               unit: records/s
               chart_type: line
               dimensions:
-                - name: value_xid_*
+                - name: value_xid=*
             - name: dcgm.gpu.health.status
               description: GPU Health Status by Watch
               unit: state
               chart_type: line
               dimensions:
-                - name: value_health_watch_*
+                - name: value_health_watch=*
             - name: dcgm.gpu.state.performance
               description: GPU Performance State
               unit: state
@@ -1274,13 +1274,13 @@ modules:
               unit: samples
               chart_type: line
               dimensions:
-                - name: value_clock_event_*
+                - name: value_clock_event=*
             - name: dcgm.mig.throttle.event_rate
               description: MIG Clock Event Rate
               unit: events/s
               chart_type: line
               dimensions:
-                - name: value_clock_event_*
+                - name: value_clock_event=*
             - name: dcgm.mig.thermal.temperature
               description: MIG Temperature and Limits
               unit: Celsius
@@ -1482,7 +1482,7 @@ modules:
               unit: state
               chart_type: line
               dimensions:
-                - name: value_peer_gpu_*
+                - name: value_peer_gpu=*
             - name: dcgm.mig.interconnect.c2c.capacity
               description: MIG C2C Link Capacity
               unit: bytes/s
@@ -1535,19 +1535,19 @@ modules:
               unit: samples
               chart_type: line
               dimensions:
-                - name: value_xid_*
+                - name: value_xid=*
             - name: dcgm.mig.reliability.xid_rate
               description: MIG XID Record Rate
               unit: records/s
               chart_type: line
               dimensions:
-                - name: value_xid_*
+                - name: value_xid=*
             - name: dcgm.mig.health.status
               description: MIG Health Status by Watch
               unit: state
               chart_type: line
               dimensions:
-                - name: value_health_watch_*
+                - name: value_health_watch=*
             - name: dcgm.mig.state.performance
               description: MIG Performance State
               unit: state

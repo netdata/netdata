@@ -92,7 +92,7 @@ func TestCatalogMetadata(t *testing.T) {
 		}
 		dim := def.DimName
 		if len(def.Labels) > 0 {
-			dim += "_" + def.Labels[0] + "_*"
+			dim += "_" + def.Labels[0] + "=*"
 		}
 		var dimensions []string
 		for _, d := range row.Dimensions {

@@ -249,7 +249,7 @@ func TestCollector_StatesLabelsAndScope(t *testing.T) {
 	c := collectorWithMetrics(t, body)
 	mx := c.Collect(context.Background())
 	for _, watch := range []string{"MEM", "PCIE"} {
-		got, ok := displayedDimension(c, mx, "dcgm.gpu.health.status", "value_health_watch_"+watch)
+		got, ok := displayedDimension(c, mx, "dcgm.gpu.health.status", "value_health_watch="+watch)
 		require.True(t, ok)
 		assert.Equal(t, 10.0, got)
 	}
@@ -453,6 +453,7 @@ func TestCollector_IdentityCollisions(t *testing.T) {
 		"entity delimiter":     {`,namespace="a|pod=b"`, `,namespace="a",pod="b"`},
 		"encoded delimiter":    {`,namespace="a|pod=b"`, `,namespace="a%7Cpod%3Db"`},
 		"dimension separators": {`,channel="a",lane="b"`, `,channel_a="lane_b"`},
+		"escape boundary":      {`,foo="5fbar_baz"`, `,foo_bar="5fbaz"`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := exposition("DCGM_FI_DEV_UNKNOWN", "gauge", 3, labels[0]) + exposition("DCGM_FI_DEV_UNKNOWN", "gauge", 7, labels[1])

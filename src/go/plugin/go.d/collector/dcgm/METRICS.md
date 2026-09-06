@@ -101,7 +101,9 @@ case preserved to prevent collisions. Unsupported sentinels, non-finite values a
 Chart and dimension IDs now include a hash of the length-framed original identity components. Entity label values are
 escaped before key construction, so punctuation and delimiter characters cannot merge distinct devices or workloads.
 This changes all DCGM instance IDs, including contexts whose names stay the same. New instances start new history;
-old history is retained under its previous IDs. Prefer context-and-label queries, and update any saved chart-ID references.
+old history is retained under its previous IDs. Label-qualified dimension names use `key=value` tokens, for example
+`value_health_watch=MEM`, to preserve the boundary between label names and values. Prefer context-and-label queries,
+and update any saved chart-ID references.
 
 Existing stored history is not rewritten. Update custom dashboards, exports and alert overrides that reference the
 following contexts or renamed dimensions. Prefixes below use `dcgm.gpu`; the corresponding entity-specific changes also apply.
