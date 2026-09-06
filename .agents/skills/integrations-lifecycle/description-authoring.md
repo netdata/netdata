@@ -127,7 +127,6 @@ Before committing `metadata.yaml` changes:
 1. Regenerate and validate the integration data (dependencies: `integrations/README.md`):
 
    ```bash
-
    python3 integrations/gen_integrations.py
    python3 integrations/gen_docs_integrations.py --check
    python3 -m unittest integrations.tests.test_descriptions

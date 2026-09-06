@@ -49,7 +49,6 @@ short contributor-facing version.
   committed. Before opening the PR run:
 
   ```bash
-
   git status --porcelain |
     rg '^(\?\?|!!| M|M |A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
   ```
@@ -73,7 +72,6 @@ this repository's skills documents how to author it. Its PR gate is still live, 
   stdout unless `--output` is given:
 
   ```bash
-
   python3 integrations/gen_taxonomy_seed.py <collector-dir>/metadata.yaml --module-name <module> \
     --section-id <id from integrations/taxonomy/sections.yaml> --placement-id <module> --icon <icon id> \
     --output <collector-dir>/taxonomy.yaml

@@ -84,7 +84,6 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
    contain main module"):
 
    ```bash
-
    cd src/go && go generate ./plugin/ibm.d/modules/<module-dir>/...
    ```
 
@@ -97,7 +96,6 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 4. `go generate` does not run the integrations pipeline. Validate the derived metadata locally:
 
    ```bash
-
    python3 integrations/gen_integrations.py
    python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>
    python3 integrations/gen_doc_collector_page.py
