@@ -271,8 +271,8 @@ set at the end.
 | W/limit-aliases | weights limit and cardinality_limit select the strongest physical dimensions with explicit cardinality_limit precedence | n/a |  |
 | W/limit-boundaries | weights omitted and zero caps preserve unlimited shape while exact and above-population caps report no truncation | n/a |  |
 | W/limit-invalid | weights HTTP endpoints reject malformed or overflowing supplied limits | n/a |  |
-| W/limit-ranking | limited weights retain the strongest entries and their complete-population raw or normalized score vectors | n/a |  |
-| W/limit-summaries | limited weights preserve complete-query parent summary vectors and full correlated and examined counts | n/a |  |
+| W/limit-ranking | limited weights retain the strongest entries and their complete-population raw or normalized score vectors; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled | n/a |  |
+| W/limit-summaries | limited weights preserve complete-query parent summary vectors and full correlated and examined counts; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled | n/a |  |
 | W/limit-legacy | legacy weights and metric_correlations formats honor result limits without changing full population counts | n/a |  |
 | W/limit-grouped | weights group limits select complete final group objects by the requested aggregate without changing their vectors | n/a |  |
 | W/limit-complete-groups | weights limits rank multi-dimension groups by the requested raw or normalized aggregate after complete aggregation | n/a |  |

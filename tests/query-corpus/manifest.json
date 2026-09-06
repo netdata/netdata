@@ -1167,11 +1167,47 @@
   },
   {
     "name": "W/limit-ranking",
-    "proves": "limited weights retain the strongest entries and their complete-population raw or normalized score vectors"
+    "proves": "limited weights retain the strongest entries and their complete-population raw or normalized score vectors; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled",
+    "components": [
+      "value/raw",
+      "value/null2zero",
+      "value/raw|anomaly-bit",
+      "value/null2zero|anomaly-bit",
+      "volume/raw",
+      "volume/null2zero",
+      "volume/raw|anomaly-bit",
+      "volume/null2zero|anomaly-bit",
+      "ks2/raw",
+      "ks2/null2zero",
+      "ks2/raw|anomaly-bit",
+      "ks2/null2zero|anomaly-bit",
+      "anomaly-rate/raw",
+      "anomaly-rate/null2zero",
+      "anomaly-rate/raw|anomaly-bit",
+      "anomaly-rate/null2zero|anomaly-bit"
+    ]
   },
   {
     "name": "W/limit-summaries",
-    "proves": "limited weights preserve complete-query parent summary vectors and full correlated and examined counts"
+    "proves": "limited weights preserve complete-query parent summary vectors and full correlated and examined counts; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled",
+    "components": [
+      "value/raw",
+      "value/null2zero",
+      "value/raw|anomaly-bit",
+      "value/null2zero|anomaly-bit",
+      "volume/raw",
+      "volume/null2zero",
+      "volume/raw|anomaly-bit",
+      "volume/null2zero|anomaly-bit",
+      "ks2/raw",
+      "ks2/null2zero",
+      "ks2/raw|anomaly-bit",
+      "ks2/null2zero|anomaly-bit",
+      "anomaly-rate/raw",
+      "anomaly-rate/null2zero",
+      "anomaly-rate/raw|anomaly-bit",
+      "anomaly-rate/null2zero|anomaly-bit"
+    ]
   },
   {
     "name": "W/limit-legacy",

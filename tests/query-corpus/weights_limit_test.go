@@ -201,6 +201,9 @@ func TestWeightsLimitScoresAndSummaries(t *testing.T) {
 	for _, method := range []string{"value", "volume", "ks2", "anomaly-rate"} {
 		for _, options := range []string{"raw", "null2zero", "raw|anomaly-bit", "null2zero|anomaly-bit"} {
 			t.Run(method+"/"+options, func(t *testing.T) {
+				component := method + "/" + options
+				registerContractComponent(t, "W/limit-ranking", component)
+				registerContractComponent(t, "W/limit-summaries", component)
 				p := weightsLimitParams(method, options)
 				full, err := td.HostJSON("weights-h", "api/v3/weights", p)
 				if err != nil {
@@ -213,7 +216,7 @@ func TestWeightsLimitScoresAndSummaries(t *testing.T) {
 				}
 				all, kept := weightsLimitRows(t, full), weightsLimitRows(t, limited)
 				t.Run("ranking", func(t *testing.T) {
-					trackContract(t, "W/limit-ranking")
+					trackContractComponent(t, "W/limit-ranking", component)
 					ids := make([]string, 0, len(all))
 					for id := range all {
 						ids = append(ids, id)
@@ -248,7 +251,7 @@ func TestWeightsLimitScoresAndSummaries(t *testing.T) {
 					weightsAssertLimit(t, limited, 1, len(all), want, "dimensions")
 				})
 				t.Run("summaries", func(t *testing.T) {
-					trackContract(t, "W/limit-summaries")
+					trackContractComponent(t, "W/limit-summaries", component)
 					parents := map[float64][]any{}
 					for _, entry := range full["result"].([]any) {
 						r := entry.([]any)
