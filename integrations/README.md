@@ -1,63 +1,56 @@
-To generate a copy of `integrations.js` and validate collector
-taxonomy locally, you will need:
+# Integrations pipeline
 
-- Python 3.10 or newer.
-- The generation and test dependencies installed by
-  `./integrations/pip.sh`, including `jsonschema`, `referencing`, `jinja2`,
-  `ruamel.yaml`, and `markdown-it-py`.
-- A local checkout of https://github.com/netdata/netdata
-- A local checkout of https://github.com/netdata/go.d.plugin. The script
-  expects this to be checked out in a directory called `go.d.plugin`
-  in the root directory of the Agent repo, though a symlink with that
-  name pointing at the actual location of the repo will work as well.
+The scripts in this directory turn every `metadata.yaml` in the repository into the integrations catalog
+(`integrations.js`, `integrations.json`), one documentation page per integration, and the umbrella pages under
+`src/collectors/`. How the pipeline works, what is generated, and how changes are delivered is documented for
+maintainers in `.agents/skills/integrations-lifecycle/`; this file is the local-run reference.
 
-The first two parts can be easily covered in a Linux environment, such
-as a VM or Docker container:
+## Requirements
 
-- On Debian or Ubuntu: `apt-get install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel.yaml`
-- On Alpine: `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml`
-- On Fedora or RHEL (EPEL is required on RHEL systems): `dnf install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml`
+- Python 3.10 or newer, run from the root of this repository: the scripts locate their inputs relative to their own
+  path.
+- The Python packages installed by `./integrations/pip.sh`: `jsonschema`, `referencing`, `jinja2`, `ruamel.yaml`, and
+  `markdown-it-py`. All five are needed for generation (the description validator imports `markdown-it-py`); the same
+  list is pinned in `packaging/cmake/Modules/NetdataRenderDocs.cmake` and the two must change together. Distribution
+  packages work too: `apt-get install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel.yaml`
+  (Debian, Ubuntu), `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml` (Alpine), or
+  `dnf install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml` (Fedora, RHEL with EPEL), plus
+  `markdown-it-py` from pip.
+- Go (the version in `src/go/go.mod`) only when ibm.d module inputs changed, for `go generate`.
 
-Those packages cover generation. The tests (`python3 -m unittest integrations.tests.test_descriptions` and
-`integrations.tests.test_collector_metadata`, the collector metadata content checks) also require `markdown-it-py`;
-`./integrations/pip.sh` installs the complete generation-and-test dependency set. The legacy
-`integrations/check_collector_metadata.py` is a different, unused script.
+## Commands
 
-Once the environment is set up, run the documentation generators from
-the Agent repo root:
-
-- `integrations/gen_integrations.py`
-- `integrations/gen_taxonomy.py --check-only`
-- `integrations/check_collector_taxonomy.py`
-- `integrations/gen_docs_integrations.py`
-- `integrations/gen_doc_collector_page.py`
-- `integrations/gen_doc_secrets_page.py`
-- `integrations/gen_doc_service_discovery_page.py`
-
-These scripts must be run _from this specific location_, as they use
-their own path to figure out where all the files they need are.
-
-Collector dashboard taxonomy is authored in sibling `taxonomy.yaml`
-files next to collector `metadata.yaml` files. Static collectors use
-ordered `items:` trees; a plain context string in `items:` owns that
-chart context and normalizes to `type: owned_context`. Display widgets
-use `type: context` with `contexts:` and `chart_library`, and every
-referenced literal context must be owned somewhere in the structural
-tree. Dynamic collectors use `type: selector` with `context_prefix:`
-or `collect_plugin:` and must opt in from `metadata.yaml` with
-`metrics.dynamic_context_prefixes:` or
-`metrics.dynamic_collect_plugins:`; a taxonomy `context_prefix:` may
-narrow a declared metadata namespace. The generated
-`integrations/taxonomy.json` artifact is gitignored like
-`integrations/integrations.js`.
-
-To seed a static collector taxonomy from existing metadata contexts:
+Run in this order from the repository root. The producers (first two lines) matter only when their inputs or generators
+changed; everything after them reads `integrations/integrations.js`, which is gitignored and produced by
+`gen_integrations.py`.
 
 ```bash
-python3 integrations/gen_taxonomy_seed.py src/go/plugin/go.d/collector/apache/metadata.yaml --module-name apache --section-id applications.apache --placement-id apache --icon apache
+python3 integrations/gen_npm_catalog.py                       # SNMP profiles -> npm-catalog/metadata.yaml
+(cd src/go && go generate ./plugin/ibm.d/modules/...)         # ibm.d inputs -> metadata.yaml, README.md, config_schema.json
+python3 integrations/gen_integrations.py                      # every metadata.yaml -> integrations.js / integrations.json
+python3 integrations/gen_taxonomy.py --check-only             # validates taxonomy.yaml files (the taxonomy CI gate)
+python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD   # what the PR gate will say; adjust the range
+python3 -m unittest integrations.tests.test_taxonomy integrations.tests.test_descriptions \
+    integrations.tests.test_prometheus_profile_docs integrations.tests.test_collector_metadata
+python3 integrations/gen_docs_integrations.py                 # integrations.js -> one page per integration
+python3 integrations/gen_doc_collector_page.py                # -> src/collectors/COLLECTORS.md
+python3 integrations/gen_doc_secrets_page.py                  # -> src/collectors/SECRETS.md
+python3 integrations/gen_doc_service_discovery_page.py        # -> src/collectors/SERVICE-DISCOVERY.md
 ```
 
-Pull requests run `integrations/check_collector_taxonomy.py` from
-`.github/workflows/check-markdown.yml`. The gate validates committed
-taxonomy files and fails when a collector `metadata.yaml` metrics block
-or `taxonomy.yaml` changes without matching taxonomy coverage.
+`gen_docs_integrations.py -c <plugin>/<module>` regenerates one collector's page; `--check` validates the generated
+page descriptions without writing. `integrations/check_collector_metadata.py` is a legacy script that no longer runs.
+
+## What to commit
+
+A source pull request commits the authoritative inputs only. Generated pages, generated README files, the umbrella
+pages,
+and generated metadata (ibm.d, NPM catalog) are validated locally and left unstaged; the post-merge workflow
+`.github/workflows/generate-integrations.yml` regenerates them and opens the `integrations-regen` pull request. The
+gitignored catalogs (`integrations.js`, `integrations.json`, `taxonomy.json`) and the untracked
+`src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are never committed.
+
+Pull requests run `.github/workflows/check-markdown.yml`, which regenerates everything, runs the tests above, runs the
+taxonomy gate (a collector `metadata.yaml` that is added or whose metric contexts change must have a sibling
+`taxonomy.yaml`; seed one with `integrations/gen_taxonomy_seed.py`), and validates the generated links through the
+Learn ingest.

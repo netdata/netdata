@@ -1,6 +1,6 @@
 ---
 name: collectors-metadata-yaml
-description: Content rules for collector metadata.yaml, field by field, for every collector family (go.d, C plugins, scripts.d, Rust plugins, ibm.d via its docgen sources). Use when writing or reviewing a collector's metadata.yaml; when asked what goes on the integration page, in the overview, metrics description, method description, auto-detection, limits, performance impact, permissions, prerequisites, the config options table, examples, troubleshooting, metrics scopes, or alerts; when a generated integration page reads as a wall of text or says something false about defaults or discovery. Not for the generator pipeline, JSON schemas, taxonomy, or generated outputs (integrations-lifecycle), and not for config_schema.json (collectors-go-design/config-schema.md).
+description: Content rules for collector metadata.yaml, field by field, for every collector family (go.d, C plugins, scripts.d, Rust plugins, ibm.d via its docgen sources). Use when writing or reviewing a collector's metadata.yaml; when asked what goes on the integration page, in the overview, metrics description, method description, auto-detection, limits, performance impact, permissions, prerequisites, the config options table, examples, troubleshooting, metrics scopes, or alerts; when a generated integration page reads as a wall of text or says something false about defaults or discovery. Not for the generator pipeline, JSON schemas, or generated outputs (integrations-lifecycle), and not for config_schema.json (collectors-go-design/config-schema.md).
 ---
 
 # Collector metadata.yaml: The Page The User Reads
@@ -18,7 +18,7 @@ product copy for an operator, not developer documentation. This skill owns what 
   metadata template (`src/go/plugin/ibm.d/docgen/main.go`, see `integrations-lifecycle/ibm-d.md`), so applying these
   rules there means changing the template. `config.go` feeds the schema and README, not the options table.
 - `.agents/skills/integrations-lifecycle/`: mechanics. JSON schemas, generators, validation commands, artifacts and
-  banners, taxonomy, the ibm.d generation chain, and the cross-type page meta-description derivation contract
+  banners, the ibm.d generation chain, and the cross-type page meta-description derivation contract
   (`description-authoring.md`).
 - `.agents/skills/collectors-go-design/config-schema.md`: the DynCfg form. Option wording shared between the
   form and the options table has one owner there (sections 7 and 8); this skill points to it.

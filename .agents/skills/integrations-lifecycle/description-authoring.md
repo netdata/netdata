@@ -42,8 +42,9 @@ first tells users what Netdata does for them.
 ## Generated Page Meta Description Contract
 
 `integrations/gen_docs_integrations.py` emits one `description:` frontmatter field for every generated page in all ten
-documentation modes: collector, flows, device, exporter, agent notification, cloud notification, logs, authentication,
-secret store, and service discovery.
+documentation modes (`DOCUMENTATION_TYPES` in `integrations/descriptions.py`): collector, flows, device, exporter, agent
+notification, cloud notification, logs, authentication, secret store, and service discovery. `deploy` entries have no
+page and no description.
 
 The generator resolves each description in this order:
 
@@ -68,8 +69,9 @@ An explicit description MUST:
 - be one line of plain text with no C0/C1 control character, including tabs, no surrogate code point or Unicode line/paragraph
   separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), no CommonMark list marker or
   hyphen thematic break at the beginning, and no URL, double quote, or backslash;
-- not begin with `- `, `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1.` followed by a space or `1)` followed by a space, and not consist only of
-  three or more hyphens separated by optional spaces. Internal hyphens, plus signs, and digits remain valid plain text;
+- not begin with a hyphen at all (the schema pattern and `integrations/descriptions.py` reject any leading `-`, which
+  covers list markers and thematic breaks), nor with `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1.`
+  or `1)` followed by a space. Internal hyphens, plus signs, and digits remain valid plain text;
 - be a complete statement: it must not end with `:`, the Unicode ellipsis `…`, or the ASCII ellipsis `...`, and every round
   parenthesis must be balanced. Nested balanced parentheses are valid;
 - be unique across every generated integration page. Duplicate identity is case-insensitive and NFC-normalized, but accepted authored
@@ -122,7 +124,7 @@ metrics_description: |
 
 Before committing `metadata.yaml` changes:
 
-1. Regenerate and validate the integration data:
+1. Regenerate and validate the integration data (dependencies: `integrations/README.md`):
 
    ```bash
    python3 integrations/gen_integrations.py
@@ -131,7 +133,10 @@ Before committing `metadata.yaml` changes:
    python3 -m unittest integrations.tests.test_collector_metadata
    ```
 
-2. Regenerate `src/collectors/COLLECTORS.md`.
+   Both workflows run the same two test modules; `check-markdown.yml` runs `test_descriptions` with
+   `LEARN_INGEST_PATH` pointing at the checked-out `netdata/learn` ingest script, so a locally green run can still fail
+   there on Learn-side frontmatter parsing.
+2. Regenerate `src/collectors/COLLECTORS.md` (`python3 integrations/gen_doc_collector_page.py`).
 3. Read the table row description and generated page frontmatter for the integration. Both must answer "what is this
    integration?" without relying on setup context and stay useful when rendered alone in a list, card, or search result.
 4. For a collector, run the review checklist in `.agents/skills/collectors-metadata-yaml/SKILL.md` over the rest of

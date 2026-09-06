@@ -291,7 +291,7 @@ regenerate. Note: go.d uses `//go:embed` for static assets — there is no `go g
 
 Collector consistency has one detailed checklist:
 `.agents/skills/integrations-lifecycle/consistency.md`. Treat code,
-integration metadata, taxonomy, config, stock examples, alerts, and generated
+integration metadata, config, stock examples, alerts, and generated
 documentation as one unit, but do not maintain a second artifact matrix here.
 
 If a collector exposes a Function, its response shape MUST also conform to the

@@ -615,9 +615,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
 - Integrations.
-  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` and collector `taxonomy.yaml` schemas and
-    validation, `integrations/` generators, taxonomy registries, templates, generated outputs,
-    `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d `contexts.yaml`; the collector-consistency rule
+  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
+    generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
+    `contexts.yaml` and the NPM catalog generator; the collector-consistency rule and the taxonomy CI gate
   - Also relevant: `collectors-metadata-yaml` (what the fields say) and `docs-learn-site-structure` (where the
     generated pages land).
 - Health.

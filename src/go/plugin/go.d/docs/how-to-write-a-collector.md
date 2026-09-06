@@ -87,7 +87,7 @@ src/go/plugin/go.d/collector/<name>/
 |-- charts.yaml           # V2 chart template
 |-- config_schema.json    # DYNCFG schema
 |-- metadata.yaml         # integration metadata source
-|-- taxonomy.yaml         # dashboard TOC placement source
+|-- taxonomy.yaml         # required by the taxonomy CI gate; seed it, do not design it
 |-- integrations/         # generated integration page
 |-- README.md             # symlink to generated integration page
 |-- testdata/             # fixtures and config serialization files
@@ -305,7 +305,7 @@ For a new collector `<name>`:
    README; follow `.agents/skills/integrations-lifecycle/consistency.md`.
 
 Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands and
-taxonomy pipeline details.
+the taxonomy CI gate.
 
 The PR description or design note MUST enumerate the relevant collector consistency artifacts and justify every artifact
 that did not need a matching change. Most of this is not CI-enforced; it must be reviewer-visible.
@@ -356,7 +356,7 @@ When the collector uses concurrency or Functions, also run:
 go test -race -count=1 ./plugin/go.d/collector/<name>/...
 ```
 
-When integration metadata, generated pages, taxonomy, or health alerts change, run the relevant integrations pipeline
+When integration metadata, generated pages, or health alerts change, run the relevant integrations pipeline
 checks from `.agents/skills/integrations-lifecycle/`.
 
 Do not claim full-project validation from a narrow collector command. State exactly what was run.
