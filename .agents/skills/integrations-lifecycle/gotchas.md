@@ -33,8 +33,8 @@ cost someone a debugging session. Citations name symbols; open the file to find 
 - The `collector_default` fallback (`data-collection.applications`) fires only for a module whose `categories` list is
   empty. A module whose declared ids are all invalid gets a fatal warning and an empty category list; it is not parked
   anywhere.
-- The community badge is chosen by key presence (`"community" in integration["meta"]`), not by value: `community: false`
-  still renders the Community badge. Every current use is `true`.
+- The community badge is chosen by key presence (`"community" in integration["meta"]`), not by value: a `community`
+  key set to `false` still renders the Community badge. Every current use is `true`.
 
 - `PRESERVE_FILES` in `gen_docs_integrations.py` and the dcstat removal step in `check-markdown.yml` are a coupled pair
   around one Learn redirect migration (`pipeline.md`, Stage 2). A local full regeneration therefore keeps a page whose
