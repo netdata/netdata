@@ -538,6 +538,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			autoDetectionRetryToken{},
 			attempt.markApplied(),
+			jobConfigFailure(err, "activation"),
 		)
 	}
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
@@ -557,6 +558,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			autoDetectionRetryToken{},
 			composeAfterApply(func() { dcjc.scheduleAutoDetectionRetry(config, failure) }, attempt.markApplied()),
+			jobConfigFailure(err, "activation"),
 		)
 	}
 	if classifyConstructionError(err) == constructionErrorProposal {
@@ -571,6 +573,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			autoDetectionRetryToken{},
 			attempt.markApplied(),
+			jobConfigFailure(err, "activation"),
 		)
 	}
 	return nil, err

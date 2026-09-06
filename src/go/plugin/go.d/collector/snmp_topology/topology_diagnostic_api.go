@@ -358,13 +358,17 @@ func newDiagnosticLifecycleRegistration(
 		return diagnosticLifecycleRegistration{}, fmt.Errorf("lifecycle outcome: %w", err)
 	}
 	return diagnosticLifecycleRegistration{
-		Hostname:      entry.Info.Hostname,
-		Port:          entry.Info.Port,
-		SNMPVersion:   entry.Info.SNMPVersion,
-		Phase:         phase,
-		Outcome:       outcome,
-		CompletedAt:   entry.LastCompleted.CompletedAt,
-		TopologyReady: entry.TopologyReady,
+		Hostname:           entry.Info.Hostname,
+		Profiles:           entry.Info.Profiles.Snapshot(),
+		Port:               entry.Info.Port,
+		SNMPVersion:        entry.Info.SNMPVersion,
+		Phase:              phase,
+		Failure:            entry.LastCompleted.Failure,
+		PreparationFailure: entry.LastCompleted.PreparationFailure,
+		CollectionFailures: entry.LastCompleted.CollectionFailures,
+		Outcome:            outcome,
+		CompletedAt:        entry.LastCompleted.CompletedAt,
+		TopologyReady:      entry.TopologyReady,
 	}, nil
 }
 
@@ -472,21 +476,24 @@ func newDiagnosticAcquisitionEvidenceSummary(
 		return diagnosticAcquisitionEvidenceSummary{}, fmt.Errorf("VLAN profiles phase: %w", err)
 	}
 	result := diagnosticAcquisitionEvidenceSummary{
-		Hostname:      evidence.device.hostname,
-		SysObjectID:   evidence.device.sysObjectID,
-		SysName:       evidence.device.sysName,
-		Vendor:        evidence.device.vendor,
-		Model:         evidence.device.model,
-		TargetOutcome: target,
-		CollectedAt:   evidence.collectedAt,
-		FreshForNanos: int64(evidence.freshFor),
-		Client:        client,
-		Connect:       connect,
-		Profiles:      profiles,
-		Collection:    collection,
-		SysUptime:     sysUptime,
-		VLANProfiles:  vlanProfiles,
-		Contexts:      len(evidence.collectionContexts),
+		Interruption:       evidence.interruption,
+		ProfileContext:     evidence.profileContext.Snapshot(),
+		VLANProfileContext: evidence.vlanProfileContext.Snapshot(),
+		Hostname:           evidence.device.hostname,
+		SysObjectID:        evidence.device.sysObjectID,
+		SysName:            evidence.device.sysName,
+		Vendor:             evidence.device.vendor,
+		Model:              evidence.device.model,
+		TargetOutcome:      target,
+		CollectedAt:        evidence.collectedAt,
+		FreshForNanos:      int64(evidence.freshFor),
+		Client:             client,
+		Connect:            connect,
+		Profiles:           profiles,
+		Collection:         collection,
+		SysUptime:          sysUptime,
+		VLANProfiles:       vlanProfiles,
+		Contexts:           len(evidence.collectionContexts),
 	}
 	for _, address := range evidence.target.addresses {
 		result.TargetAddresses = append(result.TargetAddresses, address.String())
@@ -523,7 +530,7 @@ func newDiagnosticPhaseStatus(
 	if err != nil {
 		return diagnosticPhaseStatus{}, err
 	}
-	return diagnosticPhaseStatus{Outcome: outcome, Failure: failure}, nil
+	return diagnosticPhaseStatus{Outcome: outcome, Failure: failure, Detail: phase.detail}, nil
 }
 
 func newDiagnosticAbortedSweep(

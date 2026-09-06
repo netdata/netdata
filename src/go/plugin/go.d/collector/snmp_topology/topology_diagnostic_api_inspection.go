@@ -187,7 +187,21 @@ func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult
 		return converted, nil
 	}
 	for _, context := range result.capture.evidence.collectionContexts {
+		client, err := newDiagnosticPhaseStatus(context.client)
+		if err != nil {
+			return diagnosticDeviceCaptureInspection{}, err
+		}
+		connect, err := newDiagnosticPhaseStatus(context.connect)
+		if err != nil {
+			return diagnosticDeviceCaptureInspection{}, err
+		}
+		collection, err := newDiagnosticPhaseStatus(context.collection)
+		if err != nil {
+			return diagnosticDeviceCaptureInspection{}, err
+		}
 		accounting := diagnosticContextAccounting{
+			Interruption: context.interruption, Failures: context.failures,
+			Client: client, Connect: connect, Collection: collection,
 			Ordinal: context.ordinal, VLANID: context.vlanID, VLANName: context.vlanName,
 			Profiles: make([]diagnosticProfileAccounting, 0, len(context.profiles)),
 		}

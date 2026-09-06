@@ -561,7 +561,7 @@ func TestTopologyAcquisitionCaptureLimitFailsOpen(t *testing.T) {
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
 		topologyAcquisitionLimits{
 			maxRecords:      1,
-			maxLogicalBytes: 1024,
+			maxLogicalBytes: 4096,
 		})
 
 	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})

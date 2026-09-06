@@ -4,8 +4,10 @@ package diagnostics
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 var lifecyclePhases = []string{"unknown", "init", "check", "collect"}
@@ -63,13 +65,17 @@ func NewLifecycle(cut ddsnmp.DeviceLifecycleCut) (Lifecycle, error) {
 			result.Cut.Entries,
 			LifecycleEntry{
 				RegistrationID: uint64(entry.RegistrationID),
+				Profiles:       entry.Info.Profiles.Snapshot(),
 				Hostname:       entry.Info.Hostname,
 				Port:           entry.Info.Port,
 				SNMPVersion:    entry.Info.SNMPVersion,
 				LastCompleted: LifecycleStatus{
-					Phase:       phase,
-					Outcome:     outcome,
-					CompletedAt: entry.LastCompleted.CompletedAt,
+					Phase:              phase,
+					Failure:            entry.LastCompleted.Failure,
+					PreparationFailure: entry.LastCompleted.PreparationFailure,
+					CollectionFailures: entry.LastCompleted.CollectionFailures,
+					Outcome:            outcome,
+					CompletedAt:        entry.LastCompleted.CompletedAt,
 				},
 				TopologyReady: entry.TopologyReady,
 			},
@@ -106,7 +112,7 @@ func CaptureLifecycle(source LifecycleSource, maxRecords, maxBytes uint64) (resu
 	records := uint64(1 + len(cut.Entries))
 	size := LifecycleCutLogicalBytes
 	for _, entry := range cut.Entries {
-		size += uint64(64 + len(entry.Info.Hostname) + len(entry.Info.SNMPVersion))
+		size += LifecycleEntryLogicalBytes(entry.Info.Hostname, entry.Info.SNMPVersion)
 	}
 	if records > maxRecords || size > maxBytes {
 		result = Lifecycle{
@@ -122,9 +128,32 @@ func CaptureLifecycle(source LifecycleSource, maxRecords, maxBytes uint64) (resu
 		}
 		return result
 	}
+	cut.Entries = slices.Clone(cut.Entries)
+	for i := range cut.Entries {
+		context := cut.Entries[i].Info.Profiles
+		if context == nil {
+			continue
+		}
+		contextRecords, contextBytes := context.Shape()
+		if contextRecords > maxRecords-records || contextBytes > maxBytes-size {
+			limited, _ := ddsnmp.RestoreProfileContext(ddsnmp.ProfileContextData{State: "limit_exceeded"}, 0, 0)
+			cut.Entries[i].Info.Profiles = limited
+			continue
+		}
+		records += contextRecords
+		size += contextBytes
+	}
 	projected, err := NewLifecycle(cut)
 	if err != nil {
 		return result
 	}
 	return projected
+}
+
+// LifecycleEntryLogicalBytes includes fixed failure and unavailable-context slots.
+func LifecycleEntryLogicalBytes(hostname, version string) uint64 {
+	const preparationFailureBytes = 128
+	return uint64(
+		64+len(hostname)+len(version),
+	) + snmputils.FailureLogicalBytes + preparationFailureBytes + ddsnmp.CollectionFailuresLogicalBytes + 32
 }

@@ -22,6 +22,7 @@ var (
 )
 
 type autoDetectionFailure struct {
+	diagnosticFailure  collectorapi.JobConfigFailure
 	cause              error
 	retry              bool
 	retryAfter         int
@@ -377,7 +378,8 @@ func (pj PreparedJob) takeForGeneration(generation uint64) (*preparedJobState, e
 
 func autoDetectionFailureFor(constructed ConstructedJob, err error) *autoDetectionFailure {
 	failure := &autoDetectionFailure{
-		cause: err,
+		diagnosticFailure: jobConfigFailure(err, "autodetection"),
+		cause:             err,
 	}
 	if constructed.retryAutoDetection != nil {
 		failure.retry = constructed.retryAutoDetection()

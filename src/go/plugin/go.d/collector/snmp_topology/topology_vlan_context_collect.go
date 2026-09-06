@@ -12,15 +12,36 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func loadTopologyVLANContextProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+	return resolveTopologyVLANProfileView(dev).Profiles()
+}
+
+func resolveTopologyVLANProfileView(dev ddsnmp.DeviceConnectionInfo) ddsnmp.ProjectedView {
 	return ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
 		SysObjectID:    dev.SysObjectID,
 		SysDescr:       dev.SysDescr,
 		ManualProfiles: dev.ManualProfiles,
 		ManualPolicy:   ddsnmp.ManualProfileAugment,
-	}).Project(ddsnmp.ConsumerTopology).FilterByKind(vlanScopableKinds).Profiles()
+	}).Project(ddsnmp.ConsumerTopology).FilterByKind(vlanScopableKinds)
+}
+
+type topologyVLANProgress struct {
+	client       topologyAcquisitionPhaseEvidence
+	connect      topologyAcquisitionPhaseEvidence
+	collection   topologyAcquisitionPhaseEvidence
+	interruption snmputils.Failure
+	failures     ddsnmp.CollectionFailures
+}
+
+func newTopologyVLANProgress() topologyVLANProgress {
+	return topologyVLANProgress{
+		client:     notObservedAcquisitionPhase(),
+		connect:    notObservedAcquisitionPhase(),
+		collection: notObservedAcquisitionPhase(),
+	}
 }
 
 func collectTopologyVLANContext(
@@ -30,47 +51,51 @@ func collectTopologyVLANContext(
 	vlanID string,
 	profiles []*ddsnmp.Profile,
 	observer ddsnmpcollector.AcquisitionObserver,
-) ([]*ddsnmp.ProfileMetrics, topologyAcquisitionFailureClass, error) {
+) ([]*ddsnmp.ProfileMetrics, topologyVLANProgress, error) {
+	progress := newTopologyVLANProgress()
 	if strings.TrimSpace(vlanID) == "" {
-		return nil, topologyAcquisitionFailureVLANIdentifier, fmt.Errorf("empty vlan id")
+		err := fmt.Errorf("empty vlan id")
+		progress.client = failedAcquisitionPhase(topologyAcquisitionFailureVLANIdentifier, err)
+		return nil, progress, err
 	}
 	if _, err := strconv.Atoi(vlanID); err != nil {
-		return nil, topologyAcquisitionFailureVLANIdentifier, fmt.Errorf("invalid vlan id '%s': %w", vlanID, err)
+		progress.client = failedAcquisitionPhase(topologyAcquisitionFailureVLANIdentifier, err)
+		return nil, progress, fmt.Errorf("invalid vlan id '%s': %w", vlanID, err)
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, topologyAcquisitionFailureCollection, err
+		progress.interruption = snmputils.ClassifyFailure(err)
+		return nil, progress, err
 	}
-
-	snmpClient, stopContextClose, failure, err := initTopologyVLANClient(ctx, c, dev, vlanID)
+	client, stopContextClose, progress, err := initTopologyVLANClient(ctx, c, dev, vlanID)
 	if err != nil {
-		return nil, failure, err
+		return nil, progress, err
 	}
 	defer stopContextClose()
-	defer func() {
-		_ = snmpClient.Close()
-	}()
-
+	defer func() { _ = client.Close() }()
 	if err := ctx.Err(); err != nil {
-		return nil, topologyAcquisitionFailureCollection, err
+		progress.interruption = snmputils.ClassifyFailure(err)
+		return nil, progress, err
 	}
-
-	vlanCollector := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient:                 snmpClient,
-		Profiles:                   profiles,
-		Log:                        c.Logger,
-		SysObjectID:                dev.SysObjectID,
-		DisableBulkWalk:            dev.DisableBulkWalk,
-		InitialAcquisitionObserver: observer,
+	collector := c.newDdSnmpColl(ddsnmpcollector.Config{
+		SnmpClient: client, Profiles: profiles, Log: c.Logger, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, InitialAcquisitionObserver: observer,
 	})
-
-	pms, err := vlanCollector.Collect()
+	pms, err := collector.Collect()
+	if source, ok := collector.(interface {
+		CollectionFailures() ddsnmp.CollectionFailures
+	}); ok {
+		progress.failures = source.CollectionFailures()
+	}
 	if err != nil {
-		return nil, topologyAcquisitionFailureCollection, err
+		progress.collection = failedAcquisitionPhase(topologyAcquisitionFailureCollection, err)
+		progress.interruption = snmputils.ClassifyFailure(ctx.Err())
+		return nil, progress, err
 	}
+	progress.collection = successfulAcquisitionPhase()
 	if err := ctx.Err(); err != nil {
-		return nil, topologyAcquisitionFailureCollection, err
+		progress.interruption = snmputils.ClassifyFailure(err)
+		return nil, progress, err
 	}
-	return pms, topologyAcquisitionFailureNone, nil
+	return pms, progress, nil
 }
 
 func initTopologyVLANClient(
@@ -78,16 +103,18 @@ func initTopologyVLANClient(
 	c *Collector,
 	dev ddsnmp.DeviceConnectionInfo,
 	vlanID string,
-) (gosnmp.Handler, func(), topologyAcquisitionFailureClass, error) {
+) (gosnmp.Handler, func(), topologyVLANProgress, error) {
+	progress := newTopologyVLANProgress()
 	if err := ctx.Err(); err != nil {
-		return nil, func() {}, topologyAcquisitionFailureCollection, err
+		progress.interruption = snmputils.ClassifyFailure(err)
+		return nil, func() {}, progress, err
 	}
-
 	client, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
 	if err != nil {
-		return nil, func() {}, topologyAcquisitionFailureClientConfiguration, err
+		progress.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration, err)
+		return nil, func() {}, progress, err
 	}
-
+	progress.client = successfulAcquisitionPhase()
 	switch client.Version() {
 	case gosnmp.Version3:
 		client.SetContextName("vlan-" + vlanID)
@@ -98,15 +125,14 @@ func initTopologyVLANClient(
 		}
 		client.SetCommunity(baseCommunity + "@" + vlanID)
 	}
-
 	if dev.MaxRepetitions != 0 {
 		client.SetMaxRepetitions(dev.MaxRepetitions)
 	}
-
 	if err := client.Connect(); err != nil {
-		return nil, func() {}, topologyAcquisitionFailureConnect, err
+		progress.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect, err)
+		progress.interruption = snmputils.ClassifyFailure(ctx.Err())
+		return nil, func() {}, progress, err
 	}
-
-	stopContextClose := closeSNMPClientOnContextCancel(ctx, client)
-	return client, stopContextClose, topologyAcquisitionFailureNone, nil
+	progress.connect = successfulAcquisitionPhase()
+	return client, closeSNMPClientOnContextCancel(ctx, client), progress, nil
 }

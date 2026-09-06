@@ -19,6 +19,42 @@ import (
 )
 
 func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
+	tests := map[string]struct {
+		phase, outcome, reason, stage string
+		config                        confgroup.Config
+	}{
+		"collector init": {phase: "init",
+			outcome: "failed",
+			reason:  "missing_hostname",
+			stage:   "autodetection"},
+		"before construction": {
+			phase:   "unknown",
+			outcome: "unknown",
+			stage:   "vnode",
+			config: confgroup.Config{
+				"module":       "snmp",
+				"name":         "missing-vnode-device",
+				"hostname":     "192.0.2.10",
+				"vnode":        "missing-vnode",
+				"update_every": 10,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			document := runNormalSNMPFailurePublication(t, tc.config)
+			row := document.Snapshot.Lifecycle.Cut.Entries[0]
+			require.Equal(t, tc.phase, row.LastCompleted.Phase)
+			require.Equal(t, tc.outcome, row.LastCompleted.Outcome)
+			require.Equal(t, tc.reason, row.LastCompleted.Failure.Reason)
+			require.Equal(t, tc.stage, row.LastCompleted.PreparationFailure.Stage)
+			require.Equal(t, "not_attempted", row.Profiles.State)
+		})
+	}
+}
+
+func runNormalSNMPFailurePublication(t *testing.T, config confgroup.Config) snmpdiag.Document {
+	t.Helper()
 	dir := t.TempDir()
 	registry, publisher := NewRegistry(dir)
 	// Exercise the real normal-SNMP Creator and failed Init commit with the
@@ -44,7 +80,7 @@ func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
 			agentdiscovery.NewProviderFactory(
 				"test",
 				func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-					return diagnosticTestDiscovery{}, true, nil
+					return diagnosticTestDiscovery{config: config}, true, nil
 				},
 			),
 		},
@@ -66,8 +102,6 @@ func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
 	}, 3*time.Second, 5*time.Millisecond)
 	require.Nil(t, document.Snapshot.Topology)
 	row := document.Snapshot.Lifecycle.Cut.Entries[0]
-	require.Equal(t, "init", row.LastCompleted.Phase)
-	require.Equal(t, "failed", row.LastCompleted.Outcome)
 	require.False(t, row.TopologyReady)
 	archive, err := snmptopology.InspectDiagnosticDocument(document)
 	require.NoError(t, err)
@@ -82,16 +116,20 @@ func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
 	after, err := os.ReadFile(snmpdiag.ArchivePath(dir))
 	require.NoError(t, err)
 	require.Equal(t, before, after, "shutdown must preserve useful evidence, not publish cleared state")
+	return document
 }
 
-type diagnosticTestDiscovery struct{}
+type diagnosticTestDiscovery struct{ config confgroup.Config }
 
-func (diagnosticTestDiscovery) Run(ctx context.Context, out chan<- []*confgroup.Group) {
+func (d diagnosticTestDiscovery) Run(ctx context.Context, out chan<- []*confgroup.Group) {
 	config := confgroup.Config{
 		"module":       "snmp",
 		"name":         "invalid-device",
 		"hostname":     "",
 		"update_every": 10,
+	}
+	if d.config != nil {
+		config = d.config
 	}
 	config.SetProvider("test")
 	config.SetSourceType(confgroup.TypeUser)

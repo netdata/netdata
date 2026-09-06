@@ -26,8 +26,10 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 		return
 	}
 
-	profiles := loadTopologyVLANContextProfiles(dev)
+	view := resolveTopologyVLANProfileView(dev)
+	profiles := view.Profiles()
 	if recorder.evidence != nil {
+		recorder.evidence.vlanProfileContext = view.Context(recorder.limits.maxRecords, recorder.limits.maxLogicalBytes)
 		if len(profiles) == 0 {
 			recorder.evidence.vlanProfiles = topologyAcquisitionPhaseEvidence{outcome: topologyAcquisitionPhaseEmpty}
 		} else {
@@ -42,32 +44,20 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 		contextOrdinal := uint32(i + 1)
 		observer := recorder.beginContext(contextOrdinal, context.vlanID, context.vlanName)
 
-		pms, failure, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles, observer)
+		pms, progress, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles, observer)
+		if captured := recorder.contextByOrdinal(contextOrdinal); captured != nil {
+			captured.client, captured.connect = progress.client, progress.connect
+			captured.interruption, captured.failures = progress.interruption, progress.failures
+		}
+		recorder.completeContext(contextOrdinal, progress.collection)
 		if err != nil {
-			if captured := recorder.contextByOrdinal(contextOrdinal); captured != nil {
-				switch failure {
-				case topologyAcquisitionFailureClientConfiguration:
-					captured.client = failedAcquisitionPhase(failure)
-				case topologyAcquisitionFailureConnect:
-					captured.client = successfulAcquisitionPhase()
-					captured.connect = failedAcquisitionPhase(failure)
-				case topologyAcquisitionFailureCollection:
-					captured.client = successfulAcquisitionPhase()
-					captured.connect = successfulAcquisitionPhase()
-				}
-			}
-			recorder.completeContext(contextOrdinal, failedAcquisitionPhase(failure))
 			if ctx.Err() != nil {
+				recorder.recordInterruption(ctx.Err())
 				return
 			}
 			c.Warningf("device '%s': topology vlan-context polling failed for vlan %s: %v", dev.Hostname, context.vlanID, err)
 			continue
 		}
-		if captured := recorder.contextByOrdinal(contextOrdinal); captured != nil {
-			captured.client = successfulAcquisitionPhase()
-			captured.connect = successfulAcquisitionPhase()
-		}
-		recorder.completeContext(contextOrdinal, successfulAcquisitionPhase())
 		applyTopologySemanticEvent(cache, topologySemanticEvent{
 			kind:     topologySemanticEventVLANContext,
 			profiles: pms,
