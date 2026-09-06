@@ -1253,13 +1253,12 @@ send_signalgrid() {
     esac
 
     for channel in ${channels}; do
-      httpcode=$(docurl \
-        --form-string "client_key=${client_key}" \
+      httpcode=$(printf '%s' "${client_key}" | docurl \
+        --form "client_key=<-" \
         --form-string "channel=${channel}" \
         --form-string "type=${type}" \
         --form-string "title=${title}" \
         --form-string "body=${message}" \
-        --form-string "critical=false" \
         https://api.signalgrid.co/v1/push)
 
       if [ "${httpcode}" = "200" ]; then
