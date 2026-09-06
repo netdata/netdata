@@ -140,6 +140,9 @@ func dimensionName(spec metricSpec, lbls promlabels.Labels) string {
 			keep = !isIdentityOrMetadataLabel(key)
 		}
 		if keep && l.Value != "" {
+			if spec.Raw {
+				key = escapeDimensionLabel(l.Name)
+			}
 			tokens = append(tokens, key+"_"+escapeDimensionLabel(l.Value))
 		}
 	}

@@ -404,3 +404,45 @@ func TestCollector_CPUUnits(t *testing.T) {
 		assert.Equal(t, tc.want, got)
 	}
 }
+
+func TestCollector_EmptyScrapeResetsCounterBaseline(t *testing.T) {
+	c := collectorWithMetrics(t, exposition("DCGM_FI_PROF_PCIE_RX_BYTES_TOTAL", "counter", 100, ""))
+	now := time.Unix(1, 0)
+	c.now = func() time.Time { return now }
+	assert.Empty(t, c.Collect(context.Background()))
+	now = now.Add(time.Second)
+	setStaticMetrics(t, c, exposition("DCGM_FI_PROF_PCIE_RX_BYTES_TOTAL", "counter", 200, ""))
+	require.NotEmpty(t, c.Collect(context.Background()))
+	ch := chartByContext(c, "dcgm.gpu.interconnect.pcie.throughput")
+	setStaticMetrics(t, c, "")
+	for i := 0; i < maxNotSeenCharts; i++ {
+		now = now.Add(time.Second)
+		assert.Empty(t, c.Collect(context.Background()))
+	}
+	assert.Empty(t, c.counterSamples)
+	assert.True(t, ch.Obsolete)
+	setStaticMetrics(t, c, exposition("DCGM_FI_PROF_PCIE_RX_BYTES_TOTAL", "counter", 500, ""))
+	now = now.Add(time.Second)
+	assert.Empty(t, c.Collect(context.Background()), "a successful absent scrape breaks the rate baseline")
+}
+
+func TestCollector_CanonicalAliasesShareDimensions(t *testing.T) {
+	for _, tc := range []struct {
+		canonical, legacy, ctx, dim string
+		value, want                 float64
+	}{
+		{"FB_USED_RATIO", "FB_USED_PERCENT", "memory.utilization", "used_percent", 0.5, 50},
+		{"BOARD_POWER_LIMIT_ENFORCED_WATTS", "ENFORCED_POWER_LIMIT", "power.usage", "enforced_limit", 450, 450},
+		{"GPU_VIRTUAL_MODE", "VIRTUAL_MODE", "state.virtualization", "virtualization_vgpu", 2, 1},
+		{"BANK_REMAP_AVAIL_HIGH", "BANKS_REMAP_ROWS_AVAIL_HIGH", "reliability.remap_banks", "high", 3, 3},
+	} {
+		t.Run(tc.canonical, func(t *testing.T) {
+			c := collectorWithMetrics(t, exposition("DCGM_FI_DEV_"+tc.canonical, "gauge", tc.value, "")+exposition("DCGM_FI_DEV_"+tc.legacy, "gauge", tc.value, ""))
+			mx := c.Collect(context.Background())
+			require.Len(t, *c.Charts(), 1, "canonical and legacy samples represent one measurement")
+			value, ok := displayedDimension(c, mx, "dcgm.gpu."+tc.ctx, tc.dim)
+			require.True(t, ok)
+			assert.Equal(t, tc.want, value)
+		})
+	}
+}

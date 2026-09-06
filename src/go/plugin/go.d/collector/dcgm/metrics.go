@@ -97,6 +97,7 @@ func buildFieldCatalog() map[string]fieldDefinition {
 		}
 		for i := 0; i < count; i++ {
 			prof(fmt.Sprintf("%s%d_ACTIVE", engine, i), "compute.media.activity", fmt.Sprintf("%s%d", strings.ToLower(engine), i), 100)
+			alias(fmt.Sprintf("DCGM_FI_PROF_%s_UTIL_%d_RATIO", engine, i), fmt.Sprintf("DCGM_FI_PROF_%s%d_ACTIVE", engine, i))
 		}
 	}
 	for _, domain := range []string{"SM", "MEM", "VIDEO"} {
@@ -299,12 +300,15 @@ func buildFieldCatalog() map[string]fieldDefinition {
 		dim := strings.ToLower(strings.TrimSuffix(name, "_COUNT"))
 		dev(name+"_TOTAL", "interconnect.nvlink.error_rate", dim, sampleCounter, 1)
 		if name == "NVLINK_ECC_DATA_ERROR_COUNT" {
+			alias("DCGM_FI_DEV_NVLINK_ECC_ERROR_TOTAL", "DCGM_FI_DEV_"+name+"_TOTAL")
 			continue
 		}
+		alias("DCGM_FI_DEV_"+strings.TrimSuffix(name, "_COUNT")+"_TOTAL", "DCGM_FI_DEV_"+name+"_TOTAL")
 		for i := 0; i < 18; i++ {
 			field := fmt.Sprintf("DCGM_FI_DEV_%s_L%d", name, i)
 			add(field, "interconnect.nvlink.error_rate", dim, sampleCounter, 1)
 			update(field, func(d *fieldDefinition) { d.Link = fmt.Sprint(i) })
+			alias(fmt.Sprintf("DCGM_FI_DEV_%s_L%d_TOTAL", strings.TrimSuffix(name, "_COUNT"), i), field)
 		}
 	}
 	for _, name := range []string{"NVLINK_ERROR_DL_CRC", "NVLINK_ERROR_DL_REPLAY", "NVLINK_ERROR_DL_RECOVERY"} {
@@ -355,9 +359,11 @@ func buildFieldCatalog() map[string]fieldDefinition {
 	}
 	for _, kind := range []string{"REPLAY", "RECOVERY", "CRC", "ECC"} {
 		dev("NVSWITCH_LINK_"+kind+"_ERRORS", "interconnect.nvswitch.errors", strings.ToLower(kind), sampleCounter, 1)
+		alias("DCGM_FI_DEV_NVSWITCH_LINK_"+kind+"_ERROR_TOTAL", "DCGM_FI_DEV_NVSWITCH_LINK_"+kind+"_ERRORS")
 	}
 	for i := 0; i < 8; i++ {
 		dev(fmt.Sprintf("NVSWITCH_LINK_ECC_ERRORS_LANE%d", i), "interconnect.nvswitch.ecc_lanes", fmt.Sprintf("lane%d", i), sampleCounter, 1)
+		alias(fmt.Sprintf("DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERROR_L%d_TOTAL", i), fmt.Sprintf("DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE%d", i))
 	}
 	dev("NVSWITCH_TEMPERATURE_CURRENT", "interconnect.nvswitch.temperature", "current", sampleGauge, 1)
 
@@ -397,6 +403,18 @@ func buildFieldCatalog() map[string]fieldDefinition {
 			}
 			d.Window = strings.HasSuffix(name, "_COUNT")
 		})
+	}
+	// Exact aliases in the v4.6.1 field header share the same sample semantics.
+	for name, original := range map[string]string{
+		"BANK_REMAP_AVAIL_HIGH": "BANKS_REMAP_ROWS_AVAIL_HIGH", "BANK_REMAP_AVAIL_LOW": "BANKS_REMAP_ROWS_AVAIL_LOW",
+		"BANK_REMAP_AVAIL_MAX": "BANKS_REMAP_ROWS_AVAIL_MAX", "BANK_REMAP_AVAIL_NONE": "BANKS_REMAP_ROWS_AVAIL_NONE", "BANK_REMAP_AVAIL_PARTIAL": "BANKS_REMAP_ROWS_AVAIL_PARTIAL",
+		"BOARD_POWER_LIMIT_DEFAULT_WATTS": "POWER_MGMT_LIMIT_DEF", "BOARD_POWER_LIMIT_ENFORCED_WATTS": "ENFORCED_POWER_LIMIT", "BOARD_POWER_LIMIT_MAX_WATTS": "POWER_MGMT_LIMIT_MAX", "BOARD_POWER_LIMIT_MIN_WATTS": "POWER_MGMT_LIMIT_MIN", "BOARD_POWER_LIMIT_REQUESTED_WATTS": "POWER_MGMT_LIMIT",
+		"C2C_LINK_QUANTITY": "C2C_LINK_COUNT", "CLOCKS_AUTOBOOST_MODE": "AUTOBOOST", "FB_USED_RATIO": "FB_USED_PERCENT", "GPU_RECOVERY_ACTION": "GET_GPU_RECOVERY_ACTION", "GPU_VIRTUAL_MODE": "VIRTUAL_MODE", "MEMORY_UNREPAIRABLE": "MEMORY_UNREPAIRABLE_FLAG",
+		"NVLINK_CRC_ERROR_TOTAL": "NVLINK_ERROR_DL_CRC", "NVLINK_RECOVERY_TOTAL": "NVLINK_ERROR_DL_RECOVERY", "NVLINK_REPLAY_TOTAL": "NVLINK_ERROR_DL_REPLAY",
+		"NVLINK_RX_PACKET_TOTAL": "NVLINK_COUNT_RX_PACKETS", "NVLINK_TX_PACKET_TOTAL": "NVLINK_COUNT_TX_PACKETS",
+		"NVSWITCH_TEMP_CELSIUS": "NVSWITCH_TEMPERATURE_CURRENT", "SXID_FATAL_ERROR": "NVSWITCH_FATAL_ERRORS", "SXID_NON_FATAL_ERROR": "NVSWITCH_NON_FATAL_ERRORS",
+	} {
+		alias("DCGM_FI_DEV_"+name, "DCGM_FI_DEV_"+original)
 	}
 	// Explicit aliases retain the old field's units even when the new name says RATIO.
 	for name, original := range map[string]string{

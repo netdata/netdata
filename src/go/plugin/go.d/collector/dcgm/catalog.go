@@ -246,21 +246,3 @@ func classifyMetric(entity metricEntity, metricName, _ string, typ sampleKind) m
 		fieldDefinition: def,
 	}
 }
-func classifyMetricGroup(entity metricEntity, name string, typ sampleKind) string {
-	spec := classifyMetric(entity, name, "", typ)
-	return strings.TrimPrefix(spec.Context.ID, "dcgm."+string(entity)+".")
-}
-func metricDimensionName(name string) string {
-	for _, prefix := range []string{"DCGM_FI_DEV_", "DCGM_FI_PROF_", "DCGM_FI_", "DCGM_EXP_", "DCGM_"} {
-		name = strings.TrimPrefix(name, prefix)
-	}
-	return strings.ToLower(name)
-}
-func containsAny(s string, values ...string) bool {
-	for _, v := range values {
-		if strings.Contains(s, v) {
-			return true
-		}
-	}
-	return false
-}

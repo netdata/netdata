@@ -143,5 +143,5 @@ A user-owned `health.d/dcgm.conf` shadows the stock file and must be migrated se
 - [DCGM v4.6.1 CPU monitoring](https://github.com/NVIDIA/DCGM/blob/v4.6.1/modules/sysmon/DcgmSystemMonitor.cpp):
   utilization fractions, temperature and power conversion.
 - [DCGM BER decoding](https://github.com/NVIDIA/DCGM/blob/v4.4.1/common/DcgmUtilities.cpp),
-  [NVSwitch field definitions](https://github.com/NVIDIA/DCGM/blob/v4.6.1/modules/nvswitch/DcgmNvSwitchFieldDefinitions.h)
+  [NVSwitch field definitions](https://github.com/NVIDIA/DCGM/blob/v4.6.1/modules/nvswitch/FieldDefinitions.h)
   and [NVSwitch backend implementation](https://github.com/NVIDIA/DCGM/tree/v4.6.1/modules/nvswitch).

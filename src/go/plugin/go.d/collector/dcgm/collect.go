@@ -25,6 +25,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		return nil, err
 	}
 	if mfs.Len() == 0 {
+		c.counterSamples = nil
+		c.cache.reset()
+		c.removeStaleChartsAndDims()
 		return nil, nil
 	}
 	if c.checkMetrics && !hasDCGMMetricFamilies(mfs) {

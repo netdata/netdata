@@ -7,7 +7,7 @@
 # Example:
 #   dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv -c 30000
 #
-# This file documents all known DCGM fields (623 in current source dataset).
+# This profile contains 623 fields from its original DCGM source dataset.
 # Exactly 123 fields are enabled by default below (127 max per field group).
 # To enable a different field, uncomment one line and comment another enabled line.
 #
@@ -19,6 +19,7 @@
 # VGPU_FBC_SESSIONS_INFO, VGPU_FBC_STATS, VGPU_INSTANCE_IDS,
 # VGPU_PER_PROCESS_UTILIZATION, VGPU_UTILIZATIONS, GPU_TOPOLOGY_AFFINITY,
 # GPU_TOPOLOGY_NVLINK, GPU_TOPOLOGY_PCI, SYNC_BOOST
+# Power-profile masks/blobs must also remain disabled.
 #
 # Format:
 # DCGM FIELD, Prometheus metric type, help message
@@ -112,13 +113,13 @@ DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
 DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS, counter, Correctable remapped rows
 # context=dcgm.host.inventory.gpu_count family=host inventory dimension=gpus
 DCGM_FI_DEV_COUNT, gauge, Count
-# numeric=dcgm.cpu.raw.dcgm_fi_dev_cpu_affinity_0 (raw; physical unit not established)
+# numeric=dcgm.gpu.raw.dcgm_fi_dev_cpu_affinity_0 (raw; physical unit not established)
 # DCGM_FI_DEV_CPU_AFFINITY_0, gauge, Cpu affinity 0
-# numeric=dcgm.cpu.raw.dcgm_fi_dev_cpu_affinity_1 (raw; physical unit not established)
+# numeric=dcgm.gpu.raw.dcgm_fi_dev_cpu_affinity_1 (raw; physical unit not established)
 # DCGM_FI_DEV_CPU_AFFINITY_1, gauge, Cpu affinity 1
-# numeric=dcgm.cpu.raw.dcgm_fi_dev_cpu_affinity_2 (raw; physical unit not established)
+# numeric=dcgm.gpu.raw.dcgm_fi_dev_cpu_affinity_2 (raw; physical unit not established)
 # DCGM_FI_DEV_CPU_AFFINITY_2, gauge, Cpu affinity 2
-# numeric=dcgm.cpu.raw.dcgm_fi_dev_cpu_affinity_3 (raw; physical unit not established)
+# numeric=dcgm.gpu.raw.dcgm_fi_dev_cpu_affinity_3 (raw; physical unit not established)
 # DCGM_FI_DEV_CPU_AFFINITY_3, gauge, Cpu affinity 3
 # context=dcgm.cpu.clock.frequency family=cpu clock dimension=current
 # DCGM_FI_DEV_CPU_CLOCK_CURRENT, gauge, Cpu clock current
@@ -748,113 +749,113 @@ DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL, counter, Nvlink replay error count 
 # DCGM_FI_DEV_NVSWITCH_DEVICE_UUID, label, Nvswitch device uuid
 # context=dcgm.nvswitch.interconnect.nvswitch.sxid family=nvswitch interconnect/nvlink dimension=fatal
 DCGM_FI_DEV_NVSWITCH_FATAL_ERRORS, gauge, Nvswitch fatal errors
-# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect/nvlink dimension=crc
+# context=dcgm.nvlink.interconnect.nvswitch.errors family=nvlink interconnect/nvlink dimension=crc
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS, counter, Nvswitch link crc errors
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane0 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane0 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE0, counter, Nvswitch link crc errors lane0
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane1 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane1 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE1, counter, Nvswitch link crc errors lane1
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane2 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane2 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE2, counter, Nvswitch link crc errors lane2
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane3 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane3 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE3, counter, Nvswitch link crc errors lane3
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane4 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane4 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE4, counter, Nvswitch link crc errors lane4
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane5 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane5 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE5, counter, Nvswitch link crc errors lane5
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane6 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane6 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE6, counter, Nvswitch link crc errors lane6
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane7 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_crc_errors_lane7 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE7, counter, Nvswitch link crc errors lane7
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_device_link_id (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_device_link_id (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_DEVICE_LINK_ID, gauge, Nvswitch link device link id
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_device_link_sid (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_device_link_sid (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_DEVICE_LINK_SID, gauge, Nvswitch link device link sid
-# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect/nvlink dimension=ecc
+# context=dcgm.nvlink.interconnect.nvswitch.errors family=nvlink interconnect/nvlink dimension=ecc
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS, counter, Nvswitch link ecc errors
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane0
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane0
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE0, counter, Nvswitch link ecc errors lane0
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane1
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane1
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE1, counter, Nvswitch link ecc errors lane1
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane2
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane2
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE2, counter, Nvswitch link ecc errors lane2
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane3
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane3
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE3, counter, Nvswitch link ecc errors lane3
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane4
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane4
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE4, counter, Nvswitch link ecc errors lane4
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane5
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane5
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE5, counter, Nvswitch link ecc errors lane5
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane6
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane6
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE6, counter, Nvswitch link ecc errors lane6
-# context=dcgm.nvswitch.interconnect.nvswitch.ecc_lanes family=nvswitch interconnect/nvlink dimension=lane7
+# context=dcgm.nvlink.interconnect.nvswitch.ecc_lanes family=nvlink interconnect/nvlink dimension=lane7
 # DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE7, counter, Nvswitch link ecc errors lane7
-# context=dcgm.nvswitch.interconnect.nvswitch.link_sxid family=nvswitch interconnect/nvlink dimension=fatal
+# context=dcgm.nvlink.interconnect.nvswitch.link_sxid family=nvlink interconnect/nvlink dimension=fatal
 DCGM_FI_DEV_NVSWITCH_LINK_FATAL_ERRORS, gauge, Nvswitch link fatal errors
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_flit_errors (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_flit_errors (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_FLIT_ERRORS, counter, Nvswitch link flit errors
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_id (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_id (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_ID, gauge, Nvswitch link id
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc0 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc0 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC0, counter, Nvswitch link latency count vc0
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc1 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc1 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC1, counter, Nvswitch link latency count vc1
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc2 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc2 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC2, counter, Nvswitch link latency count vc2
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc3 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_count_vc3 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC3, counter, Nvswitch link latency count vc3
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc0 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc0 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC0, counter, Nvswitch link latency high vc0
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc1 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc1 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC1, counter, Nvswitch link latency high vc1
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc2 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc2 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC2, counter, Nvswitch link latency high vc2
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc3 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_high_vc3 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC3, counter, Nvswitch link latency high vc3
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc0 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc0 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC0, counter, Nvswitch link latency low vc0
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc1 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc1 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC1, counter, Nvswitch link latency low vc1
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc2 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc2 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC2, counter, Nvswitch link latency low vc2
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc3 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_low_vc3 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC3, counter, Nvswitch link latency low vc3
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc0 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc0 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC0, counter, Nvswitch link latency medium vc0
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc1 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc1 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC1, counter, Nvswitch link latency medium vc1
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc2 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc2 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC2, counter, Nvswitch link latency medium vc2
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc3 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_medium_vc3 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC3, counter, Nvswitch link latency medium vc3
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc0 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc0 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC0, counter, Nvswitch link latency panic vc0
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc1 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc1 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC1, counter, Nvswitch link latency panic vc1
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc2 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc2 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC2, counter, Nvswitch link latency panic vc2
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc3 (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_latency_panic_vc3 (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC3, counter, Nvswitch link latency panic vc3
-# context=dcgm.nvswitch.interconnect.nvswitch.link_sxid family=nvswitch interconnect/nvlink dimension=non_fatal
+# context=dcgm.nvlink.interconnect.nvswitch.link_sxid family=nvlink interconnect/nvlink dimension=non_fatal
 DCGM_FI_DEV_NVSWITCH_LINK_NON_FATAL_ERRORS, gauge, Nvswitch link non fatal errors
-# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect/nvlink dimension=recovery
+# context=dcgm.nvlink.interconnect.nvswitch.errors family=nvlink interconnect/nvlink dimension=recovery
 # DCGM_FI_DEV_NVSWITCH_LINK_RECOVERY_ERRORS, counter, Nvswitch link recovery errors
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_bus (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_bus (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_BUS, gauge, Nvswitch link remote pcie bus
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_device (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_device (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_DEVICE, gauge, Nvswitch link remote pcie device
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_domain (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_domain (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_DOMAIN, gauge, Nvswitch link remote pcie domain
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_function (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_remote_pcie_function (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_FUNCTION, gauge, Nvswitch link remote pcie function
-# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect/nvlink dimension=replay
+# context=dcgm.nvlink.interconnect.nvswitch.errors family=nvlink interconnect/nvlink dimension=replay
 DCGM_FI_DEV_NVSWITCH_LINK_REPLAY_ERRORS, counter, Nvswitch link replay errors
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_status (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_status (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_STATUS, gauge, Nvswitch link status
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_throughput_rx (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_throughput_rx (raw; physical unit not established)
 DCGM_FI_DEV_NVSWITCH_LINK_THROUGHPUT_RX, counter, Nvswitch link throughput rx
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_throughput_tx (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_throughput_tx (raw; physical unit not established)
 DCGM_FI_DEV_NVSWITCH_LINK_THROUGHPUT_TX, counter, Nvswitch link throughput tx
-# numeric=dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_link_type (raw; physical unit not established)
+# numeric=dcgm.nvlink.raw.dcgm_fi_dev_nvswitch_link_type (raw; physical unit not established)
 # DCGM_FI_DEV_NVSWITCH_LINK_TYPE, gauge, Nvswitch link type
 # context=dcgm.nvswitch.interconnect.nvswitch.sxid family=nvswitch interconnect/nvlink dimension=non_fatal
 DCGM_FI_DEV_NVSWITCH_NON_FATAL_ERRORS, gauge, Nvswitch non fatal errors

@@ -71,11 +71,11 @@ func TestCatalogMetadata(t *testing.T) {
 		switch {
 		case def.Host:
 			entity = entityHost
-		case def.Link != "":
+		case def.Link != "" || strings.HasPrefix(name, "DCGM_FI_DEV_NVSWITCH_LINK_"):
 			entity = entityNVLink
 		case strings.HasPrefix(name, "DCGM_FI_DEV_CPU_"):
 			entity = entityCPU
-		case strings.HasPrefix(name, "DCGM_FI_DEV_NVSWITCH_"):
+		case strings.HasPrefix(def.Group, "interconnect.nvswitch."):
 			entity = entityNVSwitch
 		}
 		spec := classifyMetric(entity, name, "", def.SourceKind)
@@ -178,4 +178,18 @@ func TestStockAlertContracts(t *testing.T) {
 			assert.Equal(t, "max", lookup[0], name)
 		}
 	}
+}
+
+func TestNVSwitchLinkMetadata(t *testing.T) {
+	body := "# TYPE DCGM_FI_DEV_NVSWITCH_LINK_FATAL_ERRORS gauge\nDCGM_FI_DEV_NVSWITCH_LINK_FATAL_ERRORS{nvlink=\"0\",nvswitch=\"switch0\"} 42\n"
+	c := collectorWithMetrics(t, body)
+	mx := c.Collect(nil)
+	ch := chartByContext(c, "dcgm.nvlink.interconnect.nvswitch.link_sxid")
+	require.NotNil(t, ch)
+	require.NotEmpty(t, mx)
+	rows, _ := readMetadata(t)
+	row, ok := rows[ch.Ctx]
+	require.True(t, ok, "real switch-link context must be documented")
+	assert.Equal(t, ch.Title, row.Description)
+	assert.Equal(t, ch.Units, row.Unit)
 }

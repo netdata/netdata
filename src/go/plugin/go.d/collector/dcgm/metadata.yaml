@@ -55,7 +55,7 @@ modules:
               [`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
               (raw download: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
 
-              The Netdata profile enables 123 fields by default and documents all remaining known DCGM fields as commented entries.
+              The Netdata profile enables 123 fields by default and lists optional fields from its source dataset as commented entries.
               To customize beyond the baseline, uncomment the field you need and comment one currently enabled field.
 
               Runtime validation artifact:
@@ -1654,6 +1654,35 @@ modules:
                 - name: nvlink_crc_flit_error
                 - name: nvlink_recovery_error
                 - name: nvlink_replay_error
+            - name: dcgm.nvlink.interconnect.nvswitch.link_sxid
+              description: NVLink NVSwitch Link Error Code
+              unit: code
+              chart_type: line
+              dimensions:
+                - name: fatal
+                - name: non_fatal
+            - name: dcgm.nvlink.interconnect.nvswitch.ecc_lanes
+              description: NVLink NVSwitch ECC Error Rate by Lane
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: lane0
+                - name: lane1
+                - name: lane2
+                - name: lane3
+                - name: lane4
+                - name: lane5
+                - name: lane6
+                - name: lane7
+            - name: dcgm.nvlink.interconnect.nvswitch.errors
+              description: NVLink NVSwitch Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: crc
+                - name: ecc
+                - name: recovery
+                - name: replay
         - name: nvswitch
           description: An NVSwitch exposed by a supported fabric monitoring backend.
           labels:
@@ -1667,35 +1696,6 @@ modules:
               dimensions:
                 - name: fatal
                 - name: non_fatal
-            - name: dcgm.nvswitch.interconnect.nvswitch.link_sxid
-              description: NVSwitch Link Error Code
-              unit: code
-              chart_type: line
-              dimensions:
-                - name: fatal
-                - name: non_fatal
-            - name: dcgm.nvswitch.interconnect.nvswitch.ecc_lanes
-              description: NVSwitch ECC Error Rate by Lane
-              unit: errors/s
-              chart_type: line
-              dimensions:
-                - name: lane0
-                - name: lane1
-                - name: lane2
-                - name: lane3
-                - name: lane4
-                - name: lane5
-                - name: lane6
-                - name: lane7
-            - name: dcgm.nvswitch.interconnect.nvswitch.errors
-              description: NVSwitch Error Rate
-              unit: errors/s
-              chart_type: line
-              dimensions:
-                - name: crc
-                - name: ecc
-                - name: recovery
-                - name: replay
             - name: dcgm.nvswitch.interconnect.nvswitch.temperature
               description: NVSwitch Temperature
               unit: Celsius
