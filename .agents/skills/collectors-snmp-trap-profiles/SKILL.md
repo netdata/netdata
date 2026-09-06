@@ -83,9 +83,9 @@ This skill holds only what the documents below lack. Point at them; do not resta
     comment says so); never hand-edit them for site concerns. Operator profiles live in the user config directory
     `go.d/snmp.trap-profiles/` (`catalog_paths.go`) in one of three forms: a complete same-identity replacement of a
     stock file, an independent different-identity addition, or a metric-only profile whose rules reference stock
-    traps. Partial inheritance does not exist; an `extends:` key is rejected as unknown at profile load. Per-OID category,
-    severity, and label overrides belong in the listener job's `overrides:` (`docs/npm/snmp-traps/trap-profiles.md`
-    has the decision table).
+    traps. Partial inheritance does not exist; an `extends:` key is rejected as unknown at profile load. Per-OID
+    category, severity, and label overrides belong in the listener job's `overrides:`
+    (`docs/npm/snmp-traps/trap-profiles.md` has the decision table).
 
 11. **No hand-authored journal fields.** There is no `journal_fields:` key: `TRAP_VAR_*` fields are derived from the
     received non-sensitive, non-redundant varbinds and `TRAP_JSON` keeps the audit copy. `display_hint` is documented
