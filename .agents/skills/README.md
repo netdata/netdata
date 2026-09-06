@@ -22,7 +22,7 @@ published contract and are exempt from the naming rule below.
 ## Owner-Section Citations
 
 - A skill points at facts rather than restating them. When a skill depends on a specific section of the document that
-  owns a fact, it MUST cite the section as `path/to/doc.md#anchor`, where `anchor` is the heading's GitHub slug
+  owns a fact, it MUST cite the section as `<path>/<doc>.md#<anchor>`, where `<anchor>` is the heading's GitHub slug
   (lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else dropped; spaces become hyphens;
   a repeated heading gets `-1`, `-2`). Paths are repo-relative, or relative to the citing file when they start with
   `./` or `../`.
