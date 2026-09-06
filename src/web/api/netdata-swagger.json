@@ -7643,8 +7643,7 @@
         "required": false,
         "schema": {
           "type": "integer",
-          "minimum": 0,
-          "default": 0
+          "minimum": 0
         }
       },
       "weightsCardinalityLimit": {
@@ -7655,8 +7654,7 @@
         "required": false,
         "schema": {
           "type": "integer",
-          "minimum": 0,
-          "default": 0
+          "minimum": 0
         }
       }
     },

@@ -9352,7 +9352,6 @@ components:
       schema:
         type: integer
         minimum: 0
-        default: 0
     weightsCardinalityLimit:
       name: cardinality_limit
       in: query
@@ -9363,7 +9362,6 @@ components:
       schema:
         type: integer
         minimum: 0
-        default: 0
     contextsQueryOptions:
       name: options
       in: query
