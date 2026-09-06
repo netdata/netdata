@@ -1,0 +1,15 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: dcgm
+placements:
+  - id: dcgm
+    section_id: system.hardware.gpus.nvidia
+    title: NVIDIA DCGM
+    icon: compute
+    families: true
+    items:
+      - type: selector
+        id: dcgm-contexts
+        title: DCGM metrics
+        context_prefix:
+          - dcgm.
