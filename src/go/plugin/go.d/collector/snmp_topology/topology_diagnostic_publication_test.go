@@ -41,8 +41,9 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 	id := collectorapi.JobConfigIdentity{1}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	start := func() (*Collector, context.CancelFunc, <-chan error) {
+	start := func(scope string) (*Collector, context.CancelFunc, <-chan error) {
 		c := creator.CreateV2().(*Collector)
+		c.topologyRegistry.producerScopeID = scope
 		c.UpdateEvery = 1
 		c.RefreshEvery = confopt.LongDuration(time.Second)
 		require.NoError(t, c.Init(ctx))
@@ -55,7 +56,7 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 		}, time.Second, time.Millisecond)
 		return c, stop, done
 	}
-	incumbent, stopIncumbent, incumbentDone := start()
+	incumbent, stopIncumbent, incumbentDone := start("incumbent")
 	hook.Reconcile(collectorapi.JobConfigIdentity{}, hook.Capture(id, topologyLifecycleTestJob{incumbent}), topologyLifecycleTestJob{incumbent})
 	publisherDone := make(chan struct{})
 	go func() { publisher.Run(ctx); close(publisherDone) }()
@@ -73,7 +74,11 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 	}, time.Second, time.Millisecond)
 	before, err := read()
 	require.NoError(t, err)
-	candidate, stopCandidate, candidateDone := start()
+	candidate, stopCandidate, candidateDone := start("candidate")
+	require.NotEqual(t,
+		incumbent.topologyRegistry.producerScope(), candidate.topologyRegistry.producerScope(),
+		"ownership assertions need distinct producer scopes",
+	)
 	hook.Bind(id, topologyLifecycleTestJob{candidate})
 	hook.Capture(id, topologyLifecycleTestJob{candidate})
 	// Wait for another real disk publication to prove that merely running the

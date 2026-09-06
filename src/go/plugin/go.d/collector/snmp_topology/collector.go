@@ -94,7 +94,12 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		store:                        metricStore,
 		metrics:                      newCollectorMetrics(metricStore),
 	}
-	c.diagnosticProvider = &topologyDiagnosticProvider{registry: c.topologyRegistry, aborted: &c.lastAbortedTopologyDiagnostic, source: deviceStore, limits: defaultTopologyDiagnosticGlobalLimits}
+	c.diagnosticProvider = &topologyDiagnosticProvider{
+		registry: c.topologyRegistry,
+		aborted:  &c.lastAbortedTopologyDiagnostic,
+		source:   deviceStore,
+		limits:   c.currentTopologyDiagnosticGlobalLimits(),
+	}
 	return c
 }
 

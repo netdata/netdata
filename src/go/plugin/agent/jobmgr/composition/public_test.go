@@ -371,3 +371,58 @@ func TestProcessServicesJoinOnInputShutdownAndIsolatePanic(t *testing.T) {
 type processServiceFunc func(context.Context)
 
 func (f processServiceFunc) Run(ctx context.Context) { f(ctx) }
+
+func TestProcessServiceShutdownTimeoutIsReportedWithoutBlockingTeardown(t *testing.T) {
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	defer writer.Close()
+	started, canceled, release, exited := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
+	config := testProductionProcessConfig(reader, io.Discard)
+	config.ShutdownTimeout = 50 * time.Millisecond
+	config.Services = []ProcessService{processServiceFunc(func(ctx context.Context) {
+		close(started)
+		<-ctx.Done()
+		close(canceled)
+		<-release
+		close(exited)
+	})}
+	process, err := NewProcess(config)
+	require.NoError(t, err)
+	runDone := make(chan error, 1)
+	go func() { runDone <- process.Run(t.Context()) }()
+	<-started
+	terminated := make(chan error, 1)
+	go func() { terminated <- process.Terminate(t.Context()) }()
+	<-canceled
+	var stopErr error
+	timedOut := false
+	select {
+	case stopErr = <-terminated:
+	case <-time.After(time.Second):
+		timedOut = true
+		t.Error("service join bypassed the shutdown budget")
+	}
+	var runErr error
+	runTimedOut := false
+	select {
+	case runErr = <-runDone:
+	case <-time.After(time.Second):
+		runTimedOut = true
+		t.Error("Process.Run re-entered service wait after termination")
+	}
+	close(release)
+	<-exited
+	if timedOut {
+		stopErr = <-terminated
+	}
+	if runTimedOut {
+		runErr = <-runDone
+	}
+	require.ErrorIs(t, stopErr, context.DeadlineExceeded)
+	require.ErrorIs(t, runErr, context.DeadlineExceeded)
+	select {
+	case <-process.done:
+	default:
+		t.Fatal("process completion was not signaled")
+	}
+}

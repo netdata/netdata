@@ -35,7 +35,12 @@ func InspectDiagnosticDocument(document snmpdiag.Document) (*DiagnosticArchive, 
 	if err != nil {
 		return nil, fmt.Errorf("inspect SNMP diagnostic archive: %w", err)
 	}
-	return &DiagnosticArchive{archive: topologyDiagnosticArchive{producerVersion: document.Producer.AgentVersion, diagnostics: diagnostics}}, nil
+	return &DiagnosticArchive{
+		archive: topologyDiagnosticArchive{
+			producerVersion: document.Producer.AgentVersion,
+			diagnostics:     diagnostics,
+		},
+	}, nil
 }
 
 func (a *DiagnosticArchive) Identity() DiagnosticArchiveIdentity {

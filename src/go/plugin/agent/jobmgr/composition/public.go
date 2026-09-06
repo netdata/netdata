@@ -211,9 +211,17 @@ func (p *Process) Run(ctx context.Context) error {
 		})
 	}
 	stopServices := p.startServices(ctx)
+	stop := func() error {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), p.core.config.ShutdownTimeout)
+		defer cancel()
+		return stopServices(shutdownCtx)
+	}
+	defer stop()
 	p.core.config.StopServices = stopServices
 	result := p.core.run(ctx, p.controls)
-	stopServices()
+	if err := stop(); err != nil && !errors.Is(result, err) {
+		result = errors.Join(result, err)
+	}
 	p.mu.Lock()
 	p.result = result
 	close(p.done)
@@ -293,24 +301,48 @@ func cloneSecretConfigs(configs []secretstore.Config) ([]secretstore.Config, err
 	return cloned, nil
 }
 
-func (p *Process) startServices(ctx context.Context) func() {
+func (p *Process) startServices(ctx context.Context) func(context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	var joined sync.WaitGroup
+	var completions []<-chan struct{}
 	for _, service := range p.services {
 		if service == nil {
 			continue
 		}
-		joined.Add(1)
+		done := make(chan struct{})
+		completions = append(completions, done)
 		go func() {
-			defer joined.Done()
+			defer close(done)
 			defer func() {
 				if recovered := recover(); recovered != nil {
-					jobmgr.ObserveDiagnostic(p.core.diagnostics, jobmgr.DiagnosticEvent{Level: jobmgr.DiagnosticError, Name: "process service panicked", Err: fmt.Errorf("%v", recovered)})
+					jobmgr.ObserveDiagnostic(p.core.diagnostics, jobmgr.DiagnosticEvent{
+						Level: jobmgr.DiagnosticError,
+						Name:  "process service panicked",
+						Err:   fmt.Errorf("%v", recovered),
+					})
 				}
 			}()
 			service.Run(ctx)
 		}()
 	}
 	var once sync.Once
-	return func() { once.Do(func() { cancel(); joined.Wait() }) }
+	var stopErr error
+	return func(shutdownCtx context.Context) error {
+		once.Do(func() {
+			cancel()
+			for _, done := range completions {
+				select {
+				case <-done:
+					continue
+				default:
+				}
+				select {
+				case <-done:
+				case <-shutdownCtx.Done():
+					stopErr = fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err())
+					return
+				}
+			}
+		})
+		return stopErr
+	}
 }
