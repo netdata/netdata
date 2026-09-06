@@ -34,6 +34,14 @@ static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) 
     return true;
 }
 
+// The receiver accumulates input into line_buffer across reads until a newline
+// shows up, so its length is attacker-controlled. A single protocol line can
+// never exceed PLUGINSD_LINE_MAX bytes: beyond that the sender is misbehaving
+// and the connection has to be dropped before memory grows without bound.
+static inline bool stream_receiver_line_buffer_overflow(const BUFFER *line_buffer) {
+    return line_buffer->len > PLUGINSD_LINE_MAX;
+}
+
 struct parser;
 
 struct receiver_state {
