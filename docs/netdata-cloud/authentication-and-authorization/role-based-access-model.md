@@ -159,6 +159,8 @@ The **Groups** tab under **User Management** only appears after [SCIM integratio
 | **Edit own dashboard in Room**   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
 | **Delete any dashboard in Room** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |           |
 | **Delete own dashboard in Room** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
+| **See chart annotations**        | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | [Chart Annotations](/docs/dashboards-and-charts/chart-annotations.md) |
+| **Create, edit, delete chart annotations** | :heavy_check_mark: |         -          |         -          |         -          |      -      |           |
 
 </details>
 
