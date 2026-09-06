@@ -48,6 +48,13 @@ class ProofBundleLauncherTest(unittest.TestCase):
             ],
         )
 
+    def test_does_not_consume_a_following_option_as_a_value(self) -> None:
+        caller = Path.cwd() / "caller"
+        self.assertEqual(
+            launcher.normalize_arguments(["verify", "--testdata-root", "--profile", "ceph"], caller),
+            ["verify", "--repo-root", str(launcher.repo_root(launcher.__file__)), "--testdata-root", "--profile", "ceph"],
+        )
+
     def test_main_runs_proof_tool_from_go_root(self) -> None:
         launcher_path = Path(__file__).with_name("proof-bundle.py").resolve()
         root = launcher.repo_root(str(launcher_path))

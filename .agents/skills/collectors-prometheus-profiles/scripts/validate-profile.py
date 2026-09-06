@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-from _go_tool_launcher import exec_go_tool
+from _go_tool_launcher import exec_go_tool, normalize_path_arguments
 
 _FILE_OPTIONS = frozenset(
     {
@@ -24,33 +24,7 @@ _FILE_OPTIONS = frozenset(
 
 def normalize_file_arguments(arguments: list[str], caller_cwd: Path) -> list[str]:
     """Preserve caller-relative file arguments after the launcher changes directory."""
-    normalized: list[str] = []
-    index = 0
-    while index < len(arguments):
-        argument = arguments[index]
-        option, separator, value = argument.partition("=")
-
-        if separator and option in _FILE_OPTIONS:
-            normalized.append(f"{option}={_absolute_argument(value, caller_cwd)}")
-        elif argument in _FILE_OPTIONS and index + 1 < len(arguments):
-            normalized.extend(
-                [
-                    argument,
-                    _absolute_argument(arguments[index + 1], caller_cwd),
-                ]
-            )
-            index += 1
-        else:
-            normalized.append(argument)
-        index += 1
-    return normalized
-
-
-def _absolute_argument(value: str, caller_cwd: Path) -> str:
-    if not value:
-        return value
-    path = Path(value)
-    return str(path if path.is_absolute() else caller_cwd / path)
+    return normalize_path_arguments(arguments, _FILE_OPTIONS, caller_cwd)
 
 
 def main() -> None:

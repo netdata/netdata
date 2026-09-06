@@ -66,6 +66,14 @@ class NormalizeFileArgumentsTest(unittest.TestCase):
             ["--profile=", "--dump"],
         )
 
+    def test_does_not_consume_a_following_option_as_a_value(self) -> None:
+        caller = Path.cwd() / "caller"
+
+        self.assertEqual(
+            launcher.normalize_file_arguments(["--profile", "--dump", "x.prom", "-job", "-quiet"], caller),
+            ["--profile", "--dump", str(caller / "x.prom"), "-job", "-quiet"],
+        )
+
     def test_main_resolves_go_from_relative_path_before_chdir(self) -> None:
         launcher_path = Path(__file__).with_name("validate-profile.py").resolve()
         go_root = go_tool_launcher.repo_root(str(launcher_path)) / "src" / "go"
