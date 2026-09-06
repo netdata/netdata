@@ -445,11 +445,11 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   lowers emitted chart cardinality; `aggregation` only selects the value for resulting collisions. Every scraped series is
   still processed and retained in the collector's metric store. This chart reduction is separate from Prometheus
   relabeling: it does not remove or rewrite stored series labels.
-- **Only collected series can be charted.** `*_info` families are skipped. Untyped scalar families are collected only
-  when the selected profile or job `fallback_type` maps them to a gauge or counter, or when the name ends in `_total`
-  (the last-resort implicit counter rule). Declared type wins; job policy wins over profile policy; and an explicit
-  gauge match wins over counter classification within the same policy layer. A chart's `algorithm` acts later and
-  cannot make an unclassified sample collectible.
+- **Only collected series can be charted.** Gauge families named `*_info` are skipped. Untyped scalar families are
+  collected only when the selected profile or job `fallback_type` maps them to a gauge or counter, or when the name ends
+  in `_total` (the last-resort implicit counter rule). Declared type wins; job policy wins over profile policy; and an
+  explicit gauge match wins over counter classification within the same policy layer. A chart's `algorithm` acts later
+  and cannot make an unclassified sample collectible.
 - **Every group that contains charts must list the metrics its selectors reference in its `metrics` list** (or inherit
   them from an ancestor group). A selector on a metric outside the group's declared scope fails validation.
 

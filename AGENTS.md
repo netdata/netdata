@@ -606,8 +606,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
     permissions, auto-detection (including service discovery), limits and cost, prerequisites, option rows, examples,
     the known-errors troubleshooting catalog, metrics scopes, alerts, identity and keywords; a page that reads as a
     wall of text or claims something false
-  - `collectors-prometheus-profiles`: creating, reviewing, validating, iterating, or installing Prometheus chart
-    profiles from exposition dumps; selector/relabel/fallback policy, coverage, NIDL, live verification
+  - `collectors-prometheus-profiles`: creating, reviewing, validating, proving, iterating, or installing Prometheus
+    chart profiles; exporter dashboard design, selector/relabel/fallback policy, coverage and cardinality, stock proof
+    artifacts, live verification, the authoring scripts
   - `collectors-snmp-profiles`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
     docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
   - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs and their `metrics:`/`charts:` rules, the trap

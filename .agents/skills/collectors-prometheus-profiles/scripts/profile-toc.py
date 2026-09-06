@@ -73,7 +73,11 @@ def build_tree(profile: dict, app: str = "") -> Node:
             priority = effective_priority if value is None or int(value) == 0 else int(value)
             if priority <= 0:
                 priority = DEFAULT_PRIORITY
-            node.charts.append(Chart(context, priority))
+            # A nonblank chart-level family is one more path segment under the group
+            # (chartengine/compiler.go composeFamily), so the chart lands in that child node.
+            family = normalize(chart.get("family"))
+            target = node.children.setdefault(family, Node(family)) if family else node
+            target.charts.append(Chart(context, priority))
 
     root_priority = group_priority(template, 0)
     add_charts(template, root, root_context, root_priority)

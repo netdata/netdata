@@ -1,90 +1,62 @@
 # Authoring stock Prometheus semantic proofs
 
-Stock proofs make the profile's source and dashboard claims executable. They are not snapshots generated from the profile:
-source facts, operator intent, replay inputs, and production output remain independent authorities that the compiler
-reconciles.
+Stock proofs make a profile's source and dashboard claims executable. They are not snapshots generated from the
+profile: source facts, operator intent, replay inputs, and production output stay independent authorities that the
+compiler reconciles. Never generate expected routes or chart identities from the candidate profile; the point is to
+detect disagreement between independently authored contracts and production behavior.
 
-Read the [canonical framework architecture](../../../src/go/internal/promprofile/README.md) for the cross-repository
-ownership, package boundaries, support compilation, replay, and compatibility model. This reference owns the artifact
-authoring workflow and field navigation.
+Owners this file does not restate:
 
-## Contents
-
-- [Artifact layout](#artifact-layout)
-- [Artifact responsibilities](#artifact-responsibilities)
-- [Authoring sequence](#authoring-sequence)
-- [SOURCE-SEMANTICS.yaml](#source-semanticsyaml)
-- [PROFILE-DESIGN.yaml](#profile-designyaml)
-- [proof.yaml](#proofyaml)
-- [Generated source registries](#generated-source-registries)
-- [Exclusions](#exclusions)
-- [Verification](#verification)
-- [Examples to copy](#examples-to-copy)
-
-## Artifact layout
-
-Netdata keeps compact reviewable intent with the profile:
-
-```text
-src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/
-  OPERATOR-MODEL.md
-  PROFILE-DESIGN.yaml
-  proof.yaml
-```
-
-Bulky source evidence and fixtures live in the latest `netdata/testdata` checkout:
-
-```text
-prometheus/profiles/<profile>/
-  SOURCE-SEMANTICS.yaml
-  fixtures/*.prom
-  SOURCE-REGISTRY.yaml                 # optional; pair is indivisible
-  SOURCE-REGISTRY.generator.yaml       # optional
-  generator/*.py                       # required with the pair
-```
-
-`proof.yaml` paths such as `fixtures/haproxy_all_metrics.prom` are relative to
-`prometheus/profiles/<profile>/` in testdata, not to the local proof directory.
-
-The verifier enforces exact layouts: every local proof directory contains the three local files, every consumed fixture is
-declared, and unreferenced or unexpected external artifacts fail verification.
+- `src/go/internal/promprofile/README.md`: cross-repository ownership, the authority model, package boundaries, the
+  compile and replay flow, support composition, the latest-testdata model and its paired-branch merge order.
+- `src/go/plugin/go.d/collector/prometheus/profile-proofs/README.md`: the artifact layout in both repositories, the
+  evidence boundary and what "sanitized" means, the external testdata contract, the verification workflow.
+- `src/go/tools/prometheus-profile-proof/README.md`: the `evidence-dirs` and `verify` subcommands.
+- The Go strict types are the field authority: `src/go/internal/promprofile/semantics/types_source.go` with
+  `validate_source.go`, `types_design.go` with `validate_design.go`, and
+  `src/go/internal/promprofile/proof/descriptor.go`. Copy a nearby stock contract rather than inventing field shapes.
 
 ## Artifact responsibilities
 
+Local proof directory `src/go/plugin/go.d/collector/prometheus/profile-proofs/<profile>/` holds exactly
+`OPERATOR-MODEL.md`, `PROFILE-DESIGN.yaml`, and `proof.yaml`; the bulky evidence lives in `netdata/testdata` under
+`prometheus/profiles/<profile>/`, and `proof.yaml` fixture paths are relative to that testdata directory, not to the
+local proof directory. The verifier fails on a missing local file, an undeclared consumed fixture, or an unreferenced or
+unexpected external artifact.
+
 | Artifact | Owns | Must not duplicate |
 |---|---|---|
-| `OPERATOR-MODEL.md` | Human rationale, domain hierarchy, operator questions, causal flow, and unresolved limitations | Exact registrations, YAML routes, fixture outcomes |
-| `SOURCE-SEMANTICS.yaml` | Public source-backed registrations, environments, components, labels, lifecycle, units, populations, relationships, and source exclusions | Private observed scrape data or dashboard destinations |
-| `SOURCE-REGISTRY.yaml` | Mechanically extracted registrations and source locations for large/generated surfaces | Operator grouping or view semantics |
-| `PROFILE-DESIGN.yaml` | Composition, entities, identity, label treatment, reducers, normalization, exclusions, limitations, views, units, and presentation intent | Replay inputs/results |
-| `proof.yaml` | Realizable environments, fixture/sequence inputs, expected verdict/findings, future inputs, metadata-example identity, and coverage participation | Support-profile ownership or generated semantic summaries |
-| `fixtures/*.prom` | Sanitized realizable raw inputs with collision-relevant identities and values | Semantic claims not present on the wire |
+| `OPERATOR-MODEL.md` | human rationale, domain hierarchy, operator questions, causal flow, unresolved limitations | exact registrations, YAML routes, fixture outcomes |
+| `SOURCE-SEMANTICS.yaml` (external, `netdata/testdata`) | public source-backed registrations, environments, components, labels, lifecycle, units, populations, relationships, source exclusions | private observed scrape data, dashboard destinations |
+| `SOURCE-REGISTRY.yaml` (external) | mechanically extracted registrations and source locations for large or generated surfaces | operator grouping, view semantics |
+| `PROFILE-DESIGN.yaml` | documentation, composition, entities, identity, label treatment, reducers, normalization, exclusions, limitations, views, presentation intent | replay inputs and results |
+| `proof.yaml` | realizable environments, fixture and sequence inputs, expected verdict and findings, future inputs, metadata-example identity, coverage participation | support-profile ownership, generated semantic summaries |
+| `fixtures/*.prom` (external) | sanitized realizable raw inputs with collision-relevant identities and values | semantic claims not present on the wire |
 
-Support profiles are declared once in `PROFILE-DESIGN.yaml` under `composition.supports`. The proof compiler derives the
-active support closure from that design and each case environment; do not copy a support list into `proof.yaml`.
+Support profiles are declared once, in `PROFILE-DESIGN.yaml` under `composition.supports`. The compiler derives the
+active support closure from that design and each case environment. Do not copy a support list into `proof.yaml`, the
+job configuration, or the source semantics.
 
-All current schema versions are `v1`. The version labels the strict current format; it is not a historical residue and must
-not be removed or advanced casually.
+All current schema versions are `v1`. The version labels the strict current format; do not remove or advance it
+casually.
 
 ## Authoring sequence
 
-1. Write `OPERATOR-MODEL.md` from application/source research before sorting metrics into charts.
+1. Write `OPERATOR-MODEL.md` from application and source research before sorting metrics into charts.
 2. Build `SOURCE-SEMANTICS.yaml` from pinned public upstream revisions and evidence locations.
-3. Add the generated registry descriptor, output, and generator implementation/tests when registrations are too large or
-   mechanically defined for trustworthy manual inventory.
-4. Write `PROFILE-DESIGN.yaml` independently from the source contract: entities and operator questions first, then views,
-   reductions, normalizations, and exclusions.
+3. Add the generated registry descriptor, output, and generator implementation with tests when registrations are too
+   large or too mechanical for a trustworthy manual inventory.
+4. Write `PROFILE-DESIGN.yaml` independently of the source contract: entities and operator questions first, then
+   views, reductions, normalizations, exclusions.
 5. Encode the production profile from the approved design.
-6. Build source-derived sanitized fixtures. Split mutually exclusive modes into separate fixtures/cases.
-7. Write `proof.yaml` with independently expected PASS/FAIL results and explicit environments.
+6. Build source-derived sanitized fixtures (`how-tos/build-synthetic-fixture.md`). Split mutually exclusive modes into
+   separate fixtures and cases.
+7. Write `proof.yaml` with independently expected `PASS` or `FAIL` results and explicit environments.
 8. Verify the targeted profile, then the complete catalog.
 
-Do not generate expected routes or chart identities from the candidate profile. The point is to detect disagreement between
-independently authored contracts and production behavior.
+## `SOURCE-SEMANTICS.yaml`
 
-## SOURCE-SEMANTICS.yaml
-
-The strict top level is:
+The strict top level:
 
 ```yaml
 version: v1
@@ -102,27 +74,24 @@ state_encodings: {}
 source_exclusions: {}
 ```
 
-Key rules:
-
-- Pin every public upstream to a full commit and cite repository-relative paths/lines in evidence.
-- Evidence records have one typed `kind`; consumers may reference only compatible kinds. Common kinds include
-  `registration`, `availability`, `population`, `lifecycle`, `unit`, `label`, `relationship`, `state_encoding`,
-  `normalization`, `identity`, `deprecation`, `collection_hazard`, and `display_convention`.
-- Every inline registration declares an exact or grammar family selector, Prometheus type/shape, optional environment
-  condition, and registration evidence.
-- Every signal declares what one observation describes, its components, label domains/stability/cardinality, functional
-  dependencies, and contributor behavior when reduction depends on membership/reset semantics.
-- Model lifecycle as source behavior (`current`, `cumulative`, or `constant`), not as a guess from the metric name.
-- State encodings own closed state domains. Relationships own facts such as equivalence, partition, subset, overlap, and sum
+- Pin every public upstream to a full commit and cite repository-relative paths and lines in evidence.
+- Every evidence record has exactly one `kind` from the closed set the loader enforces (`validate_source.go`):
+  `availability`, `registration`, `lifecycle`, `unit`, `population`, `label`, `relationship`, `state_encoding`,
+  `normalization`, `identity`, `deprecation`, `collection_hazard`, `display_convention`. Any other value fails the load.
+  Consumers may reference only compatible kinds.
+- Every inline registration declares an exact or grammar family selector, the Prometheus type and shape, an optional
+  environment condition, and registration evidence.
+- Every signal declares what one observation describes, its components, label domains with stability and cardinality,
+  functional dependencies, and contributor behavior where reduction depends on membership or reset semantics.
+- Model lifecycle as source behavior (`current`, `cumulative`, `constant`), never as a guess from the metric name.
+- State encodings own closed state domains. Relationships own equivalence, partition, subset, overlap, and sum
   projection; a view cannot manufacture those facts.
-- Reusable component/label policies are for actual reuse and must have at least two consumers.
+- A reusable component or label policy exists for actual reuse: the compiler rejects one with fewer than two
+  consumers (`semantics/evidence.go`, also for the design's label and reduction policies).
 
-The Go structures in `src/go/internal/promprofile/semantics/types_source.go` and strict validators in
-`validate_source.go` are the executable field authority. Copy a nearby stock contract rather than inventing field shapes.
+## `PROFILE-DESIGN.yaml`
 
-## PROFILE-DESIGN.yaml
-
-The strict top level is:
+The strict top level (`types_design.go`; `documentation.title` and `documentation.summary` are required text):
 
 ```yaml
 version: v1
@@ -130,6 +99,9 @@ profile: exporter
 match: 'exporter_*'
 app: exporter                 # optional; omit when runtime resolution is intended
 namespace: exporter
+documentation:
+  title: Exporter
+  summary: One operator-facing sentence on what the profile charts.
 composition:
   supports: {}
 entities: {}
@@ -141,29 +113,29 @@ limitations: {}
 views: {}
 ```
 
-Key rules:
-
-- An entity records the operator grain plus required, alternative, and optional identity. Identity is the minimum
-  non-aggregated view useful to the operator, not every label emitted by the source.
-- A view records one question, one entity, source signal/components, label roles, optional reduction, and any non-default
-  display/presentation intent.
+- `documentation.title` and `summary` are the public profile copy the integrations projection renders. Every
+  `composition.supports` entry carries an `activation` sentence saying when an operator sees that supporting profile;
+  machine condition IDs are not public explanations.
+- An entity records the operator grain plus required, alternative, and optional identity: the minimum non-aggregated
+  view useful to the operator, not every label the source emits.
+- A view records one `question`, one entity, the source signal and components, label roles, an optional reduction, and
+  any non-default presentation intent. The `question` is internal authoring rationale and is never projected into
+  generated documentation.
 - `labels.dimensions` owns bounded comparison labels; `promote` is an allowlist of useful non-identity metadata; `omit`
-  records each deliberately lost label/comparison.
-- A reduction declares both `reducer` and `lost_comparison`. It must agree with the production chart's `aggregation` and
-  with source contributor semantics.
-- A presentation declaration is required for non-default area/stacked intent. Stacked relationships must be source-proven,
-  not inferred merely because dimensions share units.
-- A normalization owns the semantic transformation that profile relabeling implements. Use category, finite/namespace
-  alias, label rename, embedded identity repair/extract, or generated-component exclusion only when its strict schema and
-  public evidence fit the source behavior.
-- Declare support profiles here. A `when` policy controls environment activation; the compiler verifies that the support
-  environment is owner-qualified and compatible.
+  records each deliberately lost label and comparison.
+- A reduction declares both `reducer` and `lost_comparison` and must agree with the production chart's `aggregation`
+  and with source contributor semantics.
+- A presentation declaration is required for non-default `area` or `stacked` intent; stacked relationships must be
+  source-proven, not inferred from shared units.
+- A normalization owns the semantic transformation that profile relabeling implements (category, finite or namespace
+  alias, label rename, embedded identity repair or extraction, generated-component exclusion) only when its strict
+  schema and public evidence fit the source behavior.
+- Support profiles are declared here with a `when` policy for environment activation; the compiler verifies that the
+  support environment is owner-qualified and compatible.
 
-The Go structures in `types_design.go` and validators in `validate_design.go` are the field authority.
+## `proof.yaml`
 
-## proof.yaml
-
-A single-fixture case looks like:
+A single-fixture case:
 
 ```yaml
 version: v1
@@ -181,84 +153,61 @@ cases:
     expected: {verdict: PASS}
 ```
 
-Key rules:
-
 - Every case supplies an explicit environment for the candidate and every active support profile.
-- A candidate fixture is one endpoint scrape. It must contain the support-profile samples needed for production automatic
-  selection in that environment; declaring a support environment does not inject another metric stream.
-- `coverage: true` lets the case satisfy declaration-bounded source/design coverage. A focused negative or diagnostic case
-  normally uses `coverage: false`.
-- A standalone expected failure uses `expected: {verdict: FAIL, findings: [...]}`. Ordered lifecycle `steps` expect `PASS`;
-  do not use a failed step as a reusable-session state transition.
-- Use `steps` only when disappearance, contributor membership, reset, label replacement, or chart/dimension lifecycle must
-  be proved across successive collection cycles.
-- `future_inputs` add raw families absent from current source evidence to exercise future-relevant match/relabel branches.
-  They do not claim those invented metrics have real future semantics.
-- Keep an untyped scalar genuinely untyped in the fixture and classify it with a narrow profile `fallback_type` backed by
-  lifecycle evidence. Adding a synthetic `# TYPE` line would bypass the behavior the proof is meant to exercise.
-- `job: minimal` uses the validator's minimal job. `job: {metadata_example: ...}` replays the exact integration metadata
-  example. The top-level `metadata_example` identifies the stock example the catalog must reconcile.
-- `observations` assert declared semantic states and membership/aggregate/identity predicates; do not restate generated
-  chart snapshots.
-
-The strict descriptor lives in `src/go/internal/promprofile/proof/descriptor.go`. Use existing descriptors for syntax.
+- A candidate fixture is one endpoint scrape. It must contain the support-profile samples production needs for
+  automatic selection in that environment; declaring a support environment injects no metric stream.
+- `coverage: true` lets the case satisfy declaration-bounded source and design coverage. A `FAIL` case must set
+  `coverage: false` (the descriptor loader rejects otherwise); a diagnostic `PASS` case normally does too.
+- A standalone expected failure is `expected: {verdict: FAIL, findings: [...]}`. Ordered lifecycle `steps` expect
+  `PASS`; a failed step is not a reusable session state.
+- Use `steps` only when disappearance, contributor membership, reset, label replacement, or chart and dimension
+  lifecycle must be proved across successive collection cycles.
+- `future_inputs` add raw families absent from current evidence to exercise future-relevant `match` and relabel
+  branches; they claim no real future semantics.
+- Keep an untyped scalar genuinely untyped in the fixture and classify it with a narrow profile `fallback_type` backed
+  by lifecycle evidence. A synthetic `# TYPE` line bypasses the path the proof exists to exercise.
+- `job: minimal` uses the validator's minimal job; `job: {metadata_example: ...}` replays the exact integration
+  metadata example; the top-level `metadata_example` names the stock example the catalog must reconcile.
+- `observations` (inside a `steps` entry) assert declared semantic states and membership, aggregate, and identity
+  predicates; they never restate generated chart snapshots.
 
 ## Generated source registries
-
-Use a registry when registration coverage is large, generated, or encoded by bounded source grammars. The descriptor,
-generated output, and generator implementation/tests are one mechanical authority:
-
-- `SOURCE-REGISTRY.generator.yaml` pins upstream repository, full commit, source paths, and runner ID.
-- `generator/` contains deterministic extraction logic and tests.
-- `SOURCE-REGISTRY.yaml` is the committed output. Groups are mechanical shorthand only; source signals select exact
-  registrations/families and assign semantic ownership independently.
-
-From the testdata repository root, verify one or all registries:
-
-```bash
-python3 prometheus/tools/source_registry_runner.py ceph
-python3 prometheus/tools/source_registry_runner.py
-```
-
-The runner downloads pinned public sources, executes generator tests and generation in a network/file-write restricted
-sandbox, and compares exact output. Do not hand-edit the generated registry without updating the generator.
+ Use a registry when registration coverage is large, generated, or encoded by bounded source grammars. The descriptor
+`SOURCE-REGISTRY.generator.yaml` (upstream repository, full commit, source paths, runner ID), the `generator/` directory
+(only `*.py` files: `generate.py` plus at least one `test_negative_*.py` fail-closed test, checked by
+`semantics/load.go`), and the `SOURCE-REGISTRY.yaml` output committed to `netdata/testdata` are one mechanical
+authority; groups in the output are shorthand only, and source signals select exact registrations and assign semantic
+ownership independently. Verify from the testdata repository root with `python3
+prometheus/tools/source_registry_runner.py [<profile>]`, which downloads the pinned sources, runs the generator tests
+and generation in a restricted sandbox, and compares exact output. Never hand-edit the generated registry without
+updating the generator.
 
 ## Exclusions
 
-Every writer-capable source signal must render through a view or have one binding design exclusion. Allowed design reasons
-and their additional fields are:
+Every writer-capable source signal renders through a view or has one binding design exclusion. The loader
+(`validate_design.go`) enforces the `reason` set, each reason's required fields, and the two `outcome` literals
+`drop_before_writer` and `retain_writable_unrendered`; only `metadata_only` is bound to one outcome. The compiler
+(`semantics/evidence.go`) enforces which evidence kinds each reason must cite. Every other reason
+takes either outcome, and shipped proofs use both (`haproxy` retains a `not_chartable` timestamp, `process_runtime`
+drops one). Only `retain_writable_unrendered` discharges an `autogen.selector.deny` (`semantics/coverage.go`).
 
-| Reason | Required additional field | Typical outcome |
-|---|---|---|
-| `equivalent_duplicate` | `covering_view` | retain unrendered or source-backed drop |
-| `source_superseded` | `replacement` | source-backed drop/retain |
-| `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | drop before writer |
-| `metadata_only` | none; value must be a constant metadata carrier | `retain_writable_unrendered` |
-| `collection_hazard` | source hazard evidence | drop before writer |
+| `reason` | Required field | Required evidence kinds | Typical `outcome` |
+|---|---|---|---|
+| `equivalent_duplicate` | `covering_view` | `relationship` | `retain_writable_unrendered`, or `drop_before_writer` with a source-backed drop |
+| `source_superseded` | `replacement` | `deprecation` | either, source-backed |
+| `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | `lifecycle` and `unit` | either |
+| `metadata_only` | none; the value must be a constant metadata carrier | `lifecycle`, `unit`, and `label` | `retain_writable_unrendered` (enforced) |
+| `collection_hazard` | none | `collection_hazard` | either |
 
-`not_chartable` is intentionally narrow: the current strict operation is only deriving age from a Unix timestamp. Do not
-use it as a generic “not useful” escape hatch. `metadata_only` applies to a source-proven constant-one carrier with useful
-metadata labels, not to any gauge that happened to equal one in a fixture.
+`not_chartable` is deliberately narrow: the only strict operation is deriving age from a Unix timestamp; it is not a
+generic "not useful" escape. `metadata_only` needs the conditions in `metric-types.md`, "Info families", not a gauge
+that happened to equal one in a fixture. Every production `autogen.selector.deny` family must be discharged by a
+`retain_writable_unrendered` exclusion naming that family; a `drop_before_writer` exclusion does not discharge it
+(`semantics/coverage.go`, `replay_route.go`).
 
 ## Verification
 
-Use latest testdata `master`; the Netdata repository intentionally does not pin its commit. By default it is cloned at the
-ignored `src/go/testdata`; `--testdata-root` can name another checkout.
-
-For a coordinated source/profile change:
-
-1. Use `src/go/testdata` as a checkout of the contributor's `netdata/testdata` fork.
-2. Create one feature branch in testdata and one matching feature branch in Netdata.
-3. Author and validate the source contract and fixtures on the testdata branch while the Netdata proof consumes that local
-   checkout.
-4. Open the paired pull requests and merge testdata first.
-5. Update `src/go/testdata` to the merged testdata `master`, rerun complete Netdata verification, and then merge the Netdata
-   pull request promptly.
-
-The repositories cannot merge atomically under the latest-testdata model. This ordering keeps the unavoidable compatibility
-window short without adding a testdata pin or weakening consumer verification.
-
-From the Netdata repository root:
+From any directory (the launcher resolves the repository root):
 
 ```bash
 .agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py evidence-dirs
@@ -266,18 +215,23 @@ From the Netdata repository root:
 .agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py verify
 ```
 
-The targeted command accelerates iteration. The full command proves catalog layout, support closure, source/design schema,
-metadata examples, normalization, routes, chart plans, observations, public wire identities, and aggregate semantic
-coverage for every stock proof.
+The launcher injects `--repo-root`; `--testdata-root` names a checkout other than the ignored `src/go/testdata`. The
+targeted command accelerates iteration; the full command proves catalog layout, support closure, source and design
+schema, metadata examples, normalization, routes, chart plans, observations, public wire identities, and aggregate
+semantic coverage for every stock proof. CI runs the same verification
+(`.github/workflows/prometheus-profile-tests.yml`). For a change that touches both repositories, follow the
+paired-branch order in `promprofile/README.md`, "Latest-testdata model": merge testdata first, then rerun complete
+verification before merging Netdata.
 
 ## Examples to copy
 
-- `process_runtime`: smallest source/design/case contract and a `not_chartable` timestamp exclusion.
-- `python_gc`: a bounded label used as chart identity and runtime support composition.
-- `litellm`: single/multiprocess environments, future input, reduction and optional identity cases.
-- `vllm`: support-profile composition, namespace aliasing, generated component exclusion, and high-cardinality acceptance.
+- `process_runtime`: smallest source, design, and case contract; a `not_chartable` timestamp exclusion.
+- `python_gc`: a bounded label used as chart identity; runtime support composition.
+- `fastapi`: the smallest chart-heavy HTTP instrumentation contract; declared as a support by `vllm`.
+- `litellm`: single and multiprocess environments, a future input, reduction and optional identity cases.
+- `vllm`: support-profile composition, namespace aliasing, generated component exclusion, high-cardinality acceptance.
 - `haproxy`: `equivalent_duplicate` and `not_chartable` exclusions.
-- `ceph`: generated registries plus bounded metric-name identity extraction/repair.
+- `ceph`: generated registries plus bounded metric-name identity extraction and repair.
 
-Read only the relevant example files. Copying an entire large contract before understanding its source model usually
-creates stale evidence and accidental policy.
+Read only the relevant example files. Copying an entire large contract before understanding its source model creates
+stale evidence and accidental policy.

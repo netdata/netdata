@@ -100,6 +100,54 @@ template:
         self.assertIn("equals the application name", flagged[0])
 
 
+class ProfileTocChartFamilyTest(unittest.TestCase):
+    # chartengine composes the group family path with a nonblank chart-level family
+    # (chartengine/compiler.go composeFamily), so the ToC must place such a chart under
+    # that child node, not under its group.
+    def test_chart_family_becomes_a_child_of_its_group(self) -> None:
+        root = tree_from_yaml(
+            """
+template:
+  context_namespace: exporter
+  charts:
+    - context: availability
+      family: Overview
+      title: A
+  groups:
+    - family: Requests
+      charts:
+        - context: requests.rate
+          title: R
+        - context: requests.errors
+          family: Errors
+          title: E
+"""
+        )
+        self.assertEqual({"Overview", "Requests"}, set(root.children))
+        self.assertEqual([], root.charts)
+        self.assertEqual(["exporter.availability"], [c.context for c in root.children["Overview"].charts])
+        requests = root.children["Requests"]
+        self.assertEqual(["exporter.requests.rate"], [c.context for c in requests.charts])
+        self.assertEqual(["exporter.requests.errors"], [c.context for c in requests.children["Errors"].charts])
+
+    def test_chart_family_inherits_the_group_priority(self) -> None:
+        root = tree_from_yaml(
+            """
+template:
+  family: App
+  groups:
+    - family: Requests
+      chart_defaults:
+        priority: 200
+      charts:
+        - context: requests.errors
+          family: Errors
+          title: E
+"""
+        )
+        self.assertEqual([200], [c.priority for c in root.children["Requests"].children["Errors"].charts])
+
+
 class ProfileTocWarningsTest(unittest.TestCase):
     def test_common_prefix_warning(self) -> None:
         root = tree_from_yaml(

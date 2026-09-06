@@ -6,35 +6,18 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-from _go_tool_launcher import exec_go_tool, repo_root
+from _go_tool_launcher import exec_go_tool, normalize_path_arguments, repo_root
 
-_FILE_OPTIONS = frozenset({"--testdata-root", "-testdata-root"})
+_FILE_OPTIONS = frozenset({"--testdata-root", "-testdata-root", "--repo-root", "-repo-root"})
 
 
 def normalize_arguments(arguments: list[str], caller_cwd: Path) -> list[str]:
+    """Inject the repository root after the subcommand and keep caller-relative paths valid."""
     if not arguments:
         return []
     normalized = [arguments[0], "--repo-root", str(repo_root(__file__))]
-    index = 1
-    while index < len(arguments):
-        argument = arguments[index]
-        option, separator, value = argument.partition("=")
-        if separator and option in _FILE_OPTIONS:
-            normalized.append(f"{option}={_absolute_argument(value, caller_cwd)}")
-        elif argument in _FILE_OPTIONS and index + 1 < len(arguments):
-            normalized.extend([argument, _absolute_argument(arguments[index + 1], caller_cwd)])
-            index += 1
-        else:
-            normalized.append(argument)
-        index += 1
+    normalized.extend(normalize_path_arguments(arguments[1:], _FILE_OPTIONS, caller_cwd))
     return normalized
-
-
-def _absolute_argument(value: str, caller_cwd: Path) -> str:
-    if not value:
-        return value
-    path = Path(value)
-    return str(path if path.is_absolute() else caller_cwd / path)
 
 
 def main() -> None:

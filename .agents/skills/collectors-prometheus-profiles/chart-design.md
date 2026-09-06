@@ -235,12 +235,12 @@ That mismatch can be intentional. Resolve it explicitly:
 - retain the mismatch only when the UI boundary is meant to change entity level,
   and explain it.
 
-The validator fails when a selected writer series lacks a label required by the
-chart's effective instance identity: that chart cannot materialize at the
-declared entity level. It also reports mixed leaf identities, descendant loss of
-an explicitly declared parent identity, and siblings with no common explicit
-identity as review prompts. The tool can prove structural contradictions; it
-cannot decide which valid entity boundary matches the operator's mental model.
+The validator fails a chart whose selected series lack a required identity label
+and reports mixed leaf identities, lost parent identity, and siblings with no
+common identity as review prompts (finding codes in
+`src/go/tools/prometheus-profile-validation/README.md`). It proves structural
+contradictions; it cannot decide which valid entity boundary matches the
+operator's mental model.
 
 ## Assign labels by role
 
@@ -250,6 +250,7 @@ A label can play several roles, but each role has different UX and cardinality:
 |---|---|---|---|
 | Entity identity | `instances.by_labels` | creates separate chart instances and filter identity | server, database, table, device |
 | Ownership path | promoted label and, when needed for uniqueness, `instances.by_labels` | places the entity in its containing hierarchy without changing its leaf type | cluster, database, pool, namespace |
+| Optional identity | `instances.optional_by_labels` | refines the base chart into a per-value chart only when the label is present and nonblank | a stable, bounded axis some deployments omit |
 | Comparable aspect | `name_from_label` or selector-specific static names | creates dimensions within one chart | status class, method, bounded phase |
 | Descriptive detail | `label_promotion` | adds filter/group metadata without splitting identity | serial number, display name, version |
 | Routing constraint | selector label match | includes only the intended series | role, operation, state |
@@ -274,6 +275,11 @@ lattice.
 identity and multiply charts. Use it only when the exporter contract itself says
 all labels are identity. Explicit labels are easier to reason about and keep
 stable.
+
+Every routed series must carry each required identity label; a series without
+one does not route. Add selector guards when the metric can also appear without
+those labels. For optional identity, do not add such guards merely to force the
+detailed view: the base-or-refined behavior is the feature's contract.
 
 ### Dimension labels
 
@@ -345,14 +351,12 @@ The design review must account for every observed label key, including labels
 intentionally aggregated away. Aggregation is a decision because it removes
 the ability to compare that label in the dashboard.
 
-The validator warns when selected series carry a label that the chart does not
-use for identity, dimension naming, promoted metadata, selector routing, or an
-explicit `by_labels` exclusion. One observed value does not make the warning
-irrelevant: a later second value may be a distinct entity that would be merged.
-Resolve the warning by reasoning about the exporter's label contract and
-expected cardinality. Do not mechanically promote every label or add it to
-identity; intentional aggregation is valid when the lost comparison is stated
-and correct for the operator story.
+The validator warns on a selected label the chart neither uses nor explicitly
+excludes. One observed value does not make that warning irrelevant: a later
+second value may be a distinct entity that would be merged. Resolve it by
+reasoning about the exporter's label contract and expected cardinality, not by
+promoting every label or adding it to identity; intentional aggregation is valid
+when the lost comparison is stated and correct for the operator story.
 
 ### Aggregation when labels are omitted
 
@@ -375,6 +379,9 @@ Use that behavior deliberately:
   source-proven 0/1 states. Status categories themselves remain dimensions.
 - **Summary quantiles:** No supported reducer creates a global quantile from
   per-source quantiles. Preserve the source identity.
+- **Non-sum reducers over counters:** `avg` is unweighted, and any non-sum
+  reducer over cumulative counters produces misleading deltas when contributor
+  membership changes.
 - **No collector-side deltas:** A profile or collector MUST NOT precompute
   counter deltas, rates, or reset adjustments to make aggregation appear safe.
   That duplicates and conflicts with the Agent's incremental algorithm.
@@ -405,6 +412,12 @@ representative gauges remain separate when any identity label differs.
 Promotion is metadata, not identity. Use it for stable attributes that help the
 operator filter or explain a chart. It does not make a missing identity label
 available, and it cannot recover labels from writer-skipped `_info` metrics.
+
+Omitting `label_promotion` promotes the non-identity labels whose value is
+identical across every contributing series; one unlabeled contributor empties
+that intersection. When a high-cardinality or irrelevant label must never become
+chart metadata, write `label_promotion: []` or an explicit safe allowlist; do not
+rely on one fixture happening to carry several values.
 
 Ownership and descriptive-detail labels are valid promoted metadata only when
 they are functionally stable for the chosen instance. If one purported serial
@@ -595,9 +608,9 @@ need unrelated scale manipulation, they probably do not belong on one axis.
 
 ## Order the operator journey
 
-Set `chart_defaults.priority` at the nearest group when one family subtree shares an ordering priority. Use chart-local
-`priority` only for a deliberate exception. Omit it for unrelated charts; the runtime default remains `70000`. YAML
-position is still not an ordering contract.
+Priority placement follows the stock rule sheet in `SKILL.md` (nearest group,
+chart-local only for an exception, otherwise omitted). YAML position is not an
+ordering contract.
 
 At the application level, order domain capabilities by the operator's causal
 journey. Within each capability, a useful local order is health/workload →
@@ -619,10 +632,9 @@ Before choosing dynamic identity:
 - validate values that normalize similarly, such as punctuation variants;
 - use lifecycle only with an understood loss/expiry policy.
 
-A schema-valid collision can silently suppress or merge charts. The objective
-validator checks observed cross-template IDs, same-template instance collapse,
-lifecycle dimension loss, and public-wire normalization of chart IDs,
-contexts, and dimensions. Unseen future values remain a review risk.
+A schema-valid collision can silently suppress or merge charts. The validator
+checks the observed identities (its README lists the checks); unseen future
+values remain a review risk.
 
 ## Recognize bad patterns by their effects
 
@@ -672,6 +684,14 @@ After objective validation passes, review the dashboard design:
 - Are dimensions bounded comparable aspects?
 - Do sibling families share the intended parent identity?
 - Does every chart satisfy question, units, algorithm, scale, and cardinality?
+- Does every omitted label have a truthful reduction, or a reason no collision
+  can occur?
+- Can charts sharing a context be aggregated meaningfully in Netdata?
+- Does nesting produce the intended family hierarchy and context path?
+- Are optional modes and missing labels handled without silently losing useful
+  metrics?
+- Are relabeling, fallback classification, and exclusions owned by source
+  semantics rather than by one fixture?
 - Does every shared axis preserve the exact counted/measured noun, rather than
   hiding unlike objects under `events`, `operations`, `items`, or
   `observations`?

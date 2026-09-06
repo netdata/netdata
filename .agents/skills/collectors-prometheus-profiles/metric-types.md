@@ -282,6 +282,7 @@ end in `_info`, for example `runtime_node{node="a"} 1`. Production correctly
 treats that family as a writable scalar gauge. A stock profile MAY leave the
 numeric carrier unrendered only through the binding `metadata_only` case:
 
+- the source registration is a scalar;
 - source semantics prove a `constant` lifecycle, `count`/`one`/`none` unit
   algebra, and at least one metadata label;
 - every replayed carrier value is exactly `1`;
@@ -294,18 +295,15 @@ contain only `1`.
 
 ## Untyped families and fallback
 
-For unknown/untyped families:
-
-- matching `fallback_type.gauge` writes a scalar gauge;
-- matching `fallback_type.counter` writes a scalar counter;
-- an untyped name ending in `_total` is treated as a counter;
-- other untyped families are skipped.
-
-Use fallback only with authoritative semantic evidence. It restores scalar type
-behavior; it does not make an ambiguous suffix-only family a distribution.
-Histogram/summary inference, when possible, happens earlier from structural
-witnesses. A broad fallback pattern can silently convert unrelated families to
-the wrong algorithm, so prefer the narrowest stable family set.
+The precedence chain (declared type, job classification, profile
+`fallback_type`, the implicit `_total` counter, otherwise skipped) is owned by
+`src/go/plugin/go.d/collector/prometheus/profile-format.md` under
+`fallback_type`. Use fallback only with authoritative
+semantic evidence. It restores scalar type behavior; it does not make an
+ambiguous suffix-only family a distribution. Histogram/summary inference, when
+possible, happens earlier from structural witnesses. A broad fallback pattern
+can silently convert unrelated families to the wrong algorithm, so prefer the
+narrowest stable family set.
 
 ## Writer rejection and schema drift
 
@@ -332,16 +330,12 @@ representative.
 
 ## Collection filtering and relabeling
 
-The job selector filters efficiently by metric name/labels. Ordered relabeling
-can keep/drop series, rename metrics, add/remove/normalize labels, and reshape
-identity before family reassembly.
-
-Relabeling is powerful because it changes the data contract:
-
-- renaming only one member of a histogram/summary can split and corrupt it;
-- removing the label that distinguishes distribution instances can merge them;
-- mutating `le` or `quantile` can invalidate distribution structure;
-- changing an instance label changes chart identity and cardinality.
+Relabel actions, the ordered stages, histogram and summary safety, and profile
+precedence are owned by `src/go/plugin/go.d/collector/prometheus/relabel/README.md`;
+read it in full and validate the exact ordered rules with the profile. Relabeling
+changes the data contract: a rename or a label change on one member of a
+distribution, or on an instance label, changes what the writer assembles and what
+chart identity results.
 
 The same whole-family caution applies to job selectors. Filtering a histogram
 or summary `_count`, `_sum`, bucket, or quantile sample before family assembly
@@ -349,9 +343,6 @@ can make the writer reject the entire family; it is not a way to keep only the
 visually convenient member. Curate every required structural role, or exclude
 the whole family only when the exclusion policy permits losing its operator
 question.
-
-Read the relabel README in full and validate the exact ordered rules with the
-profile.
 
 Every exclusion trades away diagnostic capability. The binding exclusion cases
 are defined in `proof-authoring.md`; a writer rejection is a pipeline limitation rather

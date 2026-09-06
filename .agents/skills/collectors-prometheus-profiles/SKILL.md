@@ -1,275 +1,206 @@
 ---
 name: collectors-prometheus-profiles
-description: Create, review, validate, prove, iterate, or install Netdata Prometheus collector chart profiles (`go.d/prometheus.profiles/*.yaml`). Use for exporter dashboard design, profile schema/runtime behavior, selector/relabel/fallback policy, chart coverage and cardinality, stock semantic proof artifacts, or live profile verification.
+description: Create, review, validate, prove, iterate, or install Netdata Prometheus collector chart profiles (`go.d/prometheus.profiles/*.yaml`). Use for exporter dashboard design, profile schema/runtime behavior, selector/relabel/fallback policy, chart coverage and cardinality, stock semantic proof artifacts, live profile verification, or the authoring scripts (`validate-profile.py`, `profile-toc.py`, `proof-bundle.py`).
 ---
 
 # Prometheus profile authoring
 
-A profile is an operator dashboard design backed by source evidence. It is not a mechanical metric-name translation.
-The author decides the useful entity grain, chart comparisons, cardinality boundary, hierarchy, and collection policy;
-the validator proves only contracts that code can establish.
+A profile is an operator dashboard design backed by source evidence, not a mechanical metric-name translation. The
+author decides the entity grain, chart comparisons, cardinality boundary, hierarchy, and collection policy; the
+validator proves only the contracts code can establish.
+
+## Authorities
+
+When this skill and the code disagree, these shipped documents win; the skill states nothing they already state:
+
+- `src/go/plugin/go.d/collector/prometheus/profile-format.md`: the envelope, the runtime processing order, the stock
+  contribution policy for `autogen.selector` and relabeling, chart-template rules, job-side profile selection.
+- `src/go/plugin/framework/charttpl/README.md`: every group and chart field, the validation rules, engine-derived
+  behavior.
+- `src/go/plugin/go.d/collector/prometheus/relabel/README.md`: relabel actions, stage order, histogram and summary
+  safety, profile precedence.
+- `src/go/tools/prometheus-profile-validation/README.md`: the validator CLI, safe job policy, what `PASS` establishes
+  (one finding code per objective check), the warning classes.
+- `src/go/internal/promprofile/README.md`: framework boundary, authority model, compile and replay flow, support
+  composition, the latest-testdata model.
+- `src/go/plugin/go.d/collector/prometheus/profile-proofs/README.md` and
+  `src/go/tools/prometheus-profile-proof/README.md`: proof artifact contract, evidence boundary, external testdata
+  contract, the `evidence-dirs` and `verify` commands.
+- `docs/NIDL-Framework.md`: the NIDL model (families, contexts, instances, dimensions, labels).
+
+`src/go/plugin/go.d/collector/prometheus/README.md` is a symlink to a generated integration page and is not an
+authority.
 
 ## Choose the workflow
 
-Read only the references needed for the request:
+Read the row for the work at hand, not the whole skill.
 
-| Work | Required references |
+| Work | Read |
 |---|---|
-| Create or redesign any profile | `chart-design.md`, `profile-schema.md`, `metric-types.md` |
+| Create or redesign a user profile | `chart-design.md`, `metric-types.md`; `profile-schema.md` for where each field is documented |
+| Create or change a stock profile | the above, then `ownership-proof.md`, `proof-authoring.md`, and the rule sheet below |
+| Build stock fixtures | `how-tos/build-synthetic-fixture.md`, `proof-authoring.md` |
 | Capture private evidence | `how-tos/capture-metrics-dump.md` |
-| Create or change a stock profile | all three design references, then `ownership-proof.md` and `proof-authoring.md` |
-| Build stock fixtures | `how-tos/build-synthetic-fixture.md` and `proof-authoring.md` |
-| Review a schema/runtime question | the relevant reference plus the authoritative repository document named there |
-| Install or live-test a profile | the delivery section below; read `sqlite-metadata-reset.md` only if reset is proposed |
-
-Repository architecture and runtime documents are the final authority when the skill and code disagree:
-
-- `src/go/internal/promprofile/README.md` — framework boundary, authority model, package graph, and replay flow.
-- `src/go/plugin/go.d/collector/prometheus/profile-format.md`
-- `src/go/plugin/go.d/collector/prometheus/README.md`
-- `src/go/plugin/go.d/collector/prometheus/relabel/README.md`
-- `src/go/plugin/framework/charttpl/README.md`
-
-Read `docs/NIDL-Framework.md` when choosing or reviewing a monitored component, instance grain, dimension set, or label
-role. Then use the chart-template reference for the Prometheus-specific identity, label-promotion, aggregation, and
-hierarchy contract that realizes that NIDL model.
+| Answer a schema or runtime question | the owner named in `profile-schema.md`, then the authority itself |
+| Install or live-test a profile | "Delivery and live verification"; `sqlite-metadata-reset.md` only when a reset is proposed |
+| Relate a stock profile to integration metadata | `.agents/skills/integrations-lifecycle/how-tos/prometheus-profile-metadata.md` |
+| Change the scripts | "Scripts" below |
 
 ## Authoring workflow
 
-### 1. Establish the evidence boundary
+1. **Establish the evidence boundary.** Inventory metric families, types, labels, optional modes, and source revisions.
+   Separate exposition facts (names, `HELP`, `TYPE`, labels, observed values), source facts (lifecycle, units, label
+   domains, relationships, optionality), and design judgments (grain, composition, hierarchy, exclusions). A captured
+   endpoint is private input: never commit it unless deliberately sanitized from public source contracts, and never
+   commit credentials, customer identities, private endpoints, or deployment data. Missing source evidence is a real
+   limitation; one observed fixture is not a universal exporter contract.
+2. **Design the operator model before YAML** (`chart-design.md`). Answer, in causal order: is the service available and
+   doing useful work; what load is it serving; is latency, error rate, or saturation worsening; which bounded entity or
+   category explains it; which resource or dependency is responsible. For each view state one operator question, one
+   entity grain, the smallest stable identity, the labels compared as dimensions, the labels kept for filtering, the
+   labels omitted with the reducer that keeps the omission truthful, and the exact source signals with units,
+   lifecycle, and inter-dimension relationship. Do not build an aggregate view Netdata derives by grouping the detailed
+   one; choose the finest operator-useful grain whose cardinality and churn stay acceptable.
+3. **Classify labels and cardinality** (`chart-design.md`, "Assign labels by role"; `docs/NIDL-Framework.md` when
+   choosing a monitored component, instance grain, dimension set, or label role). Give every relevant label a role:
+   required identity, optional identity, dimension, promoted metadata, routing only, or omitted with a stated lost
+   comparison. Estimate cardinality from the exporter contract, not the fixture; raw user IDs, addresses, request IDs,
+   URLs, exception text, and hashes are normally too high-cardinality for identity or dimensions.
+4. **Choose truthful aggregation** (`chart-design.md`, "Aggregation when labels are omitted"). One reducer per chart;
+   never merge gauges and counters into one rendered dimension, although a chart may hold distinct authored dimensions
+   of different kinds when the shared comparison is intentional, each keeping its runtime-derived algorithm; quantiles
+   are not mergeable. In a stock profile write `aggregation` explicitly wherever a deliberate many-to-one projection can
+   occur, including deliberate `sum`, and omit it for collision-free routes.
+5. **Choose collection policy.** `match` detects the exporter and bounds the profile's source namespace; prefer
+   exporter-unique families for detection: generic runtime families (`process_*`, `python_*`, `http_*`) may still be
+   charted, but naming them in `match` makes unrelated endpoints eligible. Profile `relabeling` normalizes or drops
+   exporter-owned families after selection (recover bounded identity encoded in metric names, normalize label values
+   such as status classes, remove an established useless family class such as a source-wide `*_created`, or another
+   source-backed transformation), only with a source-backed contract and a bounded result, never as a substitute for an
+   identity or aggregation decision; the first applicable selected profile owns each original family and every selected
+   template consumes the shared result. Profile `fallback_type` classifies untyped scalars the exporter owns, as
+   narrowly as the evidence allows. `autogen.selector` shapes only the generic fallback charts. Job `selector`, job
+   relabeling, and job `fallback_type` are deployment policy and are never a hidden prerequisite of a stock profile.
+   Unknown future families inside a wildcard namespace stay eligible for generic fallback; a bounded, source-proven
+   alias may route a future input to an authored metric only when an explicit `future_inputs` case proves that branch.
+6. **Encode the profile.** Nested groups express hierarchy: child `context_namespace` segments join with `.`, child
+   `family` segments with `/`. Omit the root `family` when it would only repeat the resolved application; the named
+   child groups then become top-level families, nested groups still need `family`, and a chart directly under a
+   transparent root needs its own `family`. Keep a meaningful root on reusable instrumentation profiles that compose
+   into other applications. Use base units; convert bytes to bits only where the operator convention is bandwidth. Omit
+   `algorithm` (the runtime kind resolves it), `type` for `line` charts and histogram buckets (forced to `heatmap`), and
+   multiplier and divisor defaults; use `area` and `stacked` only for the meanings in `chart-design.md`, "Choose chart
+   types for visual meaning". Status values are dimensions from the source's closed state mapping, not chart instances.
+   Gauge families ending in `_info` are skipped by the writer and never reach metrix (`metric-types.md`, "Info
+   families").
+7. **Run the objective validator and the ToC** ("Scripts" below). `PASS` proves schema and the exercised production
+   collector, planner, and emitter path; it does not prove operator usefulness, source semantics, cardinality outside
+   the evidence, or additivity. Resolve every warning with evidence; never silence one mechanically.
+8. **Review as an operator** (`chart-design.md`, "Semantic review"). For a stock profile continue with
+   `ownership-proof.md` and `proof-authoring.md`; stock work is complete only when the source contract, design,
+   descriptor, fixtures, production profile, and integration metadata reconcile.
 
-- Inventory metric families, types, labels, optional modes, and source revisions.
-- Separate facts:
-  - exposition facts: names, `HELP`, `TYPE`, labels, and observed values;
-  - source facts: lifecycle, units, label domains, relationships, and optionality;
-  - design judgments: entity grain, chart composition, hierarchy, exclusions, and presentation.
-- Treat a captured endpoint as private input. Do not commit it unless it was deliberately sanitized from public source
-  contracts. Never commit credentials, customer identities, private endpoints, or deployment data.
-- Missing source evidence is a real limitation. Do not turn one observed fixture into a universal exporter contract.
+## Stock contribution rule sheet
 
-### 2. Design the operator model before YAML
+Stock profiles live under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/<name>.yaml` with a proof
+directory beside the collector. The "review by hand" table is contribution policy that the runtime format permits in
+user profiles. The validator has no user mode: its contributor-policy checks below apply to every profile it validates.
 
-Start with the questions an operator needs answered, in causal order:
+### The code enforces
 
-1. Is the service available and doing useful work?
-2. What load is it serving?
-3. Is latency, error rate, or saturation worsening?
-4. Which bounded entity or category explains the problem?
-5. Which resource or dependency is responsible?
+- Validator (`tools/prometheus-profile-validation`, finding codes in its README): no `autogen.selector.allow`; every
+  `deny` names one exact family (`open_ended_profile_fallback_deny`), and under CLI validation that family must appear
+  in the fixture (`unproven_profile_fallback_deny`; under proof replay the coverage discharge below covers it); current
+  evidence yields zero generic fallback and zero unmatched series (unmatched series downgrade to the
+  `profile_suppressed_series` warning when a selected profile's `autogen.selector` explains every one); the relabel
+  grammar and name-provenance rules (under proof replay, three specific checks are deferred to warnings, one branch each
+  of `open_ended_relabel_name_rewrite`, `unpreserved_relabel_name_identity`, and `unbounded_relabel_discard`; the other
+  branches emitting the first two codes stay errors); a lifecycle cap that discards observed entities or dimensions; a
+  chart with no visible dimension; bucket charts use `observations/s` and no algorithm other than `incremental`
+  (omitting it is fine); explicit `area` or `stacked` raises a semantic-review warning; a selected series carrying a
+  label the chart neither uses nor excludes raises a warning.
+- Proof loaders and compiler (`internal/promprofile/semantics`): `documentation.title` and `summary` required; the
+  closed evidence `kind` set; the `outcome` literals `drop_before_writer` and `retain_writable_unrendered`, with
+  `metadata_only` bound to the latter; a reusable component, label, or reduction policy in either document needs two
+  consumers (compile stage, `semantics/evidence.go`); every production `autogen.selector.deny` family is discharged by a
+  `retain_writable_unrendered` exclusion naming it (`coverage.go`); `metadata_only` requires the conditions in
+  `metric-types.md`, "Info families"; supports are accepted only in `PROFILE-DESIGN.composition.supports`; no other
+  strict schema has the field.
+- Integrations projection (`integrations/prometheus_profile_docs.py`, run by `gen_integrations.py` and
+  `integrations/tests/test_prometheus_profile_docs.py`): every stock profile, supporting ones included, needs a direct
+  row under some module in the top-level `profile_coverage.modules` of the Prometheus collector `metadata.yaml`
+  (generation raises `Stock Prometheus profiles without an integration mapping` otherwise); the projection resolves the
+  support closure from the design; the key is accepted only on `go.d.plugin/prometheus` modules (a Python check, not
+  the JSON schema); an unknown module id under it is recorded as a warning by `_common.py`, and `gen_integrations.py`
+  ends with `fail_on_warnings()`, so the generation run still fails; a semantic view and its runtime chart
+  must agree on family and chart identity (also enforced by the proof compiler, `semantics/replay_route.go`); the view
+  `question` is never rendered.
 
-For each view, state:
+### Review by hand
 
-- one operator question;
-- one semantic entity grain;
-- the smallest stable identity that creates that view;
-- the labels compared as dimensions;
-- the labels retained only for filtering/grouping;
-- the labels intentionally omitted and the reducer that makes the omission truthful;
-- the exact source signals, units, lifecycle, and relationship between dimensions.
+| Surface | Stock rule |
+|---|---|
+| chart `id` | omit when the context-derived ID is sufficient |
+| `priority` | set `chart_defaults.priority` at the nearest group only where operator navigation needs one order for that subtree; chart-local `priority` only for a deliberate exception; otherwise omit (runtime default `70000`) |
+| `instances.by_labels: ['*']` | avoid; use explicit source-backed identity |
+| `lifecycle` caps | omit; coverage must not depend on silently dropping observed or future entities |
+| `options.float` | omit when the runtime metric is already floating point |
+| `algorithm`, `type`, multiplier, divisor | omit defaults; `algorithm` only for a deliberate source-lifecycle override (`metric-types.md`) |
+| `aggregation` | explicit wherever a many-to-one projection can occur; omitted for collision-free routes |
+| root `family` | omit when it only repeats the application; keep for reusable instrumentation profiles |
+| stock `metadata.yaml` example | must show that auto-selection suffices: no `profiles`, `app`, job `selector`, job relabeling, or job `fallback_type`; such a field in a stock example is evidence that profile ownership is incomplete |
+| profile-required normalization | lives in profile `relabeling`, never duplicated as an optional job recipe |
+| `profile_coverage.modules` row | lists the stock profiles the module owns, never a service's own supports: a repeated support is projected as `primary` with no activation sentence, and nothing rejects it |
+| `PROFILE-DESIGN.yaml` `documentation` | operator-facing `title` and `summary`; every `composition.supports` entry has an `activation` sentence |
+| integration copy | the generated coverage table groups rows by top-level family (metric, family and chart title, dimension, unit, entity scope); `metrics_description` carries a short operator-model brief, not the chart ledger |
 
-For every stock profile, also state the operator-facing profile `title` and
-`summary` in `PROFILE-DESIGN.yaml` `documentation`. Every
-`composition.supports` entry must include an `activation` sentence that explains
-when an operator will see that supporting profile. Machine condition IDs are not
-public explanations.
+## Scripts
 
-The view `question` is internal authoring rationale used to design and review one coherent chart. It MUST NOT be projected
-into generated integration documentation. Public coverage is rendered as ordinary tables grouped by each profile's
-top-level family. Every metric-to-chart row contains the Prometheus metric, full Netdata family and chart title, dimension,
-unit, and entity scope.
+Invoke them from the repository root as written below. The two launchers resolve the repository root themselves and make
+caller-relative file arguments absolute before `go run` from `src/go`, so their file arguments may be given relative to
+wherever you are; `profile-toc.py` is plain Python and takes the profile path as given. CI runs their unit tests
+(`.github/workflows/prometheus-profile-tests.yml`, "Verify authoring launcher"); run them locally with
+`.venv/bin/python3 -m unittest discover -s .agents/skills/collectors-prometheus-profiles/scripts -p 'test_*.py'`.
 
-Do not create duplicate aggregate and detailed views when Netdata can derive the aggregate by grouping the detailed
-charts. Choose the finest operator-useful grain whose cardinality and churn remain acceptable.
-
-### 3. Classify labels and cardinality
-
-Assign every relevant label one or more explicit roles:
-
-- **Required identity:** `instances.by_labels`; missing/blank means the series does not route.
-- **Optional identity:** `instances.optional_by_labels`; present nonblank values refine the chart ID, while absent values
-  use the base chart. Use only for a stable, operator-useful, bounded axis.
-- **Dimension:** `name_from_label` or selector-specific static names; use for bounded comparable aspects such as CPU mode,
-  read/write operation, or a closed state domain.
-- **Promoted metadata:** `label_promotion`; use for stable useful labels that do not define identity.
-- **Routing only:** label matchers select a subset without exposing the label as identity or metadata.
-- **Omitted:** state the lost comparison and select an explicit reducer when several source series can collide.
-
-Omitting `label_promotion` enables automatic intersection. When a high-cardinality or irrelevant label must never become
-chart metadata, use `label_promotion: []` or an explicit safe allowlist; do not rely on one fixture having several values.
-
-Estimate chart and dimension cardinality from the exporter contract, not only the fixture. Raw user IDs, IP addresses,
-request IDs, URLs, arbitrary exception text, hashes, and similar axes are normally too high-cardinality for chart identity
-or dimensions. Preserve useful values as labels only when they remain stable and operationally meaningful.
-
-### 4. Choose truthful aggregation
-
-Aggregation occurs only when multiple routed series render to the same chart ID and dimension. It does not reduce scrape
-or store cardinality.
-
-- Use `sum` for additive counters, histogram components, and gauges whose source meaning is an additive stock.
-- Use `avg` for a typical value of a non-additive gauge only when an unweighted mean is meaningful.
-- Use `min` or `max` for extrema and deliberately reduced 0/1 status populations.
-- Preserve complete identity when no reducer preserves meaning.
-- Never merge gauges and counters into the same rendered dimension. A chart may contain distinct authored dimensions of
-  different kinds when the shared comparison is intentional; with no override, each dimension keeps its runtime-derived
-  algorithm.
-- Summary quantiles are not mergeable. Do not claim a global quantile from per-source quantiles.
-- A chart has one reducer for all dimensions. Split views when dimensions require different reducers.
-
-Omitting `aggregation` means `sum` for runtime compatibility. In stock profiles, write it explicitly whenever a deliberate
-many-to-one projection can occur, including deliberate sum; omit it for collision-free routes.
-
-### 5. Choose collection policy
-
-Keep responsibilities separate:
-
-- `match` selects profiles automatically and defines the profile's source namespace.
-- Profile `relabeling` normalizes or drops exporter-owned families after profile selection. Use it to recover bounded
-  identity encoded in metric names, normalize label values such as status classes, remove established useless families
-  such as a source-wide `*_created` class, or implement another source-backed transformation.
-- Profile `fallback_type` classifies untyped scalar families owned by the exporter.
-- `autogen.selector` controls only generic fallback charts after profile processing. It matches the final family name and
-  labels; it does not discard samples or change authored charts.
-- Job `selector`, job relabeling, and job fallback policy are deployment/user policy. They may be used in user jobs but
-  MUST NOT be hidden prerequisites of a contributed stock profile.
-
-Relabel only when the transformation has a source-backed contract and a bounded result. Do not use relabeling as a
-substitute for a chart-engine identity or aggregation decision. Profile normalizers run once per original source family;
-all selected templates consume the same final stream, so one profile can affect another selected profile.
-
-Unknown future families inside a wildcard profile namespace must remain eligible for generic fallback. A bounded,
-source-proven alias or normalization may intentionally route a future input to an authored metric; prove that branch with
-an explicit future input when the validator cannot derive it.
-
-### 6. Encode the profile
-
-- Use nested groups to express hierarchy. Child `context_namespace` segments join with `.` and child `family` segments
-  join with `/`.
-- Omit the template root `family` when it would only repeat the resolved application; its named child groups then become
-  top-level families. Retain a meaningful root for reusable instrumentation profiles that compose into other
-  applications. Nested groups still require `family`, and a chart directly under a transparent root needs its own
-  chart-level `family`.
-- Use base units. Convert bytes to bits only when the operator convention is bandwidth in bits/s; otherwise multiplier and
-  divisor are usually unnecessary.
-- Omit `algorithm` normally. Runtime counter kind resolves to `incremental`; gauges and other kinds resolve to `absolute`.
-  Override only for a deliberate authored interpretation.
-- Omit `type` for the normal `line` chart and for histogram buckets, whose runtime type is `heatmap`.
-- Use explicit `area` only for deliberate filled-magnitude meaning.
-- Use explicit `stacked` only when dimensions are an exact disjoint, exhaustive, additive partition of one whole.
-- Status values are dimensions. Use the source's closed state mapping; do not turn every state into a chart instance.
-- `_info` families are metadata signals. The writer skips gauge families with that suffix, so their labels cannot be
-  charted or promoted. Reuse metadata only when the exporter also exposes it on a writer-eligible series.
-
-Contributed stock profiles MUST keep authored YAML minimal and predictable:
-
-- set `chart_defaults.priority` at the nearest group when operator navigation requires one order for the family subtree;
-  use chart-local `priority` only for a deliberate exception, and otherwise omit priority so the chart uses the runtime
-  default;
-- omit explicit chart `id` when the context-derived ID is sufficient;
-- avoid `instances.by_labels: ['*']`; use a source-backed explicit identity;
-- omit lifecycle caps; stock coverage must not depend on silently dropping observed or future entities;
-- omit redundant `options.float` when the runtime metric is already floating point;
-- omit redundant `algorithm`, `type`, multiplier, and divisor defaults.
-
-Stock profile work is incomplete until the profile is reachable from a
-Prometheus integration module through the owning metadata document's top-level
-`profile_coverage.modules` mapping. Do not repeat supporting profiles there;
-integration generation resolves the support closure from the design contract
-and fails on missing, duplicate, extra, or family-mismatched chart mappings.
-
-The runtime format permits those fields for user profiles. The restrictions above are stock contribution policy, not
-claims that the parser lacks the feature.
-
-### 7. Run the objective validator
-
-From the repository root:
-
-```bash
-.agents/skills/collectors-prometheus-profiles/scripts/validate-profile.py \
-  --profile /path/to/profile.yaml \
-  --dump /path/to/metrics.prom \
-  --job /path/to/job.yaml \
-  --output text
-```
-
-Use repeatable `--support-profile` arguments when the candidate composes with other profiles. Relative paths are resolved
-from the caller's directory. A user profile may use a minimal or deployment-specific job. Stock validation uses the jobs
-declared by its proof cases.
-
-`PASS` proves schema and the exercised production collector/planner/emitter path. It does not prove operator usefulness,
-source semantics, cardinality outside the evidence, or that a relationship is additive. Resolve warnings with evidence;
-do not mechanically silence them.
-
-Before semantic review, render the actual family table of contents:
-
-```bash
-.agents/skills/collectors-prometheus-profiles/scripts/profile-toc.py \
-  /path/to/profile.yaml \
-  --app application-name
-```
-
-`--app` is the resolved job application (default: the profile's own `app:`). The ToC renders the profile-relative
-context with the collector's rule applied: the template's `context_namespace` is kept unless it equals the app. The
-collector additionally prefixes `prometheus.<app>.`, which the ToC omits.
-
-The helper prints the operator-visible family tree with contexts and effective priorities, then emits advisory UX
-warnings. It is not a gate and does not make design decisions. Investigate each warning and either repair the hierarchy
-or record why the warning is intentional:
-
-- all top-level families sharing a prefix usually repeat the application/root;
-- a leaf with more than 15 contexts usually needs intermediate owner structure;
-- a one-context leaf may be unnecessary structure or a merge candidate;
-- a one-character family segment is often a slash-containing label such as `I/O` split accidentally into `I` and `O`.
-
-Do not remove structure solely to silence the warning when the parent is an operator entity, a module boundary, or a
-release contract; do not add structure solely to divide by metric type.
-
-### 8. Perform semantic review
-
-After objective validation, review the result as an operator:
-
-- Does the overview answer availability, load, errors, latency, and saturation before internals?
-- Does every chart answer one question with honest units and scale?
-- Are identity and dimension domains stable and bounded?
-- Does every omitted label have a truthful reduction or a reason no collision can occur?
-- Can charts with the same context be aggregated meaningfully in Netdata?
-- Does nesting produce the intended family hierarchy and context path?
-- Are optional modes and missing labels handled without silently losing useful metrics?
-- Are relabeling, fallback classification, and exclusions owned by source semantics rather than one fixture?
-
-For a stock profile, continue with `proof-authoring.md`. Stock work is incomplete until the source contract, profile
-design, replay descriptor, fixtures, and production profile reconcile.
-
-## Stock metadata examples
-
-A stock integration example should demonstrate that profile auto-selection is sufficient. Do not add `profiles`, `app`,
-job `selector`, job relabeling, or job `fallback_type` merely to make the stock profile work. Those fields remain valid for
-deployment-specific jobs, but a stock example containing them is evidence that profile ownership is incomplete.
-
-When editing `metadata.yaml`, use the `integrations-lifecycle` skill and regenerate its derived artifacts through the
-repository workflow. Integration files under `integrations/` are generated and should not be hand-edited for this work.
+- `.agents/skills/collectors-prometheus-profiles/scripts/validate-profile.py --profile P --dump D [--job J]
+  [--support-profile S]... [--output text|json]`:
+  launcher for `tools/prometheus-profile-validation`. A user profile may use a minimal or deployment-specific job;
+  stock validation uses the jobs its proof cases declare. A dash-prefixed token is never absolutized as an option's
+  value, so a missing value reaches the tool unchanged and is rejected there instead of becoming a bogus path.
+- `.venv/bin/python3 .agents/skills/collectors-prometheus-profiles/scripts/profile-toc.py PROFILE [--app APP] [--quiet]`
+  (needs PyYAML, which the repository `.venv` provides): renders the operator-visible family tree with contexts and
+  effective priorities, then advisory UX warnings; it is not a gate. `--app` defaults to the profile's `app:`; the root
+  `context_namespace` is dropped when it equals the app, as the collector does, and the `prometheus.<app>.` prefix is
+  omitted. A chart with its own `family` is placed under that child node, as chartengine composes it. Priority `0`
+  inherits, non-positive resolves to `70000`. The six warnings, each to investigate and either repair or record as
+  intentional: a one-character family segment (usually a slash label such as `I/O` split into path segments); all
+  top-level families sharing a prefix, a top-level family equal to the application name, or one starting with it
+  (usually a repeated application or root); a leaf with more than 15 contexts (usually missing intermediate owner
+  structure); a one-context leaf (unnecessary structure or a merge candidate). Do not remove structure only to silence a
+  warning when the parent is an operator entity, module boundary, or release contract; do not add structure only to
+  divide by metric type.
+- `.agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py evidence-dirs | verify [--profile P]
+  [--testdata-root DIR]`: launcher for
+  `tools/prometheus-profile-proof`; injects `--repo-root`.
 
 ## Delivery and live verification
 
-- Put contributed profiles under
-  `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/<name>.yaml`.
-- Keep reusable runtime/instrumentation profiles independent. A service profile may declare them as support profiles in
-  `PROFILE-DESIGN.composition.supports`; do not duplicate their charts.
-- Install a user profile under the configured user profile directory and verify collector profile selection, advancing
-  chart values, chart identity, labels, hierarchy, and cardinality against a live target.
-- Do not reset Netdata's SQLite metadata as routine iteration. Existing identities expire through lifecycle/retention.
-  Read `sqlite-metadata-reset.md` and obtain explicit production approval before destructive reset work.
+- Keep reusable runtime or instrumentation profiles independent; a service profile declares them in
+  `PROFILE-DESIGN.composition.supports` and never duplicates their charts.
+- Install a user profile under the configured user profile directory and verify profile selection, advancing values,
+  chart identity, labels, hierarchy, and cardinality against a live target.
+- Do not reset Netdata's SQLite metadata as routine iteration; identities expire through lifecycle and retention. Read
+  `sqlite-metadata-reset.md` and obtain explicit production approval before any destructive reset.
+- When editing `metadata.yaml`, follow `integrations-lifecycle`: validate with the generators, never hand-edit
+  generated files under `integrations/`, and undo any regenerated tracked pages before committing.
 
 ## References
 
-- `chart-design.md` — operator model, entity grain, labels, reducers, hierarchy, presentation, and cardinality.
-- `profile-schema.md` — profile fields, runtime effects, stock-policy boundary, and relabeling consequences.
-- `metric-types.md` — parser/writer behavior and per-type design choices.
-- `ownership-proof.md` — source ownership inventory and reconciliation method.
-- `proof-authoring.md` — exact stock artifact responsibilities, schemas, examples, and verification.
-- `how-tos/capture-metrics-dump.md` — safe private evidence capture.
-- `how-tos/build-synthetic-fixture.md` — public source-complete fixture construction.
-- `sqlite-metadata-reset.md` — destructive metadata-reset boundary.
-- `scripts/validate-profile.py` — compatibility launcher for the authoritative Go validator.
-- `scripts/profile-toc.py` — render the operator family ToC and report advisory hierarchy UX warnings.
-- `scripts/proof-bundle.py` — stock proof catalog and replay wrapper.
+- `chart-design.md`: operator model, entity grain, label roles, reducers, hierarchy, presentation, cardinality, review.
+- `metric-types.md`: parser and writer behavior per Prometheus type and the design consequences.
+- `profile-schema.md`: which document owns each field group; the notes none of them states.
+- `ownership-proof.md`: source ownership inventory and reconciliation.
+- `proof-authoring.md`: stock artifact responsibilities, skeletons, exclusions, verification.
+- `how-tos/capture-metrics-dump.md`: private evidence capture.
+- `how-tos/build-synthetic-fixture.md`: public source-complete fixture construction.
+- `sqlite-metadata-reset.md`: the destructive metadata-reset boundary.
