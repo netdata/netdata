@@ -34,6 +34,7 @@
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
 #  - ntfy.sh by @Dim-P
+#  - signalgrid.co notifications by @signalgridco
 #shellcheck source=/dev/null disable=SC2086,SC2154
 
 # -----------------------------------------------------------------------------
@@ -266,6 +267,7 @@ prowl
 pushbullet
 pushover
 rocketchat
+signalgrid
 slack
 sms
 syslog
@@ -422,6 +424,9 @@ DISCORD_WEBHOOK_URL=
 
 # pushover configs
 PUSHOVER_APP_TOKEN=
+
+# signalgrid configs
+SIGNALGRID_CLIENT_KEY=
 
 # pushbullet configs
 PUSHBULLET_ACCESS_TOKEN=
@@ -719,6 +724,9 @@ fi
 # check pushover
 [ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
 
+# check signalgrid
+[ -z "${SIGNALGRID_CLIENT_KEY}" ] && SEND_SIGNALGRID="NO"
+
 # check pushbullet
 [ -z "${PUSHBULLET_ACCESS_TOKEN}" ] && SEND_PUSHBULLET="NO"
 
@@ -795,6 +803,7 @@ check_supported_targets() {
   shift
 
   if [ "${SEND_PUSHOVER}" = "YES" ] ||
+    [ "${SEND_SIGNALGRID}" = "YES" ] ||
     [ "${SEND_SLACK}" = "YES" ] ||
     [ "${SEND_ROCKETCHAT}" = "YES" ] ||
     [ "${SEND_ALERTA}" = "YES" ] ||
@@ -827,6 +836,7 @@ check_supported_targets() {
     if [ -z "${curl}" ]; then
       $log "Cannot find curl command in the system path. Disabling all curl based notifications."
       SEND_PUSHOVER="NO"
+      SEND_SIGNALGRID="NO"
       SEND_PUSHBULLET="NO"
       SEND_TELEGRAM="NO"
       SEND_SLACK="NO"
@@ -982,6 +992,7 @@ fi
 proceed=0
 for method in "${SEND_EMAIL}" \
   "${SEND_PUSHOVER}" \
+  "${SEND_SIGNALGRID}" \
   "${SEND_TELEGRAM}" \
   "${SEND_SLACK}" \
   "${SEND_ROCKETCHAT}" \
@@ -1218,6 +1229,44 @@ send_pushover() {
         sent=$((sent + 1))
       else
         error "failed to send pushover notification to '${user}' for ${notification_description}, with HTTP response status code ${httpcode}."
+      fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+  fi
+
+  return 1
+}
+
+# -----------------------------------------------------------------------------
+# signalgrid sender
+
+send_signalgrid() {
+  local client_key="${1}" channels="${2}" status="${3}" title="${4}" message="${5}" httpcode sent=0 channel type
+
+  if [ "${SEND_SIGNALGRID}" = "YES" ] && [ -n "${client_key}" ] && [ -n "${channels}" ] && [ -n "${title}" ] && [ -n "${message}" ]; then
+    case "${status}" in
+    WARNING) type="WARN" ;;
+    CRITICAL) type="CRIT" ;;
+    CLEAR) type="SUCCESS" ;;
+    *) type="INFO" ;;
+    esac
+
+    for channel in ${channels}; do
+      httpcode=$(docurl \
+        --form-string "client_key=${client_key}" \
+        --form-string "channel=${channel}" \
+        --form-string "type=${type}" \
+        --form-string "title=${title}" \
+        --form-string "body=${message}" \
+        --form-string "critical=false" \
+        https://api.signalgrid.co/v1/push)
+
+      if [ "${httpcode}" = "200" ]; then
+        info "sent signalgrid notification to '${channel}' for ${notification_description}"
+        sent=$((sent + 1))
+      else
+        error "failed to send signalgrid notification to '${channel}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -2818,6 +2867,15 @@ send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "
 SENT_PUSHOVER=$?
 
 # -----------------------------------------------------------------------------
+# send the signalgrid notification
+
+send_signalgrid "${SIGNALGRID_CLIENT_KEY}" "${to_signalgrid}" "${status}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
+Severity: ${severity}
+Chart: ${chart}
+${info}"
+SENT_SIGNALGRID=$?
+
+# -----------------------------------------------------------------------------
 # send the pushbullet notification
 
 send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\\n
@@ -3813,6 +3871,7 @@ SENT_SIGNL4=$?
 # let netdata know
 for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
+  "${SENT_SIGNALGRID}" \
   "${SENT_TELEGRAM}" \
   "${SENT_SLACK}" \
   "${SENT_ROCKETCHAT}" \
