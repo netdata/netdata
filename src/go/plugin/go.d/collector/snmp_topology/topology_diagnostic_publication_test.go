@@ -4,10 +4,11 @@ package snmptopology
 
 import (
 	"context"
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -92,12 +93,23 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 		d, err := read()
 		return err == nil && d.Snapshot.ProducerScopeID == candidate.topologyRegistry.producerScope()
 	}, time.Second, time.Millisecond)
-	hook.Remove(id)
-	stopCandidate()
-	require.NoError(t, <-candidateDone)
-	candidate.Cleanup(ctx)
+	// Stop the selected runner without config removal. A fresh publisher run
+	// forces a checkpoint without waiting for the 30-minute fallback interval.
 	cancel()
 	<-publisherDone
+	stopCandidate()
+	require.NoError(t, <-candidateDone)
+	nextCtx, nextCancel := context.WithCancel(t.Context())
+	defer nextCancel()
+	nextDone := make(chan struct{})
+	go func() { publisher.Run(nextCtx); close(nextDone) }()
+	require.Eventually(t, func() bool {
+		d, err := read()
+		return err == nil && d.Snapshot.ProducerScopeID == "" && d.Snapshot.Topology == nil
+	}, time.Second, time.Millisecond)
+	nextCancel()
+	<-nextDone
+	candidate.Cleanup(ctx)
 }
 
 type topologyLifecycleTestJob struct{ c *Collector }

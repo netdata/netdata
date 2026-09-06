@@ -36,6 +36,7 @@ func defaultArchivePath(varLibDir string) string {
 type Source interface {
 	LifecycleSource
 	ConfigurationRevision() uint64
+	WithConfigurationRevision(uint64, func() error) error
 	ConfigurationChanges() <-chan struct{}
 }
 
@@ -53,11 +54,20 @@ type Publisher struct {
 	publishedTopologyRevision uint64
 	interval                  time.Duration
 	changed                   chan struct{}
+	rename                    func(string, string) error
 	writeFile                 func(context.Context, string, Document, func(string, string) error) error
 }
 
 func NewPublisher(source Source, varLibDir string) *Publisher {
-	return &Publisher{Logger: logger.New(), source: source, path: defaultArchivePath(varLibDir), interval: DefaultInterval, changed: make(chan struct{}, 1), writeFile: writeArchiveFile}
+	return &Publisher{
+		Logger:    logger.New(),
+		source:    source,
+		path:      defaultArchivePath(varLibDir),
+		interval:  DefaultInterval,
+		changed:   make(chan struct{}, 1),
+		writeFile: writeArchiveFile,
+		rename:    os.Rename,
+	}
 }
 
 // SetTopology is called only for an accepted configuration. Candidate captures
@@ -96,14 +106,10 @@ func (p *Publisher) ReleaseTopology(source TopologySource) {
 	p.mu.Unlock()
 	p.notify()
 }
-func (p *Publisher) TopologyUpdated(source TopologySource) {
-	p.mu.Lock()
-	current := p.topology == source && p.publishedTopologyRevision != p.revision
-	p.mu.Unlock()
-	if current {
-		p.notify()
-	}
-}
+
+// TopologyUpdated must remain independent of file replacement: collectors call
+// it while committing a generation. The writer filters coalesced notifications.
+func (p *Publisher) TopologyUpdated() { p.notify() }
 func (p *Publisher) needsInitialTopology() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -192,23 +198,32 @@ func (p *Publisher) publish(ctx context.Context, requireMeaningful bool) (meanin
 	if requireMeaningful && !meaningful {
 		return false
 	}
-	document := Document{Format: Format, Version: Version, Producer: Producer{AgentVersion: buildinfo.Version}, Snapshot: snapshot}
+	document := Document{
+		Format:  Format,
+		Version: Version,
+		Producer: Producer{
+			AgentVersion: buildinfo.Version,
+		},
+		Snapshot: snapshot,
+	}
 	err := p.writeFile(ctx, p.path, document, func(from, to string) error {
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if p.revision != revision || p.source.ConfigurationRevision() != configRevision {
+		if p.revision != revision {
 			return errors.New("diagnostic ownership changed during publication")
 		}
-		if err := os.Rename(from, to); err != nil {
-			return err
-		}
-		if snapshot.Topology != nil {
-			p.publishedTopologyRevision = revision
-		}
-		return nil
+		return p.source.WithConfigurationRevision(configRevision, func() error {
+			if err := p.rename(from, to); err != nil {
+				return err
+			}
+			if snapshot.Topology != nil {
+				p.publishedTopologyRevision = revision
+			}
+			return nil
+		})
 	})
 	if err != nil {
 		p.warn(err)
@@ -223,7 +238,14 @@ func (p *Publisher) warn(err error) {
 func writeArchiveFile(ctx context.Context, path string, document Document, replace func(string, string) error) error {
 	return writeArchiveFileWithClose(ctx, path, document, (*os.File).Close, replace)
 }
-func writeArchiveFileWithClose(ctx context.Context, path string, document Document, closeFile func(*os.File) error, replace func(string, string) error) error {
+
+func writeArchiveFileWithClose(
+	ctx context.Context,
+	path string,
+	document Document,
+	closeFile func(*os.File) error,
+	replace func(string, string) error,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

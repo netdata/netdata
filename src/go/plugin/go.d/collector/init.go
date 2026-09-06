@@ -3,6 +3,8 @@
 package collector
 
 import (
+	"maps"
+
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -10,7 +12,6 @@ import (
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
-	"maps"
 
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/activemq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/adaptecraid"
@@ -18,6 +19,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apcupsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor"
+
 	// _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400" // Moved to ibm.d.plugin (requires CGO)
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/beanstalk"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"

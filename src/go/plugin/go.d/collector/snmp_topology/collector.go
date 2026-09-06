@@ -158,6 +158,7 @@ func (c *Collector) Collect(context.Context) error {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) Run(ctx context.Context) error {
+	defer c.releaseDiagnosticProvider()
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
@@ -238,6 +239,7 @@ func (c *Collector) refreshEvery() time.Duration {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	c.releaseDiagnosticProvider()
 	c.unpublishTrapTopologyEnrichment()
 
 	c.refreshMu.Lock()
@@ -431,7 +433,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	})
 	c.topologyRegistry.publishGeneration(generation)
 	if c.diagnosticPublisher != nil {
-		c.diagnosticPublisher.TopologyUpdated(c.diagnosticProvider)
+		c.diagnosticPublisher.TopologyUpdated()
 	}
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()

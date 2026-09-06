@@ -23,17 +23,31 @@ func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
 	registry, publisher := NewRegistry(dir)
 	// Exercise the real normal-SNMP Creator and failed Init commit with the
 	// topology module entirely absent from enabled modules.
-	modules := collectorapi.Registry{"snmp": registry["snmp"]}
+	modules := collectorapi.Registry{
+		"snmp": registry["snmp"],
+	}
 	reader, writer := io.Pipe()
 	defer reader.Close()
 	defer writer.Close()
 	process, err := composition.NewProcess(composition.Config{
-		Input: reader, Output: io.Discard, PluginName: "go.d", Modules: modules,
-		Defaults: confgroup.Registry{"snmp": {}}, AutoEnable: true, ShutdownTimeout: time.Second,
-		Services: []composition.ProcessService{publisher},
-		DiscoveryProviders: []agentdiscovery.ProviderFactory{agentdiscovery.NewProviderFactory("test", func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-			return diagnosticTestDiscovery{}, true, nil
-		})},
+		Input:      reader,
+		Output:     io.Discard,
+		PluginName: "go.d",
+		Modules:    modules,
+		Defaults: confgroup.Registry{
+			"snmp": {},
+		},
+		AutoEnable:      true,
+		ShutdownTimeout: time.Second,
+		Services:        []composition.ProcessService{publisher},
+		DiscoveryProviders: []agentdiscovery.ProviderFactory{
+			agentdiscovery.NewProviderFactory(
+				"test",
+				func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+					return diagnosticTestDiscovery{}, true, nil
+				},
+			),
+		},
 	})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -73,7 +87,12 @@ func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
 type diagnosticTestDiscovery struct{}
 
 func (diagnosticTestDiscovery) Run(ctx context.Context, out chan<- []*confgroup.Group) {
-	config := confgroup.Config{"module": "snmp", "name": "invalid-device", "hostname": "", "update_every": 10}
+	config := confgroup.Config{
+		"module":       "snmp",
+		"name":         "invalid-device",
+		"hostname":     "",
+		"update_every": 10,
+	}
 	config.SetProvider("test")
 	config.SetSourceType(confgroup.TypeUser)
 	config.SetSource("file=test")
@@ -89,6 +108,10 @@ func TestSNMPRegistryInstancesHaveIndependentState(t *testing.T) {
 	first, firstPublisher := NewRegistry(t.TempDir())
 	second, secondPublisher := NewRegistry(t.TempDir())
 	require.NotSame(t, firstPublisher, secondPublisher)
-	require.NotEqual(t, pointerField(t, first["snmp"].Create(), "deviceStore"), pointerField(t, second["snmp"].Create(), "deviceStore"))
+	require.NotEqual(
+		t,
+		pointerField(t, first["snmp"].Create(), "deviceStore"),
+		pointerField(t, second["snmp"].Create(), "deviceStore"),
+	)
 	require.NotContains(t, collectorapi.DefaultRegistry, "snmp")
 }

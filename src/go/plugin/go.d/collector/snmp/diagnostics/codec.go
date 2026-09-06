@@ -34,11 +34,20 @@ func Write(w io.Writer, document Document) error {
 	if w == nil {
 		return errors.New("write SNMP diagnostic archive: nil writer")
 	}
-	encoder, err := zstd.NewWriter(w, zstd.WithEncoderLevel(zstd.SpeedDefault), zstd.WithEncoderConcurrency(1), zstd.WithEncoderCRC(true))
+	encoder, err := zstd.NewWriter(
+		w,
+		zstd.WithEncoderLevel(zstd.SpeedDefault),
+		zstd.WithEncoderConcurrency(1),
+		zstd.WithEncoderCRC(true),
+	)
 	if err != nil {
 		return fmt.Errorf("create diagnostic zstd encoder: %w", err)
 	}
-	encodeErr := jsonv2.MarshalWrite(encoder, document, jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.EscapeForHTML(false)))
+	encodeErr := jsonv2.MarshalWrite(
+		encoder,
+		document,
+		jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.EscapeForHTML(false)),
+	)
 	closeErr := encoder.Close()
 	return errors.Join(encodeErr, closeErr)
 }
@@ -55,7 +64,10 @@ func Read(r io.Reader, limits ReadLimits) (Document, error) {
 	if limits.MaxDecodedBytes <= 0 || limits.MaxDecodedBytes == math.MaxInt64 {
 		return Document{}, errors.New("invalid decoded-byte limit")
 	}
-	compressed := &io.LimitedReader{R: r, N: limits.MaxCompressedBytes + 1}
+	compressed := &io.LimitedReader{
+		R: r,
+		N: limits.MaxCompressedBytes + 1,
+	}
 	decoder, err := zstd.NewReader(compressed, zstd.WithDecoderConcurrency(1))
 	if err != nil {
 		if compressed.N == 0 {
@@ -63,9 +75,16 @@ func Read(r io.Reader, limits ReadLimits) (Document, error) {
 		}
 		return Document{}, fmt.Errorf("create diagnostic zstd decoder: %w", err)
 	}
-	decoded := &io.LimitedReader{R: decoder, N: limits.MaxDecodedBytes + 1}
+	decoded := &io.LimitedReader{
+		R: decoder,
+		N: limits.MaxDecodedBytes + 1,
+	}
 	var document Document
-	err = jsonv2.UnmarshalRead(decoded, &document, jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.AllowInvalidUTF8(false)))
+	err = jsonv2.UnmarshalRead(
+		decoded,
+		&document,
+		jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.AllowInvalidUTF8(false)),
+	)
 	decoder.Close()
 	if compressed.N == 0 {
 		return Document{}, ErrCompressedLimit

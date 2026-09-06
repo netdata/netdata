@@ -39,7 +39,10 @@ func readTopologyDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (top
 	if err != nil {
 		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: %w", err)
 	}
-	return topologyDiagnosticArchive{producerVersion: document.Producer.AgentVersion, diagnostics: diagnostics}, nil
+	return topologyDiagnosticArchive{
+		producerVersion: document.Producer.AgentVersion,
+		diagnostics:     diagnostics,
+	}, nil
 }
 
 func newTopologyDiagnosticArchiveDocumentV1(
@@ -61,15 +64,26 @@ func newTopologyDiagnosticArchiveDocumentV1(
 }
 
 func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
-	diagnostics, limits := captureTopologyCut(c.topologyRegistry, c.lastAbortedTopologyDiagnostic.Load(), c.currentTopologyDiagnosticGlobalLimits())
+	diagnostics, limits := captureTopologyCut(
+		c.topologyRegistry,
+		c.lastAbortedTopologyDiagnostic.Load(),
+		c.currentTopologyDiagnosticGlobalLimits(),
+	)
 	diagnostics.lifecycle = acquireTopologyJobLifecycleCut(c.deviceLifecycleSource, limits)
 	return diagnostics
 }
-func acquireTopologyJobLifecycleCut(source deviceLifecycleSource, limits topologyAcquisitionLimits) topologyJobLifecycleDiagnosticCut {
+
+func acquireTopologyJobLifecycleCut(
+	source deviceLifecycleSource,
+	limits topologyAcquisitionLimits,
+) topologyJobLifecycleDiagnosticCut {
 	projected := snmpdiag.CaptureLifecycle(source, limits.maxRecords, limits.maxLogicalBytes)
 	result, err := restoreArchiveLifecycle(projected)
 	if err != nil {
-		return topologyJobLifecycleDiagnosticCut{state: diagnosticCaptureUnavailable, reason: diagnosticCaptureReasonProjectionError}
+		return topologyJobLifecycleDiagnosticCut{
+			state:  diagnosticCaptureUnavailable,
+			reason: diagnosticCaptureReasonProjectionError,
+		}
 	}
 	return result
 }

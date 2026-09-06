@@ -19,13 +19,39 @@ func TestProcessRetiresCommittedLifecycleOnRestartAndShutdown(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer reader.Close()
 	defer writer.Close()
-	hook := &processLifecycleHook{current: make(map[collectorapi.JobConfigIdentity]bool), changed: make(chan struct{}, 8)}
+	hook := &processLifecycleHook{
+		current: make(map[collectorapi.JobConfigIdentity]bool),
+		changed: make(chan struct{}, 8),
+	}
 	config := testProductionProcessConfig(reader, io.Discard)
 	config.AutoEnable = true
-	config.Modules["test"] = collectorapi.Creator{JobConfigLifecycle: hook, Create: func() collectorapi.CollectorV1 { return &collectorapi.MockCollectorV1{FailOnInit: true} }}
-	config.DiscoveryProviders = []agentdiscovery.ProviderFactory{agentdiscovery.NewProviderFactory("test", func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-		return runTestDiscoverer{configs: []confgroup.Config{{"module": "test", "name": "device", "update_every": 1, "__source__": "test", "__source_type__": "user", "__provider__": "test"}}}, true, nil
-	})}
+	config.Modules["test"] = collectorapi.Creator{
+		JobConfigLifecycle: hook,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				FailOnInit: true,
+			}
+		},
+	}
+	config.DiscoveryProviders = []agentdiscovery.ProviderFactory{
+		agentdiscovery.NewProviderFactory(
+			"test",
+			func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+				return runTestDiscoverer{
+					configs: []confgroup.Config{
+						{
+							"module":          "test",
+							"name":            "device",
+							"update_every":    1,
+							"__source__":      "test",
+							"__source_type__": "user",
+							"__provider__":    "test",
+						},
+					},
+				}, true, nil
+			},
+		),
+	}
 	process, err := NewProcess(config)
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -38,7 +64,12 @@ func TestProcessRetiresCommittedLifecycleOnRestartAndShutdown(t *testing.T) {
 		t.Fatal("no committed lifecycle")
 	}
 	require.NoError(t, process.Restart(ctx))
-	require.Eventually(t, func() bool { hook.mu.Lock(); defer hook.mu.Unlock(); return hook.commits >= 2 }, time.Second, time.Millisecond)
+	require.Eventually(
+		t,
+		func() bool { hook.mu.Lock(); defer hook.mu.Unlock(); return hook.commits >= 2 },
+		time.Second,
+		time.Millisecond,
+	)
 	hook.mu.Lock()
 	removes := hook.removes
 	hook.mu.Unlock()
@@ -63,14 +94,26 @@ type processLifecycleHook struct {
 	changed          chan struct{}
 }
 
-func (*processLifecycleHook) Project(id collectorapi.JobConfigIdentity, _ map[string]any) collectorapi.JobConfigLifecycleSnapshot {
+func (*processLifecycleHook) Project(
+	id collectorapi.JobConfigIdentity,
+	_ map[string]any,
+) collectorapi.JobConfigLifecycleSnapshot {
 	return processLifecycleSnapshot{id}
 }
 func (*processLifecycleHook) Bind(collectorapi.JobConfigIdentity, collectorapi.RuntimeJob) {}
-func (*processLifecycleHook) Capture(id collectorapi.JobConfigIdentity, _ collectorapi.RuntimeJob) collectorapi.JobConfigLifecycleSnapshot {
+
+func (*processLifecycleHook) Capture(
+	id collectorapi.JobConfigIdentity,
+	_ collectorapi.RuntimeJob,
+) collectorapi.JobConfigLifecycleSnapshot {
 	return processLifecycleSnapshot{id}
 }
-func (h *processLifecycleHook) Reconcile(_ collectorapi.JobConfigIdentity, s collectorapi.JobConfigLifecycleSnapshot, _ collectorapi.RuntimeJob) {
+
+func (h *processLifecycleHook) Reconcile(
+	_ collectorapi.JobConfigIdentity,
+	s collectorapi.JobConfigLifecycleSnapshot,
+	_ collectorapi.RuntimeJob,
+) {
 	h.mu.Lock()
 	h.current[s.Identity()] = true
 	h.commits++

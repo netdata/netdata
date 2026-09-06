@@ -57,3 +57,9 @@ func (h *topologyJobConfigLifecycle) Remove(id collectorapi.JobConfigIdentity) {
 		h.publisher.RemoveTopology(id.String())
 	}
 }
+
+func (c *Collector) releaseDiagnosticProvider() {
+	if c.diagnosticPublisher != nil {
+		c.diagnosticPublisher.ReleaseTopology(c.diagnosticProvider)
+	}
+}

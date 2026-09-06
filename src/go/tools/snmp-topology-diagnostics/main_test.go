@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
