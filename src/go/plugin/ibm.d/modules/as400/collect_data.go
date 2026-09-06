@@ -211,6 +211,13 @@ func parseInt64OrZero(value string) int64 {
 	return 0
 }
 
+// int64ToCount narrows a row count to int, saturating instead of wrapping.
+// The values come from SQL COUNT(*) results parsed as int64, so a bogus or
+// hostile value must not become a negative or tiny int.
+func int64ToCount(v int64) int {
+	return int(min(max(v, 0), math.MaxInt))
+}
+
 func boolToInt(cond bool) int64 {
 	if cond {
 		return 1
@@ -911,7 +918,7 @@ func (a *Collector) countDisks(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQuery(ctx, "count_disks", queryCountDisks, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
-			count = int(parseInt64OrZero(value))
+			count = int64ToCount(parseInt64OrZero(value))
 		}
 	})
 	return count, err
@@ -946,7 +953,7 @@ func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	err := a.doQueryRow(ctx, "count_network_interfaces", queryCountNetworkInterfaces, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = int(v)
+				count = int64ToCount(v)
 			}
 		}
 	})
@@ -962,7 +969,7 @@ func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	return int(count), err
+	return int64ToCount(count), err
 }
 
 func withFetchLimit(query string, limit int) string {
@@ -986,7 +993,7 @@ func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	return int(count), err
+	return int64ToCount(count), err
 }
 
 // Temporary storage collection
