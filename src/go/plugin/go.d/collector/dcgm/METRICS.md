@@ -104,9 +104,9 @@ case preserved to prevent collisions. Unsupported sentinels, non-finite values a
 
 ## Chart migration
 
-Chart and dimension IDs now include a hash of the length-framed original identity components. Entity label values are
+Chart IDs and internal metric keys now include a hash of the length-framed original identity components. Entity label values are
 escaped before key construction, so punctuation and delimiter characters cannot merge distinct devices or workloads.
-This changes all DCGM instance IDs, including contexts whose names stay the same. New instances start new history;
+This changes all DCGM chart instance IDs, including contexts whose names stay the same. New instances start new history;
 old history is retained under its previous IDs. Label-qualified dimension names use `key=value` tokens, for example
 `value_health_watch=MEM`, to preserve the boundary between label names and values. Prefer context-and-label queries,
 and update any saved chart-ID references.
