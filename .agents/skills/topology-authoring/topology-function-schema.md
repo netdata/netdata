@@ -110,6 +110,10 @@ Actor types declare:
 - optional `presentation` with UI-owned tokens, safe label policy, size policy,
   actor repulsion policy, and graph port-bullet policy.
 
+Every actor-type `aggregation_scopes[]` entry must reference a declared
+`types.aggregation_scopes` key. A missing or empty membership list is valid and
+does not remove the actor from the graph.
+
 Link types declare:
 
 - `orientation`: `directed`, `undirected`, `hierarchical`, or
@@ -266,7 +270,9 @@ from `label_policy.columns`.
 
 Actor `search` is the only approved way to choose graph search content for v1.
 `search.columns[]` references scalar actor-table columns. `search.label_keys[]`
-references values in the actor label table, normally `actor_labels.key`. Set
+references values in the actor label table, normally `actor_labels.key`. Label
+keys are unique non-empty strings, not registry IDs; `_hostname` and `_os` are
+valid. Validate search settings even when actor presentation is omitted. Set
 `search.enabled: false` for helper actors that should not be searchable. The UI
 must not traverse producer-specific `details`, `match`, `attributes`, or label
 paths when rendering v1.

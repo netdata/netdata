@@ -198,9 +198,14 @@ developer-facing and must stay in this project skill, not under
    - Define `label_policy.columns` with safe scalar display columns; never let
      canonical identity arrays become actor names.
    - Define `search.columns[]` and/or `search.label_keys[]` for searchable
-     actors. Set `search.enabled: false` for helper actors that should not
+     actors. Label keys are unique non-empty strings, not registry IDs; keys
+     such as `_hostname` are valid. Validate search independently of optional
+     actor presentation. Set `search.enabled: false` for helper actors that should not
      appear in graph search. Do not rely on UI hardcoded `details`, `match`, or
      `attributes` paths.
+   - Reference only declared `types.aggregation_scopes` keys from actor-type
+     scope memberships. Use no memberships for actors that do not participate
+     in grouping; never invent a scope merely to include an actor in the graph.
    - Define `presentation.size.scale` when an actor type needs fixed visual
      emphasis, and `presentation.layout.repulsion` when an actor type needs
      relative force-graph separation. Do not emit raw force numbers.

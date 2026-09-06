@@ -1057,9 +1057,10 @@
         },
         "label_keys": {
           "type": "array",
-          "description": "actor_labels.key values whose label values should be indexed for graph search.",
+          "description": "Non-empty actor_labels.key values whose label values should be indexed for graph search. Label keys are not registry ids; built-in keys such as _hostname are valid.",
           "items": {
-            "$ref": "#/$defs/id"
+            "type": "string",
+            "minLength": 1
           },
           "uniqueItems": true,
           "default": []
