@@ -18,6 +18,25 @@ The production schema is defined by:
 The schema is generic across topology domains. It applies to network
 connections, streaming, SNMP, vSphere, and future topology producers.
 
+## Notifications
+
+Status: implemented in the canonical Agent schema, Go model, and validator.
+CTS and frontend consumer support must be qualified separately.
+
+- `data.notifications` MAY carry information or issues about the returned graph.
+- Entries MUST have `severity` (`info`, `warning`, or `error`), an identifier `code`, and a non-empty plain-text
+  `message`. Notifications do not change the response status or substitute for fatal Function errors.
+- `origin` MAY supply the existing full Producer object. When omitted, it means `data.producer`; aggregators MUST
+  make that origin explicit before replacing the payload producer and MUST preserve explicit origins.
+- `affected_node_id` MAY name the affected Agent, using the existing producer node-id string representation.
+  The affected source is distinct from the notification emitter.
+- Omission and `[]` report no notifications; `null` is invalid. Consumers MUST clear previously displayed
+  notifications when the displayed response omits them.
+- CTS MUST preserve source notifications and add its own through this contract. Message text MUST NOT be a merge
+  identity. No occurrence-count or automatic coalescing policy is defined.
+- Consumers MUST render messages as untrusted plain text, not HTML or Markdown. Producers MUST NOT emit secrets.
+- Full contract: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, Notifications.
+
 ## Planes
 
 Topology payloads separate these planes:

@@ -98,6 +98,20 @@ absorbed, candidate, rewrite plan, partial class, or equivalence set may exist
 inside the service, but final topology output contains only normal actors,
 links, tables, labels, presentation, and diagnostics.
 
+### Notifications
+
+- Aggregation MUST preserve the optional `data.notifications` contract across topology kinds and modes.
+- A notification with no explicit `origin` belongs to the input `data.producer`. The aggregator MUST materialize
+  that origin before assigning its output producer, and MUST retain already explicit origins.
+- Aggregator notifications use its own origin; `affected_node_id` identifies an affected Agent when applicable.
+  Emitter identity and affected source MUST NOT be conflated.
+- `info`, `warning`, and `error` notifications MAY accompany usable graph data. They MUST NOT be used to conceal
+  fatal request failures or change collection completeness merely because a diagnostic exists.
+- Source reports MUST remain distinguishable. Message text is not a merge key, and this contract defines no
+  count/coalescing rule.
+- Field definitions and consumer-support status are documented in
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, Notifications.
+
 ### No Duplicate Display Facts
 
 Do not copy high-cardinality evidence rows only to make modal tables easier.

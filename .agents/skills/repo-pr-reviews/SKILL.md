@@ -179,9 +179,7 @@ open review threads. Use this as the input to the rest of the cycle.
 bash .agents/skills/repo-pr-reviews/scripts/fetch-sonar-findings.sh <PR_NUMBER>
 ```
 
-SonarCloud findings are NOT delivered as inline GitHub comments -- only a
-QualityGate summary is. The actual issue list lives behind the SonarCloud
-API. This script writes:
+This script fetches SonarCloud findings that are not posted inline on GitHub:
 - `.local/audits/pr-reviews/pr-<N>/sonar-issues.json`
 - `.local/audits/pr-reviews/pr-<N>/sonar-hotspots.json`
 - a brief summary to stdout (counts by rule and severity).
@@ -189,6 +187,13 @@ API. This script writes:
 Requires the same `.env` config the `triage-sonarqube` skill uses
 (`SONAR_TOKEN`, `SONAR_HOST_URL`, `SONAR_PROJECT`). If `.env` is missing,
 the script prints what's needed and exits.
+
+An empty issue/hotspot list does not prove the quality gate passed. Inspect
+`/api/qualitygates/project_status?projectKey=<project>&pullRequest=<PR>` for
+failed metric conditions. For duplication, use
+`/api/duplications/show?key=<file-component-key>&pullRequest=<PR>`: each
+`duplications[].blocks[]` identifies `from`, `size`, and `_ref`; `files`
+resolves those references. Preserve test cases when sharing duplicated setup.
 
 ### 1c. Note the CI signal as a third source
 
