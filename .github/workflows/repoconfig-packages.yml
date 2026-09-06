@@ -32,10 +32,14 @@ jobs:
         id: prepare
         run: |
           sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get install -y python3-venv
+          python3 -m venv ./virtualenv
+          source ./virtualenv/bin/activate
+          pip install ruamel.yaml pydantic
       - name: Read build matrix
         id: set-matrix
         run: |
+          source ./virtualenv/bin/activate
           matrix="$(.github/scripts/gen-matrix-repoconfig.py)"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
