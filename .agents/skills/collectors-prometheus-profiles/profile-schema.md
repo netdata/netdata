@@ -8,11 +8,11 @@ this file says which one owns what and adds only the notes none of them states.
 
 ## Owner map
 
-| Field group | Owner (read this, the skill does not restate it) |
+| Field group | Owner (authoritative; read it for the full contract) |
 |---|---|
 | Envelope: `match` syntax and scope, `app` precedence, `fallback_type` precedence chain, `relabeling` placement, `autogen.selector` semantics, `template`, file naming, strict decoding, the runtime processing order | `src/go/plugin/go.d/collector/prometheus/profile-format.md`, "How profiles work" and "Top-level fields" |
 | Stock contribution policy for `autogen.selector` and the relabel grammar (allowlists, exact denies, wildcard drop and rewrite forms, name provenance, identity preservation) | `profile-format.md`, "Stock contribution policy" under `autogen.selector`; every rule has a finding code in `src/go/tools/prometheus-profile-validation/README.md`, "What `PASS` establishes" |
-| Chart template: groups, `chart_defaults`, charts, `instances.by_labels` and `optional_by_labels`, dimensions and naming modes, `label_promotion`, `aggregation`, `lifecycle`, `options`, selectors, the validation rules, engine-derived behavior (ID derivation, per-dimension algorithm, priority `<= 0` to `70000`, family composition, multiplier and divisor `0` to `1`) | `src/go/plugin/framework/charttpl/README.md`, "Field Reference", "Validation Rules", "Engine-Derived Behavior" |
+| Chart template: groups, `chart_defaults`, charts, `instances.by_labels` and `optional_by_labels`, dimensions and naming modes, `label_promotion`, `aggregation`, `lifecycle`, `options`, selectors, the validation rules, engine-derived behavior (ID derivation, per-dimension algorithm, priority `<= 0` to `70000`, family composition, multiplier and divisor `0` to `1`) | `src/go/plugin/framework/charttpl/README.md`, "Field Reference", "Validation Rules", "Engine-Derived Behavior" (the design roles and consequences of `label_promotion` and `optional_by_labels` are in `chart-design.md`) |
 | Relabel actions, the ordered stages, histogram and summary safety, profile precedence on the shared stream | `src/go/plugin/go.d/collector/prometheus/relabel/README.md` |
 | Validator CLI, safe job policy, what `PASS` establishes, every warning class, the evidence boundary | `src/go/tools/prometheus-profile-validation/README.md` |
 | Flattened metric names per Prometheus type and what the writer accepts or rejects | `metric-types.md` in this skill |

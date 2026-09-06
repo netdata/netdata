@@ -55,6 +55,14 @@ class ProofBundleLauncherTest(unittest.TestCase):
             ["verify", "--repo-root", str(launcher.repo_root(launcher.__file__)), "--testdata-root", "--profile", "ceph"],
         )
 
+    def test_leading_flag_instead_of_subcommand_is_passed_to_the_tool(self) -> None:
+        caller = Path.cwd() / "caller"
+        # The tool rejects the unknown command loudly; the launcher does not guess a subcommand.
+        self.assertEqual(
+            launcher.normalize_arguments(["--profile", "ceph"], caller),
+            ["--profile", "--repo-root", str(launcher.repo_root(launcher.__file__)), "ceph"],
+        )
+
     def test_caller_supplied_repo_root_is_absolutized(self) -> None:
         caller = Path.cwd() / "caller"
         self.assertEqual(

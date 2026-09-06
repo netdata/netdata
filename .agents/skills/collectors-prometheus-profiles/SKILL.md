@@ -33,6 +33,8 @@ authority.
 
 ## Choose the workflow
 
+Read the row for the work at hand, not the whole skill.
+
 | Work | Read |
 |---|---|
 | Create or redesign a user profile | `chart-design.md`, `metric-types.md`; `profile-schema.md` for where each field is documented |
@@ -85,11 +87,12 @@ authority.
    `family` segments with `/`. Omit the root `family` when it would only repeat the resolved application; the named
    child groups then become top-level families, nested groups still need `family`, and a chart directly under a
    transparent root needs its own `family`. Keep a meaningful root on reusable instrumentation profiles that compose
-   into other applications. Use base units; convert bytes to bits only where the operator convention is bandwidth.
-   Omit `algorithm` (the runtime kind resolves it), `type` for `line` charts and histogram buckets (forced to
-   `heatmap`), and multiplier and divisor defaults; use `area` and `stacked` only for the meanings in
-   `chart-design.md`, "Choose chart types". Status values are dimensions from the source's closed state mapping, not
-   chart instances. Gauge families ending in `_info` never reach the writer (`metric-types.md`, "Info families").
+   into other applications. Use base units; convert bytes to bits only where the operator convention is bandwidth. Omit
+   `algorithm` (the runtime kind resolves it), `type` for `line` charts and histogram buckets (forced to `heatmap`), and
+   multiplier and divisor defaults; use `area` and `stacked` only for the meanings in `chart-design.md`, "Choose chart
+   types for visual meaning". Status values are dimensions from the source's closed state mapping, not chart instances.
+   Gauge families ending in `_info` are skipped by the writer and never reach metrix (`metric-types.md`, "Info
+   families").
 7. **Run the objective validator and the ToC** ("Scripts" below). `PASS` proves schema and the exercised production
    collector, planner, and emitter path; it does not prove operator usefulness, source semantics, cardinality outside
    the evidence, or additivity. Resolve every warning with evidence; never silence one mechanically.
@@ -106,14 +109,16 @@ user profiles. The validator has no user mode: its contributor-policy checks bel
 ### The code enforces
 
 - Validator (`tools/prometheus-profile-validation`, finding codes in its README): no `autogen.selector.allow`; every
-  `deny` names an exact fixture-present family; current evidence yields zero generic fallback and zero unmatched
-  series (unmatched series downgrade to the `profile_suppressed_series` warning when a selected profile's
-  `autogen.selector` explains every one); the relabel grammar and name-provenance rules (three of them,
-  `open_ended_relabel_name_rewrite`, `unpreserved_relabel_name_identity`, `unbounded_relabel_discard`, become warnings
-  under proof replay); a lifecycle cap that discards observed entities or dimensions; a chart with no visible dimension;
-  bucket charts use `observations/s` and no algorithm other than `incremental` (omitting it is fine); explicit `area`
-  or `stacked` raises a semantic-review warning; a selected series carrying a label the chart neither uses nor
-  excludes raises a warning.
+  `deny` names one exact family (`open_ended_profile_fallback_deny`), and under CLI validation that family must appear
+  in the fixture (`unproven_profile_fallback_deny`; under proof replay the coverage discharge below covers it); current
+  evidence yields zero generic fallback and zero unmatched series (unmatched series downgrade to the
+  `profile_suppressed_series` warning when a selected profile's `autogen.selector` explains every one); the relabel
+  grammar and name-provenance rules (under proof replay, three specific checks are deferred to warnings, one branch each
+  of `open_ended_relabel_name_rewrite`, `unpreserved_relabel_name_identity`, and `unbounded_relabel_discard`; the other
+  branches emitting the first two codes stay errors); a lifecycle cap that discards observed entities or dimensions; a
+  chart with no visible dimension; bucket charts use `observations/s` and no algorithm other than `incremental`
+  (omitting it is fine); explicit `area` or `stacked` raises a semantic-review warning; a selected series carrying a
+  label the chart neither uses nor excludes raises a warning.
 - Proof loaders and compiler (`internal/promprofile/semantics`): `documentation.title` and `summary` required; the
   closed evidence `kind` set; the `outcome` literals `drop_before_writer` and `retain_writable_unrendered`, with
   `metadata_only` bound to the latter; a reusable component, label, or reduction policy in either document needs two
@@ -126,7 +131,8 @@ user profiles. The validator has no user mode: its contributor-policy checks bel
   row under some module in the top-level `profile_coverage.modules` of the Prometheus collector `metadata.yaml`
   (generation raises `Stock Prometheus profiles without an integration mapping` otherwise); the projection resolves the
   support closure from the design; the key is accepted only on `go.d.plugin/prometheus` modules (a Python check, not
-  the JSON schema; an unknown module id under it only warns in `_common.py`); a semantic view and its runtime chart
+  the JSON schema); an unknown module id under it is recorded as a warning by `_common.py`, and `gen_integrations.py`
+  ends with `fail_on_warnings()`, so the generation run still fails; a semantic view and its runtime chart
   must agree on family and chart identity (also enforced by the proof compiler, `semantics/replay_route.go`); the view
   `question` is never rendered.
 

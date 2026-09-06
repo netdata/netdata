@@ -282,6 +282,7 @@ end in `_info`, for example `runtime_node{node="a"} 1`. Production correctly
 treats that family as a writable scalar gauge. A stock profile MAY leave the
 numeric carrier unrendered only through the binding `metadata_only` case:
 
+- the source registration is a scalar;
 - source semantics prove a `constant` lifecycle, `count`/`one`/`none` unit
   algebra, and at least one metadata label;
 - every replayed carrier value is exactly `1`;

@@ -74,6 +74,11 @@ class NormalizeFileArgumentsTest(unittest.TestCase):
             ["--profile", "--dump", str(caller / "x.prom"), "-job", "-quiet"],
         )
 
+    def test_separated_empty_value_is_preserved(self) -> None:
+        caller = Path.cwd() / "caller"
+
+        self.assertEqual(launcher.normalize_file_arguments(["--profile", ""], caller), ["--profile", ""])
+
     def test_dash_prefixed_path_passes_through_and_equals_form_is_the_escape(self) -> None:
         caller = Path.cwd() / "caller"
 

@@ -27,11 +27,11 @@ unexpected external artifact.
 | Artifact | Owns | Must not duplicate |
 |---|---|---|
 | `OPERATOR-MODEL.md` | human rationale, domain hierarchy, operator questions, causal flow, unresolved limitations | exact registrations, YAML routes, fixture outcomes |
-| `SOURCE-SEMANTICS.yaml` | public source-backed registrations, environments, components, labels, lifecycle, units, populations, relationships, source exclusions | private observed scrape data, dashboard destinations |
-| `SOURCE-REGISTRY.yaml` | mechanically extracted registrations and source locations for large or generated surfaces | operator grouping, view semantics |
+| `SOURCE-SEMANTICS.yaml` (external, `netdata/testdata`) | public source-backed registrations, environments, components, labels, lifecycle, units, populations, relationships, source exclusions | private observed scrape data, dashboard destinations |
+| `SOURCE-REGISTRY.yaml` (external) | mechanically extracted registrations and source locations for large or generated surfaces | operator grouping, view semantics |
 | `PROFILE-DESIGN.yaml` | documentation, composition, entities, identity, label treatment, reducers, normalization, exclusions, limitations, views, presentation intent | replay inputs and results |
 | `proof.yaml` | realizable environments, fixture and sequence inputs, expected verdict and findings, future inputs, metadata-example identity, coverage participation | support-profile ownership, generated semantic summaries |
-| `fixtures/*.prom` | sanitized realizable raw inputs with collision-relevant identities and values | semantic claims not present on the wire |
+| `fixtures/*.prom` (external) | sanitized realizable raw inputs with collision-relevant identities and values | semantic claims not present on the wire |
 
 Support profiles are declared once, in `PROFILE-DESIGN.yaml` under `composition.supports`. The compiler derives the
 active support closure from that design and each case environment. Do not copy a support list into `proof.yaml`, the
@@ -168,35 +168,36 @@ cases:
   by lifecycle evidence. A synthetic `# TYPE` line bypasses the path the proof exists to exercise.
 - `job: minimal` uses the validator's minimal job; `job: {metadata_example: ...}` replays the exact integration
   metadata example; the top-level `metadata_example` names the stock example the catalog must reconcile.
-- `observations` assert declared semantic states and membership, aggregate, and identity predicates; they never
-  restate generated chart snapshots.
+- `observations` (inside a `steps` entry) assert declared semantic states and membership, aggregate, and identity
+  predicates; they never restate generated chart snapshots.
 
 ## Generated source registries
-
-Use a registry when registration coverage is large, generated, or encoded by bounded source grammars. The descriptor
+ Use a registry when registration coverage is large, generated, or encoded by bounded source grammars. The descriptor
 `SOURCE-REGISTRY.generator.yaml` (upstream repository, full commit, source paths, runner ID), the `generator/` directory
 (only `*.py` files: `generate.py` plus at least one `test_negative_*.py` fail-closed test, checked by
-`semantics/load.go`), and the committed `SOURCE-REGISTRY.yaml` output are one mechanical authority; groups in the output
-are shorthand only, and source signals select exact registrations and assign semantic ownership independently. Verify
-from the testdata repository root with `python3 prometheus/tools/source_registry_runner.py [<profile>]`, which downloads
-the pinned sources, runs the generator tests and generation in a restricted sandbox, and compares exact output. Never
-hand-edit the generated registry without updating the generator.
+`semantics/load.go`), and the `SOURCE-REGISTRY.yaml` output committed to `netdata/testdata` are one mechanical
+authority; groups in the output are shorthand only, and source signals select exact registrations and assign semantic
+ownership independently. Verify from the testdata repository root with `python3
+prometheus/tools/source_registry_runner.py [<profile>]`, which downloads the pinned sources, runs the generator tests
+and generation in a restricted sandbox, and compares exact output. Never hand-edit the generated registry without
+updating the generator.
 
 ## Exclusions
 
 Every writer-capable source signal renders through a view or has one binding design exclusion. The loader
 (`validate_design.go`) enforces the `reason` set, each reason's required fields, and the two `outcome` literals
-`drop_before_writer` and `retain_writable_unrendered`; only `metadata_only` is bound to one outcome. Every other reason
+`drop_before_writer` and `retain_writable_unrendered`; only `metadata_only` is bound to one outcome. The compiler
+(`semantics/evidence.go`) enforces which evidence kinds each reason must cite. Every other reason
 takes either outcome, and shipped proofs use both (`haproxy` retains a `not_chartable` timestamp, `process_runtime`
 drops one). Only `retain_writable_unrendered` discharges an `autogen.selector.deny` (`semantics/coverage.go`).
 
-| `reason` | Required additional field | Typical `outcome` |
-|---|---|---|
-| `equivalent_duplicate` | `covering_view` | `retain_writable_unrendered`, or `drop_before_writer` with a source-backed drop |
-| `source_superseded` | `replacement` | either, source-backed |
-| `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | either |
-| `metadata_only` | none; the value must be a constant metadata carrier | `retain_writable_unrendered` (enforced) |
-| `collection_hazard` | source hazard evidence | either |
+| `reason` | Required field | Required evidence kinds | Typical `outcome` |
+|---|---|---|---|
+| `equivalent_duplicate` | `covering_view` | `relationship` | `retain_writable_unrendered`, or `drop_before_writer` with a source-backed drop |
+| `source_superseded` | `replacement` | `deprecation` | either, source-backed |
+| `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | `lifecycle` and `unit` | either |
+| `metadata_only` | none; the value must be a constant metadata carrier | `lifecycle`, `unit`, and `label` | `retain_writable_unrendered` (enforced) |
+| `collection_hazard` | none | `collection_hazard` | either |
 
 `not_chartable` is deliberately narrow: the only strict operation is deriving age from a Unix timestamp; it is not a
 generic "not useful" escape. `metadata_only` needs the conditions in `metric-types.md`, "Info families", not a gauge
