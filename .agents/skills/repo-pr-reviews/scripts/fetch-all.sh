@@ -11,6 +11,7 @@
 #   reviews.json           -- /repos/{slug}/pulls/{n}/reviews         (review submissions with body)
 #   review-threads.json    -- GraphQL reviewThreads (per-thread isResolved + comments[])
 #   summary.txt            -- human-readable triage summary
+#   FETCH-INCOMPLETE       -- present while a run is in progress or after it aborted; the snapshot is partial
 #
 # Pagination paranoia:
 #   GitHub paginates everything. Default page size is 30, max 100. The skill's
@@ -35,6 +36,10 @@ PR="${1:?usage: $0 <pr-number>}"
 pr_require_numeric "${PR}"
 SLUG="$(pr_require_slug)"
 DIR="$(pr_state_dir "${PR}")"
+# A marker that survives an abort: readers of the state dir must not treat a partial
+# fetch (an earlier run's files next to this run's) as a complete snapshot.
+touch "${DIR}/FETCH-INCOMPLETE"
+rm -f "${DIR}/summary.txt"
 
 echo -e "${PR_GRAY}[fetch-all] PR ${SLUG}#${PR} -> ${DIR}${PR_NC}" >&2
 
@@ -89,8 +94,15 @@ fetch_paranoid() {
         local next_page=$(( n / 100 + 1 ))
         echo -e "${PR_YELLOW}[fetch-all] ${kind}: count is exactly ${n} (multiple of 100). Verifying with explicit page=${next_page}...${PR_NC}" >&2
 
+        # Never substitute [] for a failed call: an auth or rate-limit error would look
+        # identical to "no more pages" and the cache would be reported complete while
+        # truncated. fetch_paranoid runs under set -e, so return 1 aborts the script.
         local probe
-        probe="$(gh api "${path}${sep}per_page=100&page=${next_page}" 2>/dev/null || echo '[]')"
+        if ! probe="$(gh api "${path}${sep}per_page=100&page=${next_page}")" \
+            || ! jq -e 'type=="array"' <<< "${probe}" >/dev/null 2>&1; then
+            echo -e "${PR_RED}[fetch-all] ${kind}: page ${next_page} probe FAILED or was not an array (see gh output above); the cache would be incomplete${PR_NC}" >&2
+            return 1
+        fi
         local extra
         extra="$(jq 'length' <<< "${probe}")"
         if (( extra > 0 )); then
@@ -100,7 +112,11 @@ fetch_paranoid() {
             mv "${out}.merged" "${out}"
             local p=$(( next_page + 1 ))
             while true; do
-                probe="$(gh api "${path}${sep}per_page=100&page=${p}" 2>/dev/null || echo '[]')"
+                if ! probe="$(gh api "${path}${sep}per_page=100&page=${p}")" \
+                    || ! jq -e 'type=="array"' <<< "${probe}" >/dev/null 2>&1; then
+                    echo -e "${PR_RED}[fetch-all] ${kind}: page ${p} FAILED or was not an array (see gh output above); the cache would be incomplete${PR_NC}" >&2
+                    return 1
+                fi
                 extra="$(jq 'length' <<< "${probe}")"
                 (( extra == 0 )) && break
                 echo -e "${PR_YELLOW}[fetch-all] ${kind}: page ${p} had ${extra} more.${PR_NC}" >&2
@@ -240,6 +256,7 @@ echo -e "${PR_GRAY}[fetch-all] review-threads: ${n_threads} threads total${PR_NC
         + "  by=" + (.comments.nodes[0].author.login // "?")' \
         "${DIR}/review-threads.json"
 } > "${DIR}/summary.txt"
+rm -f "${DIR}/FETCH-INCOMPLETE"
 
 echo
 cat "${DIR}/summary.txt"

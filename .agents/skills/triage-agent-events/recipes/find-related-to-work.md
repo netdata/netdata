@@ -29,7 +29,7 @@ Working on dbengine page eviction:
 .agents/skills/triage-agent-events/scripts/get-events.sh \
     --function 'rrdeng_page_descr_t,rrdeng_evict_pages,evict_main' \
     --since '14d ago' \
-    --versions auto \
+    --version auto \
     --output /tmp/related-pass1.json
 
 # 2. If pass 1 is sparse, widen to filename.
@@ -51,7 +51,7 @@ agentevents_query_function cloud "$payload" > /tmp/related-pass2.json
     --health crash \
     --query 'page_descr OR cache_evict OR rrdeng' \
     --since '14d ago' \
-    --versions auto \
+    --version auto \
     --output /tmp/related-pass3.json
 ```
 

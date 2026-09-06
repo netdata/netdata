@@ -76,6 +76,13 @@ while [ $# -gt 0 ]; do
 done
 
 [ -z "$BY" ] && { usage >&2; exit 2; }
+case "$FORMAT" in
+    text|json) ;;
+    *) echo "Unknown --format '$FORMAT' (expected text or json)" >&2; exit 2 ;;
+esac
+case "$TOP" in
+    ''|*[!0-9]*|0*) echo "--top must be a positive integer, got '$TOP'" >&2; exit 2 ;;
+esac
 
 FIELD="$(field_for_dim "$BY")"
 
@@ -105,7 +112,8 @@ fi
 
 # Build filter expression.
 filter_expr='true'
-for f in "${FILTERS[@]}"; do
+# ${arr[@]+"${arr[@]}"} keeps bash 3.2 with set -u from treating an empty array as unbound.
+for f in ${FILTERS[@]+"${FILTERS[@]}"}; do
     k="${f%%=*}"
     v="${f#*=}"
     filter_expr="$filter_expr and (.\"$k\" == \"$v\")"
@@ -144,7 +152,7 @@ case "$FORMAT" in
     json)
         echo "$result" | jq .
         ;;
-    text|*)
+    text)
         echo
         echo "Top $TOP by $BY ($FIELD):"
         printf '%s\n' "----------------------------------------"

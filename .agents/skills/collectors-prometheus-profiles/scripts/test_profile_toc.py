@@ -25,14 +25,79 @@ def load_module():
 profile_toc = load_module()
 
 
-def tree_from_yaml(text: str):
+def tree_from_yaml(text: str, app: str = ""):
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as stream:
         stream.write(text)
         path = Path(stream.name)
     try:
-        return profile_toc.build_tree(yaml.safe_load(path.read_text()))
+        return profile_toc.build_tree(yaml.safe_load(path.read_text()), app)
     finally:
         path.unlink()
+
+
+NAMESPACED_PROFILE = """
+template:
+  family: Exporter
+  context_namespace: exporter
+  charts:
+    - context: availability
+      title: A
+  groups:
+    - family: Requests
+      charts:
+        - context: requests.rate
+          title: R
+"""
+
+
+def all_contexts(node) -> set[str]:
+    return {chart.context for chart in profile_toc.descendant_charts(node)}
+
+
+class ProfileTocContextNamespaceTest(unittest.TestCase):
+    # The rule under test mirrors collector/prometheus/chart_template.go: the template's
+    # context_namespace is a real segment unless it equals the resolved app.
+    def test_root_namespace_kept_when_app_differs(self) -> None:
+        root = tree_from_yaml(NAMESPACED_PROFILE, app="other")
+        self.assertEqual({"exporter.availability", "exporter.requests.rate"}, all_contexts(root))
+
+    def test_root_namespace_dropped_when_it_equals_the_app(self) -> None:
+        root = tree_from_yaml(NAMESPACED_PROFILE, app="exporter")
+        self.assertEqual({"availability", "requests.rate"}, all_contexts(root))
+
+    def test_application_prefix_warning_fires_for_a_prefixed_family(self) -> None:
+        root = tree_from_yaml(
+            """
+app: ceph
+template:
+  family: Ceph
+  groups:
+    - family: Ceph Cluster
+      charts: [{context: health, title: H}]
+    - family: CephFS
+      charts: [{context: fs, title: F}]
+"""
+        )
+        flagged = [w for w in profile_toc.warnings(root, "ceph") if "application name" in w]
+        self.assertEqual(1, len(flagged))
+        self.assertIn("'Ceph Cluster'", flagged[0])
+
+    def test_family_equal_to_the_application_gets_its_own_message(self) -> None:
+        root = tree_from_yaml(
+            """
+app: ceph
+template:
+  family: Ceph
+  groups:
+    - family: Ceph
+      charts: [{context: health, title: H}]
+    - family: Pools
+      charts: [{context: pools, title: P}]
+"""
+        )
+        flagged = [w for w in profile_toc.warnings(root, "ceph") if "application name" in w]
+        self.assertEqual(1, len(flagged))
+        self.assertIn("equals the application name", flagged[0])
 
 
 class ProfileTocWarningsTest(unittest.TestCase):

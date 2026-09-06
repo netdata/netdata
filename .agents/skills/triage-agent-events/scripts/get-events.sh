@@ -70,6 +70,7 @@ EXIT_CAUSE=all
 SIGNAL=
 FUNCTION=
 VERSION=auto
+VERSION_REGEX=
 VERSIONS_EXPLICIT=
 ARCH=
 OS_FAMILY=
@@ -196,9 +197,9 @@ elif [ "$VERSION" = "auto" ]; then
 elif [ "$VERSION" = "all" ]; then
     : # no filter
 else
-    # Pattern -- best-effort: not multi-value selection, leave it
-    # to the caller to client-side-filter the dump after fetch.
-    echo "[get-events] --version <regex> is not pushed to the server; filter the resulting JSON with jq" >&2
+    # A regex cannot be pushed to the server (the facet API takes explicit values), so it is
+    # applied to AE_AGENT_VERSION after the dump is written (see below).
+    VERSION_REGEX="$VERSION"
 fi
 
 # ---------------------------------------------------------------
@@ -256,6 +257,34 @@ fi
 
 echo "[get-events] fetching via $VIA (output: $OUTPUT)..." >&2
 agentevents_query_function "$VIA" "$PAYLOAD" > "$OUTPUT"
+
+if [ -n "$VERSION_REGEX" ]; then
+    # The facet API takes explicit values only, so the pattern is applied to the fetched
+    # page. Every failure path says so instead of claiming a filter that was not applied.
+    if ! jq -e . "$OUTPUT" >/dev/null 2>&1; then
+        echo "[get-events] --version regex NOT applied: the response at $OUTPUT is not JSON" >&2
+        exit 2
+    elif ! jq -e '.columns.AE_AGENT_VERSION.index != null' "$OUTPUT" >/dev/null 2>&1; then
+        echo "[get-events] --version regex NOT applied: the response has no AE_AGENT_VERSION column (dump kept unfiltered at $OUTPUT)" >&2
+        exit 2
+    else
+        pre_rows="$(jq '(.data // []) | length' "$OUTPUT")"
+        trap 'rm -f "$OUTPUT.tmp"' EXIT
+        if ! jq --arg re "$VERSION_REGEX" '
+            (.columns.AE_AGENT_VERSION.index) as $i
+            | .data = [ (.data // [])[] | select(((.[$i] // "") | tostring) | test($re)) ]
+        ' "$OUTPUT" > "$OUTPUT.tmp"; then
+            rm -f "$OUTPUT.tmp"
+            echo "[get-events] --version regex '$VERSION_REGEX' failed; the dump at $OUTPUT is NOT filtered" >&2
+            exit 2
+        fi
+        mv "$OUTPUT.tmp" "$OUTPUT"
+        echo "[get-events] applied client-side --version regex: $VERSION_REGEX" >&2
+        if [ "$pre_rows" -ge "$LAST" ]; then
+            echo "[get-events] the fetched page was full ($pre_rows rows, --last $LAST): the regex narrowed that page only; raise --last or use --versions for a server-side filter" >&2
+        fi
+    fi
+fi
 
 rows="$(jq '.data | length // 0' "$OUTPUT" 2>/dev/null || echo 0)"
 echo "[get-events] wrote $rows row(s) to $OUTPUT" >&2

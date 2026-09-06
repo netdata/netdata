@@ -462,8 +462,8 @@ Used to decide whether a tainted-data path is `FALSE_POSITIVE_TRUSTED_INPUT`:
 - The `lastDefectInstanceId` field, NOT `cid`, is what `defectdetails.json` wants.
 - Coverity caches results aggressively; if a CID disappears from "Outstanding"
   immediately after finalize, a fresh fetch can take a few seconds to reflect.
-- Idempotence: `fetch-details.sh` skips files already present, so partial runs
-  are safe to re-invoke.
+- Idempotence: `fetch-details.sh` skips cached files that hold a defect-details object and refetches any other cached
+  body (an expired-session login page, for example), so partial runs are safe to re-invoke.
 - `prepare-defect.sh` uses Coverity's `displayFile` and the main-event line
   to extract source context. If Coverity's line numbers are stale (after a
   refactor), the context may not center on the current code -- use it as a

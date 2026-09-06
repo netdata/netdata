@@ -50,12 +50,17 @@ def group_priority(group: dict, inherited: int) -> int:
     return inherited if priority == 0 else priority
 
 
-def build_tree(profile: dict) -> Node:
+def build_tree(profile: dict, app: str = "") -> Node:
     template = profile.get("template")
     if not isinstance(template, dict):
         raise ValueError("profile has no template mapping")
 
     root = Node(normalize(template.get("family")) or "(root)")
+    # The template root is a chartengine group, so its context_namespace is a real context
+    # segment. The collector drops it only when it equals the resolved app, to avoid
+    # prometheus.<app>.<app>.<context> (collector/prometheus/chart_template.go).
+    root_namespace = normalize(template.get("context_namespace"))
+    root_context: list[str] = [root_namespace] if root_namespace and root_namespace != normalize(app) else []
 
     def add_charts(group: dict, node: Node, context_parts: list[str], effective_priority: int) -> None:
         for chart in group.get("charts") or []:
@@ -71,7 +76,7 @@ def build_tree(profile: dict) -> Node:
             node.charts.append(Chart(context, priority))
 
     root_priority = group_priority(template, 0)
-    add_charts(template, root, [], root_priority)
+    add_charts(template, root, root_context, root_priority)
     groups = template.get("groups")
     if not isinstance(groups, list):
         return root
@@ -92,7 +97,7 @@ def build_tree(profile: dict) -> Node:
             add_group(child, node, child_context_parts, effective_priority)
 
     for group in groups:
-        add_group(group, root, [], root_priority)
+        add_group(group, root, root_context, root_priority)
     return root
 
 
@@ -185,12 +190,15 @@ def warnings(root: Node, app_name: str | None = None) -> list[str]:
 
     if application:
         lowered = application.casefold()
-        exact_names = {name.casefold() for name in top_names}
         for name in top_names:
             # CephFS-style product names legitimately begin with the same letters as the
             # application; only flag an exact application token, not a longer product word.
             exact_application_prefix = name.casefold() == lowered or name.casefold().startswith(lowered + " ")
-            if exact_application_prefix and name.casefold() not in exact_names:
+            if name.casefold() == lowered:
+                results.append(
+                    f"top-level family {name!r} equals the application name: name the product area it holds instead"
+                )
+            elif exact_application_prefix:
                 results.append(
                     f"top-level family {name!r} starts with application name {application!r}: remove the redundant prefix"
                 )
@@ -217,7 +225,11 @@ def warnings(root: Node, app_name: str | None = None) -> list[str]:
 def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("profile", type=Path, help="profile YAML path")
-    parser.add_argument("--app", help="application name used to detect redundant application prefixes")
+    parser.add_argument(
+        "--app",
+        help="resolved job application (default: the profile's app:); drops the root context_namespace segment when it"
+        " equals the app, as the collector does, and detects redundant application prefixes in family names",
+    )
     parser.add_argument("--quiet", action="store_true", help="print ToC without warnings")
     return parser.parse_args(argv)
 
@@ -233,15 +245,16 @@ def main(argv: list[str]) -> int:
         print(f"error: profile {args.profile} is not a YAML mapping", file=sys.stderr)
         return 2
 
+    application = args.app or normalize(document.get("app"))
     try:
-        tree = build_tree(document)
+        tree = build_tree(document, application)
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
     print("\n".join(render(tree)))
     if not args.quiet:
-        design_warnings = warnings(tree, args.app or normalize(document.get("app")))
+        design_warnings = warnings(tree, application)
         print("\nUX warnings (not validation failures):")
         if design_warnings:
             for index, warning in enumerate(design_warnings, 1):

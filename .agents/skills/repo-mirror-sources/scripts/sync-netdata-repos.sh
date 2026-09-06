@@ -71,8 +71,8 @@ done
 # 1. NETDATA_REPOS_DIR set and points to an existing directory.
 if [ -z "${NETDATA_REPOS_DIR:-}" ]; then
     echo "ERROR: NETDATA_REPOS_DIR is not set." >&2
-    echo "       Set it in <repo>/.env (or your shell env) to the directory" >&2
-    echo "       that holds (or will hold) your Netdata-org repos mirror." >&2
+    echo "       Export it (for example: set -a; source <repo>/.env; set +a); this script does" >&2
+    echo "       not read .env. It names the directory that holds your Netdata-org repos mirror." >&2
     exit 2
 fi
 MIRROR_DIR="$NETDATA_REPOS_DIR"
@@ -154,12 +154,13 @@ has_uncommitted_changes() {
     git diff-index --quiet HEAD -- 2>/dev/null
     local diff_result=$?
     
-    # git diff-index returns 0 if no changes, 1 if changes exist
-    # We want to return 0 (true) if changes exist, 1 (false) if no changes
-    if [ $diff_result -eq 1 ]; then
-        local result=0  # Has changes
-    else
+    # git diff-index: 0 = clean, 1 = changes, anything else = the command itself
+    # failed (corrupt index, unreadable repo). Only exit 0 proves the tree is clean;
+    # every other status must skip the repo rather than pull into an unknown state.
+    if [ $diff_result -eq 0 ]; then
         local result=1  # No changes
+    else
+        local result=0  # Has changes, or we could not tell
     fi
     
     cd "$MIRROR_DIR" 2>/dev/null || true  # Try to return to script directory
@@ -197,8 +198,8 @@ get_uncommitted_details() {
     fi
     cd "$repo" || { echo "cannot access"; return; }
     local staged unstaged
-    staged=$(git diff --cached --numstat | wc -l)
-    unstaged=$(git diff --numstat | wc -l)
+    staged=$(git diff --cached --numstat 2>/dev/null | wc -l)
+    unstaged=$(git diff --numstat 2>/dev/null | wc -l)
     cd "$MIRROR_DIR" 2>/dev/null || true  # Try to return to script directory
     
     # Report details - note that untracked files are shown but don't block updates
@@ -325,8 +326,12 @@ update_repo() {
             REPOS_BRANCH_SWITCHED+=("$repo: $current_branch → $default_branch")
             current_branch="$default_branch"
         else
-            print_status "  ${RED}✗ Failed to switch to ${default_branch}${NC}"
+            print_status "  ${RED}✗ Failed to switch to ${default_branch}; leaving ${current_branch} untouched${NC}"
             REPOS_WRONG_BRANCH+=("$repo: stuck on $current_branch, default is $default_branch")
+            # The contract is "sync the default branch": pulling the branch we could not
+            # leave would mutate work the safety check meant to protect.
+            cd "$MIRROR_DIR" 2>/dev/null || true
+            return 1
         fi
     fi
     
@@ -369,27 +374,31 @@ clone_new_repos() {
     # Get list of all repos from GitHub
     print_status "Fetching repository list from GitHub..."
     local repos_list
-    repos_list=$(gh repo list "$ORG" --limit 1000 --json name,sshUrl,defaultBranchRef --source --no-archived)
+    if ! repos_list=$(gh repo list "$ORG" --limit 1000 --json name,sshUrl,defaultBranchRef --source --no-archived) \
+        || [ -z "$repos_list" ]; then
+        # An auth or rate-limit failure must not read as "nothing new to clone".
+        print_status "${RED}✗ gh repo list failed; skipping discovery (check gh auth and rate limits)${NC}"
+        return 1
+    fi
     
-    echo "$repos_list" | jq -r '.[] | "\(.name) \(.sshUrl) \(.defaultBranchRef.name)"' | while read -r name url default_branch; do
+    # Process substitution keeps the loop in this shell; a pipeline would run it in a
+    # subshell and discard new_repos_count.
+    while read -r name url default_branch; do
         if [ ! -d "$name" ]; then
             new_repos_count=$((new_repos_count + 1))
             print_status "${GREEN}→ Cloning new repo: $name (default branch: $default_branch, with submodules)${NC}"
-            if git clone --quiet --recursive "$url" "$name" 2>/dev/null; then
-                # Set up tracking for default branch
-                # Safety: validate we can enter the directory
-                if cd "$name" 2>/dev/null; then
-                    git symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default_branch" 2>/dev/null || true
-                    cd "$MIRROR_DIR" 2>/dev/null || true
-                else
-                    print_status "  ${YELLOW}⚠️  Warning: Could not enter cloned directory${NC}"
-                fi
+            # stdin is the repo list (process substitution): keep ssh or credential prompts from eating it.
+            if git clone --quiet --recursive "$url" "$name" </dev/null 2>/dev/null; then
+                # Set up tracking for the default branch without changing this shell's
+                # directory (the loop now runs in the caller's shell).
+                git -C "$name" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default_branch" 2>/dev/null \
+                    || print_status "  ${YELLOW}⚠️  Warning: could not set origin/HEAD for $name${NC}"
                 print_status "  ${GREEN}✓ Cloned successfully${NC}"
             else
                 print_status "  ${RED}✗ Clone failed${NC}"
             fi
         fi
-    done
+    done < <(echo "$repos_list" | jq -r '.[] | "\(.name) \(.sshUrl) \(.defaultBranchRef.name)"')
     
     if [ $new_repos_count -eq 0 ]; then
         print_status "No new repositories to clone."

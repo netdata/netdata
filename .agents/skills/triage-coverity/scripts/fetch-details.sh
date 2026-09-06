@@ -6,7 +6,9 @@
 #
 # Reads cookies/XSRF/UA from .env via _lib.sh.
 # For each row, calls /sourcebrowser/defectdetails.json?defectInstanceId=<lastDefectInstanceId>.
-# Skips rows whose output file already exists (idempotent; safe to re-run).
+# Skips rows whose cached output is a defect-details object; anything else cached (for
+# example a login page fetched with an expired session) is discarded and refetched, so
+# partial runs are safe to re-run.
 
 set -euo pipefail
 
@@ -50,8 +52,12 @@ while IFS=$'\t' read -r cid defect_instance_id; do
     fi
     out_file="${OUT_DIR}/cid-${cid}.json"
     if [[ -s "${out_file}" ]]; then
-        skipped=$((skipped + 1))
-        continue
+        # A cache entry written before the shape guard below existed may hold a login page.
+        if jq -e 'type=="object" and has("occurrences")' "${out_file}" >/dev/null 2>&1; then
+            skipped=$((skipped + 1))
+            continue
+        fi
+        rm -f "${out_file}"
     fi
     sleep 0.3
 
@@ -73,6 +79,16 @@ while IFS=$'\t' read -r cid defect_instance_id; do
             rm -f "${out_file}"
             exit 2
         fi
+        rm -f "${out_file}"
+        continue
+    fi
+
+    # A 200 body is not proof of a defect payload (an expired session can return a
+    # login page with 200). Anything cached here is skipped forever by the -s guard
+    # above, and prepare-defect.sh then dies on an opaque jq parse error.
+    if ! jq -e 'type=="object" and has("occurrences")' "${out_file}" >/dev/null 2>&1; then
+        failed=$((failed + 1))
+        echo -e "${COV_RED}[${i}/${TOTAL}] cid=${cid} HTTP=200 but the body is not a defect-details object; discarding${COV_NC}" >&2
         rm -f "${out_file}"
         continue
     fi

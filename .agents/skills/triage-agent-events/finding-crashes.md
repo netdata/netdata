@@ -11,7 +11,7 @@ Get recent signal crashes on stable + recent nightlies:
 .agents/skills/triage-agent-events/scripts/get-events.sh \
     --health crash \
     --since '24h ago' \
-    --versions auto
+    --version auto
 ```
 
 Output is a JSON dump under
@@ -121,12 +121,15 @@ see `AE_FIELDS.md` for the full table)
 ## Filtering out noise
 
 Many crashes from old / unsupported versions are already
-fixed. The default `--versions auto` filter handles this.
+fixed. The default `--version auto` filter handles this.
 For wider investigations, scope to stable releases only:
 
 ```bash
-get-events.sh --health crash --versions '^v2\.\d+\.\d+$'
+get-events.sh --health crash --version '^v2\.\d+\.\d+$'
 ```
+
+The regex filters the page the server returned (`--last`, default 500); raise `--last` or pass the releases with
+`--versions` when you need every stable-release row.
 
 ## Related recipes
 

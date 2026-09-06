@@ -12,7 +12,7 @@ called `exit()` or `_exit()` ourselves).
 .agents/skills/triage-agent-events/scripts/get-events.sh \
     --exit-cause fatal \
     --since '24h ago' \
-    --versions auto
+    --version auto
 ```
 
 `--exit-cause fatal` is shorthand for the deliberate-fatal

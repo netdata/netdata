@@ -95,6 +95,7 @@ it during a triage session).
 | `CODACY_TOKEN` | Account API token (header `api-token: <value>`) | https://app.codacy.com -> top-right avatar -> Account -> API tokens -> "Create API Token" | 20-char opaque string |
 | `CODACY_HOST` | API host. Defaults to `https://api.codacy.com`; set only if Codacy moves the API host. | n/a | URL |
 | `CODACY_PROVIDER` | git provider. Defaults to `gh` (GitHub). | n/a | `gh` |
+| `CODACY_CLI_VERSION` | Docker image tag for `analyze-local.sh`; defaults to `latest`. Read from the process environment only, `analyze-local.sh` does not source `.env`: export it or prefix the command. Not a secret. | n/a | image tag |
 | `CODACY_ORG` | Codacy organization (matches the GitHub org). Defaults to `netdata`. | n/a | short string |
 | `CODACY_REPO` | Codacy repository name. Defaults to `netdata`. | n/a | short string |
 

@@ -40,30 +40,36 @@ echo
 
 # Group checks by conclusion / status.
 jq -r '
-    .statusCheckRollup
-    | map(. + {key: ((.conclusion // .status) // "PENDING")})
+    # StatusContext nodes (commit-status API: Codacy and other non-Actions integrations)
+    # carry .state, not .conclusion/.status, and gh reports an in-progress CheckRun with
+    # conclusion "". Empty strings are truthy in jq, so // alone picks the wrong field.
+    def nz: if . == null or . == "" then empty else . end;
+    (.statusCheckRollup // [])
+    | map(. + {key: ((.conclusion|nz) // (.state|nz) // (.status|nz) // "PENDING")})
     | group_by(.key)
-    | map({key: .[0].key, count: length, names: [.[].name // .[].context]})
+    | map({key: .[0].key, count: length, names: [.[] | .name // .context]})
     | sort_by(.key)
     | .[]
     | "\(.key)\t\(.count)\t\((.names | sort | unique | join(", ")[0:200]))"
 ' <<< "${data}" | column -t -s $'\t'
 
 echo
-total=$(jq '.statusCheckRollup | length' <<< "${data}")
-fail=$(jq '[.statusCheckRollup[] | select((.conclusion // "")|test("FAILURE|TIMED_OUT|CANCELLED"))] | length' <<< "${data}")
-running=$(jq '[.statusCheckRollup[] | select((.status // "")=="IN_PROGRESS" or (.status // "")=="QUEUED")] | length' <<< "${data}")
+total=$(jq '(.statusCheckRollup // []) | length' <<< "${data}")
+fail=$(jq '[(.statusCheckRollup // [])[] | select(((.conclusion // "")|test("FAILURE|TIMED_OUT|CANCELLED|ACTION_REQUIRED|STARTUP_FAILURE|STALE")) or ((.state // "")|test("^(FAILURE|ERROR)$")))] | length' <<< "${data}")
+running=$(jq '[(.statusCheckRollup // [])[] | select(((.status // "")|test("^(IN_PROGRESS|QUEUED|WAITING|PENDING|REQUESTED)$")) or ((.state // "")|test("^(PENDING|EXPECTED)$")))] | length' <<< "${data}")
 echo "Total checks: ${total}   Failing: ${fail}   Running: ${running}"
 
+# Failures are decided first: a PR with failures and running checks must exit 3, because
+# the skill tells the caller to ignore exit 2 and push.
+if (( fail > 0 )); then
+    echo -e "${PR_RED}WARNING: ${fail} check(s) failing. Address these BEFORE pushing.${PR_NC}" >&2
+    exit 3
+fi
 if (( running > 0 )); then
     # Exit 2 is informational, not a "do not push" signal. The next push
     # will start a fresh CI run on top of the new code -- that's what we
     # actually want to verify. The skill's policy is to push anyway.
     echo -e "${PR_GRAY}Note: ${running} check(s) still running; the next push will start a fresh CI run.${PR_NC}" >&2
     exit 2
-fi
-if (( fail > 0 )); then
-    echo -e "${PR_RED}WARNING: ${fail} check(s) failing. Address these BEFORE pushing.${PR_NC}" >&2
-    exit 3
 fi
 exit 0

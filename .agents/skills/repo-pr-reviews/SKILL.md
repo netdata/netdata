@@ -156,6 +156,8 @@ State for each PR is cached under `<repo-root>/.local/audits/pr-reviews/pr-<N>/`
 - `reviews.json` -- review submissions with body (REST)
 - `review-threads.json` -- per-thread, with `isResolved` (GraphQL)
 - `summary.txt` -- human-readable triage summary
+- `FETCH-INCOMPLETE` -- present only while a fetch is running or after one aborted; the snapshot is partial, re-run
+  `fetch-all.sh` before reading anything else here
 
 ## Workflow
 
@@ -528,6 +530,7 @@ If a new AI reviewer appears in the project, classify it by adding to
 | Symptom                                                | Likely cause                                                         |
 |--------------------------------------------------------|----------------------------------------------------------------------|
 | `fetch-all.sh` returns suspiciously round counts       | Pagination missed pages. Re-run; fetch-all auto-probes when count is a multiple of 100. |
+| `fetch-all.sh` aborts with `page N probe FAILED` and leaves `FETCH-INCOMPLETE` in the state dir | `gh` auth or rate limit; the cache is incomplete. Fix `gh auth status`, re-run; do not read the partial dump. |
 | A GraphQL helper script fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. This affected both `fetch-all.sh` and `wait-for-activity.sh`. |
 | `reply-thread.sh` -> 404                               | Wrong comment id (use `databaseId` from `review-threads.json`, not the GraphQL node id). |
 | `reply-thread.sh` -> `line N: 2: usage`, yet the thread ends up resolved | The comment id expanded to empty AND the resolve ran anyway. Never chain reply and resolve so that resolve can run after reply fails: run `reply-thread.sh`, confirm it printed `posted reply id=...`, THEN resolve. See the bash-vs-zsh note below. |
@@ -535,6 +538,7 @@ If a new AI reviewer appears in the project, classify it by adding to
 | `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
 | `trigger-copilot.sh` succeeds but no new review        | Expected. The org has no Copilot review credits, which is why it is not in the loop. Do not wait on it. |
 | `trigger-cubic.sh` succeeds but no new review          | cubic ignores comments without an explicit `@cubic-dev-ai` mention. The script always prepends it. |
+| `ci-status.sh` exits 3 (failing)                       | At least one check failed or a commit status is in FAILURE/ERROR. Fix before pushing; 3 wins over 2 when checks are also running. |
 | `ci-status.sh` exits 2 (running)                       | CI hasn't finished. Push anyway -- waiting on CI between iterations destroys throughput. The next push triggers a fresh CI run on the new code, which is what matters. (See Step 4b.) |
 | Bot keeps re-flagging the same line after a fix push   | The bot didn't see the new commit because it wasn't re-triggered.    |
 | `wait-for-activity.sh` 124 timeout                     | Bots are silent -- could be done, could be quota-limited. Check `summary.txt`; if all threads resolved, you're done. |

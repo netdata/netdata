@@ -208,6 +208,10 @@ Before semantic review, render the actual family table of contents:
   --app application-name
 ```
 
+`--app` is the resolved job application (default: the profile's own `app:`). The ToC renders the profile-relative
+context with the collector's rule applied: the template's `context_namespace` is kept unless it equals the app. The
+collector additionally prefixes `prometheus.<app>.`, which the ToC omits.
+
 The helper prints the operator-visible family tree with contexts and effective priorities, then emits advisory UX
 warnings. It is not a gate and does not make design decisions. Investigate each warning and either repair the hierarchy
 or record why the warning is intentional:

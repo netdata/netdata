@@ -239,7 +239,7 @@ exist in the producer source.)
 
 ### `AE_AGENT_HEALTH`
 
-Source: `src/daemon/status-file.c:929-952`. Computed by the
+Source: `src/daemon/status-file.c:1167-1189` (`agent_health()`). Computed by the
 **agent** (not the ingestion server) at POST time across
 restart history. Used to isolate crash classes.
 
@@ -308,11 +308,11 @@ exist in producer source.)
 
 ### `AE_EXIT_CAUSE` (top-level)
 
-Source: `src/daemon/status-file.c:1097-1286`. Computed by the
+Source: `src/daemon/status-file.c:1349-1524`. Computed by the
 **agent**, NOT the ingestion server. The most useful field for
 classifying records.
 
-26 distinct strings:
+27 distinct strings (29 rows below; `abnormal power off` and `out of memory` each appear under two prior states):
 
 **Initial / no prior state (1):**
 
@@ -332,7 +332,7 @@ classifying records.
 | `exit and updated` | Stopped and was replaced by a new version. |
 | `exit instructed` | `netdata --exit` or service stop. |
 
-**Prior was INITIALIZING (8):**
+**Prior was INITIALIZING (9):**
 
 | Value | Meaning |
 |---|---|
@@ -346,7 +346,7 @@ classifying records.
 | `fatal on start` | fatal() during startup. |
 | `killed hard on start` | SIGKILL/SIGTERM during startup. |
 
-**Prior was EXITING (5):**
+**Prior was EXITING (6):**
 
 | Value | Meaning |
 |---|---|

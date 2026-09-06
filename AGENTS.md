@@ -718,6 +718,7 @@ renames:
 | `triage-codeql` | `graphql/` | Code Scanning fetches and dismissals |
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
+| `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
 | `query-snmp-traps` (public) | `query-snmp-traps/` | saved trap query results from its how-tos |

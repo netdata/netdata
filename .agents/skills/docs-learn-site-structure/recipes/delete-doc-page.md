@@ -43,7 +43,7 @@ with the ingest PR):
 
 1. Open `${NETDATA_REPOS_DIR}/learn/LegacyLearnCorrelateLinksWithGHURLs.json`.
 2. Search for the GitHub blob/edit URL of the deleted file:
-   ```
+   ```text
    "https://github.com/netdata/netdata/blob/master/docs/<...>/<deleted-page>.md"
    ```
 3. Find the entry. Apply your decision from step 1:

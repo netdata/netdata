@@ -10,7 +10,10 @@ surface.
 For a local unprotected endpoint:
 
 ```bash
-curl -fsS "http://127.0.0.1:PORT/metrics" -o metrics.txt
+DUMP="$(git rev-parse --show-toplevel)/.local/audits/prometheus-profiles/APP-$(date -u +%Y%m%dT%H%M%SZ).prom"
+mkdir -p "$(dirname "$DUMP")"
+curl -fsS "http://127.0.0.1:PORT/metrics" -o "$DUMP"
+echo "$DUMP"   # keep this path; the checks below read it
 ```
 
 For an authenticated endpoint, use the operator's existing secret-safe curl or
@@ -23,9 +26,10 @@ and `# TYPE` lines are part of the evidence.
 ## Check the evidence
 
 ```bash
-grep -c '^# TYPE ' metrics.txt
-grep -c '^# HELP ' metrics.txt
-wc -l metrics.txt
+DUMP="${DUMP:?set DUMP to the path printed by the capture}"
+grep -c '^# TYPE ' "$DUMP"
+grep -c '^# HELP ' "$DUMP"
+wc -l "$DUMP"
 ```
 
 Then inspect family names, types, label keys, and cardinality without copying

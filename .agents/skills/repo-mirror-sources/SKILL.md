@@ -115,8 +115,9 @@ output, end-of-run summary). Run it on demand.
 ### First sync
 
 ```bash
-# Source the env, run the script.
-source <(grep -E '^NETDATA_REPOS_DIR=' <repo>/.env)
+# Export the variable (the script is a child process and reads the environment;
+# it does not source .env itself), then run the script.
+set -a; source <(grep -E '^NETDATA_REPOS_DIR=' <repo>/.env); set +a
 .agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh
 ```
 

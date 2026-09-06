@@ -90,7 +90,7 @@ For files marked `learn_status: Published`, the destination is
 computed by `create_mdx_path_from_metadata`
 (`ingest.py:1140-1204`):
 
-```
+```text
 docs/<learn_rel_path>/<sanitized_sidebar_label>.mdx
 ```
 
@@ -203,7 +203,7 @@ the other. On Linux they coexist as separate files.
 
 The lookup key is the **canonical edit URL**:
 
-```
+```text
 https://github.com/netdata/<repo>/edit/<branch>/<repo-rel-path>
 ```
 

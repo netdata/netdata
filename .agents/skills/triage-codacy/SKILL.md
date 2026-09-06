@@ -50,10 +50,12 @@ Out of scope until a real use case creates a GitHub issue or branch-local SOW:
 | `CODACY_TOKEN` | Account API token, header `api-token: <value>`. Required by `pr-issues.sh` and any wrapper that calls `_codacyaudit_run`. NOT required by `analyze-local.sh` (the CLI runs anonymously). |
 | `CODACY_HOST` | Defaults to `https://api.codacy.com`. Override only if Codacy moves the API host. |
 | `CODACY_PROVIDER` | Defaults to `gh` (GitHub). |
+| `CODACY_CLI_VERSION` | Optional, not a secret, and read from the process environment only (`analyze-local.sh` does not source `.env`): `CODACY_CLI_VERSION=1.2.3 analyze-local.sh` pins the docker image tag; defaults to `latest`. |
 | `CODACY_ORG` | Defaults to `netdata`. |
 | `CODACY_REPO` | Defaults to `netdata`. |
 
-All values live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for setup (where each value comes from, sample formats, common mistakes).
+All values except `CODACY_CLI_VERSION` live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for setup (where
+each value comes from, sample formats, common mistakes).
 
 ## Scripts (in scripts/)
 
@@ -73,10 +75,11 @@ $ .agents/skills/triage-codacy/scripts/analyze-local.sh
 
 Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
 
-Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
-results, the output file may have a `.json` suffix but contain tool-runner logs
-instead of JSON. Always verify with `jq empty <dump>` before treating a local
-dump as finding evidence. If GitHub check-run annotations are empty too, use
+Failed analyses are not clean trees: when the dump is not JSON, is JSON of the
+wrong shape (not a findings array, an `{issues: [...]}` object, or a SARIF `runs`
+document), or the CLI exits non-zero with zero findings, the script exits 4 and
+keeps the CLI's stderr in `<dump>.log`. Treat exit 4 as "no
+evidence", not as green. If GitHub check-run annotations are empty too, use
 `pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
 and re-check after the next push.
 
