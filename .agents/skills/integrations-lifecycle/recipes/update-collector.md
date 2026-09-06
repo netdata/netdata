@@ -37,6 +37,6 @@ Do not skip the page generators: they validate the source locally even though th
 
 ## 5. Before opening the PR
 
-Stage the source artifacts only. Run the gitignored-catalog check from `../consistency.md`; it MUST print nothing.
-Name the post-merge regeneration PR as the delivery route for the generated pages in the PR description, and
-enumerate the consistency artifacts you left unchanged with the reason.
+Stage the source artifacts only. Run the gitignored-catalog check from `../consistency.md`; it MUST print nothing. Name
+the post-merge regeneration PR as the delivery route for the generated pages in the PR description, and enumerate the
+consistency artifacts you left unchanged with the reason.

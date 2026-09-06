@@ -58,12 +58,11 @@ The generator resolves each description in this order:
 2. Otherwise, derive it mechanically from the first useful prose in the rendered overview.
    - Markdown and HTML are reduced to plain text.
    - Underscores are preserved rather than silently deleting part of an identifier. Final validation then rejects the
-     derived value,
-     requiring an explicit plain-text override that describes the concept without corrupting the identifier.
+     derived value, requiring an explicit plain-text override that describes the concept without corrupting the
+     identifier.
    - Sentences are included until the description reaches 50 characters.
    - Text longer than 160 characters is trimmed at a word boundary with a terminal Unicode ellipsis. Final validation
-     rejects that
-     incomplete result, so its source record needs a complete explicit override.
+     rejects that incomplete result, so its source record needs a complete explicit override.
 3. Fail generation when the result is missing, invalid, or duplicated by another generated page.
 
 An explicit description MUST:
@@ -71,35 +70,29 @@ An explicit description MUST:
 - be 50–160 characters;
 - be already trimmed, with no leading or trailing whitespace;
 - be one line of plain text with no C0/C1 control character, including tabs, no surrogate code point or Unicode
-  line/paragraph
-  separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), no CommonMark list
-  marker or
-  hyphen thematic break at the beginning, and no URL, double quote, or backslash;
+  line/paragraph separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), no
+  CommonMark list marker or hyphen thematic break at the beginning, and no URL, double quote, or backslash;
 - not begin with a hyphen at all (the schema pattern and `integrations/descriptions.py` reject any leading `-`, which
   covers list markers and thematic breaks), nor with `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1.`
   or `1)` followed by a space. Internal hyphens, plus signs, and digits remain valid plain text;
 - be a complete statement: it must not end with `:`, the Unicode ellipsis `…`, or the ASCII ellipsis `...`, and every
-  round
-  parenthesis must be balanced. Nested balanced parentheses are valid;
+  round parenthesis must be balanced. Nested balanced parentheses are valid;
 - be unique across every generated integration page. Duplicate identity is case-insensitive and NFC-normalized, but
-  accepted authored
-  text is emitted exactly and is never silently normalized;
+  accepted authored text is emitted exactly and is never silently normalized;
 - accurately describe the specific integration in active, user-facing language.
 
 Mechanical overview extraction and explicit author input are deliberately separate paths. Markdown stripping, whitespace
 normalization, sentence selection, and word-boundary truncation apply only to a mechanically derived description.
 
 Double quotes and backslashes are rejected because Learn's legacy frontmatter parser cannot preserve their escaping. Use
-unquoted wording
-or Unicode typographic quotation marks when quotation is essential.
+unquoted wording or Unicode typographic quotation marks when quotation is essential.
 
 Use an explicit description only when the mechanical result is missing, too short, duplicated, or otherwise inaccurate.
 Do not duplicate every overview sentence into metadata: the fallback is the normal path and the override is the
 exception.
 
 The Monitor Anything catalog deliberately retains its existing overview-first precedence. Adding an explicit meta
-override
-MUST NOT silently change a catalog table row.
+override MUST NOT silently change a catalog table row.
 
 ## Good And Bad Examples
 
@@ -144,11 +137,11 @@ Before committing `metadata.yaml` changes:
    python3 -m unittest integrations.tests.test_collector_metadata
    ```
 
-   Both workflows run the same two test modules; `check-markdown.yml` runs `test_descriptions` with
-   `LEARN_INGEST_PATH` pointing at the checked-out `netdata/learn` ingest script, so a locally green run can still fail
-   there on Learn-side frontmatter parsing.
+   Both workflows run the same two test modules; `check-markdown.yml` runs `test_descriptions` with `LEARN_INGEST_PATH`
+   pointing at the checked-out `netdata/learn` ingest script, so a locally green run can still fail there on Learn-side
+   frontmatter parsing.
 2. Regenerate `src/collectors/COLLECTORS.md` (`python3 integrations/gen_doc_collector_page.py`).
 3. Read the table row description and generated page frontmatter for the integration. Both must answer "what is this
    integration?" without relying on setup context and stay useful when rendered alone in a list, card, or search result.
-4. For a collector, run the review checklist in `.agents/skills/collectors-metadata-yaml/SKILL.md` over the rest of
-   the page.
+4. For a collector, run the review checklist in `.agents/skills/collectors-metadata-yaml/SKILL.md` over the rest of the
+   page.

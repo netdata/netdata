@@ -13,9 +13,9 @@ Referenced by every other schema as `./shared.json#/$defs/<name>`, so an edit he
   netdata-balanced-parentheses`; the pattern rejects any leading hyphen). Used by `instance.description`,
   `secretstore.meta.description`, and `service_discovery.meta.description`. Contract: `description-authoring.md`.
 - `id`: the deduplication key (`dedupe_integrations`).
-- `instance`: name, link, categories, icon, optional `description` and `variables`. `name` drives the slug, the
-  sidebar label, and the id; `categories` must name `categories.yaml` ids (fallback behavior: `pipeline.md`);
-  `icon_filename` is a filename in the website repository's icon directory; `variables` triggers the second Jinja pass.
+- `instance`: name, link, categories, icon, optional `description` and `variables`. `name` drives the slug, the sidebar
+  label, and the id; `categories` must name `categories.yaml` ids (fallback behavior: `pipeline.md`); `icon_filename` is
+  a filename in the website repository's icon directory; `variables` triggers the second Jinja pass.
 - `keywords`: emitted into the `<!--startmeta` block.
 - `short_setup` and `full_setup`: the two setup shapes; `setup-generic.md` renders both. In `full_setup`, an option's
   `detailed_description` turns the table cell into a link to an `h5` section below the table, `group` adds a Group
@@ -53,31 +53,31 @@ Behavior not visible in the schema:
 - `functions.list[].parameters[].default` is a string only. `returns.columns[].visibility` is rendered as a table cell
   by `templates/functions.md`; the `hidden` value does not suppress the column.
 - `additionalProperties: false` is set only on `profile_coverage`, the two `metrics.dynamic_*` list entries, and (via
-  `shared.json`) `instance.variables` and the troubleshooting `errors.list[]` entry, so unknown module keys pass
-  through (`gotchas.md`, `alternative_monitored_instances`).
+  `shared.json`) `instance.variables` and the troubleshooting `errors.list[]` entry, so unknown module keys pass through
+  (`gotchas.md`, `alternative_monitored_instances`).
 
 ### `flows.json` and `device.json`
 
-Tiny schemas that `$ref` `collector.json`: NetFlow, IPFIX, sFlow and flow-enrichment entries (`integration_type:
-flows`) and the generated NPM catalog entries (`integration_type: device`) validate as collectors. Fork the schema only
-when type-specific fields diverge.
+Tiny schemas that `$ref` `collector.json`: NetFlow, IPFIX, sFlow and flow-enrichment entries (`integration_type: flows`)
+and the generated NPM catalog entries (`integration_type: device`) validate as collectors. Fork the schema only when
+type-specific fields diverge.
 
 ## Thin schemas
 
-Each is a single entry or an array of entries (`oneOf`); `id`, `meta`, and `keywords` are required everywhere; `meta`
-is `shared.instance` except for `secretstore.json` and `service_discovery.json`, which define their own `$defs.meta`
+Each is a single entry or an array of entries (`oneOf`); `id`, `meta`, and `keywords` are required everywhere; `meta` is
+`shared.instance` except for `secretstore.json` and `service_discovery.json`, which define their own `$defs.meta`
 (`kind`, `name`, `link`, `icon_filename`, `description`, plus `tagline` for discoverers; no `categories`, no
 `variables`), so a `shared.json` edit does not reach those two. `setup` is `oneOf [short_setup, full_setup]` unless
 stated.
 
 - `exporter.json`: `overview.exporter_description` (required) and `exporter_limitations` (required, may be empty,
   rendered as `## Limitations` when non-empty); `setup` is `full_setup`; `troubleshooting` optional.
-- `agent_notification.json`: `overview.notification_description` and `notification_limitations` (same pattern);
-  optional `global_setup` whose two booleans (`severity_filtering`, `http_proxy`) are required only when the object is
-  present; `troubleshooting` optional.
+- `agent_notification.json`: `overview.notification_description` and `notification_limitations` (same pattern); optional
+  `global_setup` whose two booleans (`severity_filtering`, `http_proxy`) are required only when the object is present;
+  `troubleshooting` optional.
 - `cloud_notification.json`: no `overview`; `setup` required; `troubleshooting` optional; the same optional
-  `global_setup` as agent notifications.
-  `integrations/cloud-notifications/metadata.yaml` is one file holding the whole array.
+  `global_setup` as agent notifications. `integrations/cloud-notifications/metadata.yaml` is one file holding the whole
+  array.
 - `authentication.json`: `overview.authentication_description` and `authentication_limitations`; `troubleshooting`
   optional. `integrations/cloud-authentication/metadata.yaml` is one file holding the array.
 - `logs.json`: `overview.description`, `overview.visualization.description`, `overview.key_features.description`;
@@ -85,11 +85,11 @@ stated.
   `required` sits inside `setup.properties`, so nothing under `setup` is enforced and `setup` itself is optional.
   `integrations/logs/metadata.yaml` holds four entries (systemd journal, Windows events, macOS unified logs,
   OpenTelemetry).
-- `secretstore.json`: `meta.kind` (the slug, matching `/etc/netdata/go.d/ss/<kind>.conf`), optional
-  `meta.description` (page description), `overview.description` and optional `limitations`, `setup` (`full_setup`,
-  rendered by `setup-secretstore.md`), `collector_configs` (its `summary.operand_format` and `summary.example_operand`
-  feed the `SECRETS.md` table; `examples.list[].language` defaults to `text` in the schema but the template uses
-  `yaml`), `troubleshooting` required.
+- `secretstore.json`: `meta.kind` (the slug, matching `/etc/netdata/go.d/ss/<kind>.conf`), optional `meta.description`
+  (page description), `overview.description` and optional `limitations`, `setup` (`full_setup`, rendered by
+  `setup-secretstore.md`), `collector_configs` (its `summary.operand_format` and `summary.example_operand` feed the
+  `SECRETS.md` table; `examples.list[].language` defaults to `text` in the schema but the template uses `yaml`),
+  `troubleshooting` required.
 - `service_discovery.json`: `meta.kind` (the slug and discoverer registry name), `meta.tagline` (the
   `SERVICE-DISCOVERY.md` table one-liner), optional `meta.description`, `overview.description` with optional
   `how_it_works` and `limitations`, `setup` (`full_setup` only, rendered by `setup-service_discovery.md`), `services`
@@ -100,12 +100,11 @@ stated.
 
 - `deploy.json`: an array of deploy methods for the in-app "Add Nodes" dialog; never rendered to a page.
   `methods[].commands[].command` and `additional_info` may carry the frontend's `{% if $showClaimingOptions %}...{% /if
-  %}`
-  tags, stripped by `CUSTOM_TAG_PATTERN` in the clean variant; `clean_additional_info` replaces `additional_info` there.
-  `quick_start` orders the dialog; negative hides. `platform_info.group` (`include`, `no_include`, empty) and `distro`
-  cross-reference `distros.yml` (`in-app-contract.md`).
-- `categories.json`: the recursive `id`/`name`/`description`/`children` tree with the optional `collector_default`
-  flag (fallback semantics in `pipeline.md`).
+  %}` tags, stripped by `CUSTOM_TAG_PATTERN` in the clean variant; `clean_additional_info` replaces `additional_info`
+  there. `quick_start` orders the dialog; negative hides. `platform_info.group` (`include`, `no_include`, empty) and
+  `distro` cross-reference `distros.yml` (`in-app-contract.md`).
+- `categories.json`: the recursive `id`/`name`/`description`/`children` tree with the optional `collector_default` flag
+  (fallback semantics in `pipeline.md`).
 - `distros.json`: describes `.github/data/distros.yml` (`platform_map`, `arch_order`, `include[]` platforms with
   `distro`, `version`, `support_type` enum, `notes`, `bundle_sentry` required) but is never consulted by the generator
   (`gotchas.md`). Its platform object is closed and `packages.type` and `packages.arches` are required inside

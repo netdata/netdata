@@ -64,5 +64,5 @@ PY
 ## Repair rule
 
 Prefer the source-relative `/docs/... .md` form when the consuming surface supports Learn ingest rewriting. Keep an
-absolute URL only for surfaces that do not rewrite, derive its slug from the `map.yaml` label, and verify it with
-`curl` as above.
+absolute URL only for surfaces that do not rewrite, derive its slug from the `map.yaml` label, and verify it with `curl`
+as above.

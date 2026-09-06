@@ -4,8 +4,8 @@ Any change touching a collector MUST land in one source PR with matching changes
 artifact (root `AGENTS.md`, "Collector Consistency"):
 
 1. **The code**: the collector implementation files.
-2. **`metadata.yaml`**: the integration page driver (field content: `.agents/skills/collectors-metadata-yaml/`).
-   A sibling `taxonomy.yaml` is not part of this list ("The dormant collector taxonomy" below).
+2. **`metadata.yaml`**: the integration page driver (field content: `.agents/skills/collectors-metadata-yaml/`). A
+   sibling `taxonomy.yaml` is not part of this list ("The dormant collector taxonomy" below).
 3. **`config_schema.json`**: the dashboard's DynCfg editor (form rules:
    `.agents/skills/collectors-go-design/config-schema.md`).
 4. **The stock `.conf`**: what `/etc/netdata/<plugin>/...` ships.
@@ -27,19 +27,19 @@ This is the skill's one statement of the boundary; other skill files point here.
 short contributor-facing version.
 
 - The source PR contains authoritative inputs (hand-authored `metadata.yaml`, ibm.d `contexts.yaml`/`config.go`/
-  `module.yaml`, SNMP profiles and the trap catalogue), generators, schemas, templates, workflows, tests, and
-  maintainer contracts.
+  `module.yaml`, SNMP profiles and the trap catalogue), generators, schemas, templates, workflows, tests, and maintainer
+  contracts.
 - Generated documentation is NOT in the source PR: per-integration `<dir>/integrations/<slug>.md`, generated `README.md`
   files and symlinks, the umbrella pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md`, and
   producer-generated metadata (ibm.d `metadata.yaml`, the NPM catalog `metadata.yaml`). After the source PR merges,
-  `.github/workflows/generate-integrations.yml` reruns the producers and generators and opens the
-  `integrations-regen` PR ("Regenerate integrations docs") with every derived change; a maintainer reviews and merges
-  it. Name that delivery route in the source PR description.
-- Exception, generated runtime outputs: ibm.d `contexts/zz_generated_contexts.go` (compilation) and
-  `config_schema.json` (the shipped configuration contract) MUST ship in the source PR with the `contexts.yaml` or
-  `config.go` change that produced them. Both workflows run `go generate` and fail on drift in those two files
-  (step "Verify generated runtime outputs"). `go generate` also writes through the module's `README.md` symlink into
-  the generated integration page; leave that page unstaged (`ibm-d.md`).
+  `.github/workflows/generate-integrations.yml` reruns the producers and generators and opens the `integrations-regen`
+  PR ("Regenerate integrations docs") with every derived change; a maintainer reviews and merges it. Name that delivery
+  route in the source PR description.
+- Exception, generated runtime outputs: ibm.d `contexts/zz_generated_contexts.go` (compilation) and `config_schema.json`
+  (the shipped configuration contract) MUST ship in the source PR with the `contexts.yaml` or `config.go` change that
+  produced them. Both workflows run `go generate` and fail on drift in those two files (step "Verify generated runtime
+  outputs"). `go generate` also writes through the module's `README.md` symlink into the generated integration page;
+  leave that page unstaged (`ibm-d.md`).
 - Local regeneration is still mandatory validation: run the pipeline (`integrations/README.md` lists the commands and
   dependencies), inspect the complete generated diff, rerun to confirm it is a fixed point (a second run changes
   nothing), then leave every generated file unstaged.
@@ -71,33 +71,32 @@ are read only by this tooling.
 ## What is enforced today
 
 - `gen_integrations.py` validates each `metadata.yaml` against its JSON Schema only (fatal on any warning).
-- `integrations/tests/test_collector_metadata.py` (both integration workflows): a collector named by a
-  service-discovery rule documents its auto-detection; prose fields contain no Markdown that breaks the Learn build.
+- `integrations/tests/test_collector_metadata.py` (both integration workflows): a collector named by a service-discovery
+  rule documents its auto-detection; prose fields contain no Markdown that breaks the Learn build.
 - `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
   (`description-authoring.md`) resolve, validate, and are unique.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
 - The ibm.d runtime-output drift gate ("Delivery boundary" above).
 - Not enforced anywhere: metric rows against the code, alert rows against `health.d/*.conf`, option names against the
-  schema for collectors that have not opted in, stock conf defaults against the schema. `check-markdown.yml` checks
-  that generated links resolve on Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is
-  broken and unused (`gotchas.md`). Until such checks exist, these are review-time checks.
+  schema for collectors that have not opted in, stock conf defaults against the schema. `check-markdown.yml` checks that
+  generated links resolve on Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is broken
+  and unused (`gotchas.md`). Until such checks exist, these are review-time checks.
 - ibm.d modules are the exception: docgen generates `metadata.yaml` and `config_schema.json` from `contexts.yaml`,
-  `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still
-  need manual sync (`ibm-d.md`).
+  `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still need
+  manual sync (`ibm-d.md`).
 
 ## What reviewers should check
 
-1. **Code changes have matching `metadata.yaml` changes.** A chart, dimension, label, or unit change in the code
-   appears in `metadata.yaml`; a renamed metric changes both files. Row content (rows mirror the code's context,
-   title, unit, type, and dimensions): `.agents/skills/collectors-metadata-yaml/metrics.md`.
+1. **Code changes have matching `metadata.yaml` changes.** A chart, dimension, label, or unit change in the code appears
+   in `metadata.yaml`; a renamed metric changes both files. Row content (rows mirror the code's context, title, unit,
+   type, and dimensions): `.agents/skills/collectors-metadata-yaml/metrics.md`.
 2. **Config changes propagate to all four config-related files**: the Go struct field (`config.go`),
-   `config_schema.json` (type, default, validation), the stock `.conf` (a representative example), and
-   `metadata.yaml` (`setup.configuration.options.list`). The option's `group` and the DynCfg tab MUST name the same
-   thing and the option `description` MUST be identical in both files. The rules (tab and group naming, the
-   `Tab / Subgroup` form, order, deriving groups from the collector's own keys, the opt-in
-   `collecttest.AssertConfigSchemaMatchesMetadata` call) are owned by
-   `.agents/skills/collectors-go-design/config-schema.md` sections 3 and 8; the metadata side of a row by
+   `config_schema.json` (type, default, validation), the stock `.conf` (a representative example), and `metadata.yaml`
+   (`setup.configuration.options.list`). The option's `group` and the DynCfg tab MUST name the same thing and the option
+   `description` MUST be identical in both files. The rules (tab and group naming, the `Tab / Subgroup` form, order,
+   deriving groups from the collector's own keys, the opt-in `collecttest.AssertConfigSchemaMatchesMetadata` call) are
+   owned by `.agents/skills/collectors-go-design/config-schema.md` sections 3 and 8; the metadata side of a row by
    `.agents/skills/collectors-metadata-yaml/setup.md`.
 3. **Alert changes have matching `metadata.yaml.alerts` entries.** An alert added, removed, or renamed in
    `health.d/<plugin>.conf` changes `metadata.yaml.modules.<m>.alerts[]`. Row content (name, `on:` context, `info`
@@ -108,9 +107,9 @@ are read only by this tooling.
    `integrations/` subdirectory).
 5. **Umbrella pages.** Adding or removing a collector, secret store, or discoverer changes
    `src/collectors/COLLECTORS.md`, `SECRETS.md`, or `SERVICE-DISCOVERY.md` respectively; delivery boundary above.
-6. **Generated artifacts are outputs, not source.** Files with a `DO NOT EDIT THIS FILE DIRECTLY` or
-   `<!--startmeta ... message: "DO NOT EDIT..." -->` banner are regenerated from their sources, never hand-edited;
-   so are the three umbrella pages, which carry no banner (`pipeline.md`).
+6. **Generated artifacts are outputs, not source.** Files with a `DO NOT EDIT THIS FILE DIRECTLY` or `<!--startmeta ...
+   message: "DO NOT EDIT..." -->` banner are regenerated from their sources, never hand-edited; so are the three
+   umbrella pages, which carry no banner (`pipeline.md`).
 
 ## Anti-patterns to flag in review
 
@@ -119,7 +118,7 @@ are read only by this tooling.
 - "The integration page on Learn doesn't show my new option." Verify `metadata.yaml` changed and the post-merge
   regeneration PR completed.
 - "I edited `integrations/<slug>.md` to fix a description." No: it is generated. Edit `metadata.yaml` and regenerate.
-- "I edited `metadata.yaml` for an ibm.d module." No: edit `contexts.yaml`, `config.go`, or `module.yaml` and run
-  `go generate`.
-- "I changed a default in the stock `.conf` only." Update the `config_schema.json` `default`, the `metadata.yaml`
-  option `default_value`, and the authoritative documentation source in lockstep.
+- "I edited `metadata.yaml` for an ibm.d module." No: edit `contexts.yaml`, `config.go`, or `module.yaml` and run `go
+  generate`.
+- "I changed a default in the stock `.conf` only." Update the `config_schema.json` `default`, the `metadata.yaml` option
+  `default_value`, and the authoritative documentation source in lockstep.

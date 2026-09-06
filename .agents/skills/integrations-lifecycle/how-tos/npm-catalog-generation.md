@@ -66,15 +66,15 @@ generator:
 `integrations/templates/setup-generic.md` makes "nothing to configure" a first-class state: an empty `prerequisites`
 list renders `No action required.` and an empty `configuration.file.name` renders `There is no configuration file.`
 Never point an entry at a config file it does not use to fill the section. The template renders the UI / File
-configuration table only for `meta.plugin_name == 'go.d.plugin'` entries without `setup.single_job`, so entries owned
-by other plugins skip it correctly.
+configuration table only for `meta.plugin_name == 'go.d.plugin'` entries without `setup.single_job`, so entries owned by
+other plugins skip it correctly.
 
 ## Verify entries against the collector's own metadata
 
 Several entries describe collectors that have an authoritative `metadata.yaml` elsewhere
 (`src/collectors/network-viewer.plugin/metadata.yaml` for example). That file is the source of truth for supported
-platforms, `multi_instance`, and options; copy those facts, because a catalog entry that contradicts the collector's
-own metadata is a bug in the catalog. Producers with no `metadata.yaml` of their own (`snmp_topology` is one) have the
+platforms, `multi_instance`, and options; copy those facts, because a catalog entry that contradicts the collector's own
+metadata is a bug in the catalog. Producers with no `metadata.yaml` of their own (`snmp_topology` is one) have the
 catalog entry as their only public documentation, so check its setup block directly against the collector source and
 `config_schema.json`.
 

@@ -16,17 +16,16 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
    `device.json` do: a five-line schema that `$ref`s `collector.json`, forked only when fields diverge. For a thin type
    (overview, setup, troubleshooting) clone `logs.json` or `exporter.json`.
 2. **`gen_integrations.py`**: a `<TYPE>_SOURCES` list, a `<TYPE>_VALIDATOR` from `make_validator`, a
-   `<TYPE>_RENDER_KEYS`
-   list, a `load_<type>` and `render_<type>` pair, and the two concatenations in `main()` (rich and clean). Render keys
-   are a downstream contract, not a docs choice: every section the website or cloud-frontend treats as content must be
-   emitted as a Markdown string (`../in-app-contract.md`). When the schema reuses `collector.json`, default to the
-   collector render keys.
+   `<TYPE>_RENDER_KEYS` list, a `load_<type>` and `render_<type>` pair, and the two concatenations in `main()` (rich and
+   clean). Render keys are a downstream contract, not a docs choice: every section the website or cloud-frontend treats
+   as content must be emitted as a Markdown string (`../in-app-contract.md`). When the schema reuses `collector.json`,
+   default to the collector render keys.
 3. **`gen_docs_integrations.py`**: a `mode` branch in `build_readme_from_integration` (frontmatter, message, sections,
    `learn_rel_path`), a branch in `main()` that dispatches the type, and, if the output location differs from
    `<dir>/integrations/<slug>.md`, a `write_to_file` mode. Add the type to `DOCUMENTATION_TYPES` in `descriptions.py` so
-   the description preflight covers it. Two `learn_rel_path` styles exist: fixed (exporter, logs, secretstore,
-   service discovery) or derived from the first category through `generate_category_from_name` (collector, flows,
-   device, notifications, authentication); `../pipeline.md` has the table.
+   the description preflight covers it. Two `learn_rel_path` styles exist: fixed (exporter, logs, secretstore, service
+   discovery) or derived from the first category through `generate_category_from_name` (collector, flows, device,
+   notifications, authentication); `../pipeline.md` has the table.
 4. **Templates** under `integrations/templates/`: an `overview/<type>.md` file AND its `elif` branch in the dispatcher
    `overview.md` (without the branch the overview renders empty and the description preflight fails with "Missing
    description source"); unless `setup-generic.md` fits, a `setup-<type>.md`; custom delimiters `[[ ]]` and `[% %]`
@@ -37,17 +36,17 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
    sections.
 6. **Source metadata**: `integration_type: <type>` and `categories` on every entry, one shared file (like logs) or one
    file per source directory (like collectors).
-7. **Learn** (`docs/.map/map.yaml`): a section holding an `integration_placeholder` node with an `integration_kind`.
-   The kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
+7. **Learn** (`docs/.map/map.yaml`): a section holding an `integration_placeholder` node with an `integration_kind`. The
+   kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
    `flows`, `exporters`, `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, and
    `service_discovery` (keep their singular/plural style). Learn's ingest buckets pages by a fixed kind list
    (`.agents/skills/docs-learn-site-structure/mapping.md`, "Integration placeholders"), so a new kind is a Learn-repo
-   change too; `device` has no placeholder and attaches through the NPM chapter nodes.
-   Map authoring and companion hand-written pages: the `docs-learn-site-structure` skill (`mapping.md`).
+   change too; `device` has no placeholder and attaches through the NPM chapter nodes. Map authoring and companion
+   hand-written pages: the `docs-learn-site-structure` skill (`mapping.md`).
 8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically, but FAQ and solution pages
-   that describe the old story may need edits, and a new top-level category or section shape needs the website build
-   run or emulated with the Hugo version pinned in its `netlify.toml`. Cloud-frontend is data-driven, but its content
-   tabs (`src/domains/integrations/components/content/integration/tabs.js`), its Markdown renderer
+   that describe the old story may need edits, and a new top-level category or section shape needs the website build run
+   or emulated with the Hugo version pinned in its `netlify.toml`. Cloud-frontend is data-driven, but its content tabs
+   (`src/domains/integrations/components/content/integration/tabs.js`), its Markdown renderer
    (`src/components/markdown/useRenderableTree.js`), and `scripts/checkIntegrations.js` assume Markdown strings under
    the standard keys, so inspect the generated `integrations.js` shape against them before merging.
 
@@ -69,5 +68,5 @@ this repository; website corrections go in their own PR there, and a new `integr
 Traced `learn_rel_path` per mode through `build_readme_from_integration` in `integrations/gen_docs_integrations.py`,
 read the `<!--startmeta` block of one generated page per type, listed the `integration_kind` values in
 `docs/.map/map.yaml`, read the fixed-kind bucketing in `docs-learn-site-structure/mapping.md`, and confirmed `deploy`
-has no documentation mode in `descriptions.py`. The `flows` and `device`
-additions are the worked examples (`integrations/schemas/flows.json`, `device.json`, `FLOWS_SOURCES`, `DEVICE_SOURCES`).
+has no documentation mode in `descriptions.py`. The `flows` and `device` additions are the worked examples
+(`integrations/schemas/flows.json`, `device.json`, `FLOWS_SOURCES`, `DEVICE_SOURCES`).

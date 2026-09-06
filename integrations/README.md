@@ -14,8 +14,8 @@ maintainers in `.agents/skills/integrations-lifecycle/`; this file is the local-
   `markdown-it-py`. All five are needed for generation (the description validator imports `markdown-it-py`); the same
   list is pinned in `packaging/cmake/Modules/NetdataRenderDocs.cmake` and the two must change together. Distribution
   packages work too: `apt-get install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel.yaml`
-  (Debian, Ubuntu), `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml` (Alpine), or
-  `dnf install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml` (Fedora, RHEL with EPEL), plus
+  (Debian, Ubuntu), `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml` (Alpine), or `dnf install
+  python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml` (Fedora, RHEL with EPEL), plus
   `markdown-it-py` from pip.
 - Go (the version in `src/go/go.mod`) only when ibm.d module inputs changed, for `go generate`.
 
@@ -37,16 +37,15 @@ python3 integrations/gen_doc_secrets_page.py                  # -> src/collector
 python3 integrations/gen_doc_service_discovery_page.py        # -> src/collectors/SERVICE-DISCOVERY.md
 ```
 
-`gen_docs_integrations.py -c <plugin>/<module>` regenerates one collector's page; `--check` validates the generated
-page descriptions without writing. `integrations/check_collector_metadata.py` is a legacy script that no longer runs.
+`gen_docs_integrations.py -c <plugin>/<module>` regenerates one collector's page; `--check` validates the generated page
+descriptions without writing. `integrations/check_collector_metadata.py` is a legacy script that no longer runs.
 `gen_taxonomy.py`, `gen_taxonomy_seed.py`, `check_collector_taxonomy.py`, the `taxonomy.yaml` files, and
 `integrations/taxonomy/` are a dormant collector-taxonomy prototype kept for later work; nothing runs them.
 
 ## What to commit
 
 A source pull request commits the authoritative inputs only. Generated pages, generated README files, the umbrella
-pages,
-and generated metadata (ibm.d, NPM catalog) are validated locally and left unstaged; the post-merge workflow
+pages, and generated metadata (ibm.d, NPM catalog) are validated locally and left unstaged; the post-merge workflow
 `.github/workflows/generate-integrations.yml` regenerates them and opens the `integrations-regen` pull request. The
 gitignored catalogs (`integrations.js`, `integrations.json`, `taxonomy.json`) and the untracked
 `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are never committed.

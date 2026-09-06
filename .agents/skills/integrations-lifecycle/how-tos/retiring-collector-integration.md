@@ -58,17 +58,17 @@ Use the installer's existing traced command wrapper for destructive file operati
 
 ## 5. Handle metadata and generated outputs by ownership
 
-Delete the authoritative `metadata.yaml` (and any dormant sibling `taxonomy.yaml`) with the collector. Remove backlinks and ownership assertions in replacement metadata and tests.
+Delete the authoritative `metadata.yaml` (and any dormant sibling `taxonomy.yaml`) with the collector. Remove backlinks
+and ownership assertions in replacement metadata and tests.
 
 Generated outputs follow two cases:
 
 1. A generated integration page and README symlink live inside the directory being retired. Delete them with the
-   complete
-   directory; retaining a generated-only directory is not a clean collector removal. The sensors retirement
+   complete directory; retaining a generated-only directory is not a clean collector removal. The sensors retirement
    (`aba1472fe81a2c9367e6120e202846ce90adcaa9`) is the repository precedent.
 2. Generated pages that survive elsewhere, umbrella pages, and gitignored catalogs are not hand-edited. Regenerate them
-   locally for inspection and let the post-merge regeneration PR publish them (`../consistency.md`, "Delivery
-   boundary", including the gitignored-catalog check).
+   locally for inspection and let the post-merge regeneration PR publish them (`../consistency.md`, "Delivery boundary",
+   including the gitignored-catalog check).
 
 ## 6. Route deleted Learn pages
 
@@ -98,10 +98,10 @@ route.
 
 Files read: `src/go/plugin/go.d/collector/init.go`, `src/go/plugin/go.d/config/go.d.conf`,
 `src/go/plugin/go.d/config/go.d/sd/net_listeners.conf`,
-`src/go/plugin/agent/discovery/sd/pipeline/{services.go,promport.go}`,
-`packaging/makeself/install-or-update.sh`, `integrations/gen_integrations.py`, `integrations/gen_docs_integrations.py`,
-both integration CI workflows, the sensors removal commit `aba1472fe81a2c9367e6120e202846ce90adcaa9`, and the Learn
-redirect ownership documented by the Learn structure skill.
+`src/go/plugin/agent/discovery/sd/pipeline/{services.go,promport.go}`, `packaging/makeself/install-or-update.sh`,
+`integrations/gen_integrations.py`, `integrations/gen_docs_integrations.py`, both integration CI workflows, the sensors
+removal commit `aba1472fe81a2c9367e6120e202846ce90adcaa9`, and the Learn redirect ownership documented by the Learn
+structure skill.
 
 Commands run: `rg '<module>|<collector-path>|<integration-id>|<context-prefix>' src integrations packaging`; focused
 registry, replacement, and discovery tests; integration metadata and generated-document validation; `git diff --check`.

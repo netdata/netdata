@@ -1,7 +1,7 @@
 # Tracing metadata sections missing from published integration pages
 
-How do you identify where an integration section is lost when `metadata.yaml` contains it but Website or Learn does
-not render it?
+How do you identify where an integration section is lost when `metadata.yaml` contains it but Website or Learn does not
+render it?
 
 ## Answer
 
@@ -49,8 +49,7 @@ Published integration files are then copied and sanitized without reconstructing
 At `netdata/website @ db6ed7b907a8d9f833450bfbbc24fc10eb4c9e8e`, Website does not consume the tracked Agent Markdown.
 Its `update-integrations.yml` workflow checks out Agent `master`, runs `gen_integrations.py`, and copies
 `integrations.json` into Website data; `scripts/build_integrations_md_files.py` then creates integration page shells
-from
-that data. The template `themes/tailwind/layouts/partials/integration-tabs.html` creates an Alerts tab whenever the
+from that data. The template `themes/tailwind/layouts/partials/integration-tabs.html` creates an Alerts tab whenever the
 integration object contains a non-empty `alerts` value. Therefore:
 
 - If Agent JSON is correct but Website data is stale, run the normal Website integration update workflow.
@@ -69,16 +68,16 @@ For an alerts omission, verify all of these independently:
 5. Website data regeneration and Learn ingestion ran after the Agent source and generated artifacts were merged.
 6. The rendered Website and Learn pages contain a known alert name.
 
-This sequence distinguishes a source or generator defect from a stale delivery artifact. A missing public section is
-not evidence of a template defect until the downstream input has been shown to contain that section.
+This sequence distinguishes a source or generator defect from a stale delivery artifact. A missing public section is not
+evidence of a template defect until the downstream input has been shown to contain that section.
 
 ## How I figured this out
 
 Files read: `integrations/gen_integrations.py`, `integrations/templates/alerts.md`,
-`integrations/gen_docs_integrations.py`, `.github/workflows/generate-integrations.yml`; in
-`netdata/website @ db6ed7b907a8d9f833450bfbbc24fc10eb4c9e8e`: `.github/workflows/update-integrations.yml`,
-`scripts/build_integrations_md_files.py`, `themes/tailwind/layouts/partials/integration-tabs.html`; in
-`netdata/learn @ 6bde65e850454be8778013a583ee6c96d1feb178`: `ingest/ingest.py`.
+`integrations/gen_docs_integrations.py`, `.github/workflows/generate-integrations.yml`; in `netdata/website @
+db6ed7b907a8d9f833450bfbbc24fc10eb4c9e8e`: `.github/workflows/update-integrations.yml`,
+`scripts/build_integrations_md_files.py`, `themes/tailwind/layouts/partials/integration-tabs.html`; in `netdata/learn @
+6bde65e850454be8778013a583ee6c96d1feb178`: `ingest/ingest.py`.
 
 ```bash
 rg -n "COLLECTOR_RENDER_KEYS|render_collectors|integration.get\(\"alerts\"\)" integrations
