@@ -2,6 +2,11 @@
 
 # Prometheus profile proofs
 
+**Place in the documentation set.** The project skill `.agents/skills/collectors-prometheus-profiles/SKILL.md` names
+this document as the owner of the `evidence-dirs` and `verify` commands and cites its sections by heading anchor;
+`.agents/sow/audit.sh` fails when a cited heading no longer exists, so renaming or removing a heading here updates the
+skill in the same change.
+
 This developer tool discovers every
 `src/go/plugin/go.d/collector/prometheus/profile-proofs/*/proof.yaml` descriptor. It is the command-line adapter over
 `internal/promprofile/proof` and `internal/promprofile/validation`; it contains no independent proof contract or validation
