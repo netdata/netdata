@@ -2,6 +2,7 @@
 
 #include "database/rrd.h"
 #include "KolmogorovSmirnovDist.h"
+#include "weights-ranking.h"
 
 #define MAX_POINTS 10000
 
@@ -72,6 +73,10 @@ struct register_result {
     STORAGE_POINT highlighted;
     STORAGE_POINT baseline;
     usec_t duration_ut;
+    bool selected;
+    bool instance_selected;
+    bool context_selected;
+    bool node_selected;
 };
 
 struct weights_host_snapshot {
@@ -215,6 +220,84 @@ static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname
     dictionary_set_advanced(results, buf, len, &t, sizeof(struct register_result), NULL);
 }
 
+static int weights_result_compare(const void *left, const void *right, void *data) {
+    const struct register_result *a = left, *b = right;
+    bool normalized = *(bool *)data;
+    if(a->value != b->value)
+        return ((a->value < b->value) == normalized) ? -1 : 1;
+
+    const ND_UUID *aid = UUIDiszero(a->host->host_id) ? &a->host->node_id : &a->host->host_id;
+    const ND_UUID *bid = UUIDiszero(b->host->host_id) ? &b->host->node_id : &b->host->host_id;
+    int rc = memcmp(aid->uuid, bid->uuid, sizeof(aid->uuid));
+    if(!rc) rc = strcmp(rrdcontext_acquired_id(a->rca), rrdcontext_acquired_id(b->rca));
+    if(!rc) rc = strcmp(rrdinstance_acquired_id(a->ria), rrdinstance_acquired_id(b->ria));
+    if(!rc) rc = strcmp(rrdmetric_acquired_id(a->rma), rrdmetric_acquired_id(b->rma));
+    return rc;
+}
+
+static void weights_parent_key(char *key, size_t size, char type, const void *parent) {
+    snprintfz(key, size, "%c%p", type, parent);
+}
+
+static WEIGHTS_RANKING weights_select_results(DICTIONARY *results, size_t limit, bool *normalized, bool mark_parents) {
+    size_t total = dictionary_entries(results);
+    WEIGHTS_RANKING ranking = {
+        .capacity = MIN(limit, total), .compare = weights_result_compare, .data = normalized,
+    };
+    struct register_result *t;
+    if(mark_parents && limit >= total) {
+        dfe_start_read(results, t)
+            t->selected = t->instance_selected = t->context_selected = t->node_selected = true;
+        dfe_done(t);
+        return ranking;
+    }
+
+    ranking.items = callocz(ranking.capacity, sizeof(*ranking.items));
+    dfe_start_read(results, t)
+        weights_ranking_offer(&ranking, t);
+    dfe_done(t);
+
+    if(!mark_parents)
+        return ranking;
+
+    DICTIONARY *parents = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    char key[2 * sizeof(void *) + 4];
+    for(size_t i = 0; i < ranking.used; i++) {
+        t = ranking.items[i];
+        t->selected = true;
+        weights_parent_key(key, sizeof(key), 'n', t->host);
+        dictionary_set(parents, key, "", 1);
+        weights_parent_key(key, sizeof(key), 'c', t->rca);
+        dictionary_set(parents, key, "", 1);
+        weights_parent_key(key, sizeof(key), 'i', t->ria);
+        dictionary_set(parents, key, "", 1);
+    }
+    dfe_start_read(results, t) {
+        weights_parent_key(key, sizeof(key), 'n', t->host);
+        t->node_selected = dictionary_get(parents, key) != NULL;
+        weights_parent_key(key, sizeof(key), 'c', t->rca);
+        t->context_selected = dictionary_get(parents, key) != NULL;
+        weights_parent_key(key, sizeof(key), 'i', t->ria);
+        t->instance_selected = dictionary_get(parents, key) != NULL;
+    }
+    dfe_done(t);
+    dictionary_destroy(parents);
+    return ranking;
+}
+
+static void weights_result_limit_to_json(BUFFER *wb, size_t limit, size_t total, size_t returned, bool grouped) {
+    if(!limit)
+        return;
+    buffer_json_member_add_object(wb, "result_limit");
+    buffer_json_member_add_uint64(wb, "limit", limit);
+    buffer_json_member_add_uint64(wb, "total", total);
+    buffer_json_member_add_uint64(wb, "returned", returned);
+    buffer_json_member_add_string(wb, "unit", grouped ? "groups" : "dimensions");
+    buffer_json_member_add_boolean(wb, "truncated", total > returned);
+    buffer_json_member_add_string(wb, "summary_scope", "all");
+    buffer_json_object_close(wb);
+}
+
 // ----------------------------------------------------------------------------
 // Generation of JSON output for the results
 
@@ -266,7 +349,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 size_t points, WEIGHTS_METHOD method,
                                                 RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
-                                                WEIGHTS_STATS *stats) {
+                                                WEIGHTS_STATS *stats, size_t limit) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -279,6 +362,8 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
     struct register_result *t;
     RRDINSTANCE_ACQUIRED *last_ria = NULL; // never access this - we use it only for comparison
     dfe_start_read(results, t) {
+        if(limit && !t->selected)
+            continue;
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
@@ -305,8 +390,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     return total_dimensions;
@@ -318,7 +404,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   size_t points, WEIGHTS_METHOD method,
                                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
-                                                  WEIGHTS_STATS *stats) {
+                                                  WEIGHTS_STATS *stats, size_t limit) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -333,6 +419,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
     dfe_start_read(results, t) {
+        if(limit && !t->context_selected)
+            continue;
 
         if(t->rca != last_rca) {
             last_rca = t->rca;
@@ -357,6 +445,11 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             last_ria = NULL;
         }
 
+        contexts_total_weight += t->value;
+        context_dims++;
+        if(limit && !t->instance_selected)
+            continue;
+
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
@@ -374,12 +467,12 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             charts_total_weight = 0.0;
         }
 
-        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
         charts_total_weight += t->value;
-        contexts_total_weight += t->value;
         chart_dims++;
-        context_dims++;
-        total_dimensions++;
+        if(!limit || t->selected) {
+            buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+            total_dimensions++;
+        }
     }
     dfe_done(t);
 
@@ -395,8 +488,9 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     return total_dimensions;
@@ -761,6 +855,8 @@ typedef enum {
 
 struct aggregated_weight {
     const char *name;
+    const char *id;
+    bool selected;
     NETDATA_DOUBLE min;
     NETDATA_DOUBLE max;
     NETDATA_DOUBLE sum;
@@ -768,6 +864,28 @@ struct aggregated_weight {
     STORAGE_POINT hsp;
     STORAGE_POINT bsp;
 };
+
+static NETDATA_DOUBLE weights_group_score(const struct aggregated_weight *aw, RRDR_GROUP_BY_FUNCTION aggregation) {
+    switch(aggregation) {
+        case RRDR_GROUP_BY_FUNCTION_MIN: return aw->min;
+        case RRDR_GROUP_BY_FUNCTION_MAX:
+        case RRDR_GROUP_BY_FUNCTION_EXTREMES: return aw->max;
+        case RRDR_GROUP_BY_FUNCTION_SUM:
+        case RRDR_GROUP_BY_FUNCTION_PERCENTAGE: return aw->sum;
+        default: return aw->count ? aw->sum / (NETDATA_DOUBLE)aw->count : 0.0;
+    }
+}
+
+static int weights_group_compare(const void *left, const void *right, void *data) {
+    const struct aggregated_weight *a = left, *b = right;
+    const QUERY_WEIGHTS_REQUEST *qwr = data;
+    NETDATA_DOUBLE av = weights_group_score(a, qwr->group_by.aggregation);
+    NETDATA_DOUBLE bv = weights_group_score(b, qwr->group_by.aggregation);
+    bool normalized = !(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE;
+    if(av != bv)
+        return ((av < bv) == normalized) ? -1 : 1;
+    return strcmp(a->id, b->id);
+}
 
 static inline void storage_point_to_json(BUFFER *wb, WEIGHTS_POINT_TYPE type, ssize_t di, ssize_t ii, ssize_t ci, ssize_t ni, struct aggregated_weight *aw, RRDR_OPTIONS options __maybe_unused, bool baseline) {
     if(type != WPT_GROUP) {
@@ -1032,6 +1150,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     bool baseline = method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME;
     multinode_data_schema(wb, options, "schema", baseline, false);
+    size_t limit = qwd->qwr->cardinality_limit;
 
     DICTIONARY *dict_nodes = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_node));
     DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name_units));
@@ -1052,27 +1171,33 @@ static size_t registered_results_to_json_multinode_no_group_by(
     ssize_t di = -1, ii = -1, ci = -1, ni = -1;
     ssize_t di_max = 0, ii_max = 0, ci_max = 0, ni_max = 0;
     size_t total_dimensions = 0;
+    bool node_selected = false;
     dfe_start_read(results, t) {
 
         // close instance
         if(t->ria != last_ria && last_ria) {
-            storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
-            instance_dun->exposed = true;
+            if(instance_dun) {
+                storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
+                instance_dun->exposed = true;
+            }
             last_ria = NULL;
             instance_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close context
         if(t->rca != last_rca && last_rca) {
-            storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
-            context_dun->exposed = true;
+            if(context_dun) {
+                storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
+                context_dun->exposed = true;
+            }
             last_rca = NULL;
             context_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close node
         if(t->host != last_host && last_host) {
-            storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
+            if(node_selected)
+                storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
             node_dun->exposed = true;
             last_host = NULL;
             node_aw = AGGREGATED_WEIGHT_EMPTY;
@@ -1083,64 +1208,68 @@ static size_t registered_results_to_json_multinode_no_group_by(
             last_host = t->host;
             node_dun = dict_unique_node_add(dict_nodes, t->host, &ni_max);
             ni = node_dun->i;
+            node_selected = !limit || t->node_selected;
+            node_dun->exposed = true;
         }
 
         // open context
         if(t->rca != last_rca) {
             last_rca = t->rca;
-            context_dun = dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
-                                                     rrdcontext_acquired_units(t->rca), &ci_max);
-            ci = context_dun->i;
+            context_dun = (!limit || t->context_selected) ?
+                dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
+                                           rrdcontext_acquired_units(t->rca), &ci_max) : NULL;
+            ci = context_dun ? context_dun->i : -1;
         }
 
         // open instance
         if(t->ria != last_ria) {
             last_ria = t->ria;
-            instance_dun = dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max);
-            ii = instance_dun->i;
+            instance_dun = (!limit || t->instance_selected) ?
+                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max) : NULL;
+            ii = instance_dun ? instance_dun->i : -1;
         }
 
-        dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
-        di = dimension_dun->i;
-
-        struct aggregated_weight aw = {
+        if(!limit || t->selected) {
+            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
+            di = dimension_dun->i;
+            struct aggregated_weight aw = {
                 .min = t->value,
                 .max = t->value,
                 .sum = t->value,
                 .count = 1,
                 .hsp = t->highlighted,
                 .bsp = t->baseline,
-        };
+            };
 
-        storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
-        node_dun->exposed = true;
-        context_dun->exposed = true;
-        instance_dun->exposed = true;
-        dimension_dun->exposed = true;
+            storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
+            context_dun->exposed = true;
+            instance_dun->exposed = true;
+            dimension_dun->exposed = true;
+            total_dimensions++;
+        }
 
         merge_into_aw(instance_aw, t);
         merge_into_aw(context_aw, t);
         merge_into_aw(node_aw, t);
 
         node_dun->duration_ut += t->duration_ut;
-        total_dimensions++;
     }
     dfe_done(t);
 
     // close instance
-    if(last_ria) {
+    if(last_ria && instance_dun) {
         storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
         instance_dun->exposed = true;
     }
 
     // close context
-    if(last_rca) {
+    if(last_rca && context_dun) {
         storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
         context_dun->exposed = true;
     }
 
     // close node
-    if(last_host) {
+    if(last_host && node_selected) {
         storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
         node_dun->exposed = true;
     }
@@ -1221,8 +1350,9 @@ static size_t registered_results_to_json_multinode_no_group_by(
     buffer_json_object_close(wb); //dictionaries
 
     buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     dictionary_destroy(dict_nodes);
@@ -1338,28 +1468,46 @@ static size_t registered_results_to_json_multinode_group_by(
     buffer_free(name); name = NULL;
 
     struct aggregated_weight *aw;
+    size_t limit = qwd->qwr->cardinality_limit;
+    size_t total_groups = dictionary_entries(group_by), returned_groups = 0;
+    WEIGHTS_RANKING ranking = {.capacity = MIN(limit, total_groups), .compare = weights_group_compare, .data = qwd->qwr};
+    if(limit && limit < total_groups) {
+        ranking.items = callocz(ranking.capacity, sizeof(*ranking.items));
+        dfe_start_read(group_by, aw) {
+            aw->id = aw_dfe.name;
+            weights_ranking_offer(&ranking, aw);
+        }
+        dfe_done(aw);
+        for(size_t i = 0; i < ranking.used; i++)
+            ((struct aggregated_weight *)ranking.items[i])->selected = true;
+    }
     buffer_json_member_add_array(wb, "result");
     dfe_start_read(group_by, aw) {
         const char *k = aw_dfe.name;
         const char *n = aw->name;
 
-        buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", k);
+        if(!limit || limit >= total_groups || aw->selected) {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "id", k);
 
-        if(strcmp(k, n) != 0)
-            buffer_json_member_add_string(wb, "nm", n);
+            if(strcmp(k, n) != 0)
+                buffer_json_member_add_string(wb, "nm", n);
 
-        storage_point_to_json(wb, WPT_GROUP, 0, 0, 0, 0, aw, options, baseline);
-        buffer_json_object_close(wb);
+            storage_point_to_json(wb, WPT_GROUP, 0, 0, 0, 0, aw, options, baseline);
+            buffer_json_object_close(wb);
+            returned_groups++;
+        }
 
         freez((void *)aw->name);
     }
     dfe_done(aw);
     buffer_json_array_close(wb); // result
+    freez(ranking.items);
 
     buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, total_groups, returned_groups, true);
     buffer_json_finalize(wb);
 
     dictionary_destroy(group_by);
@@ -1989,16 +2137,6 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 // MCP format output
 
 // Comparator for sorting results by value (descending order - highest scores first)
-static int registered_results_value_compare(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
-    struct register_result *r1 = dictionary_acquired_item_value(*item1);
-    struct register_result *r2 = dictionary_acquired_item_value(*item2);
-    
-    // Sort by value in descending order (highest first)
-    if (r1->value < r2->value) return 1;
-    if (r1->value > r2->value) return -1;
-    return 0;
-}
-
 // Callback for sorted dictionary walkthrough
 struct mcp_output_state {
     BUFFER *wb;
@@ -2156,8 +2294,12 @@ static size_t registered_results_to_json_mcp(
         .limit = cardinality_limit
     };
     
-    // Walk through dictionary in sorted order (by value descending)
-    dictionary_sorted_walkthrough_rw(results, 'r', registered_results_to_json_mcp_callback, &state, registered_results_value_compare);
+    bool normalized = false;
+    WEIGHTS_RANKING ranking = weights_select_results(results, cardinality_limit, &normalized, false);
+    weights_ranking_sort(&ranking);
+    for(size_t i = 0; i < ranking.used; i++)
+        registered_results_to_json_mcp_callback(NULL, ranking.items[i], &state);
+    freez(ranking.items);
     
     buffer_json_array_close(wb); // results
     
@@ -2166,7 +2308,7 @@ static size_t registered_results_to_json_mcp(
     buffer_json_member_add_uint64(wb, "total_time_series_analyzed", examined_dimensions);
     buffer_json_member_add_uint64(wb, "total_time_series_returned", state.count);
     buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
-    if (state.count >= cardinality_limit) {
+    if (dictionary_entries(results) > state.count) {
         buffer_json_member_add_uint64(wb, "cardinality_limit", cardinality_limit);
         buffer_json_member_add_boolean(wb, "truncated", true);
     }
@@ -2664,6 +2806,15 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->format != WEIGHTS_FORMAT_MCP)
         spread_results_evenly(qwd.results, &qwd.stats);
 
+    // Select only after complete scoring and normalization; parents keep full-query aggregates.
+    qwr->group_by.group_by &= ~(RRDR_GROUP_BY_LABEL|RRDR_GROUP_BY_SELECTED|RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
+    if(qwr->cardinality_limit && qwr->format != WEIGHTS_FORMAT_MCP &&
+       (qwr->format != WEIGHTS_FORMAT_MULTINODE || qwr->group_by.group_by == RRDR_GROUP_BY_NONE)) {
+        bool normalized = !(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE;
+        WEIGHTS_RANKING ranking = weights_select_results(qwd.results, qwr->cardinality_limit, &normalized, true);
+        freez(ranking.items);
+    }
+
     usec_t ended_usec = qwd.timings.executed_ut = now_monotonic_usec();
 
     // generate the json output we need
@@ -2679,7 +2830,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.timings.received_ut, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats, qwr->cardinality_limit);
             break;
 
         case WEIGHTS_FORMAT_CONTEXTS:
@@ -2690,7 +2841,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.timings.received_ut, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats, qwr->cardinality_limit);
             break;
 
         case WEIGHTS_FORMAT_MCP:
@@ -2706,8 +2857,6 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         default:
         case WEIGHTS_FORMAT_MULTINODE:
-            // we don't support these groupings in weights
-            qwr->group_by.group_by &= ~(RRDR_GROUP_BY_LABEL|RRDR_GROUP_BY_SELECTED|RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
             if(qwr->group_by.group_by == RRDR_GROUP_BY_NONE) {
                 added_dimensions =
                         registered_results_to_json_multinode_no_group_by(
