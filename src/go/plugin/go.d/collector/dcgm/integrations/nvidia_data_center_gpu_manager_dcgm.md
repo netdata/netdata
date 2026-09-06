@@ -23,7 +23,7 @@ Module: dcgm
 ## Overview
 
 This collector gathers NVIDIA GPU telemetry from a `dcgm-exporter` endpoint.
-It supports all numeric fields exposed by the exporter and maps them into Netdata-native contexts.
+Known fields use source-defined units and chart groups. Other numeric fields remain available as raw measurements.
 
 
 It collects metrics by periodically scraping the exporter Prometheus endpoint over HTTP.
@@ -42,11 +42,13 @@ Nvidia Data Center GPU Manager (DCGM) can be monitored further using the followi
 
 #### Auto-Detection
 
-This integration does not support auto-detection in v1.
+This integration requires a configured dcgm-exporter endpoint.
 
 #### Limits
 
 The collector applies global and per-metric time series limits to prevent excessive cardinality.
+Some exporter versions round floating-point bit error ratios to six decimal places. Enable the packed
+`*_BER_RAW` (or legacy `COUNT_*_BER`) field when available to preserve small ratios; float-only values retain the exporter's precision limit.
 
 
 #### Performance Impact
@@ -83,7 +85,7 @@ Use the Netdata recommended profile:
 [`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
 (raw download: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
 
-The Netdata profile enables 127 fields by default and documents all remaining known DCGM fields as commented entries.
+The Netdata profile enables 123 fields by default and lists optional fields from its source dataset as commented entries.
 To customize beyond the baseline, uncomment the field you need and comment one currently enabled field.
 
 Runtime validation artifact:
@@ -242,11 +244,11 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ dcgm_gpu_xid_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.reliability.xid | NVIDIA driver reported GPU XID error on GPU ${label:gpu} |
-| [ dcgm_gpu_row_remap_failure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.reliability.row_remap_status | GPU row remapping failed on GPU ${label:gpu} |
-| [ dcgm_gpu_uncorrectable_remapped_rows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.reliability.row_remap_events | Uncorrectable remapped rows increased on GPU ${label:gpu} |
-| [ dcgm_gpu_power_violation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.throttle.violations | Power throttling detected on GPU ${label:gpu} |
-| [ dcgm_gpu_thermal_violation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.throttle.violations | Thermal throttling detected on GPU ${label:gpu} |
+| [ dcgm_gpu_xid_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.reliability.xid | NVIDIA driver reported a GPU XID error (metric ${label:chart_context}). |
+| [ dcgm_gpu_row_remap_failure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.reliability.row_remap_status | Row remapping has failed, indicating a persistent memory reliability problem. |
+| [ dcgm_gpu_uncorrectable_remapped_rows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.reliability.row_remap_events | New uncorrectable row remap events were detected in the last 5 minutes. |
+| [ dcgm_gpu_power_violation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.throttle.duration | The GPU was power-throttled during the last 5 minutes. |
+| [ dcgm_gpu_thermal_violation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf) | dcgm.gpu.throttle.duration | The GPU was thermally throttled during the last 5 minutes. |
 
 
 
@@ -256,274 +258,313 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-Metrics are grouped into static Netdata contexts. Contexts are created only when matching DCGM fields are present in the exporter output.
+Charts appear only for fields supplied by the exporter; availability depends on hardware, driver and exporter versions.
+Missing, unsupported and invalid samples leave gaps. Labels identifying health watches, event reasons and peers
+distinguish dimensions; event window lengths distinguish chart instances.
 
+See [metric semantics and chart migration](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/METRICS.md)
+for interpretation, source selection and changes to existing charts.
+
+
+
+### Per host
+
+The GPU inventory reported by one exporter host.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dcgm.host.inventory.gpu_count | Host GPU Count | gpus | GPUs |
 
 
 ### Per gpu
 
-These metrics refer to GPU device instances.
+A physical GPU identified by the exporter device and UUID labels.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| gpu | gpu label from exporter metrics. |
-| uuid | uuid label from exporter metrics. |
+| gpu | GPU device index. |
+| uuid | GPU UUID. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dcgm.gpu.capability.support | GPU Capability Support metrics. | cc_mode, cuda_compute_capability, gpm_support, mig_attributes, mig_ci_info, mig_gi_info, mig_max_slices, supported_clocks, supported_type_info | state |
-| dcgm.gpu.clock.frequency | GPU Clock Frequency metrics. | app_mem_clock, app_sm_clock, max_mem_clock, max_sm_clock, max_video_clock, memory, sm, video_clock | MHz |
-| dcgm.gpu.compute.activity | GPU Compute Pipeline Activity metrics. | dram, fp16, fp32, fp64, graphics_engine_active, integer, sm_active, sm_occupancy, tensor | % |
-| dcgm.gpu.compute.tensor.activity | GPU Tensor Core Activity by precision type. | tensor_dfma, tensor_hmma, tensor_imma | % |
-| dcgm.gpu.compute.media.activity | GPU Media Engine Activity metrics. | nvdec0_active, nvdec1_active, nvdec2_active, nvdec3_active, nvdec4_active, nvdec5_active, nvdec6_active, nvdec7_active, nvjpg0_active, nvjpg1_active, nvjpg2_active, nvjpg3_active, nvjpg4_active, nvjpg5_active, nvjpg6_active, nvjpg7_active, nvofa0_active, nvofa1_active | % |
-| dcgm.gpu.compute.cache.activity | GPU Memory Cache Hit/Miss metrics. | hostmem_cache_hit, hostmem_cache_miss, peermem_cache_hit, peermem_cache_miss | events/s |
-| dcgm.gpu.compute.utilization | GPU Compute Utilization metrics. | decoder, encoder, gpu, memory_copy | % |
-| dcgm.gpu.cpu.power | GPU CPU Power metrics. | module_power_util_current, sysio_power_util_current | Watts |
-| dcgm.gpu.cpu.info | GPU CPU Information metrics. | cpu_model, cpu_vendor | value |
-| dcgm.gpu.diagnostics.results | GPU Diagnostics Results metrics. | diag_diagnostic_result, diag_eud_result, diag_memory_bandwidth_result, diag_memory_result, diag_memtest_result, diag_nccl_tests_result, diag_nvbandwidth_result, diag_pulse_test_result, diag_software_result, diag_targeted_power_result, diag_targeted_stress_result | state |
-| dcgm.gpu.diagnostics.status | GPU Diagnostics Status metrics. | diag_status | state |
-| dcgm.gpu.health.status | GPU Health Status metrics. | imex_daemon_status, imex_domain_status | state |
-| dcgm.gpu.interconnect.connectx.error_status | GPU ConnectX Error Status metrics. | connectx_correctable_err_mask, connectx_correctable_err_status, connectx_uncorrectable_err_mask, connectx_uncorrectable_err_severity, connectx_uncorrectable_err_status | state |
-| dcgm.gpu.interconnect.connectx.errors | GPU ConnectX Errors metrics. | connectx_correctable_err_mask, connectx_correctable_err_status, connectx_uncorrectable_err_mask, connectx_uncorrectable_err_severity, connectx_uncorrectable_err_status | errors/s |
-| dcgm.gpu.interconnect.connectx.link | GPU ConnectX Link metrics. | connectx_active_pcie_link_speed, connectx_expect_pcie_link_speed | value |
-| dcgm.gpu.interconnect.connectx.status | GPU ConnectX Status metrics. | connectx_health | state |
-| dcgm.gpu.interconnect.error_rate | GPU Interconnect Error Rate metrics. | c2c_link_error_intr, c2c_link_error_replay, c2c_link_error_replay_b2b | errors/s |
-| dcgm.gpu.interconnect.fabric | GPU Fabric State metrics. | fabric_clique_id, fabric_cluster_uuid, fabric_health_mask, fabric_manager_error_code, fabric_manager_status | state |
-| dcgm.gpu.interconnect.nvlink.error_rate | GPU NVLink Error Rate metrics. | gpu_nvlink_errors | errors/s |
-| dcgm.gpu.interconnect.pcie.error_rate | GPU PCIe Error Rate metrics. | pcie_count_correctable_errors, pcie_replay | errors/s |
-| dcgm.gpu.interconnect.pcie.link.generation | GPU PCIe Link Generation metrics. | link_gen, max_link_gen | generation |
-| dcgm.gpu.interconnect.pcie.link.width | GPU PCIe Link Width metrics. | connectx_active_pcie_link_width, connectx_expect_pcie_link_width, link_width, max_link_width | lanes |
-| dcgm.gpu.interconnect.state | GPU Interconnect State metrics. | c2c_link, c2c_link_power_state, c2c_link_status | state |
-| dcgm.gpu.interconnect.pcie.state | GPU PCIe State metrics. | diag_pcie_result | state |
-| dcgm.gpu.interconnect.throughput | GPU Interconnect Throughput metrics. | c2c_max_bandwidth, c2c_rx_all_bytes, c2c_rx_data_bytes, c2c_tx_all_bytes, c2c_tx_data_bytes | B/s |
-| dcgm.gpu.interconnect.pcie.throughput | GPU PCIe Throughput metrics. | pcie_rx, pcie_rx_throughput, pcie_tx, pcie_tx_throughput | B/s |
-| dcgm.gpu.interconnect.nvlink.throughput | GPU NVLink Throughput metrics. | nvlink_rx, nvlink_tx | B/s |
-| dcgm.gpu.interconnect.total.throughput | GPU Interconnect Total Throughput metrics. | pcie, nvlink | B/s |
-| dcgm.gpu.internal.boundary | GPU Internal Boundary Fields metrics. | first_connectx_field_id, first_vgpu_field_id, internal_fields_0_end, internal_fields_0_start, last_connectx_field_id, last_vgpu_field_id | state |
-| dcgm.gpu.inventory.identity | GPU Inventory Identity metrics. | brand, count, cuda_visible_devices_str, minor_number, name, nvml_index, serial, uuid | value |
-| dcgm.gpu.inventory.platform | GPU Platform Inventory metrics. | platform_chassis_serial_number, platform_chassis_slot_number, platform_host_id, platform_infiniband_guid, platform_module_id, platform_peer_type, platform_tray_index | value |
-| dcgm.gpu.inventory.software | GPU Software and Firmware metrics. | inforom_config_check, inforom_config_valid, inforom_image_ver, oem_inforom_ver, power_inforom_ver, process_name, vbios_version | value |
-| dcgm.gpu.memory.bar1_usage | GPU BAR1 Memory Usage metrics. | free, used | B |
-| dcgm.gpu.memory.bar1_capacity | GPU BAR1 Memory Capacity metrics. | total | B |
-| dcgm.gpu.memory.ecc_error_rate | GPU ECC Error Rate metrics. | ecc_current, ecc_dbe_agg, ecc_dbe_agg_cbu, ecc_dbe_agg_dev, ecc_dbe_agg_l1, ecc_dbe_agg_l2, ecc_dbe_agg_reg, ecc_dbe_agg_shm, ecc_dbe_agg_srm, ecc_dbe_agg_tex, ecc_dbe_vol, ecc_dbe_vol_cbu, ecc_dbe_vol_dev, ecc_dbe_vol_l1, ecc_dbe_vol_l2, ecc_dbe_vol_reg, ecc_dbe_vol_shm, ecc_dbe_vol_srm, ecc_dbe_vol_tex, ecc_pending, ecc_sbe_agg, ecc_sbe_agg_cbu, ecc_sbe_agg_dev, ecc_sbe_agg_l1, ecc_sbe_agg_l2, ecc_sbe_agg_reg, ecc_sbe_agg_shm, ecc_sbe_agg_srm, ecc_sbe_agg_tex, ecc_sbe_vol, ecc_sbe_vol_cbu, ecc_sbe_vol_dev, ecc_sbe_vol_l1, ecc_sbe_vol_l2, ecc_sbe_vol_reg, ecc_sbe_vol_shm, ecc_sbe_vol_srm, ecc_sbe_vol_tex | errors/s |
-| dcgm.gpu.memory.ecc_errors | GPU ECC Errors metrics. | ecc_current, ecc_dbe_agg_cbu, ecc_dbe_agg_dev, ecc_dbe_agg_l1, ecc_dbe_agg_l2, ecc_dbe_agg_reg, ecc_dbe_agg_shm, ecc_dbe_agg_srm, ecc_dbe_agg_tex, ecc_dbe_vol_cbu, ecc_dbe_vol_dev, ecc_dbe_vol_l1, ecc_dbe_vol_l2, ecc_dbe_vol_reg, ecc_dbe_vol_shm, ecc_dbe_vol_srm, ecc_dbe_vol_tex, ecc_inforom_ver, ecc_pending, ecc_sbe_agg_cbu, ecc_sbe_agg_dev, ecc_sbe_agg_l1, ecc_sbe_agg_l2, ecc_sbe_agg_reg, ecc_sbe_agg_shm, ecc_sbe_agg_srm, ecc_sbe_agg_tex, ecc_sbe_vol_cbu, ecc_sbe_vol_dev, ecc_sbe_vol_l1, ecc_sbe_vol_l2, ecc_sbe_vol_reg, ecc_sbe_vol_shm, ecc_sbe_vol_srm, ecc_sbe_vol_tex | errors |
-| dcgm.gpu.memory.page_retirements | GPU Retired Memory Pages metrics. | retired_dbe, retired_pending, retired_sbe | pages/s |
-| dcgm.gpu.memory.usage | GPU Memory Usage metrics. | free, reserved, used | B |
-| dcgm.gpu.memory.capacity | GPU Memory Capacity metrics. | total | B |
-| dcgm.gpu.memory.utilization | GPU Memory Utilization metrics. | used_percent | % |
-| dcgm.gpu.power.energy | GPU Energy Consumption Rate metrics. | total | mJ/s |
-| dcgm.gpu.power.profiles | GPU Power Profiles metrics. | enforced_power_profile_mask, requested_power_profile_mask, valid_power_profile_mask | state |
-| dcgm.gpu.power.smoothing | GPU Power Smoothing metrics. | pwr_smoothing_active_preset_profile, pwr_smoothing_admin_override_percent_tmp_floor, pwr_smoothing_admin_override_ramp_down_hyst_val, pwr_smoothing_admin_override_ramp_down_rate, pwr_smoothing_admin_override_ramp_up_rate, pwr_smoothing_applied_tmp_ceil, pwr_smoothing_applied_tmp_floor, pwr_smoothing_enabled, pwr_smoothing_hw_circuitry_percent_lifetime_remaining, pwr_smoothing_imm_ramp_down_enabled, pwr_smoothing_max_num_preset_profiles, pwr_smoothing_max_percent_tmp_floor_setting, pwr_smoothing_min_percent_tmp_floor_setting, pwr_smoothing_priv_lvl, pwr_smoothing_profile_percent_tmp_floor, pwr_smoothing_profile_ramp_down_hyst_val, pwr_smoothing_profile_ramp_down_rate, pwr_smoothing_profile_ramp_up_rate | value |
-| dcgm.gpu.power.usage | GPU Power Usage metrics. | draw, enforced_limit, power_mgmt_limit, power_mgmt_limit_def, power_mgmt_limit_max, power_mgmt_limit_min, power_usage_instant | Watts |
-| dcgm.gpu.reliability.memory_health | GPU Memory Health metrics. | banks_remap_rows_avail_high, banks_remap_rows_avail_low, banks_remap_rows_avail_max, banks_remap_rows_avail_none, banks_remap_rows_avail_partial, memory_unrepairable_flag, threshold_srm | state |
-| dcgm.gpu.reliability.recovery_action | GPU Recovery Action metrics. | get_gpu_recovery_action | state |
-| dcgm.gpu.reliability.row_remap_events | GPU Row Remap Events metrics. | correctable_remapped_rows, uncorrectable_remapped_rows | rows/s |
-| dcgm.gpu.reliability.row_remap_status | GPU Row Remap Status metrics. | row_remap_failure, row_remap_pending | state |
-| dcgm.gpu.reliability.xid | GPU XID Errors metrics. | xid | code |
-| dcgm.gpu.state.configuration | GPU Configuration State metrics. | autoboost, compute_mode, persistence_mode, sync_boost, sync_boost_violation | state |
-| dcgm.gpu.state.performance | GPU Performance State metrics. | pstate | state |
-| dcgm.gpu.state.virtualization | GPU Virtualization State metrics. | mig_mode, virtual_mode | state |
-| dcgm.gpu.thermal.fan_speed | GPU Fan Speed metrics. | fan_speed | % |
-| dcgm.gpu.thermal.temperature | GPU Temperature metrics. | connectx_device_temperature, gpu, gpu_max_op_temp, gpu_temp_limit, mem_max_op_temp, memory, shutdown_temp, slowdown_temp | Celsius |
-| dcgm.gpu.throttle.reasons | GPU Throttle Reasons metrics. | clocks_event_reasons | bitmask |
-| dcgm.gpu.throttle.violations | GPU Throttle Violation Duration metrics. | board_limit_violation, hw_power_brake_slowdown, hw_therm_slowdown, low_utilization_violation, power_violation, reliability_violation, sw_power_cap, sw_therm_slowdown, sync_boost, thermal_violation, total_app_clocks_violation, total_base_clocks_violation | milliseconds/s |
-| dcgm.gpu.topology.affinity | GPU Topology and Affinity metrics. | cpu_affinity_0, cpu_affinity_1, cpu_affinity_2, cpu_affinity_3, gpu_topology_affinity, gpu_topology_pci, mem_affinity_0, mem_affinity_1, mem_affinity_2, mem_affinity_3, pci_busid, pci_combined_id, pci_subsys_id | value |
-| dcgm.gpu.virtualization.vgpu.frame_rate | GPU vGPU Frame Rate metrics. | vgpu_frame_rate_limit | fps |
-| dcgm.gpu.virtualization.vgpu.instance | GPU vGPU Instance metrics. | vgpu_instance_ids, vgpu_pci_id, vgpu_uuid | value |
-| dcgm.gpu.virtualization.vgpu.license | GPU vGPU License metrics. | vgpu_instance_license_state, vgpu_license_status, vgpu_type_license | state |
-| dcgm.gpu.virtualization.vgpu.memory | GPU vGPU Memory metrics. | vgpu_memory_usage | B |
-| dcgm.gpu.virtualization.vgpu.sessions | GPU vGPU Sessions metrics. | vgpu_enc_sessions_info, vgpu_enc_stats, vgpu_fbc_sessions_info, vgpu_fbc_stats | value |
-| dcgm.gpu.virtualization.vgpu.software | GPU vGPU Software metrics. | vgpu_driver_version | value |
-| dcgm.gpu.virtualization.vgpu.type | GPU vGPU Type metrics. | creatable_vgpu_type_ids, supported_vgpu_type_ids, vgpu_type, vgpu_type_class, vgpu_type_info, vgpu_type_name | value |
-| dcgm.gpu.virtualization.vgpu.utilization | GPU vGPU Utilization metrics. | vgpu_per_process_utilization | % |
-| dcgm.gpu.virtualization.vgpu.vm | GPU vGPU VM metrics. | vgpu_vm_gpu_instance_id, vgpu_vm_id, vgpu_vm_name | value |
-| dcgm.gpu.workload.sessions | GPU Workload Sessions metrics. | accounting_data, enc_stats, fbc_sessions_info, fbc_stats | value |
+| dcgm.gpu.compute.utilization | GPU and Memory Busy Time | gpu, memory_copy | percentage |
+| dcgm.gpu.compute.engine_activity | GPU Graphics and Compute Engine Activity | activity | percentage |
+| dcgm.gpu.compute.sm.utilization | GPU Streaming Multiprocessor Utilization | activity, occupancy | percentage |
+| dcgm.gpu.compute.resource_activity | GPU Tensor and Memory Interface Activity | dram, tensor | percentage |
+| dcgm.gpu.compute.pipe.activity | GPU Arithmetic Pipeline Activity | fp16, fp32, fp64, integer | percentage |
+| dcgm.gpu.compute.tensor.activity | GPU Tensor Instruction Activity | tensor_dfma, tensor_hmma, tensor_imma | percentage |
+| dcgm.gpu.compute.media.utilization | GPU Video Engine Utilization | decoder, encoder | percentage |
+| dcgm.gpu.compute.media.activity | GPU Media Engine Activity | nvdec0, nvdec1, nvdec2, nvdec3, nvdec4, nvdec5, nvdec6, nvdec7, nvjpg0, nvjpg1, nvjpg2, nvjpg3, nvjpg4, nvjpg5, nvjpg6, nvjpg7, nvofa0, nvofa1 | percentage |
+| dcgm.gpu.compute.cache.host | GPU Host Memory Cache Efficiency | hit, miss | percentage |
+| dcgm.gpu.compute.cache.peer | GPU Peer Memory Cache Efficiency | hit, miss | percentage |
+| dcgm.gpu.memory.utilization | GPU VRAM Capacity Used | used_percent | percentage |
+| dcgm.gpu.memory.usage | GPU VRAM Allocation | free, reserved, used | bytes |
+| dcgm.gpu.memory.capacity | GPU VRAM Capacity | total | bytes |
+| dcgm.gpu.memory.bar1_usage | GPU BAR1 Mapping Usage | free, used | bytes |
+| dcgm.gpu.memory.bar1_capacity | GPU BAR1 Mapping Capacity | total | bytes |
+| dcgm.gpu.memory.ecc_mode | GPU ECC Mode | current, pending | state |
+| dcgm.gpu.memory.ecc_volatile | GPU Volatile ECC Errors | dbe, sbe | errors |
+| dcgm.gpu.memory.ecc_aggregate | GPU Persistent ECC Errors | dbe, sbe | errors |
+| dcgm.gpu.memory.ecc_volatile_rate | GPU Volatile ECC Error Rate | dbe, sbe | errors/s |
+| dcgm.gpu.memory.ecc_aggregate_rate | GPU Persistent ECC Error Rate | dbe, sbe | errors/s |
+| dcgm.gpu.memory.ecc_volatile_detail | GPU Volatile ECC Errors by Location | dbe_cbu, dbe_dev, dbe_l1, dbe_l2, dbe_reg, dbe_shm, dbe_srm, dbe_tex, sbe_cbu, sbe_dev, sbe_l1, sbe_l2, sbe_reg, sbe_shm, sbe_srm, sbe_tex | errors |
+| dcgm.gpu.memory.ecc_aggregate_detail | GPU Persistent ECC Errors by Location | dbe_cbu, dbe_dev, dbe_l1, dbe_l2, dbe_reg, dbe_shm, dbe_srm, dbe_tex, sbe_cbu, sbe_dev, sbe_l1, sbe_l2, sbe_reg, sbe_shm, sbe_srm, sbe_tex | errors |
+| dcgm.gpu.memory.page_retirements | GPU Memory Page Retirement Rate | dbe, sbe | pages/s |
+| dcgm.gpu.memory.retired_pages | GPU Retired Memory Pages | dbe, sbe | pages |
+| dcgm.gpu.reliability.page_retirement_status | GPU Memory Page Retirement Pending | pending | state |
+| dcgm.gpu.reliability.row_remap_status | GPU Row Remap Status | row_remap_failure, row_remap_pending | state |
+| dcgm.gpu.reliability.row_remap_events | GPU Row Remap Rate | correctable_remapped_rows, uncorrectable_remapped_rows | rows/s |
+| dcgm.gpu.reliability.remapped_rows | GPU Remapped Memory Rows | correctable_remapped_rows, uncorrectable_remapped_rows | rows |
+| dcgm.gpu.reliability.remap_banks | GPU Memory Bank Remap Availability | high, low, max, none, partial | banks |
+| dcgm.gpu.reliability.memory_health | GPU Memory Health Flags | sram_threshold_exceeded, unrepairable | state |
+| dcgm.gpu.reliability.recovery_action | GPU Recovery Action | action | state |
+| dcgm.gpu.clock.sm.frequency | GPU SM Clock Frequency | application, current, maximum | MHz |
+| dcgm.gpu.clock.memory.frequency | GPU Memory Clock Frequency | application, current, maximum | MHz |
+| dcgm.gpu.clock.video.frequency | GPU Video Clock Frequency | current, maximum | MHz |
+| dcgm.gpu.throttle.reasons | GPU Clock Event Reasons | application_clocks, display_clocks, gpu_idle, hardware_power_brake, hardware_slowdown, hardware_thermal, power_cap, software_thermal, sync_boost, unknown | state |
+| dcgm.gpu.throttle.duration | GPU Clock Limiting Duration | board_limit, hw_power_brake_slowdown, hw_therm_slowdown, low_utilization, power_violation, reliability, sw_therm_slowdown, sync_boost, thermal_violation | percentage |
+| dcgm.gpu.throttle.event_samples | GPU Clock Event Samples | value_clock_event=* | samples |
+| dcgm.gpu.throttle.event_rate | GPU Clock Event Rate | value_clock_event=* | events/s |
+| dcgm.gpu.thermal.temperature | GPU Temperature and Limits | gpu, gpu_max_operating, gpu_shutdown, gpu_slowdown, memory, memory_max_operating | Celsius |
+| dcgm.gpu.thermal.headroom | GPU Thermal Headroom | gpu | Celsius |
+| dcgm.gpu.thermal.fan_speed | GPU Reported Fan Speed | fan_speed | percentage |
+| dcgm.gpu.power.usage | GPU Power Draw and Limit | configured_limit, draw, enforced_limit, instantaneous | Watts |
+| dcgm.gpu.power.limits | GPU Configurable Power Limits | default, maximum, minimum | Watts |
+| dcgm.gpu.power.energy_rate | GPU Energy-Derived Power | power | Watts |
+| dcgm.gpu.power.smoothing.bounds | GPU Power Smoothing Bounds | applied_tmp_ceil, applied_tmp_floor | Watts |
+| dcgm.gpu.power.smoothing.floor | GPU Power Smoothing Floor | admin_override_percent_tmp_floor, max_percent_tmp_floor_setting, min_percent_tmp_floor_setting, profile_percent_tmp_floor | percentage |
+| dcgm.gpu.power.smoothing.lifetime | GPU Power Smoothing Circuit Lifetime Remaining | hw_circuitry_percent_lifetime_remaining | percentage |
+| dcgm.gpu.power.smoothing.ramp | GPU Power Smoothing Ramp Rate | admin_override_ramp_down_rate, admin_override_ramp_up_rate, profile_ramp_down_rate, profile_ramp_up_rate | Watts/s |
+| dcgm.gpu.power.smoothing.hysteresis | GPU Power Smoothing Ramp Hysteresis | admin_override_ramp_down_hyst_val, profile_ramp_down_hyst_val | milliseconds |
+| dcgm.gpu.power.smoothing.state | GPU Power Smoothing Enablement | enabled, imm_ramp_down_enabled | state |
+| dcgm.gpu.power.smoothing.privilege | GPU Power Smoothing Privilege Level | priv_lvl | level |
+| dcgm.gpu.power.smoothing.profile | GPU Active Power Smoothing Profile | active_preset_profile | profile |
+| dcgm.gpu.power.smoothing.profile_capacity | GPU Power Smoothing Profile Capacity | max_num_preset_profiles | profiles |
+| dcgm.gpu.interconnect.total.throughput | GPU Observed Interconnect Throughput | nvlink, pcie | bytes/s |
+| dcgm.gpu.interconnect.pcie.throughput | GPU PCIe Throughput | pcie_rx, pcie_tx | bytes/s |
+| dcgm.gpu.interconnect.nvlink.throughput | GPU NVLink Throughput | nvlink_rx, nvlink_tx | bytes/s |
+| dcgm.gpu.interconnect.pcie.link.generation | GPU PCIe Link Generation | link_gen, max_link_gen | generation |
+| dcgm.gpu.interconnect.pcie.link.width | GPU PCIe Link Width | link_width, max_link_width | lanes |
+| dcgm.gpu.interconnect.pcie.error_rate | GPU PCIe Error and Replay Rate | pcie_replay | errors/s |
+| dcgm.gpu.interconnect.nvlink.error_rate | GPU NVLink Error Rate | nvlink_crc_data_error, nvlink_crc_flit_error, nvlink_ecc_data_error, nvlink_error_dl_crc, nvlink_error_dl_recovery, nvlink_error_dl_replay, nvlink_recovery_error, nvlink_replay_error | errors/s |
+| dcgm.gpu.interconnect.nvlink.traffic | GPU NVLink Packet Rate | rx, tx | packets/s |
+| dcgm.gpu.interconnect.nvlink.ber | GPU NVLink Bit Error Ratio | effective, symbol | errors per trillion bits |
+| dcgm.gpu.interconnect.fabric | GPU Fabric Manager State | failure, in_progress, not_started, not_supported, nvml_too_old, success, unknown, unrecognized | state |
+| dcgm.gpu.interconnect.fabric_error | GPU Fabric Manager Error | error | code |
+| dcgm.gpu.interconnect.p2p | GPU Peer Access State | value_peer_gpu=* | state |
+| dcgm.gpu.interconnect.c2c.capacity | GPU C2C Link Capacity | maximum | bytes/s |
+| dcgm.gpu.interconnect.c2c.links | GPU C2C Link Count | links | links |
+| dcgm.gpu.interconnect.c2c.state | GPU C2C Link State | power_state, status | state |
+| dcgm.gpu.interconnect.c2c.throughput | GPU C2C All Traffic | rx, tx | bytes/s |
+| dcgm.gpu.interconnect.c2c.payload | GPU C2C Payload Traffic | rx, tx | bytes/s |
+| dcgm.gpu.interconnect.c2c.error_rate | GPU C2C Error Rate | intr, replay, replay_b2b | errors/s |
+| dcgm.gpu.reliability.xid | GPU XID Error Code | xid | code |
+| dcgm.gpu.reliability.xid_samples | GPU XID Samples | value_xid=* | samples |
+| dcgm.gpu.reliability.xid_rate | GPU XID Record Rate | value_xid=* | records/s |
+| dcgm.gpu.health.status | GPU Health Status by Watch | value_health_watch=* | state |
+| dcgm.gpu.state.performance | GPU Performance State | P0, P1, P10, P11, P12, P13, P14, P15, P2, P3, P4, P5, P6, P7, P8, P9, unknown | state |
+| dcgm.gpu.state.virtualization | GPU Virtualization Mode | mig_enabled, virtualization_bare_metal, virtualization_host_vgpu, virtualization_host_vsga, virtualization_passthrough, virtualization_unknown, virtualization_vgpu | state |
+| dcgm.gpu.state.configuration | GPU Compute and Persistence Modes | autoboost_enabled, compute_default, compute_exclusive_process, compute_exclusive_thread, compute_prohibited, compute_unknown, persistence_enabled | state |
+| dcgm.gpu.virtualization.vgpu.license | GPU vGPU License State | licensed | state |
+| dcgm.gpu.virtualization.vgpu.memory | GPU vGPU Memory Usage | used | bytes |
+| dcgm.gpu.virtualization.vgpu.frame_rate | GPU vGPU Frame Rate Limit | limit | frames/s |
+| dcgm.gpu.capability.mig_slices | GPU Maximum MIG Slices | maximum | slices |
 
 
 ### Per mig
 
-These metrics refer to MIG instances.
+A GPU instance exposed when MIG monitoring is available.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| gpu | gpu label from exporter metrics. |
-| gpu_i_id | gpu_i_id label from exporter metrics. |
-| gpu_i_profile | gpu_i_profile label from exporter metrics. |
+| gpu | GPU device index. |
+| uuid | GPU UUID. |
+| gpu_i_id | MIG GPU instance identifier. |
+| gpu_i_profile | MIG profile. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dcgm.mig.clock.frequency | MIG Clock Frequency metrics. | app_mem_clock, app_sm_clock, max_mem_clock, max_sm_clock, max_video_clock, memory, sm, video_clock | MHz |
-| dcgm.mig.compute.activity | MIG Compute Pipeline Activity metrics. | dram, fp16, fp32, fp64, graphics_engine_active, integer, sm_active, sm_occupancy, tensor | % |
-| dcgm.mig.compute.tensor.activity | MIG Tensor Core Activity by precision type. | tensor_dfma, tensor_hmma, tensor_imma | % |
-| dcgm.mig.compute.media.activity | MIG Media Engine Activity metrics. | nvdec0_active, nvdec1_active, nvdec2_active, nvdec3_active, nvdec4_active, nvdec5_active, nvdec6_active, nvdec7_active, nvjpg0_active, nvjpg1_active, nvjpg2_active, nvjpg3_active, nvjpg4_active, nvjpg5_active, nvjpg6_active, nvjpg7_active, nvofa0_active, nvofa1_active | % |
-| dcgm.mig.compute.cache.activity | MIG Memory Cache Hit/Miss metrics. | hostmem_cache_hit, hostmem_cache_miss, peermem_cache_hit, peermem_cache_miss | events/s |
-| dcgm.mig.compute.utilization | MIG Compute Utilization metrics. | decoder, encoder, gpu, memory_copy | % |
-| dcgm.mig.interconnect.nvlink.ber | MIG NVLink Bit Error Rate metrics. | nvlink_count_effective_ber, nvlink_count_effective_ber_float, nvlink_count_symbol_ber, nvlink_count_symbol_ber_float | ratio |
-| dcgm.mig.interconnect.nvlink.congestion | MIG NVLink Congestion metrics. | nvlink_ppcnt_ibpc_port_xmit_wait | events/s |
-| dcgm.mig.interconnect.error_rate | MIG Interconnect Error Rate metrics. | c2c_link_error_intr, c2c_link_error_replay, c2c_link_error_replay_b2b | errors/s |
-| dcgm.mig.interconnect.nvlink.error_rate | MIG NVLink Error Rate metrics. | gpu_nvlink_errors, nvlink_count_effective_errors, nvlink_count_fec_history_0, nvlink_count_fec_history_1, nvlink_count_fec_history_10, nvlink_count_fec_history_11, nvlink_count_fec_history_12, nvlink_count_fec_history_13, nvlink_count_fec_history_14, nvlink_count_fec_history_15, nvlink_count_fec_history_2, nvlink_count_fec_history_3, nvlink_count_fec_history_4, nvlink_count_fec_history_5, nvlink_count_fec_history_6, nvlink_count_fec_history_7, nvlink_count_fec_history_8, nvlink_count_fec_history_9, nvlink_count_link_recovery_events, nvlink_count_link_recovery_failed_events, nvlink_count_link_recovery_successful_events, nvlink_count_local_link_integrity_errors, nvlink_count_rx_buffer_overrun_errors, nvlink_count_rx_errors, nvlink_count_rx_general_errors, nvlink_count_rx_malformed_packet_errors, nvlink_count_rx_remote_errors, nvlink_count_rx_symbol_errors, nvlink_count_tx_discards, nvlink_crc_data_error, nvlink_crc_data_error_count_l0, nvlink_crc_data_error_count_l1, nvlink_crc_data_error_count_l10, nvlink_crc_data_error_count_l11, nvlink_crc_data_error_count_l12, nvlink_crc_data_error_count_l13, nvlink_crc_data_error_count_l14, nvlink_crc_data_error_count_l15, nvlink_crc_data_error_count_l16, nvlink_crc_data_error_count_l17, nvlink_crc_data_error_count_l2, nvlink_crc_data_error_count_l3, nvlink_crc_data_error_count_l4, nvlink_crc_data_error_count_l5, nvlink_crc_data_error_count_l6, nvlink_crc_data_error_count_l7, nvlink_crc_data_error_count_l8, nvlink_crc_data_error_count_l9, nvlink_crc_flit_error, nvlink_crc_flit_error_count_l0, nvlink_crc_flit_error_count_l1, nvlink_crc_flit_error_count_l10, nvlink_crc_flit_error_count_l11, nvlink_crc_flit_error_count_l12, nvlink_crc_flit_error_count_l13, nvlink_crc_flit_error_count_l14, nvlink_crc_flit_error_count_l15, nvlink_crc_flit_error_count_l16, nvlink_crc_flit_error_count_l17, nvlink_crc_flit_error_count_l2, nvlink_crc_flit_error_count_l3, nvlink_crc_flit_error_count_l4, nvlink_crc_flit_error_count_l5, nvlink_crc_flit_error_count_l6, nvlink_crc_flit_error_count_l7, nvlink_crc_flit_error_count_l8, nvlink_crc_flit_error_count_l9, nvlink_error_dl_crc, nvlink_error_dl_recovery, nvlink_error_dl_replay, nvlink_ppcnt_physical_successful_recovery_events, nvlink_ppcnt_plr_rcv_uncorrectable_code, nvlink_ppcnt_recovery_time_since_last, nvlink_ppcnt_recovery_total_successful_events, nvlink_pprm_oper_recovery, nvlink_recovery_error, nvlink_recovery_error_count_l0, nvlink_recovery_error_count_l1, nvlink_recovery_error_count_l10, nvlink_recovery_error_count_l11, nvlink_recovery_error_count_l12, nvlink_recovery_error_count_l13, nvlink_recovery_error_count_l14, nvlink_recovery_error_count_l15, nvlink_recovery_error_count_l16, nvlink_recovery_error_count_l17, nvlink_recovery_error_count_l2, nvlink_recovery_error_count_l3, nvlink_recovery_error_count_l4, nvlink_recovery_error_count_l5, nvlink_recovery_error_count_l6, nvlink_recovery_error_count_l7, nvlink_recovery_error_count_l8, nvlink_recovery_error_count_l9, nvlink_replay_error, nvlink_replay_error_count_l0, nvlink_replay_error_count_l1, nvlink_replay_error_count_l10, nvlink_replay_error_count_l11, nvlink_replay_error_count_l12, nvlink_replay_error_count_l13, nvlink_replay_error_count_l14, nvlink_replay_error_count_l15, nvlink_replay_error_count_l16, nvlink_replay_error_count_l17, nvlink_replay_error_count_l2, nvlink_replay_error_count_l3, nvlink_replay_error_count_l4, nvlink_replay_error_count_l5, nvlink_replay_error_count_l6, nvlink_replay_error_count_l7, nvlink_replay_error_count_l8, nvlink_replay_error_count_l9 | errors/s |
-| dcgm.mig.interconnect.pcie.error_rate | MIG PCIe Error Rate metrics. | pcie_count_correctable_errors, pcie_replay | errors/s |
-| dcgm.mig.interconnect.nvlink.errors | MIG NVLink Errors metrics. | nvlink_ppcnt_plr_rcv_uncorrectable_code | errors |
-| dcgm.mig.interconnect.fabric | MIG Fabric State metrics. | fabric_clique_id, fabric_cluster_uuid, fabric_health_mask, fabric_manager_error_code, fabric_manager_status | state |
-| dcgm.mig.interconnect.pcie.link.generation | MIG PCIe Link Generation metrics. | link_gen, max_link_gen | generation |
-| dcgm.mig.interconnect.pcie.link.width | MIG PCIe Link Width metrics. | link_width, max_link_width | lanes |
-| dcgm.mig.interconnect.state | MIG Interconnect State metrics. | c2c_link, c2c_link_power_state, c2c_link_status | state |
-| dcgm.mig.interconnect.pcie.state | MIG PCIe State metrics. | diag_pcie_result | state |
-| dcgm.mig.interconnect.nvlink.state | MIG NVLink State metrics. | gpu_topology_nvlink, nvlink_get_state, nvlink_ppcnt_physical_link_down_counter, nvlink_ppcnt_plr_rcv_code_err, nvlink_ppcnt_plr_sync_events, nvlink_ppcnt_plr_xmit_retry_events, p2p_nvlink_status | state |
-| dcgm.mig.interconnect.throughput | MIG Interconnect Throughput metrics. | c2c_max_bandwidth, c2c_rx_all_bytes, c2c_rx_data_bytes, c2c_tx_all_bytes, c2c_tx_data_bytes | B/s |
-| dcgm.mig.interconnect.nvlink.throughput | MIG NVLink Throughput metrics. | nvlink_bandwidth_l0, nvlink_bandwidth_l1, nvlink_bandwidth_l10, nvlink_bandwidth_l11, nvlink_bandwidth_l12, nvlink_bandwidth_l13, nvlink_bandwidth_l14, nvlink_bandwidth_l15, nvlink_bandwidth_l16, nvlink_bandwidth_l17, nvlink_bandwidth_l2, nvlink_bandwidth_l3, nvlink_bandwidth_l4, nvlink_bandwidth_l5, nvlink_bandwidth_l6, nvlink_bandwidth_l7, nvlink_bandwidth_l8, nvlink_bandwidth_l9, nvlink_count_rx, nvlink_count_tx, nvlink_l0_rx, nvlink_l0_tx, nvlink_l10_rx, nvlink_l10_tx, nvlink_l11_rx, nvlink_l11_tx, nvlink_l12_rx, nvlink_l12_tx, nvlink_l13_rx, nvlink_l13_tx, nvlink_l14_rx, nvlink_l14_tx, nvlink_l15_rx, nvlink_l15_tx, nvlink_l16_rx, nvlink_l16_tx, nvlink_l17_rx, nvlink_l17_tx, nvlink_l1_rx, nvlink_l1_tx, nvlink_l2_rx, nvlink_l2_tx, nvlink_l3_rx, nvlink_l3_tx, nvlink_l4_rx, nvlink_l4_tx, nvlink_l5_rx, nvlink_l5_tx, nvlink_l6_rx, nvlink_l6_tx, nvlink_l7_rx, nvlink_l7_tx, nvlink_l8_rx, nvlink_l8_tx, nvlink_l9_rx, nvlink_l9_tx, nvlink_rx_bandwidth, nvlink_rx_bandwidth_l0, nvlink_rx_bandwidth_l1, nvlink_rx_bandwidth_l10, nvlink_rx_bandwidth_l11, nvlink_rx_bandwidth_l12, nvlink_rx_bandwidth_l13, nvlink_rx_bandwidth_l14, nvlink_rx_bandwidth_l15, nvlink_rx_bandwidth_l16, nvlink_rx_bandwidth_l17, nvlink_rx_bandwidth_l2, nvlink_rx_bandwidth_l3, nvlink_rx_bandwidth_l4, nvlink_rx_bandwidth_l5, nvlink_rx_bandwidth_l6, nvlink_rx_bandwidth_l7, nvlink_rx_bandwidth_l8, nvlink_rx_bandwidth_l9, nvlink_rx, nvlink_tx_bandwidth, nvlink_tx_bandwidth_l0, nvlink_tx_bandwidth_l1, nvlink_tx_bandwidth_l10, nvlink_tx_bandwidth_l11, nvlink_tx_bandwidth_l12, nvlink_tx_bandwidth_l13, nvlink_tx_bandwidth_l14, nvlink_tx_bandwidth_l15, nvlink_tx_bandwidth_l16, nvlink_tx_bandwidth_l17, nvlink_tx_bandwidth_l2, nvlink_tx_bandwidth_l3, nvlink_tx_bandwidth_l4, nvlink_tx_bandwidth_l5, nvlink_tx_bandwidth_l6, nvlink_tx_bandwidth_l7, nvlink_tx_bandwidth_l8, nvlink_tx_bandwidth_l9, nvlink_tx | B/s |
-| dcgm.mig.interconnect.pcie.throughput | MIG PCIe Throughput metrics. | pcie_rx, pcie_rx_throughput, pcie_tx, pcie_tx_throughput | B/s |
-| dcgm.mig.interconnect.total.throughput | MIG Interconnect Total Throughput metrics. | pcie, nvlink | B/s |
-| dcgm.mig.interconnect.nvlink.traffic | MIG NVLink Traffic metrics. | nvlink_count_rx_packets, nvlink_count_tx_packets, nvlink_ppcnt_plr_rcv_codes, nvlink_ppcnt_plr_xmit_codes, nvlink_ppcnt_plr_xmit_retry_codes | events/s |
-| dcgm.mig.memory.bar1_usage | MIG BAR1 Memory Usage metrics. | free, used | B |
-| dcgm.mig.memory.bar1_capacity | MIG BAR1 Memory Capacity metrics. | total | B |
-| dcgm.mig.memory.ecc_error_rate | MIG ECC Error Rate metrics. | ecc_current, ecc_dbe_agg, ecc_dbe_agg_cbu, ecc_dbe_agg_dev, ecc_dbe_agg_l1, ecc_dbe_agg_l2, ecc_dbe_agg_reg, ecc_dbe_agg_shm, ecc_dbe_agg_srm, ecc_dbe_agg_tex, ecc_dbe_vol, ecc_dbe_vol_cbu, ecc_dbe_vol_dev, ecc_dbe_vol_l1, ecc_dbe_vol_l2, ecc_dbe_vol_reg, ecc_dbe_vol_shm, ecc_dbe_vol_srm, ecc_dbe_vol_tex, ecc_pending, ecc_sbe_agg, ecc_sbe_agg_cbu, ecc_sbe_agg_dev, ecc_sbe_agg_l1, ecc_sbe_agg_l2, ecc_sbe_agg_reg, ecc_sbe_agg_shm, ecc_sbe_agg_srm, ecc_sbe_agg_tex, ecc_sbe_vol, ecc_sbe_vol_cbu, ecc_sbe_vol_dev, ecc_sbe_vol_l1, ecc_sbe_vol_l2, ecc_sbe_vol_reg, ecc_sbe_vol_shm, ecc_sbe_vol_srm, ecc_sbe_vol_tex, nvlink_ecc_data_error | errors/s |
-| dcgm.mig.memory.ecc_errors | MIG ECC Errors metrics. | ecc_current, ecc_dbe_agg_cbu, ecc_dbe_agg_dev, ecc_dbe_agg_l1, ecc_dbe_agg_l2, ecc_dbe_agg_reg, ecc_dbe_agg_shm, ecc_dbe_agg_srm, ecc_dbe_agg_tex, ecc_dbe_vol_cbu, ecc_dbe_vol_dev, ecc_dbe_vol_l1, ecc_dbe_vol_l2, ecc_dbe_vol_reg, ecc_dbe_vol_shm, ecc_dbe_vol_srm, ecc_dbe_vol_tex, ecc_inforom_ver, ecc_pending, ecc_sbe_agg_cbu, ecc_sbe_agg_dev, ecc_sbe_agg_l1, ecc_sbe_agg_l2, ecc_sbe_agg_reg, ecc_sbe_agg_shm, ecc_sbe_agg_srm, ecc_sbe_agg_tex, ecc_sbe_vol_cbu, ecc_sbe_vol_dev, ecc_sbe_vol_l1, ecc_sbe_vol_l2, ecc_sbe_vol_reg, ecc_sbe_vol_shm, ecc_sbe_vol_srm, ecc_sbe_vol_tex | errors |
-| dcgm.mig.memory.page_retirements | MIG Retired Memory Pages metrics. | retired_dbe, retired_pending, retired_sbe | pages/s |
-| dcgm.mig.memory.usage | MIG Memory Usage metrics. | free, reserved, used | B |
-| dcgm.mig.memory.capacity | MIG Memory Capacity metrics. | total | B |
-| dcgm.mig.memory.utilization | MIG Memory Utilization metrics. | used_percent | % |
-| dcgm.mig.power.energy | MIG Energy Consumption Rate metrics. | total | mJ/s |
-| dcgm.mig.power.profiles | MIG Power Profiles metrics. | enforced_power_profile_mask, requested_power_profile_mask, valid_power_profile_mask | state |
-| dcgm.mig.power.smoothing | MIG Power Smoothing metrics. | pwr_smoothing_active_preset_profile, pwr_smoothing_admin_override_percent_tmp_floor, pwr_smoothing_admin_override_ramp_down_hyst_val, pwr_smoothing_admin_override_ramp_down_rate, pwr_smoothing_admin_override_ramp_up_rate, pwr_smoothing_applied_tmp_ceil, pwr_smoothing_applied_tmp_floor, pwr_smoothing_enabled, pwr_smoothing_hw_circuitry_percent_lifetime_remaining, pwr_smoothing_imm_ramp_down_enabled, pwr_smoothing_max_num_preset_profiles, pwr_smoothing_max_percent_tmp_floor_setting, pwr_smoothing_min_percent_tmp_floor_setting, pwr_smoothing_priv_lvl, pwr_smoothing_profile_percent_tmp_floor, pwr_smoothing_profile_ramp_down_hyst_val, pwr_smoothing_profile_ramp_down_rate, pwr_smoothing_profile_ramp_up_rate | value |
-| dcgm.mig.power.usage | MIG Power Usage metrics. | draw, enforced_limit, power_mgmt_limit, power_mgmt_limit_def, power_mgmt_limit_max, power_mgmt_limit_min, power_usage_instant | Watts |
-| dcgm.mig.reliability.memory_health | MIG Memory Health metrics. | banks_remap_rows_avail_high, banks_remap_rows_avail_low, banks_remap_rows_avail_max, banks_remap_rows_avail_none, banks_remap_rows_avail_partial, memory_unrepairable_flag, threshold_srm | state |
-| dcgm.mig.reliability.recovery_action | MIG Recovery Action metrics. | get_gpu_recovery_action | state |
-| dcgm.mig.reliability.row_remap_events | MIG Row Remap Events metrics. | correctable_remapped_rows, uncorrectable_remapped_rows | rows/s |
-| dcgm.mig.reliability.row_remap_status | MIG Row Remap Status metrics. | row_remap_failure, row_remap_pending | state |
-| dcgm.mig.reliability.xid | MIG XID Errors metrics. | xid | code |
-| dcgm.mig.state.configuration | MIG Configuration State metrics. | autoboost, compute_mode, persistence_mode, sync_boost, sync_boost_violation | state |
-| dcgm.mig.state.performance | MIG Performance State metrics. | pstate | state |
-| dcgm.mig.state.virtualization | MIG Virtualization State metrics. | mig_mode, virtual_mode | state |
-| dcgm.mig.thermal.fan_speed | MIG Fan Speed metrics. | fan_speed | % |
-| dcgm.mig.thermal.temperature | MIG Temperature metrics. | gpu, gpu_max_op_temp, gpu_temp_limit, mem_max_op_temp, memory, shutdown_temp, slowdown_temp | Celsius |
-| dcgm.mig.throttle.reasons | MIG Throttle Reasons metrics. | clocks_event_reasons | bitmask |
-| dcgm.mig.throttle.violations | MIG Throttle Violation Duration metrics. | board_limit_violation, hw_power_brake_slowdown, hw_therm_slowdown, low_utilization_violation, power_violation, reliability_violation, sw_power_cap, sw_therm_slowdown, sync_boost, thermal_violation, total_app_clocks_violation, total_base_clocks_violation | milliseconds/s |
+| dcgm.mig.compute.utilization | MIG GPU and Memory Busy Time | gpu, memory_copy | percentage |
+| dcgm.mig.compute.engine_activity | MIG Graphics and Compute Engine Activity | activity | percentage |
+| dcgm.mig.compute.sm.utilization | MIG Streaming Multiprocessor Utilization | activity, occupancy | percentage |
+| dcgm.mig.compute.resource_activity | MIG Tensor and Memory Interface Activity | dram, tensor | percentage |
+| dcgm.mig.compute.pipe.activity | MIG Arithmetic Pipeline Activity | fp16, fp32, fp64, integer | percentage |
+| dcgm.mig.compute.tensor.activity | MIG Tensor Instruction Activity | tensor_dfma, tensor_hmma, tensor_imma | percentage |
+| dcgm.mig.compute.media.utilization | MIG Video Engine Utilization | decoder, encoder | percentage |
+| dcgm.mig.compute.media.activity | MIG Media Engine Activity | nvdec0, nvdec1, nvdec2, nvdec3, nvdec4, nvdec5, nvdec6, nvdec7, nvjpg0, nvjpg1, nvjpg2, nvjpg3, nvjpg4, nvjpg5, nvjpg6, nvjpg7, nvofa0, nvofa1 | percentage |
+| dcgm.mig.compute.cache.host | MIG Host Memory Cache Efficiency | hit, miss | percentage |
+| dcgm.mig.compute.cache.peer | MIG Peer Memory Cache Efficiency | hit, miss | percentage |
+| dcgm.mig.memory.utilization | MIG VRAM Capacity Used | used_percent | percentage |
+| dcgm.mig.memory.usage | MIG VRAM Allocation | free, reserved, used | bytes |
+| dcgm.mig.memory.capacity | MIG VRAM Capacity | total | bytes |
+| dcgm.mig.memory.bar1_usage | MIG BAR1 Mapping Usage | free, used | bytes |
+| dcgm.mig.memory.bar1_capacity | MIG BAR1 Mapping Capacity | total | bytes |
+| dcgm.mig.memory.ecc_mode | MIG ECC Mode | current, pending | state |
+| dcgm.mig.memory.ecc_volatile | MIG Volatile ECC Errors | dbe, sbe | errors |
+| dcgm.mig.memory.ecc_aggregate | MIG Persistent ECC Errors | dbe, sbe | errors |
+| dcgm.mig.memory.ecc_volatile_rate | MIG Volatile ECC Error Rate | dbe, sbe | errors/s |
+| dcgm.mig.memory.ecc_aggregate_rate | MIG Persistent ECC Error Rate | dbe, sbe | errors/s |
+| dcgm.mig.memory.ecc_volatile_detail | MIG Volatile ECC Errors by Location | dbe_cbu, dbe_dev, dbe_l1, dbe_l2, dbe_reg, dbe_shm, dbe_srm, dbe_tex, sbe_cbu, sbe_dev, sbe_l1, sbe_l2, sbe_reg, sbe_shm, sbe_srm, sbe_tex | errors |
+| dcgm.mig.memory.ecc_aggregate_detail | MIG Persistent ECC Errors by Location | dbe_cbu, dbe_dev, dbe_l1, dbe_l2, dbe_reg, dbe_shm, dbe_srm, dbe_tex, sbe_cbu, sbe_dev, sbe_l1, sbe_l2, sbe_reg, sbe_shm, sbe_srm, sbe_tex | errors |
+| dcgm.mig.memory.page_retirements | MIG Memory Page Retirement Rate | dbe, sbe | pages/s |
+| dcgm.mig.memory.retired_pages | MIG Retired Memory Pages | dbe, sbe | pages |
+| dcgm.mig.reliability.page_retirement_status | MIG Memory Page Retirement Pending | pending | state |
+| dcgm.mig.reliability.row_remap_status | MIG Row Remap Status | row_remap_failure, row_remap_pending | state |
+| dcgm.mig.reliability.row_remap_events | MIG Row Remap Rate | correctable_remapped_rows, uncorrectable_remapped_rows | rows/s |
+| dcgm.mig.reliability.remapped_rows | MIG Remapped Memory Rows | correctable_remapped_rows, uncorrectable_remapped_rows | rows |
+| dcgm.mig.reliability.remap_banks | MIG Memory Bank Remap Availability | high, low, max, none, partial | banks |
+| dcgm.mig.reliability.memory_health | MIG Memory Health Flags | sram_threshold_exceeded, unrepairable | state |
+| dcgm.mig.reliability.recovery_action | MIG Recovery Action | action | state |
+| dcgm.mig.clock.sm.frequency | MIG SM Clock Frequency | application, current, maximum | MHz |
+| dcgm.mig.clock.memory.frequency | MIG Memory Clock Frequency | application, current, maximum | MHz |
+| dcgm.mig.clock.video.frequency | MIG Video Clock Frequency | current, maximum | MHz |
+| dcgm.mig.throttle.reasons | MIG Clock Event Reasons | application_clocks, display_clocks, gpu_idle, hardware_power_brake, hardware_slowdown, hardware_thermal, power_cap, software_thermal, sync_boost, unknown | state |
+| dcgm.mig.throttle.duration | MIG Clock Limiting Duration | board_limit, hw_power_brake_slowdown, hw_therm_slowdown, low_utilization, power_violation, reliability, sw_therm_slowdown, sync_boost, thermal_violation | percentage |
+| dcgm.mig.throttle.event_samples | MIG Clock Event Samples | value_clock_event=* | samples |
+| dcgm.mig.throttle.event_rate | MIG Clock Event Rate | value_clock_event=* | events/s |
+| dcgm.mig.thermal.temperature | MIG Temperature and Limits | gpu, gpu_max_operating, gpu_shutdown, gpu_slowdown, memory, memory_max_operating | Celsius |
+| dcgm.mig.thermal.headroom | MIG Thermal Headroom | gpu | Celsius |
+| dcgm.mig.thermal.fan_speed | MIG Reported Fan Speed | fan_speed | percentage |
+| dcgm.mig.power.usage | MIG Power Draw and Limit | configured_limit, draw, enforced_limit, instantaneous | Watts |
+| dcgm.mig.power.limits | MIG Configurable Power Limits | default, maximum, minimum | Watts |
+| dcgm.mig.power.energy_rate | MIG Energy-Derived Power | power | Watts |
+| dcgm.mig.power.smoothing.bounds | MIG Power Smoothing Bounds | applied_tmp_ceil, applied_tmp_floor | Watts |
+| dcgm.mig.power.smoothing.floor | MIG Power Smoothing Floor | admin_override_percent_tmp_floor, max_percent_tmp_floor_setting, min_percent_tmp_floor_setting, profile_percent_tmp_floor | percentage |
+| dcgm.mig.power.smoothing.lifetime | MIG Power Smoothing Circuit Lifetime Remaining | hw_circuitry_percent_lifetime_remaining | percentage |
+| dcgm.mig.power.smoothing.ramp | MIG Power Smoothing Ramp Rate | admin_override_ramp_down_rate, admin_override_ramp_up_rate, profile_ramp_down_rate, profile_ramp_up_rate | Watts/s |
+| dcgm.mig.power.smoothing.hysteresis | MIG Power Smoothing Ramp Hysteresis | admin_override_ramp_down_hyst_val, profile_ramp_down_hyst_val | milliseconds |
+| dcgm.mig.power.smoothing.state | MIG Power Smoothing Enablement | enabled, imm_ramp_down_enabled | state |
+| dcgm.mig.power.smoothing.privilege | MIG Power Smoothing Privilege Level | priv_lvl | level |
+| dcgm.mig.power.smoothing.profile | MIG Active Power Smoothing Profile | active_preset_profile | profile |
+| dcgm.mig.power.smoothing.profile_capacity | MIG Power Smoothing Profile Capacity | max_num_preset_profiles | profiles |
+| dcgm.mig.interconnect.total.throughput | MIG Observed Interconnect Throughput | nvlink, pcie | bytes/s |
+| dcgm.mig.interconnect.pcie.throughput | MIG PCIe Throughput | pcie_rx, pcie_tx | bytes/s |
+| dcgm.mig.interconnect.nvlink.throughput | MIG NVLink Throughput | nvlink_rx, nvlink_tx | bytes/s |
+| dcgm.mig.interconnect.pcie.link.generation | MIG PCIe Link Generation | link_gen, max_link_gen | generation |
+| dcgm.mig.interconnect.pcie.link.width | MIG PCIe Link Width | link_width, max_link_width | lanes |
+| dcgm.mig.interconnect.pcie.error_rate | MIG PCIe Error and Replay Rate | pcie_replay | errors/s |
+| dcgm.mig.interconnect.nvlink.error_rate | MIG NVLink Error Rate | nvlink_crc_data_error, nvlink_crc_flit_error, nvlink_ecc_data_error, nvlink_error_dl_crc, nvlink_error_dl_recovery, nvlink_error_dl_replay, nvlink_recovery_error, nvlink_replay_error | errors/s |
+| dcgm.mig.interconnect.nvlink.traffic | MIG NVLink Packet Rate | rx, tx | packets/s |
+| dcgm.mig.interconnect.nvlink.ber | MIG NVLink Bit Error Ratio | effective, symbol | errors per trillion bits |
+| dcgm.mig.interconnect.fabric | MIG Fabric Manager State | failure, in_progress, not_started, not_supported, nvml_too_old, success, unknown, unrecognized | state |
+| dcgm.mig.interconnect.fabric_error | MIG Fabric Manager Error | error | code |
+| dcgm.mig.interconnect.p2p | MIG Peer Access State | value_peer_gpu=* | state |
+| dcgm.mig.interconnect.c2c.capacity | MIG C2C Link Capacity | maximum | bytes/s |
+| dcgm.mig.interconnect.c2c.links | MIG C2C Link Count | links | links |
+| dcgm.mig.interconnect.c2c.state | MIG C2C Link State | power_state, status | state |
+| dcgm.mig.interconnect.c2c.throughput | MIG C2C All Traffic | rx, tx | bytes/s |
+| dcgm.mig.interconnect.c2c.payload | MIG C2C Payload Traffic | rx, tx | bytes/s |
+| dcgm.mig.interconnect.c2c.error_rate | MIG C2C Error Rate | intr, replay, replay_b2b | errors/s |
+| dcgm.mig.reliability.xid | MIG XID Error Code | xid | code |
+| dcgm.mig.reliability.xid_samples | MIG XID Samples | value_xid=* | samples |
+| dcgm.mig.reliability.xid_rate | MIG XID Record Rate | value_xid=* | records/s |
+| dcgm.mig.health.status | MIG Health Status by Watch | value_health_watch=* | state |
+| dcgm.mig.state.performance | MIG Performance State | P0, P1, P10, P11, P12, P13, P14, P15, P2, P3, P4, P5, P6, P7, P8, P9, unknown | state |
+| dcgm.mig.state.virtualization | MIG Virtualization Mode | mig_enabled, virtualization_bare_metal, virtualization_host_vgpu, virtualization_host_vsga, virtualization_passthrough, virtualization_unknown, virtualization_vgpu | state |
+| dcgm.mig.state.configuration | MIG Compute and Persistence Modes | autoboost_enabled, compute_default, compute_exclusive_process, compute_exclusive_thread, compute_prohibited, compute_unknown, persistence_enabled | state |
+| dcgm.mig.virtualization.vgpu.license | MIG vGPU License State | licensed | state |
+| dcgm.mig.virtualization.vgpu.memory | MIG vGPU Memory Usage | used | bytes |
+| dcgm.mig.virtualization.vgpu.frame_rate | MIG vGPU Frame Rate Limit | limit | frames/s |
+| dcgm.mig.capability.mig_slices | MIG Maximum MIG Slices | maximum | slices |
 
 
 ### Per nvlink
 
-These metrics refer to NVLink link instances.
+An individual NVLink with its GPU, MIG or switch parent identity.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| gpu | gpu label from exporter metrics. |
-| gpu_uuid | gpu_uuid label from exporter metrics. |
-| nvlink | nvlink label from exporter metrics. |
+| gpu | GPU device index. |
+| gpu_uuid | Parent GPU UUID. |
+| gpu_i_id | MIG GPU instance identifier. |
+| nvswitch | NVSwitch identifier. |
+| nvlink | NVLink index within its parent. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dcgm.nvlink.interconnect.ber | NVLink Interconnect Bit Error Rate metrics. | nvlink_count_effective_ber, nvlink_count_effective_ber_float, nvlink_count_symbol_ber, nvlink_count_symbol_ber_float | ratio |
-| dcgm.nvlink.interconnect.congestion | NVLink Interconnect Congestion metrics. | nvlink_ppcnt_ibpc_port_xmit_wait | events/s |
-| dcgm.nvlink.interconnect.error_rate | NVLink Interconnect Error Rate metrics. | gpu_nvlink_errors, nvlink_count_effective_errors, nvlink_count_fec_history_0, nvlink_count_fec_history_1, nvlink_count_fec_history_10, nvlink_count_fec_history_11, nvlink_count_fec_history_12, nvlink_count_fec_history_13, nvlink_count_fec_history_14, nvlink_count_fec_history_15, nvlink_count_fec_history_2, nvlink_count_fec_history_3, nvlink_count_fec_history_4, nvlink_count_fec_history_5, nvlink_count_fec_history_6, nvlink_count_fec_history_7, nvlink_count_fec_history_8, nvlink_count_fec_history_9, nvlink_count_link_recovery_events, nvlink_count_link_recovery_failed_events, nvlink_count_link_recovery_successful_events, nvlink_count_local_link_integrity_errors, nvlink_count_rx_buffer_overrun_errors, nvlink_count_rx_errors, nvlink_count_rx_general_errors, nvlink_count_rx_malformed_packet_errors, nvlink_count_rx_remote_errors, nvlink_count_rx_symbol_errors, nvlink_count_tx_discards, nvlink_crc_data_error, nvlink_crc_data_error_count_l0, nvlink_crc_data_error_count_l1, nvlink_crc_data_error_count_l10, nvlink_crc_data_error_count_l11, nvlink_crc_data_error_count_l12, nvlink_crc_data_error_count_l13, nvlink_crc_data_error_count_l14, nvlink_crc_data_error_count_l15, nvlink_crc_data_error_count_l16, nvlink_crc_data_error_count_l17, nvlink_crc_data_error_count_l2, nvlink_crc_data_error_count_l3, nvlink_crc_data_error_count_l4, nvlink_crc_data_error_count_l5, nvlink_crc_data_error_count_l6, nvlink_crc_data_error_count_l7, nvlink_crc_data_error_count_l8, nvlink_crc_data_error_count_l9, nvlink_crc_flit_error, nvlink_crc_flit_error_count_l0, nvlink_crc_flit_error_count_l1, nvlink_crc_flit_error_count_l10, nvlink_crc_flit_error_count_l11, nvlink_crc_flit_error_count_l12, nvlink_crc_flit_error_count_l13, nvlink_crc_flit_error_count_l14, nvlink_crc_flit_error_count_l15, nvlink_crc_flit_error_count_l16, nvlink_crc_flit_error_count_l17, nvlink_crc_flit_error_count_l2, nvlink_crc_flit_error_count_l3, nvlink_crc_flit_error_count_l4, nvlink_crc_flit_error_count_l5, nvlink_crc_flit_error_count_l6, nvlink_crc_flit_error_count_l7, nvlink_crc_flit_error_count_l8, nvlink_crc_flit_error_count_l9, nvlink_error_dl_crc, nvlink_error_dl_recovery, nvlink_error_dl_replay, nvlink_ppcnt_physical_successful_recovery_events, nvlink_ppcnt_plr_rcv_uncorrectable_code, nvlink_ppcnt_recovery_time_since_last, nvlink_ppcnt_recovery_total_successful_events, nvlink_pprm_oper_recovery, nvlink_recovery_error, nvlink_recovery_error_count_l0, nvlink_recovery_error_count_l1, nvlink_recovery_error_count_l10, nvlink_recovery_error_count_l11, nvlink_recovery_error_count_l12, nvlink_recovery_error_count_l13, nvlink_recovery_error_count_l14, nvlink_recovery_error_count_l15, nvlink_recovery_error_count_l16, nvlink_recovery_error_count_l17, nvlink_recovery_error_count_l2, nvlink_recovery_error_count_l3, nvlink_recovery_error_count_l4, nvlink_recovery_error_count_l5, nvlink_recovery_error_count_l6, nvlink_recovery_error_count_l7, nvlink_recovery_error_count_l8, nvlink_recovery_error_count_l9, nvlink_replay_error, nvlink_replay_error_count_l0, nvlink_replay_error_count_l1, nvlink_replay_error_count_l10, nvlink_replay_error_count_l11, nvlink_replay_error_count_l12, nvlink_replay_error_count_l13, nvlink_replay_error_count_l14, nvlink_replay_error_count_l15, nvlink_replay_error_count_l16, nvlink_replay_error_count_l17, nvlink_replay_error_count_l2, nvlink_replay_error_count_l3, nvlink_replay_error_count_l4, nvlink_replay_error_count_l5, nvlink_replay_error_count_l6, nvlink_replay_error_count_l7, nvlink_replay_error_count_l8, nvlink_replay_error_count_l9 | errors/s |
-| dcgm.nvlink.interconnect.errors | NVLink Interconnect Errors metrics. | nvlink_ppcnt_plr_rcv_uncorrectable_code | errors |
-| dcgm.nvlink.interconnect.state | NVLink Interconnect State metrics. | gpu_topology_nvlink, nvlink_get_state, nvlink_ppcnt_physical_link_down_counter, nvlink_ppcnt_plr_rcv_code_err, nvlink_ppcnt_plr_sync_events, nvlink_ppcnt_plr_xmit_retry_events, p2p_nvlink_status | state |
-| dcgm.nvlink.interconnect.throughput | NVLink Interconnect Throughput metrics. | nvlink_bandwidth, nvlink_bandwidth_l0, nvlink_bandwidth_l1, nvlink_bandwidth_l10, nvlink_bandwidth_l11, nvlink_bandwidth_l12, nvlink_bandwidth_l13, nvlink_bandwidth_l14, nvlink_bandwidth_l15, nvlink_bandwidth_l16, nvlink_bandwidth_l17, nvlink_bandwidth_l2, nvlink_bandwidth_l3, nvlink_bandwidth_l4, nvlink_bandwidth_l5, nvlink_bandwidth_l6, nvlink_bandwidth_l7, nvlink_bandwidth_l8, nvlink_bandwidth_l9, nvlink_count_rx, nvlink_count_tx, nvlink_l0_rx, nvlink_l0_tx, nvlink_l10_rx, nvlink_l10_tx, nvlink_l11_rx, nvlink_l11_tx, nvlink_l12_rx, nvlink_l12_tx, nvlink_l13_rx, nvlink_l13_tx, nvlink_l14_rx, nvlink_l14_tx, nvlink_l15_rx, nvlink_l15_tx, nvlink_l16_rx, nvlink_l16_tx, nvlink_l17_rx, nvlink_l17_tx, nvlink_l1_rx, nvlink_l1_tx, nvlink_l2_rx, nvlink_l2_tx, nvlink_l3_rx, nvlink_l3_tx, nvlink_l4_rx, nvlink_l4_tx, nvlink_l5_rx, nvlink_l5_tx, nvlink_l6_rx, nvlink_l6_tx, nvlink_l7_rx, nvlink_l7_tx, nvlink_l8_rx, nvlink_l8_tx, nvlink_l9_rx, nvlink_l9_tx, nvlink_rx_bandwidth, nvlink_rx_bandwidth_l0, nvlink_rx_bandwidth_l1, nvlink_rx_bandwidth_l10, nvlink_rx_bandwidth_l11, nvlink_rx_bandwidth_l12, nvlink_rx_bandwidth_l13, nvlink_rx_bandwidth_l14, nvlink_rx_bandwidth_l15, nvlink_rx_bandwidth_l16, nvlink_rx_bandwidth_l17, nvlink_rx_bandwidth_l2, nvlink_rx_bandwidth_l3, nvlink_rx_bandwidth_l4, nvlink_rx_bandwidth_l5, nvlink_rx_bandwidth_l6, nvlink_rx_bandwidth_l7, nvlink_rx_bandwidth_l8, nvlink_rx_bandwidth_l9, nvlink_rx, nvlink_tx_bandwidth, nvlink_tx_bandwidth_l0, nvlink_tx_bandwidth_l1, nvlink_tx_bandwidth_l10, nvlink_tx_bandwidth_l11, nvlink_tx_bandwidth_l12, nvlink_tx_bandwidth_l13, nvlink_tx_bandwidth_l14, nvlink_tx_bandwidth_l15, nvlink_tx_bandwidth_l16, nvlink_tx_bandwidth_l17, nvlink_tx_bandwidth_l2, nvlink_tx_bandwidth_l3, nvlink_tx_bandwidth_l4, nvlink_tx_bandwidth_l5, nvlink_tx_bandwidth_l6, nvlink_tx_bandwidth_l7, nvlink_tx_bandwidth_l8, nvlink_tx_bandwidth_l9, nvlink_tx | B/s |
-| dcgm.nvlink.interconnect.traffic | NVLink Interconnect Traffic metrics. | nvlink_count_rx_packets, nvlink_count_tx_packets, nvlink_ppcnt_plr_rcv_codes, nvlink_ppcnt_plr_xmit_codes, nvlink_ppcnt_plr_xmit_retry_codes | events/s |
-| dcgm.nvlink.internal.boundary | NVLink Internal Boundary Fields metrics. | nvlink_ppcnt_recovery_time_between_last_two | state |
-| dcgm.nvlink.memory.ecc_error_rate | NVLink ECC Error Rate metrics. | nvlink_ecc_data_error | errors/s |
+| dcgm.nvlink.interconnect.combined.throughput | NVLink Combined Link Throughput | nvlink_total | bytes/s |
+| dcgm.nvlink.interconnect.throughput | NVLink Link Throughput | nvlink_rx, nvlink_tx | bytes/s |
+| dcgm.nvlink.interconnect.error_rate | NVLink Link Error Rate | nvlink_crc_data_error, nvlink_crc_flit_error, nvlink_recovery_error, nvlink_replay_error | errors/s |
+| dcgm.nvlink.interconnect.nvswitch.link_sxid | NVLink NVSwitch Link Error Code | fatal, non_fatal | code |
+| dcgm.nvlink.interconnect.nvswitch.ecc_lanes | NVLink NVSwitch ECC Error Rate by Lane | lane0, lane1, lane2, lane3, lane4, lane5, lane6, lane7 | errors/s |
+| dcgm.nvlink.interconnect.nvswitch.errors | NVLink NVSwitch Error Rate | crc, ecc, recovery, replay | errors/s |
 
 
 ### Per nvswitch
 
-These metrics refer to NVSwitch instances.
+An NVSwitch exposed by a supported fabric monitoring backend.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| nvswitch | nvswitch label from exporter metrics. |
+| nvswitch | NVSwitch identifier. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dcgm.nvswitch.interconnect.nvswitch.current | NVSwitch Current metrics. | nvswitch_current_iddq, nvswitch_current_iddq_dvdd, nvswitch_current_iddq_rev | value |
-| dcgm.nvswitch.interconnect.nvswitch.errors | NVSwitch NVSwitch Errors metrics. | nvswitch_fatal_errors, nvswitch_link_crc_errors, nvswitch_link_crc_errors_lane0, nvswitch_link_crc_errors_lane1, nvswitch_link_crc_errors_lane2, nvswitch_link_crc_errors_lane3, nvswitch_link_crc_errors_lane4, nvswitch_link_crc_errors_lane5, nvswitch_link_crc_errors_lane6, nvswitch_link_crc_errors_lane7, nvswitch_link_fatal_errors, nvswitch_link_flit_errors, nvswitch_link_non_fatal_errors, nvswitch_link_recovery_errors, nvswitch_link_replay_errors, nvswitch_non_fatal_errors | errors/s |
-| dcgm.nvswitch.interconnect.nvswitch.latency | NVSwitch NVSwitch Link Latency metrics. | nvswitch_link_latency_count_vc0, nvswitch_link_latency_count_vc1, nvswitch_link_latency_count_vc2, nvswitch_link_latency_count_vc3, nvswitch_link_latency_high_vc0, nvswitch_link_latency_high_vc1, nvswitch_link_latency_high_vc2, nvswitch_link_latency_high_vc3, nvswitch_link_latency_low_vc0, nvswitch_link_latency_low_vc1, nvswitch_link_latency_low_vc2, nvswitch_link_latency_low_vc3, nvswitch_link_latency_medium_vc0, nvswitch_link_latency_medium_vc1, nvswitch_link_latency_medium_vc2, nvswitch_link_latency_medium_vc3, nvswitch_link_latency_panic_vc0, nvswitch_link_latency_panic_vc1, nvswitch_link_latency_panic_vc2, nvswitch_link_latency_panic_vc3 | events/s |
-| dcgm.nvswitch.interconnect.nvswitch.power | NVSwitch NVSwitch Power metrics. | nvswitch_power_dvdd, nvswitch_power_hvdd, nvswitch_power_vdd | Watts |
-| dcgm.nvswitch.interconnect.nvswitch.status | NVSwitch NVSwitch Status metrics. | nvswitch_link_status, nvswitch_link_type, nvswitch_reset_required | state |
-| dcgm.nvswitch.interconnect.nvswitch.throughput | NVSwitch NVSwitch Throughput metrics. | nvswitch_link_throughput_rx, nvswitch_link_throughput_tx, nvswitch_throughput_rx, nvswitch_throughput_tx | B/s |
-| dcgm.nvswitch.interconnect.nvswitch.topology | NVSwitch NVSwitch Topology metrics. | nvswitch_device_uuid, nvswitch_link_device_link_id, nvswitch_link_device_link_sid, nvswitch_link_id, nvswitch_link_remote_pcie_bus, nvswitch_link_remote_pcie_device, nvswitch_link_remote_pcie_domain, nvswitch_link_remote_pcie_function, nvswitch_pcie_bus, nvswitch_pcie_device, nvswitch_pcie_domain, nvswitch_pcie_function, nvswitch_phys_id | value |
-| dcgm.nvswitch.interconnect.nvswitch.voltage | NVSwitch NVSwitch Voltage metrics. | nvswitch_voltage_mvolt | mV |
-| dcgm.nvswitch.internal.boundary | NVSwitch Internal Boundary Fields metrics. | first_nvswitch_field_id, last_nvswitch_field_id | state |
-| dcgm.nvswitch.memory.ecc_error_rate | NVSwitch ECC Error Rate metrics. | nvswitch_link_ecc_errors, nvswitch_link_ecc_errors_lane0, nvswitch_link_ecc_errors_lane1, nvswitch_link_ecc_errors_lane2, nvswitch_link_ecc_errors_lane3, nvswitch_link_ecc_errors_lane4, nvswitch_link_ecc_errors_lane5, nvswitch_link_ecc_errors_lane6, nvswitch_link_ecc_errors_lane7 | errors/s |
-| dcgm.nvswitch.thermal.temperature | NVSwitch Temperature metrics. | nvswitch_temperature_current, nvswitch_temperature_limit_shutdown, nvswitch_temperature_limit_slowdown | Celsius |
+| dcgm.nvswitch.interconnect.nvswitch.sxid | NVSwitch Error Code | fatal, non_fatal | code |
+| dcgm.nvswitch.interconnect.nvswitch.temperature | NVSwitch Temperature | current | Celsius |
 
 
 ### Per cpu
 
-These metrics refer to host CPU instances.
+A CPU exposed when DCGM CPU monitoring is available.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cpu | cpu label from exporter metrics. |
+| cpu | CPU identifier. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dcgm.cpu.clock.frequency | CPU Clock Frequency metrics. | cpu_clock_current | MHz |
-| dcgm.cpu.cpu.info | CPU CPU Information metrics. | cpu_model, cpu_vendor | value |
-| dcgm.cpu.cpu.power | CPU CPU Power metrics. | cpu_power_limit, cpu_power_util_current | Watts |
-| dcgm.cpu.cpu.temperature | CPU CPU Temperature metrics. | cpu_temp_critical, cpu_temp_current, cpu_temp_warning | Celsius |
-| dcgm.cpu.cpu.utilization | CPU CPU Utilization metrics. | cpu_util, cpu_util_irq, cpu_util_nice, cpu_util_sys, cpu_util_user | % |
-| dcgm.cpu.diagnostics.results | CPU Diagnostics Results metrics. | diag_cpu_eud_result | state |
+| dcgm.cpu.clock.frequency | CPU Clock Frequency | current | MHz |
+| dcgm.cpu.cpu.utilization | CPU Busy Time | total | percentage |
+| dcgm.cpu.cpu.utilization_modes | CPU Activity by Mode | irq, nice, sys, user | percentage |
+| dcgm.cpu.cpu.temperature | CPU Temperature | critical, current, warning | Celsius |
+| dcgm.cpu.cpu.power | CPU Power | current, limit | Watts |
 
 
 ### Per cpu_core
 
-These metrics refer to host CPU core instances.
+An individual CPU core exposed when DCGM CPU monitoring is available.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cpu | cpu label from exporter metrics. |
-| cpucore | cpucore label from exporter metrics. |
+| cpu | CPU identifier. |
+| cpucore | CPU core identifier. |
 
 Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dcgm.cpu_core.clock.frequency | CPU Core Clock Frequency metrics. | cpu_clock_current | MHz |
-| dcgm.cpu_core.cpu.info | CPU Core CPU Information metrics. | cpu_model, cpu_vendor | value |
-| dcgm.cpu_core.cpu.power | CPU Core CPU Power metrics. | cpu_power_limit, cpu_power_util_current | Watts |
-| dcgm.cpu_core.cpu.temperature | CPU Core CPU Temperature metrics. | cpu_temp_critical, cpu_temp_current, cpu_temp_warning | Celsius |
-| dcgm.cpu_core.cpu.utilization | CPU Core CPU Utilization metrics. | cpu_util, cpu_util_irq, cpu_util_nice, cpu_util_sys, cpu_util_user | % |
-| dcgm.cpu_core.diagnostics.results | CPU Core Diagnostics Results metrics. | diag_cpu_eud_result | state |
-
-
-### Per exporter
-
-These metrics refer to exporter/global instances.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| job | job label from exporter metrics. |
-
-Metrics:
-
-| Metric | Description | Dimensions | Unit |
-|:------|:------------|:----------|:----|
-| dcgm.exporter.health.status | Exporter Health Status metrics. | bind_unbind_event | state |
-| dcgm.exporter.inventory.software | Exporter Software and Firmware metrics. | cuda_driver_version, driver_version, nvml_version | value |
+| dcgm.cpu_core.clock.frequency | CPU Core Clock Frequency | current | MHz |
+| dcgm.cpu_core.cpu.utilization | CPU Core CPU Busy Time | total | percentage |
+| dcgm.cpu_core.cpu.utilization_modes | CPU Core CPU Activity by Mode | irq, nice, sys, user | percentage |
+| dcgm.cpu_core.cpu.temperature | CPU Core CPU Temperature | critical, current, warning | Celsius |
+| dcgm.cpu_core.cpu.power | CPU Core CPU Power | current, limit | Watts |
 
 
 
