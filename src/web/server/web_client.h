@@ -21,7 +21,8 @@ typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
     HTTP_VALIDATION_MALFORMED_URL,
     HTTP_VALIDATION_INCOMPLETE,
-    HTTP_VALIDATION_REDIRECT
+    HTTP_VALIDATION_REDIRECT,
+    HTTP_VALIDATION_URI_TOO_LONG
 } HTTP_VALIDATION;
 
 typedef enum __attribute__((packed)) {
@@ -145,14 +146,14 @@ void web_client_set_conn_unix(struct web_client *w);
 void web_client_set_conn_cloud(struct web_client *w);
 void web_client_set_conn_webrtc(struct web_client *w);
 
-#define NETDATA_WEB_REQUEST_URL_SIZE 65536              // static allocation
-
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
 
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
-#define NETDATA_WEB_REQUEST_MAX_SIZE (128 * 1024)
+#define NETDATA_WEB_REQUEST_MAX_SIZE (1024 * 1024)
+#define NETDATA_WEB_REQUEST_URL_DECODE_INITIAL_SIZE (4 * 1024)
+#define NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE (64 * 1024)
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
 struct response {
@@ -191,6 +192,7 @@ struct web_client {
     HTTP_ACCESS access;                 // the access permissions of the client
     size_t header_parse_tries;
     size_t header_parse_last_size;
+    size_t header_parse_expected_size;  // POST/PUT total; SIZE_MAX means invalid framing
 
     int fd;
 
@@ -202,6 +204,8 @@ struct web_client {
     BUFFER *url_as_received;            // the entire URL as received, used for logging - DO NOT MODIFY
     BUFFER *url_path_decoded;           // the path, decoded - it is incrementally parsed and altered
     BUFFER *url_query_string_decoded;   // the query string, decoded - it is incrementally parsed and altered
+    char *url_decode_buffer;            // reusable URL-decoding scratch space
+    size_t url_decode_buffer_size;
 
     // THESE NEED TO BE FREED
     char *auth_bearer_token;            // the Bearer auth token (if sent)
@@ -275,7 +279,8 @@ void web_client_free(struct web_client *w);
 #include "web/api/web_api_v2.h"
 #include "database/rrd.h"
 
-void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
+bool web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
+void web_client_trim_url_decode_buffer_for_cache(struct web_client *w);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);
 

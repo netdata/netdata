@@ -140,7 +140,8 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     if(validation != HTTP_VALIDATION_OK) {
         nd_log(NDLS_ACCESS, NDLP_ERR, "ACLK received request is not valid, code %d", validation);
         retval = 1;
-        w->response.code = HTTP_RESP_BAD_REQUEST;
+        w->response.code =
+            validation == HTTP_VALIDATION_URI_TOO_LONG ? HTTP_RESP_URI_TOO_LONG : HTTP_RESP_BAD_REQUEST;
         w->response.code = (short)aclk_http_msg_v2(client, query->callback_topic, query->msg_id,
                                                    dt_ut, query->created, w->response.code,
                                                    NULL, 0);

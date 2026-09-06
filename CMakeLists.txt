@@ -2070,6 +2070,7 @@ set(WEB_PLUGIN_FILES
         src/web/server/static/static-threaded.c
         src/web/server/static/static-threaded.h
         src/web/server/web_client.c
+        src/web/server/web_client-unittest.c
         src/web/server/web_client.h
         src/web/server/web_client_cache.c
         src/web/server/web_client_cache.h
