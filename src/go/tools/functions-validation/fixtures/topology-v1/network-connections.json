@@ -55,7 +55,7 @@
           "layer": "process",
           "identity": ["id"],
           "merge_identity": ["machine_guid", "process"],
-          "aggregation_scopes": ["node", "process_name", "pid"],
+          "aggregation_scopes": ["process_name", "pid"],
           "presentation": {
             "label": "Process",
             "color_slot": "primary",
@@ -79,7 +79,7 @@
           "layer": "network",
           "identity": ["id"],
           "merge_identity": ["ip", "address_space"],
-          "aggregation_scopes": ["node"]
+          "aggregation_scopes": []
         }
       },
       "link_types": {
@@ -228,6 +228,24 @@
             {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
           ]
         }
+      },
+      "aggregation_scopes": {
+        "node": {
+          "columns": ["machine_guid", "hostname"],
+          "evidence_policy": "preserve"
+        },
+        "process_name": {
+          "columns": ["process"],
+          "evidence_policy": "preserve"
+        },
+        "pid": {
+          "columns": ["pid", "net_ns_inode"],
+          "evidence_policy": "preserve"
+        },
+        "container": {
+          "columns": ["container_name"],
+          "evidence_policy": "preserve"
+        }
       }
     },
     "presentation": {
@@ -317,7 +335,11 @@
         {"id": "type", "type": "string_ref", "dictionary": "strings"},
         {"id": "id", "type": "string_ref", "dictionary": "strings", "role": "identity"},
         {"id": "machine_guid", "type": "string_ref", "dictionary": "strings", "nullable": true},
+        {"id": "hostname", "type": "string", "nullable": true, "role": "merge_identity", "aggregation": "set"},
         {"id": "process", "type": "string_ref", "dictionary": "strings", "nullable": true},
+        {"id": "pid", "type": "uint", "nullable": true, "role": "identity"},
+        {"id": "net_ns_inode", "type": "uint", "nullable": true, "role": "identity"},
+        {"id": "container_name", "type": "string", "nullable": true, "role": "group_key", "aggregation": "set"},
         {"id": "ip", "type": "ip_ref", "dictionary": "strings", "nullable": true},
         {"id": "address_space", "type": "string_ref", "dictionary": "strings", "nullable": true},
         {"id": "socket_count", "type": "uint", "role": "metric", "aggregation": "sum"}
@@ -326,7 +348,11 @@
         {"codec": "dict", "values": [0, 1, 2], "indexes": [0, 1, 2]},
         {"codec": "values", "values": [3, 5, 6]},
         {"codec": "values", "values": [4, 4, null]},
+        {"codec": "const", "value": null},
         {"codec": "values", "values": [null, 5, null]},
+        {"codec": "const", "value": null},
+        {"codec": "const", "value": null},
+        {"codec": "const", "value": null},
         {"codec": "values", "values": [null, null, 6]},
         {"codec": "values", "values": [null, null, 11]},
         {"codec": "values", "values": [2, 2, 2]}

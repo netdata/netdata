@@ -21,6 +21,15 @@ import sys
 import os
 
 
+def schema_validator(schema):
+    """Build the validator selected by the schema's declared draft."""
+    import jsonschema
+
+    validator_class = jsonschema.validators.validator_for(schema)
+    validator_class.check_schema(schema)
+    return validator_class(schema)
+
+
 def load_payload(path):
     raw = io.open(path, encoding='utf-8', errors='replace').read()
     if raw.startswith("FUNCTION_RESULT_BEGIN"):
@@ -42,6 +51,47 @@ def load_payload(path):
     return json.loads(raw)
 
 
+def aggregation_scope_reference_errors(types):
+    """Return actor-type references that have no matching scope definition."""
+    if not isinstance(types, dict):
+        return []
+
+    actor_types = types.get("actor_types")
+    aggregation_scopes = types.get("aggregation_scopes", {})
+    if not isinstance(actor_types, dict) or not isinstance(aggregation_scopes, dict):
+        return []
+
+    errors = []
+    for actor_type_id, actor_type in actor_types.items():
+        if not isinstance(actor_type, dict):
+            continue
+        actor_scopes = actor_type.get("aggregation_scopes", [])
+        if not isinstance(actor_scopes, list):
+            errors.append(
+                f"actor type {actor_type_id!r} aggregation_scopes is not an array")
+            continue
+        for scope_id in actor_scopes:
+            if isinstance(scope_id, str) and scope_id not in aggregation_scopes:
+                errors.append(
+                    f"actor type {actor_type_id!r} references undefined "
+                    f"aggregation scope {scope_id!r}")
+    return errors
+
+
+def network_viewer_actor_type_errors(types):
+    """Enforce network-viewer's endpoint actor contract."""
+    if not isinstance(types, dict) or not isinstance(types.get("actor_types"), dict):
+        return []
+
+    endpoint = types["actor_types"].get("endpoint")
+    if not isinstance(endpoint, dict):
+        return ["missing endpoint actor type"]
+    endpoint_scopes = endpoint.get("aggregation_scopes", [])
+    if isinstance(endpoint_scopes, list) and endpoint_scopes:
+        return ["endpoint actor type must not declare aggregation scopes"]
+    return []
+
+
 def semantic_checks(data, expect_mode=None, expect_group_by=None):
     errors = []
     if data.get("type") != "topology":
@@ -57,6 +107,9 @@ def semantic_checks(data, expect_mode=None, expect_group_by=None):
             errors.append(f"{table} table missing columns/values")
     if "types" not in d or "actor_types" not in d.get("types", {}):
         errors.append("missing types.actor_types registry")
+    else:
+        errors.extend(aggregation_scope_reference_errors(d["types"]))
+        errors.extend(network_viewer_actor_type_errors(d["types"]))
     if "presentation" not in d:
         errors.append("missing presentation")
     view = d.get("view")
@@ -92,6 +145,66 @@ def run_self_test():
         os.unlink(name)
     if parsed["data"]["view"]["scope"] != "FUNCTION_RESULT_END":
         print("self-test FAILED: FUNCTION_RESULT_END inside JSON string was stripped")
+        return 1
+
+    valid_types = {
+        "actor_types": {
+            "process": {"aggregation_scopes": ["process_name"]},
+            "endpoint": {"aggregation_scopes": []},
+            "scope_less": {},
+        },
+        "aggregation_scopes": {"process_name": {}},
+    }
+    if errors := aggregation_scope_reference_errors(valid_types):
+        print("self-test FAILED: valid scoped/scope-less actor types rejected:", errors)
+        return 1
+    if errors := network_viewer_actor_type_errors(valid_types):
+        print("self-test FAILED: valid endpoint actor type rejected:", errors)
+        return 1
+
+    dangling_types = {
+        "actor_types": {"endpoint": {"aggregation_scopes": ["endpoint"]}},
+        "aggregation_scopes": {},
+    }
+    expected = ["actor type 'endpoint' references undefined aggregation scope 'endpoint'"]
+    if aggregation_scope_reference_errors(dangling_types) != expected:
+        print("self-test FAILED: dangling actor aggregation scope was not rejected")
+        return 1
+    expected = ["endpoint actor type must not declare aggregation scopes"]
+    if network_viewer_actor_type_errors(dangling_types) != expected:
+        print("self-test FAILED: endpoint aggregation scope was not rejected")
+        return 1
+
+    if network_viewer_actor_type_errors({"actor_types": {}}) != ["missing endpoint actor type"]:
+        print("self-test FAILED: missing endpoint actor type was not rejected")
+        return 1
+
+    for malformed_scopes in (None, 7, "endpoint", {}):
+        malformed_types = {
+            "actor_types": {"endpoint": {"aggregation_scopes": malformed_scopes}},
+            "aggregation_scopes": {},
+        }
+        expected = ["actor type 'endpoint' aggregation_scopes is not an array"]
+        if aggregation_scope_reference_errors(malformed_types) != expected:
+            print(
+                "self-test FAILED: malformed endpoint aggregation_scopes was not rejected:",
+                repr(malformed_scopes))
+            return 1
+
+    try:
+        import jsonschema
+    except ImportError:
+        print("self-test FAILED: jsonschema is required to test schema draft selection")
+        return 1
+    here = os.path.dirname(os.path.abspath(__file__))
+    schema_file = os.path.join(
+        here, "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")
+    schema = json.load(io.open(schema_file, encoding="utf-8"))
+    validator = schema_validator(schema)
+    if validator.__class__ is not jsonschema.Draft202012Validator:
+        print(
+            "self-test FAILED: topology schema did not select Draft 2020-12; got",
+            validator.__class__.__name__)
         return 1
     print("self-test OK")
     return 0
@@ -139,7 +252,7 @@ def validate_payload(data, schema_file, expect_mode, expect_group_by):
         print("jsonschema not available; semantic checks passed")
         return 0
 
-    validator = jsonschema.Draft7Validator(schema)
+    validator = schema_validator(schema)
     errs = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
     if errs:
         print(f"SCHEMA FAILURES ({len(errs)}):")

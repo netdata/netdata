@@ -144,9 +144,13 @@ jobs:
             fi
             python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py "$out" "$@"
           }
-          validate aggregated '{}' --mode aggregated --group-by process_name
-          validate pid '{"selections":{"group_by":"pid"}}' --mode aggregated --group-by pid
-          validate detailed '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}' --mode detailed
+          validate default '{}' --mode aggregated --group-by process_name
+          validate aggregated-process-name '{"selections":{"__topology_mode":"aggregated","mode":"aggregated","group_by":"process_name"}}' --mode aggregated --group-by process_name
+          validate aggregated-pid '{"selections":{"__topology_mode":"aggregated","mode":"aggregated","group_by":"pid"}}' --mode aggregated --group-by pid
+          validate aggregated-container '{"selections":{"__topology_mode":"aggregated","mode":"aggregated","group_by":"container"}}' --mode aggregated --group-by container
+          validate detailed-process-name '{"selections":{"__topology_mode":"detailed","mode":"detailed","group_by":"process_name"}}' --mode detailed --group-by process_name
+          validate detailed-pid '{"selections":{"__topology_mode":"detailed","mode":"detailed","group_by":"pid"}}' --mode detailed --group-by pid
+          validate detailed-container '{"selections":{"__topology_mode":"detailed","mode":"detailed","group_by":"container"}}' --mode detailed --group-by container
 
   asan-tests:
     name: Unit Tests (ASAN)
