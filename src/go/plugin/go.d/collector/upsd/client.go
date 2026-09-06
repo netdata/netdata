@@ -147,20 +147,31 @@ func (c *upsdClient) sendCommand(cmd string) ([]string, error) {
 		return nil, err
 	}
 	if errMsg != "" {
-		return nil, fmt.Errorf("%w: %s (cmd: '%s')", errUpsdCommand, errMsg, cmd)
+		return nil, fmt.Errorf("%w: %s (cmd: '%s')", errUpsdCommand, errMsg, commandName(cmd))
+	}
+	// Not errUpsdCommand: an empty response means the peer closed the
+	// connection, so the caller must drop it, not keep using it.
+	if len(resp) == 0 {
+		return nil, fmt.Errorf("no response to command '%s'", commandName(cmd))
 	}
 
 	return resp, nil
 }
 
 func getEndLine(cmd string) string {
-	px, _, _ := strings.Cut(cmd, " ")
-
-	switch px {
+	switch commandName(cmd) {
 	case "USERNAME", "PASSWORD", "VER":
 		return "OK"
 	}
 	return fmt.Sprintf("END %s", cmd)
+}
+
+// commandName returns the command verb without its arguments. USERNAME and
+// PASSWORD carry credentials in their arguments, so only the verb may be put
+// in an error or a log line.
+func commandName(cmd string) string {
+	name, _, _ := strings.Cut(cmd, " ")
+	return name
 }
 
 func splitLine(s string) []string {
