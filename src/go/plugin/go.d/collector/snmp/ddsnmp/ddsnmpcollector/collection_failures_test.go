@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -120,4 +121,26 @@ func TestReplacementClientKeepsFailureObservation(t *testing.T) {
 	_, _ = c.Collect()
 	require.EqualValues(t, 1, c.CollectionFailures().GET.Count)
 	require.Equal(t, "wrong_digest", c.CollectionFailures().GET.Last.Reason)
+}
+
+func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
+	ctrl, handler := setupMockHandler(t)
+	defer ctrl.Finish()
+	const oid = "1.3.6.1.4.1.99999"
+	const first = oid + ".1.0"
+	const second = oid + ".2.0"
+	profile := &ddsnmp.Profile{SourceFile: "mixed.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+		Metadata:            ddprofiledefinition.MetadataConfig{"device": {Fields: map[string]ddprofiledefinition.MetadataField{"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: second, Name: "serial"}}}}},
+		SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{{SysobjectID: oid, Metadata: map[string]ddprofiledefinition.MetadataField{"model": {Symbol: ddprofiledefinition.SymbolConfig{OID: first, Name: "model", Format: "uint32"}}}}},
+	}}
+	c := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, SysObjectID: oid, Log: logger.New()})
+	expectSNMPGet(handler, []string{first}, []gosnmp.SnmpPDU{createStringPDU(first, "invalid number")})
+	expectSNMPGetError(handler, []string{second}, gosnmp.ErrWrongDigest)
+	_, err := c.CollectDeviceMetadata()
+	require.ErrorIs(t, err, gosnmp.ErrWrongDigest)
+	require.Equal(t, "wrong_digest", snmputils.ClassifyFailure(err).Reason)
+	failures := c.CollectionFailures()
+	require.Equal(t, "wrong_digest", failures.Profiles.Last.Reason)
+	require.Equal(t, "wrong_digest", failures.GET.Last.Reason)
+	require.EqualValues(t, 1, failures.Processing.Preparation)
 }

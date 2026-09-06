@@ -102,11 +102,7 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 		profDeviceMeta, err := c.deviceMetadataCollector.collectObserved(prof.profile, stats, nil)
 		c.failures.Processing.Preparation += stats.Errors.Processing.Preparation
 		if err != nil {
-			reason := ""
-			if stats.Errors.Processing.Preparation > 0 {
-				reason = "processing"
-			}
-			err = snmputils.WithFailure(err, "metadata", reason)
+			err = snmputils.WithFailure(err, "metadata", "")
 			recordCollectionFailure(&c.failures.Profiles, err, "metadata", "")
 			return nil, err
 		}
