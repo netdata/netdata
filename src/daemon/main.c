@@ -283,23 +283,36 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
-// Standalone `-W <name>` unittest driver: bring up sqlite + RRD, run one test,
-// tear everything down, and return the test's exit code.
-static int unittest_run_with_rrd(int (*test_fn)(void)) {
+// Library bring-up every `-W` option that creates an RRDHOST needs. Without the
+// rrdlabels ARAL, the first rrdlabels_create() inside rrdhost_create() crashes.
+static int unittest_libs_init(void) {
     unittest_running = true;
 
     if(sqlite_library_init())
         return 1;
     rrdlabels_aral_init(false);
 
+    return 0;
+}
+
+static void unittest_libs_shutdown(void) {
+    sqlite_close_databases();
+    sqlite_library_shutdown();
+    rrdlabels_aral_destroy(false);
+}
+
+// Standalone `-W <name>` unittest driver: bring up sqlite + RRD, run one test,
+// tear everything down, and return the test's exit code.
+static int unittest_run_with_rrd(int (*test_fn)(void)) {
+    if(unittest_libs_init())
+        return 1;
+
     const char *user = NULL;
     int rc = unittest_prepare_rrd(&user);
     if(!rc)
         rc = test_fn();
 
-    sqlite_close_databases();
-    sqlite_library_shutdown();
-    rrdlabels_aral_destroy(false);
+    unittest_libs_shutdown();
     return rc;
 }
 
@@ -782,16 +795,16 @@ int netdata_main(int argc, char **argv) {
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
-                            netdata_conf_section_global_run_as_user(&user);
-                            netdata_conf_section_global();
-                            nd_profile.update_every = 1;
-                            registry_init();
-                            if(rrd_init("dbengine-dataset", NULL, true)) {
-                                fprintf(stderr, "rrd_init failed for unittest\n");
+
+                            if(unittest_libs_init())
                                 return 1;
-                            }
-                            generate_dbengine_dataset(history_seconds);
-                            return 0;
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                generate_dbengine_dataset(history_seconds);
+
+                            unittest_libs_shutdown();
+                            return rc;
                         }
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
@@ -819,9 +832,17 @@ int netdata_main(int argc, char **argv) {
                             char workers_str[16];
                             snprintf(workers_str, 15, "%u", workers);
                             setenv("UV_THREADPOOL_SIZE", workers_str, 1);
-                            dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
-                                                 page_cache_mb, disk_space_mb);
-                            return 0;
+
+                            if(unittest_libs_init())
+                                return 1;
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
+                                                     page_cache_mb, disk_space_mb);
+
+                            unittest_libs_shutdown();
+                            return rc;
                         }
 #endif
                         else if(strcmp(optarg, "simple-pattern") == 0) {
