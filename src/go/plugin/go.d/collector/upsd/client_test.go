@@ -4,6 +4,7 @@ package upsd
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -13,7 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testPassword = "s3cr3t-password"
+const (
+	testUsername = "s3cr3t-user"
+	testPassword = "s3cr3t-password"
+)
 
 // fakeSocket replays a canned response per command verb.
 type fakeSocket struct {
@@ -39,12 +43,38 @@ func TestUpsdClient_authenticateDoesNotLeakPassword(t *testing.T) {
 		"PASSWORD": {"ERR ACCESS-DENIED"},
 	}}}
 
-	err := client.authenticate("user", testPassword)
+	err := client.authenticate(testUsername, testPassword)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errUpsdCommand))
 	assert.NotContains(t, err.Error(), testPassword)
 	assert.Contains(t, err.Error(), "PASSWORD")
+}
+
+func TestUpsdClient_authenticateDoesNotLeakUsername(t *testing.T) {
+	client := &upsdClient{conn: &fakeSocket{responses: map[string][]string{
+		"USERNAME": {"ERR ACCESS-DENIED"},
+	}}}
+
+	err := client.authenticate(testUsername, testPassword)
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, errUpsdCommand))
+	assert.NotContains(t, err.Error(), testUsername)
+	assert.Contains(t, err.Error(), "USERNAME")
+}
+
+func TestUpsdClient_errorKeepsNonCredentialCommandArguments(t *testing.T) {
+	client := &upsdClient{conn: &fakeSocket{responses: map[string][]string{
+		"LIST": {"ERR VAR-NOT-SUPPORTED"},
+	}}}
+
+	_, err := client.sendCommand(fmt.Sprintf(commandListVar, "ups1"))
+
+	require.Error(t, err)
+	// Only USERNAME/PASSWORD arguments are redacted: the UPS name is what
+	// makes this error diagnosable.
+	assert.Contains(t, err.Error(), "LIST VAR ups1")
 }
 
 func TestUpsdClient_emptyResponseIsAnError(t *testing.T) {
@@ -56,4 +86,5 @@ func TestUpsdClient_emptyResponseIsAnError(t *testing.T) {
 	// The peer closed the connection; the caller must drop it, so this must
 	// not be reported as a protocol-level upsd command error.
 	assert.False(t, errors.Is(err, errUpsdCommand))
+	assert.Contains(t, err.Error(), commandListUPS)
 }

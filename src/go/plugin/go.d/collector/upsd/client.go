@@ -147,31 +147,39 @@ func (c *upsdClient) sendCommand(cmd string) ([]string, error) {
 		return nil, err
 	}
 	if errMsg != "" {
-		return nil, fmt.Errorf("%w: %s (cmd: '%s')", errUpsdCommand, errMsg, commandName(cmd))
+		return nil, fmt.Errorf("%w: %s (cmd: '%s')", errUpsdCommand, errMsg, redactCommand(cmd))
 	}
 	// Not errUpsdCommand: an empty response means the peer closed the
 	// connection, so the caller must drop it, not keep using it.
 	if len(resp) == 0 {
-		return nil, fmt.Errorf("no response to command '%s'", commandName(cmd))
+		return nil, fmt.Errorf("no response to command '%s'", redactCommand(cmd))
 	}
 
 	return resp, nil
 }
 
 func getEndLine(cmd string) string {
-	switch commandName(cmd) {
+	px, _, _ := strings.Cut(cmd, " ")
+
+	switch px {
 	case "USERNAME", "PASSWORD", "VER":
 		return "OK"
 	}
 	return fmt.Sprintf("END %s", cmd)
 }
 
-// commandName returns the command verb without its arguments. USERNAME and
-// PASSWORD carry credentials in their arguments, so only the verb may be put
-// in an error or a log line.
-func commandName(cmd string) string {
-	name, _, _ := strings.Cut(cmd, " ")
-	return name
+// redactCommand returns cmd safe to put in an error or a log line. USERNAME
+// and PASSWORD carry credentials in their arguments, so only the verb is kept.
+// Every other command is logged in full: its arguments (the UPS name in
+// "LIST VAR <ups>") are what makes the error diagnosable.
+func redactCommand(cmd string) string {
+	verb, _, _ := strings.Cut(cmd, " ")
+
+	switch verb {
+	case "USERNAME", "PASSWORD":
+		return verb
+	}
+	return cmd
 }
 
 func splitLine(s string) []string {
