@@ -75,12 +75,11 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 	}
 	metricStore := metrix.NewCollectorStore()
 	c := &Collector{
-		deviceStates:          make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
-		topologyRegistry:      newTopologyRegistryWithResolver(reverseDNS),
-		deviceSource:          deviceStore,
-		deviceLifecycleSource: deviceStore,
-		trapEnrichment:        trapEnrichment,
-		newSnmpClient:         gosnmp.NewHandler,
+		deviceStates:     make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
+		topologyRegistry: newTopologyRegistryWithResolver(reverseDNS),
+		deviceSource:     deviceStore,
+		trapEnrichment:   trapEnrichment,
+		newSnmpClient:    gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
@@ -112,7 +111,6 @@ type (
 		generationSequence              uint64
 		topologyRegistry                *topologyRegistry
 		deviceSource                    deviceSource
-		deviceLifecycleSource           deviceLifecycleSource
 		trapEnrichment                  *TrapEnrichmentHandle
 		lastAbortedTopologyDiagnostic   atomic.Pointer[topologyAbortedSweepDiagnostic]
 		topologyDiagnosticAbortSequence atomic.Uint64

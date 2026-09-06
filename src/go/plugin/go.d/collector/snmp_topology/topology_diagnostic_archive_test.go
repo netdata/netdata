@@ -389,8 +389,6 @@ func TestTopologyDiagnosticArchiveEnumTablesAreCompleteAndRoundTrip(t *testing.T
 	}{
 		{"capture state", topologyDiagnosticArchiveCaptureStateNames, uint8(diagnosticCaptureUnavailable)},
 		{"capture reason", topologyDiagnosticArchiveCaptureReasonNames, uint8(diagnosticCaptureReasonGlobalByteLimit)},
-		{"lifecycle phase", []string{"unknown", "init", "check", "collect"}, uint8(ddsnmp.DeviceLifecyclePhaseCollect)},
-		{"lifecycle outcome", []string{"unknown", "success", "failed"}, uint8(ddsnmp.DeviceLifecycleOutcomeFailed)},
 		{"device outcome", topologyDiagnosticArchiveDeviceOutcomeNames, uint8(deviceRefreshOutcomeFailed)},
 		{"abort reason", topologyDiagnosticArchiveAbortReasonNames, uint8(topologyDiagnosticAbortPanic)},
 		{"sweep phase", topologyDiagnosticArchiveSweepPhaseNames, uint8(topologyDiagnosticSweepPhaseCommit)},
