@@ -454,7 +454,8 @@ evidence-backed reason it is unaffected.
     not named `<area>-<topic>` with a listed area, or whose frontmatter `name` differs from its directory; a public
     skill symlink that does not point into `docs/netdata-ai/skills/` or does not resolve; a skill directory missing
     from the `AGENTS.md` skills index, or an index entry with no directory; a `.agents/skills/` path named in a tracked
-    file, or a relative `../` path in a skill file, that does not exist; a failed reference scan;
+    file, or a relative `../` path in a skill file, that does not exist; an owner-section citation `path.md#anchor` in a
+    skill file whose file or heading (GitHub slug) does not exist; a failed reference scan;
   - a sensitive-data hit in the committed durable artifacts it scans (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
     `.agents/ENV.md`, the framework files, `.agents/skills/**`, `.agents/skill-verification/**`).
   Advisory: in-flight SOW files under `q/current/` are checked for the template's required sections for their kind,
