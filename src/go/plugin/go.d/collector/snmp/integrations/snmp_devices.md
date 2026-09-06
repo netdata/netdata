@@ -129,6 +129,29 @@ cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/sd/snmp.conf
 ```
 
+##### Mass-customizing discovered devices with `config_template`
+
+The [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf) file contains a `services` block whose `config_template` is a single [Go template](https://pkg.go.dev/text/template) that generates the job configuration for **every** device SNMP discovery finds. This template is the default configuration automatically created for each discovered switch.
+
+Because all discovered devices share this one template, editing it lets you mass-customize every auto-discovered device at once. Any valid job-level option added to the template — such as `update_every`, `manual_profiles`, `create_vnode`, or `options.timeout` — applies to every discovered device.
+
+The default template uses these variables for each discovered device:
+
+| Variable | Description |
+|---|---|
+| `.SysInfo.Name` | Device system name discovered via SNMP (sysName) |
+| `.IPAddress` | Discovered device IP address |
+| `.Credential.Version` | SNMP version from the matched credential (`1`, `2`, `2c`, `3`) |
+| `.Credential.Community` | SNMPv1/2c community string (versions 1/2/2c) |
+| `.Credential.UserName` | SNMPv3 username (version 3) |
+| `.Credential.SecurityLevel` | SNMPv3 security level (version 3) |
+| `.Credential.AuthProtocol` | SNMPv3 auth protocol (version 3) |
+| `.Credential.AuthPassphrase` | SNMPv3 auth passphrase (version 3) |
+| `.Credential.PrivacyProtocol` | SNMPv3 privacy protocol (version 3) |
+| `.Credential.PrivacyPassphrase` | SNMPv3 privacy passphrase (version 3) |
+
+The shipped `go.d/sd/snmp.conf` is the authoritative example of the full template. The discovery engine also makes additional fields available to a custom template — for example `.SysInfo.Location`, `.SysInfo.Contact`, and `.Credential.ContextName` — so you are not limited to the variables the default template uses. See the [Setup](#setup) section for the complete set of job-level configuration options.
+
 
 #### Limits
 
