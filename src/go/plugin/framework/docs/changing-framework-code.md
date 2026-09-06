@@ -323,7 +323,7 @@ Framework changes often require durable artifact updates. Check each class:
 - framework package READMEs
 - specs under `.agents/sow/specs/`
 - collector authoring docs under `src/go/plugin/go.d/docs/`
-- integrations-lifecycle skill and artifacts if collector metadata/taxonomy
+- integrations-lifecycle skill and artifacts if collector metadata
   changes
 - public Function/topology schemas and guides if protocol behavior changes
 

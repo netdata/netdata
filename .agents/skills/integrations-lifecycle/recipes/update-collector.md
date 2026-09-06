@@ -1,136 +1,42 @@
 # Recipe: update an existing collector integration
 
-Use this when a collector's metrics, chart contexts, configuration,
-alerts, or generated docs change. The goal is to keep runtime behavior,
-metadata, taxonomy, source documentation, and CI validation coherent. Generated
-integration pages ship through the automatic post-merge regeneration PR, not
-the source PR.
-
-## 0. Read first
-
-- `../SKILL.md` -- integrations lifecycle overview.
-- `../consistency.md` -- what the collector consistency rule requires
-  and what CI enforces.
-- `../schema-reference.md` -- exact `metadata.yaml` and
-  `taxonomy.yaml` fields.
+Use this when a collector's metrics, chart contexts, configuration, alerts, or documentation change. Read
+`../consistency.md` first: it owns which artifacts move together and the delivery boundary.
 
 ## 1. Identify what changed
 
-From the collector directory, list the changed surfaces:
-
-- runtime `.go` / script code;
-- `metadata.yaml` metric contexts, units, dimensions, setup, alerts;
-- `taxonomy.yaml` dashboard TOC placement;
-- `config_schema.json`;
-- stock `.conf`;
-- `health.d/*.conf`;
-- generated `integrations/<slug>.md` and `README.md` symlink.
-
-If chart contexts are added, removed, renamed, or moved between dynamic
-and static emission, update `taxonomy.yaml` in the same PR.
+From the collector directory, list the changed surfaces: runtime code; `metadata.yaml` metric contexts, units,
+dimensions, setup, alerts; `config_schema.json`; the stock `.conf`; `health.d/*.conf`. The generated
+`integrations/<slug>.md` and `README.md` symlink are outputs and follow automatically.
 
 ## 2. Update `metadata.yaml`
 
-Metric rows mirror the code (context, chart title, unit, chart type,
-dimensions); option rows mirror the schema; alert rows mirror the health
-conf. The content rules for every field are in
-`.agents/skills/collectors-metadata-yaml/SKILL.md` (`metrics.md`,
-`setup.md`, `alerts-and-meta.md`). If a collector emits runtime-only
-dynamic contexts, declare the guardrail in metadata:
+Metric rows mirror the code (context, chart title, unit, chart type, dimensions); option rows mirror the schema; alert
+rows mirror the health conf. The content rules for every field are in `.agents/skills/collectors-metadata-yaml/`
+(`metrics.md`, `setup.md`, `alerts-and-meta.md`); the catalog sentence and page description in
+`../description-authoring.md`.
 
-```yaml
-metrics:
-  dynamic_context_prefixes:
-    - prefix: snmp.
-      reason: SNMP profiles emit device-specific contexts at runtime.
-```
+## 3. Update the remaining artifacts
 
-Use `dynamic_collect_plugins` only when a stable context-name prefix is
-not available.
+Keep `config_schema.json`, the stock `.conf`, and `health.d/*.conf` synchronized with the behavior change
+(`../consistency.md`, "What reviewers should check"). An existing sibling `taxonomy.yaml` is dormant; leave it alone.
 
-## 3. Update `taxonomy.yaml`
+## 4. Validate locally
 
-Check whether the existing taxonomy still owns every static context
-exactly once:
-
-```bash
-python3 integrations/gen_taxonomy.py --check-only
-```
-
-Rules of thumb:
-
-- plain strings in structural `items:` own contexts;
-- `type: context` widgets reference contexts but do not own them;
-- every literal widget reference must be owned elsewhere or carry an
-  explicit `unresolved` escape hatch;
-- dynamic collectors use `type: selector` with declared
-  `context_prefix:` or `collect_plugin:`;
-- pick section IDs from `integrations/taxonomy/sections.yaml`.
-
-For a modern go.d V2 ownership reference, compare against
-`src/go/plugin/go.d/collector/cato_networks/taxonomy.yaml`. If the change needs
-grid or table widget examples, compare against
-`src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
-
-## 4. Update the remaining collector artifacts
-
-Keep these synchronized when the corresponding behavior changes:
-
-- `config_schema.json` for dynamic configuration;
-- stock `.conf` for user-visible defaults;
-- `health.d/*.conf` and `metadata.yaml.modules[].alerts[]`;
-- generated docs through the automatic post-merge regeneration PR.
-
-Do not hand-edit generated `integrations/<slug>.md` files.
-
-## 5. Run local validation
-
-From the repo root:
+Interpreter and dependencies: `integrations/README.md` (look for `<repo>/.venv/` first).
 
 ```bash
 python3 integrations/gen_integrations.py
-python3 integrations/gen_taxonomy.py --check-only
-python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
-python3 -m unittest integrations.tests.test_taxonomy
-# Validate the generated docs locally; do not stage them in the source PR:
-python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
-python3 integrations/gen_doc_collector_page.py
-python3 integrations/gen_doc_secrets_page.py
-# If service-discovery rules or sdext metadata changed:
-python3 integrations/gen_doc_service_discovery_page.py
+python3 integrations/gen_docs_integrations.py --check
+python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
 ```
 
-Do not skip the three generated-doc commands: they validate the source locally.
-`check-markdown.yml` repeats them in the PR, and
-`generate-integrations.yml` commits their final output to the separate
-post-merge regeneration PR.
+Do not regenerate the pages for the PR; CI does it after merge, and the extra changed lines make review harder. If you
+regenerate to read the rendered page (`gen_docs_integrations.py -c go.d.plugin/<module>`), undo the changes to tracked
+files before committing.
 
-Use the repo-local `.venv/bin/python` when one exists for the current
-worktree. If your local base branch is not `master`, adjust the `--pr-diff`
-range to the PR base.
+## 5. Before opening the PR
 
-If service-discovery rules or `sdext` metadata changed, run
-`python3 integrations/gen_doc_service_discovery_page.py` and inspect the
-result. Leave `src/collectors/SERVICE-DISCOVERY.md` to the post-merge
-generated-artifact PR with the other derived documentation.
-
-## 6. Before opening the PR
-
-Run:
-
-```bash
-git status --short
-git status --porcelain |
-  rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
-```
-
-Commit source and taxonomy changes together, without generated documentation.
-`generate-integrations.yml` opens the separate post-merge regeneration PR; name
-that delivery route in the source PR description.
-Do not commit gitignored runtime artifacts such as
-`integrations/integrations.js`, `integrations/integrations.json`, or
-`integrations/taxonomy.json`.
-
-The generated-artifact status grep MUST return no output before the PR is
-opened. If it reports one of those files, remove the local generated artifact
-from the commit/worktree state rather than committing it.
+Stage the source artifacts only. Run the gitignored-catalog check from `../consistency.md`; it MUST print nothing. Name
+the post-merge regeneration PR as the delivery route for the generated pages in the PR description, and enumerate the
+consistency artifacts you left unchanged with the reason.

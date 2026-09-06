@@ -27,8 +27,8 @@ Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 - Unit vocabulary is decided where charts are designed (the collector design and V2 skills), not here. If the code's
   unit is wrong, fix the code and then the row.
 - Every context the collector emits with a static definition has a row, and every row has a context in the code.
-  Contexts generated at runtime from profiles or discovered data are covered by `dynamic_context_prefixes` (section 4),
-  not by rows.
+  Contexts generated at runtime from profiles or discovered data have no rows; say so in `metrics.description`
+  (section 4).
 - `dimensions[].description` is accepted by the schema but rendered nowhere (the table shows dimension names only).
   Leave it out, or treat it as a source comment that no reader sees.
 
@@ -73,10 +73,10 @@ pointer done as a table; the size rule above does not count it. Exemplar: `cloud
 
 ## 4. `dynamic_context_prefixes` And `availability`
 
-- `dynamic_context_prefixes` declares every prefix under which the collector emits contexts that have no static row
-  (profile-driven charts, discovered entity charts). One entry per prefix with a one-sentence `reason` in operator
-  terms ("SNMP profiles emit device-specific contexts at runtime under the snmp namespace."). Static contexts that
-  share the prefix still get rows.
+- `dynamic_context_prefixes` (and `dynamic_collect_plugins`) are read only by the dormant collector taxonomy tooling
+  and render nowhere on the page (`integrations-lifecycle/consistency.md`, "The dormant collector taxonomy"). Do not add
+  them to document runtime-only contexts; describe those in `metrics.description` in operator terms instead. The
+  existing declarations stay until the taxonomy is redesigned.
 - `availability` adds one column per value to every metrics table, marking which rows exist in which variant
   (product editions, a basic versus extended mode). Use it only when rows really differ by variant; the values are
   the variant names an operator recognizes.

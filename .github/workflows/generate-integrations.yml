@@ -21,10 +21,8 @@ on:
       - 'src/go/plugin/ibm.d/modules/**/generate.go'
       - 'src/go/plugin/ibm.d/modules/**/contexts/contexts.yaml'
       - 'src/go/plugin/ibm.d/modules/**/contexts/doc.go'
-      - '**/taxonomy.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
-      - 'integrations/taxonomy/**'
       - 'integrations/templates/**'
       - 'integrations/schemas/**'
       - 'integrations/categories.yaml'
@@ -36,9 +34,6 @@ on:
       - 'integrations/gen_npm_catalog.py'
       - 'integrations/gen_integrations.py'
       - 'integrations/prometheus_profile_docs.py'
-      - 'integrations/gen_taxonomy.py'
-      - 'integrations/gen_taxonomy_seed.py'
-      - 'integrations/check_collector_taxonomy.py'
       - 'integrations/tests/**'
       - 'integrations/gen_docs_integrations.py'
       - 'integrations/gen_doc_collector_page.py'
@@ -101,16 +96,6 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 integrations/gen_integrations.py
-      - name: Generate Collector Taxonomy
-        id: generate-taxonomy
-        run: |
-          source ./virtualenv/bin/activate
-          python3 integrations/gen_taxonomy.py
-      - name: Test Collector Taxonomy Tooling
-        id: test-taxonomy
-        run: |
-          source ./virtualenv/bin/activate
-          python3 -m unittest integrations.tests.test_taxonomy
       - name: Test Integration Descriptions
         id: test-descriptions
         run: |
@@ -148,7 +133,7 @@ jobs:
           python3 integrations/gen_doc_service_discovery_page.py
       - name: Clean Up Temporary Data
         id: clean
-        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json integrations/taxonomy.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
+        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
       - name: Create PR
         id: create-pr
         uses: peter-evans/create-pull-request@v8
@@ -179,8 +164,6 @@ jobs:
               Generate Source Metadata: ${{ steps.generate-source-metadata.outcome }}
               Verify Generated Runtime Outputs: ${{ steps.verify-generated-runtime.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
-              Generate Collector Taxonomy: ${{ steps.generate-taxonomy.outcome }}
-              Test Collector Taxonomy Tooling: ${{ steps.test-taxonomy.outcome }}
               Test Integration Descriptions: ${{ steps.test-descriptions.outcome }}
               Test Prometheus Profile Documentation: ${{ steps.test-prometheus-profile-documentation.outcome }}
               Test Collector Metadata Content Rules: ${{ steps.test-collector-metadata.outcome }}

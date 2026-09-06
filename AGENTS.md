@@ -615,9 +615,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
 - Integrations.
-  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` and collector `taxonomy.yaml` schemas and
-    validation, `integrations/` generators, taxonomy registries, templates, generated outputs,
-    `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d `contexts.yaml`; the collector-consistency rule
+  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
+    generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
+    `contexts.yaml` and the NPM catalog generator; the collector-consistency rule
   - Also relevant: `collectors-metadata-yaml` (what the fields say) and `docs-learn-site-structure` (where the
     generated pages land).
 - Health.
@@ -668,8 +668,8 @@ Output/reference skill trees, updated when the related public/operator workflow 
 
 ### Collector Consistency
 
-When working on collectors, runtime behavior, metrics, charts, configuration, alerts, taxonomy, and authoritative
-documentation sources MUST stay consistent in the source PR. Generated integration and umbrella documentation is
+When working on collectors, runtime behavior, metrics, charts, configuration, alerts, and authoritative documentation
+sources MUST stay consistent in the source PR. Generated integration and umbrella documentation is
 validated locally, then committed by the post-merge generated-artifact PR. Checklist and CI notes:
 `.agents/skills/integrations-lifecycle/consistency.md`.
 

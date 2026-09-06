@@ -7,7 +7,6 @@ on:
       - '**/*.mdx'
       - 'docs/**'
       - '**/metadata.yaml'
-      - '**/taxonomy.yaml'
       - 'integrations/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/default/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.trap-profiles/**'
@@ -90,16 +89,6 @@ jobs:
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_integrations.py
-
-      - name: Check Collector Taxonomy
-        run: |
-          source ./venv/bin/activate
-          cd netdata && python3 integrations/check_collector_taxonomy.py --pr-diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
-
-      - name: Test Collector Taxonomy Tooling
-        run: |
-          source ./venv/bin/activate
-          cd netdata && python3 -m unittest integrations.tests.test_taxonomy
 
       - name: Test Integration Descriptions
         run: |

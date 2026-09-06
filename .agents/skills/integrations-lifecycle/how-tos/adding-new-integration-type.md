@@ -1,162 +1,73 @@
-# How-to: Add a new `integration_type`
+# How-to: add a new `integration_type`
 
-**One-line summary:** Adding a new top-level `integration_type` (peer of `collector`, `logs`, `exporter`, etc.) requires changes in eight places — schema, pipeline, templates, categories, map.yaml, and downstream consumers.
-
-This how-to was written when adding `flows` (NetFlow / IPFIX / sFlow) as a new integration type, on the basis that flows are a different data type from metrics (just like logs are) and deserve their own Learn section and in-app sidebar entry.
+**Summary:** a new top-level `integration_type` (a peer of `collector`, `logs`, `exporter`) touches the schema, two
+generators, the templates, `categories.yaml`, the source metadata, Learn's `map.yaml`, and possibly downstream repos.
+`flows` (NetFlow, IPFIX, sFlow) and `device` (the NPM catalog) are the most recent additions and the models to copy.
 
 ## When this applies
 
-You're adding a new fundamental data type or operational concern that:
-
-- Has its own schema (the existing types' schemas don't fit cleanly).
-- Should appear in its own Learn section (not buried under `Collecting Metrics/Collectors/<sub-category>`).
-- Should appear in its own in-app sidebar entry (not as a sub-category of an existing one).
-- Has multiple integration entries that share a common shape.
-
-Examples that would qualify:
-
-- `flows` (NetFlow / IPFIX / sFlow) — flow record collection.
-- `topology` (when implemented as a dedicated catalog) — topology graph sources.
-
-Examples that would NOT qualify (use an existing type instead):
-
-- A new database collector — use `integration_type: collector` with `categories: [data-collection.databases]`.
-- A new alert channel — use `integration_type: agent_notification` or `cloud_notification`.
+A new fundamental data type or operational concern that has its own schema, deserves its own Learn section and in-app
+sidebar entry, and has several entries sharing one shape. A new database collector is `integration_type: collector` with
+a `data-collection.databases` category; a new alert channel is an `agent_notification` or `cloud_notification`.
 
 ## What to change
 
-### 1. JSON schema (`integrations/schemas/<type>.json`)
+1. **Schema** (`integrations/schemas/<type>.json`). If the entries are collector-shaped, do what `flows.json` and
+   `device.json` do: a five-line schema that `$ref`s `collector.json`, forked only when fields diverge. For a thin type
+   (overview, setup, troubleshooting) clone `logs.json` or `exporter.json`.
+2. **`gen_integrations.py`**: a `<TYPE>_SOURCES` list, a `<TYPE>_VALIDATOR` from `make_validator`, a
+   `<TYPE>_RENDER_KEYS` list, a `load_<type>` and `render_<type>` pair, and the two concatenations in `main()` (rich and
+   clean). Render keys are a downstream contract, not a docs choice: every section the website or cloud-frontend treats
+   as content must be emitted as a Markdown string (`../in-app-contract.md`). When the schema reuses `collector.json`,
+   default to the collector render keys.
+3. **`gen_docs_integrations.py`**: a `mode` branch in `build_readme_from_integration` (frontmatter, message, sections,
+   `learn_rel_path`), a branch in `main()` that dispatches the type, and, if the output location differs from
+   `<dir>/integrations/<slug>.md`, a `write_to_file` mode. Add the type to `DOCUMENTATION_TYPES` in `descriptions.py` so
+   the description preflight covers it. Two `learn_rel_path` styles exist: fixed (exporter, logs, secretstore, service
+   discovery) or derived from the first category through `generate_category_from_name` (collector, flows, device,
+   notifications, authentication); `../pipeline.md` has the table.
+4. **Templates** under `integrations/templates/`: an `overview/<type>.md` file AND its `elif` branch in the dispatcher
+   `overview.md` (without the branch the overview renders empty and the description preflight fails with "Missing
+   description source"); unless `setup-generic.md` fits, a `setup-<type>.md`; custom delimiters `[[ ]]` and `[% %]`
+   (`../pipeline.md`). Copy the closest type's templates.
+5. **`integrations/categories.yaml`**: the type's category node. Flat by default; `collector` is sub-categorised because
+   of its size, `logs` is flat. `flows` and `device` live under the existing `network-performance-monitoring` tree
+   instead of a new top-level node; `gen_doc_collector_page.py` treats that tree's children as Monitor Anything
+   sections.
+6. **Source metadata**: `integration_type: <type>` and `categories` on every entry, one shared file (like logs) or one
+   file per source directory (like collectors).
+7. **Learn** (`docs/.map/map.yaml`): a section holding an `integration_placeholder` node with an `integration_kind`. The
+   kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
+   `flows`, `exporters`, `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, and
+   `service_discovery` (keep their singular/plural style). Learn's ingest buckets pages by a fixed kind list
+   (`.agents/skills/docs-learn-site-structure/mapping.md`, "Integration placeholders"; the list quoted there predates
+   `flows` and `service_discovery`), so a new kind is a Learn-repo change too; `device` has no placeholder and attaches
+   through the NPM chapter nodes. Map authoring and companion hand-written pages: the `docs-learn-site-structure` skill
+   (`mapping.md`).
+8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically, but FAQ and solution pages
+   that describe the old story may need edits, and a new top-level category or section shape needs the website build run
+   or emulated with the Hugo version pinned in its `netlify.toml`. Cloud-frontend is data-driven, but its content tabs
+   (`src/domains/integrations/components/content/integration/tabs.js`), its Markdown renderer
+   (`src/components/markdown/useRenderableTree.js`), and `scripts/checkIntegrations.js` assume Markdown strings under
+   the standard keys, so inspect the generated `integrations.js` shape against them before merging.
 
-Clone the closest existing schema and trim/adjust:
+## Verification
 
-- For data-bearing types (something that produces records / metrics / events): start from `collector.json`. If the new type keeps collector-style sections such as `metrics`, `alerts`, or `functions`, those sections still need to be rendered to markdown before publication, even when they describe non-metric data or say that no alerts exist.
-- For thin types (a config target with overview + setup + troubleshooting): start from `logs.json` or `exporter.json`.
+1. `python3 integrations/gen_integrations.py` exits 0; the new type appears in the flat list with its category.
+2. `python3 integrations/gen_docs_integrations.py --check` counts the new mode; a full run writes pages whose
+   `<!--startmeta` block matches the block in `../pipeline.md` in full (every key, order, quoting, the type's message).
+3. Every standard content key is a string in `integrations.json`, not an object or array.
+4. `python3 integrations/gen_doc_collector_page.py` if the type should appear on Monitor Anything.
+5. After merge: the Learn sidebar shows the section after the next ingest; the in-app catalog shows the new filter with
+   non-blank tabs.
 
-The schema field set drives validation. Anything not in the schema is rejected as an unknown property when `additionalProperties: false` is set on the relevant object.
-
-### 2. Pipeline registration (`integrations/gen_integrations.py`)
-
-There are typically 3-5 places that need updating:
-
-- `COLLECTOR_SOURCES` / equivalent type-specific source list (or add a new constant `FLOW_SOURCES`).
-- Schema dispatch (the function that picks which schema to validate against based on file location or `integration_type`).
-- The render-keys table — which sections (overview, setup, troubleshooting, alerts, metrics, ...) the type renders.
-- The categorisation in `integrations.js` — making sure the new type ends up in the flat `integrations` array with a correct `integration_type` field.
-
-Render keys are a downstream contract, not only a docs-output choice. Any
-section name that website or cloud-frontend treats as markdown content must
-be emitted as a string in `integrations.json` and `integrations.js`. If a new
-type reuses `collector.json`, default to the collector render keys unless
-there is evidence a key is invalid for that type. Publishing raw YAML
-objects or arrays under keys such as `metrics` or `alerts` breaks website
-Hugo templates and cloud-frontend integration tabs/checkers.
-
-### 3. Pipeline rendering (`integrations/gen_docs_integrations.py`)
-
-Add a branch for the new type in the main loop. The branch typically:
-
-- Calls a new `mode="<type>"` variant of `build_readme_from_integration()`.
-- Sets the `learn_rel_path` for the type. Two patterns exist:
-  - **Hardcoded** (like `exporter`, `secretstore`, `service_discovery`): one fixed path for all entries of this type.
-  - **Derived** (like `collector`, `logs`, `agent_notification`, `cloud_notification`, `authentication`): walk the category tree in `integrations.js`, then `replace()` the top-level category name with the Learn section prefix.
-- Calls a new `mode="<type>"` variant of `write_to_file()` that writes the per-integration `.md` to its conventional location.
-- Optionally invokes the symlink helper if the integration directory pattern matches single-integration plugins (`make_symlinks`).
-
-Cite `gen_docs_integrations.py` line numbers for each existing type (logs, exporter, etc.) when adding a new branch — they are the authoritative templates.
-
-### 4. Render templates (`integrations/templates/`)
-
-Add a `<type>.md` overview template under `integrations/templates/overview/` (or alongside the other type-specific templates). Reuse `setup-generic.md` if your type's setup is generic; otherwise add a `setup-<type>.md`.
-
-Templates use the customised Jinja2 delimiters `[[ ]]` and `[% %]` (see `gotchas.md`). Cargo-cult from the closest existing type's templates and adjust.
-
-### 5. Top-level category (`integrations/categories.yaml`)
-
-Add a top-level category node for the new type. For a flat structure (like `logs`):
-
-```yaml
-- id: <type>
-  name: <Display Name>
-  description: ""
-  children: []
-```
-
-For a sub-categorised structure (like `data-collection`):
-
-```yaml
-- id: <type>
-  name: <Display Name>
-  description: ""
-  children:
-    - id: <type>.<sub>
-      name: <Sub Display>
-      description: ""
-      children: []
-```
-
-Default to flat. Sub-categories only justify themselves when the count grows (collectors are sub-categorised because there are 488 of them; logs has 3 entries and stays flat).
-
-### 6. Source metadata declarations
-
-For each new integration of the type, the source `metadata.yaml` (or equivalent) carries:
-
-- `integration_type: <type>`
-- `categories: [<type>]` (or `[<type>.<sub>]` for the sub-categorised case)
-- The other fields the schema requires.
-
-If the type uses a single shared metadata file (like `integrations/logs/metadata.yaml`), declare all entries there. If the type uses per-plugin or per-module metadata files (like collectors), each lives next to its own source.
-
-### 7. Learn site map (`docs/.map/map.yaml`)
-
-Add a section node with an `integration_placeholder`:
-
-```yaml
-- meta:
-    label: <Display Name>
-  items:
-    - type: integration_placeholder
-      integration_kind: <kind>
-```
-
-The `<kind>` value is consumed by Learn's ingest to filter pages by their `learn_rel_path`. Keep it singular or plural to match existing conventions (`logs`, `collectors`, `exporters`, `agent_notifications`, `cloud_notifications`, `authentication`, `secretstore`, `service_discovery`).
-
-If the type has hand-authored content alongside the catalogue entries (like the rich `docs/network-flows/` documentation that pairs with the `flows` integration type), add explicit `meta.edit_url` rows for those pages and put the `integration_placeholder` at the appropriate position in the sub-tree.
-
-### 8. Downstream consumers
-
-Three downstream repos may need touching, in roughly decreasing likelihood:
-
-- **`netdata/website`** (`<website-repo>`): the daily `update-integrations.yml` workflow renders marketing cards from `integrations.json`. Cards usually appear automatically. But pages that reference the type explicitly (FAQ entries, solution pages) may need rewriting if the new type changes the story (e.g., "we don't do flows" → "we do flows natively").
-- **`netdata/learn`** (`<learn-repo>`): no PR usually needed. Learn ingest reads `map.yaml` + the `<!--startmeta-->` markers in the generated `.md` files. Sidebar regenerates automatically. ~3 hours after netdata-repo merge.
-- **`netdata/dashboard/cloud-frontend`** (`<cloud-frontend-repo>`): cards/categories are mostly data-driven, but content tabs and validation scripts still assume rendered markdown strings for standard section keys. Before merging a new type, inspect the generated `integrations.js` shape against `src/domains/integrations/components/content/integration/tabs.js`, `src/components/markdown/useRenderableTree.js`, and `scripts/checkIntegrations.js`. Special UI (a dedicated tab elsewhere in the dashboard) is a separate concern.
-
-## Verification checklist
-
-After all the changes:
-
-1. `python3 integrations/gen_integrations.py` — exits 0, regenerates `integrations.js` and `integrations.json`. The new type appears in the flat list, in the new top-level category, with the correct count.
-2. `python3 integrations/gen_docs_integrations.py` — exits 0, generates per-integration `.md` files. Each has `<!--startmeta-->` with the correct `learn_rel_path`.
-3. Type-check the generated artifacts — every standard content key consumed as markdown downstream (`overview`, `setup`, `troubleshooting`, `alerts`, `metrics`, `functions`, `related_resources`, and type-specific equivalents) is a string, not an object or array.
-4. Manual inspection of one generated `.md` — frontmatter complete (`custom_edit_url`, `meta_yaml`, `sidebar_label`, `learn_status: Published`, `learn_rel_path`, `keywords`, `message: "DO NOT EDIT..."`).
-5. `grep` the categories tree in `integrations.json` — the new top-level node exists with the new entries.
-6. Run or locally emulate the website integrations update/build when the new type introduces a new top-level category or a new section shape. The website PR must build with the Hugo version pinned in `netlify.toml`.
-7. Open `learn.netdata.cloud` after the next ingest cycle (~3 hours after merge) — confirm the new section renders in the sidebar.
-8. Open the in-app integrations catalog — confirm the new top-level filter appears in the sidebar with the correct entries and content tabs are not blank.
-
-## What to commit, and where
-
-- New schema + pipeline branch + template + categories.yaml + map.yaml + skill update — one PR in the netdata repo.
-- Source `metadata.yaml` for the new integrations — same PR if they live in the netdata repo (most types do).
-- Website FAQ / solution-page corrections — separate PR in the website repo.
-- No PR needed in learn or cloud-frontend (auto-discovers).
+Commit the schema, generators, templates, categories, `map.yaml`, source metadata, and this skill's tables in one PR in
+this repository; website corrections go in their own PR there, and a new `integration_kind` in the Learn repository.
 
 ## How I figured this out
 
-Spawned an Explore subagent to:
-
-- Read the `<!--startmeta-->` blocks of one example file per existing integration type.
-- Trace `learn_rel_path` computation through `gen_docs_integrations.py` (lines 199-393).
-- Locate `integration_kind` placeholders in `docs/.map/map.yaml`.
-- Confirm `deploy` has no Learn rendering branch.
-
-Then wrote this how-to before implementing flows so the future work can follow the recipe instead of re-deriving it.
+Traced `learn_rel_path` per mode through `build_readme_from_integration` in `integrations/gen_docs_integrations.py`,
+read the `<!--startmeta` block of one generated page per type, listed the `integration_kind` values in
+`docs/.map/map.yaml`, read the fixed-kind bucketing in `docs-learn-site-structure/mapping.md`, and confirmed `deploy`
+has no documentation mode in `descriptions.py`. The `flows` and `device` additions are the worked examples
+(`integrations/schemas/flows.json`, `device.json`, `FLOWS_SOURCES`, `DEVICE_SOURCES`).

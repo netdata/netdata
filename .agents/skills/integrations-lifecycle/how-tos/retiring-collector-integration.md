@@ -31,7 +31,7 @@ For a `go.d` collector, check at least:
 - `src/health/health.d/` and `src/health/guides/`;
 - packaging/install/update scripts;
 - replacement metadata, tests, and related-resource links;
-- CI, CODEOWNERS, taxonomy, and repository-wide path/content references.
+- CI, CODEOWNERS, and repository-wide path/content references.
 
 Classify every surviving product-name match. A separate collector, alert owner, log parser, OS group, exporter profile,
 or product deployment guide is not a trace of the retired collector merely because it names the same product.
@@ -56,21 +56,19 @@ packaging path:
 
 Use the installer's existing traced command wrapper for destructive file operations.
 
-## 5. Handle metadata, taxonomy, and generated outputs by ownership
+## 5. Handle metadata and generated outputs by ownership
 
-Delete authoritative `metadata.yaml` and `taxonomy.yaml` with the collector. Remove backlinks and ownership assertions in
-replacement metadata/tests.
+Delete the authoritative `metadata.yaml` (and any dormant sibling `taxonomy.yaml`) with the collector. Remove backlinks
+and ownership assertions in replacement metadata and tests.
 
 Generated outputs follow two cases:
 
-1. A generated integration page and README symlink live inside the directory being retired. Delete them with the complete
-   directory; retaining a generated-only directory is not a clean collector removal. The sensors retirement
+1. A generated integration page and README symlink live inside the directory being retired. Delete them with the
+   complete directory; retaining a generated-only directory is not a clean collector removal. The sensors retirement
    (`aba1472fe81a2c9367e6120e202846ce90adcaa9`) is the repository precedent.
 2. Generated pages that survive elsewhere, umbrella pages, and gitignored catalogs are not hand-edited. Regenerate them
-   locally for inspection and let the documented post-merge generated-artifact workflow publish their final changes.
-
-Before delivery, ensure gitignored `integrations/integrations.js`, `integrations/integrations.json`, and
-`integrations/taxonomy.json` are not staged.
+   locally for inspection and let the post-merge regeneration PR publish them (`../consistency.md`, "Delivery boundary",
+   including the gitignored-catalog check).
 
 ## 6. Route deleted Learn pages
 
@@ -89,28 +87,21 @@ Run:
 - focused tests for the registry, replacement collector/profile, and discovery engine;
 - the collector package test sweep so registration/import drift fails;
 - packaging script syntax and focused upgrade-path inspection;
-- integration metadata, taxonomy, and generated-doc validation;
+- integration metadata and generated-doc validation (`integrations/README.md`);
 - zero-reference searches for the retired package path, integration ID, stock-config path, contexts, and module wiring;
 - a retain-list audit proving replacement and independent same-product integrations remain.
 
-Inspect generated diffs, then restore or leave unstaged every generator-owned output that belongs to the post-merge route.
+Inspect generated diffs, then restore or leave unstaged every generator-owned output that belongs to the post-merge
+route.
 
 ## How I figured this out
 
-Files read:
+Files read: `src/go/plugin/go.d/collector/init.go`, `src/go/plugin/go.d/config/go.d.conf`,
+`src/go/plugin/go.d/config/go.d/sd/net_listeners.conf`,
+`src/go/plugin/agent/discovery/sd/pipeline/{services.go,promport.go}`, `packaging/makeself/install-or-update.sh`,
+`integrations/gen_integrations.py`, `integrations/gen_docs_integrations.py`, both integration CI workflows, the sensors
+removal commit `aba1472fe81a2c9367e6120e202846ce90adcaa9`, and the Learn redirect ownership documented by the Learn
+structure skill.
 
-- `src/go/plugin/go.d/collector/init.go` and `src/go/plugin/go.d/config/go.d.conf`;
-- `src/go/plugin/go.d/config/go.d/sd/net_listeners.conf` and
-  `src/go/plugin/agent/discovery/sd/pipeline/{services.go,promport.go}`;
-- `packaging/makeself/install-or-update.sh`;
-- replacement collector metadata and ownership tests;
-- `integrations/gen_integrations.py`, `integrations/gen_docs_integrations.py`, and both integration CI workflows;
-- the sensors collector-removal commit `aba1472fe81a2c9367e6120e202846ce90adcaa9`;
-- `netdata/learn` redirect ownership documented by the Learn structure skill.
-
-Commands run:
-
-- `rg '<module>|<collector-path>|<integration-id>|<context-prefix>' src integrations packaging`;
-- focused registry, replacement, and discovery tests;
-- integration metadata, taxonomy, and generated-document validation;
-- `git diff --check`.
+Commands run: `rg '<module>|<collector-path>|<integration-id>|<context-prefix>' src integrations packaging`; focused
+registry, replacement, and discovery tests; integration metadata and generated-document validation; `git diff --check`.

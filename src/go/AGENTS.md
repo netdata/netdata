@@ -18,7 +18,7 @@ them from there.
 | go.d helper packages | `src/go/plugin/go.d/docs/helper-packages.md` | Check existing HTTP, config-option, matcher, logger, socket, command, SQL, ping, log-file, and cloud-auth helpers before adding custom plumbing. |
 | Collector design across plugins | `.agents/skills/collectors-authoring/SKILL.md` | NIDL, cardinality, obsoletion, missing data, logging, config discipline. |
 | `metadata.yaml` content (what the integration page says) | `.agents/skills/collectors-metadata-yaml/SKILL.md` | One contract per field; metric, option, and alert rows mirror the code; an empty default-behavior field renders a placeholder claim that MUST be true. |
-| Integration pipeline, taxonomy, generated docs | `.agents/skills/integrations-lifecycle/SKILL.md`, `.agents/skills/integrations-lifecycle/consistency.md` | Source and generated artifacts MUST stay synchronized. |
+| Integration pipeline, generated docs | `.agents/skills/integrations-lifecycle/SKILL.md`, `.agents/skills/integrations-lifecycle/consistency.md` | Source and generated artifacts MUST stay synchronized. |
 | IBM.d work | `src/go/plugin/ibm.d/AGENTS.md` | Generator-driven workflow; go.d V2 layout rules MUST NOT be applied there. |
 | Function handlers | `src/go/plugin/framework/functions/README.md`, `src/go/tools/functions-validation/README.md` | Collector Functions SHOULD be isolated behind narrow dependencies. |
 | Topology payloads | `.agents/skills/topology-authoring/SKILL.md`, `.agents/skills/topology-authoring/topology-function-schema.md`, `src/go/pkg/topology/v1` | New producers MUST use the production `netdata.topology.v1` schema. |
@@ -49,7 +49,7 @@ them from there.
 
 - Migrations MUST start with `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
 - Migrations MUST preserve chart IDs, contexts, dimensions, config keys, defaults, health lookups, metadata,
-  taxonomy, stock config, and service discovery behavior unless the user explicitly approves a breaking change.
+  stock config, and service discovery behavior unless the user explicitly approves a breaking change.
 - Compatibility migration SHOULD be separate from enrichment (new labels, host scopes, topology, Functions, config
   expansion).
 - A completed migration MUST NOT keep a runtime V1-to-V2 bridge. Temporary V1 logic MAY serve parity checks during
