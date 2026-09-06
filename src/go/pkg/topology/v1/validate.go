@@ -23,6 +23,7 @@ type topologyShape struct {
 	actorTypes         map[string]struct{}
 	linkTypes          map[string]struct{}
 	portTypes          map[string]struct{}
+	aggregationScopes  map[string]struct{}
 	evidenceTypes      map[string]map[string]string
 	tableTypes         map[string]map[string]string
 	tableTypeOwners    map[string]string
@@ -679,6 +680,10 @@ func collectTopologyShape(data map[string]any) (topologyShape, error) {
 	if err != nil {
 		return topologyShape{}, err
 	}
+	aggregationScopes, err := optionalObjectKeySet(types["aggregation_scopes"], "data.types.aggregation_scopes")
+	if err != nil {
+		return topologyShape{}, err
+	}
 
 	evidenceTypes, err := columnTypesByRegistryObject(types["evidence_types"], "data.types.evidence_types")
 	if err != nil {
@@ -711,6 +716,7 @@ func collectTopologyShape(data map[string]any) (topologyShape, error) {
 		actorTypes:         actorTypes,
 		linkTypes:          linkTypes,
 		portTypes:          portTypes,
+		aggregationScopes:  aggregationScopes,
 		evidenceTypes:      evidenceTypes,
 		tableTypes:         tableTypes,
 		tableTypeOwners:    tableTypeOwners,
@@ -884,6 +890,21 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 		if !ok {
 			return fmt.Errorf("data.types.actor_types.%s is not an object", typeID)
 		}
+		if rawScopes, exists := actorType["aggregation_scopes"]; exists {
+			path := "data.types.actor_types." + typeID + ".aggregation_scopes"
+			scopes, err := collectStringList(path, rawScopes, false)
+			if err != nil {
+				return err
+			}
+			for i, scope := range scopes {
+				if _, ok := shape.aggregationScopes[scope]; !ok {
+					return fmt.Errorf("%s[%d] references unknown aggregation scope %q", path, i, scope)
+				}
+			}
+		}
+		if err := validateActorSearchPolicy("data.types.actor_types."+typeID+".search", actorType["search"], shape.actorColumns); err != nil {
+			return err
+		}
 		presentation, ok := actorType["presentation"].(map[string]any)
 		if !ok {
 			continue
@@ -928,9 +949,6 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 			return err
 		}
 		if err := validateModalPresentation(path+".modal", presentation["modal"], shape); err != nil {
-			return err
-		}
-		if err := validateActorSearchPolicy("data.types.actor_types."+typeID+".search", actorType["search"], shape.actorColumns); err != nil {
 			return err
 		}
 	}
