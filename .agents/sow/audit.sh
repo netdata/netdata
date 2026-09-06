@@ -261,7 +261,7 @@ fi
 # must be repointed (vs the unreferenced bulk, which is genuinely local-only).
 # Listed as paths relative to .agents/sow/specs/ (not basenames) so a nested
 # local spec that happens to share a filename is not misflagged.
-relocated_specs="sensitive-data-discipline.md go-v2-host-scope.md topology-function-schema.md topology-modes-correlation-aggregation.md taxonomy.md snmp-traps/netdata.md snmp-traps/trap-metrics-profiles.md snmp-traps/netdata-snmp-hub-architecture.md snmp-traps/pipeline-internals.md snmp-traps/decisions/0001-go-process-and-trapwriter.md"
+relocated_specs="sensitive-data-discipline.md go-v2-host-scope.md topology-function-schema.md topology-modes-correlation-aggregation.md taxonomy.md"
 
 section "spec references"
 if command -v rg >/dev/null 2>&1; then
@@ -291,10 +291,6 @@ fi
 
 section "legacy SOW references"
 if command -v rg >/dev/null 2>&1; then
-  # The rule polices active instructions, not historical design records. The
-  # snmp-traps design docs (the relocated research-derived set + decisions/) carry
-  # legitimate SOW-NNNN authoring provenance, so the whole design-doc set is exempt;
-  # SKILL.md and how-tos/ are NOT exempt (they are active instructions).
   legacy_refs=$(rg --line-number 'SOW-[0-9]{4}\b' \
     AGENTS.md .agents .github docs src \
     -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
@@ -302,11 +298,6 @@ if command -v rg >/dev/null 2>&1; then
     -g '!**/TODO*.md' \
     -g '!**/.agents/sow/q/**' \
     -g '!**/.agents/sow/specs/**' \
-    -g '!**/collectors-snmp-trap-profiles/netdata.md' \
-    -g '!**/collectors-snmp-trap-profiles/trap-metrics-profiles.md' \
-    -g '!**/collectors-snmp-trap-profiles/netdata-snmp-hub-architecture.md' \
-    -g '!**/collectors-snmp-trap-profiles/pipeline-internals.md' \
-    -g '!**/collectors-snmp-trap-profiles/decisions/**' \
     2>/dev/null || true)
 
   if [ -n "$legacy_refs" ]; then
