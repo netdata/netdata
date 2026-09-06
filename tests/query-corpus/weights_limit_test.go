@@ -394,7 +394,9 @@ func TestWeightsLimitCompleteGroups(t *testing.T) {
 		weightsLimitChart("fixture.limitc", "fixture.limit-other", []int{40, 40, 40, 40}, true),
 	}
 	c020PushCharts(t, "weights-limit-groups", guid(450), charts...)
-	weightsSettle(t, "weights-limit-groups", guid(450), charts[0])
+	for _, ch := range charts {
+		weightsSettle(t, "weights-limit-groups", guid(450), ch)
+	}
 	for _, options := range []string{"raw", "null2zero"} {
 		for aggregation, rawWinner := range map[string]string{"min": "b", "average": "b", "max": "a", "sum": "c", "percentage": "c", "extremes": "a"} {
 			t.Run(options+"/"+aggregation, func(t *testing.T) {
@@ -505,7 +507,9 @@ func TestWeightsLimitHierarchy(t *testing.T) {
 		weightsLimitChart("fixture.limith-c", "fixture.limith-other", []int{3, 80}, false),
 	}
 	c020PushCharts(t, "weights-limit-hierarchy", guid(452), charts...)
-	weightsSettle(t, "weights-limit-hierarchy", guid(452), charts[0])
+	for _, ch := range charts {
+		weightsSettle(t, "weights-limit-hierarchy", guid(452), ch)
+	}
 	p := weightsLimitFixtureParams("value", "raw")
 	p.Set("scope_nodes", guid(452))
 	full, err := td.HostJSON("weights-limit-hierarchy", "api/v3/weights", p)
