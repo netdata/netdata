@@ -246,6 +246,13 @@ Two sharp edges:
    its content is dropped.
 7. Rate limit (last).
 
+The decode budget is five fixed constants (`listener.go`, `decode.go`), enforced per job and deliberately not
+configurable: 8192-byte datagram (RFC 3417 §3 asks receivers for 484 bytes; 8 KiB covers verbose vendor traps with
+margin), 256 varbinds (about three times the largest real trap observed in public fixture corpora), nesting depth 8
+(SNMPv3 messages need about 6 constructed levels), 128-byte encoded OID (the RFC 2578 cap), and 1024-byte
+OctetString (long enough for MIB strings, short enough to bound memory per packet). Exceeding any of them drops the
+packet and counts a `malformed_pdu` error.
+
 **SNMPv1 normalization.** v1 traps carry no `snmpTrapOID.0`; decode synthesizes one plus up to four more varbinds,
 prepended in fixed order, so downstream stages see one uniform shape:
 
@@ -283,7 +290,10 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
 (`rate = burst = per_source_pps`, default 1000), per job, capped at 10 000 tracked sources with idle sweep and
 oldest-eviction. Two modes: `drop` discards over-limit packets; **`sample` does not sample — it counts and passes
 everything**. Bucket GC runs from `Collect()` via `receiver.Sweep`, so the limiter's mutex is shared between listener
-goroutines and the collect cycle.
+goroutines and the collect cycle. Bucket mechanics, none of them configurable: a new bucket starts full, so a new or
+long-idle source may burst `per_source_pps` packets before limiting bites; a bucket idle for 10 minutes is swept, at
+most once per 5 minutes; when the 10 000 cap is hit the sweep runs immediately and then the oldest bucket is evicted
+before a new source is refused.
 
 **Undecodable packets are not silent.** A decode failure is classified (`malformed_pdu`, `auth_failures`,
 `usm_failures`, `unknown_engine_id`, `decode_failed` — by substring match on gosnmp error text, a deliberate coupling
@@ -374,7 +384,9 @@ imports neither). Order and precedence:
 4. **Reverse DNS** — only if `reverse_dns.enabled`. Strictly non-blocking: a cached positive hit annotates
    `TRAP_REVERSE_DNS`; anything else schedules a background lookup and moves on. PTR results never overwrite a known
    hostname — the resolver is shared with the other SNMP collectors (one instance per plugin process, 24 h positive /
-   5 min negative TTL, 10 000-entry cache).
+   5 min negative TTL, 10 000-entry cache). Trap jobs only borrow it: job init and cleanup must never create, close,
+   sweep, or clear it. The packet path does a cache-only `Lookup` and a non-blocking `Schedule`; an entry written while
+   the lookup is cold carries audit status `pending` and is never backfilled once the PTR answer arrives.
 
 Every stage records a structured audit (`TrapEnrichmentAudit`: per-lookup status, method, match count, reason,
 applied fields) that lands in the journal — enrichment is debuggable from the trap log itself, without reproducing.
@@ -413,7 +425,7 @@ because the other backend may still hold it.
 
 | Aspect | Behavior |
 | --- | --- |
-| Format | Pure-Go systemd journal *files* via `systemd-journal-sdk` — no journald, no sockets, works on any platform; a missing log root is a startup error, not a silent fallback |
+| Format | Pure-Go systemd journal *files* via `systemd-journal-sdk` — no journald, no sockets, works on any platform; a missing log root is a startup error, not a silent fallback. Writing files directly is what lets the entry carry the *device* as `_HOSTNAME`: journald (`sd_journal_sendv`) would stamp the agent host instead |
 | Location | `<log-dir>/traps/<job>/<machine-id>/*.journal` — the job name is a filesystem path segment (hence its strict charset) |
 | Writing | Async: bounded queue (10 000), one worker, per-entry append, **fsync batched on a 1 s ticker** — there is no flush-per-write and `Flush()` is unused in production |
 | Failure | **Sticky and terminal**: the first write/sync error stops the worker, subsequent writes fail fast, and only a job restart recovers. The terminal outcome is reported once, without double-counting per-entry failures |
@@ -427,7 +439,19 @@ a failed batch is **retained and retried** on the next trigger while the full qu
 (`ErrQueueFull`); entries are dropped only in the final close drain, always accounted. One log record per trap:
 `Body` = message, semconv-style attributes (`snmp.trap.*`, `network.peer.*`, `netdata.*` — deliberately *not* the
 `TRAP_*` names), varbinds as one `snmp.varbinds` KVList reusing the same sensitive-varbind and duplicate-key rules as
-the journal.
+the journal. Severity follows the OpenTelemetry Logs Data Model, Appendix B (syslog mapping), so ordering survives
+but the eight slugs collapse into fewer ranges; the slug itself travels as `snmp.trap.severity` (`otlpSeverity`):
+
+| Slug | `severity_number` | `severity_text` |
+| --- | --- | --- |
+| `emerg` | 21 | FATAL |
+| `alert` | 19 | ERROR3 |
+| `crit` | 18 | ERROR2 |
+| `err` | 17 | ERROR |
+| `warning` | 13 | WARN |
+| `notice` (and unknown) | 10 | INFO2 |
+| `info` | 9 | INFO |
+| `debug` | 5 | DEBUG |
 
 The full journal field schema — the collector's public data contract — is in
 [The Journal Field Contract](#the-journal-field-contract).
@@ -459,7 +483,11 @@ rule names). Rules come from the profiles (Stage 3) and turn traps into time-ser
   series under that device's **vnode host scope** (its own node in the UI). Any ambiguity evidence (rejected source
   candidates, ambiguous registry match, vnode conflict) demotes the series to the job's node with an opaque
   `source_id` — a salted SHA-256 prefix, never a raw IP. Series labels are always
-  `job_name`/`source_id`/`source_kind` (+ `resource_class`/`resource_id` for resource-scoped rules).
+  `job_name`/`source_id`/`source_kind` (+ `resource_class`/`resource_id` for resource-scoped rules). The hash is
+  SHA-256 over `<salt>:<job>:<canonical source without port>`, truncated to 16 hex characters; the salt is the
+  host's machine-id from `internal/hostidentity` (a fixed string when none is available) and is never emitted
+  (`jobruntime.Job.sourceHashSalt`, `attribution.fallback`). It hides addresses, not identities: a small address
+  space can be enumerated, and a machine-id change renames every fallback `source_id`.
 - **Cardinality caps are fixed constants**, not config: 500 rules, 2000 sources, 512 resources per source, 50 000
   series per job, 2000 instances per chart (default). At a cap, only the *new* series is skipped
   (`overflow_dropped` counts it); existing series keep updating, and expiry releases cap slots. Overflow is
