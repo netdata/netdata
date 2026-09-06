@@ -8,7 +8,7 @@ import sys
 
 from _go_tool_launcher import exec_go_tool, normalize_path_arguments, repo_root
 
-_FILE_OPTIONS = frozenset({"--testdata-root", "-testdata-root"})
+_FILE_OPTIONS = frozenset({"--testdata-root", "-testdata-root", "--repo-root", "-repo-root"})
 
 
 def normalize_arguments(arguments: list[str], caller_cwd: Path) -> list[str]:

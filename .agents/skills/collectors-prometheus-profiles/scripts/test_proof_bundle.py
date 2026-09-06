@@ -55,6 +55,13 @@ class ProofBundleLauncherTest(unittest.TestCase):
             ["verify", "--repo-root", str(launcher.repo_root(launcher.__file__)), "--testdata-root", "--profile", "ceph"],
         )
 
+    def test_caller_supplied_repo_root_is_absolutized(self) -> None:
+        caller = Path.cwd() / "caller"
+        self.assertEqual(
+            launcher.normalize_arguments(["verify", "--repo-root", "../.."], caller),
+            ["verify", "--repo-root", str(launcher.repo_root(launcher.__file__)), "--repo-root", str(caller / "../..")],
+        )
+
     def test_main_runs_proof_tool_from_go_root(self) -> None:
         launcher_path = Path(__file__).with_name("proof-bundle.py").resolve()
         root = launcher.repo_root(str(launcher_path))

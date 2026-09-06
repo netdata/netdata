@@ -86,7 +86,8 @@ source_exclusions: {}
 - Model lifecycle as source behavior (`current`, `cumulative`, `constant`), never as a guess from the metric name.
 - State encodings own closed state domains. Relationships own equivalence, partition, subset, overlap, and sum
   projection; a view cannot manufacture those facts.
-- A reusable component or label policy exists for actual reuse: the loader rejects one with fewer than two consumers.
+- A reusable component or label policy exists for actual reuse: the compiler rejects one with fewer than two
+  consumers (`semantics/evidence.go`, also for the design's label and reduction policies).
 
 ## `PROFILE-DESIGN.yaml`
 
@@ -155,8 +156,8 @@ cases:
 - Every case supplies an explicit environment for the candidate and every active support profile.
 - A candidate fixture is one endpoint scrape. It must contain the support-profile samples production needs for
   automatic selection in that environment; declaring a support environment injects no metric stream.
-- `coverage: true` lets the case satisfy declaration-bounded source and design coverage; a focused negative or
-  diagnostic case normally uses `coverage: false`.
+- `coverage: true` lets the case satisfy declaration-bounded source and design coverage. A `FAIL` case must set
+  `coverage: false` (the descriptor loader rejects otherwise); a diagnostic `PASS` case normally does too.
 - A standalone expected failure is `expected: {verdict: FAIL, findings: [...]}`. Ordered lifecycle `steps` expect
   `PASS`; a failed step is not a reusable session state.
 - Use `steps` only when disappearance, contributor membership, reset, label replacement, or chart and dimension
@@ -173,34 +174,38 @@ cases:
 ## Generated source registries
 
 Use a registry when registration coverage is large, generated, or encoded by bounded source grammars. The descriptor
-`SOURCE-REGISTRY.generator.yaml` (upstream repository, full commit, source paths, runner ID), the `generator/` code
-with tests, and the committed `SOURCE-REGISTRY.yaml` output are one mechanical authority; groups in the output are
-shorthand only, and source signals select exact registrations and assign semantic ownership independently. Verify from
-the testdata repository root with `python3 prometheus/tools/source_registry_runner.py [<profile>]`, which downloads the
-pinned sources, runs the generator tests and generation in a restricted sandbox, and compares exact output. Never
+`SOURCE-REGISTRY.generator.yaml` (upstream repository, full commit, source paths, runner ID), the `generator/` directory
+(only `*.py` files: `generate.py` plus at least one `test_negative_*.py` fail-closed test, checked by
+`semantics/load.go`), and the committed `SOURCE-REGISTRY.yaml` output are one mechanical authority; groups in the output
+are shorthand only, and source signals select exact registrations and assign semantic ownership independently. Verify
+from the testdata repository root with `python3 prometheus/tools/source_registry_runner.py [<profile>]`, which downloads
+the pinned sources, runs the generator tests and generation in a restricted sandbox, and compares exact output. Never
 hand-edit the generated registry without updating the generator.
 
 ## Exclusions
 
-Every writer-capable source signal renders through a view or has one binding design exclusion. `outcome` takes one of
-two literals the loader enforces (`validate_design.go`): `drop_before_writer` or `retain_writable_unrendered`.
+Every writer-capable source signal renders through a view or has one binding design exclusion. The loader
+(`validate_design.go`) enforces the `reason` set, each reason's required fields, and the two `outcome` literals
+`drop_before_writer` and `retain_writable_unrendered`; only `metadata_only` is bound to one outcome. Every other reason
+takes either outcome, and shipped proofs use both (`haproxy` retains a `not_chartable` timestamp, `process_runtime`
+drops one). Only `retain_writable_unrendered` discharges an `autogen.selector.deny` (`semantics/coverage.go`).
 
-| `reason` | Required additional field | `outcome` |
+| `reason` | Required additional field | Typical `outcome` |
 |---|---|---|
 | `equivalent_duplicate` | `covering_view` | `retain_writable_unrendered`, or `drop_before_writer` with a source-backed drop |
 | `source_superseded` | `replacement` | either, source-backed |
-| `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | `drop_before_writer` |
-| `metadata_only` | none; the value must be a constant metadata carrier | `retain_writable_unrendered` |
-| `collection_hazard` | source hazard evidence | `drop_before_writer` |
+| `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | either |
+| `metadata_only` | none; the value must be a constant metadata carrier | `retain_writable_unrendered` (enforced) |
+| `collection_hazard` | source hazard evidence | either |
 
 `not_chartable` is deliberately narrow: the only strict operation is deriving age from a Unix timestamp; it is not a
 generic "not useful" escape. `metadata_only` needs the conditions in `metric-types.md`, "Info families", not a gauge
-that happened to equal one in a fixture. Every production `autogen.selector.deny` family must be discharged by a
-`retain_writable_unrendered` exclusion naming that family (`semantics/coverage.go`).
+that happened to equal one in a fixture. Every production `autogen.selector.deny` family must be discharged by an
+exclusion naming that family.
 
 ## Verification
 
-From the repository root:
+From any directory (the launcher resolves the repository root):
 
 ```bash
 .agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py evidence-dirs
@@ -220,7 +225,7 @@ verification before merging Netdata.
 
 - `process_runtime`: smallest source, design, and case contract; a `not_chartable` timestamp exclusion.
 - `python_gc`: a bounded label used as chart identity; runtime support composition.
-- `fastapi`: the smallest chart-heavy HTTP instrumentation contract; a declared support of `vllm`.
+- `fastapi`: the smallest chart-heavy HTTP instrumentation contract; declared as a support by `vllm`.
 - `litellm`: single and multiprocess environments, a future input, reduction and optional identity cases.
 - `vllm`: support-profile composition, namespace aliasing, generated component exclusion, high-cardinality acceptance.
 - `haproxy`: `equivalent_duplicate` and `not_chartable` exclusions.

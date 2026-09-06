@@ -74,6 +74,14 @@ class NormalizeFileArgumentsTest(unittest.TestCase):
             ["--profile", "--dump", str(caller / "x.prom"), "-job", "-quiet"],
         )
 
+    def test_dash_prefixed_path_passes_through_and_equals_form_is_the_escape(self) -> None:
+        caller = Path.cwd() / "caller"
+
+        self.assertEqual(
+            launcher.normalize_file_arguments(["--profile", "-weird.yaml", "--dump=-weird.prom"], caller),
+            ["--profile", "-weird.yaml", f"--dump={caller / '-weird.prom'}"],
+        )
+
     def test_main_resolves_go_from_relative_path_before_chdir(self) -> None:
         launcher_path = Path(__file__).with_name("validate-profile.py").resolve()
         go_root = go_tool_launcher.repo_root(str(launcher_path)) / "src" / "go"

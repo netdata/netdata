@@ -250,6 +250,7 @@ A label can play several roles, but each role has different UX and cardinality:
 |---|---|---|---|
 | Entity identity | `instances.by_labels` | creates separate chart instances and filter identity | server, database, table, device |
 | Ownership path | promoted label and, when needed for uniqueness, `instances.by_labels` | places the entity in its containing hierarchy without changing its leaf type | cluster, database, pool, namespace |
+| Optional identity | `instances.optional_by_labels` | refines the base chart into a per-value chart only when the label is present and nonblank | a stable, bounded axis some deployments omit |
 | Comparable aspect | `name_from_label` or selector-specific static names | creates dimensions within one chart | status class, method, bounded phase |
 | Descriptive detail | `label_promotion` | adds filter/group metadata without splitting identity | serial number, display name, version |
 | Routing constraint | selector label match | includes only the intended series | role, operation, state |

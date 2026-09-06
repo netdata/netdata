@@ -18,8 +18,9 @@ def repo_root(script: str) -> Path:
 def normalize_path_arguments(arguments: list[str], path_options: frozenset[str], caller_cwd: Path) -> list[str]:
     """Make caller-relative values of the given options absolute so they survive the chdir into src/go.
 
-    Both `--opt value` and `--opt=value` forms are handled. A token that starts with `-` is never taken
-    as a value, so a missing value reaches the Go flag parser unchanged and is reported by it.
+    Both `--opt value` and `--opt=value` forms are handled. A token that starts with `-` is never absolutized
+    as a value, so a missing value reaches the Go tool unchanged and is rejected there instead of becoming a
+    bogus path; a path that really starts with `-` must use the `--opt=value` form.
     """
     normalized: list[str] = []
     index = 0

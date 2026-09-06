@@ -65,21 +65,22 @@ authority.
    comparison. Estimate cardinality from the exporter contract, not the fixture; raw user IDs, addresses, request IDs,
    URLs, exception text, and hashes are normally too high-cardinality for identity or dimensions.
 4. **Choose truthful aggregation** (`chart-design.md`, "Aggregation when labels are omitted"). One reducer per chart;
-   never merge gauges and counters into one rendered dimension; quantiles are not mergeable. In a stock profile write
-   `aggregation` explicitly wherever a deliberate many-to-one projection can occur, including deliberate `sum`, and
-   omit it for collision-free routes.
+   never merge gauges and counters into one rendered dimension, although a chart may hold distinct authored dimensions
+   of different kinds when the shared comparison is intentional, each keeping its runtime-derived algorithm; quantiles
+   are not mergeable. In a stock profile write `aggregation` explicitly wherever a deliberate many-to-one projection can
+   occur, including deliberate `sum`, and omit it for collision-free routes.
 5. **Choose collection policy.** `match` detects the exporter and bounds the profile's source namespace; prefer
-   exporter-unique families, because generic runtime families (`process_*`, `python_*`, `http_*`) make unrelated
-   endpoints eligible. Profile `relabeling` normalizes or drops exporter-owned families after selection (recover
-   bounded identity encoded in metric names, normalize label values such as status classes, remove an established
-   useless family class such as a source-wide `*_created`, or another source-backed transformation), only with a
-   source-backed contract and a bounded result, never as a substitute for an identity or aggregation decision; the
-   first applicable selected profile owns each original family and every selected template consumes the shared
-   result. Profile `fallback_type` classifies untyped scalars the exporter owns, as narrowly as the evidence allows.
-   `autogen.selector` shapes only the generic fallback charts. Job `selector`, job relabeling, and job `fallback_type`
-   are deployment policy and are never a hidden prerequisite of a stock profile. Unknown future families inside a
-   wildcard namespace stay eligible for generic fallback; a bounded, source-proven alias may route a future input to an
-   authored metric only when an explicit `future_inputs` case proves that branch.
+   exporter-unique families for detection: generic runtime families (`process_*`, `python_*`, `http_*`) may still be
+   charted, but naming them in `match` makes unrelated endpoints eligible. Profile `relabeling` normalizes or drops
+   exporter-owned families after selection (recover bounded identity encoded in metric names, normalize label values
+   such as status classes, remove an established useless family class such as a source-wide `*_created`, or another
+   source-backed transformation), only with a source-backed contract and a bounded result, never as a substitute for an
+   identity or aggregation decision; the first applicable selected profile owns each original family and every selected
+   template consumes the shared result. Profile `fallback_type` classifies untyped scalars the exporter owns, as
+   narrowly as the evidence allows. `autogen.selector` shapes only the generic fallback charts. Job `selector`, job
+   relabeling, and job `fallback_type` are deployment policy and are never a hidden prerequisite of a stock profile.
+   Unknown future families inside a wildcard namespace stay eligible for generic fallback; a bounded, source-proven
+   alias may route a future input to an authored metric only when an explicit `future_inputs` case proves that branch.
 6. **Encode the profile.** Nested groups express hierarchy: child `context_namespace` segments join with `.`, child
    `family` segments with `/`. Omit the root `family` when it would only repeat the resolved application; the named
    child groups then become top-level families, nested groups still need `family`, and a chart directly under a
@@ -99,29 +100,35 @@ authority.
 ## Stock contribution rule sheet
 
 Stock profiles live under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/<name>.yaml` with a proof
-directory beside the collector. The runtime format permits everything below for user profiles; these are contribution
-rules.
+directory beside the collector. The "review by hand" table is contribution policy that the runtime format permits in
+user profiles. The validator has no user mode: its contributor-policy checks below apply to every profile it validates.
 
 ### The code enforces
 
 - Validator (`tools/prometheus-profile-validation`, finding codes in its README): no `autogen.selector.allow`; every
   `deny` names an exact fixture-present family; current evidence yields zero generic fallback and zero unmatched
-  series; the relabel grammar and name-provenance rules; a lifecycle cap that discards observed entities or dimensions;
-  a chart with no visible dimension; bucket charts use `observations/s` and an incremental algorithm; explicit `area`
+  series (unmatched series downgrade to the `profile_suppressed_series` warning when a selected profile's
+  `autogen.selector` explains every one); the relabel grammar and name-provenance rules (three of them,
+  `open_ended_relabel_name_rewrite`, `unpreserved_relabel_name_identity`, `unbounded_relabel_discard`, become warnings
+  under proof replay); a lifecycle cap that discards observed entities or dimensions; a chart with no visible dimension;
+  bucket charts use `observations/s` and no algorithm other than `incremental` (omitting it is fine); explicit `area`
   or `stacked` raises a semantic-review warning; a selected series carrying a label the chart neither uses nor
   excludes raises a warning.
 - Proof loaders and compiler (`internal/promprofile/semantics`): `documentation.title` and `summary` required; the
-  closed evidence `kind` set; the `outcome` literals `drop_before_writer` and `retain_writable_unrendered`; a reusable
-  policy needs two consumers; every production `autogen.selector.deny` family is discharged by a
+  closed evidence `kind` set; the `outcome` literals `drop_before_writer` and `retain_writable_unrendered`, with
+  `metadata_only` bound to the latter; a reusable component, label, or reduction policy in either document needs two
+  consumers (compile stage, `semantics/evidence.go`); every production `autogen.selector.deny` family is discharged by a
   `retain_writable_unrendered` exclusion naming it (`coverage.go`); `metadata_only` requires the conditions in
-  `metric-types.md`, "Info families"; supports are declared once in `PROFILE-DESIGN.composition.supports`.
+  `metric-types.md`, "Info families"; supports are accepted only in `PROFILE-DESIGN.composition.supports`; no other
+  strict schema has the field.
 - Integrations projection (`integrations/prometheus_profile_docs.py`, run by `gen_integrations.py` and
   `integrations/tests/test_prometheus_profile_docs.py`): every stock profile, supporting ones included, needs a direct
   row under some module in the top-level `profile_coverage.modules` of the Prometheus collector `metadata.yaml`
-  (generation raises `Stock Prometheus profiles without an integration mapping` otherwise); a service's row does not
-  repeat its own supports, because the projection resolves and deduplicates the closure from the design; the key is
-  valid only on `go.d.plugin/prometheus` modules; a semantic view and its runtime chart must agree on family and chart
-  identity; the view `question` is never rendered.
+  (generation raises `Stock Prometheus profiles without an integration mapping` otherwise); the projection resolves the
+  support closure from the design; the key is accepted only on `go.d.plugin/prometheus` modules (a Python check, not
+  the JSON schema; an unknown module id under it only warns in `_common.py`); a semantic view and its runtime chart
+  must agree on family and chart identity (also enforced by the proof compiler, `semantics/replay_route.go`); the view
+  `question` is never rendered.
 
 ### Review by hand
 
@@ -137,6 +144,7 @@ rules.
 | root `family` | omit when it only repeats the application; keep for reusable instrumentation profiles |
 | stock `metadata.yaml` example | must show that auto-selection suffices: no `profiles`, `app`, job `selector`, job relabeling, or job `fallback_type`; such a field in a stock example is evidence that profile ownership is incomplete |
 | profile-required normalization | lives in profile `relabeling`, never duplicated as an optional job recipe |
+| `profile_coverage.modules` row | lists the stock profiles the module owns, never a service's own supports: a repeated support is projected as `primary` with no activation sentence, and nothing rejects it |
 | `PROFILE-DESIGN.yaml` `documentation` | operator-facing `title` and `summary`; every `composition.supports` entry has an `activation` sentence |
 | integration copy | the generated coverage table groups rows by top-level family (metric, family and chart title, dimension, unit, entity scope); `metrics_description` carries a short operator-model brief, not the chart ledger |
 
@@ -147,11 +155,12 @@ before `go run` from `src/go`. CI runs their unit tests (`.github/workflows/prom
 authoring launcher"); run them locally with
 `.venv/bin/python3 -m unittest discover -s .agents/skills/collectors-prometheus-profiles/scripts -p 'test_*.py'`.
 
-- `scripts/validate-profile.py --profile P --dump D --job J [--support-profile S]... [--output text|json]`: launcher
-  for `tools/prometheus-profile-validation`. A user profile may use a minimal or deployment-specific job; stock
-  validation uses the jobs its proof cases declare. A dash-prefixed token is never taken as an option's value, so a
-  missing value is reported by the Go flag parser.
-- `scripts/profile-toc.py PROFILE [--app APP] [--quiet]`: renders the operator-visible family tree with contexts and
+- `scripts/validate-profile.py --profile P --dump D [--job J] [--support-profile S]... [--output text|json]`:
+  launcher for `tools/prometheus-profile-validation`. A user profile may use a minimal or deployment-specific job;
+  stock validation uses the jobs its proof cases declare. A dash-prefixed token is never absolutized as an option's
+  value, so a missing value reaches the tool unchanged and is rejected there instead of becoming a bogus path.
+- `.venv/bin/python3 scripts/profile-toc.py PROFILE [--app APP] [--quiet]` (needs PyYAML, which the repository
+  `.venv` provides): renders the operator-visible family tree with contexts and
   effective priorities, then advisory UX warnings; it is not a gate. `--app` defaults to the profile's `app:`; the root
   `context_namespace` is dropped when it equals the app, as the collector does, and the `prometheus.<app>.` prefix is
   omitted. A chart with its own `family` is placed under that child node, as chartengine composes it. Priority `0`
