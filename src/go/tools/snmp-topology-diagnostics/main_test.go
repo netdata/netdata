@@ -14,7 +14,8 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
@@ -108,7 +109,7 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fake := &fakeDiagnosticArchive{}
 			openCalls := 0
-			opener := func(_ io.Reader, limits snmptopology.DiagnosticReadLimits) (diagnosticArchive, error) {
+			opener := func(_ io.Reader, limits snmpdiag.ReadLimits) (diagnosticArchive, error) {
 				openCalls++
 				fake.limits = limits
 				return fake, nil
@@ -369,7 +370,7 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 type fakeDiagnosticArchive struct {
 	operation      string
 	operationCalls int
-	limits         snmptopology.DiagnosticReadLimits
+	limits         snmpdiag.ReadLimits
 	query          snmptopology.DiagnosticQueryOptions
 	linkIndex      int
 }
@@ -470,9 +471,9 @@ func readReplayableDiagnosticArchive(t testing.TB) *snmptopology.DiagnosticArchi
 	if err != nil {
 		t.Fatal(err)
 	}
-	archive, err := snmptopology.ReadDiagnosticArchive(
+	archive, err := openDiagnosticArchive(
 		bytes.NewReader(fixture),
-		snmptopology.DefaultDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -12,223 +12,42 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
-
-type topologyDiagnosticArchiveAcquisitionEvidenceV1 struct {
-	Device             topologyDiagnosticArchiveDeviceInputV1       `json:"device"`
-	Target             topologyDiagnosticArchiveTargetV1            `json:"target"`
-	Client             topologyDiagnosticArchivePhaseV1             `json:"client"`
-	Connect            topologyDiagnosticArchivePhaseV1             `json:"connect"`
-	Profiles           topologyDiagnosticArchivePhaseV1             `json:"profiles"`
-	Collection         topologyDiagnosticArchivePhaseV1             `json:"collection"`
-	SysUptime          topologyDiagnosticArchivePhaseV1             `json:"sys_uptime"`
-	VLANProfiles       topologyDiagnosticArchivePhaseV1             `json:"vlan_profiles"`
-	CollectedAt        time.Time                                    `json:"collected_at"`
-	FreshForNanos      int64                                        `json:"fresh_for_ns"`
-	SysUptimeValue     int64                                        `json:"sys_uptime_value"`
-	CollectionContexts []topologyDiagnosticArchiveContextEvidenceV1 `json:"collection_contexts,omitempty"`
-}
-
-type topologyDiagnosticArchiveDeviceInputV1 struct {
-	Hostname    string            `json:"hostname"`
-	SysObjectID string            `json:"sys_object_id"`
-	SysName     string            `json:"sys_name"`
-	SysDescr    string            `json:"sys_descr"`
-	SysContact  string            `json:"sys_contact"`
-	SysLocation string            `json:"sys_location"`
-	Vendor      string            `json:"vendor"`
-	Model       string            `json:"model"`
-	VnodeGUID   string            `json:"vnode_guid"`
-	VnodeLabels map[string]string `json:"vnode_labels,omitempty"`
-}
-
-type topologyDiagnosticArchiveTargetV1 struct {
-	Outcome   string   `json:"outcome"`
-	Addresses []string `json:"addresses,omitempty"`
-}
-
-type topologyDiagnosticArchivePhaseV1 struct {
-	Outcome string `json:"outcome"`
-	Failure string `json:"failure"`
-}
-
-type topologyDiagnosticArchiveContextEvidenceV1 struct {
-	Ordinal    uint32                                       `json:"ordinal"`
-	VLANID     string                                       `json:"vlan_id"`
-	VLANName   string                                       `json:"vlan_name"`
-	Client     topologyDiagnosticArchivePhaseV1             `json:"client"`
-	Connect    topologyDiagnosticArchivePhaseV1             `json:"connect"`
-	Collection topologyDiagnosticArchivePhaseV1             `json:"collection"`
-	Profiles   []topologyDiagnosticArchiveProfileEvidenceV1 `json:"profiles,omitempty"`
-}
-
-type topologyDiagnosticArchiveProfileEvidenceV1 struct {
-	Identity     topologyDiagnosticArchiveProfileIdentityV1 `json:"identity"`
-	Outcome      string                                     `json:"outcome"`
-	FailurePhase string                                     `json:"failure_phase"`
-	Stats        topologyDiagnosticArchiveCollectionStatsV1 `json:"stats"`
-	Execution    *topologyDiagnosticArchiveExecutionV1      `json:"execution,omitempty"`
-	Routes       []topologyDiagnosticArchiveRouteV1         `json:"routes,omitempty"`
-	Values       topologyDiagnosticArchiveProfileValuesV1   `json:"values"`
-}
-
-type topologyDiagnosticArchiveProfileIdentityV1 struct {
-	Ordinal     uint32 `json:"ordinal"`
-	RouteDigest string `json:"route_digest"`
-}
-
-type topologyDiagnosticArchiveRouteV1 struct {
-	Ordinal      uint32 `json:"ordinal"`
-	Kind         string `json:"kind"`
-	RootOID      string `json:"root_oid"`
-	Source       string `json:"source"`
-	Outcome      string `json:"outcome"`
-	FailureClass string `json:"failure_class"`
-	Rows         uint64 `json:"rows"`
-	Values       uint64 `json:"values"`
-	Missing      uint64 `json:"missing"`
-	Rejected     uint64 `json:"rejected"`
-}
-
-type topologyDiagnosticArchiveProfileValuesV1 struct {
-	Metadata  map[string]topologyDiagnosticArchiveMetaTagV1 `json:"metadata,omitempty"`
-	Tags      map[string]string                             `json:"tags,omitempty"`
-	Metrics   []topologyDiagnosticArchiveMetricValueV1      `json:"metrics,omitempty"`
-	BGPRows   []topologyDiagnosticArchiveBGPRowValueV1      `json:"bgp_rows,omitempty"`
-	BGPFailed bool                                          `json:"bgp_failed"`
-}
-
-type topologyDiagnosticArchiveMetaTagV1 struct {
-	Value        string `json:"value"`
-	IsExactMatch bool   `json:"is_exact_match"`
-}
-
-type topologyDiagnosticArchiveMetricValueV1 struct {
-	RouteOrdinal uint32            `json:"route_ordinal"`
-	RowOrdinal   uint32            `json:"row_ordinal"`
-	ValueOrdinal uint32            `json:"value_ordinal"`
-	Kind         string            `json:"kind"`
-	Tags         map[string]string `json:"tags,omitempty"`
-}
-
-type topologyDiagnosticArchiveBGPRowValueV1 struct {
-	RouteOrdinal uint32 `json:"route_ordinal"`
-	RowOrdinal   uint32 `json:"row_ordinal"`
-	ValueOrdinal uint32 `json:"value_ordinal"`
-
-	OriginProfileID string `json:"origin_profile_id"`
-	Table           string `json:"table"`
-	RowKey          string `json:"row_key"`
-	StructuralID    string `json:"structural_id"`
-	Kind            string `json:"kind"`
-
-	RoutingInstance string `json:"routing_instance"`
-	Neighbor        string `json:"neighbor"`
-	RemoteAS        string `json:"remote_as"`
-	LocalAddress    string `json:"local_address"`
-	LocalAS         string `json:"local_as"`
-	LocalIdentifier string `json:"local_identifier"`
-	PeerIdentifier  string `json:"peer_identifier"`
-	PeerType        string `json:"peer_type"`
-	BGPVersion      string `json:"bgp_version"`
-	Description     string `json:"description"`
-
-	AdminHas       bool              `json:"admin_has"`
-	AdminEnabled   bool              `json:"admin_enabled"`
-	StateHas       bool              `json:"state_has"`
-	State          string            `json:"state"`
-	StateRaw       string            `json:"state_raw"`
-	EstablishedHas bool              `json:"established_has"`
-	Established    int64             `json:"established"`
-	UpdateAgeHas   bool              `json:"update_age_has"`
-	UpdateAge      int64             `json:"update_age"`
-	Tags           map[string]string `json:"tags,omitempty"`
-}
-
-type topologyDiagnosticArchiveCollectionStatsV1 struct {
-	Timing     topologyDiagnosticArchiveTimingStatsV1     `json:"timing"`
-	SNMP       topologyDiagnosticArchiveSNMPStatsV1       `json:"snmp"`
-	Metrics    topologyDiagnosticArchiveMetricStatsV1     `json:"metrics"`
-	TableCache topologyDiagnosticArchiveTableCacheStatsV1 `json:"table_cache"`
-	Errors     topologyDiagnosticArchiveErrorStatsV1      `json:"errors"`
-}
-
-type topologyDiagnosticArchiveTimingStatsV1 struct {
-	PreparationNanos    int64 `json:"preparation_ns,omitempty"`
-	ScalarNanos         int64 `json:"scalar_ns"`
-	TableNanos          int64 `json:"table_ns"`
-	LicensingNanos      int64 `json:"licensing_ns"`
-	BGPNanos            int64 `json:"bgp_ns"`
-	VirtualMetricsNanos int64 `json:"virtual_metrics_ns"`
-}
-
-type topologyDiagnosticArchiveSNMPStatsV1 struct {
-	GetRequests  int64 `json:"get_requests"`
-	GetOIDs      int64 `json:"get_oids"`
-	WalkRequests int64 `json:"walk_requests"`
-	WalkPDUs     int64 `json:"walk_pdus"`
-	TablesWalked int64 `json:"tables_walked"`
-	TablesCached int64 `json:"tables_cached"`
-}
-
-type topologyDiagnosticArchiveMetricStatsV1 struct {
-	Scalar    int64 `json:"scalar"`
-	Table     int64 `json:"table"`
-	Virtual   int64 `json:"virtual"`
-	Licensing int64 `json:"licensing"`
-	BGP       int64 `json:"bgp"`
-	Tables    int64 `json:"tables"`
-	Rows      int64 `json:"rows"`
-}
-
-type topologyDiagnosticArchiveTableCacheStatsV1 struct {
-	Hits   int64 `json:"hits"`
-	Misses int64 `json:"misses"`
-}
-
-type topologyDiagnosticArchiveErrorStatsV1 struct {
-	ProcessingPreparation int64 `json:"processing_preparation,omitempty"`
-	SNMP                  int64 `json:"snmp"`
-	ProcessingScalar      int64 `json:"processing_scalar"`
-	ProcessingTable       int64 `json:"processing_table"`
-	ProcessingLicensing   int64 `json:"processing_licensing"`
-	ProcessingBGP         int64 `json:"processing_bgp"`
-	MissingOIDs           int64 `json:"missing_oids"`
-}
 
 func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
 	evidence *topologyAcquisitionAttemptEvidence,
-) (topologyDiagnosticArchiveAcquisitionEvidenceV1, error) {
+) (snmpdiag.AcquisitionEvidence, error) {
 	targetOutcome, err := topologyDiagnosticArchiveTargetOutcomeName(evidence.target.outcome)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, err
+		return snmpdiag.AcquisitionEvidence{}, err
 	}
 	client, err := newTopologyDiagnosticArchivePhaseV1(evidence.client)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("client phase: %w", err)
+		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("client phase: %w", err)
 	}
 	connect, err := newTopologyDiagnosticArchivePhaseV1(evidence.connect)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("connect phase: %w", err)
+		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("connect phase: %w", err)
 	}
 	profiles, err := newTopologyDiagnosticArchivePhaseV1(evidence.profiles)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("profiles phase: %w", err)
+		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("profiles phase: %w", err)
 	}
 	collection, err := newTopologyDiagnosticArchivePhaseV1(evidence.collection)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("collection phase: %w", err)
+		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("collection phase: %w", err)
 	}
 	sysUptime, err := newTopologyDiagnosticArchivePhaseV1(evidence.sysUptime)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("sys_uptime phase: %w", err)
+		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("sys_uptime phase: %w", err)
 	}
 	vlanProfiles, err := newTopologyDiagnosticArchivePhaseV1(evidence.vlanProfiles)
 	if err != nil {
-		return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("vlan_profiles phase: %w", err)
+		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("vlan_profiles phase: %w", err)
 	}
-	result := topologyDiagnosticArchiveAcquisitionEvidenceV1{
-		Device: topologyDiagnosticArchiveDeviceInputV1{
+	result := snmpdiag.AcquisitionEvidence{
+		Device: snmpdiag.DeviceInput{
 			Hostname:    evidence.device.hostname,
 			SysObjectID: evidence.device.sysObjectID,
 			SysName:     evidence.device.sysName,
@@ -240,7 +59,7 @@ func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
 			VnodeGUID:   evidence.device.vnodeGUID,
 			VnodeLabels: evidence.device.vnodeLabels,
 		},
-		Target: topologyDiagnosticArchiveTargetV1{
+		Target: snmpdiag.Target{
 			Outcome:   targetOutcome,
 			Addresses: make([]string, 0, len(evidence.target.addresses)),
 		},
@@ -253,7 +72,7 @@ func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
 		CollectedAt:        evidence.collectedAt,
 		FreshForNanos:      int64(evidence.freshFor),
 		SysUptimeValue:     evidence.sysUptimeValue,
-		CollectionContexts: make([]topologyDiagnosticArchiveContextEvidenceV1, 0, len(evidence.collectionContexts)),
+		CollectionContexts: make([]snmpdiag.ContextEvidence, 0, len(evidence.collectionContexts)),
 	}
 	for _, address := range evidence.target.addresses {
 		result.Target.Addresses = append(result.Target.Addresses, address.String())
@@ -261,7 +80,7 @@ func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
 	for _, context := range evidence.collectionContexts {
 		archived, err := newTopologyDiagnosticArchiveContextEvidenceV1(context)
 		if err != nil {
-			return topologyDiagnosticArchiveAcquisitionEvidenceV1{}, fmt.Errorf("collection context %d: %w", context.ordinal, err)
+			return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("collection context %d: %w", context.ordinal, err)
 		}
 		result.CollectionContexts = append(result.CollectionContexts, archived)
 	}
@@ -270,32 +89,32 @@ func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
 
 func newTopologyDiagnosticArchiveContextEvidenceV1(
 	context topologyAcquisitionContextEvidence,
-) (topologyDiagnosticArchiveContextEvidenceV1, error) {
+) (snmpdiag.ContextEvidence, error) {
 	client, err := newTopologyDiagnosticArchivePhaseV1(context.client)
 	if err != nil {
-		return topologyDiagnosticArchiveContextEvidenceV1{}, fmt.Errorf("client phase: %w", err)
+		return snmpdiag.ContextEvidence{}, fmt.Errorf("client phase: %w", err)
 	}
 	connect, err := newTopologyDiagnosticArchivePhaseV1(context.connect)
 	if err != nil {
-		return topologyDiagnosticArchiveContextEvidenceV1{}, fmt.Errorf("connect phase: %w", err)
+		return snmpdiag.ContextEvidence{}, fmt.Errorf("connect phase: %w", err)
 	}
 	collection, err := newTopologyDiagnosticArchivePhaseV1(context.collection)
 	if err != nil {
-		return topologyDiagnosticArchiveContextEvidenceV1{}, fmt.Errorf("collection phase: %w", err)
+		return snmpdiag.ContextEvidence{}, fmt.Errorf("collection phase: %w", err)
 	}
-	result := topologyDiagnosticArchiveContextEvidenceV1{
+	result := snmpdiag.ContextEvidence{
 		Ordinal:    context.ordinal,
 		VLANID:     context.vlanID,
 		VLANName:   context.vlanName,
 		Client:     client,
 		Connect:    connect,
 		Collection: collection,
-		Profiles:   make([]topologyDiagnosticArchiveProfileEvidenceV1, 0, len(context.profiles)),
+		Profiles:   make([]snmpdiag.ProfileEvidence, 0, len(context.profiles)),
 	}
 	for _, profile := range context.profiles {
 		archived, err := newTopologyDiagnosticArchiveProfileEvidenceV1(profile)
 		if err != nil {
-			return topologyDiagnosticArchiveContextEvidenceV1{}, fmt.Errorf("profile %d: %w", profile.identity.Ordinal, err)
+			return snmpdiag.ContextEvidence{}, fmt.Errorf("profile %d: %w", profile.identity.Ordinal, err)
 		}
 		result.Profiles = append(result.Profiles, archived)
 	}
@@ -304,17 +123,17 @@ func newTopologyDiagnosticArchiveContextEvidenceV1(
 
 func newTopologyDiagnosticArchiveProfileEvidenceV1(
 	profile topologyAcquisitionProfileEvidence,
-) (topologyDiagnosticArchiveProfileEvidenceV1, error) {
+) (snmpdiag.ProfileEvidence, error) {
 	outcome, err := topologyDiagnosticArchiveProfileOutcomeName(profile.outcome)
 	if err != nil {
-		return topologyDiagnosticArchiveProfileEvidenceV1{}, err
+		return snmpdiag.ProfileEvidence{}, err
 	}
 	failurePhase, err := topologyDiagnosticArchiveProfileFailurePhaseName(profile.failurePhase)
 	if err != nil {
-		return topologyDiagnosticArchiveProfileEvidenceV1{}, err
+		return snmpdiag.ProfileEvidence{}, err
 	}
-	result := topologyDiagnosticArchiveProfileEvidenceV1{
-		Identity: topologyDiagnosticArchiveProfileIdentityV1{
+	result := snmpdiag.ProfileEvidence{
+		Identity: snmpdiag.ProfileIdentity{
 			Ordinal:     profile.identity.Ordinal,
 			RouteDigest: hex.EncodeToString(profile.identity.RouteDigest[:]),
 		},
@@ -322,13 +141,13 @@ func newTopologyDiagnosticArchiveProfileEvidenceV1(
 		FailurePhase: failurePhase,
 		Stats:        newTopologyDiagnosticArchiveCollectionStatsV1(profile.stats),
 		Execution:    newTopologyDiagnosticArchiveExecutionV1(profile.execution),
-		Routes:       make([]topologyDiagnosticArchiveRouteV1, 0, len(profile.routes)),
+		Routes:       make([]snmpdiag.Route, 0, len(profile.routes)),
 		Values:       newTopologyDiagnosticArchiveProfileValuesV1(profile.values),
 	}
 	for _, route := range profile.routes {
 		archived, err := newTopologyDiagnosticArchiveRouteV1(route)
 		if err != nil {
-			return topologyDiagnosticArchiveProfileEvidenceV1{}, fmt.Errorf("route %d: %w", route.Ordinal, err)
+			return snmpdiag.ProfileEvidence{}, fmt.Errorf("route %d: %w", route.Ordinal, err)
 		}
 		result.Routes = append(result.Routes, archived)
 	}
@@ -337,24 +156,24 @@ func newTopologyDiagnosticArchiveProfileEvidenceV1(
 
 func newTopologyDiagnosticArchiveRouteV1(
 	route ddsnmpcollector.AcquisitionRouteReport,
-) (topologyDiagnosticArchiveRouteV1, error) {
+) (snmpdiag.Route, error) {
 	kind, err := topologyDiagnosticArchiveRouteKindName(route.Kind)
 	if err != nil {
-		return topologyDiagnosticArchiveRouteV1{}, err
+		return snmpdiag.Route{}, err
 	}
 	source, err := topologyDiagnosticArchiveRouteSourceName(route.Source)
 	if err != nil {
-		return topologyDiagnosticArchiveRouteV1{}, err
+		return snmpdiag.Route{}, err
 	}
 	outcome, err := topologyDiagnosticArchiveRouteOutcomeName(route.Outcome)
 	if err != nil {
-		return topologyDiagnosticArchiveRouteV1{}, err
+		return snmpdiag.Route{}, err
 	}
 	failureClass, err := topologyDiagnosticArchiveRouteFailureClassName(route.FailureClass)
 	if err != nil {
-		return topologyDiagnosticArchiveRouteV1{}, err
+		return snmpdiag.Route{}, err
 	}
-	return topologyDiagnosticArchiveRouteV1{
+	return snmpdiag.Route{
 		Ordinal:      route.Ordinal,
 		Kind:         kind,
 		RootOID:      route.RootOID,
@@ -370,24 +189,24 @@ func newTopologyDiagnosticArchiveRouteV1(
 
 func newTopologyDiagnosticArchiveProfileValuesV1(
 	values topologyAcquisitionProfileValues,
-) topologyDiagnosticArchiveProfileValuesV1 {
-	result := topologyDiagnosticArchiveProfileValuesV1{
+) snmpdiag.ProfileValues {
+	result := snmpdiag.ProfileValues{
 		Tags:      values.tags,
-		Metrics:   make([]topologyDiagnosticArchiveMetricValueV1, 0, len(values.metrics)),
-		BGPRows:   make([]topologyDiagnosticArchiveBGPRowValueV1, 0, len(values.bgpRows)),
+		Metrics:   make([]snmpdiag.MetricValue, 0, len(values.metrics)),
+		BGPRows:   make([]snmpdiag.BGPRowValue, 0, len(values.bgpRows)),
 		BGPFailed: values.bgpFailed,
 	}
 	if values.metadata != nil {
-		result.Metadata = make(map[string]topologyDiagnosticArchiveMetaTagV1, len(values.metadata))
+		result.Metadata = make(map[string]snmpdiag.MetaTag, len(values.metadata))
 		for key, value := range values.metadata {
-			result.Metadata[key] = topologyDiagnosticArchiveMetaTagV1{
+			result.Metadata[key] = snmpdiag.MetaTag{
 				Value:        value.Value,
 				IsExactMatch: value.IsExactMatch,
 			}
 		}
 	}
 	for _, metric := range values.metrics {
-		result.Metrics = append(result.Metrics, topologyDiagnosticArchiveMetricValueV1{
+		result.Metrics = append(result.Metrics, snmpdiag.MetricValue{
 			RouteOrdinal: metric.routeOrdinal,
 			RowOrdinal:   metric.rowOrdinal,
 			ValueOrdinal: metric.valueOrdinal,
@@ -396,7 +215,7 @@ func newTopologyDiagnosticArchiveProfileValuesV1(
 		})
 	}
 	for _, row := range values.bgpRows {
-		result.BGPRows = append(result.BGPRows, topologyDiagnosticArchiveBGPRowValueV1{
+		result.BGPRows = append(result.BGPRows, snmpdiag.BGPRowValue{
 			RouteOrdinal:    row.routeOrdinal,
 			RowOrdinal:      row.rowOrdinal,
 			ValueOrdinal:    row.valueOrdinal,
@@ -432,9 +251,9 @@ func newTopologyDiagnosticArchiveProfileValuesV1(
 
 func newTopologyDiagnosticArchiveCollectionStatsV1(
 	stats ddsnmp.CollectionStats,
-) topologyDiagnosticArchiveCollectionStatsV1 {
-	return topologyDiagnosticArchiveCollectionStatsV1{
-		Timing: topologyDiagnosticArchiveTimingStatsV1{
+) snmpdiag.CollectionStats {
+	return snmpdiag.CollectionStats{
+		Timing: snmpdiag.TimingStats{
 			PreparationNanos:    int64(stats.Timing.Preparation),
 			ScalarNanos:         int64(stats.Timing.Scalar),
 			TableNanos:          int64(stats.Timing.Table),
@@ -442,7 +261,7 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 			BGPNanos:            int64(stats.Timing.BGP),
 			VirtualMetricsNanos: int64(stats.Timing.VirtualMetrics),
 		},
-		SNMP: topologyDiagnosticArchiveSNMPStatsV1{
+		SNMP: snmpdiag.SNMPStats{
 			GetRequests:  stats.SNMP.GetRequests,
 			GetOIDs:      stats.SNMP.GetOIDs,
 			WalkRequests: stats.SNMP.WalkRequests,
@@ -450,7 +269,7 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 			TablesWalked: stats.SNMP.TablesWalked,
 			TablesCached: stats.SNMP.TablesCached,
 		},
-		Metrics: topologyDiagnosticArchiveMetricStatsV1{
+		Metrics: snmpdiag.MetricStats{
 			Scalar:    stats.Metrics.Scalar,
 			Table:     stats.Metrics.Table,
 			Virtual:   stats.Metrics.Virtual,
@@ -459,11 +278,11 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 			Tables:    stats.Metrics.Tables,
 			Rows:      stats.Metrics.Rows,
 		},
-		TableCache: topologyDiagnosticArchiveTableCacheStatsV1{
+		TableCache: snmpdiag.TableCacheStats{
 			Hits:   stats.TableCache.Hits,
 			Misses: stats.TableCache.Misses,
 		},
-		Errors: topologyDiagnosticArchiveErrorStatsV1{
+		Errors: snmpdiag.ErrorStats{
 			ProcessingPreparation: stats.Errors.Processing.Preparation,
 			SNMP:                  stats.Errors.SNMP,
 			ProcessingScalar:      stats.Errors.Processing.Scalar,
@@ -475,7 +294,7 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 	}
 }
 
-func (e topologyDiagnosticArchiveAcquisitionEvidenceV1) evidence(
+func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	id topologyAcquisitionAttemptID,
 ) (*topologyAcquisitionAttemptEvidence, error) {
 	targetOutcome, err := topologyDiagnosticArchiveParseTargetOutcome(e.Target.Outcome)
@@ -493,27 +312,27 @@ func (e topologyDiagnosticArchiveAcquisitionEvidenceV1) evidence(
 		}
 		addresses = append(addresses, address)
 	}
-	client, err := e.Client.phase()
+	client, err := restoreArchivePhase(e.Client)
 	if err != nil {
 		return nil, fmt.Errorf("client phase: %w", err)
 	}
-	connect, err := e.Connect.phase()
+	connect, err := restoreArchivePhase(e.Connect)
 	if err != nil {
 		return nil, fmt.Errorf("connect phase: %w", err)
 	}
-	profiles, err := e.Profiles.phase()
+	profiles, err := restoreArchivePhase(e.Profiles)
 	if err != nil {
 		return nil, fmt.Errorf("profiles phase: %w", err)
 	}
-	collection, err := e.Collection.phase()
+	collection, err := restoreArchivePhase(e.Collection)
 	if err != nil {
 		return nil, fmt.Errorf("collection phase: %w", err)
 	}
-	sysUptime, err := e.SysUptime.phase()
+	sysUptime, err := restoreArchivePhase(e.SysUptime)
 	if err != nil {
 		return nil, fmt.Errorf("sys_uptime phase: %w", err)
 	}
-	vlanProfiles, err := e.VLANProfiles.phase()
+	vlanProfiles, err := restoreArchivePhase(e.VLANProfiles)
 	if err != nil {
 		return nil, fmt.Errorf("vlan_profiles phase: %w", err)
 	}
@@ -547,7 +366,7 @@ func (e topologyDiagnosticArchiveAcquisitionEvidenceV1) evidence(
 		collectionContexts: make([]topologyAcquisitionContextEvidence, 0, len(e.CollectionContexts)),
 	}
 	for _, context := range e.CollectionContexts {
-		reconstructed, err := context.context()
+		reconstructed, err := restoreArchiveContextEvidence(context)
 		if err != nil {
 			return nil, fmt.Errorf("collection context %d: %w", context.Ordinal, err)
 		}
@@ -556,16 +375,16 @@ func (e topologyDiagnosticArchiveAcquisitionEvidenceV1) evidence(
 	return result, nil
 }
 
-func (c topologyDiagnosticArchiveContextEvidenceV1) context() (topologyAcquisitionContextEvidence, error) {
-	client, err := c.Client.phase()
+func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence) (topologyAcquisitionContextEvidence, error) {
+	client, err := restoreArchivePhase(c.Client)
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("client phase: %w", err)
 	}
-	connect, err := c.Connect.phase()
+	connect, err := restoreArchivePhase(c.Connect)
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("connect phase: %w", err)
 	}
-	collection, err := c.Collection.phase()
+	collection, err := restoreArchivePhase(c.Collection)
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("collection phase: %w", err)
 	}
@@ -579,7 +398,7 @@ func (c topologyDiagnosticArchiveContextEvidenceV1) context() (topologyAcquisiti
 		profiles:   make([]topologyAcquisitionProfileEvidence, 0, len(c.Profiles)),
 	}
 	for _, profile := range c.Profiles {
-		reconstructed, err := profile.profile()
+		reconstructed, err := restoreArchiveProfileEvidence(profile)
 		if err != nil {
 			return topologyAcquisitionContextEvidence{}, fmt.Errorf("profile %d: %w", profile.Identity.Ordinal, err)
 		}
@@ -588,7 +407,7 @@ func (c topologyDiagnosticArchiveContextEvidenceV1) context() (topologyAcquisiti
 	return result, nil
 }
 
-func (p topologyDiagnosticArchiveProfileEvidenceV1) profile() (topologyAcquisitionProfileEvidence, error) {
+func restoreArchiveProfileEvidence(p snmpdiag.ProfileEvidence) (topologyAcquisitionProfileEvidence, error) {
 	digest, err := hex.DecodeString(p.Identity.RouteDigest)
 	if err != nil || len(digest) != 32 {
 		return topologyAcquisitionProfileEvidence{}, errors.New("route digest must be 32 bytes of hexadecimal")
@@ -610,10 +429,10 @@ func (p topologyDiagnosticArchiveProfileEvidenceV1) profile() (topologyAcquisiti
 		},
 		outcome:      outcome,
 		failurePhase: failurePhase,
-		stats:        p.Stats.stats(),
+		stats:        restoreArchiveCollectionStats(p.Stats),
 		routes:       make([]ddsnmpcollector.AcquisitionRouteReport, 0, len(p.Routes)),
 	}
-	result.execution, err = p.Execution.execution()
+	result.execution, err = restoreArchiveExecution(p.Execution)
 	if err != nil {
 		return topologyAcquisitionProfileEvidence{}, err
 	}
@@ -622,14 +441,14 @@ func (p topologyDiagnosticArchiveProfileEvidenceV1) profile() (topologyAcquisiti
 		if _, ok := routeOrdinals[route.Ordinal]; ok {
 			return topologyAcquisitionProfileEvidence{}, fmt.Errorf("duplicate route ordinal %d", route.Ordinal)
 		}
-		reconstructed, err := route.route()
+		reconstructed, err := restoreArchiveRoute(route)
 		if err != nil {
 			return topologyAcquisitionProfileEvidence{}, fmt.Errorf("route %d: %w", route.Ordinal, err)
 		}
 		routeOrdinals[route.Ordinal] = struct{}{}
 		result.routes = append(result.routes, reconstructed)
 	}
-	values, err := p.Values.values(routeOrdinals)
+	values, err := restoreArchiveProfileValues(p.Values, routeOrdinals)
 	if err != nil {
 		return topologyAcquisitionProfileEvidence{}, err
 	}
@@ -637,7 +456,7 @@ func (p topologyDiagnosticArchiveProfileEvidenceV1) profile() (topologyAcquisiti
 	return result, nil
 }
 
-func (r topologyDiagnosticArchiveRouteV1) route() (ddsnmpcollector.AcquisitionRouteReport, error) {
+func restoreArchiveRoute(r snmpdiag.Route) (ddsnmpcollector.AcquisitionRouteReport, error) {
 	kind, err := topologyDiagnosticArchiveParseRouteKind(r.Kind)
 	if err != nil {
 		return ddsnmpcollector.AcquisitionRouteReport{}, err
@@ -668,7 +487,7 @@ func (r topologyDiagnosticArchiveRouteV1) route() (ddsnmpcollector.AcquisitionRo
 	}, nil
 }
 
-func (v topologyDiagnosticArchiveProfileValuesV1) values(
+func restoreArchiveProfileValues(v snmpdiag.ProfileValues,
 	routeOrdinals map[uint32]struct{},
 ) (topologyAcquisitionProfileValues, error) {
 	result := topologyAcquisitionProfileValues{
@@ -742,7 +561,7 @@ func (v topologyDiagnosticArchiveProfileValuesV1) values(
 	return result, nil
 }
 
-func (s topologyDiagnosticArchiveCollectionStatsV1) stats() ddsnmp.CollectionStats {
+func restoreArchiveCollectionStats(s snmpdiag.CollectionStats) ddsnmp.CollectionStats {
 	var result ddsnmp.CollectionStats
 	result.Timing.Preparation = time.Duration(s.Timing.PreparationNanos)
 	result.Timing.Scalar = time.Duration(s.Timing.ScalarNanos)
@@ -777,19 +596,19 @@ func (s topologyDiagnosticArchiveCollectionStatsV1) stats() ddsnmp.CollectionSta
 
 func newTopologyDiagnosticArchivePhaseV1(
 	phase topologyAcquisitionPhaseEvidence,
-) (topologyDiagnosticArchivePhaseV1, error) {
+) (snmpdiag.Phase, error) {
 	outcome, err := topologyDiagnosticArchivePhaseOutcomeName(phase.outcome)
 	if err != nil {
-		return topologyDiagnosticArchivePhaseV1{}, err
+		return snmpdiag.Phase{}, err
 	}
 	failure, err := topologyDiagnosticArchivePhaseFailureName(phase.failure)
 	if err != nil {
-		return topologyDiagnosticArchivePhaseV1{}, err
+		return snmpdiag.Phase{}, err
 	}
-	return topologyDiagnosticArchivePhaseV1{Outcome: outcome, Failure: failure}, nil
+	return snmpdiag.Phase{Outcome: outcome, Failure: failure}, nil
 }
 
-func (p topologyDiagnosticArchivePhaseV1) phase() (topologyAcquisitionPhaseEvidence, error) {
+func restoreArchivePhase(p snmpdiag.Phase) (topologyAcquisitionPhaseEvidence, error) {
 	outcome, err := topologyDiagnosticArchiveParsePhaseOutcome(p.Outcome)
 	if err != nil {
 		return topologyAcquisitionPhaseEvidence{}, err

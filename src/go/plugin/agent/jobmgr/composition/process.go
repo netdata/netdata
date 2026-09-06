@@ -46,16 +46,17 @@ type processInputCompletion struct {
 var errRunDidNotQuiesce = errors.New("jobmgr composition: run did not quiesce")
 
 type processCoreConfig struct {
-	Input           io.Reader                 // plugin stdin
-	Output          io.Writer                 // plugin stdout
-	ShutdownTimeout time.Duration             // per-run shutdown budget
-	KeepAlive       bool                      // emit keepalive frames (long-lived agent mode)
-	Modules         collectorapi.Registry     // collector module registry
-	Jobs            runJobServices            // process-lifetime job services (resolver, catalogs, vnodes)
-	Secrets         runSecretServices         // process-lifetime secret services
-	Discovery       runDiscoveryServices      // discovery services (providers, build context)
-	FinalizeOutput  func()                    // stops the runtime service at process teardown
-	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
+	Input           io.Reader                   // plugin stdin
+	Output          io.Writer                   // plugin stdout
+	ShutdownTimeout time.Duration               // per-run shutdown budget
+	KeepAlive       bool                        // emit keepalive frames (long-lived agent mode)
+	Modules         collectorapi.Registry       // collector module registry
+	Jobs            runJobServices              // process-lifetime job services (resolver, catalogs, vnodes)
+	Secrets         runSecretServices           // process-lifetime secret services
+	Discovery       runDiscoveryServices        // discovery services (providers, build context)
+	StopServices    func(context.Context) error // cancels and joins within the shutdown budget
+	FinalizeOutput  func()                      // stops the runtime service at process teardown
+	Diagnostics     jobmgr.DiagnosticObserver   // process-wide operational log sink
 }
 
 type processCore struct {
@@ -630,12 +631,6 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
 	if current != nil && current.isStarted() {
-		if pc.ingress.State() == functionadapter.ProcessIngressLive {
-			if err := pc.ingress.SealPause(); err != nil {
-				finalErr = errors.Join(finalErr, err)
-			}
-		}
-		current.Stop()
 		budget, err := current.run.BeginShutdown()
 		if err != nil {
 			finalErr = errors.Join(finalErr, err)
@@ -643,6 +638,17 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 			shutdownCtx = budget.Context()
 			finishRun = current.run
 		}
+	}
+	if pc.config.StopServices != nil {
+		finalErr = errors.Join(finalErr, pc.config.StopServices(shutdownCtx))
+	}
+	if current != nil && current.isStarted() {
+		if pc.ingress.State() == functionadapter.ProcessIngressLive {
+			if err := pc.ingress.SealPause(); err != nil {
+				finalErr = errors.Join(finalErr, err)
+			}
+		}
+		current.Stop()
 		if pc.ingress.State() == functionadapter.ProcessIngressLive {
 			if err := pc.ingress.DrainPause(shutdownCtx, 0); err != nil {
 				finalErr = errors.Join(finalErr, err)

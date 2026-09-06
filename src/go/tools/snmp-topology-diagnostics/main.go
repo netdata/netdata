@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/go-units"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
@@ -36,7 +37,7 @@ type diagnosticArchive interface {
 	InspectLinkAt(snmptopology.DiagnosticQueryOptions, int) (snmptopology.DiagnosticLinkInspection, error)
 }
 
-type archiveOpener func(io.Reader, snmptopology.DiagnosticReadLimits) (diagnosticArchive, error)
+type archiveOpener func(io.Reader, snmpdiag.ReadLimits) (diagnosticArchive, error)
 
 type commandOptions struct {
 	archivePath       string
@@ -56,9 +57,9 @@ func main() {
 func run(arguments []string, stdout, stderr io.Writer) int {
 	return runWithOpener(arguments, stdout, stderr, func(
 		reader io.Reader,
-		limits snmptopology.DiagnosticReadLimits,
+		limits snmpdiag.ReadLimits,
 	) (diagnosticArchive, error) {
-		return snmptopology.ReadDiagnosticArchive(reader, limits)
+		return openDiagnosticArchive(reader, limits)
 	})
 }
 
@@ -113,7 +114,7 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 }
 
 func parseCommandOptions(operation string, arguments []string, stderr io.Writer) (commandOptions, int) {
-	defaults := snmptopology.DefaultDiagnosticArchiveReadLimits()
+	defaults := snmpdiag.DefaultReadLimits()
 	options := commandOptions{
 		maxCompressedSize: formatDefaultSize(defaults.MaxCompressedBytes),
 		maxDecodedSize:    formatDefaultSize(defaults.MaxDecodedBytes),
@@ -249,18 +250,18 @@ func executeOperation(operation string, archive diagnosticArchive, options comma
 	}
 }
 
-func readLimits(compressed, decoded string) (snmptopology.DiagnosticReadLimits, error) {
-	maxCompressedBytes, err := units.RAMInBytes(compressed)
-	if err != nil || maxCompressedBytes <= 0 {
-		return snmptopology.DiagnosticReadLimits{}, fmt.Errorf("invalid maximum compressed size %q", compressed)
+func readLimits(compressed, decoded string) (snmpdiag.ReadLimits, error) {
+	MaxCompressedBytes, err := units.RAMInBytes(compressed)
+	if err != nil || MaxCompressedBytes <= 0 {
+		return snmpdiag.ReadLimits{}, fmt.Errorf("invalid maximum compressed size %q", compressed)
 	}
-	maxDecodedBytes, err := units.RAMInBytes(decoded)
-	if err != nil || maxDecodedBytes <= 0 {
-		return snmptopology.DiagnosticReadLimits{}, fmt.Errorf("invalid maximum decoded size %q", decoded)
+	MaxDecodedBytes, err := units.RAMInBytes(decoded)
+	if err != nil || MaxDecodedBytes <= 0 {
+		return snmpdiag.ReadLimits{}, fmt.Errorf("invalid maximum decoded size %q", decoded)
 	}
-	return snmptopology.DiagnosticReadLimits{
-		MaxCompressedBytes: maxCompressedBytes,
-		MaxDecodedBytes:    maxDecodedBytes,
+	return snmpdiag.ReadLimits{
+		MaxCompressedBytes: MaxCompressedBytes,
+		MaxDecodedBytes:    MaxDecodedBytes,
 	}, nil
 }
 
@@ -288,4 +289,12 @@ func usage(writer io.Writer) {
 
 func operationUsage(writer io.Writer, operation string) {
 	fmt.Fprintf(writer, "usage: snmp-topology-diagnostics %s --archive PATH [options]\n", operation)
+}
+
+func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*snmptopology.DiagnosticArchive, error) {
+	document, err := snmpdiag.Read(r, limits)
+	if err != nil {
+		return nil, err
+	}
+	return snmptopology.InspectDiagnosticDocument(document)
 }

@@ -4,8 +4,10 @@ package snmptopology
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/stretchr/testify/require"
 )
@@ -18,14 +20,14 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "v-test"))
 
-	archive, err := ReadDiagnosticArchive(
+	archive, err := readTestDiagnosticArchive(
 		bytes.NewReader(encoded.Bytes()),
-		DefaultDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
 	require.Equal(t, DiagnosticArchiveIdentity{
-		Format:               topologyDiagnosticArchiveFormat,
-		Version:              topologyDiagnosticArchiveVersion,
+		Format:               snmpdiag.Format,
+		Version:              snmpdiag.Version,
 		ProducerAgentVersion: "v-test",
 	}, archive.Identity())
 
@@ -99,7 +101,7 @@ func TestDiagnosticArchiveAPIRejectsInvalidExactLinkIndexes(t *testing.T) {
 
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
-	archive, err := ReadDiagnosticArchive(bytes.NewReader(encoded.Bytes()), DefaultDiagnosticArchiveReadLimits())
+	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
 	require.NoError(t, err)
 
 	query := diagnosticQueryOptionsFromInternal(newLLDPDirectScenario().opts)
@@ -115,7 +117,7 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
-	archive, err := ReadDiagnosticArchive(bytes.NewReader(encoded.Bytes()), DefaultDiagnosticArchiveReadLimits())
+	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -178,4 +180,12 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
+}
+
+func readTestDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*DiagnosticArchive, error) {
+	d, err := snmpdiag.Read(r, limits)
+	if err != nil {
+		return nil, err
+	}
+	return InspectDiagnosticDocument(d)
 }

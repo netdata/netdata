@@ -5,7 +5,6 @@ package snmptopology
 import (
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"slices"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
@@ -23,35 +23,24 @@ type DiagnosticArchive struct {
 	archive topologyDiagnosticArchive
 }
 
-// DefaultDiagnosticArchiveReadLimits returns the generous defaults measured for
-// archives produced by the Agent.
-func DefaultDiagnosticArchiveReadLimits() DiagnosticReadLimits {
-	limits := defaultTopologyDiagnosticArchiveReadLimits()
-	return DiagnosticReadLimits{
-		MaxCompressedBytes: limits.maxCompressedBytes,
-		MaxDecodedBytes:    limits.maxDecodedBytes,
-	}
-}
-
 // DefaultDiagnosticQueryOptions returns the production topology query defaults.
 func DefaultDiagnosticQueryOptions() DiagnosticQueryOptions {
 	return diagnosticQueryOptionsFromInternal(topologyoptions.DefaultQueryOptions())
 }
 
-// ReadDiagnosticArchive validates and reconstructs one archive through the
-// same reader used by all offline diagnostic operations.
-func ReadDiagnosticArchive(
-	r io.Reader,
-	limits DiagnosticReadLimits,
-) (*DiagnosticArchive, error) {
-	archive, err := readTopologyDiagnosticArchive(r, topologyDiagnosticArchiveReadLimits{
-		maxCompressedBytes: limits.MaxCompressedBytes,
-		maxDecodedBytes:    limits.MaxDecodedBytes,
-	})
+// InspectDiagnosticDocument validates the typed evidence before exposing
+// lifecycle inspection or topology replay. The caller has decoded it once.
+func InspectDiagnosticDocument(document snmpdiag.Document) (*DiagnosticArchive, error) {
+	diagnostics, err := restoreArchiveDocument(document)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("inspect SNMP diagnostic archive: %w", err)
 	}
-	return &DiagnosticArchive{archive: archive}, nil
+	return &DiagnosticArchive{
+		archive: topologyDiagnosticArchive{
+			producerVersion: document.Producer.AgentVersion,
+			diagnostics:     diagnostics,
+		},
+	}, nil
 }
 
 func (a *DiagnosticArchive) Identity() DiagnosticArchiveIdentity {
@@ -59,8 +48,8 @@ func (a *DiagnosticArchive) Identity() DiagnosticArchiveIdentity {
 		return DiagnosticArchiveIdentity{}
 	}
 	return DiagnosticArchiveIdentity{
-		Format:               topologyDiagnosticArchiveFormat,
-		Version:              topologyDiagnosticArchiveVersion,
+		Format:               snmpdiag.Format,
+		Version:              snmpdiag.Version,
 		ProducerAgentVersion: a.archive.producerVersion,
 	}
 }
@@ -360,11 +349,11 @@ func newDiagnosticTopologyCutSummary(
 func newDiagnosticLifecycleRegistration(
 	entry ddsnmp.DeviceLifecycleEntry,
 ) (diagnosticLifecycleRegistration, error) {
-	phase, err := topologyDiagnosticArchiveLifecyclePhaseName(entry.LastCompleted.Phase)
+	phase, err := snmpdiag.LifecyclePhaseName(entry.LastCompleted.Phase)
 	if err != nil {
 		return diagnosticLifecycleRegistration{}, fmt.Errorf("lifecycle phase: %w", err)
 	}
-	outcome, err := topologyDiagnosticArchiveLifecycleOutcomeName(entry.LastCompleted.Outcome)
+	outcome, err := snmpdiag.LifecycleOutcomeName(entry.LastCompleted.Outcome)
 	if err != nil {
 		return diagnosticLifecycleRegistration{}, fmt.Errorf("lifecycle outcome: %w", err)
 	}

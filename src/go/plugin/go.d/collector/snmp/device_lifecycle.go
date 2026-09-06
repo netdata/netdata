@@ -23,7 +23,7 @@ func (c *Collector) beginDeviceLifecycle() {
 	}
 	c.deviceLifecycleMu.Lock()
 	c.deviceLifecycleInfo = info
-	publish := !c.deviceLifecycleManaged || c.deviceLifecycleCommitted
+	publish := !c.deviceLifecycleManaged
 	c.deviceLifecycleMu.Unlock()
 	if !publish {
 		return
@@ -52,9 +52,11 @@ func (c *Collector) recordDeviceLifecycle(
 	}
 	c.deviceLifecycleMu.Lock()
 	c.deviceLifecycleStatus = status
-	publish := !c.deviceLifecycleManaged || c.deviceLifecycleCommitted
+	managed := c.deviceLifecycleManaged
+	writer := c.deviceWriter
 	c.deviceLifecycleMu.Unlock()
-	if !publish {
+	if managed {
+		writer.RecordLifecycle(status)
 		return
 	}
 	c.reportDeviceLifecycle(func(store deviceLifecycleStore) {
@@ -88,7 +90,7 @@ func (c *Collector) commitDeviceLifecycle(previousOwner string) {
 				Warningf("failed to update SNMP job lifecycle diagnostics")
 		}
 	}()
-	c.deviceStore.ReplaceJob(
+	c.deviceWriter = c.deviceStore.ReplaceJob(
 		previousOwner,
 		c.deviceLifecycleOwner,
 		c.deviceLifecycleInfo,

@@ -10,11 +10,10 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
@@ -24,14 +23,10 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-// Register registers the SNMP collector with its shared SNMP-family device store.
-func Register(store *ddsnmp.DeviceStore) {
-	collectorapi.Register("snmp", newCreator(store))
-}
-
-func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
+// Creator constructs registration with explicit SNMP-family dependencies.
+func Creator(store *ddsnmp.DeviceStore) collectorapi.Creator {
 	if store == nil {
-		panic("snmp Register requires a non-nil device store")
+		panic("snmp Creator requires a non-nil device store")
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
@@ -120,6 +115,7 @@ type (
 		seenProfiles             map[string]bool
 		deviceStore              *ddsnmp.DeviceStore
 		deviceLifecycleStore     deviceLifecycleStore
+		deviceWriter             *ddsnmp.DeviceWriter
 		deviceLifecycleMu        sync.Mutex
 		deviceLifecycleOwner     string
 		deviceLifecycleInfo      ddsnmp.DeviceLifecycleInfo

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 const (
@@ -13,11 +14,6 @@ const (
 	diagnosticStatePresent      = "present"
 	diagnosticStateAbsent       = "absent"
 )
-
-type DiagnosticReadLimits struct {
-	MaxCompressedBytes int64
-	MaxDecodedBytes    int64
-}
 
 type DiagnosticQueryOptions struct {
 	CollapseActorsByIP     bool   `json:"collapse_actors_by_ip"`
@@ -219,11 +215,11 @@ type diagnosticContextAccounting struct {
 }
 
 type diagnosticProfileAccounting struct {
-	Identity     topologyDiagnosticArchiveProfileIdentityV1 `json:"identity"`
-	Outcome      string                                     `json:"outcome"`
-	FailurePhase string                                     `json:"failure_phase"`
-	Stats        topologyDiagnosticArchiveCollectionStatsV1 `json:"stats"`
-	Execution    *topologyDiagnosticArchiveExecutionV1      `json:"execution,omitempty"`
+	Identity     snmpdiag.ProfileIdentity `json:"identity"`
+	Outcome      string                   `json:"outcome"`
+	FailurePhase string                   `json:"failure_phase"`
+	Stats        snmpdiag.CollectionStats `json:"stats"`
+	Execution    *snmpdiag.Execution      `json:"execution,omitempty"`
 }
 
 type diagnosticGraphActor struct {

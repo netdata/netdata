@@ -14,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/gosnmp/gosnmp"
+	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -22,10 +25,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
-
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,8 +48,8 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollectorCreatorRequiresDeviceStore(t *testing.T) {
-	require.PanicsWithValue(t, "snmp Register requires a non-nil device store", func() {
-		_ = newCreator(nil)
+	require.PanicsWithValue(t, "snmp Creator requires a non-nil device store", func() {
+		_ = Creator(nil)
 	})
 }
 
@@ -267,7 +266,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 	collr := New(store)
 	collr.Hostname = ""
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -286,7 +285,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 
 func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 	config := map[string]any{
 		"hostname":  "switch-a.example",
@@ -323,7 +322,7 @@ func TestCollectorRejectedManagedCandidateDoesNotRemoveIncumbentConnection(t *te
 	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{Hostname: "incumbent.example"})
 	collr := New(store)
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 
 	hook.Bind(identity, job)
 	collr.Cleanup(context.Background())
@@ -337,7 +336,7 @@ func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
 	collr := New(store)
 	collr.Config = prepareV2Config()
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -405,7 +404,7 @@ func TestCollectorManagedConnectionCollectedBeforeReconcileIsPublishedAtReconcil
 	collr.Config = prepareV2Config()
 	collr.ManualProfiles = []string{"profile-a"}
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)

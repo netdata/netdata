@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	"github.com/stretchr/testify/require"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/stretchr/testify/require"
 )
 
 type executionTestHandler struct {
@@ -113,7 +113,7 @@ func TestTopologyExecutionAccountingRetentionArchiveInspection(t *testing.T) {
 	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "v-test"))
 	archive, err := readTopologyDiagnosticArchive(
 		bytes.NewReader(encoded.Bytes()),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
 	restored := archive.diagnostics.topology.devices[0].latestAttempt.evidence.collectionContexts[0].profiles[0]
@@ -201,9 +201,9 @@ func TestTopologyExecutionAccountingPresence(t *testing.T) {
 			require.NoError(t, err)
 			raw, err := json.Marshal(dto)
 			require.NoError(t, err)
-			var decoded topologyDiagnosticArchiveProfileEvidenceV1
+			var decoded snmpdiag.ProfileEvidence
 			require.NoError(t, json.Unmarshal(raw, &decoded))
-			restored, err := decoded.profile()
+			restored, err := restoreArchiveProfileEvidence(decoded)
 			require.NoError(t, err)
 			require.Equal(t, recorded, restored.execution != nil)
 			again, err := newTopologyDiagnosticArchiveProfileEvidenceV1(restored)
@@ -214,17 +214,17 @@ func TestTopologyExecutionAccountingPresence(t *testing.T) {
 }
 
 func TestTopologyExecutionAccountingRejectsInvalidMeasurements(t *testing.T) {
-	for _, e := range []*topologyDiagnosticArchiveExecutionV1{
-		{Preparation: topologyDiagnosticArchivePreparationV1{
+	for _, e := range []*snmpdiag.Execution{
+		{Preparation: snmpdiag.Preparation{
 			ElapsedNanos: -1,
 		}},
-		{Preparation: topologyDiagnosticArchivePreparationV1{
+		{Preparation: snmpdiag.Preparation{
 			SNMPErrors: -1,
 		}},
-		{Walks: []topologyDiagnosticArchiveWalkV1{{RootOID: "1.3", ElapsedNanos: -1}}},
-		{Walks: []topologyDiagnosticArchiveWalkV1{{ElapsedNanos: int64(time.Second)}}},
+		{Walks: []snmpdiag.Walk{{RootOID: "1.3", ElapsedNanos: -1}}},
+		{Walks: []snmpdiag.Walk{{ElapsedNanos: int64(time.Second)}}},
 	} {
-		_, err := e.execution()
+		_, err := restoreArchiveExecution(e)
 		require.Error(t, err)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 )
@@ -200,7 +201,7 @@ func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult
 				return diagnosticDeviceCaptureInspection{}, err
 			}
 			accounting.Profiles = append(accounting.Profiles, diagnosticProfileAccounting{
-				Identity: topologyDiagnosticArchiveProfileIdentityV1{
+				Identity: snmpdiag.ProfileIdentity{
 					Ordinal: profile.identity.Ordinal, RouteDigest: hex.EncodeToString(profile.identity.RouteDigest[:]),
 				},
 				Outcome: outcome, FailurePhase: phase,

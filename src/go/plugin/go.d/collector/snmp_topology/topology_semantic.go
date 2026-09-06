@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 type topologySemanticEventKind uint8
@@ -120,8 +121,8 @@ var defaultTopologyAcquisitionLimits = topologyAcquisitionLimits{
 }
 
 var defaultTopologyDiagnosticGlobalLimits = topologyAcquisitionLimits{
-	maxRecords:      250_000,
-	maxLogicalBytes: 64 << 20,
+	maxRecords:      snmpdiag.MaxRecords,
+	maxLogicalBytes: snmpdiag.MaxLogicalBytes,
 }
 
 type diagnosticCaptureState uint8
