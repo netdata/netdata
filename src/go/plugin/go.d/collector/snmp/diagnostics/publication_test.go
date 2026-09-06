@@ -282,24 +282,49 @@ func TestPublisherReplacementDoesNotBlockCollection(t *testing.T) {
 	}
 }
 
-func TestPublisherReplacementSerializesConfigurationCommit(t *testing.T) {
+func TestPublisherReplacementDoesNotBlockOwnershipChanges(t *testing.T) {
 	p, store := testPublisher(t)
 	store.ReplaceJob("", "device", ddsnmp.DeviceLifecycleInfo{}, ddsnmp.DeviceLifecycleStatus{}, nil)
+	incumbent := &testTopologySource{
+		snapshot: Snapshot{
+			ProducerScopeID: "incumbent",
+			Topology:        &Sweep{},
+			Lifecycle:       CaptureLifecycle(store, MaxRecords, MaxLogicalBytes),
+		},
+	}
+	successor := &testTopologySource{
+		snapshot: Snapshot{
+			ProducerScopeID: "successor",
+			Topology:        &Sweep{},
+		},
+	}
+	p.SetTopology("same-config", incumbent, DefaultInterval)
 	entered, release := make(chan struct{}), make(chan struct{})
 	p.rename = func(from, to string) error { close(entered); <-release; return os.Rename(from, to) }
 	published := make(chan struct{})
 	go func() { p.publish(t.Context(), false); close(published) }()
 	<-entered
-	replaced := make(chan struct{})
-	go func() { store.Unregister("device"); close(replaced) }()
-	select {
-	case <-replaced:
-		t.Error("configuration retired between revision validation and rename")
-	case <-time.After(50 * time.Millisecond):
+	removed, replaced := make(chan struct{}), make(chan struct{})
+	go func() { store.Unregister("device"); close(removed) }()
+	go func() { p.SetTopology("same-config", successor, DefaultInterval); close(replaced) }()
+	for _, done := range []<-chan struct{}{removed, replaced} {
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Error("ownership transition blocked behind filesystem replacement")
+		}
 	}
 	close(release)
 	<-published
+	<-removed
 	<-replaced
-	require.Len(t, readFile(t, p.path).Snapshot.Lifecycle.Cut.Entries, 1)
+	// The file is a historical checkpoint. An ownership change during rename
+	// does not mark the successor's first checkpoint as already published.
+	require.Equal(t, "incumbent", readFile(t, p.path).Snapshot.ProducerScopeID)
 	require.Empty(t, store.LifecycleCut().Entries)
+	require.True(t, p.needsInitialTopology())
+	p.rename = os.Rename
+	p.publish(t.Context(), false)
+	require.Equal(t, "successor", readFile(t, p.path).Snapshot.ProducerScopeID)
+	require.False(t, p.needsInitialTopology())
 }

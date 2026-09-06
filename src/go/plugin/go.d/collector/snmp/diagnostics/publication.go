@@ -36,7 +36,6 @@ func defaultArchivePath(varLibDir string) string {
 type Source interface {
 	LifecycleSource
 	ConfigurationRevision() uint64
-	WithConfigurationRevision(uint64, func() error) error
 	ConfigurationChanges() <-chan struct{}
 }
 
@@ -207,23 +206,27 @@ func (p *Publisher) publish(ctx context.Context, requireMeaningful bool) (meanin
 		Snapshot: snapshot,
 	}
 	err := p.writeFile(ctx, p.path, document, func(from, to string) error {
-		p.mu.Lock()
-		defer p.mu.Unlock()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if p.revision != revision {
+		p.mu.Lock()
+		current := p.revision == revision
+		p.mu.Unlock()
+		if !current || p.source.ConfigurationRevision() != configRevision {
 			return errors.New("diagnostic ownership changed during publication")
 		}
-		return p.source.WithConfigurationRevision(configRevision, func() error {
-			if err := p.rename(from, to); err != nil {
-				return err
-			}
-			if snapshot.Topology != nil {
-				p.publishedTopologyRevision = revision
-			}
-			return nil
-		})
+		// This is a historical checkpoint, not a live inventory pointer. A
+		// concurrent configuration change may leave this cut on disk; no
+		// collection or activation lock may be held during filesystem I/O.
+		if err := p.rename(from, to); err != nil {
+			return err
+		}
+		p.mu.Lock()
+		if p.revision == revision && snapshot.Topology != nil {
+			p.publishedTopologyRevision = revision
+		}
+		p.mu.Unlock()
+		return nil
 	})
 	if err != nil {
 		p.warn(err)

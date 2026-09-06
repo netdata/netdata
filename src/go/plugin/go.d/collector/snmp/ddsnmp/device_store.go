@@ -3,7 +3,6 @@
 package ddsnmp
 
 import (
-	"errors"
 	"maps"
 	"net/netip"
 	"slices"
@@ -130,7 +129,6 @@ func NewDeviceStore() *DeviceStore {
 
 // DeviceStore holds SNMP device connection state shared between SNMP-family modules.
 type DeviceStore struct {
-	configurationMu       sync.Mutex
 	mu                    sync.RWMutex
 	changes               chan struct{}
 	writers               map[string]*DeviceWriter
@@ -218,8 +216,6 @@ func (s *DeviceStore) ReplaceJob(
 	if ownerKey == "" {
 		return nil
 	}
-	s.configurationMu.Lock()
-	defer s.configurationMu.Unlock()
 	s.mu.Lock()
 	s.ensureMapsLocked()
 	if previousOwnerKey != "" && previousOwnerKey != ownerKey {
@@ -282,8 +278,6 @@ func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo)
 
 // Unregister removes a complete job incarnation from the store.
 func (s *DeviceStore) Unregister(ownerKey string) {
-	s.configurationMu.Lock()
-	defer s.configurationMu.Unlock()
 	s.mu.Lock()
 	if _, ok := s.ownerRegistrations[ownerKey]; ok {
 		s.removeRegistrationLocked(ownerKey)
@@ -519,15 +513,4 @@ func (s *DeviceStore) notifyConfigurationChangedLocked() {
 	case s.changes <- struct{}{}:
 	default:
 	}
-}
-
-// WithConfigurationRevision serializes a snapshot commit with accepted inventory
-// changes. Its callback does not hold the lock used by polling or metadata updates.
-func (s *DeviceStore) WithConfigurationRevision(revision uint64, commit func() error) error {
-	s.configurationMu.Lock()
-	defer s.configurationMu.Unlock()
-	if s.ConfigurationRevision() != revision {
-		return errors.New("device configuration changed during snapshot publication")
-	}
-	return commit()
 }
