@@ -35,13 +35,18 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
    sections.
 6. **Source metadata**: `integration_type: <type>` and `categories` on every entry, one shared file (like logs) or one
    file per source directory (like collectors).
-7. **Learn** (`docs/.map/map.yaml`): a section with an `integration_placeholder` node whose `integration_kind` matches
-   the pages' `learn_rel_path`; authoring rules and companion hand-written pages are the `docs-learn-site-structure`
-   skill (`mapping.md`). Learn needs no PR otherwise; it ingests the generated pages on its schedule.
-8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically but FAQ and solution pages
-   that
-   describe the old story may need edits; cloud-frontend is data-driven but its content tabs and `checkIntegrations.js`
-   assume Markdown strings under the standard keys, so inspect the generated `integrations.js` shape before merging.
+7. **Learn** (`docs/.map/map.yaml`): a section holding an `integration_placeholder` node with an `integration_kind`.
+   The kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
+   `flows`, `exporters`, `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, and
+   `service_discovery` (keep their singular/plural style). A new kind needs the ingest in `netdata/learn` to learn it,
+   so a new type is a Learn-repo change too; `device` has no placeholder and attaches through the NPM chapter nodes.
+   Map authoring and companion hand-written pages: the `docs-learn-site-structure` skill (`mapping.md`).
+8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically, but FAQ and solution pages
+   that describe the old story may need edits, and a new top-level category or section shape needs the website build
+   run or emulated with the Hugo version pinned in its `netlify.toml`. Cloud-frontend is data-driven, but its content
+   tabs (`src/domains/integrations/components/content/integration/tabs.js`), its Markdown renderer
+   (`src/components/markdown/useRenderableTree.js`), and `scripts/checkIntegrations.js` assume Markdown strings under
+   the standard keys, so inspect the generated `integrations.js` shape against them before merging.
 
 ## Verification
 
@@ -54,4 +59,11 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
    non-blank tabs.
 
 Commit the schema, generators, templates, categories, `map.yaml`, source metadata, and this skill's tables in one PR in
-this repository; website corrections go in their own PR there.
+this repository; website corrections go in their own PR there, and a new `integration_kind` in the Learn repository.
+
+## How I figured this out
+
+Traced `learn_rel_path` per mode through `build_readme_from_integration` in `integrations/gen_docs_integrations.py`,
+read the `<!--startmeta` block of one generated page per type, listed the `integration_kind` values in
+`docs/.map/map.yaml`, and confirmed `deploy` has no documentation mode in `descriptions.py`. The `flows` and `device`
+additions are the worked examples (`integrations/schemas/flows.json`, `device.json`, `FLOWS_SOURCES`, `DEVICE_SOURCES`).

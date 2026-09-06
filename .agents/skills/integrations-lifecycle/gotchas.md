@@ -24,26 +24,27 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   not exist. It also assumes `https://github.com/netdata/...` (`AGENT_REPO` in `_common.py`); a fork path breaks it.
 - `resolve_related_links` replaces a `{% relatedResource %}` marker whose id is unknown with the bare name and no
   warning.
-- `make_id` keeps the display name's case (`go.d.plugin-kafka-Apache_Kafka`); `clean_string` lowercases the slug. Two
-  display names that clean to the same slug in one directory overwrite each other silently.
+- `make_id` keeps the display name's case (`go.d.plugin-pulsar-Apache_Pulsar`) while `clean_string` lowercases the
+  slug, so an id and its page slug never match byte for byte. Slug collisions: `pipeline.md`, Stage 2.
 - The schemas are not strict, so an unknown key such as `alternative_monitored_instances`
   (`src/go/plugin/go.d/collector/postgres/metadata.yaml`) validates, reaches `integrations.js`, and is rendered by
   nothing.
-- A module whose only declared categories are invalid is warned about and, if it ends up with none, is parked under
-  `data-collection.applications`. Treat that placement as the symptom of a typo.
-- `agent_notification` pages are written directly to `src/health/notifications/<dir>/README.md`; the file looks like a
-  hand-written README and only the `<!--startmeta` banner says it is generated. Multi-integration directories never get
-  a README symlink, so their README is hand-written; single-integration ones do, so their README is generated.
-- `COLLECTORS.md`, `SECRETS.md`, and `SERVICE-DISCOVERY.md` carry no banner and are regenerated all the same.
+- The `collector_default` fallback (`data-collection.applications`) fires only for a module whose `categories` list is
+  empty. A module whose declared ids are all invalid gets a fatal warning and an empty category list; it is not parked
+  anywhere.
+- The community badge is chosen by key presence (`"community" in integration["meta"]`), not by value: `community:
+  false` still renders the Community badge. Every current use is `true`.
+- `generate-integrations.yml` is path-filtered on the sources it regenerates from, but `integrations/logs/metadata.yaml`
+  is not in the list; a logs metadata change merged alone does not open the regeneration PR until another trigger
+  fires.
 - `PRESERVE_FILES` in `gen_docs_integrations.py` and the dcstat removal step in `check-markdown.yml` are a coupled pair
   around one Learn redirect migration (`pipeline.md`, Stage 2). A local full regeneration therefore keeps a page whose
   source directory no longer produces it; that is intended until the Learn catalog is republished.
 
 ## Validation traps
 
-- The page-description balance check is a custom JSON Schema format (`netdata-balanced-parentheses`), registered by
-  `make_validator()` in `_common.py` and shared with `descriptions.py`. A generic Draft-7 validator ignores unknown
-  formats and reports a file valid that the generator rejects; validate through `make_validator()` only.
+- A generic Draft-7 validator ignores the custom `netdata-balanced-parentheses` format and reports a file valid that
+  the generator rejects; validate through `make_validator()` only (`pipeline.md`, Stage 1).
 - `fail_on_warnings()` fails the run on any warning at all, deduplicated by file path. Cosmetic issues block the
   regeneration PR.
 - `related_resources.integrations.list[]` uses the Draft-7 `dependencies` keyword (`module_name` required when

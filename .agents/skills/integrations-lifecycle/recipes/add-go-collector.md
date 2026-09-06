@@ -34,9 +34,9 @@ Copy a rich, current collector as the template (`src/go/plugin/go.d/collector/po
 The validator is `integrations/schemas/collector.json`; run `python3 integrations/gen_integrations.py` and read its
 output rather than guessing which keys are required (every warning is fatal). Facts the schema does not tell you:
 
-- `meta.monitored_instance.categories` must name ids from `integrations/categories.yaml`. A typo is fatal in
-  validation; if it slipped through, the renderer would silently park the collector under `data-collection.applications`
-  (the only `collector_default: true` category). Add a new category under `data-collection` only when none fits.
+- `meta.monitored_instance.categories` must name ids from `integrations/categories.yaml`. An invalid id is dropped
+  with a warning that fails the run; an empty list falls back to `data-collection.applications` (the only
+  `collector_default: true` category). Add a new category under `data-collection` only when none fits.
 - `meta.monitored_instance.name` drives the page slug (`clean_string`: lowercase, spaces to `_`, `/` to `-`, drop
   `(`, `)`, `:`), the sidebar label, and the integration id (`make_id`, which keeps case). Two names that clean to the
   same slug in one directory overwrite each other silently.

@@ -9,7 +9,7 @@ Citations name files and symbols, never line numbers. Dependencies and the comma
 | Stage | Script | Reads | Writes | Tracked? |
 |---|---|---|---|---|
 | 0 | `integrations/gen_npm_catalog.py` | SNMP device profiles, the trap-profile catalogue, generator-owned copy | `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml`; side report `metrics-metadata-gaps.txt` | metadata yes; report untracked and not gitignored |
-| 0 | ibm.d `go generate` (`docgen`, `metricgen`) | `contexts.yaml`, `config.go`, `module.yaml` | `metadata.yaml`, `README.md`, `config_schema.json`, `zz_generated_contexts.go` | yes (`ibm-d.md`) |
+| 0 | ibm.d `go generate` (`docgen`, `metricgen`) | `contexts.yaml`, `config.go`, `module.yaml` | `metadata.yaml`, `config_schema.json`, `zz_generated_contexts.go`; also writes through the `README.md` symlink into the generated page (`ibm-d.md`) | yes |
 | 1 | `integrations/gen_integrations.py` | every source below, `integrations/categories.yaml`, `.github/data/distros.yml`, schemas, templates | `integrations/integrations.js`, `integrations/integrations.json` | gitignored |
 | 2 | `integrations/gen_docs_integrations.py` | `integrations.js` only (never the JSON) | one page per integration, README symlinks | yes |
 | 3 | `integrations/gen_doc_collector_page.py` | `integrations.js` | `src/collectors/COLLECTORS.md` | yes |
@@ -21,8 +21,9 @@ Stage 0 MUST run before stage 1 whenever its inputs or generators change; both w
 stage 0 leaves the tracked NPM metadata stale while every later stage still succeeds. Stages 2 to 5 read the same
 `integrations.js`, which is gitignored and absent from a fresh checkout: `gen_docs_integrations.py` fails before
 touching
-the tree when it is missing, and a stale one quietly regenerates pages from old data. Run everything from the repo root;
-the scripts locate their inputs relative to `INTEGRATIONS_PATH` and `REPO_PATH` in `integrations/_common.py`. Shared
+the tree when it is missing, and a stale one quietly regenerates pages from old data. Run everything from the repo
+root: stages 2 to 5 open `integrations/integrations.js` and write their outputs by paths relative to the current
+directory (`gen_integrations.py` alone resolves through `INTEGRATIONS_PATH` and `REPO_PATH` in `_common.py`). Shared
 constants and helpers (`AGENT_REPO`, `COLLECTOR_SOURCES`, `METADATA_PATTERN`, `make_id`, `make_validator`, `load_yaml`,
 `load_collectors`, `warn`, `fail_on_warnings`) live in `_common.py`, not in `gen_integrations.py`.
 `packaging/cmake/Modules/NetdataRenderDocs.cmake` (`render-docs`) wraps stages 1 and 2 for the build system and is not
@@ -32,7 +33,7 @@ a substitute for running the scripts.
 
 | `integration_type` | Source YAML (`*_SOURCES`) | Schema | Render keys | Doc mode |
 |---|---|---|---|---|
-| `collector` | `COLLECTOR_SOURCES` in `_common.py`: `src/collectors` (recursive one level: C, python.d, charts.d, guides), `src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml`, `src/go/plugin/go.d/collector`, `src/go/plugin/scripts.d/collector`, `src/go/plugin/ibm.d/modules` and `.../modules/websphere` (nested one level deeper), `src/crates/otel-plugin/metadata.yaml` | `collector.json` | `alerts metrics functions overview related_resources setup troubleshooting` | `collector` |
+| `collector` | `COLLECTOR_SOURCES` in `_common.py`; each directory root is globbed one level deep (`<root>/*/metadata.yaml`), which is why nested trees appear as their own entries: `src/collectors`, `src/collectors/charts.d.plugin`, `src/collectors/python.d.plugin`, `src/collectors/guides`, `src/go/plugin/go.d/collector`, `src/go/plugin/scripts.d/collector`, `src/go/plugin/ibm.d/modules`, `src/go/plugin/ibm.d/modules/websphere`, plus the single files `src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml`, `src/crates/otel-plugin/metadata.yaml` (and, oddly, `src/crates/otel-plugin/taxonomy.yaml`) | `collector.json` | `alerts metrics functions overview related_resources setup troubleshooting` | `collector` |
 | `flows` | `FLOWS_SOURCES`: `src/crates/netflow-plugin/metadata.yaml` | `flows.json` (`$ref` to `collector.json`) | same as collector | `flows` |
 | `device` | `DEVICE_SOURCES`: the NPM catalog `metadata.yaml` (stage 0 output) | `device.json` (`$ref` to `collector.json`) | same as collector | `device` |
 | `deploy` | `integrations/deploy.yaml` | `deploy.json` | none (`platform_info.md` template only) | none: lives only in `integrations.js` |
@@ -56,12 +57,11 @@ Non-YAML inputs: `integrations/categories.yaml` (validated against `categories.j
   page-description definition. A generic Draft-7 validator without that format checker silently accepts unbalanced
   parentheses; always validate through `make_validator()`.
 - Every `ValidationError` becomes `warn(...)`. Warnings are fatal: `fail_on_warnings()` returns 1 after the run (also
-  for
-  duplicate ids, invalid categories, unresolvable `related_resources`), so a single cosmetic warning fails CI.
-- Most schemas do not set `additionalProperties: false` (exceptions: the taxonomy schemas, the `distros.json` platform
-  objects, the troubleshooting `errors.list[]` entry, and in `collector.json` only `profile_coverage` and the two
-  `metrics.dynamic_*` list entries). Unknown keys pass through into
-  `integrations.js` and no template renders them (`gotchas.md`).
+  for duplicate ids, invalid categories, unresolvable `related_resources`), so a single cosmetic warning fails CI.
+- Most schemas do not set `additionalProperties: false` (exceptions: the taxonomy schemas, the `distros.json`
+  `platform_map` and platform objects, `shared.json`'s `instance.variables` and troubleshooting `errors.list[]` entry,
+  and in `collector.json` `profile_coverage` and the two `metrics.dynamic_*` list entries). Unknown keys pass through
+  into `integrations.js` and no template renders them (`gotchas.md`).
 
 ## Stage 1: rendering
 
@@ -73,10 +73,10 @@ For collectors (`render_collectors`; the other types follow the same shape):
    kept; flows and device entries get ids the same way.
 3. Sort (`sort_integrations`), then `dedupe_integrations` warns on duplicate ids and drops the later one.
 4. `related_resources` are resolved by a cascading lookup: plugin plus module plus `monitored_instance_name`, then
-   plugin
-   plus module, then plugin alone (only when no module is given, so a module typo is not masked).
-5. Categories: invalid ids are dropped with a warning; a module with no categories at all falls back to every category
-   flagged `collector_default: true` in `categories.yaml` (today only `data-collection.applications`).
+   plugin plus module, then plugin alone (only when no module is given, so a module typo is not masked).
+5. Categories: invalid ids are dropped with a warning (fatal at the end of the run); only a module whose `categories`
+   list is empty falls back to every category flagged `collector_default: true` in `categories.yaml` (today only
+   `data-collection.applications`).
 6. A `metrics.scopes[].name` of `global` is rewritten to `<monitored_instance.name> instance`.
 7. Each key in `*_RENDER_KEYS` is rendered twice through the section template chosen by `get_section_template_name`:
    `clean=False` (the rich variant kept under the key) and `clean=True` (the clean variant kept on a parallel object).
@@ -138,14 +138,16 @@ Per page (`build_readme_from_integration`, `write_to_file`):
 directory overwrite each other silently. `relocate_syslog_chapter` maps
 `Network Performance Monitoring/Syslog from Network Devices/Integrations` to
 `OpenTelemetry/Syslog from Network Devices/Integrations`; the matched string is the category name in `categories.yaml`,
-so change both together. Every `integration_type` lands in its own Learn section through an `integration_placeholder`
-node in `docs/.map/map.yaml`; the Learn side is the `docs-learn-site-structure` skill.
+so change both together. Every `integration_type` except `device` lands in its own Learn section through an
+`integration_placeholder` node in `docs/.map/map.yaml` (`integration_kind` values: `collectors`, `flows`, `exporters`,
+`agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, `service_discovery`); how the
+`device` pages attach is the Learn side, the `docs-learn-site-structure` skill.
 
 Every page opens with the block `create_frontmatter` emits, in this order and quoting, followed by the type's message:
 
 ```markdown
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/<dir>/integrations/<slug>.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/<dir>/integrations/<slug>.md"   # <dir>/README.md once symlinked, see below
 meta_yaml: "https://github.com/netdata/netdata/edit/master/<dir>/metadata.yaml"
 sidebar_label: "<display name>"
 learn_status: "Published"
@@ -158,8 +160,8 @@ endmeta-->
 
 The message names the source per type: `COLLECTOR'S`, `FLOWS'`, `NPM CATALOG`, `EXPORTER'S`, `NOTIFICATION'S` (both
 notification types), `LOGS'`, `AUTHENTICATION'S`, `SECRETSTORE'S`, `SERVICE DISCOVERY DISCOVERER'S`. Learn ingest reads
-this block and matches `custom_edit_url` against `map.yaml`. `create_overview_banner` inserts the community-or-Netdata
-badge (from `meta.community`) before the first `##`.
+this block and matches `custom_edit_url` against `map.yaml`. `create_overview_banner` inserts the Community badge when
+the `meta.community` key is present (its value is not read) and the Netdata badge otherwise, before the first `##`.
 
 After all pages are written: `resolve_related_links` rewrites `{% relatedResource id="..." %}name{% /relatedResource %}`
 markers into `[name](/path)` using the id-to-path map of the just-written files, falling back to the bare `name` with no
@@ -181,16 +183,19 @@ that holds exactly one page (multi-integration directories keep their hand-writt
   requires every target to be an emitted section anchor or `#beyond-the-850-integrations`, so a category or heading
   change updates the mapping and the test together. The "850+ integrations" header is a literal.
 - `gen_doc_secrets_page.py` and `gen_doc_service_discovery_page.py` render `src/collectors/SECRETS.md` and
-  `SERVICE-DISCOVERY.md` from the `secretstore` and `service_discovery` entries; only the backends and discoverer tables
-  are dynamic, the rest is static prose in the `SECRETS_PAGE` and `SD_PAGE` dicts. To change static prose, edit the
-  script.
+  `SERVICE-DISCOVERY.md` from the `secretstore` and `service_discovery` entries through `templates/secrets.md` and
+  `templates/service_discovery.md` (the two templates `get_section_template_name` never returns); only the backends and
+  discoverer tables are dynamic, the rest is static prose in the `SECRETS_PAGE` and `SD_PAGE` dicts. To change static
+  prose, edit the script. After changing an NPM or flows category, regenerate and expect the matching section heading
+  (for example `### Network Flows`) in `COLLECTORS.md`.
 - None of the three umbrella pages carries a DO-NOT-EDIT banner (`COLLECTORS.md` opens with
   `<!-- markdownlint-disable-file -->`); a direct edit is overwritten by the next regeneration.
 
 ## CI
 
-`.github/workflows/generate-integrations.yml` (push to `master`, `netdata/netdata` only, path-filtered on every source,
-schema, template, generator, and test above): stage 0 (`gen_npm_catalog.py`, `go generate` for ibm.d), the
+`.github/workflows/generate-integrations.yml` (push to `master`, `netdata/netdata` only, path-filtered on the sources,
+schemas, templates, generators, and tests above, except that `integrations/logs/metadata.yaml` is missing from the
+list): stage 0 (`gen_npm_catalog.py`, `go generate` for ibm.d), the
 "Verify generated runtime outputs" gate (`git diff --exit-code` on ibm.d `config_schema.json` and
 `zz_generated_contexts.go`, plus a check that both are tracked for every module), stage 1, `gen_taxonomy.py`, the unit
 test modules `test_taxonomy`, `test_descriptions`, `test_prometheus_profile_docs`, `test_collector_metadata`, stages 2

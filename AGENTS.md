@@ -668,8 +668,8 @@ Output/reference skill trees, updated when the related public/operator workflow 
 
 ### Collector Consistency
 
-When working on collectors, runtime behavior, metrics, charts, configuration, alerts, taxonomy, and authoritative
-documentation sources MUST stay consistent in the source PR. Generated integration and umbrella documentation is
+When working on collectors, runtime behavior, metrics, charts, configuration, alerts, and authoritative documentation
+sources MUST stay consistent in the source PR. Generated integration and umbrella documentation is
 validated locally, then committed by the post-merge generated-artifact PR. Checklist and CI notes:
 `.agents/skills/integrations-lifecycle/consistency.md`.
 

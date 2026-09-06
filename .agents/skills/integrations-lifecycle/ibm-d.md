@@ -1,12 +1,11 @@
 # ibm.d generation chain
 
-ibm.d modules generate their own `metadata.yaml`, `README.md`, `config_schema.json`, and `zz_generated_contexts.go`
-from a small set of authoritative inputs. This differs from every other collector family, where `metadata.yaml` is
-hand-edited.
+ibm.d modules generate their own `metadata.yaml`, `config_schema.json`, and `zz_generated_contexts.go` from a small
+set of authoritative inputs. This differs from every other collector family, where `metadata.yaml` is hand-edited.
 
-**Maintainer rule**: for any ibm.d module, NEVER edit `metadata.yaml`, `README.md`, or `config_schema.json` directly.
-Edit `contexts/contexts.yaml`, `config.go`, or `module.yaml`, then run `go generate`. Hand edits to generated files are
-silently overwritten on the next `go generate`; the DO-NOT-EDIT banner is the only signal.
+**Maintainer rule**: for any ibm.d module, NEVER edit `metadata.yaml`, `config_schema.json`, or the module's
+`README.md` directly. Edit `contexts/contexts.yaml`, `config.go`, or `module.yaml`, then run `go generate`. Hand edits
+to generated files are silently overwritten on the next `go generate`; the DO-NOT-EDIT banner is the only signal.
 
 ## Layout per module
 
@@ -20,7 +19,7 @@ src/go/plugin/ibm.d/modules/<module-dir>/
 │   └── zz_generated_contexts.go  # GENERATED (package doc says DO NOT EDIT)
 ├── generate.go                # //go:generate go run <path-to-docgen> ...
 ├── metadata.yaml              # GENERATED (first line: `# Generated metadata.yaml for <module> module`)
-├── README.md                  # GENERATED
+├── README.md                  # a tracked SYMLINK to integrations/<slug>.md, created by the pipeline (see the trap below)
 ├── config_schema.json         # GENERATED (pure JSON, no banner)
 └── <module-source>.go ...     # the collector implementation (hand-written)
 ```
@@ -51,15 +50,23 @@ Go file that registers those contexts with the ibm.d framework. The directive is
 
 - `contexts/contexts.yaml`, the same structure `metricgen` reads;
 - `config.go`, parsed via Go AST (`docgen/config_parser.go`) into config field records;
-- `module.yaml`: name, display name, overview `description`, frontmatter `page_description`, icon, categories, link.
-  `page_description` becomes `meta.monitored_instance.description`, the explicit page meta description
+- `module.yaml`: name, display name, overview `description`, frontmatter `page_description`, icon, categories,
+  keywords, link. `page_description` becomes `meta.monitored_instance.description`, the explicit page meta description
   (`description-authoring.md`).
 
-Outputs per module, each from a template inside `docgen/main.go` (`metadataTemplate`, `generateConfigSchema`,
-`generateReadme`). The metadata template hardcodes scaffolding that the module does not control: the default
-`update_every: 1` option, `endpoint: dummy://localhost`, and a fixed "Enable monitoring interface" prerequisite. Richer
-metadata content means extending the template or `module.yaml`, never editing the generated file; `module.yaml` is the
-right place for static prose because it survives regeneration.
+Outputs per module: `metadata.yaml` from the `metadataTemplate` constant in `docgen/main.go`, `config_schema.json`
+built programmatically by `generateConfigSchema`, and a README from `readmeTemplate` (`generateReadme`). The metadata
+template hardcodes scaffolding that the module does not control: the default `update_every: 1` option,
+`endpoint: dummy://localhost`, and a fixed "Enable monitoring interface" prerequisite. Richer metadata content means
+extending the template or `module.yaml`, never editing the generated file; `module.yaml` is the right place for static
+prose because it survives regeneration.
+
+**The README trap.** Every ibm.d module's `README.md` is a tracked symlink to `integrations/<slug>.md`, made by the
+integrations pipeline like any single-integration directory. `generateReadme` opens `README.md` with `os.Create`,
+which follows the symlink, so a local `go generate` overwrites the tracked generated integration page with docgen's
+README content and leaves it modified in `git status`. In CI this is masked because `gen_docs_integrations.py` runs
+afterwards and rewrites the page. Locally, never stage that page; regenerate it with the pipeline or leave it to the
+post-merge regeneration PR.
 
 The docgen directive lives in `generate.go`:
 
@@ -73,21 +80,24 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 
 1. Edit one of `contexts/contexts.yaml` (metric class, context, dimension), `config.go` (config field), or
    `module.yaml` (display name, descriptions, categories, icon).
-2. From the repo root:
+2. From the Go module root (there is no `go.mod` at the repository root, so the repo-root form fails with "does not
+   contain main module"):
 
    ```bash
-   go generate ./src/go/plugin/ibm.d/modules/<module-dir>/...
+
+   cd src/go && go generate ./plugin/ibm.d/modules/<module-dir>/...
    ```
 
-   This runs BOTH `metricgen` and `docgen`. `go generate ./src/go/plugin/ibm.d/modules/websphere/...` hits all three
-   WebSphere sub-modules.
-3. Inspect all four generated files. Delivery follows `consistency.md`, "Delivery boundary": the runtime outputs
+   This runs BOTH `metricgen` and `docgen`. `./plugin/ibm.d/modules/websphere/...` hits all three WebSphere sub-modules;
+   both workflows run `./plugin/ibm.d/modules/...` for every module.
+3. Inspect the generated files. Delivery follows `consistency.md`, "Delivery boundary": the runtime outputs
    `contexts/zz_generated_contexts.go` and `config_schema.json` ship in the source PR with the change that produced them
-   (both workflows fail on drift there); `metadata.yaml`, `README.md`, and the integration pages go through the
-   post-merge regeneration PR.
+   (both workflows fail on drift there); `metadata.yaml` and the integration page (including the one docgen just wrote
+   through the README symlink) go through the post-merge regeneration PR.
 4. `go generate` does not run the integrations pipeline. Validate the derived metadata locally:
 
    ```bash
+
    python3 integrations/gen_integrations.py
    python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>
    python3 integrations/gen_doc_collector_page.py
@@ -98,6 +108,5 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 
 ## What generation does and does not cover
 
-Generation keeps runtime metric registration, integration metadata, the DynCfg schema, and the README consistent by
-construction. It does NOT cover the stock `.conf` or `health.d/<...>.conf`; those still need manual sync under the
-consistency rule.
+Generation keeps runtime metric registration, integration metadata, and the DynCfg schema consistent by construction.
+It does NOT cover the stock `.conf` or `health.d/<...>.conf`; those still need manual sync under the consistency rule.

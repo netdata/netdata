@@ -22,7 +22,8 @@ definition that refers to it; changing a default changes the stock conf example 
 
 ## Delivery boundary: source PR versus post-merge PR
 
-This is the one place the boundary is stated; other files point here.
+This is the skill's one statement of the boundary; other skill files point here. `integrations/README.md` carries the
+short contributor-facing version.
 
 - The source PR contains authoritative inputs (hand-authored `metadata.yaml`, ibm.d `contexts.yaml`/`config.go`/
   `module.yaml`, SNMP profiles and the trap catalogue), generators, schemas, templates, workflows, tests, and
@@ -36,7 +37,8 @@ This is the one place the boundary is stated; other files point here.
 - Exception, generated runtime outputs: ibm.d `contexts/zz_generated_contexts.go` (compilation) and
   `config_schema.json` (the shipped configuration contract) MUST ship in the source PR with the `contexts.yaml` or
   `config.go` change that produced them. Both workflows run `go generate` and fail on drift in those two files
-  (step "Verify generated runtime outputs").
+  (step "Verify generated runtime outputs"). `go generate` also writes through the module's `README.md` symlink into
+  the generated integration page; leave that page unstaged (`ibm-d.md`).
 - Local regeneration is still mandatory validation: run the pipeline (`integrations/README.md` lists the commands and
   dependencies), inspect the complete generated diff, then leave every generated file unstaged.
 - `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
@@ -47,12 +49,13 @@ This is the one place the boundary is stated; other files point here.
   committed. Before opening the PR run:
 
   ```bash
+
   git status --porcelain |
-    rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
+    rg '^(\?\?|!!| M|M |A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
   ```
 
-  The command MUST print nothing. If it names a catalog, remove the local generated artifact from the commit rather
-  than committing it.
+  The command MUST print nothing. If it names a catalog or the side report, remove the local artifact from the commit
+  (or delete the untracked report) rather than committing it.
 
 ## The collector taxonomy gate
 
@@ -61,14 +64,19 @@ The collector taxonomy (`taxonomy.yaml` next to a `metadata.yaml`, `integrations
 this repository's skills documents how to author it. Its PR gate is still live, though:
 
 - `integrations/check_collector_taxonomy.py --pr-diff <base>...<head>` (step "Check Collector Taxonomy" in
-  `check-markdown.yml`) emits fatal `TAX030` when the PR adds or deletes a collector `metadata.yaml` under the
-  collector source roots, or changes a module's set of metric contexts (`metrics.scopes[].metrics[].name`) or its
-  `metrics.dynamic_*` declarations, and the collector directory has no `taxonomy.yaml`.
-- To satisfy it, generate a minimal file from the metadata and commit it with the collector:
+  `check-markdown.yml`) does two things and fails on any fatal finding: `check_touched_coverage` emits `TAX030` when
+  the PR adds or deletes a collector `metadata.yaml` under the collector source roots, or changes a module's set of
+  metric contexts (`metrics.scopes[].metrics[].name`) or its `metrics.dynamic_*` declarations, and the collector
+  directory has no `taxonomy.yaml`; then `build_taxonomy()` validates every committed `taxonomy.yaml` against the
+  metadata, so a stale file (a context renamed in metadata but not in the taxonomy) also fails.
+- To satisfy it, seed a minimal file from the metadata and commit it with the collector. The seed script prints to
+  stdout unless `--output` is given:
 
   ```bash
+
   python3 integrations/gen_taxonomy_seed.py <collector-dir>/metadata.yaml --module-name <module> \
-    --section-id <id from integrations/taxonomy/sections.yaml> --placement-id <module> --icon <icon id>
+    --section-id <id from integrations/taxonomy/sections.yaml> --placement-id <module> --icon <icon id> \
+    --output <collector-dir>/taxonomy.yaml
   python3 integrations/gen_taxonomy.py --check-only
   ```
 
@@ -89,9 +97,9 @@ this repository's skills documents how to author it. Its PR gate is still live, 
   schema for collectors that have not opted in, stock conf defaults against the schema. `check-markdown.yml` checks
   that generated links resolve on Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is
   broken and unused (`gotchas.md`). Until such checks exist, these are review-time checks.
-- ibm.d modules are the exception: docgen generates `metadata.yaml`, `README.md`, and `config_schema.json` from
-  `contexts.yaml`, `config.go`, and `module.yaml`, so those three agree by construction; the stock `.conf` and
-  `health.d/<...>.conf` still need manual sync (`ibm-d.md`).
+- ibm.d modules are the exception: docgen generates `metadata.yaml` and `config_schema.json` from `contexts.yaml`,
+  `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still
+  need manual sync (`ibm-d.md`).
 
 ## What reviewers should check
 
@@ -116,8 +124,8 @@ this repository's skills documents how to author it. Its PR gate is still live, 
 5. **Umbrella pages.** Adding or removing a collector, secret store, or discoverer changes
    `src/collectors/COLLECTORS.md`, `SECRETS.md`, or `SERVICE-DISCOVERY.md` respectively; delivery boundary above.
 6. **Generated artifacts are outputs, not source.** Files with a `DO NOT EDIT THIS FILE DIRECTLY` or
-   `<!--startmeta ... message: "DO NOT EDIT..." -->` banner are regenerated from their sources, never hand-edited.
-   The umbrella pages carry no banner and are generated all the same.
+   `<!--startmeta ... message: "DO NOT EDIT..." -->` banner are regenerated from their sources, never hand-edited;
+   so are the three umbrella pages, which carry no banner (`pipeline.md`).
 7. **The taxonomy gate is satisfied** when metric contexts or a collector were added or removed (section above).
 
 ## Anti-patterns to flag in review

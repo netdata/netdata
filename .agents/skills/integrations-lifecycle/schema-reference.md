@@ -45,14 +45,16 @@ Behavior not visible in the schema:
 - `info_provided_to_referring_integrations.description` is rendered on OTHER pages that reference this module.
 - `metrics.scopes[].name` `global` is rewritten to `<instance> instance` at render time.
 - `alerts[].metric` is not checked against `metrics.scopes[].metrics[].name`.
-- `metrics.dynamic_context_prefixes[]` and `metrics.dynamic_collect_plugins[]` exist only for the dormant taxonomy
-  (`consistency.md`, "The collector taxonomy gate"); do not add them for any other reason.
+- `metrics.dynamic_context_prefixes[]` and `metrics.dynamic_collect_plugins[]` are read only by the dormant taxonomy
+  tooling (`consistency.md`, "The collector taxonomy gate"); nothing renders them.
 - `profile_coverage.modules.<meta.id>[]` is allowed only in the Prometheus collector's metadata file, and
   `metrics.profile_coverage` is a generated in-memory projection that must never be authored
   (`how-tos/prometheus-profile-metadata.md`).
-- `functions.list[].parameters[].default` is a string only; `returns.columns[].visibility: hidden` suppresses a column.
-- `additionalProperties: false` is set only on `profile_coverage` and the two `metrics.dynamic_*` list entries, so
-  unknown module keys pass through (`gotchas.md`, `alternative_monitored_instances`).
+- `functions.list[].parameters[].default` is a string only. `returns.columns[].visibility` is rendered as a table cell
+  by `templates/functions.md`; the `hidden` value does not suppress the column.
+- `additionalProperties: false` is set only on `profile_coverage`, the two `metrics.dynamic_*` list entries, and (via
+  `shared.json`) `instance.variables`, so unknown module keys pass through (`gotchas.md`,
+  `alternative_monitored_instances`).
 
 ### `flows.json` and `device.json`
 
@@ -70,7 +72,8 @@ everywhere, `setup` is `oneOf [short_setup, full_setup]` unless stated.
 - `agent_notification.json`: `overview.notification_description` and `notification_limitations` (same pattern);
   optional `global_setup` whose two booleans (`severity_filtering`, `http_proxy`) are required only when the object is
   present; `troubleshooting` optional.
-- `cloud_notification.json`: no `overview`; `setup` required; `troubleshooting` optional.
+- `cloud_notification.json`: no `overview`; `setup` required; `troubleshooting` optional; the same optional
+  `global_setup` as agent notifications.
   `integrations/cloud-notifications/metadata.yaml` is one file holding the whole array.
 - `authentication.json`: `overview.authentication_description` and `authentication_limitations`; `troubleshooting`
   optional. `integrations/cloud-authentication/metadata.yaml` is one file holding the array.
@@ -86,7 +89,8 @@ everywhere, `setup` is `oneOf [short_setup, full_setup]` unless stated.
   `yaml`), `troubleshooting` required.
 - `service_discovery.json`: `meta.kind` (the slug and discoverer registry name), `meta.tagline` (the
   `SERVICE-DISCOVERY.md` table one-liner), optional `meta.description`, `overview.description` with optional
-  `how_it_works` and `limitations`, `setup` (rendered by `setup-service_discovery.md`), `services` (required:
+  `how_it_works` and `limitations`, `setup` (`full_setup` only, rendered by `setup-service_discovery.md`), `services`
+  (required:
   `description`; `evaluation`, `template_variables`, `examples` lists with `minItems: 1` when present), optional
   `verify.checks.list[]`, `troubleshooting` required.
 

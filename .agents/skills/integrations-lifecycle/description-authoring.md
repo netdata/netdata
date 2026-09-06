@@ -9,8 +9,8 @@ page meta description. The content of every collector `metadata.yaml` field is o
 ## Catalog Description Contract
 
 The Monitor Anything table reads no dedicated field. `integrations/gen_doc_collector_page.py` extracts the first
-sentence of the generated `## Overview` section and falls back to `meta.monitored_instance.description` only when
-overview text is unavailable. For collector-like integrations the first sentence of
+sentence of the generated `## Overview` section and falls back to `meta.monitored_instance.description` only when the
+overview is absent or yields no extractable first sentence. For collector-like integrations the first sentence of
 `overview.data_collection.metrics_description` therefore **is** the catalog description; write it first, deliberately.
 
 That first sentence must:
@@ -127,6 +127,7 @@ Before committing `metadata.yaml` changes:
 1. Regenerate and validate the integration data (dependencies: `integrations/README.md`):
 
    ```bash
+
    python3 integrations/gen_integrations.py
    python3 integrations/gen_docs_integrations.py --check
    python3 -m unittest integrations.tests.test_descriptions

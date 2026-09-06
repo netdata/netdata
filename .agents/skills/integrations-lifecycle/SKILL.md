@@ -15,9 +15,10 @@ Facts every reader needs:
 - `metadata.yaml` is the input. Hand-authored for most integrations; generated for ibm.d modules (from `contexts.yaml`,
   `config.go`, `module.yaml`) and for the NPM catalog (from SNMP profiles by `integrations/gen_npm_catalog.py`). Edit
   the authoritative source, never a generated file.
-- Every `<dir>/integrations/<slug>.md`, every README that is a symlink or opens with `<!--startmeta`, and the umbrella
-  pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md` are generated. Do not edit them; the
-  umbrella pages carry no banner and are generated all the same.
+- Every `<dir>/integrations/<slug>.md`, every README that is a symlink or whose `<!--startmeta` block carries a
+  `message: "DO NOT EDIT..."` line (a `<!--startmeta` block alone is not the marker; hand-authored Learn pages have
+  one too), and the umbrella pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md` (no banner) are
+  generated. Do not edit them.
 - Source PRs carry sources; generated documentation arrives through the post-merge `integrations-regen` PR. Local
   regeneration is mandatory validation, its output stays unstaged. The one place this boundary is written out, with
   its ibm.d runtime-output exception, is `consistency.md`.

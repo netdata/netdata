@@ -4,8 +4,9 @@ The Network Performance Monitoring catalog is a second-order generator: `integra
 `metadata.yaml`, and the normal pipeline renders that file like any other source. It is the only `metadata.yaml`
 generated from something other than ibm.d inputs, so it is easy to hand-edit by mistake. Both the generated
 `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml` and its 1013 pages under `npm-catalog/integrations/` are
-committed and generated; neither is hand-editable. Delivery (source PR versus the post-merge regeneration PR, the
-gitignored catalogs, the untracked `metrics-metadata-gaps.txt` side report that must be deleted before staging) is in
+committed and generated; neither is hand-editable. Every run also writes the untracked
+`npm-catalog/metrics-metadata-gaps.txt` (`write_gap_report`): read it to see which profile metrics lack metadata, then
+delete it. Delivery (source PR versus the post-merge regeneration PR, the gitignored catalogs, the side report) is in
 `../consistency.md`, "Delivery boundary".
 
 ## The chain
