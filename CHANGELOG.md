@@ -218,6 +218,19 @@
 - Docs(mcp): add PagerDuty MCP Connection guide ([#23752](https://github.com/netdata/netdata/issues/23752))
 - Chore(skills): add project-go-collector-design and slim the collector entry skill ([#23754](https://github.com/netdata/netdata/issues/23754))
 - CPU charts (windows) ([#23549](https://github.com/netdata/netdata/issues/23549))
+- Docs(integrations): add collector metadata content rules and a known-errors troubleshooting section ([#23763](https://github.com/netdata/netdata/issues/23763))
+- Regenerate integrations docs ([#23756](https://github.com/netdata/netdata/issues/23756))
+- Build(deps): bump github.com/gohugoio/hashstructure from 1.0.0 to 1.1.0 in /src/go ([#23765](https://github.com/netdata/netdata/issues/23765))
+- Build(deps): bump github.com/go-sql-driver/mysql from 1.10.0 to 1.10.1 in /src/go ([#23766](https://github.com/netdata/netdata/issues/23766))
+- Build(deps): bump github.com/klauspost/compress from 1.19.2 to 1.20.0 in /src/go ([#23764](https://github.com/netdata/netdata/issues/23764))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.109.1 to 1.110.0 in /src/go ([#23768](https://github.com/netdata/netdata/issues/23768))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.1 to 1.33.2 in /src/go ([#23772](https://github.com/netdata/netdata/issues/23772))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.69.1 to 1.70.0 in /src/go ([#23771](https://github.com/netdata/netdata/issues/23771))
+- Build(deps): bump github.com/prometheus/common from 0.70.1 to 0.71.0 in /src/go ([#23773](https://github.com/netdata/netdata/issues/23773))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.38.1 to 1.39.0 in /src/go ([#23767](https://github.com/netdata/netdata/issues/23767))
+- Optimize weights query arena reuse ([#23759](https://github.com/netdata/netdata/issues/23759))
+- Build(deps): bump github.com/prometheus/client_model from 0.6.2 to 0.6.3 in /src/go ([#23774](https://github.com/netdata/netdata/issues/23774))
+- Chore(skills): rename skills to area-prefixed names ([#23769](https://github.com/netdata/netdata/issues/23769))
 
 ## [2.11.0] - 2026-08-12
 
