@@ -609,14 +609,17 @@ func (c *Collector) refreshDeviceTopology(
 		return nil, deviceRefreshOutcomeFailed, recorder.finish()
 	}
 
-	sysUptime, err := snmputils.GetSysUptime(snmpClient)
-	if err != nil && ctx.Err() == nil {
-		if recorder.evidence != nil {
-			recorder.evidence.sysUptime = failedAcquisitionPhase(topologyAcquisitionFailureSysUptime, err)
+	sysUptime, uptimeFailure, err := snmputils.GetSysUptimeWithDiagnostics(snmpClient)
+	if recorder.evidence != nil {
+		if uptimeFailure.Reason != "" {
+			uptimeFailure.Operation = "sys_uptime"
+			recorder.evidence.sysUptime = topologyAcquisitionPhaseEvidence{outcome: topologyAcquisitionPhaseFailed, failure: topologyAcquisitionFailureSysUptime, detail: uptimeFailure}
+		} else {
+			recorder.evidence.sysUptime = successfulAcquisitionPhase()
 		}
+	}
+	if err != nil && ctx.Err() == nil {
 		c.Debugf("device '%s': failed to query system uptime: %v", dev.Hostname, err)
-	} else if err == nil && recorder.evidence != nil {
-		recorder.evidence.sysUptime = successfulAcquisitionPhase()
 	}
 
 	if ctx.Err() != nil {

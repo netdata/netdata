@@ -228,7 +228,9 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
-	c.recordCollectionFailures(ddsnmp.CollectionFailures{})
+	c.deviceLifecycleMu.Lock()
+	c.deviceCollectionFailures = ddsnmp.CollectionFailures{}
+	c.deviceLifecycleMu.Unlock()
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			c.recordDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed)

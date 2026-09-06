@@ -109,3 +109,15 @@ func TestDiagnosticClientPreservesPacketAndWalkFailures(t *testing.T) {
 	require.Equal(t, "deadline", failures.WALK.Last.Reason)
 	require.True(t, failures.Valid())
 }
+
+func TestReplacementClientKeepsFailureObservation(t *testing.T) {
+	ctrl, handler := setupMockHandler(t)
+	defer ctrl.Finish()
+	profile := createTestProfile("scalar.yaml", []ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.3.0", Name: "uptime"}}})
+	c := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	c.SetSNMPClient(handler)
+	expectSNMPGetError(handler, []string{"1.3.6.1.2.1.1.3.0"}, gosnmp.ErrWrongDigest)
+	_, _ = c.Collect()
+	require.EqualValues(t, 1, c.CollectionFailures().GET.Count)
+	require.Equal(t, "wrong_digest", c.CollectionFailures().GET.Last.Reason)
+}

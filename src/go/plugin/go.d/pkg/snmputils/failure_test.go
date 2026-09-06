@@ -61,10 +61,11 @@ func TestFailureAnnotationsPreserveErrors(t *testing.T) {
 
 func TestFailureRejectsContradictoryEvidence(t *testing.T) {
 	for _, failure := range []Failure{
-		{Operation: "get"}, {Reason: "packet_error"}, {Reason: "packet_error", PacketStatus: 255},
+		{Operation: "get"}, {Reason: "packet_error"},
 		{Reason: "unknown", PacketStatus: 1}, {Reason: "", ErrorIndex: 1},
 	} {
 		require.False(t, failure.Valid(), "%+v", failure)
 	}
 	require.True(t, (Failure{Operation: "get", Reason: "packet_error", PacketStatus: 18, ErrorIndex: 2}).Valid())
+	require.True(t, (Failure{Operation: "get", Reason: "packet_error", PacketStatus: 255, ErrorIndex: 2}).Valid())
 }

@@ -161,6 +161,14 @@ func lifecycleFailureError(wrapper, cause error, operation, reason string) error
 
 func (c *Collector) recordCollectionFailures(failures ddsnmp.CollectionFailures) {
 	c.deviceLifecycleMu.Lock()
-	c.deviceCollectionFailures = failures
+	c.deviceCollectionFailures.Merge(failures)
 	c.deviceLifecycleMu.Unlock()
+}
+
+func (c *Collector) captureCollectionFailures() {
+	if source, ok := c.ddSnmpColl.(interface {
+		CollectionFailures() ddsnmp.CollectionFailures
+	}); ok {
+		c.recordCollectionFailures(source.CollectionFailures())
+	}
 }

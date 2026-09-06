@@ -2,7 +2,10 @@
 
 package ddsnmp
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	"math"
+)
 
 // FailureCount counts observed failures and keeps only the last safe reason.
 // It is a per-attempt summary, not an error or operation history.
@@ -49,4 +52,26 @@ func (f CollectionFailures) Valid() bool {
 	}
 	return f.Processing.Preparation >= 0 && f.Processing.Scalar >= 0 && f.Processing.Table >= 0 && f.Processing.BGP >= 0 &&
 		f.Processing.Licensing >= 0
+}
+
+// Merge joins sequential stages of one owning collection attempt. Each source
+// remains independently reset; a successful later stage cannot erase a failure.
+func (f *CollectionFailures) Merge(other CollectionFailures) {
+	merge := func(dst *FailureCount, src FailureCount) {
+		if src.Count == 0 {
+			return
+		}
+		dst.Count += min(src.Count, math.MaxUint64-dst.Count)
+		dst.Last = src.Last
+	}
+	merge(&f.Profiles, other.Profiles)
+	merge(&f.GET, other.GET)
+	merge(&f.WALK, other.WALK)
+	merge(&f.BGP, other.BGP)
+	merge(&f.Licensing, other.Licensing)
+	f.Processing.Preparation += min(other.Processing.Preparation, math.MaxInt64-f.Processing.Preparation)
+	f.Processing.Scalar += min(other.Processing.Scalar, math.MaxInt64-f.Processing.Scalar)
+	f.Processing.Table += min(other.Processing.Table, math.MaxInt64-f.Processing.Table)
+	f.Processing.BGP += min(other.Processing.BGP, math.MaxInt64-f.Processing.BGP)
+	f.Processing.Licensing += min(other.Processing.Licensing, math.MaxInt64-f.Processing.Licensing)
 }

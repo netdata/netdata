@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
@@ -1641,5 +1642,55 @@ func sysInfoOIDsForTest() []string {
 		snmputils.OidSysContact,
 		snmputils.OidSysName,
 		snmputils.OidSysLocation,
+	}
+}
+
+func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
+	const metadataOID = "1.3.6.1.4.1.99999.1.0"
+	for _, reason := range []string{"wrong_digest", "processing", "partial_processing"} {
+		t.Run(reason, func(t *testing.T) {
+			handler := snmpmock.NewMockHandler(gomock.NewController(t))
+			handler.EXPECT().MaxOids().Return(20).AnyTimes()
+			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{}, nil)
+			var packet *gosnmp.SnmpPacket
+			var getErr error = gosnmp.ErrWrongDigest
+			if reason != "wrong_digest" {
+				packet = &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")}}}
+				getErr = nil
+			}
+			handler.EXPECT().Get([]string{metadataOID}).Return(packet, getErr).Times(2)
+			collector := newTestSNMPCollector()
+			collector.Config = prepareV2Config()
+			collector.Ping.Enabled = false
+			collector.CreateVnode = true
+			collector.snmpClient = handler
+			collector.snmpProfiles = []*ddsnmp.Profile{{SourceFile: "metadata.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+				Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: map[string]ddprofiledefinition.MetadataField{"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serial", Format: "uint32"}}}}},
+			}}}
+			if reason == "partial_processing" {
+				fields := collector.snmpProfiles[0].Definition.Metadata["device"].Fields
+				fields["vendor"] = ddprofiledefinition.MetadataField{Value: "synthetic"}
+				collector.Collect(context.Background())
+				require.Equal(t, ddsnmp.DeviceLifecycleOutcomeSuccess, collector.deviceLifecycleStatus.Outcome)
+				require.EqualValues(t, 2, collector.deviceLifecycleStatus.CollectionFailures.Processing.Preparation, "metadata-only and profile preparation failures must survive the successful collection")
+				return
+			}
+			for range 2 {
+				require.Nil(t, collector.Collect(context.Background()))
+				status := collector.deviceLifecycleStatus
+				require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, status.Outcome)
+				require.Equal(t, "metadata", status.Failure.Operation)
+				require.Equal(t, reason, status.Failure.Reason)
+				require.EqualValues(t, 1, status.CollectionFailures.Profiles.Count, "retries are separate attempts")
+				if reason == "wrong_digest" {
+					require.EqualValues(t, 1, status.CollectionFailures.GET.Count)
+					require.Equal(t, reason, status.CollectionFailures.GET.Last.Reason)
+				} else {
+					require.Zero(t, status.CollectionFailures.GET.Count)
+					require.EqualValues(t, 1, status.CollectionFailures.Processing.Preparation)
+				}
+			}
+		})
 	}
 }

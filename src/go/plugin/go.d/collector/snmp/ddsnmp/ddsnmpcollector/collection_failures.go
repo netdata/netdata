@@ -19,18 +19,7 @@ type diagnosticClient struct {
 
 func (c *diagnosticClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	packet, err := c.Handler.Get(oids)
-	failure := snmputils.ClassifyFailure(err)
-	if err == nil {
-		if packet == nil {
-			failure.Reason = "nil_response"
-		} else if packet.Error != gosnmp.NoError {
-			failure = snmputils.Failure{Reason: "packet_error", PacketStatus: uint8(packet.Error), ErrorIndex: uint32(packet.ErrorIndex)}
-		}
-	}
-	if failure.Reason != "" {
-		failure.Operation = "get"
-		c.failures.GET.Record(failure)
-	}
+	c.failures.GET.Record(snmputils.ClassifyGetFailure(packet, err))
 	return packet, err
 }
 

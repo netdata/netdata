@@ -178,7 +178,7 @@ func (f Failure) Valid() bool {
 		return f == (Failure{})
 	}
 	if f.Reason == "packet_error" {
-		return f.PacketStatus > 0 && f.PacketStatus <= uint8(gosnmp.InconsistentName)
+		return f.PacketStatus > 0
 	}
 	return f.PacketStatus == 0 && f.ErrorIndex == 0
 }
@@ -193,4 +193,21 @@ func WithFailureDetail(err error, f Failure) error {
 		f = Failure{Reason: "unknown"}
 	}
 	return &classifiedFailure{cause: err, failure: f}
+}
+
+// ClassifyGetFailure preserves the decoded response status, including vendor or
+// malformed numeric values accepted by the SNMP decoder.
+func ClassifyGetFailure(packet *gosnmp.SnmpPacket, err error) Failure {
+	f := ClassifyFailure(err)
+	if err == nil {
+		if packet == nil {
+			f.Reason = "nil_response"
+		} else if packet.Error != gosnmp.NoError {
+			f = Failure{Reason: "packet_error", PacketStatus: uint8(packet.Error), ErrorIndex: uint32(packet.ErrorIndex)}
+		}
+	}
+	if f.Reason != "" {
+		f.Operation = "get"
+	}
+	return f
 }

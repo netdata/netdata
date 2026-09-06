@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 type Config struct {
@@ -93,11 +94,20 @@ type (
 )
 
 func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+	c.failures = ddsnmp.CollectionFailures{}
 	meta := make(map[string]ddsnmp.MetaTag)
 
 	for _, prof := range c.profiles {
-		profDeviceMeta, err := c.deviceMetadataCollector.collect(prof.profile)
+		stats := &ddsnmp.CollectionStats{}
+		profDeviceMeta, err := c.deviceMetadataCollector.collectObserved(prof.profile, stats, nil)
+		c.failures.Processing.Preparation += stats.Errors.Processing.Preparation
 		if err != nil {
+			reason := ""
+			if stats.Errors.Processing.Preparation > 0 {
+				reason = "processing"
+			}
+			err = snmputils.WithFailure(err, "metadata", reason)
+			recordCollectionFailure(&c.failures.Profiles, err, "metadata", "")
 			return nil, err
 		}
 
@@ -268,6 +278,7 @@ func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 }
 
 func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
+	snmpClient = &diagnosticClient{Handler: snmpClient, failures: &c.failures}
 	if c.globalTagsCollector != nil {
 		c.globalTagsCollector.snmpClient = snmpClient
 	}

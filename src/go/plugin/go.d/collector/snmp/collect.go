@@ -119,6 +119,7 @@ func (c *Collector) ensureInitialized() error {
 			c.vnode = c.setupVnode(si, nil)
 		} else {
 			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
+			c.captureCollectionFailures()
 			if err != nil {
 				return err
 			}
