@@ -1,10 +1,10 @@
 # Chart Annotations
 
-Annotations let you pin a note to a specific moment on a chart. Use them to mark deployments, incidents, configuration changes, maintenance windows, or anything else that explains what you see in the data. Every member of your Space sees the same annotations, so the context travels with the chart.
+Annotations let you pin a note to a specific moment on a chart. Use them to mark deployments, incidents, configuration changes, maintenance windows, or anything else that explains what you see in the data. Everyone in your Space who can open dashboards sees the same annotations, so the context travels with the chart.
 
 :::note
 
-Annotations are a Netdata Cloud feature. They are stored in your Space and appear on Cloud dashboards and on Agent dashboards where you are signed in to Netdata Cloud. Only Space **Admins** can create, edit, or delete annotations. All other roles see them read-only. See [Role-Based Access](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+Annotations are a Netdata Cloud feature. They are stored in your Space and appear on Cloud dashboards and on Agent dashboards where you are signed in to Netdata Cloud. Only Space **Admins** can create, edit, or delete annotations. Managers, Troubleshooters, and Observers see them read-only. The Billing role has no dashboard access and does not see them. See [Role-Based Access](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 :::
 
@@ -15,7 +15,7 @@ Annotations are a Netdata Cloud feature. They are stored in your Space and appea
 3. Type your note and pick a **priority** by clicking one of the color swatches (see below).
 4. Press **Enter** or click the check mark to save. Press **Escape** or click **X** to discard.
 
-![Draft annotation form on a chart](https://raw.githubusercontent.com/netdata/docs-images/0f286e34c3360d781a5b1e4d697cd74b792bcfe2/chart-annotations/chart-annotation-draft.png)
+![Draft annotation form on a chart](https://raw.githubusercontent.com/netdata/docs-images/e3cb5c113c0cf6a9eabd2d53f5602115b560da78/chart-annotations/chart-annotation-draft.png)
 
 The saved annotation is drawn as a solid vertical line in the priority color, with a small dot at the top of the chart.
 
@@ -41,7 +41,7 @@ Each annotation has a priority that sets its color on the chart:
 
 Hover the mouse close to an annotation's vertical line. A popover shows the note text, the date and time, the priority, and an action bar. The popover stays open for a moment after you move away so you can reach its buttons.
 
-![Saved annotation with its action bar](https://raw.githubusercontent.com/netdata/docs-images/0f286e34c3360d781a5b1e4d697cd74b792bcfe2/chart-annotations/chart-annotation-popover.png)
+![Saved annotation with its action bar](https://raw.githubusercontent.com/netdata/docs-images/e3cb5c113c0cf6a9eabd2d53f5602115b560da78/chart-annotations/chart-annotation-popover.png)
 
 | Action                  | Icon      | What it does                                                                                                    |
 |-------------------------|-----------|-----------------------------------------------------------------------------------------------------------------|
