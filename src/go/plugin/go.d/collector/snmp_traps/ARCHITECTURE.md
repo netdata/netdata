@@ -9,6 +9,16 @@ It intentionally leaves two dependencies opaque: the journal file format (owned 
 wire parsing internals (owned by the gosnmp fork). This document covers how the collector drives them, not how they
 work inside.
 
+**Place in the documentation set.** This is the one maintained record of the collector's design and internals: the
+design invariants that are not visible in the code (why a limit has its value, which ownership rules the packages
+obey, what a writer or resolver contract forbids) live here and nowhere else, so a change to collector behavior
+updates this file in the same PR. The profile format is owned by the shipped
+`src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`; operator-facing behavior by
+`docs/npm/snmp-traps/`; and the authoring rules for profiles, the generator, and stock-pack regeneration by the
+project skill `.agents/skills/collectors-snmp-trap-profiles/SKILL.md`, which routes collector-code questions back
+here. The pre-implementation design proposals and decision records that once accompanied that skill were retired;
+rejected alternatives and phase history are in git history only.
+
 **Path convention.** Code references are relative to `src/go/plugin/go.d/collector/snmp_traps/`, except those starting
 with `src/go/`, which are repo-relative.
 
