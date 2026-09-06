@@ -48,7 +48,8 @@ Published integration files are then copied and sanitized without reconstructing
 
 At `netdata/website @ db6ed7b907a8d9f833450bfbbc24fc10eb4c9e8e`, Website does not consume the tracked Agent Markdown.
 Its `update-integrations.yml` workflow checks out Agent `master`, runs `gen_integrations.py`, and copies
-`integrations.json` into Website data; `scripts/build_integrations_md_files.py` then creates integration page shells from
+`integrations.json` into Website data; `scripts/build_integrations_md_files.py` then creates integration page shells
+from
 that data. The template `themes/tailwind/layouts/partials/integration-tabs.html` creates an Alerts tab whenever the
 integration object contains a non-empty `alerts` value. Therefore:
 

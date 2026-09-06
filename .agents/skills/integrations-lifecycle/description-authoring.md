@@ -51,14 +51,18 @@ The generator resolves each description in this order:
 1. Use the explicit override when one exists:
    - `meta.monitored_instance.description` for collector, flows, and device records;
    - `meta.description` for every other mode.
-   - The value must already be trimmed. The generator rejects leading or trailing whitespace and emits accepted text exactly.
-   - It never removes markup, collapses whitespace, truncates, or falls back to overview prose when an explicit value is invalid.
+   - The value must already be trimmed. The generator rejects leading or trailing whitespace and emits accepted text
+     exactly.
+   - It never removes markup, collapses whitespace, truncates, or falls back to overview prose when an explicit value is
+     invalid.
 2. Otherwise, derive it mechanically from the first useful prose in the rendered overview.
    - Markdown and HTML are reduced to plain text.
-   - Underscores are preserved rather than silently deleting part of an identifier. Final validation then rejects the derived value,
+   - Underscores are preserved rather than silently deleting part of an identifier. Final validation then rejects the
+     derived value,
      requiring an explicit plain-text override that describes the concept without corrupting the identifier.
    - Sentences are included until the description reaches 50 characters.
-   - Text longer than 160 characters is trimmed at a word boundary with a terminal Unicode ellipsis. Final validation rejects that
+   - Text longer than 160 characters is trimmed at a word boundary with a terminal Unicode ellipsis. Final validation
+     rejects that
      incomplete result, so its source record needs a complete explicit override.
 3. Fail generation when the result is missing, invalid, or duplicated by another generated page.
 
@@ -66,28 +70,35 @@ An explicit description MUST:
 
 - be 50–160 characters;
 - be already trimmed, with no leading or trailing whitespace;
-- be one line of plain text with no C0/C1 control character, including tabs, no surrogate code point or Unicode line/paragraph
-  separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), no CommonMark list marker or
+- be one line of plain text with no C0/C1 control character, including tabs, no surrogate code point or Unicode
+  line/paragraph
+  separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), no CommonMark list
+  marker or
   hyphen thematic break at the beginning, and no URL, double quote, or backslash;
 - not begin with a hyphen at all (the schema pattern and `integrations/descriptions.py` reject any leading `-`, which
   covers list markers and thematic breaks), nor with `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1.`
   or `1)` followed by a space. Internal hyphens, plus signs, and digits remain valid plain text;
-- be a complete statement: it must not end with `:`, the Unicode ellipsis `…`, or the ASCII ellipsis `...`, and every round
+- be a complete statement: it must not end with `:`, the Unicode ellipsis `…`, or the ASCII ellipsis `...`, and every
+  round
   parenthesis must be balanced. Nested balanced parentheses are valid;
-- be unique across every generated integration page. Duplicate identity is case-insensitive and NFC-normalized, but accepted authored
+- be unique across every generated integration page. Duplicate identity is case-insensitive and NFC-normalized, but
+  accepted authored
   text is emitted exactly and is never silently normalized;
 - accurately describe the specific integration in active, user-facing language.
 
 Mechanical overview extraction and explicit author input are deliberately separate paths. Markdown stripping, whitespace
 normalization, sentence selection, and word-boundary truncation apply only to a mechanically derived description.
 
-Double quotes and backslashes are rejected because Learn's legacy frontmatter parser cannot preserve their escaping. Use unquoted wording
+Double quotes and backslashes are rejected because Learn's legacy frontmatter parser cannot preserve their escaping. Use
+unquoted wording
 or Unicode typographic quotation marks when quotation is essential.
 
 Use an explicit description only when the mechanical result is missing, too short, duplicated, or otherwise inaccurate.
-Do not duplicate every overview sentence into metadata: the fallback is the normal path and the override is the exception.
+Do not duplicate every overview sentence into metadata: the fallback is the normal path and the override is the
+exception.
 
-The Monitor Anything catalog deliberately retains its existing overview-first precedence. Adding an explicit meta override
+The Monitor Anything catalog deliberately retains its existing overview-first precedence. Adding an explicit meta
+override
 MUST NOT silently change a catalog table row.
 
 ## Good And Bad Examples

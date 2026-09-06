@@ -63,7 +63,8 @@ taxonomy gate) with the collector. Remove backlinks and ownership assertions in 
 
 Generated outputs follow two cases:
 
-1. A generated integration page and README symlink live inside the directory being retired. Delete them with the complete
+1. A generated integration page and README symlink live inside the directory being retired. Delete them with the
+   complete
    directory; retaining a generated-only directory is not a clean collector removal. The sensors retirement
    (`aba1472fe81a2c9367e6120e202846ce90adcaa9`) is the repository precedent.
 2. Generated pages that survive elsewhere, umbrella pages, and gitignored catalogs are not hand-edited. Regenerate them
@@ -91,7 +92,8 @@ Run:
 - zero-reference searches for the retired package path, integration ID, stock-config path, contexts, and module wiring;
 - a retain-list audit proving replacement and independent same-product integrations remain.
 
-Inspect generated diffs, then restore or leave unstaged every generator-owned output that belongs to the post-merge route.
+Inspect generated diffs, then restore or leave unstaged every generator-owned output that belongs to the post-merge
+route.
 
 ## How I figured this out
 
