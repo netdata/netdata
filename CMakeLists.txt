@@ -1610,6 +1610,7 @@ set(API_PLUGIN_FILES
         src/web/api/queries/latest/latest.c
         src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
+        src/web/api/queries/weights-ranking.h
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
         src/web/api/formatters/rrd2json.h
