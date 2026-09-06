@@ -1610,6 +1610,7 @@ set(API_PLUGIN_FILES
         src/web/api/queries/latest/latest.c
         src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
+        src/web/api/queries/weights-ranking.h
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
         src/web/api/formatters/rrd2json.h
@@ -3455,6 +3456,17 @@ if(OS_LINUX AND MNL_FOUND)
         target_compile_options(local-sockets-mnl-test PRIVATE ${MNL_CFLAGS_OTHER})
         target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
         target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
+endif()
+
+if(OS_LINUX)
+        add_executable(local-sockets-namespaces-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_namespaces.c)
+        target_compile_options(local-sockets-namespaces-test PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(local-sockets-namespaces-test PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(local-sockets-namespaces-test libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)

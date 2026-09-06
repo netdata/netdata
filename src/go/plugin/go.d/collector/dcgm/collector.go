@@ -46,6 +46,7 @@ func New() *Collector {
 		charts:       &collectorapi.Charts{},
 		cache:        newCache(),
 		checkMetrics: true,
+		now:          time.Now,
 	}
 }
 
@@ -65,8 +66,10 @@ type Collector struct {
 	charts *collectorapi.Charts
 	prom   prometheus.Prometheus
 
-	cache        *cache
-	checkMetrics bool
+	cache          *cache
+	checkMetrics   bool
+	now            func() time.Time
+	counterSamples map[metricKey]counterSample
 }
 
 func (c *Collector) Configuration() any {
@@ -92,7 +95,7 @@ func (c *Collector) Check(context.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(mx) == 0 {
+	if len(mx) == 0 && len(c.counterSamples) == 0 {
 		return errors.New("no metrics collected")
 	}
 	return nil

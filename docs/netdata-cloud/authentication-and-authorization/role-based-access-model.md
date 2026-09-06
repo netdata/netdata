@@ -151,14 +151,16 @@ The **Groups** tab under **User Management** only appears after [SCIM integratio
 <details>
 <summary><strong>Dashboards</strong></summary><br/>
 
-| **Functionality**                |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** | **Notes** |
-|:---------------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:----------|
-| **See all dashboards in Room**   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
-| **Add new dashboard to Room**    | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
-| **Edit any dashboard in Room**   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |           |
-| **Edit own dashboard in Room**   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
-| **Delete any dashboard in Room** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |           |
-| **Delete own dashboard in Room** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
+| **Functionality**                          |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** | **Notes**                                                             |
+|:-------------------------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:----------------------------------------------------------------------|
+| **See all dashboards in Room**             | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |                                                                       |
+| **Add new dashboard to Room**              | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |                                                                       |
+| **Edit any dashboard in Room**             | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |                                                                       |
+| **Edit own dashboard in Room**             | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |                                                                       |
+| **Delete any dashboard in Room**           | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |                                                                       |
+| **Delete own dashboard in Room**           | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |                                                                       |
+| **See chart annotations**                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | [Chart Annotations](/docs/dashboards-and-charts/chart-annotations.md) |
+| **Create, edit, delete chart annotations** | :heavy_check_mark: |         -          |         -          |         -          |      -      |                                                                       |
 
 </details>
 

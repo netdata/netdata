@@ -1152,6 +1152,11 @@ sidebar:
           label: Charts
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/netdata-charts.md
       - meta:
+          label: Chart Annotations
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/chart-annotations.md
+          description: Pin notes to a moment on a chart and share them with your Space.
+          keywords: [annotations, chart annotations, notes, deployments, incidents]
+      - meta:
           label: Expanded Chart Analysis
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expanded-chart-analysis.md
       - meta:
