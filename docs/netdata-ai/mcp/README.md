@@ -59,6 +59,15 @@ no local setup, no bridges, no firewall changes.
    The Cloud MCP server can only access nodes
    connected to your Netdata Cloud space
 
+### AI credits and the Cloud MCP
+
+The Cloud MCP server is a telemetry-access endpoint. Your external AI client (Claude, Cursor, Devin IDE, VS Code, and others) sends MCP tool calls to query metrics, alerts, logs, nodes, and functions; the client's own LLM does all the reasoning. Netdata runs no server-side AI to answer these requests.
+
+Because no server-side AI is involved, **Cloud MCP queries do not consume Netdata AI credits**. AI credits meter only Netdata's built-in, server-side AI features — such as [Conversations](/docs/netdata-ai/conversations.md), [Investigations](/docs/netdata-ai/investigations/index.md), [Insights reports](/docs/ml-ai/ai-insights.md), and [Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md). See those pages for per-feature credit costs, plan availability, and how to top up.
+
+- **Plan access:** Any [Paid plan](/docs/netdata-cloud/view-plan-and-billing.md) — Homelab, Business, or Enterprise On-Premise — can use the Cloud MCP server. Access depends only on the Paid plan and an API token with `scope:mcp`, not on AI credits.
+- **Credit exhaustion:** If AI credits run out or are unavailable on your plan, the Cloud MCP server keeps working normally for every telemetry query. Only the built-in AI features above are affected by credit balance.
+
 ### Endpoint
 
 ```
