@@ -156,17 +156,19 @@ user profiles. The validator has no user mode: its contributor-policy checks bel
 
 ## Scripts
 
-All three run from any directory; the launchers resolve the repository root and make caller-relative paths absolute
-before `go run` from `src/go`. CI runs their unit tests (`.github/workflows/prometheus-profile-tests.yml`, "Verify
+Invoke them from the repository root as written below. The two launchers resolve the repository root themselves and
+make caller-relative file arguments absolute before `go run` from `src/go`, so their file arguments may be given
+relative to wherever you are; `profile-toc.py` is plain Python and takes the profile path as given. CI runs their unit tests (`.github/workflows/prometheus-profile-tests.yml`, "Verify
 authoring launcher"); run them locally with
 `.venv/bin/python3 -m unittest discover -s .agents/skills/collectors-prometheus-profiles/scripts -p 'test_*.py'`.
 
-- `scripts/validate-profile.py --profile P --dump D [--job J] [--support-profile S]... [--output text|json]`:
+- `.agents/skills/collectors-prometheus-profiles/scripts/validate-profile.py --profile P --dump D [--job J]
+  [--support-profile S]... [--output text|json]`:
   launcher for `tools/prometheus-profile-validation`. A user profile may use a minimal or deployment-specific job;
   stock validation uses the jobs its proof cases declare. A dash-prefixed token is never absolutized as an option's
   value, so a missing value reaches the tool unchanged and is rejected there instead of becoming a bogus path.
-- `.venv/bin/python3 scripts/profile-toc.py PROFILE [--app APP] [--quiet]` (needs PyYAML, which the repository
-  `.venv` provides): renders the operator-visible family tree with contexts and
+- `.venv/bin/python3 .agents/skills/collectors-prometheus-profiles/scripts/profile-toc.py PROFILE [--app APP]
+  [--quiet]` (needs PyYAML, which the repository `.venv` provides): renders the operator-visible family tree with contexts and
   effective priorities, then advisory UX warnings; it is not a gate. `--app` defaults to the profile's `app:`; the root
   `context_namespace` is dropped when it equals the app, as the collector does, and the `prometheus.<app>.` prefix is
   omitted. A chart with its own `family` is placed under that child node, as chartengine composes it. Priority `0`
@@ -177,7 +179,8 @@ authoring launcher"); run them locally with
   structure); a one-context leaf (unnecessary structure or a merge candidate). Do not remove structure only to silence a
   warning when the parent is an operator entity, module boundary, or release contract; do not add structure only to
   divide by metric type.
-- `scripts/proof-bundle.py evidence-dirs | verify [--profile P] [--testdata-root DIR]`: launcher for
+- `.agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py evidence-dirs | verify [--profile P]
+  [--testdata-root DIR]`: launcher for
   `tools/prometheus-profile-proof`; injects `--repo-root`.
 
 ## Delivery and live verification

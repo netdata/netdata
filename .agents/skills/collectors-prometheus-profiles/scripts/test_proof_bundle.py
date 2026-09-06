@@ -67,7 +67,13 @@ class ProofBundleLauncherTest(unittest.TestCase):
         caller = Path.cwd() / "caller"
         self.assertEqual(
             launcher.normalize_arguments(["verify", "--repo-root", "../.."], caller),
-            ["verify", "--repo-root", str(launcher.repo_root(launcher.__file__)), "--repo-root", str(caller / "../..")],
+            [
+                "verify",
+                "--repo-root",
+                str(launcher.repo_root(launcher.__file__)),
+                "--repo-root",
+                str(caller / "../.."),
+            ],
         )
 
     def test_main_runs_proof_tool_from_go_root(self) -> None:

@@ -201,8 +201,9 @@ drops one). Only `retain_writable_unrendered` discharges an `autogen.selector.de
 
 `not_chartable` is deliberately narrow: the only strict operation is deriving age from a Unix timestamp; it is not a
 generic "not useful" escape. `metadata_only` needs the conditions in `metric-types.md`, "Info families", not a gauge
-that happened to equal one in a fixture. Every production `autogen.selector.deny` family must be discharged by an
-exclusion naming that family.
+that happened to equal one in a fixture. Every production `autogen.selector.deny` family must be discharged by a
+`retain_writable_unrendered` exclusion naming that family; a `drop_before_writer` exclusion does not discharge it
+(`semantics/coverage.go`, `replay_route.go`).
 
 ## Verification
 
