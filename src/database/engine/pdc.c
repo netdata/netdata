@@ -1285,7 +1285,7 @@ static bool epdl_populate_pages_from_extent_data(
         bool added = true;
         PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
         if (false == added) {
-            pgd_free(pgd);
+            pgd_free(pgd, PGD_FREE_SITE_EXTENT_INSERT_LOST);
             pgd = pgc_page_data(page);
             stats_cache_hit_while_inserting++;
             stats_data_from_main_cache++;
