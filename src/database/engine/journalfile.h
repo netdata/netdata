@@ -52,7 +52,8 @@ struct rrdengine_journalfile {
 
     struct {
         SPINLOCK spinlock;
-        uint64_t pos;
+        uint64_t pos;             // reservation cursor used for journal placement
+        uint64_t accounted_size;  // bytes contributed to current_disk_space
     } unsafe;
 
     uv_file file;
@@ -64,6 +65,19 @@ static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *jo
     uint64_t size = journalfile->unsafe.pos;
     spinlock_unlock(&journalfile->unsafe.spinlock);
     return size;
+}
+
+static inline uint64_t journalfile_accounted_size_get(struct rrdengine_journalfile *journalfile) {
+    spinlock_lock(&journalfile->unsafe.spinlock);
+    uint64_t accounted_size = journalfile->unsafe.accounted_size;
+    spinlock_unlock(&journalfile->unsafe.spinlock);
+    return accounted_size;
+}
+
+static inline void journalfile_accounted_size_add(struct rrdengine_journalfile *journalfile, uint64_t bytes) {
+    spinlock_lock(&journalfile->unsafe.spinlock);
+    journalfile->unsafe.accounted_size += bytes;
+    spinlock_unlock(&journalfile->unsafe.spinlock);
 }
 
 // Journal v2 structures
@@ -267,8 +281,8 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile);
 #define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)
 /*
  * Destroys the journal file and returns a JOURNALFILE_DELETED_* bitmask
- * indicating which on-disk journal files were deleted. This is not a
- * 0 / -errno style status code.
+ * indicating which journal files were accepted by the asynchronous deletion
+ * queue. Completion updates the on-disk accounting and deletion statistics.
  */
 uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);

@@ -11,6 +11,11 @@ static inline void poll_process_updated_events(POLLINFO *pi) {
     }
 }
 
+void pollinfo_set_events(POLLINFO *pi, nd_poll_event_t events) {
+    pi->events = events;
+    poll_process_updated_events(pi);
+}
+
 // poll() based listener
 // this should be the fastest possible listener for up to 100 sockets
 // above 100, an epoll() interface is needed on Linux
@@ -98,7 +103,7 @@ static inline void poll_close_fd(POLLINFO *pi, const char *func) {
         pi->del_callback(pi);
 
         if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
-            if(close(pi->fd) == -1)
+            if(sock_close(pi->fd) == -1)
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "Failed to close() poll_events() socket %d",
                        pi->fd);
@@ -163,7 +168,7 @@ int poll_default_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
     return 0;
 }
 
-void poll_default_tmr_callback(void *timer_data) {
+void poll_default_tmr_callback(POLLJOB *p __maybe_unused, void *timer_data) {
     (void)timer_data;
 }
 
@@ -289,13 +294,18 @@ static int poll_process_new_tcp_connection(POLLINFO *pi, time_t now) {
                          "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
                          p->used, p->limit);
         }
-        else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
+        else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN
+#if defined(OS_WINDOWS)
+            // WinSock sets WSAGetLastError() but not errno for WSAEWOULDBLOCK
+            && WSAGetLastError() != WSAEWOULDBLOCK
+#endif
+        ))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "POLLFD: LISTENER: accept() failed.");
 
     }
     else if(is_socket_closed(nfd))
-        close(nfd);
+        sock_close(nfd);
 
     else {
         // accept ok
@@ -427,7 +437,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
             if(unlikely(timer_usec && now_usec >= next_timer_usec)) {
                 last_timer_usec = now_usec;
-                p.tmr_callback(p.timer_data);
+                p.tmr_callback(&p, p.timer_data);
                 now_usec = now_boottime_usec();
                 next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
             }

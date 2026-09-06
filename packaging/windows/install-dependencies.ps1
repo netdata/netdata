@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\functions.ps1"
 
 $msysprefix = Get-MSYS2Prefix
+$env:MSYSTEM = 'UCRT64'
 
 function Check-FileHash {
     $file_path = $args[0]

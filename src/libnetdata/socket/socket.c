@@ -94,7 +94,12 @@ bool is_socket_closed(int fd) {
         return true;
     }
     else if (result < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK
+#if defined(OS_WINDOWS)
+            // WinSock sets WSAGetLastError() but not errno for WSAEWOULDBLOCK
+            || WSAGetLastError() == WSAEWOULDBLOCK
+#endif
+        ) {
             // No data available, but socket is still open
             return false;
         } else {
@@ -401,10 +406,23 @@ inline int wait_on_socket_or_cancel_with_timeout(
                             pipe_revents = POLLNVAL;
                             break;
                         case ERROR_OPERATION_ABORTED:
-                            errno = ECANCELED;
-                            if(revents)
-                                *revents = 0;
-                            return -1;
+                            // This only says that a Windows I/O operation was aborted. It does not
+                            // establish that Netdata cancelled this worker, so do not tear down a
+                            // live plugin unless the worker's own cancellation flag confirms it.
+                            if(nd_thread_signaled_to_cancel()) {
+                                errno = ECANCELED;
+                                if(revents)
+                                    *revents = 0;
+                                return -1;
+                            }
+
+                            // Keep the same bounded, cancellable polling cadence as an empty pipe.
+                            const DWORD retry_ms = (DWORD)((timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
+                                                          ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms);
+                            Sleep(retry_ms);
+                            if(!forever)
+                                timeout_ms -= (int)retry_ms;
+                            continue;
                         default:
                             errno = EIO;
                             pipe_revents = POLLERR;
@@ -664,7 +682,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
-        if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+        if (client_ip && (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1"))) {
             strncpyz(client_ip, "localhost", ipsize - 1);
         }
         sock_setcloexec(nfd, true);
@@ -674,8 +692,9 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "localhost", ipsize - 1);
 #endif
 
-        client_ip[ipsize - 1] = '\0';
-        client_port[portsize - 1] = '\0';
+        // strncpyz() already null-terminates, so no need to re-terminate here.
+        // (SonarQube S3807 + S2259: redundant manual null-termination after a
+        // bounded copy that already null-terminates.)
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
             case AF_UNIX:
@@ -689,7 +708,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 break;
 
             case AF_INET6:
-                if (strncmp(client_ip, "::ffff:", 7) == 0) {
+                // SonarQube S3807: `client_ip` is the caller's buffer; the
+                // NULL check at the top of the function (line ~657) already
+                // early-returns when it is NULL, but Sonar's static analysis
+                // cannot see across the branch. Add the defensive guard.
+                if (client_ip && strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
                     // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 }
