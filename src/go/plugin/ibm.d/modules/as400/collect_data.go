@@ -215,14 +215,7 @@ func parseInt64OrZero(value string) int64 {
 // The values come from SQL COUNT(*) results parsed as int64, so a bogus or
 // hostile value must not become a negative or tiny int.
 func int64ToCount(v int64) int {
-	switch {
-	case v < 0:
-		return 0
-	case v > math.MaxInt:
-		return math.MaxInt
-	default:
-		return int(v)
-	}
+	return int(min(max(v, 0), math.MaxInt))
 }
 
 func boolToInt(cond bool) int64 {
