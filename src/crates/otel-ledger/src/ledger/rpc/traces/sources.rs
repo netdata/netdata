@@ -27,6 +27,8 @@
 //! responsibility — the wire adapter of each data mode — not this
 //! module's. A raw `0..0` here is an empty query, deliberately.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use file_lifecycle::chunk::ChunkCache;
@@ -40,7 +42,7 @@ use wal::prefix::{chunk_boundaries, tail_start};
 /// One WAL resolved to buildable parts: everything needed to
 /// materialize its sources any number of times without re-scanning.
 struct ResolvedWal {
-    path: std::path::PathBuf,
+    path: PathBuf,
     chunks: Vec<ResolvedChunk>,
     /// The trailing un-chunked byte range, when non-empty.
     tail: Option<wal::FrameRange>,
@@ -92,22 +94,78 @@ impl TracesSourceSupplier {
         copies: usize,
         cancel: &CancellationToken,
     ) -> Vec<Vec<TraceSource>> {
-        if copies == 0 {
+        self.capture_ranges(tenant, &vec![time_range; copies], cancel)
+            .await
+    }
+
+    /// [`capture`](Self::capture) with a range PER copy: one snapshot,
+    /// one source vector per entry in `ranges`, each pruned by its own
+    /// range through the registry's own predicate.
+    ///
+    /// Per-range pruning exists because a merged trace envelope is a
+    /// function of WHICH FILES were captured (the engine's
+    /// file-granularity caveat: spans living only in files outside the
+    /// range merge a truncated envelope). So a pass whose window is
+    /// narrower than another's — the Functions view's window aggregate
+    /// beside its page — must be handed its OWN file set, or it returns
+    /// different numbers than the standalone mode does for the same
+    /// window: a widened envelope can change a trace's duration bin,
+    /// drop it from the grid, or grow the span/error totals.
+    ///
+    /// Every range is answered under ONE read lock, so all copies still
+    /// observe one `valid_up_to` — the single-snapshot guarantee a
+    /// second `capture` call would break — and each WAL resolves ONCE,
+    /// its chunk bytes `Arc`-shared by every copy that selected it.
+    pub(crate) async fn capture_ranges(
+        &self,
+        tenant: &TenantId,
+        ranges: &[std::ops::Range<u32>],
+        cancel: &CancellationToken,
+    ) -> Vec<Vec<TraceSource>> {
+        if ranges.is_empty() {
             return Vec::new();
         }
-        let q = file_registry::Query {
-            time_range,
-            partition_keys: Vec::new(),
-        };
-        let (sealed, wal_descs) = {
+        // Distinct ranges only: copies over one range share its answer
+        // (search's two roles always do), so the registry is scanned
+        // once per range, not once per copy.
+        let mut distinct: Vec<std::ops::Range<u32>> = Vec::new();
+        let mut per_copy: Vec<usize> = Vec::with_capacity(ranges.len());
+        for range in ranges {
+            let at = match distinct.iter().position(|d| d == range) {
+                Some(at) => at,
+                None => {
+                    distinct.push(range.clone());
+                    distinct.len() - 1
+                }
+            };
+            per_copy.push(at);
+        }
+        let snapshots: Vec<(Vec<file_registry::SelectedFile>, Vec<WalDesc>)> = {
             let guard = self.registries.read().await;
-            guard.query_snapshot(tenant, &q)
+            distinct
+                .into_iter()
+                .map(|time_range| {
+                    guard.query_snapshot(
+                        tenant,
+                        &file_registry::Query {
+                            time_range,
+                            partition_keys: Vec::new(),
+                        },
+                    )
+                })
+                .collect()
         };
 
-        let mut resolved = Vec::with_capacity(wal_descs.len());
-        for wal in wal_descs {
+        // Every WAL any range selected resolves ONCE, keyed by the path
+        // that encodes its full `FileId`; a refused one is absent for
+        // every copy alike (one snapshot, one verdict).
+        let mut resolved: HashMap<PathBuf, ResolvedWal> = HashMap::new();
+        for wal in snapshots.iter().flat_map(|(_, wals)| wals) {
+            if resolved.contains_key(&wal.path) {
+                continue;
+            }
             if let Some(r) = self.resolve_wal(wal, cancel).await {
-                resolved.push(r);
+                resolved.insert(wal.path.clone(), r);
             }
         }
         // One check dominates the per-WAL ones: nothing between here and
@@ -117,10 +175,12 @@ impl TracesSourceSupplier {
             return Vec::new();
         }
 
-        (0..copies)
-            .map(|_| {
+        per_copy
+            .into_iter()
+            .map(|at| {
+                let (sealed, wal_descs) = &snapshots[at];
                 let mut sources: Vec<TraceSource> = Vec::new();
-                for f in &sealed {
+                for f in sealed {
                     sources.push(TraceSource::Sfst(TraceSfstCandidate {
                         source_id: SourceId::new(f.path.display().to_string()),
                         summary: f.summary.clone(),
@@ -128,7 +188,7 @@ impl TracesSourceSupplier {
                         coverage: None,
                     }));
                 }
-                for w in &resolved {
+                for w in wal_descs.iter().filter_map(|d| resolved.get(&d.path)) {
                     let wal_id: Arc<str> = w.path.display().to_string().into();
                     for c in &w.chunks {
                         sources.push(TraceSource::Sfst(TraceSfstCandidate {
@@ -170,7 +230,7 @@ impl TracesSourceSupplier {
     /// module docs). Polls `cancel` between chunk builds; a cancelled
     /// call returns `None` (indistinguishable from refusal on purpose —
     /// the capture's result is discarded either way).
-    async fn resolve_wal(&self, wal: WalDesc, cancel: &CancellationToken) -> Option<ResolvedWal> {
+    async fn resolve_wal(&self, wal: &WalDesc, cancel: &CancellationToken) -> Option<ResolvedWal> {
         // Poll before the boundary scan too — it is a blocking file read
         // a cancelled call shouldn't pay for.
         if cancel.is_cancelled() {
@@ -265,7 +325,7 @@ impl TracesSourceSupplier {
         let tail = (tail_begin < wal.valid_up_to)
             .then(|| wal::FrameRange::new(tail_begin, wal.valid_up_to));
         Some(ResolvedWal {
-            path: wal.path,
+            path: wal.path.clone(),
             chunks,
             tail,
         })
