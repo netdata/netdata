@@ -31,20 +31,13 @@ func weightsLimitRows(t *testing.T, doc map[string]any) map[string][]any {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = dicts
-	d := doc["dictionaries"].(map[string]any)
-	ids := map[int]string{}
-	for _, entry := range d["dimensions"].([]any) {
-		x := entry.(map[string]any)
-		ids[int(x["di"].(float64))] = x["id"].(string)
-	}
 	rows := map[string][]any{}
 	for _, entry := range doc["result"].([]any) {
 		r := entry.([]any)
 		if r[0].(float64) != 0 {
 			continue
 		}
-		id, ok := ids[int(r[4].(float64))]
+		id, ok := dicts.dimensions[int64(r[4].(float64))]
 		if !ok {
 			t.Fatalf("dimension index has no dictionary entry: %v", r)
 		}
@@ -252,6 +245,8 @@ func TestWeightsLimitScoresAndSummaries(t *testing.T) {
 				})
 				t.Run("summaries", func(t *testing.T) {
 					trackContractComponent(t, "W/limit-summaries", component)
+					// This fixture has one chart; TestWeightsLimitHierarchy checks
+					// sibling parents by semantic identity across dictionary compaction.
 					parents := map[float64][]any{}
 					for _, entry := range full["result"].([]any) {
 						r := entry.([]any)

@@ -10,10 +10,11 @@ python3 tests/weights-limit/weights-openapi-test.py
 It checks both schema representations and all four weights endpoint references.
 Optional aliases must not supply defaults for unchosen fields: a generated
 `limit=1000&cardinality_limit=0` request is unlimited because the explicit
-cardinality alias takes precedence. The checks preserve caller-supplied zero
-and empty values, optionality, and the nonnegative integer constraint. This is
-a schema regression; it does not emulate Swagger UI rendering or the HTTP
-parser. Changes to request generation should also be checked against the
+cardinality alias takes precedence. The checks assert absent schema defaults,
+optional query parameters, empty-value support, and the nonnegative integer
+constraint. They do not test HTTP alias precedence or emulate Swagger UI.
+The corpus tests below cover runtime alias and boundary behavior.
+Changes to request generation should also be checked against the
 interactive explorer's Swagger UI bundle in `netdata/learn`.
 
 The standalone C test checks the bounded candidate heap against an independent
