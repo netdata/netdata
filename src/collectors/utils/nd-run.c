@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "exec-signals.h"
+
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
 #endif
@@ -202,6 +204,11 @@ int main(int argc, char *argv[]) {
     // environment block it did not allocate. Reading it is fine - execvp()
     // itself reads PATH from it.
     environ = new_environ;
+
+    // Restore default signal dispositions before exec. SIG_IGN survives execve(), so an ignored
+    // signal in our caller is inherited by the command we run; netdata ignores SIGPIPE, and a
+    // command that gets EPIPE instead of dying keeps running after netdata closes its stdout.
+    reset_signal_dispositions();
 
     // Exec the requested command (replaces the current process on success)
     execvp(argv[1], &argv[1]);

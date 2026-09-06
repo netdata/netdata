@@ -31,18 +31,8 @@ system_info_unit_test() {
 }
 
 spawn_server_unit_tests() {
-  echo "Running spawn-server unit tests"
-
-  local run_dir
-  run_dir="$(mktemp -d "${TMPDIR:-/tmp}/netdata-spawn-tester.XXXXXX")" || return 1
-
-  NETDATA_RUN_DIR="${run_dir}" \
-  ASAN_OPTIONS=detect_leaks=0 \
-  "${NETDATA_BUILD_DIR:-./build}/spawn-tester" test
-  local ret=$?
-
-  rm -rf -- "${run_dir}"
-  return "${ret}"
+  # Shared with the macOS CI job, which builds netdata and then runs only this suite.
+  bash "$(dirname "$0")/spawn-server-tests.sh"
 }
 
 install_netdata || exit 1
