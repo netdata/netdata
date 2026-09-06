@@ -257,12 +257,13 @@ Two sharp edges:
 7. Rate limit (last).
 
 The decode budget is five fixed constants (`listener.go`, `decode.go`), enforced per job and deliberately not
-configurable: 8192-byte datagram (RFC 3417 §3 asks receivers for 484 bytes; 8 KiB covers verbose vendor traps with
-margin), 256 varbinds (about three times the largest real trap observed in public fixture corpora), nesting depth 8
-(SNMPv3 messages need about 6 constructed levels), 128-byte encoded OID (RFC 2578 allows 128 sub-identifiers, and real
-trap and varbind OIDs encode to a few dozen bytes), and 1024-byte OctetString (long enough for MIB strings, short
-enough to bound memory per packet). Exceeding any of them drops the
-packet and counts a `malformed_pdu` error.
+configurable: 8192-byte datagram (RFC 3417 requires receivers to accept at least 484 bytes; 8 KiB covers verbose vendor
+traps with margin), 256 varbinds (about three times the largest trap seen in the design-time survey of public fixture
+corpora, around 80), nesting depth 8 (SNMPv3 messages need about 6 constructed levels), 128-byte encoded OID (a byte
+cap independent of RFC 2578's 128 sub-identifier limit; real trap and varbind OIDs encode to a few dozen bytes), and
+1024-byte OctetString (long enough for MIB strings, short enough to bound memory per packet; waived for SNMPv3, whose
+encrypted ScopedPDU is one large OctetString, see check 3 above). Exceeding any of them drops the packet and counts a
+`malformed_pdu` error.
 
 **SNMPv1 normalization.** v1 traps carry no `snmpTrapOID.0`; decode synthesizes one plus up to four more varbinds,
 prepended in fixed order, so downstream stages see one uniform shape:
@@ -497,7 +498,8 @@ rule names). Rules come from the profiles (Stage 3) and turn traps into time-ser
   candidates, ambiguous registry match, vnode conflict) demotes the series to the job's node with an opaque
   `source_id` — a salted SHA-256 prefix, never a raw IP. Series labels are always
   `job_name`/`source_id`/`source_kind` (+ `resource_class`/`resource_id` for resource-scoped rules). The hash is
-  SHA-256 over `<salt>:<job>:<canonical source without port>`, truncated to 16 hex characters; the salt is the
+  SHA-256 over `<salt>:<job>:<selected source address>` (the raw UDP peer `ip:port` only as the last resort),
+  truncated to 16 hex characters; the salt is the
   host's machine-id from `internal/hostidentity` (a fixed string when none is available) and is never emitted
   (`jobruntime.Job.sourceHashSalt`, `attribution.fallback`). It hides addresses, not identities: a small address
   space can be enumerated, and a machine-id change renames every fallback `source_id`.

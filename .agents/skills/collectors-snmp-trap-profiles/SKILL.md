@@ -35,9 +35,10 @@ This skill holds only what the documents below lack. Point at them; do not resta
    "Trap entries").
 
 2. **Check `MAX-ACCESS` of the source MIB object for every varbind.** A `not-accessible` index object still belongs in
-   the varbinds table (it is carried in `TRAP_JSON` and, when non-sensitive and non-redundant, as an indexed
-   `TRAP_VAR_*` field), but never as a `description:` template variable on its own: an SNMP entity does not send it
-   in the trap PDU, so the placeholder never resolves. No in-tree artifact can check this; it needs the MIB.
+   the varbinds table, so that the rare device that does include it gets it named in `TRAP_JSON` and, when
+   non-sensitive and non-redundant, as an indexed `TRAP_VAR_*` field. Never use it as a `description:` template
+   variable on its own: an SNMP entity normally does not send it in the trap PDU, so the placeholder renders empty.
+   No in-tree artifact can check this; it needs the MIB.
 
 3. **Every varbind reference resolves.** A name in a trap's `varbinds:` list must exist in the file-scoped `varbinds:`
    table or be an inline `{name, oid, type}` dict on that trap. A dangling name renders empty in the description and
@@ -66,9 +67,10 @@ This skill holds only what the documents below lack. Point at them; do not resta
    label templates at profile load. High-cardinality content belongs in `description:` (rendered into `MESSAGE`),
    the indexed `TRAP_VAR_*` fields, and `TRAP_JSON`, none of which propagate to metrics.
 
-8. **Label keys** match `[a-z][a-z0-9_]*` and emit as `TRAP_TAG_<KEY_UPPERCASE>`, from profile and job `labels:`
-   alike. The dedicated prefix makes collision with the plugin-owned `TRAP_*` fields impossible, so the key syntax is
-   the only check. See `docs/npm/snmp-traps/field-reference.md` for the shipped `TRAP_*` set (it is not closed at
+8. **Label keys** match `[a-z][a-z0-9_]*` and emit as `TRAP_TAG_<KEY_UPPERCASE>`, whether they come from a profile's
+   `labels:` or from a listener job's per-OID `overrides[].labels` (there is no job-wide `labels:` option). The
+   dedicated prefix makes collision with the plugin-owned `TRAP_*` fields impossible, so the key syntax is the only
+   check. See `docs/npm/snmp-traps/field-reference.md` for the shipped `TRAP_*` set (it is not closed at
    the profile level; new fields arrive with collector releases).
 
 9. **Trap OID form and `.0.` tolerance.** Use the OID form the source MIB tooling produces. Lookup is exact-match
@@ -81,7 +83,7 @@ This skill holds only what the documents below lack. Point at them; do not resta
     comment says so); never hand-edit them for site concerns. Operator profiles live in the user config directory
     `go.d/snmp.trap-profiles/` (`catalog_paths.go`) in one of three forms: a complete same-identity replacement of a
     stock file, an independent different-identity addition, or a metric-only profile whose rules reference stock
-    traps. Partial inheritance does not exist; `extends:` fails as an unknown config key. Per-OID category,
+    traps. Partial inheritance does not exist; an `extends:` key is rejected as unknown at profile load. Per-OID category,
     severity, and label overrides belong in the listener job's `overrides:` (`docs/npm/snmp-traps/trap-profiles.md`
     has the decision table).
 
@@ -162,7 +164,8 @@ This skill holds only what the documents below lack. Point at them; do not resta
    - one table entry per varbind name; a name that recurs with a different OID or type falls back to an inline
      `{name, oid, type}` dict on that trap (intended; do not "fix" it, and do not regress to inline everywhere);
    - records with an empty name, OID, or type are dropped from table and references; no `{}` entries;
-   - traps sort by OID (`compareOIDString`), names sort lexically, so regenerations diff cleanly;
+   - traps sort by OID (`compareOIDString`) and the table keys and rule names are sorted, so regenerations diff
+     cleanly;
    - the three-line header comment is part of the file and of its digest;
    - the vendor slug (`vendorForOID`: `standard`, `ieee-lldp`, `ieee-802`, the PEN slug or `enterprise-<pen>`, else
      `oid-<first arc>` or `unknown`) is the output filename and therefore the identity an operator override replaces.
@@ -171,9 +174,9 @@ This skill holds only what the documents below lack. Point at them; do not resta
    `sample_traps`, `trap_count`, `trap_oids`, `varbind_count`, `sha256`, and `metric_rule_names` when the profile
    has rules (omitted otherwise, which is every stock file today; emitting stock rules also needs the curation path
    described in profile check 12). `sha256` is 64 lowercase hex over the exact bytes
-   written, comments and final newline included; lazy hydration verifies it
-   (`TestStockProfileCatalogueRequiresValidSHA256`). Catalog tests load all shipped profiles and require the manifest
-   and the files to agree in both directions
+   written, comments and final newline included (format pinned by `TestStockProfileCatalogueRequiresValidSHA256`);
+   lazy hydration verifies it (`TestStockProfileEpochBindsLazyHydrationToManifestContent`). Catalog tests load all
+   shipped profiles and require the manifest and the files to agree in both directions
    (`TestStockProfileCatalogueMatchesDefaultFiles`, `TestStockCatalogueReconcilesPhysicalInventory`,
    `TestStockProfileDefaultFilesParse`): regenerating profiles without the catalogue fails tests.
 
@@ -214,20 +217,24 @@ The sets are duplicated in code, alerts, and docs. Only the telemetry series are
 (`TestJobCollectsExactRetainedMetricSet` in `internal/telemetry/job_test.go` enumerates the per-category and
 per-severity counters); nothing pins the generator's or the loader's sets. A change must touch every site:
 
-1. Generator `main.go`: `validCategories`, `validSeverities`, `severityPriority`, `repairInvalidCategory`, the
-   classifier response JSON Schema (`classifierResponseSchemaJSON`), and the prompt text; bump `defaultPromptVer`.
+1. Generator `main.go`: `validCategories`, `validSeverities`, `severityPriority`, `repairInvalidCategory`,
+   `mechanicalClassification` (the no-LLM fallback hard-codes both sets), the classifier response JSON Schema
+   (`classifierResponseSchemaJSON`), and the prompt text; bump `defaultPromptVer`.
 2. Collector `internal/catalog/profile.go`: `validCategories`, `validSeverities`, `categoryList`, `severityList`
    (the loader rejects profiles the generator would otherwise emit).
-3. Per-slug surfaces in the collector: the `internal/telemetry` counters and their test, the `events` and `severity`
-   chart dimensions in `charts.yaml` and `metadata.yaml`, the OTLP severity mapping (`otlpSeverity` in
+3. Per-slug surfaces in the collector: the `overrides[].category` and `overrides[].severity` enums in
+   `config_schema.json`, the `internal/telemetry` counters and their test, the `events` and `severity` chart
+   dimensions in `charts.yaml` and `metadata.yaml`, the OTLP severity mapping (`otlpSeverity` in
    `internal/output/otlp`), and the `PRIORITY` mapping in `internal/output/journal` (`grep -rn` the slug across
    `snmp_traps/`).
 4. Health: `src/health/health.d/snmp_traps.conf` has severity-rate alert templates for `emerg`, `alert`, `crit`,
    `err`, and `warning` (`notice`, `info`, `debug` deliberately do not alert), mirrored in the `alerts:` list of
    `metadata.yaml`; a renamed or removed slug silently breaks them. `grep -rn` the slug across
    `src/health/health.d/` too.
-5. Docs: `profile-format.md` category and severity tables; `docs/npm/snmp-traps/configuration.md`,
-   `field-reference.md`, `metrics.md`, `alerts.md` where they list the sets.
+5. Docs: `profile-format.md` category and severity tables, and every operator page that enumerates the sets
+   (`grep -rln` the slug across `docs/npm/snmp-traps/`: today `README.md`, `trap-profiles.md`, `configuration.md`,
+   `field-reference.md`, `metrics.md`, `alerts.md`, `usage-and-output.md`, `journal-and-querying.md`,
+   `investigation-playbooks.md`).
 6. Re-run classification for the full corpus: existing cache records were produced under the old taxonomy.
 
 Add tests that pin the generator's and the loader's sets when you touch them.
