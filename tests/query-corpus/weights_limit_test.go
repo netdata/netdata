@@ -440,6 +440,9 @@ func TestWeightsLimitCompleteGroups(t *testing.T) {
 			})
 		}
 	}
+	if os.Getenv("QUERY_CORPUS_WEIGHTS_EXPORT") == "" {
+		return
+	}
 	for _, method := range []string{"volume", "value"} {
 		for _, options := range []string{"raw", "null2zero"} {
 			for _, endpoint := range []string{"api/v3/weights", "api/v1/weights"} {

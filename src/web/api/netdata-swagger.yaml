@@ -9339,6 +9339,7 @@ components:
     weightsLimit:
       name: limit
       in: query
+      allowEmptyValue: true
       description: |
         Returns at most N strongest physical time series, or N complete groups when group_by is used. Parent instance, context, and node rows do not count toward N and retain their complete-query summaries. No remaining bucket is added. All matching metrics are still evaluated and normalized before selection; this bounds response size, not query work or duration.
 
@@ -9355,6 +9356,7 @@ components:
     weightsCardinalityLimit:
       name: cardinality_limit
       in: query
+      allowEmptyValue: true
       description: |
         Alias of the weights limit parameter with identical strongest-result selection and complete-query summary semantics. Takes precedence over limit when both are supplied, including zero (unlimited). Unlike data-query cardinality_limit, it does not reserve a slot for a remaining bucket. See limit for validation, repeated-value, ranking, and compatibility behavior.
       required: false

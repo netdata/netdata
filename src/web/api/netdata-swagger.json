@@ -7638,6 +7638,7 @@
       "weightsLimit": {
         "name": "limit",
         "in": "query",
+        "allowEmptyValue": true,
         "description": "Returns at most N strongest physical time series, or N complete groups when group_by is used. Parent instance, context, and node rows do not count toward N and retain their complete-query summaries. No remaining bucket is added. All matching metrics are still evaluated and normalized before selection; this bounds response size, not query work or duration.\n\nRaw scores and method=value rank higher values first. Normalized scores rank lower values first. Groups rank by the requested aggregation after complete aggregation. Equal scores use stable node/context/instance/dimension identities (group IDs for groups). Metric dictionaries include only retained entries; node metadata remains complete. correlated_dimensions and total_dimensions_count describe the complete query. A positive cap adds result_limit metadata with summary_scope=all.\n\nLegacy v1 dimension objects retain their display-name keys. Duplicate display names can collapse in clients that decode these objects into maps; returned counts emitted physical entries, not unique display-name keys. The v2/v3 dimension dictionaries use metric IDs.\n\nOmitted, empty, or zero means unlimited. Values must be nonnegative decimal integers within the Agent's size_t range; malformed, negative, fractional, and overflowing values return HTTP 400. Repeated values use the last nonempty value of each alias, but every nonempty supplied value must be valid. cardinality_limit takes precedence, including zero. Agents without weights result-limit support may ignore either parameter; clients must inspect result_limit before claiming that results were capped.\n",
         "required": false,
         "schema": {
@@ -7649,6 +7650,7 @@
       "weightsCardinalityLimit": {
         "name": "cardinality_limit",
         "in": "query",
+        "allowEmptyValue": true,
         "description": "Alias of the weights limit parameter with identical strongest-result selection and complete-query summary semantics. Takes precedence over limit when both are supplied, including zero (unlimited). Unlike data-query cardinality_limit, it does not reserve a slot for a remaining bucket. See limit for validation, repeated-value, ranking, and compatibility behavior.\n",
         "required": false,
         "schema": {
