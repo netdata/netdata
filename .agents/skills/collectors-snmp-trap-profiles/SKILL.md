@@ -24,6 +24,8 @@ This skill holds only what the documents below lack. Point at them; do not resta
 - `docs/npm/snmp-traps/` (published operator docs): `trap-profiles.md` (override versus new profile), `configuration.md`
   (every job option), `field-reference.md` (every `TRAP_*` field), `metrics.md` (built-in charts and dimensions).
 - Sibling skills: `collectors-snmp-profiles` for polling profiles; `query-snmp-traps` for reading trap logs.
+- Design history (rejected alternatives, the comparison with other trap systems, the phase plans) is not maintained
+  in the tree; the pre-implementation design records that used to live in this directory are in git history.
 
 ## Required checks before changing a profile
 
@@ -51,8 +53,9 @@ This skill holds only what the documents below lack. Point at them; do not resta
 
 5. **Categories: closed set of 8.** `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`,
    `diagnostic`, `unknown`. Cross-cutting concerns (compliance scope, tenant, datacenter, change window) go in
-   `labels:`, not new slugs. Operator-authored traps default to `unknown` and are overridden per job; there is no
-   "custom" category. Changing the set is taxonomy work (below).
+   `labels:`, not new slugs. Every profile entry declares `category` and `severity` (the loader rejects a missing
+   or unknown value); only a trap with no profile match is logged with `unknown`/`notice` at runtime, and operators
+   reclassify it through the job's `overrides:`. There is no "custom" category. Changing the set is taxonomy work.
 
 6. **Severities: closed set of 8 full syslog names** mapped to `PRIORITY=0..7`: `emerg`, `alert`, `crit`, `err`,
    `warning`, `notice`, `info`, `debug` (never `warn`). `emerg` is for true vendor catastrophe; routine events are
@@ -83,29 +86,40 @@ This skill holds only what the documents below lack. Point at them; do not resta
     has the decision table).
 
 11. **No hand-authored journal fields.** There is no `journal_fields:` key: `TRAP_VAR_*` fields are derived from the
-    received non-sensitive, non-redundant varbinds and `TRAP_JSON` keeps the audit copy. `display_hint` is reserved
-    and not emitted by the generator; do not add it by hand (regeneration overwrites it).
+    received non-sensitive, non-redundant varbinds and `TRAP_JSON` keeps the audit copy. `display_hint` is documented
+    as a future varbind field but is not part of the loaded schema: `varbinds:` entries accept unknown keys
+    (`profileYAMLSpec` in `internal/catalog/load.go`), so a hand-added `display_hint` is silently ignored and then
+    overwritten on regeneration. When the renderer starts consuming DISPLAY-HINT metadata, the extractor,
+    `profile-format.md`, and `model.TrapEntry` change in the same cycle.
 
 12. **Profile metrics only through the validated schema.** `profile-format.md`, "Optional `metrics:` rules and
-    `charts:`", owns the syntax, defaults, and the load-time rejection list; a listener job enables rules explicitly
-    with `profile_metrics.include`. Rules the loader enforces that authors most often get wrong:
+    `charts:`", owns the syntax, defaults, numeric source types, and the load-time rejection list; a listener job
+    enables rules explicitly with `profile_metrics.include` (rule names, never trap names or filenames). Checks the
+    loader enforces (`internal/catalog/metric_validate.go`) that authors most often get wrong:
     - Chart IDs and contexts must not reuse the six built-in charts `events`, `severity`, `errors`,
-      `dedup_suppressed`, `pipeline`, `profile_metric_diagnostics` or their `snmp.trap.*` contexts; metric names
-      must not start with a reserved prefix (`builtInProfileMetricChartIDs`, `reservedProfileMetricPrefixes` in
-      `internal/catalog/metric_validate.go`). Profile rules describe vendor or site semantics, never receiver health.
-    - Every `where:` predicate selects exactly one string-valued source, `varbind` or `field`; predicates AND; use
-      `absent`, not `not` plus `exists`.
+      `dedup_suppressed`, `pipeline`, `profile_metric_diagnostics` or their `snmp.trap.*` contexts; a chart context
+      defaults to `snmp.trap.<chart id>` and must start with `snmp.trap.`; metric names must not start with a
+      reserved prefix (`builtInProfileMetricChartIDs`, `reservedProfileMetricPrefixes`).
+    - Every `where:` predicate selects exactly one string-valued source: `varbind`, or `field` from the closed set
+      `category`, `severity`, `trap_name`, `trap_oid`; predicates AND; use `absent`, not `not` plus `exists`.
     - `identity.resource.key_from_varbind` must be an integer-like bounded varbind (`INTEGER`, `Integer32`,
       `Unsigned32`, `Gauge32`); `Counter32`, `Counter64`, `TimeTicks` are `sample` values, not identity keys.
-    - Every rule sharing a chart has the same label shape; charts that create per-source or per-resource instances
-      declare `lifecycle`; `missing:` is one of `drop`, `error`, `zero`, `unknown_dimension` (`zero` is invalid for
-      `counter` and `state`; `unknown_dimension` needs resource identity).
-    - Profile metrics update only after the trap is committed to the configured backend; dedup-suppressed and
-      write-failed traps do not count.
+    - `missing:` is one of `drop`, `error`, `zero`, `unknown_dimension` (`zero` is invalid for `counter` and
+      `state`; `unknown_dimension` needs resource identity).
+    Authoring rules the loader does NOT check, so review them by hand:
+    - Every rule sharing a chart has the same label shape: do not mix resource and non-resource rules, or several
+      resource classes, in one chart.
+    - Declare `lifecycle` explicitly on every chart that creates per-source or per-resource instances instead of
+      relying on the loader's defaults; expired instances are removed and a returning identity starts a fresh series.
+    - Never use the community varbind or another sensitive varbind (`model.IsSensitiveVarbind`) as a predicate or
+      sample source; redaction happens downstream, not in rule validation.
+    - Profile rules describe vendor or site semantics, never receiver health. Profile metrics update only after the
+      trap is committed to the configured backend; dedup-suppressed and write-failed traps do not count.
     - No stock profile ships `metrics:` today (0 of 803). Stock rules would be a curation layer that the generator
       must preserve through a tested read-modify-write path from a reviewable, committed source recording rule name,
-      trap, varbinds, type, chart, and cardinality evidence. That path does not exist; build it before adding stock
-      rules, and check pack size and lazy-load memory when you do.
+      trap, varbinds, type, chart, and cardinality evidence, and must validate against the `varbinds:` and `traps:`
+      it just emitted before writing the file. That path does not exist; build it before adding stock rules, and
+      check pack size and lazy-load memory when you do.
 
 ## Required checks when editing the generator (`src/go/cmd/snmptrapprofilegen/`)
 
@@ -145,15 +159,17 @@ This skill holds only what the documents below lack. Point at them; do not resta
    - records with an empty name, OID, or type are dropped from table and references; no `{}` entries;
    - traps sort by OID (`compareOIDString`), names sort lexically, so regenerations diff cleanly;
    - the three-line header comment is part of the file and of its digest;
-   - the vendor slug (`vendorForOID`: `standard`, `ieee-lldp`, `ieee-802`, PEN slug or `enterprise-<pen>`) is the
-     output filename and therefore the identity an operator override replaces.
+   - the vendor slug (`vendorForOID`: `standard`, `ieee-lldp`, `ieee-802`, the PEN slug or `enterprise-<pen>`, else
+     `oid-<first arc>` or `unknown`) is the output filename and therefore the identity an operator override replaces.
 
 7. **`catalogue.json` stays in sync.** Each entry (`profileCatalogueEntry`) records `file`, `mib_count`, `mibs`,
    `sample_traps`, `trap_count`, `trap_oids`, `varbind_count`, `sha256`, and `metric_rule_names` when the profile
    has rules (omitted otherwise, which is every stock file today). `sha256` is 64 lowercase hex over the exact bytes
-   written, comments and final newline included; lazy hydration verifies it. Catalog tests load all shipped profiles
-   and require the manifest and the files to agree in both directions (`TestStockCatalogueIsRequiredAndUnambiguous`,
-   `TestStockProfileCatalogueRequiresValidSHA256`): regenerating profiles without the catalogue fails tests.
+   written, comments and final newline included; lazy hydration verifies it
+   (`TestStockProfileCatalogueRequiresValidSHA256`). Catalog tests load all shipped profiles and require the manifest
+   and the files to agree in both directions
+   (`TestStockProfileCatalogueMatchesDefaultFiles`, `TestStockCatalogueReconcilesPhysicalInventory`,
+   `TestStockProfileDefaultFilesParse`): regenerating profiles without the catalogue fails tests.
 
 8. **PEN registry.** The default is the bundled snapshot (`defaultPENFilePath`; installed at
    `usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt`). With `--refresh-pen`, or when
@@ -171,6 +187,7 @@ go run ./cmd/snmptrapprofilegen generate \
   --require-llm \
   --concurrency 20 \
   --out-dir /tmp/snmp-trap-profile-gen-output \
+  --cache /tmp/snmp-trap-profile-gen-output/classification-cache.jsonl \
   --profiles-out-dir ./plugin/go.d/config/go.d/snmp.trap-profiles/default \
   --catalogue ./plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
 ```
@@ -187,27 +204,33 @@ copied into the operator profile directory (`profile-format.md`, "Generated stoc
 
 ## Changing categories or severities (taxonomy work)
 
-The sets are duplicated in code and docs and no test pins their membership, so a change must touch every site:
+The sets are duplicated in code, alerts, and docs. Only the telemetry series are test-pinned
+(`TestJobCollectsExactRetainedMetricSet` in `internal/telemetry/job_test.go` enumerates the per-category and
+per-severity counters); nothing pins the generator's or the loader's sets. A change must touch every site:
 
 1. Generator `main.go`: `validCategories`, `validSeverities`, `severityPriority`, `repairInvalidCategory`, the
-   embedded classifier JSON Schema, and the prompt text; bump `defaultPromptVer`.
+   classifier response JSON Schema (`classifierResponseSchemaJSON`), and the prompt text; bump `defaultPromptVer`.
 2. Collector `internal/catalog/profile.go`: `validCategories`, `validSeverities`, `categoryList`, `severityList`
    (the loader rejects profiles the generator would otherwise emit).
-3. Per-severity surfaces: the `internal/telemetry` severity counters and the `severity` chart dimensions in
-   `charts.yaml` and `metadata.yaml`, the OTLP severity mapping in `internal/output/otlp`, and any `PRIORITY`
-   mapping (`grep -rn` the slug across `snmp_traps/`).
-4. Docs: `profile-format.md` category and severity tables; `docs/npm/snmp-traps/configuration.md`,
-   `field-reference.md`, `metrics.md` where they list the sets.
-5. Re-run classification for the full corpus: existing cache records were produced under the old taxonomy.
+3. Per-slug surfaces in the collector: the `internal/telemetry` counters and their test, the `events` and `severity`
+   chart dimensions in `charts.yaml` and `metadata.yaml`, the OTLP severity mapping (`otlpSeverity` in
+   `internal/output/otlp`), and the `PRIORITY` mapping in `internal/output/journal` (`grep -rn` the slug across
+   `snmp_traps/`).
+4. Health: `src/health/health.d/snmp_traps.conf` has one alert template per severity dimension, mirrored in the
+   `alerts:` list of `metadata.yaml`; a renamed or removed slug silently breaks them. `grep -rn` the slug across
+   `src/health/health.d/` too.
+5. Docs: `profile-format.md` category and severity tables; `docs/npm/snmp-traps/configuration.md`,
+   `field-reference.md`, `metrics.md`, `alerts.md` where they list the sets.
+6. Re-run classification for the full corpus: existing cache records were produced under the old taxonomy.
 
-Add a test that pins the sets in both the generator and the collector when you touch them.
+Add tests that pin the generator's and the loader's sets when you touch them.
 
 ## File size and compression
 
 - Stock profile YAMLs stay raw in the repository so `git diff` reviews them.
-- The pack build compresses them with `snmp-trap-profile-gen compress-zstd --rm` and installs `*.yaml.zst` plus
-  `catalogue.json.zst` (CMake). The loader accepts profiles as `.yaml.zst`, `.yml.zst`, `.yaml`, or `.yml`
-  (`internal/catalog/load.go`) and the manifest as `catalogue.json` or `catalogue.json.zst`, never gzip
+- The pack build (CMake) runs the generator's `compress-zstd --rm` subcommand via `go run` on a copy of the pack and
+  installs `*.yaml.zst` plus `catalogue.json.zst`. The loader accepts profiles as `.yaml.zst`, `.yml.zst`, `.yaml`, or
+  `.yml` (`internal/catalog/load.go`) and the manifest as `catalogue.json` or `catalogue.json.zst`, never gzip
   (`internal/catalog/stock.go`).
 - Operator profiles stay uncompressed `.yaml` for editability.
 - If one vendor file passes about 10 MB in the repository, cut description verbosity rather than hide generated bloat

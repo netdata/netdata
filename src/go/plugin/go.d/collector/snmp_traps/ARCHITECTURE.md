@@ -249,8 +249,9 @@ Two sharp edges:
 The decode budget is five fixed constants (`listener.go`, `decode.go`), enforced per job and deliberately not
 configurable: 8192-byte datagram (RFC 3417 §3 asks receivers for 484 bytes; 8 KiB covers verbose vendor traps with
 margin), 256 varbinds (about three times the largest real trap observed in public fixture corpora), nesting depth 8
-(SNMPv3 messages need about 6 constructed levels), 128-byte encoded OID (the RFC 2578 cap), and 1024-byte
-OctetString (long enough for MIB strings, short enough to bound memory per packet). Exceeding any of them drops the
+(SNMPv3 messages need about 6 constructed levels), 128-byte encoded OID (RFC 2578 allows 128 sub-identifiers, and real
+trap and varbind OIDs encode to a few dozen bytes), and 1024-byte OctetString (long enough for MIB strings, short
+enough to bound memory per packet). Exceeding any of them drops the
 packet and counts a `malformed_pdu` error.
 
 **SNMPv1 normalization.** v1 traps carry no `snmpTrapOID.0`; decode synthesizes one plus up to four more varbinds,
@@ -425,9 +426,9 @@ because the other backend may still hold it.
 
 | Aspect | Behavior |
 | --- | --- |
-| Format | Pure-Go systemd journal *files* via `systemd-journal-sdk` — no journald, no sockets, works on any platform; a missing log root is a startup error, not a silent fallback. Writing files directly is what lets the entry carry the *device* as `_HOSTNAME`: journald (`sd_journal_sendv`) would stamp the agent host instead |
+| Format | Pure-Go systemd journal *files* via `systemd-journal-sdk` — no journald, no sockets, works on any platform; a missing log root is a startup error, not a silent fallback (the SDK is opened with `LogOpenEager` and `LogIdentityStrict`; both are required). Writing files directly is what lets the entry carry the *device* as `_HOSTNAME`: journald (`sd_journal_sendv`) would stamp the agent host instead |
 | Location | `<log-dir>/traps/<job>/<machine-id>/*.journal` — the job name is a filesystem path segment (hence its strict charset) |
-| Writing | Async: bounded queue (10 000), one worker, per-entry append, **fsync batched on a 1 s ticker** — there is no flush-per-write and `Flush()` is unused in production |
+| Writing | Async: bounded queue (10 000), one worker owning the single reusable serializer (the only `AppendRaw` caller), per-entry append, **fsync batched on a 1 s ticker** — there is no flush-per-write and `Flush()` is unused in production |
 | Failure | **Sticky and terminal**: the first write/sync error stops the worker, subsequent writes fail fast, and only a job restart recovers. The terminal outcome is reported once, without double-counting per-entry failures |
 | Retention | `max_size` (default 10 GB), `max_duration`, `rotation_size`, `rotation_duration` — enforced by the SDK deleting archived files; no journald configuration is written |
 | Injection defense | Values containing newlines/control bytes/invalid UTF-8 are stored as journald binary fields, so `MESSAGE=real\nFAKE_FIELD=x` cannot be queried as `FAKE_FIELD` (CWE-117); the count of such fields is a telemetry gauge |
