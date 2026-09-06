@@ -4,13 +4,13 @@ Annotations let you pin a note to a specific moment on a chart. Use them to mark
 
 :::note
 
-Annotations are a Netdata Cloud feature. They are stored in your Space and appear on Cloud dashboards and on Agent dashboards where you are signed in to Netdata Cloud. Only Space **Admins** can create, edit, or delete annotations. Managers, Troubleshooters, and Observers see them read-only. The Billing role has no dashboard access and does not see them. See [Role-Based Access](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+Annotations are a Netdata Cloud feature. They are stored in your Space and are not available on Agent dashboards that are not connected to Netdata Cloud. Only Space **Admins** can create, edit, or delete annotations. Managers, Troubleshooters, and Observers see them read-only. The Billing role has no dashboard access and does not see them. See [Role-Based Access](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 :::
 
 ## Add an Annotation
 
-1. With the default **Pan** tool selected, **click** anywhere on a line chart at the moment you want to annotate. A dashed grey marker appears at that timestamp, together with a **New annotation** box showing the selected date and time.
+1. With the default **Pan** tool selected, **click** anywhere on a line, area, or stacked chart at the moment you want to annotate. A dashed grey marker appears at that timestamp, together with a **New annotation** box showing the selected date and time.
 2. Click the **+** button in the box to open the annotation form.
 3. Type your note and pick a **priority** by clicking one of the color swatches (see below).
 4. Press **Enter** or click the check mark to save. Press **Escape** or click **X** to discard.
@@ -55,11 +55,11 @@ Hover the mouse close to an annotation's vertical line. A popover shows the note
 
 An annotation has one of three scopes.
 
-| Scope              | How to get it                                              | Where it shows                                                                                                                                    | Saved? |
-|--------------------|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|--------|
-| Chart-specific     | Default when you create an annotation                      | On every chart of the same context, for example `system.cpu`, across all nodes and Rooms in the Space. On a custom dashboard, on that chart only. | Yes    |
-| Global             | Double-click the globe icon                                | On every chart in the Space.                                                                                                                      | Yes    |
-| Temporarily synced | Single-click the globe icon on a chart-specific annotation | As a dashed, semi-transparent copy on every other chart currently on the page. Disappears when you reload.                                        | No     |
+| Scope              | How to get it                                              | Where it shows                                                                                             | Saved? |
+|--------------------|------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|--------|
+| Chart-specific     | Default when you create an annotation                      | On every chart of the same context, for example `system.cpu`, across all nodes and Rooms in the Space.     | Yes    |
+| Global             | Double-click the globe icon                                | On every chart in the Space.                                                                               | Yes    |
+| Temporarily synced | Single-click the globe icon on a chart-specific annotation | As a dashed, semi-transparent copy on every other chart currently on the page. Disappears when you reload. | No     |
 
 The globe icon changes color to show the current state: blue for global, yellow for temporarily synced, grey for chart-specific.
 
