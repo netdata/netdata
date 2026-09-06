@@ -125,7 +125,8 @@ Compare every compiled mapping with `SOURCE-SEMANTICS.yaml`, `PROFILE-DESIGN.yam
 
 1. Map every exact dimension selector back to its source registration and semantic signal.
 2. Confirm the displayed family is owned by the entity, capability, operation, or stage recorded for that source evidence.
-3. Confirm the effective `instance_by_labels` describes the recorded entity type and retains required parent identity.
+3. Confirm the effective identity (`instances.by_labels` after inheritance; the validator report's `instance_by_labels`
+   field) describes the recorded entity type and retains required parent identity.
 4. Confirm chart title, context, units, algorithm intent, and naming mechanism tell the same operator story.
 5. Confirm every unrendered signal has one binding source/profile exclusion with the declared operator consequence.
 6. Re-audit every first- and second-level family using compiled production routes, not the intended prose.
