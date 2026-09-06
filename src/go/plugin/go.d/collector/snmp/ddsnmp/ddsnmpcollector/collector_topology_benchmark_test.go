@@ -337,10 +337,12 @@ func BenchmarkTableRowProcessor_IPTopologyPresence(b *testing.B) {
 
 // Warm collection excludes profile preparation so diagnostic per-poll cost is visible.
 func BenchmarkCollector_WarmDiagnostics(b *testing.B) {
-	for _, count := range []int{1, 32} {
-		b.Run(fmt.Sprint(count), func(b *testing.B) {
+	for name, tc := range map[string]struct{ tables int }{
+		"1": {tables: 1}, "32": {tables: 32},
+	} {
+		b.Run(name, func(b *testing.B) {
 			profile := createTestProfile("warm.yaml", nil)
-			for n := range count {
+			for n := range tc.tables {
 				profile.Definition.Topology = append(profile.Definition.Topology, benchmarkTopologyProfile(n).Definition.Topology...)
 			}
 			c := New(Config{SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})

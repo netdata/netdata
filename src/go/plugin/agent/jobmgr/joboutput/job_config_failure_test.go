@@ -51,14 +51,18 @@ func (h *failureLifecycleHook) Reconcile(
 }
 
 func TestJobConfigFailureEnrichesOnlyCommittedSnapshot(t *testing.T) {
-	for _, tc := range []struct {
-		name, mode         string
+	tests := map[string]struct {
+		mode               string
 		beforeConstruction bool
 	}{
-		{name: "failed check"}, {name: "missing vnode", beforeConstruction: true},
-		{name: "projection panic", mode: "panic"}, {name: "nil projection", mode: "nil"}, {name: "wrong identity", mode: "wrong_identity"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"failed check":     {},
+		"missing vnode":    {beforeConstruction: true},
+		"projection panic": {mode: "panic"},
+		"nil projection":   {mode: "nil"},
+		"wrong identity":   {mode: "wrong_identity"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 			events := []string{}
 			hook := &failureLifecycleHook{recordingJobConfigLifecycle: &recordingJobConfigLifecycle{events: &events}, mode: tc.mode}

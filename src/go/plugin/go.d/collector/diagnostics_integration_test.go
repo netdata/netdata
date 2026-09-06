@@ -19,14 +19,29 @@ import (
 )
 
 func TestNormalSNMPFailedReadinessPublishesWithoutTopology(t *testing.T) {
-	for _, tc := range []struct {
-		name, phase, outcome, reason, stage string
-		config                              confgroup.Config
+	tests := map[string]struct {
+		phase, outcome, reason, stage string
+		config                        confgroup.Config
 	}{
-		{name: "collector init", phase: "init", outcome: "failed", reason: "missing_hostname", stage: "autodetection"},
-		{name: "before construction", phase: "unknown", outcome: "unknown", stage: "vnode", config: confgroup.Config{"module": "snmp", "name": "missing-vnode-device", "hostname": "192.0.2.10", "vnode": "missing-vnode", "update_every": 10}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"collector init": {phase: "init",
+			outcome: "failed",
+			reason:  "missing_hostname",
+			stage:   "autodetection"},
+		"before construction": {
+			phase:   "unknown",
+			outcome: "unknown",
+			stage:   "vnode",
+			config: confgroup.Config{
+				"module":       "snmp",
+				"name":         "missing-vnode-device",
+				"hostname":     "192.0.2.10",
+				"vnode":        "missing-vnode",
+				"update_every": 10,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			document := runNormalSNMPFailurePublication(t, tc.config)
 			row := document.Snapshot.Lifecycle.Cut.Entries[0]
 			require.Equal(t, tc.phase, row.LastCompleted.Phase)

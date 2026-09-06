@@ -14,72 +14,162 @@ import (
 )
 
 func TestProfileContextReportsActualPolicyAndProjection(t *testing.T) {
-	catalog := &Catalog{profiles: []*Profile{
-		{SourceFile: "z-auto.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-			Selector: ddprofiledefinition.SelectorSpec{
-				{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{Include: []string{"1.3.6.1.*"}}},
+	tests := map[string]struct {
+		request                         ResolveRequest
+		consumers                       []ProfileConsumer
+		manualPolicy                    string
+		manualApplied                   bool
+		manualProfiles, missingProfiles []string
+		sources                         []string
+		projected                       []int
+		acquisition                     []uint32
+		bgpMode                         string
+	}{
+		"fallback keeps selector match": {
+			request: ResolveRequest{
+				SysObjectID:    "1.3.6.1.4",
+				ManualProfiles: []string{"/private/SECRET/a-manual.yaml", "missing"},
+				ManualPolicy:   ManualProfileFallback,
 			},
-			Metrics: []ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.1.0", Name: "metric"}}},
-		}},
-		{SourceFile: "a-manual.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-			Metrics: []ddprofiledefinition.MetricsConfig{
-				{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.0", Name: "manual_metric"}},
+			consumers:    []ProfileConsumer{ConsumerMetrics, ConsumerLicensing, ConsumerBGP},
+			manualPolicy: "fallback",
+			manualProfiles: []string{
+				"a-manual",
+				"missing",
 			},
-		}},
-	}}
-	for _, policy := range []ManualProfilePolicy{ManualProfileFallback, ManualProfileAugment, ManualProfileOverride} {
-		view := catalog.Resolve(ResolveRequest{SysObjectID: "1.3.6.1.4", ManualProfiles: []string{"/private/SECRET/a-manual.yaml", "missing"}, ManualPolicy: policy}).
-			Project(ConsumerMetrics, ConsumerLicensing, ConsumerBGP)
-		c := view.Context(250000, 64<<20)
-		data := c.Snapshot()
-		require.Equal(t, "available", data.State)
-		require.Equal(t, []string{"a-manual", "missing"}, data.ManualProfiles)
-		require.Equal(t, []string{"missing"}, data.MissingManualProfiles)
-		require.Equal(t, "full", data.BGPMode)
-		require.Len(t, data.Selected, len(view.Profiles()))
-		for i, p := range data.Selected {
-			require.Equal(t, i+1, p.ProjectedOrdinal)
-			require.Equal(t, 1, p.Projection.Metrics)
-			if policy == ManualProfileAugment {
-				if p.Source.ID == "a-manual.yaml" {
-					require.EqualValues(t, 0, *p.AcquisitionIndex)
+			missingProfiles: []string{"missing"},
+			sources:         []string{"z-auto.yaml"},
+			projected:       []int{1},
+			acquisition:     []uint32{0},
+			bgpMode:         "full",
+		},
+		"augment appends manual selection": {
+			request: ResolveRequest{
+				SysObjectID:    "1.3.6.1.4",
+				ManualProfiles: []string{"/private/SECRET/a-manual.yaml", "missing"},
+				ManualPolicy:   ManualProfileAugment,
+			},
+			consumers:     []ProfileConsumer{ConsumerMetrics, ConsumerLicensing, ConsumerBGP},
+			manualPolicy:  "augment",
+			manualApplied: true,
+			manualProfiles: []string{
+				"a-manual",
+				"missing",
+			},
+			missingProfiles: []string{"missing"},
+			sources:         []string{"z-auto.yaml", "a-manual.yaml"},
+			projected:       []int{1, 2},
+			acquisition:     []uint32{1, 0},
+			bgpMode:         "full",
+		},
+		"override uses manual selection": {
+			request: ResolveRequest{
+				SysObjectID:    "1.3.6.1.4",
+				ManualProfiles: []string{"/private/SECRET/a-manual.yaml", "missing"},
+				ManualPolicy:   ManualProfileOverride,
+			},
+			consumers:     []ProfileConsumer{ConsumerMetrics, ConsumerLicensing, ConsumerBGP},
+			manualPolicy:  "override",
+			manualApplied: true,
+			manualProfiles: []string{
+				"a-manual",
+				"missing",
+			},
+			missingProfiles: []string{"missing"},
+			sources:         []string{"a-manual.yaml"},
+			projected:       []int{1},
+			acquisition:     []uint32{0},
+			bgpMode:         "full",
+		},
+		"unmatched OID does not fall back to manual": {
+			request: ResolveRequest{
+				SysObjectID:    "9.9",
+				ManualProfiles: []string{"a-manual"},
+			},
+			consumers:      []ProfileConsumer{ConsumerMetrics},
+			manualPolicy:   "fallback",
+			manualProfiles: []string{"a-manual"},
+			bgpMode:        "absent",
+		},
+		"selected profile has no topology projection": {
+			request:      ResolveRequest{SysObjectID: "1.3.6.1.4"},
+			consumers:    []ProfileConsumer{ConsumerTopology},
+			manualPolicy: "fallback",
+			sources:      []string{"z-auto.yaml"},
+			projected:    []int{0},
+			bgpMode:      "absent",
+		},
+		"missing OID uses manual fallback": {
+			request:        ResolveRequest{ManualProfiles: []string{"a-manual"}},
+			consumers:      []ProfileConsumer{ConsumerMetrics},
+			manualPolicy:   "fallback",
+			manualApplied:  true,
+			manualProfiles: []string{"a-manual"},
+			sources:        []string{"a-manual.yaml"},
+			projected:      []int{1},
+			acquisition:    []uint32{0},
+			bgpMode:        "absent",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			catalog := &Catalog{profiles: []*Profile{
+				{SourceFile: "z-auto.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+					Selector: ddprofiledefinition.SelectorSpec{
+						{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{Include: []string{"1.3.6.1.*"}}},
+					},
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.1.0", Name: "metric"}},
+					},
+				}},
+				{SourceFile: "a-manual.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.0", Name: "manual_metric"}},
+					},
+				}},
+			}}
+
+			view := catalog.Resolve(tc.request).Project(tc.consumers[0], tc.consumers[1:]...)
+			context := view.Context(250000, 64<<20)
+			data := context.Snapshot()
+			require.Equal(t, "available", data.State)
+			require.Equal(t, tc.manualPolicy, data.ManualPolicy)
+			require.Equal(t, tc.manualApplied, data.ManualApplied)
+			require.Equal(t, tc.manualProfiles, data.ManualProfiles)
+			require.Equal(t, tc.missingProfiles, data.MissingManualProfiles)
+			require.Equal(t, tc.bgpMode, data.BGPMode)
+			require.Len(t, data.Selected, len(tc.sources))
+			for i, profile := range data.Selected {
+				require.Equal(t, tc.sources[i], profile.Source.ID)
+				require.Equal(t, tc.projected[i], profile.ProjectedOrdinal)
+				if profile.ProjectedOrdinal == 0 {
+					require.Nil(t, profile.AcquisitionIndex)
+					require.Equal(t, ProfileProjectionCounts{}, profile.Projection)
 				} else {
-					require.EqualValues(t, 1, *p.AcquisitionIndex)
+					require.NotNil(t, profile.AcquisitionIndex)
+					require.Equal(t, tc.acquisition[i], *profile.AcquisitionIndex)
+					require.Equal(t, 1, profile.Projection.Metrics)
+				}
+				if profile.Source.ID == "z-auto.yaml" {
+					require.Equal(t, "selector", profile.Origin)
+					require.Equal(t, "1.3.6.1.*", profile.MatchedSelector)
+				} else {
+					require.Equal(t, "manual", profile.Origin)
 				}
 			}
-			if p.Source.ID == "z-auto.yaml" {
-				require.Equal(t, "selector", p.Origin)
-				require.Equal(t, "1.3.6.1.*", p.MatchedSelector)
-			} else {
-				require.Equal(t, "manual", p.Origin)
+			encoded, err := json.Marshal(data)
+			require.NoError(t, err)
+			require.NotContains(t, string(encoded), "SECRET")
+			if len(data.Selected) > 0 {
+				data.Selected[0].Source.ID = "mutated"
+				require.NotEqual(t, "mutated", context.Snapshot().Selected[0].Source.ID)
 			}
-		}
-		encoded, err := json.Marshal(data)
-		require.NoError(t, err)
-		require.NotContains(t, string(encoded), "SECRET")
-		data.Selected[0].Source.ID = "mutated"
-		require.NotEqual(t, "mutated", c.Snapshot().Selected[0].Source.ID)
-		data.ManualProfiles[0] = "mutated"
-		require.Equal(t, "a-manual", c.Snapshot().ManualProfiles[0])
+			if len(data.ManualProfiles) > 0 {
+				data.ManualProfiles[0] = "mutated"
+				require.Equal(t, tc.manualProfiles, context.Snapshot().ManualProfiles)
+			}
+		})
 	}
-	// Fallback does not retry manual selection after a present but unmatched OID.
-	absent := catalog.Resolve(ResolveRequest{SysObjectID: "9.9", ManualProfiles: []string{"a-manual"}}).
-		Project(ConsumerMetrics).
-		Context(250000, 64<<20).
-		Snapshot()
-	require.Empty(t, absent.Selected)
-	require.False(t, absent.ManualApplied)
-	// The selector matched, but the topology projection contains no applicable data.
-	projectedAway := catalog.Resolve(ResolveRequest{SysObjectID: "1.3.6.1.4"}).Project(ConsumerTopology).Context(250000, 64<<20).Snapshot()
-	require.Len(t, projectedAway.Selected, 1)
-	require.Zero(t, projectedAway.Selected[0].ProjectedOrdinal)
-	require.Equal(t, ProfileProjectionCounts{}, projectedAway.Selected[0].Projection)
-	missingOID := catalog.Resolve(ResolveRequest{ManualProfiles: []string{"a-manual"}}).
-		Project(ConsumerMetrics).
-		Context(250000, 64<<20).
-		Snapshot()
-	require.True(t, missingOID.ManualApplied)
-	require.Equal(t, "manual", missingOID.Selected[0].Origin)
 }
 
 func TestProfileContextLoadedSourcesAndAdmission(t *testing.T) {
@@ -106,36 +196,84 @@ func TestProfileContextLoadedSourcesAndAdmission(t *testing.T) {
 	rr, rb := restored.Shape()
 	require.Equal(t, records, rr)
 	require.Equal(t, size, rb)
-	require.Equal(t, "limit_exceeded", v.Context(records-1, size).Snapshot().State)
-	require.Equal(t, "limit_exceeded", v.Context(records, size-1).Snapshot().State)
-	require.Equal(t, data, v.Context(records, size).Snapshot())
+	tests := map[string]struct {
+		records, bytes uint64
+		state          string
+	}{
+		"record limit": {records: records - 1,
+			bytes: size,
+			state: "limit_exceeded"},
+		"byte limit": {records: records,
+			bytes: size - 1,
+			state: "limit_exceeded"},
+		"exact fit": {records: records,
+			bytes: size,
+			state: "available"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := v.Context(tc.records, tc.bytes).Snapshot()
+			require.Equal(t, tc.state, got.State)
+			if tc.state == "available" {
+				require.Equal(t, data, got)
+			}
+		})
+	}
+
 }
 
 func TestProfileContextFourSurfacesAndTopologyPruning(t *testing.T) {
-	p := projectionTestProfile()
-	resolved := (&Catalog{profiles: []*Profile{p}}).Resolve(
-		ResolveRequest{ManualProfiles: []string{"projection"}, ManualPolicy: ManualProfileAugment},
-	)
-	normal := resolved.Project(ConsumerMetrics, ConsumerLicensing, ConsumerBGP).Context(250000, 64<<20).Snapshot()
-	require.Equal(t, "available", normal.State)
-	require.Equal(t, "full", normal.BGPMode)
-	require.Equal(t, 2, normal.Selected[0].Projection.Metrics)
-	require.Equal(t, 1, normal.Selected[0].Projection.Licensing)
-	require.Equal(t, 3, normal.Selected[0].Projection.BGP)
-	require.Zero(t, normal.Selected[0].Projection.Topology)
-	topology := resolved.Project(ConsumerTopology, ConsumerBGP).FilterBGPToTopologyPeers().Context(250000, 64<<20).Snapshot()
-	require.Equal(t, "available", topology.State)
-	require.Equal(t, "topology_peers", topology.BGPMode)
-	require.Equal(t, 2, topology.Selected[0].Projection.Topology)
-	require.Equal(t, 1, topology.Selected[0].Projection.BGP)
-	require.Zero(t, topology.Selected[0].Projection.Metrics)
-	require.Zero(t, topology.Selected[0].Projection.Licensing)
-	vlan := resolved.Project(ConsumerTopology).
-		FilterByKind(map[ddprofiledefinition.TopologyKind]bool{ddprofiledefinition.KindLldpRem: true}).
-		Context(250000, 64<<20).
-		Snapshot()
-	require.Equal(t, "available", vlan.State)
-	require.Equal(t, []string{string(ddprofiledefinition.KindLldpRem)}, vlan.TopologyKinds)
-	require.Equal(t, 1, vlan.Selected[0].Projection.Topology)
-	require.Equal(t, "absent", vlan.BGPMode)
+	tests := map[string]struct {
+		consumers                         []ProfileConsumer
+		topologyPeers                     bool
+		kinds                             map[ddprofiledefinition.TopologyKind]bool
+		bgpMode                           string
+		topologyKinds                     []string
+		metrics, topology, licensing, bgp int
+	}{
+		"normal metrics licensing and full BGP": {
+			consumers: []ProfileConsumer{ConsumerMetrics, ConsumerLicensing, ConsumerBGP},
+			bgpMode:   "full",
+			metrics:   2,
+			licensing: 1,
+			bgp:       3,
+		},
+		"topology and pruned BGP peers": {
+			consumers:     []ProfileConsumer{ConsumerTopology, ConsumerBGP},
+			topologyPeers: true,
+			bgpMode:       "topology_peers",
+			topology:      2,
+			bgp:           1,
+		},
+		"VLAN topology kind filter": {
+			consumers:     []ProfileConsumer{ConsumerTopology},
+			kinds:         map[ddprofiledefinition.TopologyKind]bool{ddprofiledefinition.KindLldpRem: true},
+			bgpMode:       "absent",
+			topologyKinds: []string{string(ddprofiledefinition.KindLldpRem)},
+			topology:      1,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			resolved := (&Catalog{profiles: []*Profile{projectionTestProfile()}}).Resolve(
+				ResolveRequest{ManualProfiles: []string{"projection"}, ManualPolicy: ManualProfileAugment},
+			)
+			view := resolved.Project(tc.consumers[0], tc.consumers[1:]...)
+			if tc.topologyPeers {
+				view = view.FilterBGPToTopologyPeers()
+			}
+			if tc.kinds != nil {
+				view = view.FilterByKind(tc.kinds)
+			}
+			data := view.Context(250000, 64<<20).Snapshot()
+			require.Equal(t, "available", data.State)
+			require.Equal(t, tc.bgpMode, data.BGPMode)
+			require.Equal(t, tc.topologyKinds, data.TopologyKinds)
+			require.Len(t, data.Selected, 1)
+			require.Equal(t, tc.metrics, data.Selected[0].Projection.Metrics)
+			require.Equal(t, tc.topology, data.Selected[0].Projection.Topology)
+			require.Equal(t, tc.licensing, data.Selected[0].Projection.Licensing)
+			require.Equal(t, tc.bgp, data.Selected[0].Projection.BGP)
+		})
+	}
 }

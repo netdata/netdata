@@ -554,43 +554,68 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 }
 
 func TestCollectorRefreshRecordsSysUptimeFailureWithoutFailingTopology(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	dev := ddsnmp.DeviceConnectionInfo{
-		Hostname:    "192.0.2.10",
-		Port:        161,
-		SNMPVersion: gosnmp.Version2c.String(),
+	tests := map[string]struct {
+		packet *gosnmp.SnmpPacket
+		err    error
+		want   snmputils.Failure
+	}{
+		"request failure": {
+			err:  errors.New("private sysUptime failure"),
+			want: snmputils.Failure{Operation: "sys_uptime", Reason: "unknown"},
+		},
+		"packet failure": {
+			packet: &gosnmp.SnmpPacket{Error: gosnmp.AuthorizationError, ErrorIndex: 2},
+			want: snmputils.Failure{
+				Operation:    "sys_uptime",
+				Reason:       "packet_error",
+				PacketStatus: uint8(gosnmp.AuthorizationError),
+				ErrorIndex:   2,
+			},
+		},
 	}
-	mockHandler := snmpmock.NewMockHandler(ctrl)
-	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
-	mockHandler.EXPECT().Get(gomock.InAnyOrder([]string{
-		snmputils.OidSnmpEngineTime,
-		snmputils.OidHrSystemUptime,
-		snmputils.OidSysUpTime,
-	})).Return(nil, errors.New("private sysUptime failure"))
-	mockHandler.EXPECT().Close().Return(nil)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	coll := newTestSNMPTopologyCollector()
-	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
-	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
-		return []*ddsnmp.Profile{{}}
-	}
-	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
-	}
+			dev := ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.10",
+				Port:        161,
+				SNMPVersion: gosnmp.Version2c.String(),
+			}
+			mockHandler := snmpmock.NewMockHandler(ctrl)
+			expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
+			mockHandler.EXPECT().Get(gomock.InAnyOrder([]string{
+				snmputils.OidSnmpEngineTime,
+				snmputils.OidHrSystemUptime,
+				snmputils.OidSysUpTime,
+			})).Return(tc.packet, tc.err)
+			mockHandler.EXPECT().Close().Return(nil)
 
-	snapshot, outcome, capture := coll.refreshDeviceTopology(
-		context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(), coll.currentTopologyAcquisitionLimits(),
-	)
-	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
-	require.NotNil(t, snapshot)
-	require.Equal(t, successfulAcquisitionPhase(), capture.evidence.collection)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureSysUptime), capture.evidence.sysUptime)
-	requireRetainedStringsExclude(t, capture.evidence.collectionContexts, "private sysUptime failure")
-	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
-	require.NoError(t, err)
-	require.Equal(t, snapshot.observation, replayed.observation)
+			coll := newTestSNMPTopologyCollector()
+			coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+			coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+				return []*ddsnmp.Profile{{}}
+			}
+			coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+				return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
+			}
+
+			snapshot, outcome, capture := coll.refreshDeviceTopology(
+				context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(), coll.currentTopologyAcquisitionLimits(),
+			)
+			require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
+			require.NotNil(t, snapshot)
+			require.Equal(t, successfulAcquisitionPhase(), capture.evidence.collection)
+			require.Equal(t, topologyAcquisitionPhaseFailed, capture.evidence.sysUptime.outcome)
+			require.Equal(t, topologyAcquisitionFailureSysUptime, capture.evidence.sysUptime.failure)
+			require.Equal(t, tc.want, capture.evidence.sysUptime.detail)
+			requireRetainedStringsExclude(t, capture.evidence.collectionContexts, "private sysUptime failure")
+			replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
+			require.NoError(t, err)
+			require.Equal(t, snapshot.observation, replayed.observation)
+		})
+	}
 }
 
 func TestCollectorRefreshRecordsClientConfigurationFailureInAttemptAndContext(t *testing.T) {
@@ -2065,47 +2090,4 @@ func BenchmarkCollectorRefreshDueDeviceWithAcquisition(b *testing.B) {
 			}
 		})
 	}
-}
-
-func TestCollectorRefreshRecordsSysUptimePacketFailureWithoutFailingTopology(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	dev := ddsnmp.DeviceConnectionInfo{
-		Hostname:    "192.0.2.10",
-		Port:        161,
-		SNMPVersion: gosnmp.Version2c.String(),
-	}
-	mockHandler := snmpmock.NewMockHandler(ctrl)
-	expectTopologyRefreshSNMPClientConnect(mockHandler, dev)
-	mockHandler.EXPECT().Get(gomock.InAnyOrder([]string{
-		snmputils.OidSnmpEngineTime,
-		snmputils.OidHrSystemUptime,
-		snmputils.OidSysUpTime,
-	})).Return(&gosnmp.SnmpPacket{Error: gosnmp.AuthorizationError, ErrorIndex: 2}, nil)
-	mockHandler.EXPECT().Close().Return(nil)
-
-	coll := newTestSNMPTopologyCollector()
-	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
-	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
-		return []*ddsnmp.Profile{{}}
-	}
-	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
-	}
-
-	snapshot, outcome, capture := coll.refreshDeviceTopology(
-		context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(), coll.currentTopologyAcquisitionLimits(),
-	)
-	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
-	require.NotNil(t, snapshot)
-	require.Equal(t, successfulAcquisitionPhase(), capture.evidence.collection)
-	require.Equal(t, topologyAcquisitionPhaseFailed, capture.evidence.sysUptime.outcome)
-	require.Equal(t, "packet_error", capture.evidence.sysUptime.detail.Reason)
-	require.EqualValues(t, gosnmp.AuthorizationError, capture.evidence.sysUptime.detail.PacketStatus)
-	require.EqualValues(t, 2, capture.evidence.sysUptime.detail.ErrorIndex)
-	requireRetainedStringsExclude(t, capture.evidence.collectionContexts, "private sysUptime failure")
-	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
-	require.NoError(t, err)
-	require.Equal(t, snapshot.observation, replayed.observation)
 }

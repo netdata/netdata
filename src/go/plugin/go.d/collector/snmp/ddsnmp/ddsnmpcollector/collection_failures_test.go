@@ -77,44 +77,74 @@ func TestCollectionFailuresObserveWarmPollAndRecovery(t *testing.T) {
 	}
 }
 
-func TestDiagnosticClientDoesNotInferSuccessfulWalkTermination(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
-	defer ctrl.Finish()
-	handler.EXPECT().BulkWalkAll("1.3.6").Return([]gosnmp.SnmpPDU{}, nil)
-	var failures ddsnmp.CollectionFailures
-	client := &diagnosticClient{Handler: handler, failures: &failures}
-	values, err := client.BulkWalkAll("1.3.6")
-	require.NoError(t, err)
-	require.Empty(t, values)
-	require.Zero(t, failures.WALK.Count)
-	require.Empty(t, failures.WALK.Last.Reason)
-}
-
-func TestDiagnosticClientPreservesPacketAndWalkFailures(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
-	defer ctrl.Finish()
-	var failures ddsnmp.CollectionFailures
-	client := &diagnosticClient{Handler: handler, failures: &failures}
-	packet := &gosnmp.SnmpPacket{Error: gosnmp.NoSuchName, ErrorIndex: 2}
-	handler.EXPECT().Get([]string{"1.3.6"}).Return(packet, nil)
-	got, err := client.Get([]string{"1.3.6"})
-	require.NoError(t, err)
-	require.Same(t, packet, got)
-	require.EqualValues(t, gosnmp.NoSuchName, failures.GET.Last.PacketStatus)
-	require.EqualValues(t, 2, failures.GET.Last.ErrorIndex)
-	values := []gosnmp.SnmpPDU{{Name: "1.3.6.1", Type: gosnmp.Integer, Value: 1}}
-	handler.EXPECT().BulkWalkAll("1.3.6").Return(values, context.DeadlineExceeded)
-	gotValues, err := client.BulkWalkAll("1.3.6")
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Equal(t, values, gotValues)
-	require.Equal(t, "deadline", failures.WALK.Last.Reason)
-	require.True(t, failures.Valid())
+func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
+	tests := map[string]struct {
+		get    bool
+		packet *gosnmp.SnmpPacket
+		values []gosnmp.SnmpPDU
+		err    error
+		want   ddsnmp.CollectionFailures
+	}{
+		"packet error preserves response and index": {
+			get:    true,
+			packet: &gosnmp.SnmpPacket{Error: gosnmp.NoSuchName, ErrorIndex: 2},
+			want: ddsnmp.CollectionFailures{
+				GET: ddsnmp.FailureCount{
+					Count: 1,
+					Last: snmputils.Failure{
+						Operation:    "get",
+						Reason:       "packet_error",
+						PacketStatus: uint8(gosnmp.NoSuchName),
+						ErrorIndex:   2,
+					},
+				},
+			},
+		},
+		"empty successful walk has no inferred termination reason": {values: []gosnmp.SnmpPDU{}},
+		"failed walk preserves partial values": {
+			values: []gosnmp.SnmpPDU{{Name: "1.3.6.1", Type: gosnmp.Integer, Value: 1}},
+			err:    context.DeadlineExceeded,
+			want: ddsnmp.CollectionFailures{
+				WALK: ddsnmp.FailureCount{Count: 1, Last: snmputils.Failure{Operation: "walk", Reason: "deadline"}},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl, handler := setupMockHandler(t)
+			defer ctrl.Finish()
+			var failures ddsnmp.CollectionFailures
+			client := &diagnosticClient{Handler: handler, failures: &failures}
+			var err error
+			if tc.get {
+				handler.EXPECT().Get([]string{"1.3.6"}).Return(tc.packet, tc.err)
+				var packet *gosnmp.SnmpPacket
+				packet, err = client.Get([]string{"1.3.6"})
+				require.Same(t, tc.packet, packet)
+			} else {
+				handler.EXPECT().BulkWalkAll("1.3.6").Return(tc.values, tc.err)
+				var values []gosnmp.SnmpPDU
+				values, err = client.BulkWalkAll("1.3.6")
+				require.Equal(t, tc.values, values)
+			}
+			if tc.err != nil {
+				require.ErrorIs(t, err, tc.err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.want, failures)
+			require.True(t, failures.Valid())
+		})
+	}
 }
 
 func TestReplacementClientKeepsFailureObservation(t *testing.T) {
 	ctrl, handler := setupMockHandler(t)
 	defer ctrl.Finish()
-	profile := createTestProfile("scalar.yaml", []ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.3.0", Name: "uptime"}}})
+	profile := createTestProfile(
+		"scalar.yaml",
+		[]ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.3.0", Name: "uptime"}}},
+	)
 	c := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 	c.SetSNMPClient(handler)
 	expectSNMPGetError(handler, []string{"1.3.6.1.2.1.1.3.0"}, gosnmp.ErrWrongDigest)
@@ -130,8 +160,21 @@ func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
 	const first = oid + ".1.0"
 	const second = oid + ".2.0"
 	profile := &ddsnmp.Profile{SourceFile: "mixed.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-		Metadata:            ddprofiledefinition.MetadataConfig{"device": {Fields: map[string]ddprofiledefinition.MetadataField{"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: second, Name: "serial"}}}}},
-		SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{{SysobjectID: oid, Metadata: map[string]ddprofiledefinition.MetadataField{"model": {Symbol: ddprofiledefinition.SymbolConfig{OID: first, Name: "model", Format: "uint32"}}}}},
+		Metadata: ddprofiledefinition.MetadataConfig{
+			"device": {
+				Fields: map[string]ddprofiledefinition.MetadataField{
+					"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: second, Name: "serial"}},
+				},
+			},
+		},
+		SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+			{
+				SysobjectID: oid,
+				Metadata: map[string]ddprofiledefinition.MetadataField{
+					"model": {Symbol: ddprofiledefinition.SymbolConfig{OID: first, Name: "model", Format: "uint32"}},
+				},
+			},
+		},
 	}}
 	c := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, SysObjectID: oid, Log: logger.New()})
 	expectSNMPGet(handler, []string{first}, []gosnmp.SnmpPDU{createStringPDU(first, "invalid number")})

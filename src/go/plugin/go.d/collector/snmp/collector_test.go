@@ -761,6 +761,7 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 		manualProfiles []string
 		wantErr        string
 		wantAbsent     []string
+		wantContextOID string
 	}{
 		"empty system query": {
 			wantErr: "SNMP system scalar query returned no PDUs",
@@ -781,6 +782,7 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			manualProfiles: []string{"generic-device"},
 			wantErr:        "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
 			wantAbsent:     []string{"manual_profiles"},
+			wantContextOID: "1.3.6.1.2.1.999",
 		},
 		"invalid manual profile": {
 			manualProfiles: []string{"profile-that-does-not-exist"},
@@ -826,10 +828,10 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 				require.NoError(t, err)
 				return
 			}
-			if name == "unmatched system object" {
+			if tc.wantContextOID != "" {
 				context := collr.deviceLifecycleInfo.Profiles.Snapshot()
 				require.Equal(t, "available", context.State)
-				require.Equal(t, "1.3.6.1.2.1.999", context.SysObjectID)
+				require.Equal(t, tc.wantContextOID, context.SysObjectID)
 				require.Empty(t, context.Selected)
 				require.False(t, context.ManualApplied)
 				require.Equal(t, "no_profiles", collr.deviceLifecycleStatus.Failure.Reason)
@@ -1647,48 +1649,83 @@ func sysInfoOIDsForTest() []string {
 
 func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
 	const metadataOID = "1.3.6.1.4.1.99999.1.0"
-	for _, reason := range []string{"wrong_digest", "processing", "partial_processing"} {
-		t.Run(reason, func(t *testing.T) {
+	tests := map[string]struct {
+		getErr        error
+		staticVendor  bool
+		attempts      int
+		outcome       ddsnmp.DeviceLifecycleOutcome
+		reason        string
+		profiles, get uint64
+		processing    int64
+	}{
+		"authentication failure before initialization": {
+			getErr:   gosnmp.ErrWrongDigest,
+			attempts: 2,
+			outcome:  ddsnmp.DeviceLifecycleOutcomeFailed,
+			reason:   "wrong_digest",
+			profiles: 1,
+			get:      1,
+		},
+		"processing failure before initialization": {
+			attempts:   2,
+			outcome:    ddsnmp.DeviceLifecycleOutcomeFailed,
+			reason:     "processing",
+			profiles:   1,
+			processing: 1,
+		},
+		"partial metadata failures survive successful collection": {
+			staticVendor: true,
+			attempts:     1,
+			outcome:      ddsnmp.DeviceLifecycleOutcomeSuccess,
+			processing:   2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			handler := snmpmock.NewMockHandler(gomock.NewController(t))
 			handler.EXPECT().MaxOids().Return(20).AnyTimes()
 			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 			handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{}, nil)
 			var packet *gosnmp.SnmpPacket
-			var getErr error = gosnmp.ErrWrongDigest
-			if reason != "wrong_digest" {
-				packet = &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")}}}
-				getErr = nil
+			if tc.getErr == nil {
+				packet = &gosnmp.SnmpPacket{
+					Variables: []gosnmp.SnmpPDU{{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")}},
+				}
 			}
-			handler.EXPECT().Get([]string{metadataOID}).Return(packet, getErr).Times(2)
+			handler.EXPECT().Get([]string{metadataOID}).Return(packet, tc.getErr).Times(2)
 			collector := newTestSNMPCollector()
 			collector.Config = prepareV2Config()
 			collector.Ping.Enabled = false
 			collector.CreateVnode = true
 			collector.snmpClient = handler
-			collector.snmpProfiles = []*ddsnmp.Profile{{SourceFile: "metadata.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-				Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: map[string]ddprofiledefinition.MetadataField{"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serial", Format: "uint32"}}}}},
-			}}}
-			if reason == "partial_processing" {
-				fields := collector.snmpProfiles[0].Definition.Metadata["device"].Fields
-				fields["vendor"] = ddprofiledefinition.MetadataField{Value: "synthetic"}
-				collector.Collect(context.Background())
-				require.Equal(t, ddsnmp.DeviceLifecycleOutcomeSuccess, collector.deviceLifecycleStatus.Outcome)
-				require.EqualValues(t, 2, collector.deviceLifecycleStatus.CollectionFailures.Processing.Preparation, "metadata-only and profile preparation failures must survive the successful collection")
-				return
+			fields := map[string]ddprofiledefinition.MetadataField{
+				"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serial", Format: "uint32"}},
 			}
-			for range 2 {
-				require.Nil(t, collector.Collect(context.Background()))
+			if tc.staticVendor {
+				fields["vendor"] = ddprofiledefinition.MetadataField{Value: "synthetic"}
+			}
+			collector.snmpProfiles = []*ddsnmp.Profile{{SourceFile: "metadata.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+				Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: fields}},
+			}}}
+			for range tc.attempts {
+				metrics := collector.Collect(context.Background())
 				status := collector.deviceLifecycleStatus
-				require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, status.Outcome)
-				require.Equal(t, "metadata", status.Failure.Operation)
-				require.Equal(t, reason, status.Failure.Reason)
-				require.EqualValues(t, 1, status.CollectionFailures.Profiles.Count, "retries are separate attempts")
-				if reason == "wrong_digest" {
-					require.EqualValues(t, 1, status.CollectionFailures.GET.Count)
-					require.Equal(t, reason, status.CollectionFailures.GET.Last.Reason)
-				} else {
-					require.Zero(t, status.CollectionFailures.GET.Count)
-					require.EqualValues(t, 1, status.CollectionFailures.Processing.Preparation)
+				require.Equal(t, tc.outcome, status.Outcome)
+				require.Equal(t, tc.reason, status.Failure.Reason)
+				if tc.outcome == ddsnmp.DeviceLifecycleOutcomeFailed {
+					require.Nil(t, metrics)
+					require.Equal(t, "metadata", status.Failure.Operation)
+				}
+				require.Equal(t, tc.profiles, status.CollectionFailures.Profiles.Count, "retries are separate attempts")
+				require.Equal(t, tc.get, status.CollectionFailures.GET.Count)
+				require.Equal(
+					t,
+					tc.processing,
+					status.CollectionFailures.Processing.Preparation,
+					"successful collection must retain earlier metadata failures",
+				)
+				if tc.get != 0 {
+					require.Equal(t, tc.reason, status.CollectionFailures.GET.Last.Reason)
 				}
 			}
 		})
