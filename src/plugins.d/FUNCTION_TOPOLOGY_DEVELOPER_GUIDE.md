@@ -277,7 +277,10 @@ Common actor identity columns:
 - `vsphere_moid`
 - `vsphere_inventory_path`
 
-Actor types define source-local identity and cross-source merge identity:
+Actor types define source-local identity and cross-source merge identity. The
+following actor-type excerpt is not a complete payload. The enclosing payload
+must declare the listed scope IDs in `types.aggregation_scopes`, provide the
+referenced actor columns, and define the referenced label and port tables:
 
 ```json
 {

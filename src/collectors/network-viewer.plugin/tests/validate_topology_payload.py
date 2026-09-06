@@ -52,26 +52,37 @@ def load_payload(path):
 
 
 def aggregation_scope_reference_errors(types):
-    """Return actor-type references that have no matching scope definition."""
+    """Require well-formed actor scope memberships and declared scope IDs."""
     if not isinstance(types, dict):
-        return []
+        return ["types is not an object"]
 
     actor_types = types.get("actor_types")
     aggregation_scopes = types.get("aggregation_scopes", {})
-    if not isinstance(actor_types, dict) or not isinstance(aggregation_scopes, dict):
-        return []
+    if not isinstance(actor_types, dict):
+        return ["types.actor_types is not an object"]
+    if not isinstance(aggregation_scopes, dict):
+        return ["types.aggregation_scopes is not an object"]
 
     errors = []
     for actor_type_id, actor_type in actor_types.items():
         if not isinstance(actor_type, dict):
+            errors.append(f"actor type {actor_type_id!r} is not an object")
             continue
         actor_scopes = actor_type.get("aggregation_scopes", [])
         if not isinstance(actor_scopes, list):
             errors.append(
                 f"actor type {actor_type_id!r} aggregation_scopes is not an array")
             continue
+        seen = set()
         for scope_id in actor_scopes:
-            if isinstance(scope_id, str) and scope_id not in aggregation_scopes:
+            if not isinstance(scope_id, str) or not scope_id:
+                errors.append(
+                    f"actor type {actor_type_id!r} aggregation_scopes members must be non-empty strings")
+                continue
+            if scope_id in seen:
+                errors.append(f"actor type {actor_type_id!r} repeats aggregation scope {scope_id!r}")
+            seen.add(scope_id)
+            if scope_id not in aggregation_scopes:
                 errors.append(
                     f"actor type {actor_type_id!r} references undefined "
                     f"aggregation scope {scope_id!r}")
@@ -105,7 +116,7 @@ def semantic_checks(data, expect_mode=None, expect_group_by=None):
         t = d.get(table)
         if not isinstance(t, dict) or "columns" not in t or "values" not in t:
             errors.append(f"{table} table missing columns/values")
-    if "types" not in d or "actor_types" not in d.get("types", {}):
+    if not isinstance(d.get("types"), dict) or "actor_types" not in d["types"]:
         errors.append("missing types.actor_types registry")
     else:
         errors.extend(aggregation_scope_reference_errors(d["types"]))
@@ -206,7 +217,121 @@ def run_self_test():
             "self-test FAILED: topology schema did not select Draft 2020-12; got",
             validator.__class__.__name__)
         return 1
+    if run_payload_validation_self_test(schema_file):
+        return 1
     print("self-test OK")
+    return 0
+
+
+def self_test_payload_result(data, schema_file, missing_dependency, expected, prefix):
+    """Check status and diagnostic prefix to pin validation-branch precedence."""
+    from contextlib import redirect_stdout
+    from unittest.mock import patch
+
+    unavailable = {"jsonschema": None} if missing_dependency else {}
+    with patch.dict(sys.modules, unavailable), redirect_stdout(io.StringIO()) as output:
+        result = validate_payload(data, schema_file, None, None)
+    if result != expected or not output.getvalue().startswith(prefix):
+        print("self-test FAILED: payload validation result", result, output.getvalue())
+        return False
+    return True
+
+
+def run_payload_validation_self_test(schema_file):
+    """Exercise the actual validator with and without its optional dependency."""
+    fixture = os.path.join(
+        os.path.dirname(schema_file), "..", "go", "tools", "functions-validation",
+        "fixtures", "topology-v1", "network-connections.json")
+    payload = load_payload(fixture)
+    payload["v"] = 3
+    for missing in (False, True):
+        cases = (
+            (payload, 0, "jsonschema not available;" if missing else "OK:"),
+            (dict(payload, v=2), 1, "SEMANTIC FAILURES:"),
+            (dict(payload, unexpected=True), 0 if missing else 1,
+             "jsonschema not available;" if missing else "SCHEMA FAILURES"),
+            (dict(payload, v=2, unexpected=True), 1,
+             "SEMANTIC FAILURES:" if missing else "SCHEMA FAILURES"),
+        )
+        for data, expected, prefix in cases:
+            if not self_test_payload_result(data, schema_file, missing, expected, prefix):
+                return 1
+    return (run_scope_validation_self_test(payload, schema_file)
+            or run_schema_errors_self_test(payload))
+
+
+def run_scope_validation_self_test(payload, schema_file):
+    """Reject malformed scope metadata even when JSON Schema is unavailable."""
+    import copy
+
+    bad_objects = (None, True, 7, 1.5, "scope", [])
+    cases = (
+        (("types",), bad_objects, True),
+        (("types", "actor_types"), bad_objects, True),
+        (("types", "aggregation_scopes"), bad_objects, True),
+        (("types", "actor_types", "process"), bad_objects, True),
+        (("types", "actor_types", "process", "aggregation_scopes"),
+         (None, True, 7, 1.5, "pid", {}, [None], [True], [7], [1.5], [{}], [[]], [""],
+          ["pid", "pid"]), True),
+        (("types", "actor_types", "process", "aggregation_scopes"), (["undefined_scope"],), False),
+    )
+    for path, values, schema_rejects in cases:
+        for value in values:
+            data = copy.deepcopy(payload)
+            target = data["data"]
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = value
+            for missing in (False, True):
+                prefix = "SCHEMA FAILURES" if schema_rejects and not missing else "SEMANTIC FAILURES:"
+                if not self_test_payload_result(data, schema_file, missing, 1, prefix):
+                    print("scope case:", path, repr(value), "missing dependency:", missing)
+                    return 1
+
+    for omit_memberships in (False, True):
+        for omit_registry in (False, True):
+            data = copy.deepcopy(payload)
+            types = data["data"]["types"]
+            for actor_type in types["actor_types"].values():
+                actor_type["aggregation_scopes"] = []
+                if omit_memberships:
+                    actor_type.pop("aggregation_scopes")
+            types["aggregation_scopes"] = {}
+            if omit_registry:
+                types.pop("aggregation_scopes")
+            for missing in (False, True):
+                prefix = "jsonschema not available;" if missing else "OK:"
+                if not self_test_payload_result(data, schema_file, missing, 0, prefix):
+                    return 1
+    return 0
+
+
+def run_schema_errors_self_test(payload):
+    """Schema file errors must not be mistaken for a missing optional library."""
+    import tempfile
+    from contextlib import redirect_stdout
+    from unittest.mock import patch
+    from jsonschema.exceptions import SchemaError
+
+    cases = (("{", False, json.JSONDecodeError), ("{", True, json.JSONDecodeError),
+             ('{"type":"invalid"}', False, SchemaError), ('{"type":"invalid"}', True, None))
+    for content, missing, exception in cases:
+        with tempfile.TemporaryDirectory() as directory:
+            schema_file = os.path.join(directory, "schema.json")
+            with io.open(schema_file, "w", encoding="utf-8") as output:
+                output.write(content)
+            if exception is None:
+                if not self_test_payload_result(payload, schema_file, missing, 0, "jsonschema not available;"):
+                    return 1
+                continue
+            unavailable = {"jsonschema": None} if missing else {}
+            try:
+                with patch.dict(sys.modules, unavailable), redirect_stdout(io.StringIO()):
+                    validate_payload(payload, schema_file, None, None)
+            except exception:
+                continue
+            print("self-test FAILED: schema file did not raise", exception.__name__)
+            return 1
     return 0
 
 
@@ -241,7 +366,7 @@ def validate_payload(data, schema_file, expect_mode, expect_group_by):
     schema = json.load(io.open(schema_file, encoding='utf-8'))
 
     try:
-        import jsonschema
+        validator = schema_validator(schema)
     except ImportError:
         errors = semantic_checks(data, expect_mode, expect_group_by)
         if errors:
@@ -252,7 +377,6 @@ def validate_payload(data, schema_file, expect_mode, expect_group_by):
         print("jsonschema not available; semantic checks passed")
         return 0
 
-    validator = schema_validator(schema)
     errs = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
     if errs:
         print(f"SCHEMA FAILURES ({len(errs)}):")
