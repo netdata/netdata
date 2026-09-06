@@ -111,6 +111,10 @@ This skill holds only what the documents below lack. Point at them; do not resta
       resource classes, in one chart.
     - Declare `lifecycle` explicitly on every chart that creates per-source or per-resource instances instead of
       relying on the loader's defaults; expired instances are removed and a returning identity starts a fresh series.
+    - On a chart that carries a `state` rule, `lifecycle.expire_after_cycles` must outlast `state.ttl`: the TTL
+      publishes the clear value once and only then expires the series, so a chart that expires first leaves the
+      problem state as the last value. The loader validates the two fields independently and never compares them.
+      A rule's `where:` is evaluated before its `state.set_when`/`clear_when` predicates.
     - Never use the community varbind or another sensitive varbind (`model.IsSensitiveVarbind`) as a predicate or
       sample source; redaction happens downstream, not in rule validation.
     - Profile rules describe vendor or site semantics, never receiver health. Profile metrics update only after the
@@ -130,8 +134,9 @@ This skill holds only what the documents below lack. Point at them; do not resta
 2. **Subcommands** are `extract`, `classify`, `emit`, `generate`, and `compress-zstd` (`usage`). `generate` is
    extract plus optional classify plus emit; the three stages exist separately for reruns on saved artifacts.
 
-3. **Extraction stays incremental.** The corpus is too large for one MIB universe: keep batch-based gomib loading
-   (`--batch-size`, default 32), deterministic source priority, and the review artifacts under `--out-dir`:
+3. **Extraction stays incremental and memory-bounded.** The corpus is too large for one MIB universe: keep
+   batch-based gomib loading (`--batch-size`, default 32), deterministic source priority, and the review artifacts
+   under `--out-dir`:
    `traps.jsonl`, `extraction-report.json`, `conflicts.json` (duplicate trap OIDs), `dot0-conflicts.json` (both
    `.0.` spellings present), `source-conflicts.json` (one module name in several files). `--baseline-profiles-dir`
    adds a stock-overlap report. If source discovery changes, rerun a representative multi-vendor corpus before
@@ -164,7 +169,8 @@ This skill holds only what the documents below lack. Point at them; do not resta
 
 7. **`catalogue.json` stays in sync.** Each entry (`profileCatalogueEntry`) records `file`, `mib_count`, `mibs`,
    `sample_traps`, `trap_count`, `trap_oids`, `varbind_count`, `sha256`, and `metric_rule_names` when the profile
-   has rules (omitted otherwise, which is every stock file today). `sha256` is 64 lowercase hex over the exact bytes
+   has rules (omitted otherwise, which is every stock file today; emitting stock rules also needs the curation path
+   described in profile check 12). `sha256` is 64 lowercase hex over the exact bytes
    written, comments and final newline included; lazy hydration verifies it
    (`TestStockProfileCatalogueRequiresValidSHA256`). Catalog tests load all shipped profiles and require the manifest
    and the files to agree in both directions
@@ -216,8 +222,9 @@ per-severity counters); nothing pins the generator's or the loader's sets. A cha
    chart dimensions in `charts.yaml` and `metadata.yaml`, the OTLP severity mapping (`otlpSeverity` in
    `internal/output/otlp`), and the `PRIORITY` mapping in `internal/output/journal` (`grep -rn` the slug across
    `snmp_traps/`).
-4. Health: `src/health/health.d/snmp_traps.conf` has one alert template per severity dimension, mirrored in the
-   `alerts:` list of `metadata.yaml`; a renamed or removed slug silently breaks them. `grep -rn` the slug across
+4. Health: `src/health/health.d/snmp_traps.conf` has severity-rate alert templates for `emerg`, `alert`, `crit`,
+   `err`, and `warning` (`notice`, `info`, `debug` deliberately do not alert), mirrored in the `alerts:` list of
+   `metadata.yaml`; a renamed or removed slug silently breaks them. `grep -rn` the slug across
    `src/health/health.d/` too.
 5. Docs: `profile-format.md` category and severity tables; `docs/npm/snmp-traps/configuration.md`,
    `field-reference.md`, `metrics.md`, `alerts.md` where they list the sets.
@@ -229,9 +236,9 @@ Add tests that pin the generator's and the loader's sets when you touch them.
 
 - Stock profile YAMLs stay raw in the repository so `git diff` reviews them.
 - The pack build (CMake) runs the generator's `compress-zstd --rm` subcommand via `go run` on a copy of the pack and
-  installs `*.yaml.zst` plus `catalogue.json.zst`. The loader accepts profiles as `.yaml.zst`, `.yml.zst`, `.yaml`, or
-  `.yml` (`internal/catalog/load.go`) and the manifest as `catalogue.json` or `catalogue.json.zst`, never gzip
-  (`internal/catalog/stock.go`).
+  installs `*.yaml.zst` plus `catalogue.json.zst`; the installed pack must stay compressed. The loader accepts
+  profiles as `.yaml.zst`, `.yml.zst`, `.yaml`, or `.yml` (`internal/catalog/load.go`) and the manifest as
+  `catalogue.json` or `catalogue.json.zst`, never gzip (`internal/catalog/stock.go`).
 - Operator profiles stay uncompressed `.yaml` for editability.
 - If one vendor file passes about 10 MB in the repository, cut description verbosity rather than hide generated bloat
   behind compression.

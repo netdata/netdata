@@ -447,7 +447,9 @@ because the other backend may still hold it.
 preflighted at job start (connectivity Ready + an empty export within `request_timeout`), so an unreachable collector
 fails the job rather than dropping traps silently. The worker batches (`batch_size` 512 / `flush_interval` 200 ms);
 a failed batch is **retained and retried** on the next trigger while the full queue exerts backpressure
-(`ErrQueueFull`); entries are dropped only in the final close drain, always accounted. One log record per trap:
+(`ErrQueueFull`); entries are dropped only in the final close drain, always accounted. When OTLP is the only sink,
+that queue is the only buffer: a full queue or a close drain loses traps, so OTLP alone is not durable storage. One
+log record per trap:
 `Body` = message, semconv-style attributes (`snmp.trap.*`, `network.peer.*`, `netdata.*` — deliberately *not* the
 `TRAP_*` names), varbinds as one `snmp.varbinds` KVList reusing the same sensitive-varbind and duplicate-key rules as
 the journal. Severity follows the OpenTelemetry Logs Data Model, Appendix B (syslog mapping), so ordering survives
@@ -505,7 +507,8 @@ rule names). Rules come from the profiles (Stage 3) and turn traps into time-ser
   deterministic because dispatch is sorted at compile time.
 - `Collect` snapshots under the runtime lock, then writes to the metrix store **outside** it; the chart template is
   generated once by merging the base `charts.yaml` with per-rule charts plus a diagnostics chart
-  (`rule_missed`, `extraction_failed`, `attribution_failed`, `overflow_dropped`, `source_transitions`).
+  (`rule_missed`, `extraction_failed`, `attribution_failed`, `overflow_dropped`, `source_transitions`), and
+  `ChartTemplateYAML()` serves exactly that compiled template — never a debug dump or a hand-maintained copy.
 
 ## Startup and Shutdown
 
