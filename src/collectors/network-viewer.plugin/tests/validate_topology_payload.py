@@ -89,6 +89,40 @@ def aggregation_scope_reference_errors(types):
     return errors
 
 
+def actor_search_label_key_errors(types):
+    """Validate optional search label keys without normalizing literal keys."""
+    if not isinstance(types, dict) or not isinstance(types.get("actor_types"), dict):
+        return []
+
+    errors = []
+    for actor_type_id, actor_type in types["actor_types"].items():
+        if not isinstance(actor_type, dict):
+            continue
+        search = actor_type.get("search")
+        # A null policy is absent in semantic-only validation, matching the Go helper.
+        if search is None:
+            continue
+        path = f"actor type {actor_type_id!r} search"
+        if not isinstance(search, dict):
+            errors.append(f"{path} is not an object")
+            continue
+        if "label_keys" not in search:
+            continue
+        keys = search["label_keys"]
+        if not isinstance(keys, list):
+            errors.append(f"{path}.label_keys is not an array")
+            continue
+        seen = set()
+        for key in keys:
+            if not isinstance(key, str) or not key:
+                errors.append(f"{path}.label_keys members must be non-empty strings")
+                continue
+            if key in seen:
+                errors.append(f"{path}.label_keys repeats {key!r}")
+            seen.add(key)
+    return errors
+
+
 def network_viewer_actor_type_errors(types):
     """Enforce network-viewer's endpoint actor contract."""
     if not isinstance(types, dict) or not isinstance(types.get("actor_types"), dict):
@@ -121,6 +155,7 @@ def semantic_checks(data, expect_mode=None, expect_group_by=None):
     else:
         errors.extend(aggregation_scope_reference_errors(d["types"]))
         errors.extend(network_viewer_actor_type_errors(d["types"]))
+        errors.extend(actor_search_label_key_errors(d["types"]))
     if "presentation" not in d:
         errors.append("missing presentation")
     view = d.get("view")
@@ -257,6 +292,7 @@ def run_payload_validation_self_test(schema_file):
             if not self_test_payload_result(data, schema_file, missing, expected, prefix):
                 return 1
     return (run_scope_validation_self_test(payload, schema_file)
+            or run_search_validation_self_test(payload, schema_file)
             or run_schema_errors_self_test(payload))
 
 
@@ -302,6 +338,44 @@ def run_scope_validation_self_test(payload, schema_file):
             for missing in (False, True):
                 prefix = "jsonschema not available;" if missing else "OK:"
                 if not self_test_payload_result(data, schema_file, missing, 0, prefix):
+                    return 1
+    return 0
+
+
+def run_search_validation_self_test(payload, schema_file):
+    """Validate literal label keys independently of presentation and schema availability."""
+    import copy
+
+    omitted = object()
+    cases = [
+        (omitted, 0, 0), ({}, 0, 0), ({"label_keys": []}, 0, 0),
+        ({"label_keys": ["_hostname", "_os", "_labels", "app/name", "主机", " ", "\t",
+                         " _hostname ", "é", "e\u0301"]}, 0, 0),
+        (None, 1, 0), ({"enabled": 7}, 1, 0), ({"columns": None}, 1, 0),
+        ({"enabled": False, "label_keys": [""]}, 1, 1),
+    ]
+    cases.extend((value, 1, 1) for value in (False, 7, 1.5, "", []))
+    invalid_keys = (None, False, 7, 1.5, "", {}, [""], ["_hostname", "_hostname"],
+                    [7], [None], [True], [{}], [[]], [" ", " "])
+    cases.extend(({"label_keys": value}, 1, 1) for value in invalid_keys)
+    for search, schema_result, fallback_result in cases:
+        for omit_presentation in (False, True):
+            data = copy.deepcopy(payload)
+            actor_type = data["data"]["types"]["actor_types"]["process"]
+            if omit_presentation:
+                actor_type.pop("presentation", None)
+            if search is omitted:
+                actor_type.pop("search", None)
+            else:
+                actor_type["search"] = search
+            for missing in (False, True):
+                expected = fallback_result if missing else schema_result
+                prefix = "jsonschema not available;" if missing else "OK:"
+                if expected:
+                    prefix = "SEMANTIC FAILURES:" if missing else "SCHEMA FAILURES"
+                if not self_test_payload_result(data, schema_file, missing, expected, prefix):
+                    print("search case:", repr(search), "missing dependency:", missing,
+                          "without presentation:", omit_presentation)
                     return 1
     return 0
 
