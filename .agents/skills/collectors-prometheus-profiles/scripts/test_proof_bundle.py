@@ -52,7 +52,14 @@ class ProofBundleLauncherTest(unittest.TestCase):
         caller = Path.cwd() / "caller"
         self.assertEqual(
             launcher.normalize_arguments(["verify", "--testdata-root", "--profile", "ceph"], caller),
-            ["verify", "--repo-root", str(launcher.repo_root(launcher.__file__)), "--testdata-root", "--profile", "ceph"],
+            [
+                "verify",
+                "--repo-root",
+                str(launcher.repo_root(launcher.__file__)),
+                "--testdata-root",
+                "--profile",
+                "ceph",
+            ],
         )
 
     def test_leading_flag_instead_of_subcommand_is_passed_to_the_tool(self) -> None:
