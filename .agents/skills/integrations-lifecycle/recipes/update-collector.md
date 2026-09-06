@@ -23,17 +23,17 @@ Keep `config_schema.json`, the stock `.conf`, and `health.d/*.conf` synchronized
 
 ## 4. Validate locally
 
-Dependencies and the complete command list: `integrations/README.md`. The scoped form:
+Interpreter and dependencies: `integrations/README.md` (look for `<repo>/.venv/` first).
 
 ```bash
 python3 integrations/gen_integrations.py
+python3 integrations/gen_docs_integrations.py --check
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
-python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
-python3 integrations/gen_doc_collector_page.py
 ```
 
-Do not skip the page generators: they validate the source locally even though their output stays unstaged. Run
-`gen_doc_secrets_page.py` or `gen_doc_service_discovery_page.py` too when a secret store or discoverer changed.
+Do not regenerate the pages for the PR; CI does it after merge, and the extra changed lines make review harder. If you
+regenerate to read the rendered page (`gen_docs_integrations.py -c go.d.plugin/<module>`), undo the changes to tracked
+files before committing.
 
 ## 5. Before opening the PR
 

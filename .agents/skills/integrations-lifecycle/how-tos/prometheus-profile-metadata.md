@@ -41,5 +41,5 @@ For every stock profile:
 - `python3 -m unittest integrations.tests.test_prometheus_profile_docs` enforces stock-profile reachability, view/chart/
   family parity, support projection, the public chart-field allowlist, absence of internal questions, inherited-YAML
   isolation, complete metric mappings, and grouped table output. Both integration workflows run it.
-- Regenerate the application page (`gen_docs_integrations.py -c go.d.plugin/prometheus`) and, when the catalog gains or
-  loses an entry, `src/collectors/COLLECTORS.md`; review the catalog sentence as public product copy.
+- Review the catalog sentence and operator-model brief as public product copy; if you regenerate the page or
+  `src/collectors/COLLECTORS.md` to read them, undo those tracked changes before committing.

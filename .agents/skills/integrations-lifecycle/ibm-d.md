@@ -97,11 +97,13 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 
    ```bash
    python3 integrations/gen_integrations.py
-   python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>
-   python3 integrations/gen_doc_collector_page.py
+   python3 integrations/gen_docs_integrations.py --check
    ```
 
-5. Confirm the generated diff contains only the expected derived changes, then leave the documentation outputs unstaged.
+   Regenerating the page (`python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>`) is optional; it
+   also repairs the page `go generate` overwrote through the README symlink.
+5. Confirm the diff contains only the expected changes, then undo every change to `metadata.yaml`, `README.md`, and
+   `integrations/<slug>.md` before committing; they arrive through the post-merge PR.
 
 ## What generation does and does not cover
 

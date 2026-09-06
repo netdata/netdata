@@ -140,7 +140,9 @@ Before committing `metadata.yaml` changes:
    Both workflows run the same two test modules; `check-markdown.yml` runs `test_descriptions` with `LEARN_INGEST_PATH`
    pointing at the checked-out `netdata/learn` ingest script, so a locally green run can still fail there on Learn-side
    frontmatter parsing.
-2. Regenerate `src/collectors/COLLECTORS.md` (`python3 integrations/gen_doc_collector_page.py`).
+2. To read the results, regenerate `src/collectors/COLLECTORS.md` (`python3 integrations/gen_doc_collector_page.py`) and
+   the page (`python3 integrations/gen_docs_integrations.py -c <plugin>/<module>`), then undo those tracked changes
+   before committing (`consistency.md`, "Delivery boundary").
 3. Read the table row description and generated page frontmatter for the integration. Both must answer "what is this
    integration?" without relying on setup context and stay useful when rendered alone in a list, card, or search result.
 4. For a collector, run the review checklist in `.agents/skills/collectors-metadata-yaml/SKILL.md` over the rest of the

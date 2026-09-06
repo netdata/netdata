@@ -52,26 +52,29 @@ schema file does not show; the facts an author hits most:
   `.agents/skills/collectors-go-design/config-schema.md`.
 - `health.d/<name>.conf`: each alert SHOULD have a matching row under `metadata.yaml` `alerts[]`.
 
-## 4. Run the pipeline locally
+## 4. Validate locally
 
-Dependencies and the full command list: `integrations/README.md`. The scoped form for one collector:
+Interpreter and dependencies: `integrations/README.md` (look for `<repo>/.venv/` first).
 
 ```bash
 python3 integrations/gen_integrations.py
+python3 integrations/gen_docs_integrations.py --check
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
-python3 integrations/gen_docs_integrations.py -c go.d.plugin/<name>
-python3 integrations/gen_doc_collector_page.py
 ```
 
-Expected: `integrations/integrations.js` and `integrations.json` regenerated (gitignored);
-`src/go/plugin/go.d/collector/<name>/integrations/<slug>.md` created with the `<!--startmeta` banner, your
-`sidebar_label`, and a `learn_rel_path` under `Collecting Metrics/Collectors/<category>`; `README.md` becomes a symlink
-to it (the directory holds exactly one integration); `src/collectors/COLLECTORS.md` lists the collector in its section.
-If `gen_integrations.py` exits non-zero, the warning names the file and the schema violation.
+Do not regenerate the pages for the PR; CI does it after merge, and the extra changed lines make review harder. To read
+the rendered page once, run `python3 integrations/gen_docs_integrations.py -c go.d.plugin/<name>` and `python3
+integrations/gen_doc_collector_page.py`, then undo the changes to tracked files before committing.
+
+Expected: `gen_integrations.py` exits 0 (a non-zero exit names the file and the schema violation) and rewrites the
+gitignored `integrations/integrations.js` and `integrations.json`; `--check` counts your collector. A rendered page, if
+you generated one, is `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md` with the `<!--startmeta` banner, your
+`sidebar_label`, and a `learn_rel_path` under `Collecting Metrics/Collectors/<category>`, plus a `README.md` symlink and
+a row in `src/collectors/COLLECTORS.md`; all of these arrive through the post-merge PR.
 
 ## 5. Verify
 
-- Read the generated page and the `COLLECTORS.md` row; both are public copy.
+- Read your catalog sentence and page description as public copy (`../description-authoring.md`).
 - From `src/go`, run `timeout 15s go run ./cmd/godplugin -m <name> -d`. Success: the module registers, a job starts, and
   the command runs until the timeout stops it. `unknown module`, `no jobs started`, config-load errors, or an immediate
   exit are failures. Use `-c <config-dir>` for a non-standard config path.
@@ -90,6 +93,5 @@ umbrella pages (`../consistency.md`, "Delivery boundary"). The Learn page appear
 
 - Forgetting one consistency artifact: the most common review finding. Enumerate them in the PR description.
 - Hand-editing `integrations/<slug>.md` after generation. Never. Edit `metadata.yaml` and regenerate.
-- Skipping `gen_doc_collector_page.py` locally, so the collector's absence from `COLLECTORS.md` goes unnoticed until the
-  regen PR.
+- Committing regenerated pages or umbrella pages with the source change.
 - A category typo, or a display name whose slug collides with an existing collector (section 2).

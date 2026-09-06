@@ -40,9 +40,11 @@ short contributor-facing version.
   produced them. Both workflows run `go generate` and fail on drift in those two files (step "Verify generated runtime
   outputs"). `go generate` also writes through the module's `README.md` symlink into the generated integration page;
   leave that page unstaged (`ibm-d.md`).
-- Local regeneration is still mandatory validation: run the pipeline (`integrations/README.md` lists the commands and
-  dependencies), inspect the complete generated diff, rerun to confirm it is a fixed point (a second run changes
-  nothing), then leave every generated file unstaged.
+- Validate locally with `gen_integrations.py`, `gen_docs_integrations.py --check`, and the unit tests
+  (`integrations/README.md` lists the commands and where the dependencies live). Do NOT regenerate the tracked pages as
+  a routine step: the regenerated pages add many changed lines to the PR and make review harder, and CI produces them
+  after merge anyway. When you do regenerate (to read a rendered page, or to check that a generator change converges on
+  a second run), undo every change to tracked generated files before committing.
 - `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
   does NOT assert that regeneration leaves the checkout clean, so an uncommitted regeneration diff never fails a source
   PR. Earlier guidance that described a clean generated diff as a PR gate was wrong.

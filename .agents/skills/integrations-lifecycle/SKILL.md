@@ -19,9 +19,9 @@ Facts every reader needs:
   `message: "DO NOT EDIT..."` line (a `<!--startmeta` block alone is not the marker; hand-authored Learn pages have one
   too), and the umbrella pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md` (no banner) are
   generated. Do not edit them.
-- Source PRs carry sources; generated documentation arrives through the post-merge `integrations-regen` PR. Local
-  regeneration is mandatory validation, its output stays unstaged. The one place this boundary is written out, with its
-  ibm.d runtime-output exception, is `consistency.md`.
+- Source PRs carry sources; generated documentation arrives through the post-merge `integrations-regen` PR. Validate
+  with `gen_integrations.py` and the tests; do not regenerate pages for the PR, and undo generated changes if you did.
+  The one place this boundary is written out, with its ibm.d runtime-output exception, is `consistency.md`.
 - The collector taxonomy (`taxonomy.yaml`, `gen_taxonomy.py`) is a dormant early implementation kept for later work;
   nothing runs it. Do not author, extend, or seed taxonomy content (`consistency.md`, "The dormant collector taxonomy").
 
