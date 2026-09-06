@@ -648,7 +648,7 @@ and users' `journalctl` queries all depend on them. Serialization order is fixed
 | `TRAP_CATEGORY`, `TRAP_SEVERITY` | Closed-taxonomy classification (severity written verbatim) |
 | `TRAP_PDU_TYPE`, `TRAP_VERSION` | `trap`/`inform`, `v1`/`v2c`/`v3` |
 | `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER` | Selected source vs raw peer (`ip:port`) |
-| `TRAP_REVERSE_DNS`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS` | Enrichment results |
+| `TRAP_REVERSE_DNS`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS` | Enrichment results; each is omitted when empty, never written as an empty string (the OTLP attributes mirror this) |
 | `TRAP_ENRICHMENT` | JSON audit of every enrichment decision (statuses, reasons, applied fields) |
 
 **Dynamic families:**
