@@ -15,7 +15,7 @@ Citations name files and symbols, never line numbers. Dependencies and the comma
 | 3 | `integrations/gen_doc_collector_page.py` | `integrations.js` | `src/collectors/COLLECTORS.md` | yes |
 | 4 | `integrations/gen_doc_secrets_page.py` | `integrations.js` | `src/collectors/SECRETS.md` | yes |
 | 5 | `integrations/gen_doc_service_discovery_page.py` | `integrations.js` | `src/collectors/SERVICE-DISCOVERY.md` | yes |
-| aside | `integrations/gen_taxonomy.py`, `check_collector_taxonomy.py` | `taxonomy.yaml` files, `integrations/taxonomy/` | `integrations/taxonomy.json` | gitignored; dormant, see `consistency.md` "The collector taxonomy gate" |
+| none | `integrations/gen_taxonomy.py`, `check_collector_taxonomy.py` | `taxonomy.yaml` files, `integrations/taxonomy/` | `integrations/taxonomy.json` | gitignored; dormant and not run by CI (`consistency.md`, "The dormant collector taxonomy") |
 
 Stage 0 MUST run before stage 1 whenever its inputs or generators change; both workflows do so, and locally a skipped
 stage 0 leaves the tracked NPM metadata stale while every later stage still succeeds. Stages 2 to 5 read the same
@@ -87,7 +87,10 @@ For collectors (`render_collectors`; the other types follow the same shape):
 
 Custom Jinja delimiters (`get_jinja_env`): `[[ ]]` for variables, `[% %]` for statements, `[# #]` for comments, so the
 templates can emit the frontend's own `{% details %}`, `{% relatedResource %}`, `{% if $showClaimingOptions %}` and
-`{{ }}` markers verbatim (`integrations/templates/README.md`).
+`{{ }}` markers verbatim (`integrations/templates/README.md`). `templates/overview.md` is a dispatcher: one
+`[% elif entry.integration_type == '<type>' %][% include 'overview/<type>.md' %]` branch per type, so a type without a
+branch renders an empty overview and then fails the description preflight with "Missing description source".
+`templates/setup/sample-*-config.md` hold the per-plugin sample configuration blocks `setup-generic.md` includes.
 
 ## Stage 1: outputs
 
@@ -143,7 +146,8 @@ so change both together. Every `integration_type` except `device` lands in its o
 `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, `service_discovery`); how the
 `device` pages attach is the Learn side, the `docs-learn-site-structure` skill.
 
-Every page opens with the block `create_frontmatter` emits, in this order and quoting, followed by the type's message:
+Every page opens with the block `create_frontmatter` emits (`custom_edit_url` is injected afterwards by
+`add_custom_edit_url`), in this order and quoting, followed by the type's message:
 
 ```markdown
 <!--startmeta
@@ -178,10 +182,11 @@ that holds exactly one page (multi-integration directories keep their hand-writt
   (`_get_ordered_sections`). The row description is the first sentence of the rendered `## Overview`
   (`get_integration_description`, `extract_description_from_overview` in `descriptions.py`), falling back to
   `meta.monitored_instance.description`, then `Monitor <name>`; the `description-authoring.md` contract follows from
-  that. `_render_tech_navigation` hardcodes the marketing navigation;
-  `integrations/tests/test_collector_page_navigation.py`
+  that. `_render_tech_navigation` hardcodes the marketing navigation; `integrations/tests/test_collector_page_navigation.py`
   requires every target to be an emitted section anchor or `#beyond-the-850-integrations`, so a category or heading
-  change updates the mapping and the test together. The "850+ integrations" header is a literal.
+  change updates the mapping and the test together, and because no workflow runs that test, run it by hand
+  (`python3 -m unittest integrations.tests.test_collector_page_navigation`). The "850+ integrations" header is a
+  literal.
 - `gen_doc_secrets_page.py` and `gen_doc_service_discovery_page.py` render `src/collectors/SECRETS.md` and
   `SERVICE-DISCOVERY.md` from the `secretstore` and `service_discovery` entries through `templates/secrets.md` and
   `templates/service_discovery.md` (the two templates `get_section_template_name` never returns); only the backends and
@@ -197,18 +202,17 @@ that holds exactly one page (multi-integration directories keep their hand-writt
 schemas, templates, generators, and tests above, except that `integrations/logs/metadata.yaml` is missing from the
 list): stage 0 (`gen_npm_catalog.py`, `go generate` for ibm.d), the
 "Verify generated runtime outputs" gate (`git diff --exit-code` on ibm.d `config_schema.json` and
-`zz_generated_contexts.go`, plus a check that both are tracked for every module), stage 1, `gen_taxonomy.py`, the unit
-test modules `test_taxonomy`, `test_descriptions`, `test_prometheus_profile_docs`, `test_collector_metadata`, stages 2
-to 5, `rm` of the gitignored catalogs and the NPM side report, then `peter-evans/create-pull-request` on branch
+`zz_generated_contexts.go`, plus a check that both are tracked for every module), stage 1, the unit test modules
+`test_descriptions`, `test_prometheus_profile_docs`, `test_collector_metadata`, stages 2 to 5, `rm` of the gitignored
+catalogs and the NPM side report, then `peter-evans/create-pull-request` on branch
 `integrations-regen` (label `integrations-update`, title "Regenerate integrations docs", token
 `NETDATABOT_GITHUB_TOKEN`), and a Slack notification on failure.
 
 `.github/workflows/check-markdown.yml` (pull requests, path-filtered on Markdown, docs, metadata, `integrations/**`, the
-profile and ibm.d producer inputs): checks out the PR with full history (the taxonomy gate diffs against the base) and
-`netdata/learn`, installs Learn's hash-pinned ingest requirements plus `pip.sh`, then runs stage 0, the same
-runtime-output
-gate, stage 1, `check_collector_taxonomy.py --pr-diff`, the same four test modules (`test_descriptions` with
-`LEARN_INGEST_PATH` set to Learn's ingest script), stages 2 to 5 with the dcstat step between 2 and 3, and finally
-`learn/ingest/ingest.py --local-repo netdata:... --ignore-on-prem-repo --fail-links-netdata`. It fails a PR on
-generation errors, the taxonomy gate, test failures, or unresolved links; it does NOT compare the regenerated pages with
-the committed ones. What the two workflows mean for a source PR is in `consistency.md`, "Delivery boundary".
+profile and ibm.d producer inputs): checks out the PR (with full history) and `netdata/learn`, installs Learn's
+hash-pinned ingest requirements plus `pip.sh`, then runs stage 0, the same runtime-output gate, stage 1, the same three
+test modules (`test_descriptions` with `LEARN_INGEST_PATH` set to Learn's ingest script), stages 2 to 5 with the dcstat
+step between 2 and 3, and finally `learn/ingest/ingest.py --local-repo netdata:... --ignore-on-prem-repo
+--fail-links-netdata`. It fails a PR on generation errors, test failures, or unresolved links; it does NOT compare the
+regenerated pages with the committed ones. `integrations/tests/test_collector_page_navigation.py` and `test_taxonomy.py`
+exist but no workflow runs them. What the two workflows mean for a source PR is in `consistency.md`, "Delivery boundary".

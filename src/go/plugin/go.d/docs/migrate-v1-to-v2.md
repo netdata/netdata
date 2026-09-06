@@ -55,7 +55,6 @@ Create a compatibility manifest before implementation. The manifest can live in 
    - chart lifecycle and obsoletion timing.
 5. Integration artifacts.
    - `metadata.yaml`;
-   - `taxonomy.yaml` (reseed it when contexts change so the taxonomy CI gate passes);
    - health alerts;
    - generated integration page and README symlink;
    - `COLLECTORS.md` / plugin README entries when affected;
@@ -138,7 +137,6 @@ Unless the user approves a breaking change, the migration MUST preserve:
 - health alert lookups;
 - metadata metric descriptions and units;
 - source metadata content that drives generated integration docs;
-- the taxonomy CI gate (`.agents/skills/integrations-lifecycle/consistency.md`);
 - service-discovery behavior;
 - vnode behavior;
 - user-facing lifecycle behavior.
@@ -283,7 +281,6 @@ At minimum:
   variable referenced by alert calculations must still be provided by a dimension, variable-equivalent design, or
   approved alert change;
 - generated integration artifact consistency when metadata changes;
-- the taxonomy CI gate when chart contexts change;
 - host-scope tests if scopes/vnodes are preserved or introduced.
 
 `collecttest.AssertChartCoverage` is not a replacement for chart-identity parity. It verifies that emitted series and

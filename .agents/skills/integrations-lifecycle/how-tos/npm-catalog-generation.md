@@ -66,7 +66,8 @@ generator:
 `integrations/templates/setup-generic.md` makes "nothing to configure" a first-class state: an empty `prerequisites`
 list renders `No action required.` and an empty `configuration.file.name` renders `There is no configuration file.`
 Never point an entry at a config file it does not use to fill the section. The template renders the UI / File
-configuration table only when `meta.plugin_name == 'go.d.plugin'`, so entries owned by other plugins skip it correctly.
+configuration table only for `meta.plugin_name == 'go.d.plugin'` entries without `setup.single_job`, so entries owned
+by other plugins skip it correctly.
 
 ## Verify entries against the collector's own metadata
 

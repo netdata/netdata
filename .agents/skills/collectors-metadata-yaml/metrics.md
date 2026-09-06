@@ -74,7 +74,7 @@ pointer done as a table; the size rule above does not count it. Exemplar: `cloud
 ## 4. `dynamic_context_prefixes` And `availability`
 
 - `dynamic_context_prefixes` (and `dynamic_collect_plugins`) are read only by the dormant collector taxonomy tooling
-  and render nowhere on the page (`integrations-lifecycle/consistency.md`, "The collector taxonomy gate"). Do not add
+  and render nowhere on the page (`integrations-lifecycle/consistency.md`, "The dormant collector taxonomy"). Do not add
   them to document runtime-only contexts; describe those in `metrics.description` in operator terms instead. The
   existing declarations stay until the taxonomy is redesigned.
 - `availability` adds one column per value to every metrics table, marking which rows exist in which variant

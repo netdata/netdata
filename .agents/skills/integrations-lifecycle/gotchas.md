@@ -12,9 +12,10 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   unused. Do not rely on it, and track any revival as its own issue first.
 - `integrations/schemas/distros.json` is declared but never consulted: `main()` loads `.github/data/distros.yml` with
   `load_yaml` and hands it to `render_deploy` unvalidated. Garbage in that file produces broken `platform_info` tables
-  with no error.
+  with no error. Track any wiring-up as its own issue first.
 - The `cid == 'flows'` branch in `gen_doc_collector_page.py` refers to a top-level category that no longer exists
-  (`network-performance-monitoring` replaced it); it is dead and safe to remove.
+  (`network-performance-monitoring` replaced it); it is dead. Earlier guidance to keep it was written before the
+  category moved; removing it is optional cleanup, not required by any current change.
 
 ## Silent behaviors
 
@@ -34,9 +35,7 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   anywhere.
 - The community badge is chosen by key presence (`"community" in integration["meta"]`), not by value: `community:
   false` still renders the Community badge. Every current use is `true`.
-- `generate-integrations.yml` is path-filtered on the sources it regenerates from, but `integrations/logs/metadata.yaml`
-  is not in the list; a logs metadata change merged alone does not open the regeneration PR until another trigger
-  fires.
+
 - `PRESERVE_FILES` in `gen_docs_integrations.py` and the dcstat removal step in `check-markdown.yml` are a coupled pair
   around one Learn redirect migration (`pipeline.md`, Stage 2). A local full regeneration therefore keeps a page whose
   source directory no longer produces it; that is intended until the Learn catalog is republished.
@@ -47,14 +46,13 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   the generator rejects; validate through `make_validator()` only (`pipeline.md`, Stage 1).
 - `fail_on_warnings()` fails the run on any warning at all, deduplicated by file path. Cosmetic issues block the
   regeneration PR.
-- `related_resources.integrations.list[]` uses the Draft-7 `dependencies` keyword (`module_name` required when
-  `monitored_instance_name` is set); nothing else in the schemas uses it.
+
 - `integrations/cloud-notifications/metadata.yaml` and `integrations/cloud-authentication/metadata.yaml` are single
   files holding arrays; the loaders branch on `if 'id' in data` to accept either one entry or an array. Most other
   types have one file per integration.
 - `COLLECTOR_SOURCES` lists `src/go/plugin/ibm.d/modules/websphere` separately from `.../modules`, and
   `TAXONOMY_SOURCES` lists each ebpfgo `taxonomy.yaml` individually, because the recursive glob is one level deep.
-  A new nested module directory needs the same treatment or it is silently skipped.
+  A new nested module directory needs the same treatment or it is silently skipped (`pipeline.md`, sources table).
 - `integrations/pip.sh` and `packaging/cmake/Modules/NetdataRenderDocs.cmake` list the same Python packages and MUST be
   changed together (`pip.sh` says so in a comment). `markdown-it-py` is a runtime dependency of generation, not a
   test-only one: `gen_integrations.py` imports `_common`, which imports `descriptions`, which imports `markdown_it`.

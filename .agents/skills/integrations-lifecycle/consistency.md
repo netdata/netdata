@@ -5,6 +5,7 @@ artifact (root `AGENTS.md`, "Collector Consistency"):
 
 1. **The code**: the collector implementation files.
 2. **`metadata.yaml`**: the integration page driver (field content: `.agents/skills/collectors-metadata-yaml/`).
+   A sibling `taxonomy.yaml` is not part of this list ("The dormant collector taxonomy" below).
 3. **`config_schema.json`**: the dashboard's DynCfg editor (form rules:
    `.agents/skills/collectors-go-design/config-schema.md`).
 4. **The stock `.conf`**: what `/etc/netdata/<plugin>/...` ships.
@@ -40,7 +41,8 @@ short contributor-facing version.
   (step "Verify generated runtime outputs"). `go generate` also writes through the module's `README.md` symlink into
   the generated integration page; leave that page unstaged (`ibm-d.md`).
 - Local regeneration is still mandatory validation: run the pipeline (`integrations/README.md` lists the commands and
-  dependencies), inspect the complete generated diff, then leave every generated file unstaged.
+  dependencies), inspect the complete generated diff, rerun to confirm it is a fixed point (a second run changes
+  nothing), then leave every generated file unstaged.
 - `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
   does NOT assert that regeneration leaves the checkout clean, so an uncommitted regeneration diff never fails a source
   PR. Earlier guidance that described a clean generated diff as a PR gate was wrong.
@@ -50,36 +52,21 @@ short contributor-facing version.
 
   ```bash
   git status --porcelain |
-    rg '^(\?\?|!!| M|M |A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
+    rg '^(\?\?| M|M |MM|A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
   ```
 
   The command MUST print nothing. If it names a catalog or the side report, remove the local artifact from the commit
   (or delete the untracked report) rather than committing it.
 
-## The collector taxonomy gate
+## The dormant collector taxonomy
 
-The collector taxonomy (`taxonomy.yaml` next to a `metadata.yaml`, `integrations/gen_taxonomy.py`, the gitignored
-`integrations/taxonomy.json`) is a dormant proof of concept. It has no consumer, its design will change, and nothing in
-this repository's skills documents how to author it. Its PR gate is still live, though:
-
-- `integrations/check_collector_taxonomy.py --pr-diff <base>...<head>` (step "Check Collector Taxonomy" in
-  `check-markdown.yml`) does two things and fails on any fatal finding: `check_touched_coverage` emits `TAX030` when
-  the PR adds or deletes a collector `metadata.yaml` under the collector source roots, or changes a module's set of
-  metric contexts (`metrics.scopes[].metrics[].name`) or its `metrics.dynamic_*` declarations, and the collector
-  directory has no `taxonomy.yaml`; then `build_taxonomy()` validates every committed `taxonomy.yaml` against the
-  metadata, so a stale file (a context renamed in metadata but not in the taxonomy) also fails.
-- To satisfy it, seed a minimal file from the metadata and commit it with the collector. The seed script prints to
-  stdout unless `--output` is given:
-
-  ```bash
-  python3 integrations/gen_taxonomy_seed.py <collector-dir>/metadata.yaml --module-name <module> \
-    --section-id <id from integrations/taxonomy/sections.yaml> --placement-id <module> --icon <icon id> \
-    --output <collector-dir>/taxonomy.yaml
-  python3 integrations/gen_taxonomy.py --check-only
-  ```
-
-  Reseed after adding, removing, or renaming contexts. Do not invest in richer taxonomy layouts.
-- Prose-only metadata edits do not trigger the gate.
+`taxonomy.yaml` files next to some `metadata.yaml` files, `integrations/gen_taxonomy.py`, `gen_taxonomy_seed.py`,
+`check_collector_taxonomy.py`, `integrations/taxonomy/`, the three `taxonomy_*.json` schemas, and
+`integrations/tests/test_taxonomy.py` are an early implementation of a collector dashboard taxonomy that is unused
+today, will change substantially, and is kept in the tree for that later work. No workflow runs any of it (removed
+2026-09-06). Do not author, extend, or seed `taxonomy.yaml` for a new collector; leave the existing files alone unless
+the redesign touches them; `metrics.dynamic_context_prefixes` and `metrics.dynamic_collect_plugins` in `metadata.yaml`
+are read only by this tooling.
 
 ## What is enforced today
 
@@ -90,7 +77,7 @@ this repository's skills documents how to author it. Its PR gate is still live, 
   (`description-authoring.md`) resolve, validate, and are unique.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
-- The taxonomy gate above, and the ibm.d runtime-output drift gate.
+- The ibm.d runtime-output drift gate ("Delivery boundary" above).
 - Not enforced anywhere: metric rows against the code, alert rows against `health.d/*.conf`, option names against the
   schema for collectors that have not opted in, stock conf defaults against the schema. `check-markdown.yml` checks
   that generated links resolve on Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is
@@ -124,7 +111,6 @@ this repository's skills documents how to author it. Its PR gate is still live, 
 6. **Generated artifacts are outputs, not source.** Files with a `DO NOT EDIT THIS FILE DIRECTLY` or
    `<!--startmeta ... message: "DO NOT EDIT..." -->` banner are regenerated from their sources, never hand-edited;
    so are the three umbrella pages, which carry no banner (`pipeline.md`).
-7. **The taxonomy gate is satisfied** when metric contexts or a collector were added or removed (section above).
 
 ## Anti-patterns to flag in review
 

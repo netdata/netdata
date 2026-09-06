@@ -617,7 +617,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
 - Integrations.
   - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
     generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
-    `contexts.yaml` and the NPM catalog generator; the collector-consistency rule and the taxonomy CI gate
+    `contexts.yaml` and the NPM catalog generator; the collector-consistency rule
   - Also relevant: `collectors-metadata-yaml` (what the fields say) and `docs-learn-site-structure` (where the
     generated pages land).
 - Health.

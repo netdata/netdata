@@ -29,10 +29,8 @@ changed; everything after them reads `integrations/integrations.js`, which is gi
 python3 integrations/gen_npm_catalog.py                       # SNMP profiles -> npm-catalog/metadata.yaml
 (cd src/go && go generate ./plugin/ibm.d/modules/...)         # ibm.d inputs -> metadata.yaml, README.md, config_schema.json
 python3 integrations/gen_integrations.py                      # every metadata.yaml -> integrations.js / integrations.json
-python3 integrations/gen_taxonomy.py --check-only             # validates taxonomy.yaml files (the taxonomy CI gate)
-python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD   # what the PR gate will say; adjust the range
-python3 -m unittest integrations.tests.test_taxonomy integrations.tests.test_descriptions \
-    integrations.tests.test_prometheus_profile_docs integrations.tests.test_collector_metadata
+python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_prometheus_profile_docs \
+    integrations.tests.test_collector_metadata                 # what CI runs; test_collector_page_navigation is manual
 python3 integrations/gen_docs_integrations.py                 # integrations.js -> one page per integration
 python3 integrations/gen_doc_collector_page.py                # -> src/collectors/COLLECTORS.md
 python3 integrations/gen_doc_secrets_page.py                  # -> src/collectors/SECRETS.md
@@ -41,6 +39,8 @@ python3 integrations/gen_doc_service_discovery_page.py        # -> src/collector
 
 `gen_docs_integrations.py -c <plugin>/<module>` regenerates one collector's page; `--check` validates the generated
 page descriptions without writing. `integrations/check_collector_metadata.py` is a legacy script that no longer runs.
+`gen_taxonomy.py`, `gen_taxonomy_seed.py`, `check_collector_taxonomy.py`, the `taxonomy.yaml` files, and
+`integrations/taxonomy/` are a dormant collector-taxonomy prototype kept for later work; nothing runs them.
 
 ## What to commit
 
@@ -51,7 +51,5 @@ and generated metadata (ibm.d, NPM catalog) are validated locally and left unsta
 gitignored catalogs (`integrations.js`, `integrations.json`, `taxonomy.json`) and the untracked
 `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are never committed.
 
-Pull requests run `.github/workflows/check-markdown.yml`, which regenerates everything, runs the tests above, runs the
-taxonomy gate (a collector `metadata.yaml` that is added or whose metric contexts change must have a sibling
-`taxonomy.yaml`; seed one with `integrations/gen_taxonomy_seed.py`), and validates the generated links through the
-Learn ingest.
+Pull requests run `.github/workflows/check-markdown.yml`, which regenerates everything, runs the tests above, and
+validates the generated links through the Learn ingest.

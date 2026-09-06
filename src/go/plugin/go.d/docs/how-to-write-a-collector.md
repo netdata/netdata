@@ -87,7 +87,6 @@ src/go/plugin/go.d/collector/<name>/
 |-- charts.yaml           # V2 chart template
 |-- config_schema.json    # DYNCFG schema
 |-- metadata.yaml         # integration metadata source
-|-- taxonomy.yaml         # required by the taxonomy CI gate; seed it, do not design it
 |-- integrations/         # generated integration page
 |-- README.md             # symlink to generated integration page
 |-- testdata/             # fixtures and config serialization files
@@ -304,8 +303,7 @@ For a new collector `<name>`:
    directories normally use the symlinked README. Multi-integration plugin directories may keep a hand-authored umbrella
    README; follow `.agents/skills/integrations-lifecycle/consistency.md`.
 
-Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands and
-the taxonomy CI gate.
+Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands.
 
 The PR description or design note MUST enumerate the relevant collector consistency artifacts and justify every artifact
 that did not need a matching change. Most of this is not CI-enforced; it must be reviewer-visible.

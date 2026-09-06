@@ -19,7 +19,8 @@ Referenced by every other schema as `./shared.json#/$defs/<name>`, so an edit he
 - `keywords`: emitted into the `<!--startmeta` block.
 - `short_setup` and `full_setup`: the two setup shapes; `setup-generic.md` renders both. In `full_setup`, an option's
   `detailed_description` turns the table cell into a link to an `h5` section below the table, `group` adds a Group
-  column, and a per-example `folding` defaults to the parent `examples.folding.enabled` at render time.
+  column, and for collectors only `render_collectors` defaults a per-example `folding` to the parent
+  `examples.folding.enabled`.
 - `troubleshooting`: `errors.list[]` (`error`, `cause`, `fix` required; `when`, `source` optional; the entry is closed
   with `additionalProperties: false`) rendered as `### Known Errors`, and the legacy `problems.list[]` (both fields
   optional) rendered as `### Other Problems`. The template adds `### Diagnostics` for `go.d.plugin`, `python.d.plugin`,
@@ -43,29 +44,31 @@ Behavior not visible in the schema:
   `monitored_instance_name` is set. It is the only `dependencies` use in the repository's schemas. Resolution is the
   cascading lookup in `pipeline.md`; an unresolvable reference is a fatal warning.
 - `info_provided_to_referring_integrations.description` is rendered on OTHER pages that reference this module.
-- `metrics.scopes[].name` `global` is rewritten to `<instance> instance` at render time.
 - `alerts[].metric` is not checked against `metrics.scopes[].metrics[].name`.
 - `metrics.dynamic_context_prefixes[]` and `metrics.dynamic_collect_plugins[]` are read only by the dormant taxonomy
-  tooling (`consistency.md`, "The collector taxonomy gate"); nothing renders them.
+  tooling (`consistency.md`, "The dormant collector taxonomy"); nothing renders them.
 - `profile_coverage.modules.<meta.id>[]` is allowed only in the Prometheus collector's metadata file, and
   `metrics.profile_coverage` is a generated in-memory projection that must never be authored
   (`how-tos/prometheus-profile-metadata.md`).
 - `functions.list[].parameters[].default` is a string only. `returns.columns[].visibility` is rendered as a table cell
   by `templates/functions.md`; the `hidden` value does not suppress the column.
 - `additionalProperties: false` is set only on `profile_coverage`, the two `metrics.dynamic_*` list entries, and (via
-  `shared.json`) `instance.variables`, so unknown module keys pass through (`gotchas.md`,
-  `alternative_monitored_instances`).
+  `shared.json`) `instance.variables` and the troubleshooting `errors.list[]` entry, so unknown module keys pass
+  through (`gotchas.md`, `alternative_monitored_instances`).
 
 ### `flows.json` and `device.json`
 
-Five-line schemas that `$ref` `collector.json`: NetFlow, IPFIX, sFlow and flow-enrichment entries (`integration_type:
+Tiny schemas that `$ref` `collector.json`: NetFlow, IPFIX, sFlow and flow-enrichment entries (`integration_type:
 flows`) and the generated NPM catalog entries (`integration_type: device`) validate as collectors. Fork the schema only
 when type-specific fields diverge.
 
 ## Thin schemas
 
-Each is a single entry or an array of entries (`oneOf`); `id`, `meta` (`shared.instance`), and `keywords` are required
-everywhere, `setup` is `oneOf [short_setup, full_setup]` unless stated.
+Each is a single entry or an array of entries (`oneOf`); `id`, `meta`, and `keywords` are required everywhere; `meta`
+is `shared.instance` except for `secretstore.json` and `service_discovery.json`, which define their own `$defs.meta`
+(`kind`, `name`, `link`, `icon_filename`, `description`, plus `tagline` for discoverers; no `categories`, no
+`variables`), so a `shared.json` edit does not reach those two. `setup` is `oneOf [short_setup, full_setup]` unless
+stated.
 
 - `exporter.json`: `overview.exporter_description` (required) and `exporter_limitations` (required, may be empty,
   rendered as `## Limitations` when non-empty); `setup` is `full_setup`; `troubleshooting` optional.
@@ -90,9 +93,8 @@ everywhere, `setup` is `oneOf [short_setup, full_setup]` unless stated.
 - `service_discovery.json`: `meta.kind` (the slug and discoverer registry name), `meta.tagline` (the
   `SERVICE-DISCOVERY.md` table one-liner), optional `meta.description`, `overview.description` with optional
   `how_it_works` and `limitations`, `setup` (`full_setup` only, rendered by `setup-service_discovery.md`), `services`
-  (required:
-  `description`; `evaluation`, `template_variables`, `examples` lists with `minItems: 1` when present), optional
-  `verify.checks.list[]`, `troubleshooting` required.
+  (required: `description`, `template_variables`, `examples`; those two lists carry `minItems: 1`, `evaluation` has no
+  minimum), optional `verify.checks.list[]`, `troubleshooting` required.
 
 ## Catalog and platform schemas
 
@@ -109,5 +111,4 @@ everywhere, `setup` is `oneOf [short_setup, full_setup]` unless stated.
   (`gotchas.md`). Its platform object is closed and `packages.type` and `packages.arches` are required inside
   `packages`.
 - `taxonomy_collector.json`, `taxonomy_sections.json`, `taxonomy_output.json`: the dormant collector taxonomy
-  (`consistency.md`, "The collector taxonomy gate"). Closed schemas; `gen_taxonomy.py --check-only` reports violations
-  as `TAX` codes.
+  (`consistency.md`, "The dormant collector taxonomy"). Closed schemas read only by `gen_taxonomy.py`.

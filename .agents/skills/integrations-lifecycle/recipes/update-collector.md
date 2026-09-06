@@ -1,7 +1,7 @@
 # Recipe: update an existing collector integration
 
 Use this when a collector's metrics, chart contexts, configuration, alerts, or documentation change. Read
-`../consistency.md` first: it owns which artifacts move together, the delivery boundary, and the taxonomy gate.
+`../consistency.md` first: it owns which artifacts move together and the delivery boundary.
 
 ## 1. Identify what changed
 
@@ -19,8 +19,7 @@ rows mirror the health conf. The content rules for every field are in `.agents/s
 ## 3. Update the remaining artifacts
 
 Keep `config_schema.json`, the stock `.conf`, and `health.d/*.conf` synchronized with the behavior change
-(`../consistency.md`, "What reviewers should check"). If you added, removed, or renamed metric contexts, reseed
-`taxonomy.yaml` so the taxonomy gate passes (`../consistency.md`, "The collector taxonomy gate").
+(`../consistency.md`, "What reviewers should check"). An existing sibling `taxonomy.yaml` is dormant; leave it alone.
 
 ## 4. Validate locally
 
@@ -28,8 +27,6 @@ Dependencies and the complete command list: `integrations/README.md`. The scoped
 
 ```bash
 python3 integrations/gen_integrations.py
-python3 integrations/gen_taxonomy.py --check-only
-python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD   # adjust the range to the PR base
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
 python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
 python3 integrations/gen_doc_collector_page.py

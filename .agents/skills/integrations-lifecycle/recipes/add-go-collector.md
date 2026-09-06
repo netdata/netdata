@@ -8,7 +8,7 @@ existing collector, see `update-collector.md`.
 - `.agents/skills/collectors-authoring/SKILL.md`: the broader "how to write a collector" context.
 - `src/go/plugin/go.d/docs/how-to-write-a-collector.md`: the framework V2 code and layout guide (new go.d collectors
   MUST use framework V2).
-- `../consistency.md`: which artifacts move together, the delivery boundary, and the taxonomy gate.
+- `../consistency.md`: which artifacts move together and the delivery boundary.
 - `.agents/skills/collectors-metadata-yaml/SKILL.md`: what every `metadata.yaml` field says. Write the file with it
   open.
 
@@ -19,7 +19,6 @@ src/go/plugin/go.d/collector/<name>/
 |-- collector.go, config.go, collect.go, metrix.go, write_metrics.go, charts.yaml, testdata/   # code
 |-- config_schema.json   # DynCfg schema (collectors-go-design/config-schema.md)
 |-- metadata.yaml        # integration metadata (this recipe)
-|-- taxonomy.yaml        # required by the taxonomy gate only; seed it, do not design it (../consistency.md)
 `-- README.md            # generated later as a symlink; do not create it in the source PR
 src/go/plugin/go.d/config/go.d/<name>.conf      # stock config
 src/health/health.d/<name>.conf                 # alerts, if any
@@ -51,7 +50,6 @@ output rather than guessing which keys are required (every warning is fatal). Fa
 - `config_schema.json`: each stock-conf option SHOULD have an entry with the same default; form rules in
   `.agents/skills/collectors-go-design/config-schema.md`.
 - `health.d/<name>.conf`: each alert SHOULD have a matching row under `metadata.yaml` `alerts[]`.
-- `taxonomy.yaml`: seed it with `gen_taxonomy_seed.py` (`../consistency.md`, "The collector taxonomy gate").
 
 ## 4. Run the pipeline locally
 
@@ -59,8 +57,6 @@ Dependencies and the full command list: `integrations/README.md`. The scoped for
 
 ```bash
 python3 integrations/gen_integrations.py
-python3 integrations/gen_taxonomy.py --check-only
-python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD   # adjust the range to the PR base
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
 python3 integrations/gen_docs_integrations.py -c go.d.plugin/<name>
 python3 integrations/gen_doc_collector_page.py
@@ -78,7 +74,7 @@ section. If `gen_integrations.py` exits non-zero, the warning names the file and
 - From `src/go`, run `timeout 15s go run ./cmd/godplugin -m <name> -d`. Success: the module registers, a job starts,
   and the command runs until the timeout stops it. `unknown module`, `no jobs started`, config-load errors, or an
   immediate exit are failures. Use `-c <config-dir>` for a non-standard config path.
-- `git diff` touches only: the module directory (including `taxonomy.yaml`), `init.go`, `go.d.conf`, the stock conf,
+- `git diff` touches only: the module directory, `init.go`, `go.d.conf`, the stock conf,
   the go.d README, the health conf, and possibly `integrations/categories.yaml`. No generated page, README symlink,
   umbrella page, or gitignored catalog (the `git status` check in `../consistency.md` MUST print nothing).
 

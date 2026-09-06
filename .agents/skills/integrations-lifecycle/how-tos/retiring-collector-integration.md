@@ -58,8 +58,7 @@ Use the installer's existing traced command wrapper for destructive file operati
 
 ## 5. Handle metadata and generated outputs by ownership
 
-Delete the authoritative `metadata.yaml` (and the sibling `taxonomy.yaml`; deleting both together does not trip the
-taxonomy gate) with the collector. Remove backlinks and ownership assertions in replacement metadata and tests.
+Delete the authoritative `metadata.yaml` (and any dormant sibling `taxonomy.yaml`) with the collector. Remove backlinks and ownership assertions in replacement metadata and tests.
 
 Generated outputs follow two cases:
 

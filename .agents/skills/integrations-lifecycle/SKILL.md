@@ -1,6 +1,6 @@
 ---
 name: integrations-lifecycle
-description: Netdata integrations pipeline reference. Use when editing metadata.yaml and needing to validate, regenerate, or deliver it; modifying integrations generators, schemas, templates, generated integration docs, integrations.js, integrations.json, COLLECTORS.md, SECRETS.md, or SERVICE-DISCOVERY.md; changing collector consistency artifacts; working with ibm.d contexts.yaml to metadata.yaml generation or the NPM catalog generator; or asked about the collector taxonomy gate.
+description: Netdata integrations pipeline reference. Use when editing metadata.yaml and needing to validate, regenerate, or deliver it; modifying integrations generators, schemas, templates, generated integration docs, integrations.js, integrations.json, COLLECTORS.md, SECRETS.md, or SERVICE-DISCOVERY.md; changing collector consistency artifacts; working with ibm.d contexts.yaml to metadata.yaml generation or the NPM catalog generator; or asked what the collector taxonomy.yaml files are.
 ---
 
 # integrations-lifecycle
@@ -22,14 +22,15 @@ Facts every reader needs:
 - Source PRs carry sources; generated documentation arrives through the post-merge `integrations-regen` PR. Local
   regeneration is mandatory validation, its output stays unstaged. The one place this boundary is written out, with
   its ibm.d runtime-output exception, is `consistency.md`.
-- The collector taxonomy (`taxonomy.yaml`) is a dormant proof of concept with a live CI gate; `consistency.md` says
-  exactly when it fires and how to satisfy it. Do not author or extend taxonomy content.
+- The collector taxonomy (`taxonomy.yaml`, `gen_taxonomy.py`) is a dormant early implementation kept for later work;
+  nothing runs it. Do not author, extend, or seed taxonomy content (`consistency.md`, "The dormant collector
+  taxonomy").
 
 ## You edit metadata or a collector and need to validate and deliver
 
 | Read | For |
 |---|---|
-| `consistency.md` | which artifacts move together, the delivery boundary, the taxonomy gate, what CI enforces, the review checklist |
+| `consistency.md` | which artifacts move together, the delivery boundary, what CI enforces, the review checklist, the dormant taxonomy |
 | `integrations/README.md` | dependencies and the command list for a local run |
 | `description-authoring.md` | the catalog sentence and the generated page meta description (the two cross-type description contracts) |
 | `recipes/add-go-collector.md`, `recipes/update-collector.md` | step-by-step for a new or changed go.d collector |

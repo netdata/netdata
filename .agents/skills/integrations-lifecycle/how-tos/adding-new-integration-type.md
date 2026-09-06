@@ -27,8 +27,10 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
    the description preflight covers it. Two `learn_rel_path` styles exist: fixed (exporter, logs, secretstore,
    service discovery) or derived from the first category through `generate_category_from_name` (collector, flows,
    device, notifications, authentication); `../pipeline.md` has the table.
-4. **Templates** under `integrations/templates/`: an overview template and, unless `setup-generic.md` fits, a
-   `setup-<type>.md`; custom delimiters `[[ ]]` and `[% %]` (`../pipeline.md`). Copy the closest type's templates.
+4. **Templates** under `integrations/templates/`: an `overview/<type>.md` file AND its `elif` branch in the dispatcher
+   `overview.md` (without the branch the overview renders empty and the description preflight fails with "Missing
+   description source"); unless `setup-generic.md` fits, a `setup-<type>.md`; custom delimiters `[[ ]]` and `[% %]`
+   (`../pipeline.md`). Copy the closest type's templates.
 5. **`integrations/categories.yaml`**: the type's category node. Flat by default; `collector` is sub-categorised because
    of its size, `logs` is flat. `flows` and `device` live under the existing `network-performance-monitoring` tree
    instead of a new top-level node; `gen_doc_collector_page.py` treats that tree's children as Monitor Anything
@@ -38,8 +40,9 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
 7. **Learn** (`docs/.map/map.yaml`): a section holding an `integration_placeholder` node with an `integration_kind`.
    The kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
    `flows`, `exporters`, `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, and
-   `service_discovery` (keep their singular/plural style). A new kind needs the ingest in `netdata/learn` to learn it,
-   so a new type is a Learn-repo change too; `device` has no placeholder and attaches through the NPM chapter nodes.
+   `service_discovery` (keep their singular/plural style). Learn's ingest buckets pages by a fixed kind list
+   (`.agents/skills/docs-learn-site-structure/mapping.md`, "Integration placeholders"), so a new kind is a Learn-repo
+   change too; `device` has no placeholder and attaches through the NPM chapter nodes.
    Map authoring and companion hand-written pages: the `docs-learn-site-structure` skill (`mapping.md`).
 8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically, but FAQ and solution pages
    that describe the old story may need edits, and a new top-level category or section shape needs the website build
@@ -65,5 +68,6 @@ this repository; website corrections go in their own PR there, and a new `integr
 
 Traced `learn_rel_path` per mode through `build_readme_from_integration` in `integrations/gen_docs_integrations.py`,
 read the `<!--startmeta` block of one generated page per type, listed the `integration_kind` values in
-`docs/.map/map.yaml`, and confirmed `deploy` has no documentation mode in `descriptions.py`. The `flows` and `device`
+`docs/.map/map.yaml`, read the fixed-kind bucketing in `docs-learn-site-structure/mapping.md`, and confirmed `deploy`
+has no documentation mode in `descriptions.py`. The `flows` and `device`
 additions are the worked examples (`integrations/schemas/flows.json`, `device.json`, `FLOWS_SOURCES`, `DEVICE_SOURCES`).
