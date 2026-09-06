@@ -610,8 +610,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
     profiles from exposition dumps; selector/relabel/fallback policy, coverage, NIDL, live verification
   - `collectors-snmp-profiles`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
     docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
-  - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs, trap profile-format docs, the `snmptrapprofilegen`
-    helper, OOB trap profile regeneration; closed 8-category / 8-severity taxonomy
+  - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs and their `metrics:`/`charts:` rules, the trap
+    `profile-format.md`, the generator `src/go/cmd/snmptrapprofilegen` (shipped as `snmp-trap-profile-gen`), stock
+    pack regeneration and compression, category/severity taxonomy changes
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
 - Integrations.
