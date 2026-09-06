@@ -87,9 +87,15 @@ legacy PCIe throughput fields do not have a verified, common physical-unit contr
 they remain individual raw measurements and do not contribute to byte-throughput totals.
 
 Bit error ratios use **errors per trillion bits**. For example, a ratio of `1e-12` displays as 1, and `1e-18` as `0.000001`.
-Packed legacy BER values are decoded as `((value >> 8) & 15) * 10^-(value & 255)` before scaling. Decoded float fields are
-preferred. Six fractional places retain ratios through `1e-18` while keeping dimension divisors compatible with 32-bit builds.
-Smaller positive values round at that resolution; this is a storage precision limit, not proof of zero errors.
+Packed BER values are decoded as `((value >> 8) & 15) * 10^-(value & 255)` before scaling and take precedence over
+float aliases of the same measurement. [DCGM Exporter 4.6.0-4.8.3](https://github.com/NVIDIA/dcgm-exporter/blob/4.6.0-4.8.3/internal/pkg/collector/gpu_collector.go)
+formats doubles with six decimal places: `1e-12` becomes `0.000000`, and `6e-7` becomes `0.000001`. Prefer the optional
+packed `*_BER_RAW` or legacy `COUNT_*_BER` field when available. A float-only source retains the exporter's precision
+limit; Netdata cannot recover rounded-away information.
+
+After decoding, six fractional places in errors-per-trillion units retain ratios through `1e-18` while keeping dimension
+divisors compatible with 32-bit builds. Smaller positive values round at that storage resolution; zero is not proof of
+zero errors when either the source or storage precision is insufficient.
 
 Unknown numeric fields appear under `dcgm.<entity>.raw.<field>` with `value` or `value/s` units. The collector does not infer
 physical units from words such as CLOCK, ECC or BANDWIDTH. Raw fallback follows the exporter's gauge/counter declaration

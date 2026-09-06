@@ -321,9 +321,10 @@ func buildFieldCatalog() map[string]fieldDefinition {
 	for _, kind := range []string{"EFFECTIVE", "SYMBOL"} {
 		name := "DCGM_FI_DEV_NVLINK_COUNT_" + kind + "_BER"
 		add(name, "interconnect.nvlink.ber", strings.ToLower(kind), sampleGauge, 1e12)
-		update(name, func(d *fieldDefinition) { d.DecodeBER = true; d.Precision = 1e6 })
+		// Packed values preserve precision that exporter %f formatting loses for doubles.
+		update(name, func(d *fieldDefinition) { d.DecodeBER = true; d.Precision = 1e6; d.Priority = 20 })
 		alias(name+"_FLOAT", name)
-		update(name+"_FLOAT", func(d *fieldDefinition) { d.DecodeBER = false })
+		update(name+"_FLOAT", func(d *fieldDefinition) { d.DecodeBER = false; d.Priority = 10 })
 		alias("DCGM_FI_DEV_NVLINK_"+kind+"_BER_RATIO", name+"_FLOAT")
 		alias("DCGM_FI_DEV_NVLINK_"+kind+"_BER_RAW", name)
 	}

@@ -227,7 +227,8 @@ func TestCollector_AliasFallbackAndBER(t *testing.T) {
 	}{
 		"packed":                     {exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER", "counter", float64(1<<8|18), ""), .000001},
 		"float":                      {exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT", "counter", 1e-18, ""), .000001},
-		"prefer decoded":             {exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER", "gauge", float64(2<<8|12), "") + exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT", "gauge", 1e-18, ""), .000001},
+		"prefer packed":              {exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER", "gauge", float64(2<<8|12), "") + exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT", "gauge", 0, ""), 2},
+		"invalid packed falls back":  {exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER", "gauge", -1, "") + exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT", "gauge", 1e-18, ""), .000001},
 		"invalid decoded falls back": {exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER", "gauge", float64(2<<8|12), "") + exposition("DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT", "gauge", -1, ""), 2},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -511,4 +512,32 @@ func TestCollector_HostIdentityPunctuation(t *testing.T) {
 	mx := c.Collect(context.Background())
 	require.Len(t, mx, 2)
 	assert.Len(t, *c.Charts(), 2)
+}
+
+func TestCollector_BERPackedPrecision(t *testing.T) {
+	for _, kind := range []string{"EFFECTIVE", "SYMBOL"} {
+		for alias, names := range map[string][2]string{
+			"legacy":    {"DCGM_FI_DEV_NVLINK_COUNT_" + kind + "_BER", "DCGM_FI_DEV_NVLINK_COUNT_" + kind + "_BER_FLOAT"},
+			"canonical": {"DCGM_FI_DEV_NVLINK_" + kind + "_BER_RAW", "DCGM_FI_DEV_NVLINK_" + kind + "_BER_RATIO"},
+		} {
+			for name, tc := range map[string]struct {
+				packed int
+				ratio  float64
+			}{
+				"rounded zero":    {1<<8 | 12, 1e-12},
+				"rounded nonzero": {6<<8 | 7, 6e-7},
+			} {
+				t.Run(kind+"/"+alias+"/"+name, func(t *testing.T) {
+					// DCGM Exporter formats doubles with six decimal places.
+					body := exposition(names[0], "gauge", float64(tc.packed), "") + fmt.Sprintf("# TYPE %s gauge\n%s{gpu=\"0\",UUID=\"GPU-test\"} %f\n", names[1], names[1], tc.ratio)
+					c := collectorWithMetrics(t, body)
+					mx := c.Collect(context.Background())
+					got, ok := displayedDimension(c, mx, "dcgm.gpu.interconnect.nvlink.ber", strings.ToLower(kind))
+					require.True(t, ok)
+					assert.Equal(t, tc.ratio*1e12, got)
+					require.Len(t, mx, 1)
+				})
+			}
+		}
+	}
 }

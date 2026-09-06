@@ -41,6 +41,8 @@ modules:
         limits:
           description: |
             The collector applies global and per-metric time series limits to prevent excessive cardinality.
+            Some exporter versions round floating-point bit error ratios to six decimal places. Enable the packed
+            `*_BER_RAW` (or legacy `COUNT_*_BER`) field when available to preserve small ratios; float-only values retain the exporter's precision limit.
         performance_impact:
           description: The impact depends on dcgm-exporter field selection and resulting series cardinality.
     setup:

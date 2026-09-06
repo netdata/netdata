@@ -400,7 +400,7 @@ DCGM_FI_DEV_MIG_MODE, gauge, Mig mode
 # context=dcgm.gpu.interconnect.total.throughput family=gpu interconnect/overview dimension=nvlink
 DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL, gauge, Nvlink bandwidth total
 # context=dcgm.gpu.interconnect.nvlink.ber family=gpu interconnect/nvlink dimension=effective
-# DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER, gauge, Nvlink count effective ber
+# DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER, gauge, Packed effective BER; preferred over the float alias to preserve small ratios
 # context=dcgm.gpu.interconnect.nvlink.ber family=gpu interconnect/nvlink dimension=effective
 # DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT, gauge, Nvlink count effective ber float
 # numeric=dcgm.gpu.raw.dcgm_fi_dev_nvlink_count_effective_errors (raw; physical unit not established)
@@ -462,7 +462,7 @@ DCGM_FI_DEV_NVLINK_COUNT_RX_BYTES, counter, Nvlink count rx bytes
 # numeric=dcgm.gpu.raw.dcgm_fi_dev_nvlink_count_rx_symbol_errors (raw; physical unit not established)
 # DCGM_FI_DEV_NVLINK_COUNT_RX_SYMBOL_ERRORS, counter, Nvlink count rx symbol errors
 # context=dcgm.gpu.interconnect.nvlink.ber family=gpu interconnect/nvlink dimension=symbol
-# DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER, gauge, Nvlink count symbol ber
+# DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER, gauge, Packed symbol BER; preferred over the float alias to preserve small ratios
 # context=dcgm.gpu.interconnect.nvlink.ber family=gpu interconnect/nvlink dimension=symbol
 # DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER_FLOAT, gauge, Nvlink count symbol ber float
 # context=dcgm.gpu.interconnect.nvlink.throughput family=gpu interconnect/nvlink dimension=nvlink_tx
