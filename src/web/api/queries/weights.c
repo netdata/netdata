@@ -1373,30 +1373,18 @@ static size_t registered_results_to_json_multinode_group_by(
 typedef long int DIFFS_NUMBERS;
 #define DOUBLE_TO_INT_MULTIPLIER 100000
 
-static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
-    // binary search to find the index the smallest index
-    // of the first value in the array that is greater than K
-
-    int right = size;
-    while(left < right) {
-        int middle = (int)(((unsigned int)(left + right)) >> 1);
-
-        if(arr[middle] > K)
-            right = middle;
-
-        else
-            left = middle + 1;
-    }
-
-    return left;
-}
-
 int compare_diffs(const void *left, const void *right) {
     DIFFS_NUMBERS lt = *(DIFFS_NUMBERS *)left;
     DIFFS_NUMBERS rt = *(DIFFS_NUMBERS *)right;
 
     // https://stackoverflow.com/a/3886497/1114110
     return (lt > rt) - (lt < rt);
+}
+
+static inline int cursor_bigger_than(const DIFFS_NUMBERS arr[], int cursor, int size, DIFFS_NUMBERS key) {
+    while(cursor < size && arr[cursor] <= key)
+        cursor++;
+    return cursor;
 }
 
 static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, NETDATA_DOUBLE *arr, size_t size) {
@@ -1439,25 +1427,24 @@ static double ks_2samp(
     //
     // It should look like this:
     //
-    // base_pcent = binary_search_bigger_than(...) / base_size;
-    // high_pcent = binary_search_bigger_than(...) / high_size;
+    // base_pcent = upper_bound(baseline_diffs, K) / base_size;
+    // high_pcent = upper_bound(highlight_diffs, K) / high_size;
     // delta = base_pcent - high_pcent;
     // if(delta < min) min = delta;
     // if(delta > max) max = delta;
     //
     // This would require a lot of multiplications and divisions.
     //
-    // To speed it up, we do the binary search to find the index of each number
-    // but, then we divide the base index by the power of two number (shifts) it
-    // is bigger than high index. So the 2 indexes are now comparable.
+    // Sorted keys let each upper-bound cursor advance monotonically.
+    // Scale the highlight index by the requested power-of-two baseline ratio.
     // We also keep track of the original indexes with min and max, to properly
     // calculate their percentages once the loops finish.
 
 
     // initialize min and max using the first number of baseline_diffs
     DIFFS_NUMBERS K = baseline_diffs[0];
-    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
-    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+    int base_idx = cursor_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = cursor_bigger_than(highlight_diffs, 0, high_size, K);
     int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
     int64_t min = delta, max = delta;
     int base_min_idx = base_idx;
@@ -1468,8 +1455,8 @@ static double ks_2samp(
     // do the baseline_diffs starting from 1 (we did position 0 above)
     for(int i = 1; i < base_size; i++) {
         K = baseline_diffs[i];
-        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
-        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+        base_idx = cursor_bigger_than(baseline_diffs, base_idx, base_size, K);
+        high_idx = cursor_bigger_than(highlight_diffs, high_idx, high_size, K);
 
         delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
@@ -1484,11 +1471,12 @@ static double ks_2samp(
         }
     }
 
-    // do the highlight_diffs starting from 0
+    // Preserve baseline-first visitation and first-winner ties when lengths do not match the shift ratio.
+    base_idx = high_idx = 0;
     for(int i = 0; i < high_size; i++) {
         K = highlight_diffs[i];
-        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
-        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
+        base_idx = cursor_bigger_than(baseline_diffs, base_idx, base_size, K);
+        high_idx = cursor_bigger_than(highlight_diffs, high_idx, high_size, K);
 
         delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
@@ -1676,7 +1664,7 @@ static void rrdset_metric_correlations_ks2(
     if(!baseline)
         goto cleanup;
 
-    stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
+    // Sorted cursor scans perform no binary searches.
 
     double prob = kstwo(owa, baseline, (int)base_points, highlight, (int)high_points, shifts);
     if(!isnan(prob) && !isinf(prob)) {
@@ -2827,6 +2815,178 @@ static int double_expect(double v, const char *str, const char *descr) {
     return ret;
 }
 
+// Keep the original lookup only as a regression-test oracle.
+static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS key) {
+    int right = size;
+    while(left < right) {
+        int middle = (int)(((unsigned int)(left + right)) >> 1);
+        if(arr[middle] > key)
+            right = middle;
+        else
+            left = middle + 1;
+    }
+    return left;
+}
+
+// Differential reference: netdata/netdata @ 5e76a5ca7f,
+// src/web/api/queries/weights.c:1416-1528. Known-answer tests below remain independent.
+static double ks_2samp_binary_reference(
+        DIFFS_NUMBERS baseline_diffs[], int base_size,
+        DIFFS_NUMBERS highlight_diffs[], int high_size,
+        uint32_t base_shifts) {
+
+    // high_idx is bounded by high_size; keep the scaled comparison representable.
+    if(unlikely(base_shifts >= sizeof(int64_t) * CHAR_BIT - 1))
+        return NAN;
+    int64_t high_multiplier = 1;
+    for(uint32_t shift = 0; shift < base_shifts; shift++)
+        high_multiplier *= 2;
+    if(unlikely((int64_t)high_size > INT64_MAX / high_multiplier))
+        return NAN;
+
+    qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+    qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+
+    // Preserve the pre-cursor algorithm independently of the production walk.
+    // initialize min and max using the first number of baseline_diffs
+    DIFFS_NUMBERS K = baseline_diffs[0];
+    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+    int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+    int64_t min = delta, max = delta;
+    int base_min_idx = base_idx;
+    int base_max_idx = base_idx;
+    int high_min_idx = high_idx;
+    int high_max_idx = high_idx;
+
+    // do the baseline_diffs starting from 1 (we did position 0 above)
+    for(int i = 1; i < base_size; i++) {
+        K = baseline_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
+        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+        if(delta < min) {
+            min = delta;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
+        }
+        else if(delta > max) {
+            max = delta;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
+        }
+    }
+
+    // do the highlight_diffs starting from 0
+    for(int i = 0; i < high_size; i++) {
+        K = highlight_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
+        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
+
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+        if(delta < min) {
+            min = delta;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
+        }
+        else if(delta > max) {
+            max = delta;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
+        }
+    }
+
+    // now we have the min, max and their indexes
+    // properly calculate min and max as dmin and dmax
+    double dbase_size = (double)base_size;
+    double dhigh_size = (double)high_size;
+    double dmin = ((double)base_min_idx / dbase_size) - ((double)high_min_idx / dhigh_size);
+    double dmax = ((double)base_max_idx / dbase_size) - ((double)high_max_idx / dhigh_size);
+
+    dmin = -dmin;
+    if(islessequal(dmin, 0.0)) dmin = 0.0;
+    else if(isgreaterequal(dmin, 1.0)) dmin = 1.0;
+
+    double d;
+    if(isgreaterequal(dmin, dmax)) d = dmin;
+    else d = dmax;
+
+    double en = round(dbase_size * dhigh_size / (dbase_size + dhigh_size));
+
+    // under these conditions, KSfbar() crashes
+    if(unlikely(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d)))
+        return NAN;
+
+    return KSfbar((int)en, d);
+}
+
+static uint64_t ks2_test_random(uint64_t *state) {
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    return *state;
+}
+
+static int ks2_cursor_unittest(void) {
+    uint64_t random = 0x9182abcd1234ULL;
+    DIFFS_NUMBERS *base = mallocz(MAX_POINTS * sizeof(*base));
+    DIFFS_NUMBERS *high = mallocz(MAX_POINTS * sizeof(*high));
+    DIFFS_NUMBERS *base_ref = mallocz(MAX_POINTS * sizeof(*base_ref));
+    DIFFS_NUMBERS *high_ref = mallocz(MAX_POINTS * sizeof(*high_ref));
+    int errors = 0;
+    for(size_t trial = 0; trial < 20000; trial++) {
+        int bs = 1 + ks2_test_random(&random) % 64;
+        int hs = 1 + ks2_test_random(&random) % 64;
+        uint32_t shifts = ks2_test_random(&random) % 10;
+        // Include request-bound-sized arrays and the largest reachable window ratio.
+        if(trial >= 19980) {
+            bs = MAX_POINTS - 1;
+            hs = trial % 2 ? 14 : MAX_POINTS - 1;
+            shifts = trial % 10;
+        }
+        for(int i = 0; i < bs; i++)
+            base[i] = (DIFFS_NUMBERS)(ks2_test_random(&random) % 17) - 8;
+        for(int i = 0; i < hs; i++)
+            high[i] = (DIFFS_NUMBERS)(ks2_test_random(&random) % 17) - 8;
+        if(trial % 3 == 0) base[0] = LONG_MIN;
+        if(trial % 5 == 0) high[0] = LONG_MAX;
+        memcpy(base_ref, base, bs * sizeof(*base));
+        memcpy(high_ref, high, hs * sizeof(*high));
+        double expected = ks_2samp_binary_reference(base_ref, bs, high_ref, hs, shifts);
+        double actual = ks_2samp(base, bs, high, hs, shifts);
+        if(!(actual == expected || (isnan(actual) && isnan(expected)))) {
+            fprintf(stderr, "FAILED KS2 cursor trial %zu (%d/%d shift %u): %.17g != %.17g\n",
+                    trial, bs, hs, shifts, actual, expected);
+            errors++;
+            break;
+        }
+        // Every visited upper-bound pair must match, including equal-delta ties.
+        for(int pass = 0; pass < 2; pass++) {
+            int bi = 0, hi = 0, size = pass ? hs : bs;
+            DIFFS_NUMBERS *keys = pass ? high : base;
+            for(int i = 0; i < size; i++) {
+                bi = cursor_bigger_than(base, bi, bs, keys[i]);
+                hi = cursor_bigger_than(high, hi, hs, keys[i]);
+                if(bi != binary_search_bigger_than(base, 0, bs, keys[i]) ||
+                   hi != binary_search_bigger_than(high, 0, hs, keys[i])) {
+                    fprintf(stderr, "FAILED KS2 cursor upper-bound pair trial %zu\n", trial);
+                    errors++;
+                    goto cleanup;
+                }
+            }
+        }
+    }
+cleanup:
+    freez(base);
+    freez(high);
+    freez(base_ref);
+    freez(high_ref);
+    fprintf(stderr, "%s KS2 cursor: 20000 unequal-length/tie/extreme/boundary differential trials\n",
+            errors ? "FAILED" : "OK");
+    return errors;
+}
+
 static int mc_unittest1(void) {
     int bs = 3, hs = 3;
     DIFFS_NUMBERS base[3] = { 1, 2, 3 };
@@ -2911,6 +3071,8 @@ static int weights_points_exceed_max_unittest(void) {
 
 int mc_unittest(void) {
     int errors = 0;
+
+    errors += ks2_cursor_unittest();
 
     errors += mc_unittest1();
     errors += mc_unittest2();
