@@ -12,8 +12,9 @@ before relying on a path.
 ## What ships and how it is consumed
 
 - This repository produces `integrations/integrations.js` and `integrations/integrations.json` on every run of
-  `gen_integrations.py`; both are gitignored here. `integrations/taxonomy.json` is also emitted but has no consumer
-  (`consistency.md`, "The dormant collector taxonomy").
+  `gen_integrations.py`; both are gitignored here. (`integrations/taxonomy.json`, also gitignored, is what the dormant
+  `gen_taxonomy.py` would write; nothing produces or consumes it today, `consistency.md`, "The dormant collector
+  taxonomy".)
 - Cloud-frontend's CI (`.github/workflows/sync-to-s3.yaml`) checks out `netdata/netdata`, runs `python3
   integrations/gen_integrations.py` against master, and copies `integrations/integrations.js` to
   `src/domains/integrations/data/integrations.js` in its own tree; the dashboard builds with that copy baked in.

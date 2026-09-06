@@ -40,9 +40,10 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
    kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
    `flows`, `exporters`, `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, and
    `service_discovery` (keep their singular/plural style). Learn's ingest buckets pages by a fixed kind list
-   (`.agents/skills/docs-learn-site-structure/mapping.md`, "Integration placeholders"), so a new kind is a Learn-repo
-   change too; `device` has no placeholder and attaches through the NPM chapter nodes. Map authoring and companion
-   hand-written pages: the `docs-learn-site-structure` skill (`mapping.md`).
+   (`.agents/skills/docs-learn-site-structure/mapping.md`, "Integration placeholders"; the list quoted there predates
+   `flows` and `service_discovery`), so a new kind is a Learn-repo change too; `device` has no placeholder and attaches
+   through the NPM chapter nodes. Map authoring and companion hand-written pages: the `docs-learn-site-structure` skill
+   (`mapping.md`).
 8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically, but FAQ and solution pages
    that describe the old story may need edits, and a new top-level category or section shape needs the website build run
    or emulated with the Hugo version pinned in its `netlify.toml`. Cloud-frontend is data-driven, but its content tabs
@@ -54,7 +55,7 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
 
 1. `python3 integrations/gen_integrations.py` exits 0; the new type appears in the flat list with its category.
 2. `python3 integrations/gen_docs_integrations.py --check` counts the new mode; a full run writes pages whose
-   `<!--startmeta` block has the right `learn_rel_path` and message.
+   `<!--startmeta` block matches the block in `../pipeline.md` in full (every key, order, quoting, the type's message).
 3. Every standard content key is a string in `integrations.json`, not an object or array.
 4. `python3 integrations/gen_doc_collector_page.py` if the type should appear on Monitor Anything.
 5. After merge: the Learn sidebar shows the section after the next ingest; the in-app catalog shows the new filter with

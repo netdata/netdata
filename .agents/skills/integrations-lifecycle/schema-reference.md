@@ -7,7 +7,7 @@ validation mechanics (`make_validator`, the custom format, fatal warnings, non-s
 
 ## Shared definitions: `shared.json`
 
-Referenced by every other schema as `./shared.json#/$defs/<name>`, so an edit here changes all consumers at once.
+Referenced by most other schemas as `./shared.json#/$defs/<name>`, so an edit here changes every consumer at once.
 
 - `page_description`: the explicit page meta description (50 to 160 characters, trimmed plain text, `format:
   netdata-balanced-parentheses`; the pattern rejects any leading hyphen). Used by `instance.description`,
@@ -82,9 +82,9 @@ stated.
   optional. `integrations/cloud-authentication/metadata.yaml` is one file holding the array.
 - `logs.json`: `overview.description`, `overview.visualization.description`, `overview.key_features.description`;
   `setup.prerequisites.description` renders through `setup-logs.md`. The schema has a defect: a key literally named
-  `required` sits inside `setup.properties`, so nothing under `setup` is enforced and `setup` itself is optional.
-  `integrations/logs/metadata.yaml` holds four entries (systemd journal, Windows events, macOS unified logs,
-  OpenTelemetry).
+  `required` sits inside `setup.properties`, so `setup` itself is optional and `prerequisites` is not required inside it
+  (a present `prerequisites` still needs its `description`). `integrations/logs/metadata.yaml` holds four entries
+  (systemd journal, Windows events, macOS unified logs, OpenTelemetry).
 - `secretstore.json`: `meta.kind` (the slug, matching `/etc/netdata/go.d/ss/<kind>.conf`), optional `meta.description`
   (page description), `overview.description` and optional `limitations`, `setup` (`full_setup`, rendered by
   `setup-secretstore.md`), `collector_configs` (its `summary.operand_format` and `summary.example_operand` feed the

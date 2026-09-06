@@ -35,7 +35,6 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   anywhere.
 - The community badge is chosen by key presence (`"community" in integration["meta"]`), not by value: a `community`
   key set to `false` still renders the Community badge. Every current use is `true`.
-
 - `PRESERVE_FILES` in `gen_docs_integrations.py` and the dcstat removal step in `check-markdown.yml` are a coupled pair
   around one Learn redirect migration (`pipeline.md`, Stage 2). A local full regeneration therefore keeps a page whose
   source directory no longer produces it; that is intended until the Learn catalog is republished.
@@ -46,6 +45,8 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   generator rejects; validate through `make_validator()` only (`pipeline.md`, Stage 1).
 - `fail_on_warnings()` fails the run on any warning at all, deduplicated by file path. Cosmetic issues block the
   regeneration PR.
+
+## Source layout
 
 - `integrations/cloud-notifications/metadata.yaml` and `integrations/cloud-authentication/metadata.yaml` are single
   files holding arrays; the loaders branch on `if 'id' in data` to accept either one entry or an array. Most other types
@@ -65,7 +66,7 @@ on Netlify. Learn's ingest escapes only a few patterns (bare `{`, the operators 
 `<details><summary>`); everything else passes this repository's CI and fails the next Learn deploy preview. The
 author-side rules are in `.agents/skills/collectors-metadata-yaml/SKILL.md` ("Safety Of The Markdown") and
 `integrations/tests/test_collector_metadata.py` checks collector metadata for them in both workflows; the MDX side is
-`docs-learn-site-structure/mdx-rules.md`.
+`docs-learn-site-structure/mdx-rules.md` and `pitfalls-and-gotchas.md`.
 
 The incident that produced the rule (2026-05-07): the netflow-plugin metadata carried `description: Sets tenant=amazon,
 region=<aws-region>, role=<service-name>.` for the AWS IP Ranges card. Netdata CI, `gen_integrations.py`, and Learn

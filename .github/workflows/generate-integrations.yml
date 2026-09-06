@@ -133,7 +133,7 @@ jobs:
           python3 integrations/gen_doc_service_discovery_page.py
       - name: Clean Up Temporary Data
         id: clean
-        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json integrations/taxonomy.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
+        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
       - name: Create PR
         id: create-pr
         uses: peter-evans/create-pull-request@v8

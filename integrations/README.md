@@ -7,9 +7,10 @@ maintainers in `.agents/skills/integrations-lifecycle/`; this file is the local-
 
 ## Requirements
 
-- Python (CI uses 3.13), run from the root of this repository: the page and umbrella generators open
-  `integrations/integrations.js` and write their outputs by paths relative to the current directory. When the checkout
-  has a `.venv/`, use `.venv/bin/python3`; the system interpreter usually lacks the packages below.
+- Python (`check-markdown.yml` pins 3.13; the regeneration workflow uses the runner default), run from the root of this
+  repository: the page and umbrella generators open `integrations/integrations.js` and write their outputs by paths
+  relative to the current directory. When the checkout has a `.venv/`, use `.venv/bin/python3`; the system interpreter
+  usually lacks the packages below.
 - The Python packages installed by `./integrations/pip.sh`: `jsonschema`, `referencing`, `jinja2`, `ruamel.yaml`, and
   `markdown-it-py`. All five are needed for generation (the description validator imports `markdown-it-py`); the same
   list is pinned in `packaging/cmake/Modules/NetdataRenderDocs.cmake` and the two must change together. Distribution

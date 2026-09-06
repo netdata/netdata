@@ -15,7 +15,7 @@ Citations name files and symbols, never line numbers. Dependencies and the comma
 | 3 | `integrations/gen_doc_collector_page.py` | `integrations.js` | `src/collectors/COLLECTORS.md` | yes |
 | 4 | `integrations/gen_doc_secrets_page.py` | `integrations.js` | `src/collectors/SECRETS.md` | yes |
 | 5 | `integrations/gen_doc_service_discovery_page.py` | `integrations.js` | `src/collectors/SERVICE-DISCOVERY.md` | yes |
-| none | `integrations/gen_taxonomy.py`, `check_collector_taxonomy.py` | `taxonomy.yaml` files, `integrations/taxonomy/` | `integrations/taxonomy.json` | gitignored; dormant and not run by CI (`consistency.md`, "The dormant collector taxonomy") |
+| none | `integrations/gen_taxonomy.py` (and `check_collector_taxonomy.py`, validation only) | `taxonomy.yaml` files, `integrations/taxonomy/` | `integrations/taxonomy.json` | gitignored; dormant and not run by CI (`consistency.md`, "The dormant collector taxonomy") |
 
 Stage 0 MUST run before stage 1 whenever its inputs or generators change; both workflows do so, and locally a skipped
 stage 0 leaves the tracked NPM metadata stale while every later stage still succeeds. Stages 2 to 5 read the same
@@ -32,7 +32,7 @@ substitute for running the scripts.
 
 | `integration_type` | Source YAML (`*_SOURCES`) | Schema | Render keys | Doc mode |
 |---|---|---|---|---|
-| `collector` | `COLLECTOR_SOURCES` in `_common.py`; each directory root is globbed one level deep (`<root>/*/metadata.yaml`), which is why nested trees appear as their own entries: `src/collectors`, `src/collectors/charts.d.plugin`, `src/collectors/python.d.plugin`, `src/collectors/guides`, `src/go/plugin/go.d/collector`, `src/go/plugin/scripts.d/collector`, `src/go/plugin/ibm.d/modules`, `src/go/plugin/ibm.d/modules/websphere`, plus the single files `src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml`, `src/crates/otel-plugin/metadata.yaml` (and, oddly, `src/crates/otel-plugin/taxonomy.yaml`) | `collector.json` | `alerts metrics functions overview related_resources setup troubleshooting` | `collector` |
+| `collector` | `COLLECTOR_SOURCES` in `_common.py`; each directory root is globbed one level deep (`<root>/*/metadata.yaml`), which is why nested trees appear as their own entries: `src/collectors`, `src/collectors/charts.d.plugin`, `src/collectors/python.d.plugin`, `src/collectors/guides`, `src/go/plugin/go.d/collector`, `src/go/plugin/scripts.d/collector`, `src/go/plugin/ibm.d/modules`, `src/go/plugin/ibm.d/modules/websphere`, plus the single files `src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml`, `src/crates/otel-plugin/metadata.yaml` (the list also names `src/crates/otel-plugin/taxonomy.yaml`, which the `*/metadata.yaml` filter in `get_metadata_entries` ignores) | `collector.json` | `alerts metrics functions overview related_resources setup troubleshooting` | `collector` |
 | `flows` | `FLOWS_SOURCES`: `src/crates/netflow-plugin/metadata.yaml` | `flows.json` (`$ref` to `collector.json`) | same as collector | `flows` |
 | `device` | `DEVICE_SOURCES`: the NPM catalog `metadata.yaml` (stage 0 output) | `device.json` (`$ref` to `collector.json`) | same as collector | `device` |
 | `deploy` | `integrations/deploy.yaml` | `deploy.json` | none (`platform_info.md` template only) | none: lives only in `integrations.js` |
@@ -87,9 +87,11 @@ For collectors (`render_collectors`; the other types follow the same shape):
 Custom Jinja delimiters (`get_jinja_env`): `[[ ]]` for variables, `[% %]` for statements, `[# #]` for comments, so the
 templates can emit the frontend's own `{% details %}`, `{% relatedResource %}`, `{% if $showClaimingOptions %}` and `{{
 }}` markers verbatim (`integrations/templates/README.md`). `templates/overview.md` is a dispatcher: one `[% elif
-entry.integration_type == '<type>' %][% include 'overview/<type>.md' %]` branch per type, so a type without a branch
-renders an empty overview and then fails the description preflight with "Missing description source".
-`templates/setup/sample-*-config.md` hold the per-plugin sample configuration blocks `setup-generic.md` includes.
+entry.integration_type == '<type>' %][% include 'overview/<type>.md' %]` branch per type that renders an `overview` key
+(`cloud_notification` has neither). A type with an `overview` render key but no branch renders an empty overview, and
+its pages then fail the description preflight with "Missing description source" unless every entry carries an explicit
+description. `templates/setup/sample-*-config.md` hold the per-plugin sample configuration blocks `setup-generic.md`
+includes.
 
 ## Stage 1: outputs
 
@@ -125,13 +127,13 @@ Per page (`build_readme_from_integration`, `write_to_file`):
 | `collector` | `meta.monitored_instance.name` | `<dir>/integrations/<slug>.md` | derived from `categories[0]` through `generate_category_from_name`, `Data Collection` replaced by `Collecting Metrics/Collectors`; a path under `Network Performance Monitoring/` gets `/Integrations` appended; then `relocate_syslog_chapter` |
 | `flows` | same | same | derived, e.g. `Network Performance Monitoring/Network Flows/Flow Protocols` |
 | `device` | same | same (1013 pages under the NPM catalog directory) | derived plus `/Integrations`, then `relocate_syslog_chapter` |
-| `exporter` | `meta.name` | same | fixed `Exporting Metrics/Connectors` |
+| `exporter` | `meta.name` | same | fixed `Exporting Metrics/Connectors` (the branch also derives a path from the category that `main()` never uses) |
 | `agent_notification` | `meta.name` | `<dir>/README.md` written directly: no `integrations/` subdirectory, no symlink | derived, `notifications` replaced by `Alerts & Notifications/Notifications` (`.../Agent Dispatched Notifications`) |
 | `cloud_notification` | `meta.name` | `integrations/cloud-notifications/integrations/<slug>.md` | same replacement (`.../Centralized Cloud Notifications`) |
 | `logs` | `meta.name` | `integrations/logs/integrations/<slug>.md` | fixed `Logs Management/Integrations` |
 | `authentication` | `meta.name` | `integrations/cloud-authentication/integrations/<slug>.md` | derived, `authentication` replaced by `Netdata Cloud/Authentication & Authorization/Cloud Authentication & Authorization Integrations` |
 | `secretstore` | label `meta.name`; slug `meta.kind` (matches `/etc/netdata/go.d/ss/<kind>.conf`) | `<backend-dir>/integrations/<kind>.md` | fixed `Collecting Metrics/Secrets Management/Secret Stores` |
-| `service_discovery` | label `meta.name`; slug `meta.kind` (the discoverer registry name) | `<discoverer-dir>/integrations/<kind>.md` | fixed `Collecting Metrics/Service Discovery/Discoverer` |
+| `service_discovery` | label `meta.name`; slug `meta.kind` (the discoverer registry name in `sdext/registry.go`; the file-based discoverers ship `go.d/sd/<kind>.conf` under the same name) | `<discoverer-dir>/integrations/<kind>.md` | fixed `Collecting Metrics/Service Discovery/Discoverer` |
 | `deploy` | never rendered to a page; lives only in `integrations.js` for the in-app "Add Nodes" dialog | | |
 
 `clean_string` (slug): lowercase, spaces to `_`, `/` to `-`, drop `(`, `)`, `:`. Two names that clean alike in one
@@ -181,9 +183,9 @@ that holds exactly one page (multi-integration directories keep their hand-writt
   `meta.monitored_instance.description`, then `Monitor <name>`; the `description-authoring.md` contract follows from
   that. `_render_tech_navigation` hardcodes the marketing navigation;
   `integrations/tests/test_collector_page_navigation.py` requires every target to be an emitted section anchor or
-  `#beyond-the-850-integrations`, so a category or heading change updates the mapping and the test together, and because
-  no workflow runs that test, run it by hand (`python3 -m unittest integrations.tests.test_collector_page_navigation`).
-  The "850+ integrations" header is a literal.
+  `#beyond-the-850-integrations` and pins the exact link list, so a category or heading change updates the mapping and
+  the test together, and because no workflow runs that test, run it by hand (`python3 -m unittest
+  integrations.tests.test_collector_page_navigation`). The "850+ integrations" header is a literal.
 - `gen_doc_secrets_page.py` and `gen_doc_service_discovery_page.py` render `src/collectors/SECRETS.md` and
   `SERVICE-DISCOVERY.md` from the `secretstore` and `service_discovery` entries through `templates/secrets.md` and
   `templates/service_discovery.md` (the two templates `get_section_template_name` never returns); only the backends and
