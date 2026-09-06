@@ -65,6 +65,7 @@ func jobConfigLifecycleSnapshotIdentity(
 }
 
 type preparedJobConfigLifecycle struct {
+	failure  collectorapi.JobConfigFailure
 	identity collectorapi.JobConfigIdentity
 	snapshot collectorapi.JobConfigLifecycleSnapshot
 	runtime  collectorapi.RuntimeJob
@@ -128,6 +129,16 @@ func (dcjc *DynCfgJobController) prepareJobConfigLifecycleReconcile(
 	}
 	if snapshotIdentity, ok := jobConfigLifecycleSnapshotIdentity(snapshot); ok &&
 		next.valid && snapshotIdentity == next.identity {
+		if prepared.identity == next.identity && prepared.failure.Valid() {
+			if projector, ok := next.hook.(collectorapi.JobConfigFailureProjector); ok {
+				var enriched collectorapi.JobConfigLifecycleSnapshot
+				if callJobConfigLifecycle(func() { enriched = projector.ProjectFailure(snapshot, prepared.failure) }) {
+					if identity, valid := jobConfigLifecycleSnapshotIdentity(enriched); valid && identity == next.identity {
+						snapshot = enriched
+					}
+				}
+			}
+		}
 		return func() {
 			var runtime collectorapi.RuntimeJob
 			if prepared.identity == next.identity && prepared.runtime != nil {

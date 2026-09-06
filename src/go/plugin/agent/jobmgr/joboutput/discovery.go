@@ -321,6 +321,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				),
 				change.retry,
 				pendingSettlement,
+				jobConfigFailure(err, "activation"),
 			)
 		}
 		if candidatePreparationBusy(err) {
@@ -372,6 +373,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 						change.Config.UID(),
 					),
 				),
+				jobConfigFailure(err, "activation"),
 			)
 		}
 		switch classifyConstructionError(err) {
@@ -400,6 +402,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 						dcjc.scheduleAutoDetectionRetry(change.Config, failure)
 					},
 				),
+				jobConfigFailure(err, "activation"),
 			)
 		case constructionErrorProposal:
 			return nil, jobmgr.RejectProposal(err)

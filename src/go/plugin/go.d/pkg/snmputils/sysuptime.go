@@ -30,7 +30,7 @@ var sysUptimeSources = []sysUptimeSource{
 func GetSysUptime(client gosnmp.Handler) (int64, error) {
 	packet, err := client.Get(sysUptimeOIDs())
 	if err != nil {
-		return 0, err
+		return 0, WithFailure(err, "get", "")
 	}
 	if packet == nil || len(packet.Variables) == 0 {
 		return 0, nil
@@ -50,7 +50,7 @@ func GetSysUptime(client gosnmp.Handler) (int64, error) {
 
 		value, err := sysUptimePduValue(pdu)
 		if err != nil {
-			lastErr = fmt.Errorf("OID '%s': %w", source.oid, err)
+			lastErr = WithFailure(fmt.Errorf("OID '%s': %w", source.oid, err), "sys_uptime", "processing")
 			continue
 		}
 		if source.scale != 0 {

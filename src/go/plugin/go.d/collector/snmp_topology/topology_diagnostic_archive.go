@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
@@ -280,6 +281,19 @@ func restoreArchiveSnapshot(s snmpdiag.Snapshot) (topologyDiagnostics, error) {
 }
 
 func restoreArchiveLifecycle(l snmpdiag.Lifecycle) (topologyJobLifecycleDiagnosticCut, error) {
+	budget := profileContextRestoreBudget{records: snmpdiag.MaxRecords, bytes: snmpdiag.MaxLogicalBytes}
+	if uint64(len(l.Cut.Entries))+1 > budget.records {
+		return topologyJobLifecycleDiagnosticCut{}, errors.New("job lifecycle exceeds record limit")
+	}
+	budget.records -= uint64(len(l.Cut.Entries)) + 1
+	budget.bytes -= snmpdiag.LifecycleCutLogicalBytes
+	for _, entry := range l.Cut.Entries {
+		size := snmpdiag.LifecycleEntryLogicalBytes(entry.Hostname, entry.SNMPVersion)
+		if size > budget.bytes {
+			return topologyJobLifecycleDiagnosticCut{}, errors.New("job lifecycle exceeds byte limit")
+		}
+		budget.bytes -= size
+	}
 	state, err := topologyDiagnosticArchiveParseCaptureState(l.State)
 	if err != nil {
 		return topologyJobLifecycleDiagnosticCut{}, fmt.Errorf("job lifecycle capture state: %w", err)
@@ -315,17 +329,34 @@ func restoreArchiveLifecycle(l snmpdiag.Lifecycle) (topologyJobLifecycleDiagnost
 		if err != nil {
 			return topologyJobLifecycleDiagnosticCut{}, fmt.Errorf("job lifecycle registration %d outcome: %w", registrationID, err)
 		}
+		if entry.LastCompleted.PreparationFailure != (collectorapi.JobConfigFailure{}) && !entry.LastCompleted.PreparationFailure.Valid() {
+			return topologyJobLifecycleDiagnosticCut{}, errors.New("invalid preparation failure")
+		}
+		if !entry.LastCompleted.CollectionFailures.Valid() {
+			return topologyJobLifecycleDiagnosticCut{}, errors.New("invalid collection failures")
+		}
+		if !entry.LastCompleted.Failure.Valid() {
+			return topologyJobLifecycleDiagnosticCut{}, errors.New("invalid lifecycle failure")
+		}
+		profileContext, err := budget.restore(entry.Profiles)
+		if err != nil {
+			return topologyJobLifecycleDiagnosticCut{}, fmt.Errorf("job lifecycle profile context: %w", err)
+		}
 		result.cut.Entries = append(result.cut.Entries, ddsnmp.DeviceLifecycleEntry{
 			RegistrationID: registrationID,
 			Info: ddsnmp.DeviceLifecycleInfo{
 				Hostname:    entry.Hostname,
+				Profiles:    profileContext,
 				Port:        entry.Port,
 				SNMPVersion: entry.SNMPVersion,
 			},
 			LastCompleted: ddsnmp.DeviceLifecycleStatus{
-				Phase:       phase,
-				Outcome:     outcome,
-				CompletedAt: entry.LastCompleted.CompletedAt,
+				Phase:              phase,
+				Failure:            entry.LastCompleted.Failure,
+				PreparationFailure: entry.LastCompleted.PreparationFailure,
+				CollectionFailures: entry.LastCompleted.CollectionFailures,
+				Outcome:            outcome,
+				CompletedAt:        entry.LastCompleted.CompletedAt,
 			},
 			TopologyReady: entry.TopologyReady,
 		})
@@ -334,6 +365,7 @@ func restoreArchiveLifecycle(l snmpdiag.Lifecycle) (topologyJobLifecycleDiagnost
 }
 
 func restoreArchiveSweep(s snmpdiag.Sweep) (*topologySweepDiagnosticCut, error) {
+	budget := profileContextRestoreBudget{records: snmpdiag.MaxRecords, bytes: snmpdiag.MaxLogicalBytes}
 	state, err := topologyDiagnosticArchiveParseCaptureState(s.CaptureState)
 	if err != nil {
 		return nil, fmt.Errorf("topology sweep capture state: %w", err)
@@ -355,7 +387,7 @@ func restoreArchiveSweep(s snmpdiag.Sweep) (*topologySweepDiagnosticCut, error) 
 	}
 	seen := make(map[ddsnmp.DeviceRegistrationID]struct{}, len(s.Devices)+len(s.Removed))
 	for _, device := range s.Devices {
-		row, err := restoreArchiveDevice(device, s.Sequence)
+		row, err := restoreArchiveDevice(device, s.Sequence, &budget)
 		if err != nil {
 			return nil, err
 		}
@@ -395,7 +427,11 @@ func restoreArchiveSweep(s snmpdiag.Sweep) (*topologySweepDiagnosticCut, error) 
 	return result, nil
 }
 
-func restoreArchiveDevice(d snmpdiag.Device, sweepGeneration uint64) (topologySweepDeviceDiagnostic, error) {
+func restoreArchiveDevice(
+	d snmpdiag.Device,
+	sweepGeneration uint64,
+	budget *profileContextRestoreBudget,
+) (topologySweepDeviceDiagnostic, error) {
 	registrationID := ddsnmp.DeviceRegistrationID(d.RegistrationID)
 	if registrationID == 0 {
 		return topologySweepDeviceDiagnostic{}, errors.New("topology sweep registration ID is zero")
@@ -425,7 +461,7 @@ func restoreArchiveDevice(d snmpdiag.Device, sweepGeneration uint64) (topologySw
 	seenRoles := make(map[string]struct{}, 2)
 	seenAttemptOrdinals := make(map[uint64]struct{}, len(d.Captures))
 	for _, archivedCapture := range d.Captures {
-		capture, err := restoreArchiveCapture(archivedCapture, registrationID)
+		capture, err := restoreArchiveCapture(archivedCapture, registrationID, budget)
 		if err != nil {
 			return topologySweepDeviceDiagnostic{}, err
 		}
@@ -442,7 +478,11 @@ func restoreArchiveDevice(d snmpdiag.Device, sweepGeneration uint64) (topologySw
 		}
 		for _, role := range archivedCapture.Roles {
 			if _, ok := seenRoles[role]; ok {
-				return topologySweepDeviceDiagnostic{}, fmt.Errorf("topology sweep registration %d duplicate capture role %q", registrationID, role)
+				return topologySweepDeviceDiagnostic{}, fmt.Errorf(
+					"topology sweep registration %d duplicate capture role %q",
+					registrationID,
+					role,
+				)
 			}
 			seenRoles[role] = struct{}{}
 			switch role {
@@ -451,7 +491,11 @@ func restoreArchiveDevice(d snmpdiag.Device, sweepGeneration uint64) (topologySw
 			case topologyDiagnosticArchiveCaptureRoleRetainedSuccess:
 				result.acquisition = capture
 			default:
-				return topologySweepDeviceDiagnostic{}, fmt.Errorf("topology sweep registration %d unknown capture role %q", registrationID, role)
+				return topologySweepDeviceDiagnostic{}, fmt.Errorf(
+					"topology sweep registration %d unknown capture role %q",
+					registrationID,
+					role,
+				)
 			}
 		}
 	}
@@ -483,6 +527,7 @@ func restoreArchiveDevice(d snmpdiag.Device, sweepGeneration uint64) (topologySw
 
 func restoreArchiveCapture(c snmpdiag.Capture,
 	registrationID ddsnmp.DeviceRegistrationID,
+	budget *profileContextRestoreBudget,
 ) (*topologyAcquisitionCapture, error) {
 	state, err := topologyDiagnosticArchiveParseCaptureState(c.State)
 	if err != nil {
@@ -504,7 +549,7 @@ func restoreArchiveCapture(c snmpdiag.Capture,
 		logicalBytes: c.LogicalBytes,
 	}
 	if c.Evidence != nil {
-		evidence, err := restoreArchiveAcquisitionEvidence(*c.Evidence, attemptID)
+		evidence, err := restoreArchiveAcquisitionEvidence(*c.Evidence, attemptID, budget)
 		if err != nil {
 			return nil, fmt.Errorf("topology sweep registration %d capture evidence: %w", registrationID, err)
 		}
@@ -527,7 +572,11 @@ func restoreArchiveEvidenceRef(r *snmpdiag.EvidenceRef,
 	}
 	registrationID := ddsnmp.DeviceRegistrationID(r.RegistrationID)
 	if registrationID == 0 || registrationID != owner {
-		return topologyEvidenceRef{}, false, fmt.Errorf("retained-success registration reference %d does not match owner %d", registrationID, owner)
+		return topologyEvidenceRef{}, false, fmt.Errorf(
+			"retained-success registration reference %d does not match owner %d",
+			registrationID,
+			owner,
+		)
 	}
 	if r.Generation == 0 {
 		return topologyEvidenceRef{}, false, errors.New("retained-success generation is zero")
@@ -641,4 +690,19 @@ func topologyDiagnosticArchiveSweepPhaseName(value topologyDiagnosticSweepPhase)
 
 func topologyDiagnosticArchiveParseSweepPhase(value string) (topologyDiagnosticSweepPhase, error) {
 	return topologyDiagnosticArchiveParseEnum[topologyDiagnosticSweepPhase](value, topologyDiagnosticArchiveSweepPhaseNames)
+}
+
+// Profile evidence shares each cut's existing ceiling, including during restore.
+// Decrement only after validation, before retaining the next detached context.
+type profileContextRestoreBudget struct{ records, bytes uint64 }
+
+func (b *profileContextRestoreBudget) restore(data ddsnmp.ProfileContextData) (*ddsnmp.ProfileContext, error) {
+	c, err := ddsnmp.RestoreProfileContext(data, b.records, b.bytes)
+	if err != nil {
+		return nil, err
+	}
+	records, size := c.Shape()
+	b.records -= records
+	b.bytes -= size
+	return c, nil
 }

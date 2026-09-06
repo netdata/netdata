@@ -226,6 +226,7 @@ func (f *Factory) build(
 	ctx context.Context,
 	config confgroup.Config,
 ) (constructed ConstructedJob, resultErr error) {
+	defer func() { resultErr = withJobConfigFailure(resultErr, "construction", "") }()
 	if f == nil || ctx == nil || config == nil {
 		return ConstructedJob{}, errors.New("job output: invalid factory build")
 	}
@@ -248,7 +249,7 @@ func (f *Factory) build(
 	}
 	vnode, err := f.lookupVNode(config)
 	if err != nil {
-		return ConstructedJob{}, err
+		return ConstructedJob{}, withJobConfigFailure(err, "vnode", "")
 	}
 	var job RuntimeJob
 	var variant JobVariant
@@ -630,13 +631,13 @@ func (f *Factory) lookupVNode(config confgroup.Config) (jobruntime.VnodeSnapshot
 	}
 	if f.config.Vnode == nil {
 		return jobruntime.VnodeSnapshot{}, transientJobConstruction(
-			fmt.Errorf("job output: vnode %q is unavailable", config.Vnode()),
+			withJobConfigFailure(fmt.Errorf("job output: vnode %q is unavailable", config.Vnode()), "vnode", "unavailable"),
 		)
 	}
 	vnode, ok := f.config.Vnode(config.Vnode())
 	if !ok || vnode.Vnode == nil {
 		return jobruntime.VnodeSnapshot{}, transientJobConstruction(
-			fmt.Errorf("job output: vnode %q is not registered", config.Vnode()),
+			withJobConfigFailure(fmt.Errorf("job output: vnode %q is not registered", config.Vnode()), "vnode", "missing_vnode"),
 		)
 	}
 	return vnode, nil

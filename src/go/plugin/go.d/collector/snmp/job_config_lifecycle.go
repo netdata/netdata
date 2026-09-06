@@ -150,3 +150,16 @@ func intConfigValue(config map[string]any, key string, fallback int) int {
 		return fallback
 	}
 }
+
+func (*snmpJobConfigLifecycle) ProjectFailure(
+	snapshot collectorapi.JobConfigLifecycleSnapshot,
+	failure collectorapi.JobConfigFailure,
+) collectorapi.JobConfigLifecycleSnapshot {
+	current, ok := snmpLifecycleSnapshot(snapshot)
+	if !ok || !failure.Valid() {
+		return snapshot
+	}
+	enriched := *current
+	enriched.status.PreparationFailure = failure
+	return &enriched
+}

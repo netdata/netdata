@@ -17,6 +17,11 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	}
 
 	pms, err := c.ddSnmpColl.Collect()
+	if source, ok := c.ddSnmpColl.(interface {
+		CollectionFailures() ddsnmp.CollectionFailures
+	}); ok {
+		c.recordCollectionFailures(source.CollectionFailures())
+	}
 	if err != nil {
 		c.markBGPCollectFailed(err)
 		return err

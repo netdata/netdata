@@ -35,7 +35,11 @@ func (c *Collector) collectLicenseRows(prof *ddsnmp.Profile, stats *ddsnmp.Colle
 	return c.collectLicenseRowsObserved(prof, stats, nil)
 }
 
-func (c *Collector) collectLicenseRowsObserved(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats, execution *AcquisitionExecutionReport) ([]ddsnmp.LicenseRow, error) {
+func (c *Collector) collectLicenseRowsObserved(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+	execution *AcquisitionExecutionReport,
+) ([]ddsnmp.LicenseRow, error) {
 	if prof.Definition == nil || len(prof.Definition.Licensing) == 0 {
 		return nil, nil
 	}
@@ -66,7 +70,10 @@ func (c *Collector) collectLicenseRowsObserved(prof *ddsnmp.Profile, stats *ddsn
 	return rows, nil
 }
 
-func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.LicensingConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.LicenseRow, error) {
+func (c *Collector) collectScalarLicenseRows(
+	configs []ddprofiledefinition.LicensingConfig,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.LicenseRow, error) {
 	var rows []ddsnmp.LicenseRow
 	var errs []error
 
@@ -86,6 +93,7 @@ func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.Licen
 		if len(oids) > 0 {
 			pdus, err = c.scalarCollector.getScalarValues(oids, stats)
 			if err != nil {
+				recordCollectionFailure(&c.failures.Licensing, err, "licensing", "")
 				errs = append(errs, fmt.Errorf("licensing scalar row %q: %w", licensingConfigDisplayName(cfg), err))
 				continue
 			}
@@ -94,6 +102,7 @@ func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.Licen
 		row, ok, err := c.buildScalarLicenseRow(cfg, pdus)
 		if err != nil {
 			stats.Errors.Processing.Licensing++
+			recordCollectionFailure(&c.failures.Licensing, err, "licensing", "processing")
 			errs = append(errs, fmt.Errorf("licensing scalar row %q: %w", licensingConfigDisplayName(cfg), err))
 			continue
 		}
@@ -108,7 +117,11 @@ func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.Licen
 	return rows, nil
 }
 
-func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.LicensingConfig, stats *ddsnmp.CollectionStats, execution *AcquisitionExecutionReport) ([]ddsnmp.LicenseRow, error) {
+func (c *Collector) collectTableLicenseRows(
+	configs []ddprofiledefinition.LicensingConfig,
+	stats *ddsnmp.CollectionStats,
+	execution *AcquisitionExecutionReport,
+) ([]ddsnmp.LicenseRow, error) {
 	var rows []ddsnmp.LicenseRow
 	var errs []error
 	walkPass := newTableWalkPass(execution)
@@ -122,6 +135,7 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 
 		outcome := walkPass.walk(c.tableCollector, cfg.Table.OID, stats)
 		if outcome.err != nil {
+			recordCollectionFailure(&c.failures.Licensing, outcome.err, "licensing", "")
 			errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), outcome.err))
 			continue
 		}
@@ -131,6 +145,7 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 		}
 
 		if err := c.walkLicenseTableDependencies(metricsCfg, tableNameToOID, walkPass, stats); err != nil {
+			recordCollectionFailure(&c.failures.Licensing, err, "licensing", "dependency")
 			errs = append(errs, fmt.Errorf("licensing table %q dependencies: %w", licensingConfigDisplayName(cfg), err))
 			continue
 		}
@@ -151,6 +166,7 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
 				stats.Errors.Processing.Licensing++
+				recordCollectionFailure(&c.failures.Licensing, err, "licensing", "processing")
 				errs = append(errs, fmt.Errorf("licensing table %q row %q: %w", licensingConfigDisplayName(cfg), rowIndex, err))
 				continue
 			}
@@ -182,7 +198,10 @@ func (c *Collector) walkLicenseTableDependencies(
 	return errors.Join(errs...)
 }
 
-func (c *Collector) buildScalarLicenseRow(cfg ddprofiledefinition.LicensingConfig, pdus map[string]gosnmp.SnmpPDU) (ddsnmp.LicenseRow, bool, error) {
+func (c *Collector) buildScalarLicenseRow(
+	cfg ddprofiledefinition.LicensingConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+) (ddsnmp.LicenseRow, bool, error) {
 	rowKey := scalarLicenseRowKey(cfg)
 	row := ddsnmp.LicenseRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -321,7 +340,11 @@ func (c *Collector) populateLicenseRow(row *ddsnmp.LicenseRow, cfg ddprofiledefi
 	return nil
 }
 
-func (c *Collector) populateLicenseState(row *ddsnmp.LicenseRow, cfg ddprofiledefinition.LicenseStateConfig, ctx licenseValueContext) error {
+func (c *Collector) populateLicenseState(
+	row *ddsnmp.LicenseRow,
+	cfg ddprofiledefinition.LicenseStateConfig,
+	ctx licenseValueContext,
+) error {
 	if !cfg.IsSet() {
 		return nil
 	}
@@ -371,7 +394,12 @@ func licenseStateRawValueByPolicy(raw string, policy ddprofiledefinition.License
 	return raw
 }
 
-func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseTimerSignalsConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseTimer(
+	timer *ddsnmp.LicenseTimer,
+	cfg ddprofiledefinition.LicenseTimerSignalsConfig,
+	ctx licenseValueContext,
+	name string,
+) error {
 	if cfg.LicenseValueConfig.IsSet() {
 		if err := c.populateLicenseTimerTimestamp(timer, cfg.LicenseValueConfig, ctx, name); err != nil {
 			return err
@@ -390,7 +418,12 @@ func (c *Collector) populateLicenseTimer(timer *ddsnmp.LicenseTimer, cfg ddprofi
 	return nil
 }
 
-func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseTimerTimestamp(
+	timer *ddsnmp.LicenseTimer,
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+	name string,
+) error {
 	if sourceOID, ok := licenseTimerZeroDateAndTimePlaceholder(cfg, ctx); ok {
 		c.log.Limit(licenseTimerNoValueLogKey+sourceOID, 1, licenseRowsErrorLogEvery).
 			Warningf("license timer %q returned zero DateAndTime placeholder; treating timer as absent", sourceOID)
@@ -414,7 +447,12 @@ func (c *Collector) populateLicenseTimerTimestamp(timer *ddsnmp.LicenseTimer, cf
 	return nil
 }
 
-func (c *Collector) populateLicenseTimerRemaining(timer *ddsnmp.LicenseTimer, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseTimerRemaining(
+	timer *ddsnmp.LicenseTimer,
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+	name string,
+) error {
 	value, sourceOID, ok, err := c.licenseNumericValue(cfg, ctx)
 	if err != nil {
 		source := licenseTimerSource(cfg, name)
@@ -462,7 +500,11 @@ func isZeroDateAndTimePlaceholderPDU(pdu gosnmp.SnmpPDU) bool {
 	}
 }
 
-func (c *Collector) populateLicenseUsage(usage *ddsnmp.LicenseUsage, cfg ddprofiledefinition.LicenseUsageSignalsConfig, ctx licenseValueContext) error {
+func (c *Collector) populateLicenseUsage(
+	usage *ddsnmp.LicenseUsage,
+	cfg ddprofiledefinition.LicenseUsageSignalsConfig,
+	ctx licenseValueContext,
+) error {
 	if err := c.populateLicenseUsageValue(&usage.HasUsed, &usage.Used, cfg.Used, ctx, "usage.used"); err != nil {
 		return err
 	}
@@ -478,7 +520,13 @@ func (c *Collector) populateLicenseUsage(usage *ddsnmp.LicenseUsage, cfg ddprofi
 	return nil
 }
 
-func (c *Collector) populateLicenseUsageValue(has *bool, dst *int64, cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext, name string) error {
+func (c *Collector) populateLicenseUsageValue(
+	has *bool,
+	dst *int64,
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+	name string,
+) error {
 	if !cfg.IsSet() {
 		return nil
 	}
@@ -556,7 +604,10 @@ func (c *Collector) licenseRawTextValue(cfg ddprofiledefinition.LicenseValueConf
 	return value, true, nil
 }
 
-func (c *Collector) licenseNumericValue(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (value int64, sourceOID string, ok bool, err error) {
+func (c *Collector) licenseNumericValue(
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+) (value int64, sourceOID string, ok bool, err error) {
 	if !cfg.IsSet() {
 		return 0, "", false, nil
 	}

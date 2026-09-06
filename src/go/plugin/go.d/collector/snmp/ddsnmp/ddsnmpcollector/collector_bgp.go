@@ -134,6 +134,7 @@ func (c *Collector) collectScalarBGPRows(
 					route.Outcome = AcquisitionRouteOutcomeFailed
 					route.FailureClass = AcquisitionFailureClassTransport
 				}
+				recordCollectionFailure(&c.failures.BGP, err, "bgp", "")
 				errs = append(errs, fmt.Errorf("BGP scalar row %q: %w", bgpConfigDisplayName(cfg), err))
 				continue
 			}
@@ -164,6 +165,7 @@ func (c *Collector) collectScalarBGPRows(
 				route.Rejected++
 			}
 			stats.Errors.Processing.BGP++
+			recordCollectionFailure(&c.failures.BGP, err, "bgp", "processing")
 			errs = append(errs, fmt.Errorf("BGP scalar row %q: %w", bgpConfigDisplayName(cfg), err))
 			continue
 		}
@@ -225,6 +227,7 @@ func (c *Collector) collectTableBGPRows(
 				route.Outcome = AcquisitionRouteOutcomeFailed
 				route.FailureClass = AcquisitionFailureClassTransport
 			}
+			recordCollectionFailure(&c.failures.BGP, outcome.err, "bgp", "")
 			errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), outcome.err))
 			continue
 		}
@@ -241,6 +244,7 @@ func (c *Collector) collectTableBGPRows(
 				route.Outcome = AcquisitionRouteOutcomeFailed
 				route.FailureClass = AcquisitionFailureClassDependency
 			}
+			recordCollectionFailure(&c.failures.BGP, err, "bgp", "dependency")
 			errs = append(errs, fmt.Errorf("BGP table %q dependencies: %w", bgpConfigDisplayName(cfg), err))
 			continue
 		}
@@ -275,6 +279,7 @@ func (c *Collector) collectTableBGPRows(
 					route.Rejected++
 				}
 				stats.Errors.Processing.BGP++
+				recordCollectionFailure(&c.failures.BGP, err, "bgp", "processing")
 				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
 				continue
 			}
@@ -607,7 +612,11 @@ func (c *Collector) populateBGPBool(dst *ddsnmp.BGPBool, cfg ddprofiledefinition
 	return nil
 }
 
-func (c *Collector) populateBGPConnection(dst *ddsnmp.BGPConnection, cfg ddprofiledefinition.BGPConnectionConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPConnection(
+	dst *ddsnmp.BGPConnection,
+	cfg ddprofiledefinition.BGPConnectionConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.EstablishedUptime, cfg.EstablishedUptime, ctx); err != nil {
 		return fmt.Errorf("established_uptime: %w", err)
 	}
@@ -617,7 +626,11 @@ func (c *Collector) populateBGPConnection(dst *ddsnmp.BGPConnection, cfg ddprofi
 	return nil
 }
 
-func (c *Collector) populateBGPDirectional(dst *ddsnmp.BGPDirectional, cfg ddprofiledefinition.BGPDirectionalConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPDirectional(
+	dst *ddsnmp.BGPDirectional,
+	cfg ddprofiledefinition.BGPDirectionalConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Received, cfg.Received, ctx); err != nil {
 		return fmt.Errorf("received: %w", err)
 	}
@@ -649,7 +662,11 @@ func (c *Collector) populateBGPTraffic(dst *ddsnmp.BGPTraffic, cfg ddprofiledefi
 	return nil
 }
 
-func (c *Collector) populateBGPTransitions(dst *ddsnmp.BGPTransitions, cfg ddprofiledefinition.BGPTransitionsConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPTransitions(
+	dst *ddsnmp.BGPTransitions,
+	cfg ddprofiledefinition.BGPTransitionsConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Established, cfg.Established, ctx); err != nil {
 		return fmt.Errorf("established: %w", err)
 	}
@@ -704,7 +721,11 @@ func (c *Collector) populateBGPLastError(dst *ddsnmp.BGPLastError, cfg ddprofile
 	return nil
 }
 
-func (c *Collector) populateBGPLastNotifications(dst *ddsnmp.BGPLastNotifications, cfg ddprofiledefinition.BGPLastNotifyConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPLastNotifications(
+	dst *ddsnmp.BGPLastNotifications,
+	cfg ddprofiledefinition.BGPLastNotifyConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPLastNotification(&dst.Received, cfg.Received, ctx); err != nil {
 		return fmt.Errorf("received: %w", err)
 	}
@@ -714,7 +735,11 @@ func (c *Collector) populateBGPLastNotifications(dst *ddsnmp.BGPLastNotification
 	return nil
 }
 
-func (c *Collector) populateBGPLastNotification(dst *ddsnmp.BGPLastNotification, cfg ddprofiledefinition.BGPLastNotificationConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPLastNotification(
+	dst *ddsnmp.BGPLastNotification,
+	cfg ddprofiledefinition.BGPLastNotificationConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Code, cfg.Code, ctx); err != nil {
 		return fmt.Errorf("code: %w", err)
 	}
@@ -747,7 +772,11 @@ func (c *Collector) populateBGPRoutes(dst *ddsnmp.BGPRoutes, cfg ddprofiledefini
 	return nil
 }
 
-func (c *Collector) populateBGPRouteCounters(dst *ddsnmp.BGPRouteCounters, cfg ddprofiledefinition.BGPRouteCountersConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPRouteCounters(
+	dst *ddsnmp.BGPRouteCounters,
+	cfg ddprofiledefinition.BGPRouteCountersConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Received, cfg.Received, ctx); err != nil {
 		return fmt.Errorf("received: %w", err)
 	}
@@ -772,7 +801,11 @@ func (c *Collector) populateBGPRouteCounters(dst *ddsnmp.BGPRouteCounters, cfg d
 	return nil
 }
 
-func (c *Collector) populateBGPRouteLimits(dst *ddsnmp.BGPRouteLimits, cfg ddprofiledefinition.BGPRouteLimitsConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPRouteLimits(
+	dst *ddsnmp.BGPRouteLimits,
+	cfg ddprofiledefinition.BGPRouteLimitsConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Limit, cfg.Limit, ctx); err != nil {
 		return fmt.Errorf("limit: %w", err)
 	}
@@ -785,7 +818,11 @@ func (c *Collector) populateBGPRouteLimits(dst *ddsnmp.BGPRouteLimits, cfg ddpro
 	return nil
 }
 
-func (c *Collector) populateBGPDeviceCounts(dst *ddsnmp.BGPDeviceCounts, cfg ddprofiledefinition.BGPDeviceCountsConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPDeviceCounts(
+	dst *ddsnmp.BGPDeviceCounts,
+	cfg ddprofiledefinition.BGPDeviceCountsConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Peers, cfg.Peers, ctx); err != nil {
 		return fmt.Errorf("peers: %w", err)
 	}
@@ -806,7 +843,10 @@ func (c *Collector) populateBGPDeviceCounts(dst *ddsnmp.BGPDeviceCounts, cfg ddp
 	return nil
 }
 
-func (c *Collector) bgpPeerStateCounts(cfg ddprofiledefinition.BGPPeerStatesConfig, ctx bgpValueContext) (map[ddprofiledefinition.BGPPeerState]int64, error) {
+func (c *Collector) bgpPeerStateCounts(
+	cfg ddprofiledefinition.BGPPeerStatesConfig,
+	ctx bgpValueContext,
+) (map[ddprofiledefinition.BGPPeerState]int64, error) {
 	counts := make(map[ddprofiledefinition.BGPPeerState]int64)
 	add := func(state ddprofiledefinition.BGPPeerState, valueCfg ddprofiledefinition.BGPValueConfig) error {
 		var value ddsnmp.BGPInt64
@@ -880,7 +920,10 @@ func (c *Collector) bgpOptionalTextValue(cfg ddprofiledefinition.BGPValueConfig,
 	return value
 }
 
-func (c *Collector) bgpAddressFamilyValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) (ddprofiledefinition.BGPAddressFamily, error) {
+func (c *Collector) bgpAddressFamilyValue(
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) (ddprofiledefinition.BGPAddressFamily, error) {
 	value, err := c.bgpTextValue(cfg, ctx)
 	if err != nil || value == "" {
 		return "", err
@@ -888,7 +931,10 @@ func (c *Collector) bgpAddressFamilyValue(cfg ddprofiledefinition.BGPValueConfig
 	return ddprofiledefinition.BGPAddressFamily(value), nil
 }
 
-func (c *Collector) bgpSubsequentAddressFamilyValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) (ddprofiledefinition.BGPSubsequentAddressFamily, error) {
+func (c *Collector) bgpSubsequentAddressFamilyValue(
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) (ddprofiledefinition.BGPSubsequentAddressFamily, error) {
 	value, err := c.bgpTextValue(cfg, ctx)
 	if err != nil || value == "" {
 		return "", err
@@ -896,7 +942,10 @@ func (c *Collector) bgpSubsequentAddressFamilyValue(cfg ddprofiledefinition.BGPV
 	return ddprofiledefinition.BGPSubsequentAddressFamily(value), nil
 }
 
-func (c *Collector) bgpRawTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) (value string, sourceOID string, ok bool, err error) {
+func (c *Collector) bgpRawTextValue(
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) (value string, sourceOID string, ok bool, err error) {
 	if !cfg.IsSet() {
 		return "", "", false, nil
 	}
@@ -943,7 +992,10 @@ func (c *Collector) bgpRawTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx 
 	return value, sourceOID, true, nil
 }
 
-func (c *Collector) bgpNumericValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) (value int64, sourceOID string, ok bool, err error) {
+func (c *Collector) bgpNumericValue(
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) (value int64, sourceOID string, ok bool, err error) {
 	if !cfg.IsSet() {
 		return 0, "", false, nil
 	}
@@ -979,7 +1031,11 @@ func (c *Collector) bgpNumericValue(cfg ddprofiledefinition.BGPValueConfig, ctx 
 	return value, sourceOID, true, nil
 }
 
-func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sym ddprofiledefinition.SymbolConfig, ctx bgpValueContext) (gosnmp.SnmpPDU, string, bool, error) {
+func (c *Collector) lookupBGPValuePDU(
+	cfg ddprofiledefinition.BGPValueConfig,
+	sym ddprofiledefinition.SymbolConfig,
+	ctx bgpValueContext,
+) (gosnmp.SnmpPDU, string, bool, error) {
 	sourceOID := trimOID(sym.OID)
 	if cfg.Table == "" || cfg.Table == ctx.tableName {
 		pdu, ok := ctx.lookupPDU(sym.OID)
@@ -994,7 +1050,11 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 	if err != nil {
 		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
-	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(cfg.Table, refTableOID, ctx.crossTableCtx.walkedData)
+	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(
+		cfg.Table,
+		refTableOID,
+		ctx.crossTableCtx.walkedData,
+	)
 	if err != nil {
 		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
@@ -1008,7 +1068,13 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 		LookupSymbol: cfg.LookupSymbol,
 	}
 	if c.tableCollector.rowProcessor.crossTableResolver.requiresLookupByValue(tagCfg) {
-		lookupIndex, err = c.tableCollector.rowProcessor.crossTableResolver.resolveLookupIndexByValue(tagCfg, lookupIndex, refTableOID, refTablePDUs, ctx.crossTableCtx)
+		lookupIndex, err = c.tableCollector.rowProcessor.crossTableResolver.resolveLookupIndexByValue(
+			tagCfg,
+			lookupIndex,
+			refTableOID,
+			refTablePDUs,
+			ctx.crossTableCtx,
+		)
 		if err != nil {
 			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 		}
@@ -1142,7 +1208,11 @@ func bgpTableNameToOID(configs []ddprofiledefinition.BGPConfig) map[string]strin
 	return tableNameToOID
 }
 
-func bgpTableDependencies(cfg ddprofiledefinition.BGPConfig, metricsCfg ddprofiledefinition.MetricsConfig, tableNameToOID map[string]string) []string {
+func bgpTableDependencies(
+	cfg ddprofiledefinition.BGPConfig,
+	metricsCfg ddprofiledefinition.MetricsConfig,
+	tableNameToOID map[string]string,
+) []string {
 	deps := make(map[string]bool)
 	for _, dep := range extractTableDependencies(metricsCfg, tableNameToOID) {
 		deps[trimOID(dep)] = true

@@ -38,6 +38,8 @@ func New(cfg Config) *Collector {
 		tableIdentity:             buildTableIdentity(cfg.Profiles),
 	}
 
+	cfg.SnmpClient = &diagnosticClient{Handler: cfg.SnmpClient, failures: &coll.failures}
+
 	for _, prof := range cfg.Profiles {
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
@@ -56,6 +58,7 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
+		failures                   ddsnmp.CollectionFailures
 		log                        *logger.Logger
 		profiles                   map[string]*profileState
 		missingOIDs                map[string]bool
@@ -107,6 +110,7 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 }
 
 func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	c.failures = ddsnmp.CollectionFailures{}
 	var prepared []*preparedProfileCollection
 	var errs []error
 	if c.initialAcquisitionObserver != nil {
@@ -122,6 +126,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 		profile, err := c.prepareProfileCollection(state, uint32(ordinal))
 		if err != nil {
 			errs = append(errs, err)
+			recordCollectionFailure(&c.failures.Profiles, err, "prepare", "")
 			c.observeAcquisitionProfile(profile, AcquisitionProfileOutcomeFailed, AcquisitionFailurePhasePrepare)
 			continue
 		}
@@ -152,6 +157,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	for _, profile := range prepared {
 		if err := c.collectPreparedProfileTables(profile, session); err != nil {
 			errs = append(errs, err)
+			recordCollectionFailure(&c.failures.Profiles, err, "tables", "")
 			c.observeAcquisitionProfile(profile, AcquisitionProfileOutcomeFailed, AcquisitionFailurePhaseTables)
 			continue
 		}
@@ -195,6 +201,14 @@ func (c *Collector) observeAcquisitionProfile(
 	outcome AcquisitionProfileOutcome,
 	phase AcquisitionFailurePhase,
 ) {
+	if profile != nil && profile.metrics != nil {
+		p := profile.metrics.Stats.Errors.Processing
+		c.failures.Processing.Preparation += p.Preparation
+		c.failures.Processing.Scalar += p.Scalar
+		c.failures.Processing.Table += p.Table
+		c.failures.Processing.BGP += p.BGP
+		c.failures.Processing.Licensing += p.Licensing
+	}
 	if c.initialAcquisitionObserver == nil || profile == nil || profile.acquisition == nil {
 		return
 	}

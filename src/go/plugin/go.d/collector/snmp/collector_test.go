@@ -825,6 +825,15 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 				require.NoError(t, err)
 				return
 			}
+			if name == "unmatched system object" {
+				context := collr.deviceLifecycleInfo.Profiles.Snapshot()
+				require.Equal(t, "available", context.State)
+				require.Equal(t, "1.3.6.1.2.1.999", context.SysObjectID)
+				require.Empty(t, context.Selected)
+				require.False(t, context.ManualApplied)
+				require.Equal(t, "no_profiles", collr.deviceLifecycleStatus.Failure.Reason)
+			}
+
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErr)
 			for _, value := range tc.wantAbsent {

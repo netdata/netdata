@@ -120,6 +120,7 @@ type (
 		deviceLifecycleOwner     string
 		deviceLifecycleInfo      ddsnmp.DeviceLifecycleInfo
 		deviceLifecycleStatus    ddsnmp.DeviceLifecycleStatus
+		deviceCollectionFailures ddsnmp.CollectionFailures
 		deviceLifecyclePending   *ddsnmp.DeviceConnectionInfo
 		deviceLifecycleManaged   bool
 		deviceLifecycleCommitted bool
@@ -171,17 +172,17 @@ func (c *Collector) Init(context.Context) (err error) {
 	}()
 
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation failed: %v", err)
+		return lifecycleFailureError(fmt.Errorf("config validation failed: %v", err), err, "configuration", "invalid_configuration")
 	}
 
 	if _, err := c.initSNMPClient(); err != nil {
-		return fmt.Errorf("failed to initialize SNMP client: %v", err)
+		return lifecycleFailureError(fmt.Errorf("failed to initialize SNMP client: %v", err), err, "client", "invalid_configuration")
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
 		pr, err := c.initPinger()
 		if err != nil {
-			return fmt.Errorf("failed to initialize ping client: %v", err)
+			return lifecycleFailureError(fmt.Errorf("failed to initialize ping client: %v", err), err, "ping", "")
 		}
 		c.pingClient = pr
 	}
@@ -204,7 +205,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 	if c.snmpClient == nil {
 		snmpClient, err := c.initAndConnectSNMPClient()
 		if err != nil {
-			return fmt.Errorf("failed to init and connect SNMP client: %v", err)
+			return lifecycleFailureError(fmt.Errorf("failed to init and connect SNMP client: %v", err), err, "connect", "")
 		}
 		c.snmpClient = snmpClient
 	}
@@ -215,7 +216,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 
 	if c.PingOnly && c.pingClient != nil {
 		if _, err := c.pingClient.Probe(ctx, c.Hostname); err != nil && isPingUnrecoverableError(err) {
-			return fmt.Errorf("ping check failed: %v", err)
+			return lifecycleFailureError(fmt.Errorf("ping check failed: %v", err), err, "ping", "")
 		}
 	}
 
@@ -227,6 +228,13 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	c.recordCollectionFailures(ddsnmp.CollectionFailures{})
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			c.recordDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed)
+			panic(recovered)
+		}
+	}()
 	mx, err := c.collect(ctx)
 	c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, err)
 	if err != nil {

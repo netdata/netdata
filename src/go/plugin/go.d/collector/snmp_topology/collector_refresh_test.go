@@ -611,11 +611,24 @@ func TestCollectorRefreshRecordsClientConfigurationFailureInAttemptAndContext(t 
 	require.Nil(t, snapshot)
 	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
 	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration), capture.evidence.client)
+	require.Equal(
+		t,
+		failedAcquisitionPhase(
+			topologyAcquisitionFailureClientConfiguration,
+			snmputils.WithFailure(errors.New("missing user"), "client", "missing_v3_username"),
+		),
+		capture.evidence.client,
+	)
 	require.Equal(t, notObservedAcquisitionPhase(), capture.evidence.connect)
 	require.Len(t, capture.evidence.collectionContexts, 1)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration),
-		capture.evidence.collectionContexts[0].client)
+	require.Equal(
+		t,
+		failedAcquisitionPhase(
+			topologyAcquisitionFailureClientConfiguration,
+			snmputils.WithFailure(errors.New("missing user"), "client", "missing_v3_username"),
+		),
+		capture.evidence.collectionContexts[0].client,
+	)
 	require.Equal(t, notObservedAcquisitionPhase(), capture.evidence.collectionContexts[0].connect)
 	require.Equal(t, notObservedAcquisitionPhase(), capture.evidence.collectionContexts[0].collection)
 }
@@ -1104,7 +1117,7 @@ func TestCollectorVLANContextsRecordDistinctSuccessAndFailureEvidence(t *testing
 	require.Equal(t, "200", capture.evidence.collectionContexts[2].vlanID)
 	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureConnect),
 		capture.evidence.collectionContexts[2].connect)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureConnect),
+	require.Equal(t, notObservedAcquisitionPhase(),
 		capture.evidence.collectionContexts[2].collection)
 	require.Empty(t, capture.evidence.collectionContexts[2].profiles)
 
@@ -1122,9 +1135,13 @@ func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
 			return nil, nil
 		}
 
-		require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
-			Hostname: "::ffff:192.0.2.10",
-		}))
+		require.Equal(
+			t,
+			[]netip.Addr{netip.MustParseAddr("192.0.2.10")},
+			coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
+				Hostname: "::ffff:192.0.2.10",
+			}),
+		)
 		require.Empty(t, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "127.0.0.1",
 		}))

@@ -10,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // DeviceConnectionInfo holds SNMP connection parameters for a device.
@@ -67,6 +70,7 @@ type DeviceLifecycleInfo struct {
 	Hostname    string
 	Port        int
 	SNMPVersion string
+	Profiles    *ProfileContext
 }
 
 // DeviceLifecyclePhase identifies the last completed collector lifecycle call.
@@ -90,9 +94,12 @@ const (
 
 // DeviceLifecycleStatus describes the last completed lifecycle call.
 type DeviceLifecycleStatus struct {
-	Phase       DeviceLifecyclePhase
-	Outcome     DeviceLifecycleOutcome
-	CompletedAt time.Time
+	CollectionFailures CollectionFailures
+	PreparationFailure collectorapi.JobConfigFailure
+	Failure            snmputils.Failure
+	Phase              DeviceLifecyclePhase
+	Outcome            DeviceLifecycleOutcome
+	CompletedAt        time.Time
 }
 
 // DeviceLifecycleEntry is one current normal-SNMP job incarnation.
@@ -270,7 +277,9 @@ func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo)
 	}
 	s.devices[registrationID] = cloneDeviceConnectionInfo(info)
 	record := s.lifecycles[registrationID]
+	profileContext := record.info.Profiles
 	record.info = lifecycleInfoFromDeviceConnection(info)
+	record.info.Profiles = profileContext
 	s.lifecycles[registrationID] = record
 	s.addHostnameIndexLocked(ownerKey, info.Hostname)
 	s.lifecycleSequence++
@@ -513,4 +522,22 @@ func (s *DeviceStore) notifyConfigurationChangedLocked() {
 	case s.changes <- struct{}{}:
 	default:
 	}
+}
+
+// RecordProfileContext updates only this accepted runtime's immutable evidence.
+func (w *DeviceWriter) RecordProfileContext(context *ProfileContext) {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] != w {
+		return
+	}
+	id := s.ownerRegistrations[w.owner]
+	record := s.lifecycles[id]
+	record.info.Profiles = context
+	s.lifecycles[id] = record
+	s.lifecycleSequence++
 }

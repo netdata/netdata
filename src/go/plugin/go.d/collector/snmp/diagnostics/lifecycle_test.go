@@ -3,6 +3,7 @@
 package diagnostics
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -41,4 +42,38 @@ func TestLifecycleOutcomesAreCompleteAndRoundTrip(t *testing.T) {
 	require.Error(t, err)
 	_, err = ParseLifecycleOutcome("invalid")
 	require.Error(t, err)
+}
+
+type fixedLifecycleSource struct{ cut ddsnmp.DeviceLifecycleCut }
+
+func (s fixedLifecycleSource) LifecycleCut() ddsnmp.DeviceLifecycleCut { return s.cut }
+
+func TestProfileContextLimitPreservesLifecycleAndSourceCut(t *testing.T) {
+	profile, err := ddsnmp.RestoreProfileContext(
+		ddsnmp.ProfileContextData{State: "available", ManualPolicy: "fallback", BGPMode: "absent", SysDescr: strings.Repeat("s", 8192)},
+		MaxRecords,
+		MaxLogicalBytes,
+	)
+	require.NoError(t, err)
+	source := fixedLifecycleSource{
+		cut: ddsnmp.DeviceLifecycleCut{
+			Sequence: 7,
+			Entries: []ddsnmp.DeviceLifecycleEntry{
+				{
+					RegistrationID: 1,
+					Info:           ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.1", Profiles: profile},
+					LastCompleted: ddsnmp.DeviceLifecycleStatus{
+						Phase:   ddsnmp.DeviceLifecyclePhaseCheck,
+						Outcome: ddsnmp.DeviceLifecycleOutcomeFailed,
+					},
+				},
+			},
+		},
+	}
+	result := CaptureLifecycle(source, MaxRecords, 4096)
+	require.Equal(t, "available", result.State)
+	require.Len(t, result.Cut.Entries, 1)
+	require.Equal(t, "failed", result.Cut.Entries[0].LastCompleted.Outcome)
+	require.Equal(t, "limit_exceeded", result.Cut.Entries[0].Profiles.State)
+	require.Equal(t, "available", source.cut.Entries[0].Info.Profiles.Snapshot().State, "admission must not mutate a source-owned cut")
 }
