@@ -37,54 +37,87 @@ func (f *fakeSocket) Command(command string, process socket.Processor) error {
 	return nil
 }
 
-func TestUpsdClient_authenticateDoesNotLeakPassword(t *testing.T) {
-	client := &upsdClient{conn: &fakeSocket{responses: map[string][]string{
-		"USERNAME": {"OK"},
-		"PASSWORD": {"ERR ACCESS-DENIED"},
-	}}}
+func TestUpsdClient_commandErrorsDoNotLeakCredentials(t *testing.T) {
+	tests := map[string]struct {
+		command        string
+		responses      map[string][]string
+		wantUpsdError  bool
+		wantContains   string
+		wantNotContain string
+	}{
+		"username protocol error is redacted": {
+			command: fmt.Sprintf(commandUsername, testUsername),
+			responses: map[string][]string{
+				"USERNAME": {"ERR ACCESS-DENIED"},
+			},
+			wantUpsdError:  true,
+			wantContains:   "USERNAME",
+			wantNotContain: testUsername,
+		},
+		"password protocol error is redacted": {
+			command: fmt.Sprintf(commandPassword, testPassword),
+			responses: map[string][]string{
+				"PASSWORD": {"ERR ACCESS-DENIED"},
+			},
+			wantUpsdError:  true,
+			wantContains:   "PASSWORD",
+			wantNotContain: testPassword,
+		},
+		"username empty response is redacted": {
+			command:        fmt.Sprintf(commandUsername, testUsername),
+			responses:      map[string][]string{},
+			wantContains:   "USERNAME",
+			wantNotContain: testUsername,
+		},
+		"password empty response is redacted": {
+			command:        fmt.Sprintf(commandPassword, testPassword),
+			responses:      map[string][]string{},
+			wantContains:   "PASSWORD",
+			wantNotContain: testPassword,
+		},
+		"list ups protocol error is unchanged": {
+			command: commandListUPS,
+			responses: map[string][]string{
+				"LIST": {"ERR UNKNOWN-COMMAND"},
+			},
+			wantUpsdError: true,
+			wantContains:  commandListUPS,
+		},
+		"list var protocol error keeps ups name": {
+			command: fmt.Sprintf(commandListVar, "ups1"),
+			responses: map[string][]string{
+				"LIST": {"ERR VAR-NOT-SUPPORTED"},
+			},
+			wantUpsdError: true,
+			wantContains:  "LIST VAR ups1",
+		},
+		"list ups empty response is unchanged": {
+			command:      commandListUPS,
+			responses:    map[string][]string{},
+			wantContains: commandListUPS,
+		},
+		"logout empty response is unchanged": {
+			command:      commandLogout,
+			responses:    map[string][]string{},
+			wantContains: commandLogout,
+		},
+	}
 
-	err := client.authenticate(testUsername, testPassword)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := &upsdClient{conn: &fakeSocket{responses: tt.responses}}
 
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, errUpsdCommand))
-	assert.NotContains(t, err.Error(), testPassword)
-	assert.Contains(t, err.Error(), "PASSWORD")
-}
+			_, err := client.sendCommand(tt.command)
 
-func TestUpsdClient_authenticateDoesNotLeakUsername(t *testing.T) {
-	client := &upsdClient{conn: &fakeSocket{responses: map[string][]string{
-		"USERNAME": {"ERR ACCESS-DENIED"},
-	}}}
+			require.Error(t, err)
+			// An empty response means the peer closed the connection: the
+			// caller must drop it, so it must not be an upsd command error.
+			assert.Equal(t, tt.wantUpsdError, errors.Is(err, errUpsdCommand))
+			assert.Contains(t, err.Error(), tt.wantContains)
 
-	err := client.authenticate(testUsername, testPassword)
-
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, errUpsdCommand))
-	assert.NotContains(t, err.Error(), testUsername)
-	assert.Contains(t, err.Error(), "USERNAME")
-}
-
-func TestUpsdClient_errorKeepsNonCredentialCommandArguments(t *testing.T) {
-	client := &upsdClient{conn: &fakeSocket{responses: map[string][]string{
-		"LIST": {"ERR VAR-NOT-SUPPORTED"},
-	}}}
-
-	_, err := client.sendCommand(fmt.Sprintf(commandListVar, "ups1"))
-
-	require.Error(t, err)
-	// Only USERNAME/PASSWORD arguments are redacted: the UPS name is what
-	// makes this error diagnosable.
-	assert.Contains(t, err.Error(), "LIST VAR ups1")
-}
-
-func TestUpsdClient_emptyResponseIsAnError(t *testing.T) {
-	client := &upsdClient{conn: &fakeSocket{responses: map[string][]string{}}}
-
-	_, err := client.sendCommand(commandListUPS)
-
-	require.Error(t, err)
-	// The peer closed the connection; the caller must drop it, so this must
-	// not be reported as a protocol-level upsd command error.
-	assert.False(t, errors.Is(err, errUpsdCommand))
-	assert.Contains(t, err.Error(), commandListUPS)
+			if tt.wantNotContain != "" {
+				assert.NotContains(t, err.Error(), tt.wantNotContain)
+			}
+		})
+	}
 }
