@@ -11,8 +11,9 @@ under learn `docs/` is deleted and rebuilt on every ingest (`../authoring-bounda
    `INTEGRATION_MARKER` and is repaired in its `metadata.yaml` or producer input, then regenerated
    (`integrations-lifecycle`); an ordinary mapped page is edited directly.
 4. For an ordinary page, add an accurate `meta.description` to the node; ingest injects it as frontmatter
-   (`../mapping.md#frontmatter-ingest-writes`). `integrations/tests/test_descriptions.py` checks map descriptions
-   for presence, validity, and global uniqueness and runs in `.github/workflows/check-markdown.yml`.
+   (`../mapping.md#frontmatter-ingest-writes`). `integrations/tests/test_descriptions.py` requires a valid description
+   on the pages listed in its `MAP_DESCRIPTION_TARGETS` and case-folded uniqueness across every description in the
+   map, and runs in `.github/workflows/check-markdown.yml`; add the page to the targets to pin it.
 5. Add source-level regression coverage for the objective defect (map ownership, description presence, heading
    structure, resolvable links); a word count is not a completeness measure.
 6. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`) and a disposable ingest with

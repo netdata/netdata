@@ -16,7 +16,7 @@ collector metadata: `.agents/skills/collectors-metadata-yaml/SKILL.md#safety-of-
    safe while it contains no `{`. Nothing escapes `}` or `<`.
 5. Integration pages (`INTEGRATION_MARKER`) get their `netdata.cloud/img` logo tags annotated with contrast data
    attributes (`_annotate_integration_logo_tags`, one HTTP fetch per logo URL per run, `LOGO_ANALYSIS_TIMEOUT`); a
-   failed fetch silently leaves the attributes off.
+   failed fetch still writes the attributes, with `unknown` contrast and `low` confidence.
 6. The exact substrings `<=`, `%<`, and `<->` are backslash-escaped. `< =` or `<-->` are not.
 7. `<https://...>`, `<http://...>`, and `<user@host>` become markdown links.
 8. A `meta_yaml: "<url>"` line anywhere in the file is removed and `custom_edit_url` is rewritten to that URL.
@@ -26,10 +26,13 @@ collector metadata: `.agents/skills/collectors-metadata-yaml/SKILL.md#safety-of-
 
 Not covered by the transforms, each fails the MDX build:
 
-- `<word>` placeholders in prose (`<service-name>`, `<scope>`), which MDX reads as an unclosed tag;
-- `<` directly followed by a digit (`<100 minutes`);
+- `<word>` placeholders in prose (`<service-name>`, `<scope>`), which MDX reads as an unclosed tag (the build reports
+  `Expected a closing tag for <word>`);
+- `<` directly followed by a digit (`<100 minutes`; reported as `Unexpected character ... before name`);
 - generic type syntax (`Vec<u32>`, `List<String>`);
-- any HTML tag in body text that is not meant as JSX.
+- any HTML tag in body text that is not meant as JSX;
+- a standalone `}` outside code (nothing escapes it), and operator spellings other than the three exact substrings of
+  step 6, such as `<-->` or `< =`.
 
 Fixes, in order of preference: wrap the token in inline code (step 4 preserves it); rephrase (`under 100 minutes`);
 escape as `\<` only when the character must read as a less-than sign. Fenced and inline code, MDX `import`/`export`

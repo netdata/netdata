@@ -57,8 +57,8 @@ Enforced by code (the file names the tool and the effect):
   (`./redirects.md`).
 - A broken link or anchor in a mapped page fails `.github/workflows/check-markdown.yml` on the PR here, and the
   learn ingest under `--fail-links` (`./pipeline.md#verification-before-merging-here`).
-- Every `.md`, `.mdx`, and `.json` under learn `docs/` without `part_of_learn: True` is deleted at each run
-  (`./authoring-boundary.md`).
+- Every `.md` and `.mdx` under learn `docs/` without `part_of_learn: True`, and every `.json` unconditionally, is
+  deleted at the start of each full ingest (`./authoring-boundary.md`).
 
 Hand-reviewed, because no code checks them:
 

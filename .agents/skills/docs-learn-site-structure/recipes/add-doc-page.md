@@ -23,6 +23,7 @@ checks that catch the silent failures.
    against the PR (`../pipeline.md#verification-before-merging-here`).
 7. After merge, `trigger-learn-update.yml` dispatches the learn ingest; a learn maintainer merges the ingest PR;
    Netlify deploys (`../pipeline.md#when-ingest-runs`, `docs/.map/README.md#4-merge-the-learn-ingest-pr`).
+8. After deploy, request the predicted URL and confirm the page, its sidebar position, and its description.
 
 Mistakes this catches: a missing node (no error, no page); an `edit_url` that does not match the schema pattern
 (exit 2); an `edit_url` that matches the pattern but not the file (no error, no page); content from another source

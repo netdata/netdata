@@ -19,13 +19,15 @@ behaviour an author meets:
   fork named unlike its upstream can bind to the wrong repository; use `--local-repo netdata:<path>`.
 - `--ignore-on-prem-repo` skips the on-prem clone, adds that repository to the redirect ignore set, and forces plain
   HTTPS cloning.
-- `--fail-links` and the per-repository `--fail-links-<repo>` flags turn broken links or anchors into exit code 1 at
-  the end of the run (the run completes first).
+- `--fail-links`, or one abbreviated flag per repository (`--fail-links-netdata`, `-helmchart`, `-onprem`, `-asd`,
+  `-grafana`, `-github`), turns broken links or anchors into exit code 1 at the end of the run (the run completes
+  first).
 - `--kickstart-checksum` (32 hex characters) is required for a full remote ingest; with a local `netdata` checkout it
   is derived from that checkout's `packaging/installer/kickstart.sh` (`resolve_kickstart_checksum`).
 - `--regenerate-grids-only` rebuilds generated outputs from the committed recovery state (`regenerate_grids_only`,
-  `load_sidebar_order_state`) without touching sources.
-- `--debug` prints the source files that matched no map row; `--dry-run` and `--docs-prefix` exist.
+  `load_sidebar_order_state`) without touching sources and without resolving a checksum.
+- `--debug` prints the non-empty source files that matched no map row; `--dry-run` and `--docs-prefix` (default
+  `docs`, the output directory) exist.
 
 ## What a run does, in order
 
@@ -37,7 +39,8 @@ Read `__main__` for the exact sequence; the symbols, in order:
    failure is caught and printed; the run continues without that repository.
 4. The map is moved out of the `netdata` checkout and validated (`validate_map_schema`, exit `MAP_SCHEMA_EXIT_CODE`),
    then `load_map_sidebar_order` fills `MAP_SIDEBAR_ORDER` (`./sidebars.md`).
-5. `fetch_markdown_from_repo` lists every `.md*` file, dot-directories included.
+5. `fetch_markdown_from_repo` lists every `.md*` file; a dot-directory is searched one level deep only
+   (`.github/*.md`), so a page nested deeper under a dot-directory is never found.
 6. `populate_integrations` splices integration pages into the map (`./mapping.md`).
 7. `automate_sidebar_position`, then per file `insert_and_read_hidden_metadata_from_doc` and
    `create_mdx_path_from_metadata`; `resolve_publish_path_collisions`; `update_metadata_of_file`; the case-only
@@ -45,7 +48,8 @@ Read `__main__` for the exact sequence; the symbols, in order:
 8. Per published file `local_to_absolute_links`, `copy_doc`, `sanitize_page` (`./mdx-rules.md`).
 9. `add_new_learn_path_key_to_dict` sets each entry's `new_learn_path` from its computed slug (the view and edit link
    dictionary it builds is discarded, and `produce_gh_edit_link_for_repo` returns an unsubstituted format string for
-   every repository except `.github`, so GitHub edit links in bodies are never rewritten), then `convert_github_links`.
+   every repository except `.github`; neither matters, because `convert_github_links` builds its own key and
+   normalizes `edit/` to `blob/`, so edit links to published pages are rewritten too).
 10. `autogenerateRedirects.main` (`./redirects.md`); a `LegacyRedirectGateError` exits with `REDIRECT_GATE_EXIT_CODE`
     (3) before the catalogue, `netlify.toml`, or the mapping state are written.
 11. Broken-link and broken-anchor reports grouped by repository; the exit decision is recorded, not applied yet.
@@ -69,17 +73,18 @@ from the `netdata` checkout, so a page from any other repository still needs its
   `**.mdx?`, `docs/.map/map.yaml`, or `packaging/installer/kickstart.sh` and dispatches the learn workflow `Ingest`.
   In GitHub Actions filter syntax `?` means zero or one of the preceding character, so `**.mdx?` matches `.md` and
   `.mdx`.
-- `ingest.yml` in `netdata/learn` also runs on `workflow_dispatch`, on its cron (every third hour, `schedule:`), and
-  on pushes to its own `master` touching the paths it lists.
+- `ingest.yml` in `netdata/learn` also runs on `workflow_dispatch`, on its cron (every third hour between 08:00 and
+  23:00 UTC, `schedule:`), and on pushes to its own `master` touching the paths it lists.
 
 So a merged docs PR normally reaches the ingest PR within minutes; the cron is the ceiling, not the expectation.
 
-`ingest.yml` (read the file for the steps): resolves the kickstart checksum from this repository's `master`, runs
-`ingest.py --fail-links`, classifies the output with `ingest/classify_ingest_result.py` (broken links become an issue
+`ingest.yml` (read the file for the steps): resolves the kickstart checksum from this repository's `master` (the
+step fails the workflow when the download or the 32-hex check fails), runs `ingest.py --fail-links`, classifies the output with `ingest/classify_ingest_result.py` (broken links become an issue
 labelled `broken-links`, not a failed workflow; an unclassifiable run fails), verifies the recovery state as a fixed
 point (snapshot, `--regenerate-grids-only`, identical snapshot), opens or updates the PR on branch `ingest` (title
 "Ingest New Documentation", labels `ingest` and `automation`), and dispatches `rendered-link-integrity.yml` against
-that PR. A person reviews and merges the ingest PR (`docs/.map/README.md#4-merge-the-learn-ingest-pr`).
+that PR. The PR carries the regenerated `docs/`, `netlify.toml`, and the redirect catalogue; a person reviews those
+and merges it (`docs/.map/README.md#4-merge-the-learn-ingest-pr`).
 
 Other gates: `daily-learn-link-check.yml` runs `ingest/check_learn_links.py` daily (the copy under `scripts/` is an
 unwired duplicate) and fails on any `learn_link:` that returns 404; `generated-output-boundary.yml` refuses hand edits
@@ -99,7 +104,8 @@ to generated output in learn PRs; `rendered-link-integrity.yml` renders head and
 
 ## Deploy
 
-Netlify builds and deploys `master` of `netdata/learn`; there is no deploy workflow. The build command, publish
+Netlify builds and deploys `master` of `netdata/learn`; there is no deploy workflow (site name and preview branches:
+learn `README.md`, section "Netlify status"). The build command, publish
 directory, and pinned Node and npm versions are the `[build]` table of `static.toml`, copied into the generated
 `netlify.toml`; read them there rather than from the learn `README.md`, whose Node pin lags. Redirects ship in
 `netlify.toml` and apply at the edge on deploy. There is one live version of the site: no `versioned_docs/` or

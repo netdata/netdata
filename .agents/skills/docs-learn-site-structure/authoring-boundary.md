@@ -19,7 +19,8 @@ working here. Verified against `netdata/learn @ c3a16edd5ee4dc819976ef162c9afaff
 Everything else in that repository (`static.toml`, `docusaurus.config.js`, `src/`, `static/`, `ingest/*.py`,
 `config/`, workflows) is hand-maintained there; a change to site behaviour, styling, or the ingest itself is a learn
 PR. A page that must live in the learn repository sets `part_of_learn: True` in its frontmatter; ingest never matches,
-copies, or sanitizes it (only the sidebar-position pass touches it), so the map and MDX rules do not apply to it.
+copies, or sanitizes it, so the map and MDX rules do not apply to it; only the end-of-run reconciliation touches it
+(sidebar position, sibling `_category_.json`, Mermaid contrast).
 
 ## Where documentation is edited
 

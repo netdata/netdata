@@ -12,10 +12,12 @@ Consequences:
 - A cross-reference written as an absolute `https://learn.netdata.cloud/...` URL is not touched: no anchor validation,
   and no correction when the target is later moved or renamed in `map.yaml`. It renders correctly only while the
   target's slug stays what it was when the link was written.
-- The generator copies the link text verbatim; nothing between `metadata.yaml` and ingest rewrites or checks it, so the
-  rule is applied at the source. The audit commands for existing absolute links are in
+- The generator rewrites a repository-relative `](/...` link to its `https://github.com/netdata/netdata/blob/master/...`
+  form (`convert_local_links` in `integrations/gen_integrations.py`, whose `integrations.js` output the page generator
+  reads), which is exactly the form `convert_github_links` resolves; an absolute Learn URL passes through both
+  untouched. The rule is therefore applied at the source. The audit commands for existing absolute links are in
   `.agents/skills/integrations-lifecycle/how-tos/auditing-metadata-learn-links.md`.
 
 Verified against `netdata/learn @ c3a16edd5ee4dc819976ef162c9afaff4b9b968c` (`local_to_absolute_links` skips links
 containing `http`; `convert_github_links` keys on `https://github.com/netdata`) and this repository's
-`src/crates/netflow-plugin/integrations/*.md` reproducing their `metadata.yaml` link text byte for byte.
+`src/crates/netflow-plugin/integrations/*.md`, whose links carry the GitHub form of the `metadata.yaml` paths.
