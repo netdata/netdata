@@ -83,7 +83,8 @@ values here, because the pins move with the site:
 
 ```bash
 sed -n '/^\[build\]/,/^$/p' "${LEARN_COPY}/static.toml"
-PUBLISH_DIR="$(sed -n 's/^ *publish *= *"\(.*\)"/\1/p' "${LEARN_COPY}/static.toml")"
+PUBLISH_DIR="$(sed -n '/^\[build\]/,/^$/{s/^ *publish *= *"\(.*\)"/\1/p;}' "${LEARN_COPY}/static.toml")"
+[ -n "${PUBLISH_DIR}" ] || { echo "no publish key in the [build] table of static.toml" >&2; exit 1; }
 ```
 
 Run the printed `command` inside `${LEARN_COPY}` with the printed `NODE_OPTIONS` exported and Node and npm matching

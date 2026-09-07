@@ -27,8 +27,8 @@ Verified against `netdata/learn @ c3a16edd5ee4dc819976ef162c9afaff4b9b968c`.
    already one), retained (the value is still a URL, but a `static.toml` rule or a tracked rule to a live page covers
    the route; reported), retired (listed under `legacy_catalogue_retirements` in `config/redirect-policy.json`), or
    failed. A failed entry raises `LegacyRedirectGateError`, ingest exits 3, and nothing below is written. A value
-   that is any other absolute URL, a `learn.netdata.cloud` one included, is never resolved through the map and can
-   only be retained or retired.
+   that is any other absolute URL, a `learn.netdata.cloud` one included, is never resolved through the map: it is
+   retained or retired when a rule or the policy covers it, and failed otherwise.
 3. `append_entries_to_json` adds the moved entries to the catalogue; `combineDictsOverwrite` merges the resolved
    entries into the tracked rules and raises `ValueError` (an uncaught traceback, not exit 3) when a route would get
    a different target; `clean_redirects` drops rules whose source is a live route and collapses chains;

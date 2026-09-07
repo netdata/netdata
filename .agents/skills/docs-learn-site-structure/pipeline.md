@@ -33,7 +33,8 @@ behaviour an author meets:
 
 Read `__main__` for the exact sequence; the symbols, in order:
 
-1. `resolve_kickstart_checksum`, before anything is deleted.
+1. `resolve_kickstart_checksum`, before anything is deleted (a no-op under `--regenerate-grids-only`, which then
+   runs `regenerate_grids_only` and exits before any cleanup).
 2. `unsafe_cleanup_folders` on the temp folder and `safe_cleanup_learn_folders` on `docs/` (`./authoring-boundary.md`).
 3. `clone_repo` for every entry of `default_repos` with depth 1, or `shutil.copytree` for `--local-repo`. A clone
    failure is caught and printed; the run continues without that repository.
