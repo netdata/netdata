@@ -99,10 +99,3 @@ func testLatestArchiveCapture(t testing.TB, document *snmpdiag.Document, index i
 	t.Fatal("archive has no latest attempt")
 	return nil
 }
-
-// Tests that inspect the current generation directly do not exercise publication.
-func (p *topologyDiagnosticProvider) Capture() (snmpdiag.Snapshot, error) {
-	cut := captureTopologyCut(p.registry, p.aborted.Load())
-	cut.Lifecycle = captureCheckpointLifecycle(p.source)
-	return topologydiag.NewSnapshot(cut)
-}

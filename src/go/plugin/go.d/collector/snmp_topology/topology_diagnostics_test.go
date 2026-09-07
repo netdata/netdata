@@ -14,30 +14,36 @@ import (
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCollectorDiagnosticsReadsLifecycleIndependently(t *testing.T) {
+func TestCollectorDiagnosticCheckpointPreservesLifecycle(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10", Port: 161})
-
-	first, err := coll.diagnosticProvider.Capture()
+	coll.refreshTopology(t.Context())
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 1)
+	first, err := checkpoints[0].Capture()
 	require.NoError(t, err)
 	require.Equal(t, "available", first.Lifecycle.State)
 	require.Len(t, first.Lifecycle.Cut.Entries, 1)
-	require.Nil(t, first.Topology)
+	require.Equal(t, "unknown", first.Lifecycle.Cut.Entries[0].LastCompleted.Outcome)
 
 	store.RecordJobLifecycle("job-a", ddsnmp.DeviceLifecycleStatus{
 		Phase:       ddsnmp.DeviceLifecyclePhaseInit,
 		Outcome:     ddsnmp.DeviceLifecycleOutcomeFailed,
 		CompletedAt: time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC),
 	})
-	second, err := coll.diagnosticProvider.Capture()
+	current := snmpdiag.CaptureLifecycle(store)
+	require.Greater(t, current.Cut.Sequence, first.Lifecycle.Cut.Sequence)
+	require.Equal(t, "failed", current.Cut.Entries[0].LastCompleted.Outcome)
+	coll.refreshTopology(t.Context())
+	require.Equal(t, checkpoints, coll.diagnosticProvider.Checkpoints(), "lifecycle alone must not replace historical topology")
+	preserved, err := checkpoints[0].Capture()
 	require.NoError(t, err)
-	require.Greater(t, second.Lifecycle.Cut.Sequence, first.Lifecycle.Cut.Sequence)
-	require.Equal(t, "failed", second.Lifecycle.Cut.Entries[0].LastCompleted.Outcome)
-	require.Equal(t, first.Topology, second.Topology)
+	require.Equal(t, first, preserved)
 }
 
 func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
@@ -225,20 +231,28 @@ func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T
 	require.True(t, cut.Devices[0].HasRetainedSuccess)
 }
 
-func TestAcquireTopologyDiagnosticsContainsLifecyclePanic(t *testing.T) {
+func TestDiagnosticCheckpointContainsLifecyclePanic(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
 	coll.diagnosticProvider.source = panickingTopologyLifecycleSource{}
 
-	diagnostics, err := coll.diagnosticProvider.Capture()
+	coll.refreshTopology(t.Context())
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 1)
+	diagnostics, err := checkpoints[0].Capture()
 	require.NoError(t, err)
 	require.Equal(t, "unavailable", diagnostics.Lifecycle.State)
 	require.Equal(t, "projection_panic", diagnostics.Lifecycle.Reason)
 }
 
-func TestCollectorDiagnosticsConcurrentLifecycleAndGenerationReads(t *testing.T) {
+func TestCollectorDiagnosticsConcurrentLifecycleAndCheckpointReads(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10"})
 
+	coll.refreshTopology(t.Context())
+	require.Len(t, coll.diagnosticProvider.Checkpoints(), 1)
+	// Aborted sweeps create meaningful history without querying a device.
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
 	const iterations = 500
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -250,36 +264,35 @@ func TestCollectorDiagnosticsConcurrentLifecycleAndGenerationReads(t *testing.T)
 				Outcome:     ddsnmp.DeviceLifecycleOutcomeSuccess,
 				CompletedAt: time.Unix(int64(i+1), 0),
 			})
-			cut := &topologydiag.SweepCut{
-				Sequence:     uint64(i + 1),
-				CaptureState: topologydiag.CaptureAvailable,
-				RecordCount:  1,
-				LogicalBytes: 32,
-			}
-			coll.topologyRegistry.publishGeneration(&topologyGeneration{sequence: uint64(i + 1), diagnostic: cut})
+			coll.refreshTopology(canceled)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		for range iterations {
-			diagnostics, err := coll.diagnosticProvider.Capture()
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			if diagnostics.Lifecycle.State != "available" {
-				t.Errorf("lifecycle capture state = %s", diagnostics.Lifecycle.State)
-				return
-			}
-			if diagnostics.Topology != nil {
-				if diagnostics.Topology.Sequence == 0 || diagnostics.Topology.CaptureState != "available" {
-					t.Errorf("invalid topology cut: sequence=%d state=%s", diagnostics.Topology.Sequence, diagnostics.Topology.CaptureState)
+			for _, checkpoint := range coll.diagnosticProvider.Checkpoints() {
+				diagnostics, err := checkpoint.Capture()
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				if diagnostics.Lifecycle.State != "available" {
+					t.Errorf("lifecycle capture state = %s", diagnostics.Lifecycle.State)
+					return
+				}
+				if diagnostics.Topology == nil || diagnostics.Topology.Sequence == 0 || diagnostics.Topology.CaptureState != "available" {
+					t.Errorf("invalid topology cut: %+v", diagnostics.Topology)
 					return
 				}
 			}
 		}
 	}()
 	wg.Wait()
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, snmpdiag.CheckpointRetention)
+	latest, err := checkpoints[len(checkpoints)-1].Capture()
+	require.NoError(t, err)
+	require.NotNil(t, latest.LastAborted)
 }
 
 type panickingTopologyLifecycleSource struct{}

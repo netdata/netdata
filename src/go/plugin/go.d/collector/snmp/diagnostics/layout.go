@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -58,6 +57,5 @@ func ListCheckpoints(directory string) ([]CheckpointFile, error) {
 		}
 		result = append(result, CheckpointFile{Sequence: sequence, Filename: name})
 	}
-	slices.SortFunc(result, func(a, b CheckpointFile) int { return strings.Compare(a.Filename, b.Filename) })
 	return result, nil
 }
