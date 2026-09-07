@@ -111,8 +111,10 @@ Likely homes:
   `pid`, or `container`, `process_name` by default) and `selections.mode`
   (`aggregated` or `detailed`, aggregated by default), parsed at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:474`; the
-  `aggregated` / `mode:aggregated` and `detailed` / `mode:detailed` spellings
-  are retained as compatibility aliases;
+  `mode:` and `__topology_mode:` token spellings are both accepted, as are the
+  other `key:value` option tokens the parser owns (the developer guide's
+  Network Connections Shape section describes them as the canonical option
+  form, not a compatibility layer);
 - response metadata exposes the `mode` selector at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:5134`;
 - actors, graph links, and optional socket evidence rows are emitted as compact
@@ -187,8 +189,13 @@ vSphere:
   `catofunc/topology.go`);
 - the Function emits `netdata.topology.v1` directly from the Go collector and
   never emitted an earlier schema;
-- actor types are `site`, `pop`, `device`, and `bgp_peer`; actor identity is a
-  producer-composed `id` with `account_id` and `site_id` as merge identities;
+- actor types are `cato_site`, `cato_pop`, `cato_device`, and `bgp_peer`
+  (`catofunc/topology.go`); the aggregation scopes are `site`, `pop`, and
+  `network`; actor identity is a producer-composed `id`, with per-type merge
+  identities declared in `catofunc/presentation.go` (`account_id` and `site_id`
+  for sites, plus `device_id` for devices, `account_id` and `pop_name` for
+  PoPs, `remote_ip` and `remote_asn` for BGP peers; devices and BGP peers
+  declare `site_id` as `parent_identity`);
 - tests validate the payload with `topologyv1.ValidateDecodedData` and the JSON
   Schema.
 
@@ -567,6 +574,14 @@ aggregator.
   guide's Aggregator Behavior section, and merged actor scalars prefer the
   non-empty value from the newest comparable Agent version, otherwise the
   conflict is preserved in diagnostics or expanded labels.
+- Streaming table merge keys. The streaming design merges `stream_path` rows on
+  identical path membership, `inbound` rows by parent, child, immediate source,
+  and relationship type, `outbound` rows by sending parent, streamed node,
+  destination, and stream state, and links by source, destination, type,
+  protocol, and state, deduplicating identical rows and merging numeric
+  metrics. The shipped table types declare `append` (`set` for
+  `actor_labels`), so these keys are not expressible today; they land with the
+  four-dimension policy above.
 - Loose-side materialization policy. A detailed network-connections row whose
   remote side has endpoint facts but no actor would let the producer skip one
   visible `endpoint` actor per remote peer; the table would declare how such a

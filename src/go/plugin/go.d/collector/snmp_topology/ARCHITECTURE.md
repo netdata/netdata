@@ -923,8 +923,9 @@ An unchanged golden is expected for internal ownership and generation refactors.
 inputs, runs the real cache, registry, and Function rendering path, validates
 the final `topology.v1` payload, and compares it with one full-payload oracle
 per golden scenario (`topologyScenarioGoldenCases`, currently five of the
-eighteen scenarios; the rest are covered by `TestSNMPTopologyScenarioSemantics`
-with assertions and determinism checks but no oracle). The oracles are bulky
+eighteen scenarios; all eighteen run `TestSNMPTopologyScenarioSemantics` with
+assertions and a determinism check, and only the five also have an oracle). The
+oracles are bulky
 and live in the external `netdata/testdata` repository under
 `snmp/topology-scenarios/`, checked out at `src/go/testdata/` (gitignored);
 `NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR` overrides that location. When

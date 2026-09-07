@@ -23,13 +23,14 @@ published contract and are exempt from the naming rule below.
 
 - A skill points at facts rather than restating them. When a skill depends on a specific section of the document that
   owns a fact, it MUST cite the section as `<path>/<doc>.md#<anchor>`, where `<anchor>` is the heading's slug as
-  GitHub renders it for an ATX heading with a plain ASCII title (inline HTML removed and links reduced to their text;
-  then lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else dropped; spaces become
-  hyphens; a repeated heading gets `-1`, `-2`). Cite only such headings: non-ASCII titles, setext headings, and a
-  literal title that collides with a generated suffix are outside the convention. Paths are repo-relative (with or
-  without a leading `/`), or relative to the citing file when they start with `./` or `../`.
+  GitHub renders it for an ATX heading with a plain ASCII title (code spans flattened, inline HTML removed, links
+  reduced to their text; then lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else
+  dropped; spaces become hyphens; a repeated heading gets `-1`, `-2` as GitHub numbers them). Cite only such headings:
+  non-ASCII titles and setext headings are outside the convention. Paths are repo-relative (with or without a leading
+  `/`), or relative to the citing file when they start with `./` or `../`. URLs are written with their scheme.
 - `.agents/sow/audit.sh` fails when the cited file or a heading with that slug is missing, so renaming or removing a
-  heading in an owner document is caught until every citing skill is updated.
+  heading in an owner document is caught until every citing skill is updated. Headings and citations inside fenced
+  code blocks or HTML comments are not scanned.
 - A privately published owner document (one not mapped in `docs/.map/map.yaml`) that skills cite by section SHOULD
   carry a short "Place in the documentation set" paragraph naming the citing skill(s), so an editor of the document
   knows the dependency exists; Learn-published documents carry no such paragraph.

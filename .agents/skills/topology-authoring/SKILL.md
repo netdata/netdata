@@ -15,7 +15,7 @@ Read the owner for the plane you touch; do not work from memory of it.
 
 | Owner | Owns |
 |---|---|
-| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the keyed registries (`actor_types`, `link_types`, `evidence_types`, `table_types`, overlay templates, aggregation scopes, `dictionaries`, `stats`, `extensions`) are open maps whose keys are producer-chosen ids, and `required_params[]` items are unconstrained. |
+| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the type registries (`actor_types`, `link_types`, `port_types`, `evidence_types`, `table_types`, `overlay_templates`, `aggregation_scopes`) are maps keyed by producer-chosen ids, and the other keyed maps (`dictionaries`, `stats`, `extensions`, `evidence`, `scale_keys`, `correlation.rules`, detail-table maps, `badge_map`, `link_aggregation.metrics`) are open; `required_params[]` items are objects with no further constraint. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | The payload contract, plane by plane, plus per-producer Shape sections and the aggregator rules a producer relies on. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Migration state per producer, Cloud aggregator and frontend scope, the CTS gate, and design that is not yet in the schema. |
 | `src/go/pkg/topology/v1` | Go builders and the semantic validator (`validate.go`, `validate_notification.go`). |
@@ -33,7 +33,7 @@ starts where those rows have become observations.
 
 | Function | Producer | Tests |
 |---|---|---|
-| `topology:network-connections` | `src/collectors/network-viewer.plugin/network-viewer-topology.c` (shared renderer; Windows main in `network-viewer-windows.c`, container rules in `network-viewer-topology-containers.c`) | `src/collectors/network-viewer.plugin/tests/validate_topology_payload.py`, `src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py`, fixtures under `src/collectors/network-viewer.plugin/tests/fixtures/topology/` |
+| `topology:network-connections` | `src/collectors/network-viewer.plugin/network-viewer-topology.c` (shared renderer; Windows main in `network-viewer-windows.c`, container rules in `network-viewer-topology-containers.c`) | `src/collectors/network-viewer.plugin/tests/validate_topology_payload.py`, `validate_topology_container_fixtures.py`, the C unit tests `test_network_viewer_topology_containers.c` and `test_network_viewer_apps_lookup_client.c`, and fixtures under `tests/fixtures/topology/` (all under `src/collectors/network-viewer.plugin/tests/`) |
 | `topology:streaming` | `src/web/api/functions/function-topology-streaming.c` | no producer-level test; `src/go/tools/functions-validation/fixtures/topology-v1/streaming.json` is a hand-authored schema sample that does not mirror the emitted shape |
 | `topology:snmp` | `src/go/plugin/go.d/collector/snmp_topology/` (render in `internal/topologyv1`) | `topology_scenario_golden_test.go`, `internal/topologyv1/golden_test.go`, see `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#validation-checklist` |
 | `topology:vsphere` | `src/go/plugin/go.d/collector/vsphere/func_topology*.go` | `func_topology_test.go` |
@@ -54,20 +54,25 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
   envelope; both return an error, there is no warning level): reference bounds, column-length equality with `rows`,
   dictionary indexes, label-policy display types, search columns, the `ports.sources[]` rules except the
   `actor_table` carve-out below (and `show_bullets` is read untyped, so only the schema rejects a non-boolean),
-  highlight-path column types, every overlay-refs convention rule, correlation rules and point/claim key columns, all
-  modal projections, and the presentation, correlation, and overlay token vocabularies. Structural tokens
-  (`orientation`, `direction_role`, `link_type.aggregation.*`, `evidence_type.role`, `table_type.role`, `owner`, and
-  `aggregation`, `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are schema-only; the Go
-  validator never reads them. Producer tests call `ValidateDecodedData` (`cato_networks/topology_test.go` is the
-  reference shape); the CLI tool calls `ValidateDecodedResponse` and needs
-  `--schema src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` to add the JSON Schema check.
+  highlight-path column types (including that `path_table` is owned by `actor`, the one use the validator makes of
+  `table_type.owner`), every overlay-refs convention rule except the id-pattern rule (schema-only), correlation rules
+  and point/claim key columns, all modal projections, and the presentation, correlation, and overlay token
+  vocabularies. Structural tokens (`orientation`, `direction_role`, `link_type.aggregation.*`, `evidence_type.role`,
+  `table_type.role` and `aggregation`, `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are
+  schema-only; the Go validator never reads them. Producer tests call `ValidateDecodedData`
+  (`cato_networks/topology_test.go` is the reference shape). The CLI tool always validates against one JSON Schema
+  first, defaulting to `FUNCTION_UI_SCHEMA.json`, which rejects a topology payload, so a topology run passes
+  `--schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` from `src/go`
+  (`src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`); it then calls
+  `ValidateDecodedResponse`.
 - The CLI tool (`src/go/tools/functions-validation`) counts a topology payload's rows as
   `max(actor rows, link rows)` (`topologyv1.GraphRowsFromDecodedData`) for its `--min-rows` and `--require-rows`
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
 - Not checked by the Go validator although the contract states them: `actor_labels` key, value, source, and kind
   column types (only `actor_column` is type-checked), `search.label_keys[]` against any label registry (string shape
-  only), correlation `key_space` values (schema-required, never read), and unknown optional column ids on
-  `actor_table` port sources.
+  only), correlation `key_space` values (schema-required, never read), unknown optional column ids on `actor_table`
+  port sources, and the owner of a detail table named as an `actor_table` source by port bullets, modal sections, or
+  modal labels (a link- or evidence-owned table is accepted there).
 - `topology:network-connections` returns a Function error with HTTP `413` above its 64 MiB budget and never
   truncates (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`).
 - The SNMP scenario golden suite skips, not fails, without the external fixture checkout

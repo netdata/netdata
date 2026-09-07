@@ -607,7 +607,9 @@ self/current node emphasis. Do not force the UI to infer emphasis from actor
 type names or labels. Initial UI-owned mappings are `compact=0.85`,
 `normal=1.0`, and `emphasized=1.18`; these numbers are not schema and may be
 tuned after visual QA. `size.scale` composes with `size.mode`; it does not
-override data-driven sizing.
+override data-driven sizing. Omitting `size.scale`, `layout.repulsion`, or
+`search` is valid and means the neutral default (`normal`, no search policy);
+it must not re-enable pre-v1 UI heuristics.
 
 When `selection.actor_click.mode` is `highlight_path`, the payload must also
 set `path_table`, `path_actor_column`, and `path_order_column`. The path table
@@ -640,7 +642,9 @@ names an evidence type id.
 `hover.fields` is intentionally lightweight graph hover metadata. Full modal
 and table composition lives in `types.actor_types.<id>.presentation.modal`,
 `types.link_types.<id>.presentation.modal`, and optional
-`types.table_types.<id>.presentation`.
+`types.table_types.<id>.presentation`, which supplies reusable per-table
+defaults (label, order, default visibility, column display metadata) and does
+not replace an actor or link modal section.
 
 `annotation` is a small actor marker such as a ring or dot. It must use closed
 color slots and style tokens; it is not a free-form badge or CSS hook.
@@ -1023,10 +1027,9 @@ Use `empty_label` for the section-level empty-state label. Use column
 `sortable` as presentation hints over already-projected columns. These fields
 must not add new data or embed UI components.
 
-The Cloud aggregator preserves and merges modal/table definitions by the
-namespacing rules under Aggregator Behavior. It should not materialize modal
-rows during aggregation unless it is already merging the underlying canonical
-table.
+The Cloud aggregator MUST preserve and merge modal/table definitions by the
+namespacing rules under Aggregator Behavior and MUST NOT materialize modal rows
+during aggregation unless it is already merging the underlying canonical table.
 
 ## Telemetry Overlays
 
@@ -1095,7 +1098,9 @@ Selector params must not use the reserved refs-table convention column names
 The `template` column and selector-param columns required by a row's resolved
 template must be `string` or `string_ref`. Required selector-param values must
 resolve to non-empty strings. Selector-param columns used by other templates may
-be nullable and null on rows whose template does not require them.
+be nullable and null on rows whose template does not require them. A future
+selector that needs `ip_ref`, `mac_ref`, or empty-string matching must relax
+this contract explicitly, in the schema and here.
 
 Overlay refs are optional. Do not fabricate per-link bandwidth if the producer
 does not have it. For network sockets, current evidence may include snapshot
@@ -1126,37 +1131,37 @@ attached to their owner. Do not silently drop rows.
 
 ### Aggregator Behavior
 
-These rules bind the Cloud topology aggregator; producers rely on them when
-they choose what to emit.
+These rules bind the Cloud topology aggregator, which lives outside this
+repository; producers rely on them when they choose what to emit.
 
 Mode on fan-out:
 
-- when the user asks for `__topology_mode=aggregated`, the aggregator rewrites
-  its fan-out requests to `__topology_mode=detailed` for every producer that
-  advertises `data.view.supported_modes` with both modes, correlates on the
-  detailed payloads, and returns detailed or aggregated output according to the
+- when the user asks for `__topology_mode=aggregated`, the aggregator MUST
+  rewrite its fan-out requests to `__topology_mode=detailed` for every producer
+  that advertises `data.view.supported_modes` with both modes, correlate on the
+  detailed payloads, and return detailed or aggregated output according to the
   original request;
-- the aggregator must not add `__topology_mode` to a request for a producer
-  that does not advertise it.
+- the aggregator MUST NOT add `__topology_mode` to a request for a producer that
+  does not advertise it.
 
-Table merge defaults, by table role, when the table type declares no narrower
-`aggregation`:
+Table merging follows the `aggregation` each table type declares. When a table
+type declares none, the aggregator MUST apply these role defaults:
 
 - relationship evidence: `append`, or `deduplicate` on identical rows;
 - relationship summaries: `merge_metrics` on the declared key columns;
 - `actor_labels`: `set_union` keyed by actor, key, value, source, kind, and
   `value_index`, after actor references are remapped;
-- streaming `retention`: `preserve` (or `append`); two parents retaining data
-  for the same node are two meaningful rows and must not collapse into one;
 - raw `json` columns never take part in key construction unless the table
   declares a scalar JSON path.
 
-Streaming actors from different payloads merge by `machine_guid` only, using
-`merge_enrich_actor` semantics: labels by set union, `stream_path` rows
-deduplicated on identical membership, `inbound` rows merged by parent, child,
-immediate source, and relationship type, `outbound` rows merged by sending
-parent, streamed node, destination, and stream state, links merged by source,
-destination, type, protocol, and state.
+Two parents retaining data for the same node are two meaningful rows in
+`retention` and MUST NOT collapse into one, whatever the merge policy.
+Actors from different payloads MUST merge only by the `merge_identity` their
+type declares; a merged actor combines its labels, attributes, links, evidence,
+and detail tables by table policy. Streaming declares `machine_guid` plus
+`node_id`; the table-level merge keys the streaming design wants are not
+expressible with the shipped `append` declarations and are recorded in the
+implementation scope document as design not yet in the schema.
 
 Required behavior at the edges:
 
@@ -1165,35 +1170,37 @@ Required behavior at the edges:
   pick a process at random;
 - socket closed between two node collections: the exact process match may
   fail; a broader rule may still match when a node or endpoint claim exists;
-- NAT, load-balancer, or proxy aliases: extra point/claim rows, never a
-  rewrite of the original tuple;
 - one strong SNMP actor matching several weak actors: replace all of them and
   keep their evidence and diagnostics;
 - one weak SNMP actor matching several strong actors: keep it visible or
   diagnostic, never choose at random;
 - stale streaming nodes: keep the actor while it carries streaming status;
-  merge by `machine_guid` only when the identities match;
+  merge only when the declared identities match;
 - conflicting actor labels: keep the full label set; modal identification
   limits display, never data;
-- detailed network-connections at scale: aggregated output must not explode
+- detailed network-connections at scale: aggregated output MUST NOT explode
   into one actor per port.
+
+Alias and NAT evidence is represented as described under Correlation Plane;
+whether the first aggregator infers NAT at all is scoped in the implementation
+scope document.
 
 Namespacing and id conflicts:
 
 - producer-local type ids, port ids, scale keys, evidence ids, table type ids,
-  and overlay template ids are namespaced before aggregation;
+  and overlay template ids MUST be namespaced before aggregation;
 - identical definitions are deduplicated after canonicalization;
-- conflicting local definitions are preserved as distinct canonical ids rather
-  than failing aggregation;
+- conflicting local definitions MUST be preserved as distinct canonical ids
+  rather than failing aggregation;
 - `label_policy` belongs to the actor type presentation and follows the same
   namespace-and-deduplicate rule;
-- source column names are table-local and stay unchanged during aggregation;
-  type ids inside row values and `default_type` values are rewritten only when
-  they refer to type registries;
-- modal and table presentation definitions are preserved and their type, table,
-  evidence, and column references rewritten by the same rules.
+- source column names are table-local and MUST stay unchanged during
+  aggregation; type ids inside row values and `default_type` values are
+  rewritten only when they refer to type registries;
+- modal and table presentation definitions MUST be preserved and their type,
+  table, evidence, and column references rewritten by the same rules.
 
-The aggregator must preserve schema-valid fields it does not understand, so a
+The aggregator MUST preserve schema-valid fields it does not understand, so a
 newer producer can ship additive fields before the aggregator learns them.
 
 ### Network Connections Actor Grouping
@@ -1241,6 +1248,8 @@ The actor types advertise these aggregation scopes:
 - `process_name` -> `process`
 - `pid` -> `pid`, `net_ns_inode`
 - `container` -> `container_name`
+
+Each declared scope carries `evidence_policy: preserve`.
 
 `view.group_by` lists exactly `process_name`, `pid`, and `container`.
 `view.scope` is the active group selected for the Function call.
@@ -1422,59 +1431,58 @@ only the graph port-bullet inventory. Put less common per-connection fields such
 as retransmissions or receiver RTT behind `visibility: "expanded"` instead of
 creating another duplicate tab.
 
-In both modes every graph link is between two actor references. An unknown
-peer becomes a visible `endpoint` actor whose per-payload id is the peer IP
-(`ip:<address>`); `address_space` is carried as a non-identity label and as the
-type-level `merge_identity` (`ip` plus `address_space`), so two peers with the
-same IP in different address spaces share one actor inside a payload and
-separate only after Cloud merge. A local socket with both processes known links
-the two process actors directly. A listening socket contributes a process actor
-and an endpoint-owner claim but no link and no evidence row, so nothing
-fabricates a remote actor for it. Detailed mode differs from aggregated mode
-only in emitting socket evidence rows instead of connection rows. A detailed
-row whose loose side has endpoint facts but no actor at all is not part of the
-shipped contract (see the implementation scope document). The `socket_exact`
-correlation rule uses `class: resolve_loose_side` with `action: absorb`.
+In both modes every graph link is between two actor references
+(`topology_v1_collect_links` in `network-viewer-topology.c`). An unknown peer is
+a visible `endpoint` actor whose per-payload id is the peer IP
+(`topology_actor_id_for_remote_endpoint`); the type declares `merge_identity`
+`ip` plus `address_space`, and `address_space` is a non-identity label, so two
+peers with the same IP in different address spaces are one actor inside a
+payload. A local socket with both processes known links the two process actors.
+Listening sockets produce no link and no evidence row. Aggregated mode emits
+`tables.relationship.connections` and the `Dependencies`/`Dependants` sections
+over it; detailed mode emits `evidence.socket` instead and its sections read
+from that evidence with the endpoint port shown. A detailed row whose loose
+side has endpoint facts but no actor at all is not part of the shipped contract
+(see the implementation scope document). The `socket_exact` correlation rule
+uses `class: resolve_loose_side` with `action: absorb`.
 
 The Function `info` response advertises `v: 3`, and data requests select the
 grouping through the v3 POST payload shape
 `{"selections": {"group_by": ["..."]}}`; `__topology_mode` is read from the same
 `selections` object, with `mode` accepted as an alias. The `key:value` selector
-tokens (`group_by:pid`, `processes:by_pid`, and their `-`/`=` spellings) are
-the producer's canonical internal form: the payload path rewrites each JSON
-selection into one of those tokens and both paths share one parser, and the
-tokens are still accepted directly on the function string. They are not a
-removable compatibility layer.
+tokens the function string accepts are the producer's canonical option form;
+the payload path rewrites JSON selections into them and both paths share one
+parser (`topology_apply_payload_key_value`, `topology_apply_option_param`).
+The accepted spellings are enumerated in that parser, not here.
 
-Container identity, orchestrator naming, and the display-subtype rules for
-process and cgroup actors live in one shared rule module,
-`src/collectors/common-cgroups/cgroup-topology-rules.c`;
-`network-viewer-topology-containers.c` is the network-viewer adapter over it,
-and the user-slice fallback and label whitelist are applied in
-`network-viewer-topology.c`. Do not scatter orchestrator or cgroup-path special
-cases through the emitters. The metric-side cgroup selection rules and the
-topology display rules (actor kind, icon, name) are related but separate
-contracts, and a new display subtype (`docker_container`, `systemd_service`,
-`user`, `vm`, ...) must not widen the netipc orchestrator enum.
+Container identity and orchestrator classification for process and cgroup
+actors are rule-based and shared with the cgroups collector
+(`cgroup_topology_classify` in `src/collectors/common-cgroups/cgroup-topology-rules.c`).
+Do not scatter orchestrator or cgroup-path special cases through the emitters.
+The metric-side cgroup selection rules and the topology display rules (actor
+kind, icon, name) are related but separate contracts, and a new display subtype
+(`docker_container`, `systemd_service`, `user`, `vm`, ...) MUST NOT widen the
+netipc orchestrator enum.
 
-The same producer runs on Windows: `network-viewer-windows.c` registers the
-Function and the shared renderer in `network-viewer-topology.c` emits the same
-v1 contract, with the `self` actor, process actors, `endpoint` actors, and
-`ownership` links as on Linux. Cgroup detail rows are emitted but unenriched:
-the apps-lookup client is Linux-only, so container, orchestrator, and
-Kubernetes fields fall back to the process name with `cgroup_status` and
-`orchestrator` set to `unknown`, and under container grouping the actor type is
-`process_group`. Windows UDP sockets have no remote endpoint (the UDP table
-exposes local endpoints only), so the zero-remote path classifies them as
-listening and they produce no link or evidence row.
+The same producer runs on Windows (`network-viewer-windows.c` registers the
+Function; the shared renderer emits the same v1 contract). Windows payloads
+carry the `self`, process, and `endpoint` actors and `ownership` links as on
+Linux; cgroup rows are present but unenriched because the apps-lookup client is
+Linux-only (`nv_container_fields_set_process_fallback` fills `container_name`
+with the process name, `cgroup_status` and `orchestrator` with `unknown`, and
+the actor type with `process_group`; the Kubernetes, Docker, and systemd
+columns stay empty). Windows UDP sockets have no remote endpoint and produce no
+link or evidence row.
 
 Network-connections actor modals also expose two producer-declared actor-owned
-tables: `processes` (contributing PID, process name, user, namespace, command
-line) and `cgroups` (per-PID cgroup status, path and name, container or service
-name, effective display orchestrator, actor kind, Kubernetes, Docker/Podman, and
-systemd unit fields). They are schema tables, not Cloud-side container views;
-when a producer has typed rows like these, do not push the operator to the
-generic Labels tab for structured inspection.
+tables, `processes` and `cgroups`, whose columns are declared in
+`network-viewer-topology.c` (`processes`: pid, ppid, uid, network namespace,
+process, username, namespace type, local ip and address space, command line;
+`cgroups`: cgroup status, path and name, container name, orchestrator, actor
+kind, Docker container name and image, systemd unit name and kind). They are
+schema tables, not Cloud-side container views; when a producer has typed rows
+like these, do not push the operator to the generic Labels tab for structured
+inspection.
 
 ## Streaming Shape
 
@@ -1524,18 +1532,21 @@ duplicate rows for display. The default sections of a streaming actor modal:
 
 - `Stream path`: `stream_path` filtered by `actor`, ordered by `path_index`.
   It is the selected actor's own path only; children and virtual nodes have
-  their own actors and path rows. Every path row, including a synthetic row
-  added only for rendering or highlighting, carries `since` and `first_time`
-  resolved from the owning actor's host status: `since` from ingest, then
-  stream, then database first time, then the Agent start time; `first_time`
-  from database first time first. The columns are nullable, but the chain ends
-  at the Agent start time, so a shipped row is not null in practice; an actor
-  whose host cannot be acquired contributes no path row at all.
+  their own actors and path rows. Every path row carries `since` and
+  `first_time`; the producer fills them from the stream-path record and falls
+  back to the owning actor's host status (`streaming_topology_v1_best_since_ut`,
+  `streaming_topology_v1_best_first_time_ut`), so the nullable columns are
+  populated on every shipped row, synthetic highlight rows included. An actor
+  whose host cannot be acquired contributes no path row.
 - `Retained nodes`: `retention` filtered by `observer_actor`; the nodes whose
   data the selected actor maintains, including self, virtual nodes, direct
   children, transit descendants, and stale or archived hosts present in the
-  Agent root index with retention state. `db_from` and `db_to` are null only
-  when the database status has no time range.
+  Agent root index with retention state. Rows show the retained node and its
+  type, retention status, `db_from` and `db_to`, duration, and the metrics,
+  instances, and contexts counts; `db_from` and `db_to` are nullable and null
+  when the database status has no usable start. The producer sets
+  `observer_actor` to its own actor, so before aggregation only the emitting
+  Agent's modal has rows here.
 - `Received nodes`: `inbound` filtered by `parent_actor`; children, virtual
   nodes, stale nodes, and descendants received by or transiting through the
   selected parent. `source_actor` is the immediate sending actor; for direct
@@ -1543,13 +1554,13 @@ duplicate rows for display. The default sections of a streaming actor modal:
   when the immediate source is genuinely unknown.
 - `Outbound streams`: `outbound` filtered by `sender_actor` (the emitting
   Agent's own actor), not by the streamed node. Rows are sender-owned: every
-  node payload the emitting Agent streams upstream (self, virtual nodes, direct
-  children, transit descendants) with its resolved destination actor; a node
-  whose destination cannot be resolved to an actor gets no row. Status, age,
-  hops, TLS, and compression describe the sender's upstream connection and are
-  the same on every row; the collected and replication metrics are per streamed
-  node. A table that records only the selected actor's own upstream destination
-  is insufficient.
+  locally known node whose stored stream path routes through this Agent (self,
+  virtual nodes, direct children, transit descendants, stale hosts included)
+  with its resolved destination actor; a node whose destination cannot be
+  resolved to an actor gets no row. Status, age, hops, TLS, and compression
+  describe the sender's upstream connection and are the same on every row; the
+  collected and replication metrics are per streamed node. A table that records
+  only the selected actor's own upstream destination is insufficient.
 
 The former `Retention for node` default section is not part of the contract.
 `retention` keeps both `actor` and `observer_actor` so aggregation can preserve
@@ -1583,7 +1594,7 @@ Managed SNMP device actor modals are port-centric:
 - never invent numeric port IDs. Do not use row order or any generated sequence;
   `if_index` must come from the device/SNMP facts and must align with
   `actor_port_links.if_index`, so local port identity never contradicts the
-  port table;
+  port table (an authoring rule; no validator or test checks the alignment);
 - include compact expanded-row neighbor columns such as nullable
   `neighbor_actor` and `neighbor_port_name` when graph-link facts can align the
   port to a remote actor;
@@ -1616,12 +1627,19 @@ suppression state, never IP-only graph actors.
 ### SNMP Logical L3 And Control-Plane Links
 
 Besides observed and inferred L2 relationships, the SNMP producer emits logical
-L3 relationships with their own link, actor, and evidence types. None of them
-may be presented as discovery, physical, L2, or port-neighbor evidence:
+L3 relationships with their own link, actor, and evidence types. Every SNMP
+link type, logical ones included, declares `orientation: observed_bidirectional`,
+`direction_role: observation`, and `aggregation.direction:
+canonicalize_unordered` (`snmpTopologyV1LinkTypes`); `semantic_role` is
+`normal` except for the control-plane types below. None of them may be
+presented as discovery, physical, L2, or port-neighbor evidence, and each
+requires two distinct resolved managed device actors:
 
 - `l3_subnet`: two managed device actors have interfaces in the same IPv4
   point-to-point subnet (`/30` or `/31`, from IP-MIB interface address state).
-  It proves shared addressing, not a physical connection.
+  It proves shared addressing, not a physical connection; its evidence carries
+  the link reference, both device actors, both interface IPs, subnet, network,
+  netmask, prefix, and source.
 - `l3_subnet_segment` actor plus `l3_subnet_membership` links: a broader shared
   IPv4 subnet (`/24` through `/29`) becomes a logical segment actor with one
   membership link per resolved managed device. The segment is a grouping
@@ -1631,14 +1649,15 @@ may be presented as discovery, physical, L2, or port-neighbor evidence:
   producer scope plus the subnet; the grain boundaries and the single
   routing-context caveat are owned by the collector's `ARCHITECTURE.md`.
 - `ospf_adjacency` (`semantic_role: control`): OSPF adjacency between two
-  resolved managed devices, emitted only for neighbors in state `full`. Other
-  neighbor rows stay in the actor-owned `actor_ospf_neighbors` table. The
+  resolved managed devices, emitted only for neighbors whose normalized state
+  is `full` (`isOSPFNeighborFull`). Other neighbor rows of a resolved local
+  device stay in the actor-owned `actor_ospf_neighbors` table. The
   topology scope is OSPFv2 `ospfNbrTable` rows (profile kind `ospf_neighbor`);
   `ospfVirtNbrTable` is collected as metrics only, with no `topology:` row, and
   no OSPFv3 profile exists.
 - `bgp_adjacency` (`semantic_role: control`): BGP adjacency between two
-  resolved managed devices, emitted only for established peers with both ends
-  resolved. Graph identity is the managed actor pair plus routing instance
+  distinct resolved managed devices, emitted only for established peers
+  (`isBGPPeerEstablished`). Graph identity is the managed actor pair plus routing instance
   (`default` when the profile exposes none); BGP identifiers, ASNs, and
   endpoint IPs stay evidence and display fields because vendor profiles expose
   them asymmetrically, and parallel sessions of one pair in one routing
