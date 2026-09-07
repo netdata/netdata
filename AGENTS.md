@@ -514,8 +514,8 @@ files, and other docs written so future AI agents can execute repository rules c
 
 ### Open-Source Reference Evidence
 
-When SOW evidence comes from another open-source repository, cite the upstream repository and the checked commit,
-never the workstation path:
+When evidence in a SOW or a skill comes from another open-source repository, cite the upstream repository and the
+checked commit, never the workstation path:
 
 ```text
 owner/repo @ commit
@@ -523,7 +523,7 @@ relative/path/inside/repo:line
 ```
 
 Resolve `owner/repo` from the repository remote, record the checked commit, keep paths relative to the upstream
-root. Never write absolute paths into SOW evidence.
+root. Never write absolute paths into SOW or skill evidence.
 
 ### Specs
 
@@ -554,6 +554,9 @@ Project skills are memory of HOW to work here.
 - Every change to a skill MUST end with a slimming pass over the touched files: remove restatements, merged-in
   duplicates, and rules that now live elsewhere, keeping every rule (a removed directive is moved or superseded by a
   recorded decision, never dropped). Skills accrete bloat with each update; report line counts before and after.
+- How to create, edit, slim, split, or review a skill, and the rot signals to watch for: the runtime skill
+  `repo-skill-authoring`. It cites sections of this file and of `.agents/skills/README.md` by heading anchor, so a
+  heading rename in either fails the audit until that skill is updated.
 
 Public skill convention (`docs/netdata-ai/skills/`):
 
@@ -656,6 +659,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `repo-pr-reviews`: PR comment and review iteration
   - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
     reset-to-default safety; `--repo` scoping
+  - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
+    at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change method
+    (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
@@ -724,11 +730,14 @@ renames:
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
+| `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
 | `query-snmp-traps` (public) | `query-snmp-traps/` | saved trap query results from its how-tos |
 
-A new runtime skill picks a `<dir>` equal to its topic; a public skill uses its skill name. Both record the row here.
+A new runtime skill picks a `<dir>` equal to its topic; a public skill uses its skill name; `repo-skill-authoring` is
+the exception: its `<subject>` is the directory name of the skill under change (distinct from that skill's own pinned
+directory) or the SOW topic. All record the row here.
 
 ### Per-User Secrets
 

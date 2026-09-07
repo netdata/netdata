@@ -27,8 +27,9 @@ published contract and are exempt from the naming rule below.
   reduced to their text; then lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else
   dropped; spaces become hyphens; a repeated heading gets `-1`, `-2`, and this repository's check gives a further
   suffix to a generated slug that collides with a literal title, which GitHub may not). Cite only such headings:
-  non-ASCII titles, setext headings, and titles that collide with generated suffixes are outside the convention. Paths are repo-relative (with or without a leading
-  `/`), or relative to the citing file when they start with `./` or `../`. URLs are written with their scheme.
+  non-ASCII titles, setext headings, and titles that collide with generated suffixes are outside the convention. Paths
+  are repo-relative (with or without a leading `/`), or relative to the citing file when they start with `./` or
+  `../`. URLs are written with their scheme.
 - `.agents/sow/audit.sh` fails when the cited file or a heading with that slug is missing, so renaming or removing a
   heading in an owner document is caught until every citing skill is updated. Headings and citations inside fenced
   code blocks or multi-line HTML comments are not scanned.
@@ -59,4 +60,5 @@ published contract and are exempt from the naming rule below.
 
 The per-skill grouped index is the "Skills index" in the root `AGENTS.md`: skills under their area, an area's entry
 point marked where it has one, and a skill that serves two areas cross-referenced from the other. A skill's frontmatter
-description is its trigger.
+description is its trigger. How to create, edit, slim, split, or review a skill, and the rot signals to watch for:
+`repo-skill-authoring`, which cites sections of this file and of the root `AGENTS.md` by heading anchor.
