@@ -331,6 +331,7 @@ func TestTopologyInspectionSubjectsReturnEveryRenderedLinkAsCandidate(t *testing
 	require.NoError(t, err)
 	require.Positive(t, payload.Links.Rows)
 	families := make(map[string]bool)
+	reversedFamilies := make(map[string]bool)
 	for i := 0; i < payload.Links.Rows; i++ {
 		exact, err := archive.InspectLinkAt(query, i)
 		require.NoError(t, err)
@@ -346,13 +347,19 @@ func TestTopologyInspectionSubjectsReturnEveryRenderedLinkAsCandidate(t *testing
 			require.Equal(t, "undetermined", match.GraphLink.Membership.State)
 			require.Equal(t, -1, match.GraphLink.SelectedIndex)
 		}
-		if subject.Family == "lldp" || subject.Family == "cdp" || subject.Direction == "bidirectional" {
+		unordered := subject.Direction == "bidirectional"
+		switch subject.Family {
+		case topologymodel.L3SubnetLinkType, topologymodel.OSPFAdjacencyLinkType, topologymodel.BGPAdjacencyLinkType:
+			unordered = true
+		}
+		if unordered {
 			subject.SourceIdentity, subject.DestinationIdentity = subject.DestinationIdentity, subject.SourceIdentity
 			reversed, err := archive.InspectLink(query, subject)
 			require.NoError(t, err)
 			require.Contains(t, reversed.GraphLink.Candidates, exact.GraphLink.Candidates[0])
 			require.Equal(t, match.GraphLink.Membership, reversed.GraphLink.Membership)
 			require.Equal(t, match.GraphLink.SelectedIndex, reversed.GraphLink.SelectedIndex)
+			reversedFamilies[subject.Family] = true
 		}
 		families[subject.Family] = true
 	}
@@ -360,6 +367,9 @@ func TestTopologyInspectionSubjectsReturnEveryRenderedLinkAsCandidate(t *testing
 	require.True(t, families[topologymodel.L3SubnetLinkType] || families[topologymodel.L3SubnetMembershipLinkType])
 	require.True(t, families[topologymodel.OSPFAdjacencyLinkType])
 	require.True(t, families[topologymodel.BGPAdjacencyLinkType])
+	require.True(t, reversedFamilies[topologymodel.L3SubnetLinkType])
+	require.True(t, reversedFamilies[topologymodel.OSPFAdjacencyLinkType])
+	require.True(t, reversedFamilies[topologymodel.BGPAdjacencyLinkType])
 }
 
 func TestTopologyInspectionLinkSubjectReturnsParallelBGPRoutingInstancesAsCandidates(t *testing.T) {

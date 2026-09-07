@@ -12,7 +12,7 @@ func ObservationDeviceID(device Device, baseBridgeAddress string) string {
 	if mac := primaryIdentityMAC(device.ChassisID, baseBridgeAddress); mac != "" {
 		return "macAddress:" + mac
 	}
-	if key := strings.TrimSpace(deviceKey(device)); key != "" {
+	if key := deviceKey(device); key != "" {
 		return key
 	}
 	if sysName := strings.TrimSpace(device.SysName); sysName != "" {
@@ -46,10 +46,11 @@ func primaryIdentityMAC(chassisID, baseBridgeAddress string) string {
 }
 
 func deviceKey(dev Device) string {
-	if dev.ChassisID == "" {
+	chassisID := strings.TrimSpace(dev.ChassisID)
+	if chassisID == "" {
 		return ""
 	}
-	return dev.ChassisIDType + ":" + dev.ChassisID
+	return strings.TrimSpace(dev.ChassisIDType) + ":" + chassisID
 }
 
 // LocalActorID applies the same fallback used by live local actor construction.
