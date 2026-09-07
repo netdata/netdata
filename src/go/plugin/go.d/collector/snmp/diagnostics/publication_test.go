@@ -240,6 +240,49 @@ func TestPublisherCheckpointRotationAndRestart(t *testing.T) {
 	require.Equal(t, p.runID, docs[1].Producer.RunID)
 	require.FileExists(t, filepath.Join(p.directory, TopologyDirectory, "unrelated.zst"))
 }
+func TestPublisherRestartRetriesCheckpointPruning(t *testing.T) {
+	for name, tc := range map[string]struct {
+		completed    uint64
+		retryFailure bool
+	}{
+		"retained history":                    {3, false},
+		"unfinished rotation":                 {4, false},
+		"cleanup still failing after restart": {4, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p, store := testPublisher(t)
+			source := &testTopologySource{}
+			p.SetTopology("topology", source)
+			p.remove = func(string) error { return errors.New("transient cleanup failure") }
+			for id := uint64(1); id <= tc.completed; id++ {
+				publishTestCheckpoint(t, p, source, id)
+			}
+			require.Len(t, topologyFiles(t, p), int(tc.completed))
+			unrelated := filepath.Join(p.directory, TopologyDirectory, "unrelated.zst")
+			require.NoError(t, os.WriteFile(unrelated, []byte("keep"), 0600))
+			restarted := NewPublisher(store, filepath.Dir(filepath.Dir(p.directory)))
+			if tc.retryFailure {
+				restarted.remove = func(string) error { return errors.New("cleanup remains unavailable") }
+				restarted.flush(t.Context())
+				require.Len(t, topologyFiles(t, restarted), int(tc.completed))
+				restarted.remove = os.Remove
+			}
+			restarted.flush(t.Context())
+			entries := topologyFiles(t, restarted)
+			require.Len(t, entries, CheckpointRetention, "startup must recover rotation without a topology producer")
+			require.Equal(t, tc.completed-2, entries[0].Sequence)
+			require.Equal(t, tc.completed, entries[2].Sequence)
+			require.FileExists(t, unrelated)
+			nextSource := &testTopologySource{}
+			restarted.SetTopology("topology", nextSource)
+			publishTestCheckpoint(t, restarted, nextSource, 1)
+			entries = topologyFiles(t, restarted)
+			require.Len(t, entries, CheckpointRetention)
+			require.Equal(t, tc.completed+1, entries[2].Sequence, "cleanup must preserve restart ordering")
+		})
+	}
+}
+
 func TestPublisherCheckpointFailures(t *testing.T) {
 	for name, tc := range map[string]struct{ prune bool }{"write failure": {}, "prune failure": {true}} {
 		t.Run(name, func(t *testing.T) {

@@ -333,10 +333,6 @@ func TestDeviceStoreLifecycleChangeNotifications(t *testing.T) {
 		}, true},
 		"remove":        {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("job") }, true},
 		"remove absent": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("absent") }, false},
-		"new profile context": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
-			w.RecordProfileContext(&ProfileContext{})
-		}, true},
-		"same profile context": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { w.RecordProfileContext(nil) }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			store := NewDeviceStore()
@@ -345,6 +341,37 @@ func TestDeviceStoreLifecycleChangeNotifications(t *testing.T) {
 			<-store.LifecycleChanges()
 			revision := store.LifecycleRevision()
 			tc.change(store, writer, status)
+			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
+			select {
+			case <-store.LifecycleChanges():
+				require.True(t, tc.wantChange)
+			default:
+				require.False(t, tc.wantChange)
+			}
+		})
+	}
+}
+
+func TestDeviceWriterProfileContextChangeNotifications(t *testing.T) {
+	first, second := &ProfileContext{}, &ProfileContext{}
+	for name, tc := range map[string]struct {
+		previous   *ProfileContext
+		next       *ProfileContext
+		wantChange bool
+	}{
+		"still unset":          {nil, nil, false},
+		"first context":        {nil, first, true},
+		"same non-nil context": {first, first, false},
+		"replacement context":  {first, second, true},
+		"cleared context":      {first, nil, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := NewDeviceStore()
+			writer := store.ReplaceJob("", "job", DeviceLifecycleInfo{}, DeviceLifecycleStatus{}, nil)
+			writer.RecordProfileContext(tc.previous)
+			<-store.LifecycleChanges()
+			revision := store.LifecycleRevision()
+			writer.RecordProfileContext(tc.next)
 			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
 			select {
 			case <-store.LifecycleChanges():

@@ -67,8 +67,9 @@ type Publisher struct {
 }
 
 func NewPublisher(source Source, varLibDir string) *Publisher {
+	// A prior run may have published a complete checkpoint without finishing rotation.
 	return &Publisher{Logger: logger.New(), source: source, directory: DirectoryPath(varLibDir),
-		runID: uuid.NewString(), changed: make(chan struct{}, 1),
+		runID: uuid.NewString(), changed: make(chan struct{}, 1), prunePending: true,
 		rename: os.Rename, remove: os.Remove, writeFile: writeArchiveFile}
 }
 
