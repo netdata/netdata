@@ -74,12 +74,16 @@ type (
 		SourceFile         string                                 `yaml:"-"`
 		Definition         *ddprofiledefinition.ProfileDefinition `yaml:",inline"`
 		extensionHierarchy []*extensionInfo
+		sourceOrigin       ProfileSource
+		selectionOrigin    string
+		matchedSelector    string
 	}
 	// extensionInfo represents a single extension in the hierarchy
 	extensionInfo struct {
 		name       string           // Extension name (e.g., "_base.yaml")
 		sourceFile string           // Full path to the extension file
 		extensions []*extensionInfo // Nested extensions
+		origin     ProfileSource
 	}
 )
 
@@ -146,8 +150,11 @@ func formatExtensions(extensions []*extensionInfo) string {
 
 func (p *Profile) clone() *Profile {
 	cloned := &Profile{
-		SourceFile: p.SourceFile,
-		Definition: p.Definition.Clone(),
+		SourceFile:      p.SourceFile,
+		sourceOrigin:    p.sourceOrigin,
+		selectionOrigin: p.selectionOrigin,
+		matchedSelector: p.matchedSelector,
+		Definition:      p.Definition.Clone(),
 	}
 	if p.extensionHierarchy != nil {
 		cloned.extensionHierarchy = cloneExtensionHierarchy(p.extensionHierarchy)
@@ -164,6 +171,7 @@ func cloneExtensionHierarchy(extensions []*extensionInfo) []*extensionInfo {
 	for i, ext := range extensions {
 		cloned[i] = &extensionInfo{
 			name:       ext.name,
+			origin:     ext.origin,
 			sourceFile: ext.sourceFile,
 			extensions: cloneExtensionHierarchy(ext.extensions),
 		}
@@ -378,7 +386,11 @@ func indexTopologyKindConflict[K comparable](
 	return nil
 }
 
-func topologyColumnSymbolKey(kind ddprofiledefinition.TopologyKind, table ddprofiledefinition.SymbolConfig, sym ddprofiledefinition.SymbolConfig) topologyColumnMetricKey {
+func topologyColumnSymbolKey(
+	kind ddprofiledefinition.TopologyKind,
+	table ddprofiledefinition.SymbolConfig,
+	sym ddprofiledefinition.SymbolConfig,
+) topologyColumnMetricKey {
 	return topologyColumnMetricKey{
 		kind:       kind,
 		table:      columnMetricTableIdentity(table),

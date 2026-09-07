@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // deviceMetadataCollector handles collection of device metadata
@@ -204,7 +205,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	}
 
 	if len(errs) > 0 && len(metadata) == 0 {
-		return fmt.Errorf("failed to process any metadata fields: %w", errors.Join(errs...))
+		return snmputils.WithFailure(fmt.Errorf("failed to process any metadata fields: %w", errors.Join(errs...)), "metadata", "processing")
 	}
 
 	return nil

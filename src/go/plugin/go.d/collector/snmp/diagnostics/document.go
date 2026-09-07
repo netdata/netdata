@@ -2,7 +2,15 @@
 
 package diagnostics
 
-import "time"
+import (
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+)
 
 type Document struct {
 	Format   string   `json:"format"`
@@ -35,18 +43,22 @@ type LifecycleCut struct {
 }
 
 type LifecycleEntry struct {
-	RegistrationID uint64          `json:"registration_id"`
-	Hostname       string          `json:"hostname"`
-	Port           int             `json:"port"`
-	SNMPVersion    string          `json:"snmp_version"`
-	LastCompleted  LifecycleStatus `json:"last_completed"`
-	TopologyReady  bool            `json:"topology_ready"`
+	Profiles       ddsnmp.ProfileContextData `json:"profile_context"`
+	RegistrationID uint64                    `json:"registration_id"`
+	Hostname       string                    `json:"hostname"`
+	Port           int                       `json:"port"`
+	SNMPVersion    string                    `json:"snmp_version"`
+	LastCompleted  LifecycleStatus           `json:"last_completed"`
+	TopologyReady  bool                      `json:"topology_ready"`
 }
 
 type LifecycleStatus struct {
-	Phase       string    `json:"phase"`
-	Outcome     string    `json:"outcome"`
-	CompletedAt time.Time `json:"completed_at"`
+	CollectionFailures ddsnmp.CollectionFailures     `json:"collection_failures"`
+	PreparationFailure collectorapi.JobConfigFailure `json:"preparation_failure"`
+	Failure            snmputils.Failure             `json:"failure"`
+	Phase              string                        `json:"phase"`
+	Outcome            string                        `json:"outcome"`
+	CompletedAt        time.Time                     `json:"completed_at"`
 }
 
 type Sweep struct {
@@ -109,18 +121,21 @@ type Abort struct {
 }
 
 type AcquisitionEvidence struct {
-	Device             DeviceInput       `json:"device"`
-	Target             Target            `json:"target"`
-	Client             Phase             `json:"client"`
-	Connect            Phase             `json:"connect"`
-	Profiles           Phase             `json:"profiles"`
-	Collection         Phase             `json:"collection"`
-	SysUptime          Phase             `json:"sys_uptime"`
-	VLANProfiles       Phase             `json:"vlan_profiles"`
-	CollectedAt        time.Time         `json:"collected_at"`
-	FreshForNanos      int64             `json:"fresh_for_ns"`
-	SysUptimeValue     int64             `json:"sys_uptime_value"`
-	CollectionContexts []ContextEvidence `json:"collection_contexts,omitempty"`
+	Interruption       snmputils.Failure         `json:"interruption"`
+	ProfileContext     ddsnmp.ProfileContextData `json:"profile_context"`
+	VLANProfileContext ddsnmp.ProfileContextData `json:"vlan_profile_context"`
+	Device             DeviceInput               `json:"device"`
+	Target             Target                    `json:"target"`
+	Client             Phase                     `json:"client"`
+	Connect            Phase                     `json:"connect"`
+	Profiles           Phase                     `json:"profiles"`
+	Collection         Phase                     `json:"collection"`
+	SysUptime          Phase                     `json:"sys_uptime"`
+	VLANProfiles       Phase                     `json:"vlan_profiles"`
+	CollectedAt        time.Time                 `json:"collected_at"`
+	FreshForNanos      int64                     `json:"fresh_for_ns"`
+	SysUptimeValue     int64                     `json:"sys_uptime_value"`
+	CollectionContexts []ContextEvidence         `json:"collection_contexts,omitempty"`
 }
 
 type DeviceInput struct {
@@ -142,18 +157,21 @@ type Target struct {
 }
 
 type Phase struct {
-	Outcome string `json:"outcome"`
-	Failure string `json:"failure"`
+	Detail  snmputils.Failure `json:"detail"`
+	Outcome string            `json:"outcome"`
+	Failure string            `json:"failure"`
 }
 
 type ContextEvidence struct {
-	Ordinal    uint32            `json:"ordinal"`
-	VLANID     string            `json:"vlan_id"`
-	VLANName   string            `json:"vlan_name"`
-	Client     Phase             `json:"client"`
-	Connect    Phase             `json:"connect"`
-	Collection Phase             `json:"collection"`
-	Profiles   []ProfileEvidence `json:"profiles,omitempty"`
+	Interruption snmputils.Failure         `json:"interruption"`
+	Failures     ddsnmp.CollectionFailures `json:"failures"`
+	Ordinal      uint32                    `json:"ordinal"`
+	VLANID       string                    `json:"vlan_id"`
+	VLANName     string                    `json:"vlan_name"`
+	Client       Phase                     `json:"client"`
+	Connect      Phase                     `json:"connect"`
+	Collection   Phase                     `json:"collection"`
+	Profiles     []ProfileEvidence         `json:"profiles,omitempty"`
 }
 
 type ProfileEvidence struct {

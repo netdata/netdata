@@ -119,6 +119,7 @@ func (c *Collector) ensureInitialized() error {
 			c.vnode = c.setupVnode(si, nil)
 		} else {
 			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
+			c.captureCollectionFailures()
 			if err != nil {
 				return err
 			}
@@ -189,11 +190,11 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
-		return nil, fmt.Errorf("init: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
 
 	if err := snmpClient.Connect(); err != nil {
-		return nil, fmt.Errorf("connect: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
 
 	if snmpClient.Version() == gosnmp.Version1 {
@@ -210,7 +211,7 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	} else {
 		ok, err := c.adjustMaxRepetitions(snmpClient)
 		if err != nil {
-			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
+			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
 		}
 		if !ok {
 			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")

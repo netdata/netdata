@@ -47,6 +47,9 @@ func newTopologyDiagnosticArchiveAcquisitionEvidenceV1(
 		return snmpdiag.AcquisitionEvidence{}, fmt.Errorf("vlan_profiles phase: %w", err)
 	}
 	result := snmpdiag.AcquisitionEvidence{
+		Interruption:       evidence.interruption,
+		ProfileContext:     evidence.profileContext.Snapshot(),
+		VLANProfileContext: evidence.vlanProfileContext.Snapshot(),
 		Device: snmpdiag.DeviceInput{
 			Hostname:    evidence.device.hostname,
 			SysObjectID: evidence.device.sysObjectID,
@@ -103,13 +106,15 @@ func newTopologyDiagnosticArchiveContextEvidenceV1(
 		return snmpdiag.ContextEvidence{}, fmt.Errorf("collection phase: %w", err)
 	}
 	result := snmpdiag.ContextEvidence{
-		Ordinal:    context.ordinal,
-		VLANID:     context.vlanID,
-		VLANName:   context.vlanName,
-		Client:     client,
-		Connect:    connect,
-		Collection: collection,
-		Profiles:   make([]snmpdiag.ProfileEvidence, 0, len(context.profiles)),
+		Interruption: context.interruption,
+		Failures:     context.failures,
+		Ordinal:      context.ordinal,
+		VLANID:       context.vlanID,
+		VLANName:     context.vlanName,
+		Client:       client,
+		Connect:      connect,
+		Collection:   collection,
+		Profiles:     make([]snmpdiag.ProfileEvidence, 0, len(context.profiles)),
 	}
 	for _, profile := range context.profiles {
 		archived, err := newTopologyDiagnosticArchiveProfileEvidenceV1(profile)
@@ -296,6 +301,7 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 
 func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	id topologyAcquisitionAttemptID,
+	budget *diagnosticRestoreBudget,
 ) (*topologyAcquisitionAttemptEvidence, error) {
 	targetOutcome, err := topologyDiagnosticArchiveParseTargetOutcome(e.Target.Outcome)
 	if err != nil {
@@ -336,8 +342,12 @@ func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	if err != nil {
 		return nil, fmt.Errorf("vlan_profiles phase: %w", err)
 	}
+	if !e.Interruption.Valid() {
+		return nil, fmt.Errorf("invalid interruption")
+	}
 	result := &topologyAcquisitionAttemptEvidence{
-		id: id,
+		interruption: e.Interruption,
+		id:           id,
 		device: topologySemanticDeviceInput{
 			hostname:    e.Device.Hostname,
 			sysObjectID: e.Device.SysObjectID,
@@ -365,17 +375,32 @@ func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 		sysUptimeValue:     e.SysUptimeValue,
 		collectionContexts: make([]topologyAcquisitionContextEvidence, 0, len(e.CollectionContexts)),
 	}
+	if err := budget.take(topologyAcquisitionAttemptShape(result.device, result.target)); err != nil {
+		return nil, err
+	}
 	for _, context := range e.CollectionContexts {
-		reconstructed, err := restoreArchiveContextEvidence(context)
+		reconstructed, err := restoreArchiveContextEvidence(context, budget)
 		if err != nil {
 			return nil, fmt.Errorf("collection context %d: %w", context.Ordinal, err)
 		}
 		result.collectionContexts = append(result.collectionContexts, reconstructed)
 	}
+	profileContext, err := budget.restore(e.ProfileContext)
+	if err != nil {
+		return nil, err
+	}
+	vlanProfileContext, err := budget.restore(e.VLANProfileContext)
+	if err != nil {
+		return nil, err
+	}
+	result.profileContext, result.vlanProfileContext = profileContext, vlanProfileContext
 	return result, nil
 }
 
-func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence) (topologyAcquisitionContextEvidence, error) {
+func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence, budget *diagnosticRestoreBudget) (topologyAcquisitionContextEvidence, error) {
+	if err := budget.take(topologyAcquisitionContextShape(c.VLANID, c.VLANName)); err != nil {
+		return topologyAcquisitionContextEvidence{}, err
+	}
 	client, err := restoreArchivePhase(c.Client)
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("client phase: %w", err)
@@ -388,23 +413,50 @@ func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence) (topologyAcquisit
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("collection phase: %w", err)
 	}
+	if !c.Interruption.Valid() || !c.Failures.Valid() {
+		return topologyAcquisitionContextEvidence{}, fmt.Errorf("invalid context failure")
+	}
 	result := topologyAcquisitionContextEvidence{
-		ordinal:    c.Ordinal,
-		vlanID:     c.VLANID,
-		vlanName:   c.VLANName,
-		client:     client,
-		connect:    connect,
-		collection: collection,
-		profiles:   make([]topologyAcquisitionProfileEvidence, 0, len(c.Profiles)),
+		interruption: c.Interruption,
+		failures:     c.Failures,
+		ordinal:      c.Ordinal,
+		vlanID:       c.VLANID,
+		vlanName:     c.VLANName,
+		client:       client,
+		connect:      connect,
+		collection:   collection,
+		profiles:     make([]topologyAcquisitionProfileEvidence, 0, len(c.Profiles)),
 	}
 	for _, profile := range c.Profiles {
 		reconstructed, err := restoreArchiveProfileEvidence(profile)
 		if err != nil {
 			return topologyAcquisitionContextEvidence{}, fmt.Errorf("profile %d: %w", profile.Identity.Ordinal, err)
 		}
+		if err := budget.take(restoredAcquisitionProfileShape(reconstructed)); err != nil {
+			return topologyAcquisitionContextEvidence{}, err
+		}
 		result.profiles = append(result.profiles, reconstructed)
 	}
 	return result, nil
+}
+
+func restoredAcquisitionProfileShape(profile topologyAcquisitionProfileEvidence) (uint64, uint64) {
+	records, size := topologyAcquisitionReportShape(profile.routes, profile.execution)
+	values := profile.values
+	records += uint64(len(values.metrics)) + uint64(len(values.bgpRows))
+	for _, metric := range values.metrics {
+		size += uint64(len(metric.kind)) + topologySemanticStringMapBytes(metric.tags)
+	}
+	for key, value := range values.metadata {
+		size += uint64(len(key) + len(value.Value) + 1)
+	}
+	size += topologySemanticStringMapBytes(values.tags)
+	for _, row := range values.bgpRows {
+		size += topologySemanticBGPRowLogicalBytes(topologySemanticBGPRowFromAcquisition(row))
+		// Count unexpected tags too; imported data has not passed producer filtering.
+		size += topologySemanticStringMapBytes(row.tags) - topologySemanticFilteredStringMapBytes(row.tags, topologySemanticBGPTagAllowed)
+	}
+	return records, size
 }
 
 func restoreArchiveProfileEvidence(p snmpdiag.ProfileEvidence) (topologyAcquisitionProfileEvidence, error) {
@@ -605,7 +657,7 @@ func newTopologyDiagnosticArchivePhaseV1(
 	if err != nil {
 		return snmpdiag.Phase{}, err
 	}
-	return snmpdiag.Phase{Outcome: outcome, Failure: failure}, nil
+	return snmpdiag.Phase{Outcome: outcome, Failure: failure, Detail: phase.detail}, nil
 }
 
 func restoreArchivePhase(p snmpdiag.Phase) (topologyAcquisitionPhaseEvidence, error) {
@@ -617,7 +669,10 @@ func restoreArchivePhase(p snmpdiag.Phase) (topologyAcquisitionPhaseEvidence, er
 	if err != nil {
 		return topologyAcquisitionPhaseEvidence{}, err
 	}
-	return topologyAcquisitionPhaseEvidence{outcome: outcome, failure: failure}, nil
+	if !p.Detail.Valid() {
+		return topologyAcquisitionPhaseEvidence{}, fmt.Errorf("invalid phase failure detail")
+	}
+	return topologyAcquisitionPhaseEvidence{outcome: outcome, failure: failure, detail: p.Detail}, nil
 }
 
 var (
@@ -680,7 +735,10 @@ func topologyDiagnosticArchiveProfileOutcomeName(value ddsnmpcollector.Acquisiti
 }
 
 func topologyDiagnosticArchiveParseProfileOutcome(value string) (ddsnmpcollector.AcquisitionProfileOutcome, error) {
-	return topologyDiagnosticArchiveParseEnum[ddsnmpcollector.AcquisitionProfileOutcome](value, topologyDiagnosticArchiveProfileOutcomeNames)
+	return topologyDiagnosticArchiveParseEnum[ddsnmpcollector.AcquisitionProfileOutcome](
+		value,
+		topologyDiagnosticArchiveProfileOutcomeNames,
+	)
 }
 
 func topologyDiagnosticArchiveProfileFailurePhaseName(value ddsnmpcollector.AcquisitionFailurePhase) (string, error) {
@@ -688,7 +746,10 @@ func topologyDiagnosticArchiveProfileFailurePhaseName(value ddsnmpcollector.Acqu
 }
 
 func topologyDiagnosticArchiveParseProfileFailurePhase(value string) (ddsnmpcollector.AcquisitionFailurePhase, error) {
-	return topologyDiagnosticArchiveParseEnum[ddsnmpcollector.AcquisitionFailurePhase](value, topologyDiagnosticArchiveProfileFailurePhaseNames)
+	return topologyDiagnosticArchiveParseEnum[ddsnmpcollector.AcquisitionFailurePhase](
+		value,
+		topologyDiagnosticArchiveProfileFailurePhaseNames,
+	)
 }
 
 func topologyDiagnosticArchiveRouteKindName(value ddsnmpcollector.AcquisitionRouteKind) (string, error) {
@@ -720,5 +781,8 @@ func topologyDiagnosticArchiveRouteFailureClassName(value ddsnmpcollector.Acquis
 }
 
 func topologyDiagnosticArchiveParseRouteFailureClass(value string) (ddsnmpcollector.AcquisitionFailureClass, error) {
-	return topologyDiagnosticArchiveParseEnum[ddsnmpcollector.AcquisitionFailureClass](value, topologyDiagnosticArchiveRouteFailureClassNames)
+	return topologyDiagnosticArchiveParseEnum[ddsnmpcollector.AcquisitionFailureClass](
+		value,
+		topologyDiagnosticArchiveRouteFailureClassNames,
+	)
 }
