@@ -300,9 +300,6 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 	for i := range report.Routes {
 		report.Routes[i].RootOID = strings.Clone(report.Routes[i].RootOID)
 	}
-	if report.Execution != nil {
-
-	}
 	context.profiles = append(context.profiles, topologyAcquisitionProfileEvidence{
 		identity:     report.Identity,
 		outcome:      report.Outcome,

@@ -675,6 +675,3 @@ func topologyDiagnosticArchiveSweepPhaseName(value topologyDiagnosticSweepPhase)
 func topologyDiagnosticArchiveParseSweepPhase(value string) (topologyDiagnosticSweepPhase, error) {
 	return topologyDiagnosticArchiveParseEnum[topologyDiagnosticSweepPhase](value, topologyDiagnosticArchiveSweepPhaseNames)
 }
-
-// Admission counts actual evidence, never the archive's reported usage counters.
-// Profile and non-profile evidence share the same cut ceiling.
