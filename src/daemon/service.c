@@ -111,6 +111,7 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
 
     size_t full_candidates = 0;
     size_t full_archives = 0;
+    size_t full_referenced = 0;
     size_t partial_candidates = 0;
     size_t partial_archives = 0;
     // Total archived metadata items (RRDMETRIC + RRDINSTANCE). Used by the
@@ -152,7 +153,24 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             if(!is_replicating && svc_rrdset_lock_for_deletion(st, now)) {
                 archived_items += svc_rrdset_archive_obsolete_dimensions(st, /* chart_obsolete = */ true);
 
-                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
+                // The reference test must happen under destroy_lock and mirrors the one the
+                // dimension reaper does above: 1 == only this traversal holds the item.
+                // rrdset_free() -> dict_item_del() only flags a referenced item ITEM_FLAG_DELETED
+                // and defers rrdset_delete_callback() - the only place st->destroy_lock is
+                // unlocked - so freeing a chart somebody else holds (any rrdset_find_and_acquire()
+                // caller: health, web, ML, contexts, backfill) leaves an unindexed, still-OBSOLETE
+                // chart with destroy_lock held for as long as that reference lives; any collector
+                // still holding a pointer to it then fatal()s in rrdset_timed_done() with "is being
+                // collected while is being destroyed". Holding destroy_lock while counting also
+                // settles the race with rrdset_create_custom(), which acquires the item before it
+                // trylocks destroy_lock: a reviver is therefore either already counted here, or it
+                // has not acquired yet and will find the item deleted. Skipping without counting an
+                // archive re-arms RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS below, so the sweep retries.
+                bool referenced = (dictionary_acquired_item_references(st_dfe.item) != 1);
+                if(referenced)
+                    full_referenced++;
+
+                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) && !referenced) {
                     full_archives++;
                     archived_items++;       // rrdset_free archives the RRDINSTANCE
 
@@ -173,6 +191,18 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
 
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+
+    // Charts held by someone else are retried on the next sweep, so a steady non-zero count here is
+    // the only symptom of a holder that never releases - the charts simply stop being reclaimed and
+    // memory grows with nothing else to see. Rate-limited because a busy parent legitimately shows a
+    // few per sweep while a query or a health evaluation is in flight.
+    if(full_referenced) {
+        nd_log_limit_static_global_var(erl, 600, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                     "SERVICE: host '%s': %zu of %zu obsolete charts are still referenced and were "
+                     "not reclaimed; they will be retried on the next sweep.",
+                     rrdhost_hostname(host), full_referenced, full_candidates);
+    }
 
     return archived_items;
 }
