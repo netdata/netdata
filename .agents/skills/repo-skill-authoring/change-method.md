@@ -6,25 +6,28 @@ relocated from prose instead of from the symbol, and enforcement claims nobody q
 of those gaps. The rules the rewrite must satisfy are in `./SKILL.md#authoring-rules`. There is no size
 target: the end state is defined by those rules, and line counts are reported, not aimed at.
 
-Where things go: decisions, the recorded target, dispositions, and validation evidence go in the SOW; the evidence
-files named below, the review reports (`review-r<n>-<lens>.md`), and any throwaway tooling written for the change go
-under `.local/audits/<subject>/` (`AGENTS.md#local-only-working-directory`).
+Where things go: the SOW is opened first (`planning`; the evidence round is analysis, not implementation) and holds
+the decisions, the recorded target, dispositions, and validation evidence; the evidence files named below, the review
+reports (`review-r<n>-preservation.md`, `review-r<n>-correctness.md`; a PR bot round is `review-bot<n>.md`), and any
+throwaway tooling written for the change go under `.local/audits/<subject>/`, where `<subject>` is the directory name
+of the skill under change (`AGENTS.md#local-only-working-directory`).
 
 ## Evidence Round
 
 Before proposing anything, run two independent read-only passes with fresh context (subagents or external
-assistants, one per pass, one output file each), each given the skill directory, the owner candidates from a first
-sweep of `./change-method.md#recorded-findings-and-owners` (an empty list is acceptable; the passes extend it), and
-the output format below, and each writing its output file before its summary turn. If a pass dies, read its file
-before re-running; a dying pass has usually written it. When the passes disagree on a claim, the code decides:
-re-verify it yourself.
+assistants; one writes `inventory.md`, the other `staleness.md`), each given the skill directory, the owner candidates
+from a first sweep of `./change-method.md#recorded-findings-and-owners` (an empty list is acceptable; the passes extend
+it), and the output format below, and each writing its output file before its summary turn. If a pass dies, read its
+file before re-running; a dying pass has usually written it. When the passes disagree on a claim, the code decides:
+re-verify it yourself; when they disagree on how to split a rule, take the finer split.
 
 `inventory.md`, the preservation baseline, opens with a census: per-file line counts, lines over 120 columns,
-provenance (`git log --follow -- <path>`). A maintained design record and an abandoned one get different options.
-Then:
+provenance (`git log --follow -- <path>`: first and last change dates and commit count; hashes belong in this local
+evidence, never in the skill). A maintained design record and an abandoned one get different options. Then:
 
-- one row per rule with a stable id per file (`<file>-R<n>`, assigned in document order); a compound bullet is split
-  into sub-clauses, one row each;
+- one row per rule or hard-won fact, with a stable id per file (`<file>-R<n>` in document order, the stem
+  directory-qualified when basenames repeat); narrative and examples are counted in the classification only, and
+  dropping them needs no row; a compound bullet is split into sub-clauses, one row each;
 - the permissive half of a rule (MAY) is its own row, separate from its prohibition;
 - a closed list (enum, token vocabulary) is one row naming its members and their count;
 - a kind per row: MUST, MUST NOT, SHOULD, MAY, fact, enum, pointer, procedure, history, rationale, example, status;
@@ -40,7 +43,10 @@ Then:
   can get it from the owner), or UNVERIFIABLE (say why);
 - a Tier-1 list: claims that would cause wrong work today;
 - code facts the skill lacks; an authority check (every named authority exists and is hand-maintained); a keep list
-  with stable ids.
+  with its own stable ids (`K<n>`), mapped to inventory ids in the preservation map.
+- When an owner lives in another repository and its mirror is absent on the machine, its claims are UNVERIFIABLE and
+  whether to touch them at all is a numbered user decision in the options round; a verified out-of-repo fact is
+  labelled `owner/repo @ commit`.
 
 Then re-verify every Tier-1 item yourself against the code before presenting anything.
 
@@ -48,8 +54,9 @@ Then re-verify every Tier-1 item yourself against the code before presenting any
 
 - Collect the findings already recorded against the skill and triage each before proposing scope: fixed here, or
   rejected with evidence; close the entry. Stores: GitHub issues (`gh issue list --search "<skill name>"`,
-  `AGENTS.md#followup-discipline`), the local stores `.local/sow/` and `.local/audits/<subject>/followups.md`, and past
-  PR bot reviews (fetched as `repo-pr-reviews` describes).
+  `AGENTS.md#followup-discipline`), the local stores `.local/sow/` and `.local/audits/<subject>/followups.md`, past PR
+  bot reviews (fetched as `repo-pr-reviews` describes), and a tree-wide grep for the skill's name (sibling skills carry
+  findings in prose).
 - Owner search: the candidate owners and the generated-file check in `./SKILL.md#authoring-rules`; the Learn status of
   each candidate via `docs/.map/map.yaml` decides the marker paragraph
   (`.agents/skills/README.md#owner-section-citations`; repository instruction files such as the root `AGENTS.md` and
@@ -65,9 +72,11 @@ Then re-verify every Tier-1 item yourself against the code before presenting any
 ## Options Round
 
 Record the clean-end-state target first (`AGENTS.md#clean-end-state-over-less-churn`), then present numbered options
-with a recommendation (`AGENTS.md#working-with-the-user`): slim in place, split (the split test is in
-`./SKILL.md#authoring-rules`), keep; and, for every keep-list fact with no owner, the fork in the same section. No
-step plan before the evidence round. The user decides scope and design.
+with a recommendation (`AGENTS.md#working-with-the-user`), one numbered decision per fork: scope (slim in place, split
+per the test in `./SKILL.md#authoring-rules`, keep); each keep-list cluster with no owner; each file deletion (the
+approval `AGENTS.md#git-and-pr-workflow` requires, staged later with `git rm <path>`); each self-declared rule to
+demote; each unverifiable out-of-repo cluster. No step plan before the evidence round. The user decides scope and
+design.
 
 ## Rewrite And Preservation Map
 
@@ -92,10 +101,12 @@ finding, CRITICAL vs TODO. The blocker bar, verify-before-acting, the one-round 
 
 - Preservation lens: receives `inventory.md`, the keep list, and `preservation-map.md`; checks that every row and keep
   item is reachable from the new skill or the cited owner section; flags dropped permissive clauses and range rows.
-- Correctness lens: receives the code and the owner documents, never the old skill text; checks every fact at its
-  symbol, every enforcement qualifier, every command as written, every anchor.
+- Correctness lens: receives the new skill text, the code, and the owner documents, never the pre-change skill text;
+  checks every fact at its symbol, every enforcement qualifier, every command as written, every anchor; marks claims
+  whose owner is unavailable on the machine as unverifiable.
 
-Probe every fix wrong-to-right and on the normal case; hold user edit requests until the round closes, or tell the
+Probe every fix wrong-to-right and on the normal case (for prose: run the documented commands and re-resolve the
+cited anchors and paths); hold user edit requests until the round closes, or tell the
 reviewers to review the tree as it is. A PR bot review is triaged
 the same way: fix real issues, add no machinery for unlikely edge cases; the mechanics are in `repo-pr-reviews`.
 
@@ -105,8 +116,9 @@ round of patches.
 
 ## Mechanical Hygiene
 
-The width and reflow-commit rules are `AGENTS.md#durable-ai-facing-artifact-formatting`. The tooling rules that have
-bitten, for the throwaway scripts:
+The width and reflow-commit rules are `AGENTS.md#durable-ai-facing-artifact-formatting`: a rewritten paragraph is
+wrapped in its content commit; surviving prose at another width is rewrapped in a separate whitespace-only commit. The
+tooling rules that have bitten, for the throwaway scripts:
 
 - rewrap whole paragraphs with fence-, table-, and list-aware logic; a line starting with `- ` begins a paragraph;
 - assert that the whitespace-split token stream is unchanged after every rewrap; never auto-join short lines;
@@ -132,7 +144,7 @@ bitten, for the throwaway scripts:
 - `bash .agents/sow/audit.sh` before every commit and at close, after `git add` of every new file (its citation and
   path scans read tracked files); nothing in CI replaces it (`.github/workflows/sow.yml` is the PR gate).
 - Line counts before and after per touched file; a symbol sweep (grep the tree for every backticked identifier and
-  path the skill cites); the reference search re-run; the slimming pass over every touched skill
-  (`AGENTS.md#project-skills`).
+  path the skill cites); the reference search re-run for every file or heading removed or renamed; the slimming pass
+  over every touched skill file (`AGENTS.md#project-skills`).
 - Follow-ups tracked and the artifact gate recorded (`AGENTS.md#followup-discipline`,
   `AGENTS.md#artifact-maintenance-gate`); a lesson about the method goes into `./SKILL.md#maintaining-this-skill`.

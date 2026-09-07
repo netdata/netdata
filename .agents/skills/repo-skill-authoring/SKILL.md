@@ -16,7 +16,7 @@ change.
 |---|---|
 | create a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, `./SKILL.md#creating-a-skill`; `./change-method.md#review-round`, `./change-method.md#mechanical-hygiene`, `./change-method.md#close` |
 | add or change rules in an existing skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`; `./change-method.md#recorded-findings-and-owners`, `./change-method.md#mechanical-hygiene`, `./change-method.md#close` |
-| slim, split, or restructure a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, then all of `./change-method.md#changing-a-skill`; the method is not optional |
+| slim, split, or restructure a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, `./SKILL.md#rot-signals`, then all of `./change-method.md#changing-a-skill`; the method is not optional |
 | periodic rot pass | `./SKILL.md#rot-signals` |
 | review a skill change | `./change-method.md#review-round`: the two lenses and what each reviewer receives |
 
@@ -29,7 +29,7 @@ names.
 |---|---|
 | `AGENTS.md#project-skills` | where runtime skills live; the same-PR rule for gap-closing and pointer-fixing updates; the slimming pass every skill change ends with and what it reports; the public-skill convention (audience boundary, symlinks, script shape, token safety, the live how-tos catalog); output/reference skill trees and their no-rename rule; the grouped skills index |
 | `AGENTS.md#durable-ai-facing-artifact-formatting` | retrieval structure, requirement words next to the action, prose width, reflow-only commits |
-| `AGENTS.md#sensitive-data-in-durable-artifacts` | the public-artifact assumption and the sanitized-evidence requirement |
+| `AGENTS.md#sensitive-data-in-durable-artifacts`, `.agents/sensitive-data-discipline.md#allowed-alternatives` | the public-artifact assumption and the sanitized-evidence requirement; the `<repo>/`-prefixed path form for prose (an anchor citation stays repo-relative without it) |
 | `AGENTS.md#enforcement` | what `.agents/sow/audit.sh` hard-fails on and what the PR gate `.github/workflows/sow.yml` re-checks |
 | `AGENTS.md#local-only-working-directory` | where skill-change evidence goes, and how this skill's `<dir>` (the `<subject>` in `./change-method.md#changing-a-skill`) is named |
 | `AGENTS.md#clean-end-state-over-less-churn` | the target is recorded before options are generated; the disclosure of what is removed and what is excluded; the reference search when a path is replaced; how coupled cleanup is handled |
@@ -74,7 +74,8 @@ Ownership and pointing:
 - Design records rot once the code ships its own document. Propose retiring them, with the relocation target and the
   rejected alternatives; deletion is the user's call; history stays in git. Unshipped design that must survive goes
   to the owning subsystem's scope or architecture document, labelled as not shipped; when none exists, that is the
-  user-owned fork above.
+  user-owned fork above. A rule a skill declares mandatory or durable that a repo-wide owner contradicts is demoted
+  the same way: proposed with the superseding owner named, decided by the user.
 
 Citations and claims:
 
@@ -139,8 +140,8 @@ Structure and routing:
 
 ## Rot Signals
 
-Run this over a skill periodically and before extending it. A cluster of hits is a slim; a single hit is a one-line fix
-in the same change.
+Run this over a skill periodically and before extending it (an owner document is judged only by being hand-maintained
+and current). A cluster of hits is a slim; a single hit is a one-line fix in the same change.
 
 - Line-number citations; PR, commit, issue, or SOW identifiers; a promise that line numbers track a branch. Grep for
   them; the audit automates only its legacy SOW-identifier check.
