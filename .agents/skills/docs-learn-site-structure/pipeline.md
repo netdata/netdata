@@ -55,7 +55,8 @@ Read `__main__` for the exact sequence; the symbols, in order:
 11. Broken-link and broken-anchor reports grouped by repository; the exit decision is recorded, not applied yet.
 12. `ingest/one_commit_back_file-dict.yaml` (next run's redirect baseline), `apply_kickstart_checksum` (exactly one
     placeholder in the installation page), temp cleanup, `reconcile_generated_outputs` (grids, `_category_.json`,
-    `normalize_sidebar_positions_by_parent`, `fix_mermaid_diagram_contrast`, `clean_redirects`),
+    `normalize_sidebar_positions_by_parent`, `fix_mermaid_diagram_contrast`, `clean_redirects` and
+    `write_netlify_config`),
     `write_sidebar_order_state` (map hash, sibling order, corpus SHA-256, plus a `.sha256` sidecar), removal of the
     temporary map, then exit 1 if a fail flag fired.
 

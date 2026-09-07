@@ -45,9 +45,9 @@ evidence, never in the skill). A maintained design record and an abandoned one g
 - code facts the skill lacks; an authority check (every named authority exists and is hand-maintained); a keep list
   with its own stable ids (`K<n>`), mapped to inventory ids in the preservation map.
 - When an owner lives in another repository and its mirror is absent on the machine, take the throwaway clone
-  `./SKILL.md#authoring-rules` allows and give the pass its path, with the instruction to write only
-  `owner/repo @ commit` and repository-relative paths; the verification source is a numbered user decision in the
-  options round. Only a claim no clone can settle is UNVERIFIABLE.
+  `./SKILL.md#authoring-rules` allows (no approval needed) and give the pass its path, with the instruction to write
+  only `owner/repo @ commit` and repository-relative paths for what it settles. Only a claim no clone can settle is
+  UNVERIFIABLE, and only that reaches the options round as a numbered decision.
 
 Then re-verify every Tier-1 item yourself against the code before presenting anything.
 

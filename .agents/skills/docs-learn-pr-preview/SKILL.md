@@ -86,9 +86,9 @@ sed -n '/^\[build\]/,/^$/p' "${LEARN_COPY}/static.toml"
 PUBLISH_DIR="$(sed -n 's/^ *publish *= *"\(.*\)"/\1/p' "${LEARN_COPY}/static.toml")"
 ```
 
-Run the printed `command` inside `${LEARN_COPY}` with the printed `NODE_OPTIONS` exported and a Node matching
-`NODE_VERSION` (for example through `npx -y -p node@<NODE_VERSION> <command>`). The output lands in
-`${LEARN_COPY}/${PUBLISH_DIR}`.
+Run the printed `command` inside `${LEARN_COPY}` with the printed `NODE_OPTIONS` exported and Node and npm matching
+`NODE_VERSION` and `NPM_VERSION` (for example through `npx -y -p node@<NODE_VERSION> -p npm@<NPM_VERSION> <command>`).
+The output lands in `${LEARN_COPY}/${PUBLISH_DIR}`.
 
 Serve the static build for inspection:
 

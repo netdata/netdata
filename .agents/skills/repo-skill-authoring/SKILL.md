@@ -62,8 +62,9 @@ Ownership and pointing:
 - An owner outside this repository cannot be an anchor citation: read it from the local mirror (`repo-mirror-sources`)
   and cite it as `owner/repo @ commit` (`AGENTS.md#open-source-reference-evidence`). When the mirror is absent, a
   throwaway shallow clone of the owner's default branch outside the repository serves the same purpose; a checkout
-  found elsewhere on the machine is compared with upstream first (`git ls-remote`), since the commit is what the
-  citation pins. A fact whose only owner is out of repo stays in the skill, labelled with the verifying commit, or as
+  found elsewhere on the machine is usable only when its worktree is clean (`git status --short` prints nothing) and
+  after comparing its commit with upstream (`git ls-remote`), since the commit is what the citation pins and a
+  modified checkout would be cited under a commit it does not match. A fact whose only owner is out of repo stays in the skill, labelled with the verifying commit, or as
   unverifiable; never delete what you cannot re-home.
 - One owner per fact. When a fact moves into its owner, delete every copy in the same commit and record the owner
   section, not just the file.

@@ -10,8 +10,9 @@ checks that catch the silent failures.
    (`docs/.map/README.md#meta-fields`); `description` and `keywords` are optional; `path` changes the directory
    segment, never the page's own segment (`docs/.map/README.md#path-reconstruction`,
    `../mapping.md#rows-ingest-reads-from-the-map`). Its position among siblings is its sidebar position
-   (`../sidebars.md`). The `edit_url` is the join key: owner `netdata`, branch `master` (`main` for `.github`), the
-   file's repository-relative path with its extension.
+   (`../sidebars.md`). The `edit_url` is the join key and has the exact shape
+   `https://github.com/netdata/<repo>/edit/<branch>/<repository-relative path with extension>`, with `<repo>` the
+   source repository (`netdata` for this one) and `<branch>` `master`, or `main` for `.github`.
 3. Predict the URL: `/docs/<learn_rel_path>/<label>` lowercased, spaces as `-`, after the sanitizer
    (`../mapping.md#file-path-and-slug`). Check for a sibling that sanitizes to the same name.
 4. Write cross-references as repository-relative `.md` paths (`../mapping.md#links-between-pages`); keep MDX-hostile
