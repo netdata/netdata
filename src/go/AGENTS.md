@@ -21,7 +21,7 @@ them from there.
 | Integration pipeline, generated docs | `.agents/skills/integrations-lifecycle/SKILL.md`, `.agents/skills/integrations-lifecycle/consistency.md` | Source and generated artifacts MUST stay synchronized. |
 | IBM.d work | `src/go/plugin/ibm.d/AGENTS.md` | Generator-driven workflow; go.d V2 layout rules MUST NOT be applied there. |
 | Function handlers | `src/go/plugin/framework/functions/README.md`, `src/go/tools/functions-validation/README.md` | Collector Functions SHOULD be isolated behind narrow dependencies. |
-| Topology payloads | `.agents/skills/topology-authoring/SKILL.md`, `.agents/skills/topology-authoring/topology-function-schema.md`, `src/go/pkg/topology/v1` | New producers MUST use the production `netdata.topology.v1` schema. |
+| Topology payloads | `.agents/skills/topology-authoring/SKILL.md`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/go/pkg/topology/v1` | New producers MUST use the production `netdata.topology.v1` schema. |
 | Host scopes / vnodes | `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`, `src/go/plugin/go.d/collector/azure_monitor/` | One job emitting metrics for resources that SHOULD appear as separate Netdata nodes MUST use host scopes. |
 | Matchers/selectors | `src/go/pkg/matcher/README.md` | Prefer existing matcher APIs over custom selector grammars. |
 | Core framework changes | `src/go/plugin/framework/docs/changing-framework-code.md` and "Core Framework Change Gate" below | The applicable approval tier MUST be satisfied before implementation. |

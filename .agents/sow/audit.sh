@@ -3,6 +3,7 @@
 # Never modifies files.
 
 set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
 
 if [ -t 1 ]; then
   RED=$'\033[0;31m'
@@ -63,6 +64,67 @@ read_sow_status() {
 }
 
 echo "${BLUE}=== SOW audit (cwd=$(pwd)) ===${NC}"
+
+# Heading slugs of one markdown file, one per line, in document order, following GitHub's rule for ATX headings
+# (up to three leading spaces) whose rendered title is plain text: code spans are flattened, inline HTML tags are
+# removed, and markdown links reduce to their text; then the title is lowercased; letters, digits, spaces, hyphens,
+# and underscores are kept, everything else dropped; spaces become hyphens; a repeated slug gets -1, -2, ...; a
+# generated suffix that collides with a literal title gets a further suffix (this script's disambiguation; GitHub's
+# own numbering differs there, so such titles are outside the convention). Fenced code blocks (``` or ~~~, up to
+# three leading spaces, closed only by a fence of the same character at least as long with nothing but whitespace
+# after it) and HTML comment blocks (from an opener anywhere on a line to the next closer) are ignored. Non-ASCII titles and setext headings are outside the convention (see .agents/skills/README.md).
+md_heading_slugs() {
+  md_markdown_lines "$1" | awk '
+    /^ {0,3}#{1,6}[ \t]/ {
+      h = $0
+      sub(/^ *#+[ \t]+/, "", h)
+      sub(/[ \t]+#+[ \t]*$/, "", h)
+      sub(/[ \t]+$/, "", h)
+      while (match(h, /`[^`]+`/)) {
+        span = substr(h, RSTART + 1, RLENGTH - 2); gsub(/[<>]/, "", span)
+        h = substr(h, 1, RSTART - 1) span substr(h, RSTART + RLENGTH)
+      }
+      gsub(/`/, "", h)
+      gsub(/<[^>]*>/, "", h)
+      while (match(h, /\[[^]]*\]\([^()]*(\([^()]*\)[^()]*)*\)/)) {
+        link = substr(h, RSTART, RLENGTH)
+        text = link; sub(/\]\([^()]*(\([^()]*\)[^()]*)*\)$/, "", text); sub(/^\[/, "", text)
+        if (text == link) break
+        h = substr(h, 1, RSTART - 1) text substr(h, RSTART + RLENGTH)
+      }
+      h = tolower(h)
+      gsub(/[^a-z0-9 _-]/, "", h)
+      gsub(/ /, "-", h)
+      slug = h
+      if (h in seen) { do { seen[h]++; slug = h "-" seen[h] } while (slug in seen) } else seen[h] = 0
+      if (!(slug in seen)) seen[slug] = 0
+      print slug
+    }'
+}
+
+# The lines of a markdown file that are neither inside a fenced code block nor inside an HTML comment block; the
+# heading and citation scans both read markdown through this filter.
+md_markdown_lines() {
+  awk '
+    {
+      line = $0
+      if (incomment) { if (index(line, "-->")) incomment = 0; next }
+      if (match(line, /^ {0,3}(`{3,}|~{3,})/)) {
+        t = substr(line, RSTART, RLENGTH); sub(/^ */, "", t)
+        c = substr(t, 1, 1); l = length(t)
+        rest = substr(line, RSTART + RLENGTH)
+        if (!infence) { infence = 1; fchar = c; flen = l; next }
+        else if (c == fchar && l >= flen && rest ~ /^[ \t]*$/) { infence = 0; next }
+      }
+      if (infence) next
+      if ((o = index(line, "<!--")) > 0 && !index(substr(line, o), "-->")) {
+        incomment = 1
+        if (o > 1) print substr(line, 1, o - 1)
+        next
+      }
+      print line
+    }' "$1"
+}
 
 section "initialization marker"
 if [ -f AGENTS.md ]; then
@@ -272,7 +334,7 @@ if command -v rg >/dev/null 2>&1; then
       ok "spec reference resolves: $ref"
     else
       case " $relocated_specs " in
-        *" $refrel "*) fail "reference to a relocated spec — repoint to its committed home: $ref" ;;
+        *" $refrel "*) fail "reference to a relocated spec — repoint to its committed home, or to the document that now owns its facts: $ref" ;;
         *) warn "spec reference unresolved (specs are local-only; may be absent here): $ref" ;;
       esac
     fi
@@ -397,8 +459,38 @@ if [ -d .agents/skills ]; then
   done < <(git grep -n -o -E '(source "([^/.]*/)?|\]\()(\.\./)+[A-Za-z0-9_./-]+' \
              -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
              | sed -E 's/^([^:]*):[0-9]+:(source "([^/.]*\/)?|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
+  # Owner-section anchors. A skill cites a section of the document that owns a fact as `path/to/doc.md#anchor`
+  # (heading slug, see md_heading_slugs). The file must exist and a heading with that slug must exist, so renaming
+  # or removing a heading in an owner document fails here until every skill that cites it is updated. Paths are
+  # repo-relative (with or without a leading /), or relative to the citing file when they start with ./ or ../.
+  # A token starting with // is the tail of a URL and is not a citation. Citations inside fenced code blocks or HTML
+  # comments of a markdown skill file are not scanned.
+  while IFS='|' read -r file ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in //*) continue ;; esac
+    path=${ref%%#*}
+    anchor=${ref#*#}
+    case "$path" in
+      ./*|../*) target="$(dirname "$file")/$path" ;;
+      /*) target="${path#/}" ;;
+      *) target="$path" ;;
+    esac
+    if [ ! -f "$target" ]; then
+      fail "$file cites $ref but $target does not exist"
+      skills_bad=1
+    elif ! md_heading_slugs "$target" | grep -Fx -- "$anchor" >/dev/null; then
+      fail "$file cites $ref but no heading in $target has the anchor #$anchor"
+      skills_bad=1
+    fi
+  done < <(git ls-files -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
+             | while IFS= read -r skill_file; do
+                 [ -f "$skill_file" ] || continue
+                 case "$skill_file" in *.md) src=$(md_markdown_lines "$skill_file") ;; *) src=$(cat "$skill_file") ;; esac
+                 printf '%s\n' "$src" | grep -o -E '[A-Za-z0-9_./-]+\.md#[A-Za-z0-9_-]+' \
+                   | sed "s|^|$skill_file\||"
+               done | sort -u)
   if [ "$skills_bad" -eq 0 ]; then
-    ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, and every skill path reference resolves"
+    ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, every skill path reference resolves, and every owner-section anchor resolves to a heading"
   fi
 else
   warn "no .agents/skills directory"

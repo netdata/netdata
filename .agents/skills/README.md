@@ -16,8 +16,25 @@ published contract and are exempt from the naming rule below.
 - The frontmatter `name` MUST equal the directory name.
 - `.agents/sow/audit.sh` enforces both, and also that every skill directory has a `SKILL.md`, every public symlink
   points into `docs/netdata-ai/skills/` and resolves, every skill is in the `AGENTS.md` skills index and every index
-  entry has a directory, and every `.agents/skills/` path named in a tracked file (or relative `../` path in a skill
-  file) exists.
+  entry has a directory, every `.agents/skills/` path named in a tracked file (or relative `../` path in a skill
+  file) exists, and every owner-section citation resolves (below).
+
+## Owner-Section Citations
+
+- A skill points at facts rather than restating them. When a skill depends on a specific section of the document that
+  owns a fact, it MUST cite the section as `<path>/<doc>.md#<anchor>`, where `<anchor>` is the heading's slug as
+  GitHub renders it for an ATX heading with a plain ASCII title (code spans flattened, inline HTML removed, links
+  reduced to their text; then lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else
+  dropped; spaces become hyphens; a repeated heading gets `-1`, `-2`, and this repository's check gives a further
+  suffix to a generated slug that collides with a literal title, which GitHub may not). Cite only such headings:
+  non-ASCII titles, setext headings, and titles that collide with generated suffixes are outside the convention. Paths are repo-relative (with or without a leading
+  `/`), or relative to the citing file when they start with `./` or `../`. URLs are written with their scheme.
+- `.agents/sow/audit.sh` fails when the cited file or a heading with that slug is missing, so renaming or removing a
+  heading in an owner document is caught until every citing skill is updated. Headings and citations inside fenced
+  code blocks or multi-line HTML comments are not scanned.
+- A privately published owner document (one not mapped in `docs/.map/map.yaml`) that skills cite by section SHOULD
+  carry a short "Place in the documentation set" paragraph naming the citing skill(s), so an editor of the document
+  knows the dependency exists; Learn-published documents carry no such paragraph.
 
 ## Areas
 
@@ -26,7 +43,7 @@ published contract and are exempt from the naming rule below.
 | `collectors` | any data-collection plugin or module, across plugin families |
 | `integrations` | the `integrations/` pipeline: schemas, generators, generated pages |
 | `health` | `src/health/`: alerts and alert templates |
-| `topology` | topology producers, payload schema, correlation, Cloud aggregation fixtures |
+| `topology` | topology producers, the `netdata.topology.v1` payload contract, correlation, the aggregator contract |
 | `tests` | repository test suites under `tests/` |
 | `packaging` | installers, packages, and images under `packaging/` |
 | `docs` | `learn.netdata.cloud` and the docs pipeline |

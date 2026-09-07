@@ -220,8 +220,8 @@ targeted command accelerates iteration; the full command proves catalog layout, 
 schema, metadata examples, normalization, routes, chart plans, observations, public wire identities, and aggregate
 semantic coverage for every stock proof. CI runs the same verification
 (`.github/workflows/prometheus-profile-tests.yml`). For a change that touches both repositories, follow the
-paired-branch order in `promprofile/README.md`, "Latest-testdata model": merge testdata first, then rerun complete
-verification before merging Netdata.
+paired-branch order in `src/go/internal/promprofile/README.md#latest-testdata-model`: merge testdata first, then rerun
+complete verification before merging Netdata.
 
 ## Examples to copy
 

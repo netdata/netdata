@@ -7,6 +7,10 @@ profiles. The framework is intentionally split between the
 [`netdata/netdata`](https://github.com/netdata/netdata) and
 [`netdata/testdata`](https://github.com/netdata/testdata) repositories.
 
+**Place in the documentation set.** The project skill `.agents/skills/collectors-prometheus-profiles/SKILL.md` cites
+sections of this document by heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer exists, so
+renaming or removing a heading here updates the skill in the same change.
+
 Field-level schemas, production behavior, and command syntax remain with their executable owners. This document owns the
 system boundary, authority model, dependency direction, and extension rules that connect those owners.
 

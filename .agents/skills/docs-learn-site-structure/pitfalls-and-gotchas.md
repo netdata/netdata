@@ -316,7 +316,7 @@ the `check-markdown.yml` CI gate) even though Docusaurus would
 render it. Use `## Heading` text that slugifies to the anchor
 you want instead of injecting a custom ID. (Same-page `#anchor`
 links are not validated by this checker, but cross-file
-`/docs/.../page.md#anchor` links are.)
+`<docs path>.md#<anchor>` links are.)
 
 ## OpenAPI / Swagger
 

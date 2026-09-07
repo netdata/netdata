@@ -454,7 +454,8 @@ evidence-backed reason it is unaffected.
     not named `<area>-<topic>` with a listed area, or whose frontmatter `name` differs from its directory; a public
     skill symlink that does not point into `docs/netdata-ai/skills/` or does not resolve; a skill directory missing
     from the `AGENTS.md` skills index, or an index entry with no directory; a `.agents/skills/` path named in a tracked
-    file, or a relative `../` path in a skill file, that does not exist; a failed reference scan;
+    file, or a relative `../` path in a skill file, that does not exist; an owner-section citation `path.md#anchor` in a
+    skill file whose file or heading (GitHub slug) does not exist; a failed reference scan;
   - a sensitive-data hit in the committed durable artifacts it scans (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
     `.agents/ENV.md`, the framework files, `.agents/skills/**`, `.agents/skill-verification/**`).
   Advisory: in-flight SOW files under `q/current/` are checked for the template's required sections for their kind,
@@ -626,8 +627,10 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `health-alert-authoring`: authoring, adapting, or reviewing health alerts and templates in
     `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests
 - Topology.
-  - `topology-authoring`: topology producers, topology Function payloads, schema fixtures, graph presentation,
-    correlation rules, direction semantics, drilldowns, telemetry overlays, Cloud aggregation fixtures
+  - `topology-authoring`: creating or changing a topology producer (`topology:network-connections`,
+    `topology:streaming`, `topology:snmp`, vSphere, `topology:cato_networks`, or a new one) and its
+    `netdata.topology.v1` payload: actors, links, evidence, correlation rules, presentation, modals, overlays,
+    validation, and the aggregator contract a producer relies on
 - Tests.
   - `tests-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
     query-engine bugs, formatter byte-pins, validating a fix branch

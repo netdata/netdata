@@ -10,6 +10,14 @@ and [FUNCTION_TOPOLOGY_SCHEMA.json](/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json
 It is not an implementation plan for one commit. It is the work map for the
 backend, frontend, producer, and aggregator changes.
 
+**Place in the documentation set.** This document owns migration state, the
+Cloud aggregator and frontend scope, and design that is not yet in the schema.
+The payload contract itself is the developer guide. The project skill
+`.agents/skills/topology-authoring/SKILL.md` cites sections of this document by
+heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer
+exists, so renaming or removing a heading here updates the skill in the same
+change.
+
 ## Ground Rules
 
 - New topology producers emit only the new schema.
@@ -103,8 +111,10 @@ Likely homes:
   `pid`, or `container`, `process_name` by default) and `selections.mode`
   (`aggregated` or `detailed`, aggregated by default), parsed at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:474`; the
-  `aggregated` / `mode:aggregated` and `detailed` / `mode:detailed` spellings
-  are retained as compatibility aliases;
+  option parser (`topology_apply_option_param`) owns the accepted spellings of
+  every option, including bare `aggregated` / `detailed` values and the `mode:`
+  and `__topology_mode:` prefixes (the developer guide's Network Connections
+  Shape section describes the option tokens as the canonical form);
 - response metadata exposes the `mode` selector at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:5134`;
 - actors, graph links, and optional socket evidence rows are emitted as compact
@@ -172,6 +182,22 @@ vSphere:
 - inventory containment is modeled as hierarchical ownership links;
 - VM-to-host and host/VM-to-network relationships are graph links with typed
   evidence.
+
+`topology:cato_networks`:
+
+- producer path: `src/go/plugin/go.d/collector/cato_networks/` (`topology.go`,
+  `catofunc/topology.go`);
+- the Function emits `netdata.topology.v1` directly from the Go collector and
+  never emitted an earlier schema;
+- actor types are `cato_site`, `cato_pop`, `cato_device`, and `bgp_peer`
+  (`catofunc/topology.go`); the aggregation scopes are `site`, `pop`, and
+  `network`; actor identity is a producer-composed `id`, with per-type merge
+  identities declared in `catofunc/presentation.go` (`account_id` and `site_id`
+  for sites, plus `device_id` for devices, `account_id` and `pop_name` for
+  PoPs, `remote_ip` and `remote_asn` for BGP peers; devices and BGP peers
+  declare `site_id` as `parent_identity`);
+- tests validate the payload with `topologyv1.ValidateDecodedData` and the JSON
+  Schema.
 
 ### Cloud Frontend
 
@@ -455,7 +481,8 @@ Required behavior:
 - preserve evidence rows when evidence policy is `preserve`;
 - count evidence rows when evidence policy is `count`;
 - preserve modal composition definitions and rewrite their type, table,
-  evidence, and column references after namespacing/deduplication;
+  evidence, and column references after namespacing/deduplication (the rules
+  are in the developer guide's Aggregator Behavior section);
 - do not materialize modal rows during aggregation unless the underlying
   canonical table is already being merged;
 - merge `actor_labels` after actor reference remapping and preserve repeated
@@ -518,7 +545,51 @@ Required test classes:
 - generic schema-conformant custom topology passthrough;
 - synthetic scale benchmark near and above current corpus scale;
 - sanitized real-corpus replay from `.local/` promoted only as non-sensitive
-  fixtures when safe.
+  fixtures when safe;
+- `__topology_mode=aggregated` rewritten to `detailed` on fan-out only for
+  producers that advertise the mode, and never added for the others;
+- schema-valid unknown fields preserved through aggregation.
+
+### Design Not Yet In The Schema
+
+These aggregator requirements are agreed design, not shipped contract. The
+schema has no fields for them on the types they would extend, its record
+definitions reject unknown properties, and a producer must not emit them until
+the schema and the developer guide carry them. When they land they may take the
+most compact shape that fits the schema's style; exact field names are free as
+long as they are schema-valid, documented, and used uniformly by Agent, UI, and
+aggregator.
+
+- Four-dimension table merge policy. Today a table type declares one flat
+  `aggregation` value; most of the `action` and `metrics` tokens below already
+  exist as values of that enum, so what is missing is the structure plus
+  `avg_weighted` and the whole `conflicts` dimension. The target policy has four
+  dimensions: `key` (the
+  columns that identify equivalent rows), `action` (`deduplicate`, `append`,
+  `set_union`, `merge_metrics`, `latest`, or `preserve`), `metrics` (a per
+  numeric column operation such as `sum`, `min`, `max`, `avg_weighted`, or
+  `latest`), and `conflicts` (how non-key scalar conflicts resolve:
+  `prefer_claim`, `prefer_newest_agent`, `preserve_all`, or `diagnostic`).
+  Until it lands, the aggregator applies the per-role defaults in the developer
+  guide's Aggregator Behavior section, and merged actor scalars prefer the
+  non-empty value from the newest comparable Agent version, otherwise the
+  conflict is preserved in diagnostics or expanded labels.
+- Streaming table merge keys. The streaming design merges `stream_path` rows on
+  identical path membership, `inbound` rows by parent, child, immediate source,
+  and relationship type, `outbound` rows by sending parent, streamed node,
+  destination, and stream state, and links by source, destination, type,
+  protocol, and state, deduplicating identical rows and merging numeric
+  metrics. The shipped table types declare `append` (`set` for
+  `actor_labels`), so these keys are not expressible today; they land with the
+  four-dimension policy above.
+- Loose-side materialization policy. A detailed network-connections row whose
+  remote side has endpoint facts but no actor would let the producer skip one
+  visible `endpoint` actor per remote peer; the table would declare how such a
+  loose side is grouped into a presentation actor when nothing claims it. The
+  shipped producer instead materializes visible `endpoint` correlation-point
+  actors and every graph link has two actor references. This stronger
+  loose-side model needs one Agent, UI, and aggregator pass before it becomes
+  contract.
 
 ## Rollout Plan
 
