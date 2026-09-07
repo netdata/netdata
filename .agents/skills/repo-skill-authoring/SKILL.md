@@ -98,8 +98,8 @@ Citations and claims:
 
 Structure and routing:
 
-- Every file is routed from `SKILL.md`; a router or index lists only files that exist (a bare name is invisible to the
-  audit's path scan); no stubs.
+- Every file is routed from `SKILL.md`; a router or index lists only files that exist, checked by hand (a bare
+  filename is not a path the audit resolves); no stubs.
 - When a skill serves more than one audience, `SKILL.md` routes by audience and a topic file SHOULD serve one. Split
   into two skills only when the audiences differ and the seam cuts no shared step and no facts that change together;
   otherwise one skill with a router.
@@ -129,13 +129,11 @@ Structure and routing:
 3. Write the trigger with the phrases users type and the "not for" clauses; write `SKILL.md` on the skeleton above; add
    a supporting file only when `SKILL.md` routes it.
 4. If the skill writes output, add its row to the table in `AGENTS.md#local-only-working-directory`.
-5. Add the index entry under its area in `AGENTS.md#project-skills`. The audit (`.agents/sow/audit.sh`) resolves an
-   entry to its directory only when it is a bullet whose first token is the backticked skill name followed by a colon,
-   inside the block between the `Skills index (` and `Public skills (` lines. When the skill serves two areas, add the
-   cross-reference `.agents/skills/README.md#finding-a-skill` asks for.
-6. `git add` the new files (the audit's path and anchor scans read tracked files; CI runs no skills check), run
-   `bash .agents/sow/audit.sh`, then one review round with the correctness lens of `./change-method.md#review-round`
-   plus a trigger-coverage check. A creation has no inventory, so no preservation map and no preservation lens.
+5. Add the index entry under its area in `AGENTS.md#project-skills`, in the bullet form the existing entries use, and,
+   when the skill serves two areas, the cross-reference `.agents/skills/README.md#finding-a-skill` asks for.
+6. `git add` the new files first (the audit reads tracked files), run `bash .agents/sow/audit.sh` (nothing in CI
+   replaces it), then one review round with the correctness lens of `./change-method.md#review-round` plus a
+   trigger-coverage check. A creation has no inventory, so no preservation map and no preservation lens.
 
 ## Rot Signals
 
@@ -143,8 +141,7 @@ Run this over a skill periodically and before extending it. A cluster of hits is
 in the same change.
 
 - Line-number citations; PR, commit, issue, or SOW identifiers; a promise that line numbers track a branch. Grep for
-  them: the audit automates only legacy four-digit SOW identifiers, not dated SOW ids, line numbers, or PR and commit
-  references.
+  them; do not assume the audit does.
 - A code-side document now exists for facts the skill states.
 - "Authoritative design", "Spec -", Status, Migration Notes, Schema Additions Required, phase history, open review
   questions.
@@ -154,8 +151,8 @@ in the same change.
 - Hard-coded counts or percentages.
 - Index entry and frontmatter disagree; a new producer, subcommand, or flag the trigger does not name.
 - No task router: every task opens most of the skill; `SKILL.md` narrative paid on every trigger.
-- Audit anchor failures after an owner document edit; a link the audit does not check that no longer resolves
-  (`./change-method.md#recorded-findings-and-owners` lists what it checks).
+- Audit anchor failures after an owner document edit; a relative link or bare filename that no longer resolves
+  (`./change-method.md#recorded-findings-and-owners` says what is verified by hand).
 - A generated page or symlink in an authority list.
 - An owner section named in prose instead of cited by anchor.
 

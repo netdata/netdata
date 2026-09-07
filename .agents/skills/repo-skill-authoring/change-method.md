@@ -51,10 +51,9 @@ Then re-verify every Tier-1 item yourself against the code before presenting any
   read from the local mirror and cited as `./SKILL.md#authoring-rules` says.
 - Reference search for every file you may rename or delete (`AGENTS.md#clean-end-state-over-less-churn`): root
   `AGENTS.md`, sibling skills, `src/**/AGENTS.md`, developer documents, CI path filters and test discovery, code-tree
-  README links, tests, audit globs. The audit checks repository-relative `.agents/skills/` paths in tracked files
-  (`CHANGELOG.md` excluded), `../` markdown links and `source` lines inside skill files, and anchor citations inside
-  skill files. Everything else is verified by hand: `./`, sibling, and subdirectory links, bare filenames,
-  `docs/netdata-ai/skills/` paths anywhere, and the hop depth of a relative link from a non-skill file.
+  README links, tests, audit globs. The skills-layout section of `.agents/sow/audit.sh` says which path and anchor
+  forms it resolves; everything else is verified by hand, in particular `./`, sibling, and subdirectory links, bare
+  filenames, public-skill paths under `docs/netdata-ai/skills/`, and links from files outside a skill.
 
 ## Options Round
 
@@ -113,18 +112,16 @@ bitten, for the throwaway scripts:
           if len(l.rstrip("\n")) > 120 and not l.startswith("|"): print(f"{f}:{n}")' <files>
   ```
 
-- never write an HTML comment opener literally in prose or a code span: the audit's anchor scan treats it as the start
-  of a comment and stops seeing headings until a closer appears;
+- never write an HTML comment opener literally in prose or a code span inside a skill: the anchor scan stops seeing
+  headings after it;
 - `git diff HEAD` before each commit;
-- the sensitive scanner (`.agents/sow/scan-sensitive.sh`) flags an SNMP community keyword followed by a colon or an
-  equals sign and a value; its placeholder exemption is a short whole-word list, so a redaction token is still
-  flagged. Phrase around the keyword rather than relying on a placeholder.
+- on a sensitive-scan hit, phrase around the keyword, not around the value (a redaction placeholder does not clear an
+  SNMP community hit); `.agents/sow/scan-sensitive.sh` defines the hits.
 
 ## Close
 
-- `bash .agents/sow/audit.sh` before every commit and at close, after `git add` of every new file: it is the only check
-  for the skills items `AGENTS.md#enforcement` lists; CI (`.github/workflows/sow.yml`) re-runs the sensitive scan and
-  the committed-working-files check and no skills check.
+- `bash .agents/sow/audit.sh` before every commit and at close, after `git add` of every new file; nothing in CI
+  replaces it (`.github/workflows/sow.yml` is what CI runs).
 - Line counts before and after per touched file; a symbol sweep (grep the tree for every backticked identifier and
   path the skill cites); the reference search re-run; the slimming pass over every touched skill
   (`AGENTS.md#project-skills`).
