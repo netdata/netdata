@@ -788,7 +788,8 @@ Example actor custom table type:
           {"id": "path_actor", "type": "actor_ref", "role": "reference"},
           {"id": "path_index", "type": "uint"},
           {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
-          {"id": "since", "type": "timestamp"}
+          {"id": "since", "type": "timestamp", "nullable": true},
+          {"id": "first_time", "type": "timestamp", "nullable": true}
         ]
       }
     }
