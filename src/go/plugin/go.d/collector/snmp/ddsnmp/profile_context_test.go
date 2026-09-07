@@ -130,7 +130,7 @@ func TestProfileContextReportsActualPolicyAndProjection(t *testing.T) {
 			}}
 
 			view := catalog.Resolve(tc.request).Project(tc.consumers[0], tc.consumers[1:]...)
-			context := view.Context(250000, 64<<20)
+			context := view.Context()
 			data := context.Snapshot()
 			require.Equal(t, "available", data.State)
 			require.Equal(t, tc.manualPolicy, data.ManualPolicy)
@@ -172,7 +172,7 @@ func TestProfileContextReportsActualPolicyAndProjection(t *testing.T) {
 	}
 }
 
-func TestProfileContextLoadedSourcesAndAdmission(t *testing.T) {
+func TestProfileContextLoadedSourcesAndRestore(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(
 		t,
@@ -182,7 +182,7 @@ func TestProfileContextLoadedSourcesAndAdmission(t *testing.T) {
 	p, err := loadProfile(filepath.Join(dir, "device.yaml"), multipath.MultiPath{dir})
 	require.NoError(t, err)
 	v := (&Catalog{profiles: []*Profile{p}}).Resolve(ResolveRequest{ManualProfiles: []string{"device"}}).Project(ConsumerMetrics)
-	context := v.Context(250000, 64<<20)
+	context := v.Context()
 	data := context.Snapshot()
 	require.Equal(t, ProfileSource{ID: "device.yaml", Class: "unknown", Priority: 1}, data.Selected[0].Source)
 	require.Equal(
@@ -191,35 +191,12 @@ func TestProfileContextLoadedSourcesAndAdmission(t *testing.T) {
 		data.Selected[0].Extensions,
 	)
 	records, size := context.Shape()
-	restored, err := RestoreProfileContext(data, 250000, 64<<20)
+	restored, err := RestoreProfileContext(data)
 	require.NoError(t, err)
 	rr, rb := restored.Shape()
 	require.Equal(t, records, rr)
 	require.Equal(t, size, rb)
-	tests := map[string]struct {
-		records, bytes uint64
-		state          string
-	}{
-		"record limit": {records: records - 1,
-			bytes: size,
-			state: "limit_exceeded"},
-		"byte limit": {records: records,
-			bytes: size - 1,
-			state: "limit_exceeded"},
-		"exact fit": {records: records,
-			bytes: size,
-			state: "available"},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			got := v.Context(tc.records, tc.bytes).Snapshot()
-			require.Equal(t, tc.state, got.State)
-			if tc.state == "available" {
-				require.Equal(t, data, got)
-			}
-		})
-	}
-
+	require.Equal(t, data, v.Context().Snapshot())
 }
 
 func TestProfileContextFourSurfacesAndTopologyPruning(t *testing.T) {
@@ -265,7 +242,7 @@ func TestProfileContextFourSurfacesAndTopologyPruning(t *testing.T) {
 			if tc.kinds != nil {
 				view = view.FilterByKind(tc.kinds)
 			}
-			data := view.Context(250000, 64<<20).Snapshot()
+			data := view.Context().Snapshot()
 			require.Equal(t, "available", data.State)
 			require.Equal(t, tc.bgpMode, data.BGPMode)
 			require.Equal(t, tc.topologyKinds, data.TopologyKinds)

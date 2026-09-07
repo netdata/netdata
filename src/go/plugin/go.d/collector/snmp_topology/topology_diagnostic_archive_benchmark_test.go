@@ -217,7 +217,6 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 			topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1},
 			topologySemanticDeviceInputFromConnection(info),
 			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-			defaultTopologyAcquisitionLimits,
 		)
 		observer := recorder.beginContext(0, "", "")
 		observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
@@ -265,7 +264,6 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 		selected:    selected,
 		seen:        seen,
 		states:      states,
-		limits:      defaultTopologyDiagnosticGlobalLimits,
 	})
 	if err != nil {
 		tb.Fatal(err)

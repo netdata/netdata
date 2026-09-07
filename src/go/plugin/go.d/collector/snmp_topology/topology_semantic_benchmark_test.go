@@ -30,7 +30,6 @@ func BenchmarkTopologyAcquisitionIngest(b *testing.B) {
 							topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 							input,
 							topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-							defaultTopologyAcquisitionLimits,
 						)
 						observer := recorder.beginContext(0, "", "")
 						observer.ObserveProfile(report, pms[0])
@@ -89,7 +88,6 @@ func benchmarkTopologyAcquisitionEvidence(b *testing.B, pms []*ddsnmp.ProfileMet
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 		input,
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		defaultTopologyAcquisitionLimits,
 	)
 	observer := recorder.beginContext(0, "", "")
 	observer.ObserveProfile(acquisitionReportForMetrics(

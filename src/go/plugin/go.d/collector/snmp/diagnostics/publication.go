@@ -191,7 +191,7 @@ func (p *Publisher) publish(ctx context.Context, requireMeaningful bool) (meanin
 			return false
 		}
 	} else {
-		snapshot.Lifecycle = CaptureLifecycle(p.source, MaxRecords, MaxLogicalBytes)
+		snapshot.Lifecycle = CaptureLifecycle(p.source)
 	}
 	meaningful = len(snapshot.Lifecycle.Cut.Entries) > 0
 	if requireMeaningful && !meaningful {

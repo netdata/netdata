@@ -50,9 +50,10 @@ type tableCollectionScope struct {
 }
 
 type tableCollectionRequest struct {
-	scope  *tableCollectionScope
-	config ddprofiledefinition.MetricsConfig
-	route  *tableCollectionRoute
+	scope        *tableCollectionScope
+	config       ddprofiledefinition.MetricsConfig
+	route        *tableCollectionRoute
+	dependencies []*tableCollectionRoute
 
 	missing          bool
 	cacheEligible    bool
@@ -63,6 +64,7 @@ type tableCollectionRequest struct {
 }
 
 type tableCollectionRoute struct {
+	sourceOperation        uint64
 	oid                    string
 	requests               []*tableCollectionRequest
 	state                  tableRouteState
@@ -80,15 +82,11 @@ type tableRouteGraph struct {
 	// Forward edges stay request-scoped because only rows eligible for that
 	// request activate its dependencies. Reverse edges are route-scoped because
 	// any current dependency outcome invalidates every cached tag snapshot.
-	dependenciesByRequest map[*tableCollectionRequest][]*tableCollectionRoute
-	dependentsByRoute     map[*tableCollectionRoute]map[string]*tableCollectionRoute
+	dependentsByRoute map[*tableCollectionRoute]map[string]*tableCollectionRoute
 }
 
 func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency *tableCollectionRoute) {
-	if g.dependenciesByRequest == nil {
-		g.dependenciesByRequest = make(map[*tableCollectionRequest][]*tableCollectionRoute)
-	}
-	g.dependenciesByRequest[req] = append(g.dependenciesByRequest[req], dependency)
+	req.dependencies = append(req.dependencies, dependency)
 
 	if g.dependentsByRoute == nil {
 		g.dependentsByRoute = make(map[*tableCollectionRoute]map[string]*tableCollectionRoute)
@@ -100,7 +98,7 @@ func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency 
 }
 
 func (g *tableRouteGraph) dependencies(req *tableCollectionRequest) []*tableCollectionRoute {
-	return g.dependenciesByRequest[req]
+	return req.dependencies
 }
 
 func (g *tableRouteGraph) hasDependents(route *tableCollectionRoute) bool {
@@ -453,6 +451,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
 	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
+	route.sourceOperation = sourceRecorder(s.collector.snmpClient).Cursor()
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
 		route.state = tableRouteFailed

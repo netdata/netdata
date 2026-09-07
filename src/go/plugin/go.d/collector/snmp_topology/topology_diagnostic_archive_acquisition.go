@@ -106,6 +106,7 @@ func newTopologyDiagnosticArchiveContextEvidenceV1(
 		return snmpdiag.ContextEvidence{}, fmt.Errorf("collection phase: %w", err)
 	}
 	result := snmpdiag.ContextEvidence{
+		Sources:      context.sources,
 		Interruption: context.interruption,
 		Failures:     context.failures,
 		Ordinal:      context.ordinal,
@@ -179,6 +180,7 @@ func newTopologyDiagnosticArchiveRouteV1(
 		return snmpdiag.Route{}, err
 	}
 	return snmpdiag.Route{
+		Sources: route.Sources, Processing: route.Processing,
 		Ordinal:      route.Ordinal,
 		Kind:         kind,
 		RootOID:      route.RootOID,
@@ -212,6 +214,7 @@ func newTopologyDiagnosticArchiveProfileValuesV1(
 	}
 	for _, metric := range values.metrics {
 		result.Metrics = append(result.Metrics, snmpdiag.MetricValue{
+			RowIndex: metric.rowIndex, Field: metric.field,
 			RouteOrdinal: metric.routeOrdinal,
 			RowOrdinal:   metric.rowOrdinal,
 			ValueOrdinal: metric.valueOrdinal,
@@ -301,7 +304,6 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 
 func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	id topologyAcquisitionAttemptID,
-	budget *diagnosticRestoreBudget,
 ) (*topologyAcquisitionAttemptEvidence, error) {
 	targetOutcome, err := topologyDiagnosticArchiveParseTargetOutcome(e.Target.Outcome)
 	if err != nil {
@@ -375,21 +377,19 @@ func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 		sysUptimeValue:     e.SysUptimeValue,
 		collectionContexts: make([]topologyAcquisitionContextEvidence, 0, len(e.CollectionContexts)),
 	}
-	if err := budget.take(topologyAcquisitionAttemptShape(result.device, result.target)); err != nil {
-		return nil, err
-	}
+
 	for _, context := range e.CollectionContexts {
-		reconstructed, err := restoreArchiveContextEvidence(context, budget)
+		reconstructed, err := restoreArchiveContextEvidence(context)
 		if err != nil {
 			return nil, fmt.Errorf("collection context %d: %w", context.Ordinal, err)
 		}
 		result.collectionContexts = append(result.collectionContexts, reconstructed)
 	}
-	profileContext, err := budget.restore(e.ProfileContext)
+	profileContext, err := ddsnmp.RestoreProfileContext(e.ProfileContext)
 	if err != nil {
 		return nil, err
 	}
-	vlanProfileContext, err := budget.restore(e.VLANProfileContext)
+	vlanProfileContext, err := ddsnmp.RestoreProfileContext(e.VLANProfileContext)
 	if err != nil {
 		return nil, err
 	}
@@ -397,10 +397,8 @@ func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	return result, nil
 }
 
-func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence, budget *diagnosticRestoreBudget) (topologyAcquisitionContextEvidence, error) {
-	if err := budget.take(topologyAcquisitionContextShape(c.VLANID, c.VLANName)); err != nil {
-		return topologyAcquisitionContextEvidence{}, err
-	}
+func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence) (topologyAcquisitionContextEvidence, error) {
+
 	client, err := restoreArchivePhase(c.Client)
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("client phase: %w", err)
@@ -416,7 +414,11 @@ func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence, budget *diagnosti
 	if !c.Interruption.Valid() || !c.Failures.Valid() {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("invalid context failure")
 	}
+	if err := ddsnmp.ValidateSourceOperations(c.Sources); err != nil {
+		return topologyAcquisitionContextEvidence{}, err
+	}
 	result := topologyAcquisitionContextEvidence{
+		sources:      c.Sources,
 		interruption: c.Interruption,
 		failures:     c.Failures,
 		ordinal:      c.Ordinal,
@@ -427,36 +429,36 @@ func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence, budget *diagnosti
 		collection:   collection,
 		profiles:     make([]topologyAcquisitionProfileEvidence, 0, len(c.Profiles)),
 	}
+	sourceRequests := ddsnmp.SourceRequestIndex(c.Sources)
+	chargedWalks := make(map[uint64]struct{})
 	for _, profile := range c.Profiles {
+		for _, route := range profile.Routes {
+			if err := ddsnmp.ValidateSourceBindings(route.Sources, sourceRequests); err != nil {
+				return topologyAcquisitionContextEvidence{}, err
+			}
+			if err := ddsnmp.ValidateProcessingEvents(route.Processing); err != nil {
+				return topologyAcquisitionContextEvidence{}, err
+			}
+		}
+		if profile.Execution != nil {
+			for _, id := range profile.Execution.WalkOperations {
+				if id == 0 || id > uint64(len(c.Sources)) || c.Sources[id-1].Method == "get" {
+					return topologyAcquisitionContextEvidence{}, errors.New("invalid executed WALK reference")
+				}
+				if _, duplicate := chargedWalks[id]; duplicate {
+					return topologyAcquisitionContextEvidence{}, errors.New("WALK execution charged more than once")
+				}
+				chargedWalks[id] = struct{}{}
+			}
+		}
 		reconstructed, err := restoreArchiveProfileEvidence(profile)
 		if err != nil {
 			return topologyAcquisitionContextEvidence{}, fmt.Errorf("profile %d: %w", profile.Identity.Ordinal, err)
 		}
-		if err := budget.take(restoredAcquisitionProfileShape(reconstructed)); err != nil {
-			return topologyAcquisitionContextEvidence{}, err
-		}
+
 		result.profiles = append(result.profiles, reconstructed)
 	}
 	return result, nil
-}
-
-func restoredAcquisitionProfileShape(profile topologyAcquisitionProfileEvidence) (uint64, uint64) {
-	records, size := topologyAcquisitionReportShape(profile.routes, profile.execution)
-	values := profile.values
-	records += uint64(len(values.metrics)) + uint64(len(values.bgpRows))
-	for _, metric := range values.metrics {
-		size += uint64(len(metric.kind)) + topologySemanticStringMapBytes(metric.tags)
-	}
-	for key, value := range values.metadata {
-		size += uint64(len(key) + len(value.Value) + 1)
-	}
-	size += topologySemanticStringMapBytes(values.tags)
-	for _, row := range values.bgpRows {
-		size += topologySemanticBGPRowLogicalBytes(topologySemanticBGPRowFromAcquisition(row))
-		// Count unexpected tags too; imported data has not passed producer filtering.
-		size += topologySemanticStringMapBytes(row.tags) - topologySemanticFilteredStringMapBytes(row.tags, topologySemanticBGPTagAllowed)
-	}
-	return records, size
 }
 
 func restoreArchiveProfileEvidence(p snmpdiag.ProfileEvidence) (topologyAcquisitionProfileEvidence, error) {
@@ -526,6 +528,7 @@ func restoreArchiveRoute(r snmpdiag.Route) (ddsnmpcollector.AcquisitionRouteRepo
 		return ddsnmpcollector.AcquisitionRouteReport{}, err
 	}
 	return ddsnmpcollector.AcquisitionRouteReport{
+		Sources: r.Sources, Processing: r.Processing,
 		Ordinal:      r.Ordinal,
 		Kind:         kind,
 		RootOID:      r.RootOID,
@@ -564,6 +567,7 @@ func restoreArchiveProfileValues(v snmpdiag.ProfileValues,
 		}
 		result.metrics = append(result.metrics, topologyAcquisitionMetricValue{
 			routeOrdinal: metric.RouteOrdinal,
+			rowIndex:     metric.RowIndex, field: metric.Field,
 			rowOrdinal:   metric.RowOrdinal,
 			valueOrdinal: metric.ValueOrdinal,
 			kind:         kind,

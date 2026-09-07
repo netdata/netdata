@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
-	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 type topologySemanticEventKind uint8
@@ -110,27 +109,11 @@ func newTopologyBuilderFromSemanticInput(
 	return builder
 }
 
-type topologyAcquisitionLimits struct {
-	maxRecords      uint64
-	maxLogicalBytes uint64
-}
-
-var defaultTopologyAcquisitionLimits = topologyAcquisitionLimits{
-	maxRecords:      100_000,
-	maxLogicalBytes: 32 << 20,
-}
-
-var defaultTopologyDiagnosticGlobalLimits = topologyAcquisitionLimits{
-	maxRecords:      snmpdiag.MaxRecords,
-	maxLogicalBytes: snmpdiag.MaxLogicalBytes,
-}
-
 type diagnosticCaptureState uint8
 
 const (
 	diagnosticCaptureUnknown diagnosticCaptureState = iota
 	diagnosticCaptureAvailable
-	diagnosticCaptureLimitExceeded
 	diagnosticCaptureUnavailable
 )
 
@@ -138,12 +121,8 @@ type diagnosticCaptureReason uint8
 
 const (
 	diagnosticCaptureReasonNone diagnosticCaptureReason = iota
-	diagnosticCaptureReasonRecordLimit
-	diagnosticCaptureReasonByteLimit
 	diagnosticCaptureReasonProjectionError
 	diagnosticCaptureReasonProjectionPanic
-	diagnosticCaptureReasonGlobalRecordLimit
-	diagnosticCaptureReasonGlobalByteLimit
 )
 
 type topologyAcquisitionProfileValues struct {
@@ -155,6 +134,8 @@ type topologyAcquisitionProfileValues struct {
 }
 
 type topologyAcquisitionMetricValue struct {
+	rowIndex     string
+	field        string
 	routeOrdinal uint32
 	rowOrdinal   uint32
 	valueOrdinal uint32
@@ -207,6 +188,8 @@ func projectTopologyAcquisitionMetrics(
 			continue
 		}
 		result = append(result, topologyAcquisitionMetricValue{
+			rowIndex:     strings.Clone(references[i].RowIndex),
+			field:        strings.Clone(references[i].Field),
 			routeOrdinal: references[i].RouteOrdinal,
 			rowOrdinal:   references[i].RowOrdinal,
 			valueOrdinal: references[i].ValueOrdinal,

@@ -210,7 +210,6 @@ func newTopologyScenarioReplayFixture(
 			topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1},
 			topologySemanticDeviceInputFromConnection(info),
 			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-			defaultTopologyAcquisitionLimits,
 		)
 		observer := recorder.beginContext(0, "", "")
 		observer.ObserveProfile(acquisitionReportForMetrics(
@@ -259,7 +258,6 @@ func newTopologyScenarioReplayFixture(
 		selected:    selected,
 		seen:        seen,
 		states:      states,
-		limits:      defaultTopologyDiagnosticGlobalLimits,
 	})
 	require.NoError(t, err)
 	generation.diagnostic = cut

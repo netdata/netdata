@@ -221,6 +221,7 @@ type diagnosticDeviceCaptureInspection struct {
 }
 
 type diagnosticContextAccounting struct {
+	Sources      []ddsnmp.SourceOperation      `json:"source_operations,omitempty"`
 	Interruption snmputils.Failure             `json:"interruption"`
 	Failures     ddsnmp.CollectionFailures     `json:"failures"`
 	Client       diagnosticPhaseStatus         `json:"client"`
@@ -233,6 +234,7 @@ type diagnosticContextAccounting struct {
 }
 
 type diagnosticProfileAccounting struct {
+	Routes       []snmpdiag.Route         `json:"routes,omitempty"`
 	Identity     snmpdiag.ProfileIdentity `json:"identity"`
 	Outcome      string                   `json:"outcome"`
 	FailurePhase string                   `json:"failure_phase"`
@@ -308,6 +310,8 @@ type diagnosticSourceFact struct {
 }
 
 type diagnosticMetricFact struct {
+	RowIndex     string            `json:"row_index,omitempty"`
+	Field        string            `json:"field,omitempty"`
 	RouteOrdinal uint32            `json:"route_ordinal"`
 	RowOrdinal   uint32            `json:"row_ordinal"`
 	ValueOrdinal uint32            `json:"value_ordinal"`

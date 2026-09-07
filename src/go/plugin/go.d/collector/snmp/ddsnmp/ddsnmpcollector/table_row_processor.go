@@ -32,6 +32,7 @@ type (
 	}
 	// tableRowProcessingContext contains context needed for processing a row
 	tableRowProcessingContext struct {
+		processing         *processingObserver
 		config             ddprofiledefinition.MetricsConfig
 		columnOIDs         map[string][]ddprofiledefinition.SymbolConfig
 		crossTableCtx      *crossTableContext
@@ -64,7 +65,7 @@ func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProce
 		dependency := false
 		switch orderedTag.tagType {
 		case tagTypeSameTable:
-			err = p.processSingleSameTableTag(row, orderedTag.config)
+			err = p.processSingleSameTableTag(row, orderedTag.config, ctx.processing)
 		case tagTypeCrossTable:
 			dependency = true
 			if ctx.crossTableCtx != nil {
@@ -75,6 +76,9 @@ func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProce
 		}
 		if err == nil {
 			continue
+		}
+		if orderedTag.tagType == tagTypeIndex {
+			ctx.processing.record(metricTagDisplayName(orderedTag.config), "", "index_processing")
 		}
 		if ctx.rejected != nil {
 			*ctx.rejected++
@@ -89,14 +93,18 @@ func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProce
 func (p *tableRowProcessor) processSingleSameTableTag(
 	row *tableRowData,
 	tagCfg ddprofiledefinition.MetricTagConfig,
+	processing *processingObserver,
 ) error {
 	columnOID := trimOID(tagCfg.Symbol.OID)
 	pdu, ok := row.pdus[columnOID]
 	if !ok {
+		if processing != nil {
+			processing.record(metricTagDisplayName(tagCfg), columnOID+"."+row.index, "missing_input")
+		}
 		return nil
 	}
 
-	ta := tagAdder{tags: row.tags}
+	ta := tagAdder{tags: row.tags, processing: processing}
 	return p.tagProc.processTag(tagCfg, pdu, ta)
 }
 
@@ -105,7 +113,7 @@ func (p *tableRowProcessor) processSingleCrossTableTag(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	ctx *tableRowProcessingContext,
 ) error {
-	return p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx)
+	return p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx, ctx.processing)
 }
 
 func (p *tableRowProcessor) processSingleIndexTag(
@@ -217,12 +225,18 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 	for columnOID, syms := range ctx.columnOIDs {
 		pdu, ok := row.pdus[columnOID]
 		if !ok {
+			if ctx.processing != nil {
+				for _, sym := range syms {
+					ctx.processing.record(sym.Name, columnOID+"."+row.index, "missing_input")
+				}
+			}
 			continue
 		}
 
 		for _, sym := range syms {
 			metric, err := p.createMetric(sym, pdu, row, ctx.symbolMode)
 			if err != nil {
+				ctx.processing.record(sym.Name, pdu.Name, "conversion")
 				if ctx.rejected != nil {
 					*ctx.rejected++
 				}
@@ -230,6 +244,7 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 				continue
 			}
 			if metric == nil {
+				ctx.processing.record(sym.Name, pdu.Name, "empty_date")
 				continue
 			}
 
@@ -301,35 +316,41 @@ func newCrossTableContext(
 }
 
 // resolveCrossTableTag resolves a tag value from another table
-func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext) error {
+func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext, processing *processingObserver) error {
+	field := metricTagDisplayName(tagCfg)
 	refTableOID, err := r.findReferencedTableOID(tagCfg.Table, ctx.tableNameToOID)
 	if err != nil {
+		processing.record(field, tagCfg.Symbol.OID, "dependency_processing")
 		return err
 	}
 
 	refTablePDUs, err := r.getReferencedTableData(tagCfg.Table, refTableOID, ctx.walkedData)
 	if err != nil {
+		processing.record(field, tagCfg.Symbol.OID, "dependency_processing")
 		return err
 	}
 
 	lookupIndex, err := r.transformIndex(index, tagCfg.IndexTransform)
 	if err != nil {
+		processing.record(field, tagCfg.Symbol.OID, "dependency_processing")
 		return err
 	}
 
 	if r.requiresLookupByValue(tagCfg) {
 		lookupIndex, err = r.resolveLookupIndexByValue(tagCfg, lookupIndex, refTableOID, refTablePDUs, ctx)
 		if err != nil {
+			processing.record(field, tagCfg.LookupSymbol.OID, "dependency_processing")
 			return err
 		}
 	}
 
 	pdu, err := r.lookupValue(tagCfg, lookupIndex, refTablePDUs)
 	if err != nil {
+		processing.record(field, trimOID(tagCfg.Symbol.OID)+"."+lookupIndex, "missing_dependency")
 		return err
 	}
 
-	ta := tagAdder{tags: ctx.rowTags}
+	ta := tagAdder{tags: ctx.rowTags, processing: processing}
 
 	return r.tagProcessor.processTag(tagCfg, pdu, ta)
 }

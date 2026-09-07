@@ -48,11 +48,9 @@ type fixedLifecycleSource struct{ cut ddsnmp.DeviceLifecycleCut }
 
 func (s fixedLifecycleSource) LifecycleCut() ddsnmp.DeviceLifecycleCut { return s.cut }
 
-func TestProfileContextLimitPreservesLifecycleAndSourceCut(t *testing.T) {
+func TestProfileContextPreservesLifecycleAndSourceCut(t *testing.T) {
 	profile, err := ddsnmp.RestoreProfileContext(
 		ddsnmp.ProfileContextData{State: "available", ManualPolicy: "fallback", BGPMode: "absent", SysDescr: strings.Repeat("s", 8192)},
-		MaxRecords,
-		MaxLogicalBytes,
 	)
 	require.NoError(t, err)
 	source := fixedLifecycleSource{
@@ -70,10 +68,10 @@ func TestProfileContextLimitPreservesLifecycleAndSourceCut(t *testing.T) {
 			},
 		},
 	}
-	result := CaptureLifecycle(source, MaxRecords, 4096)
+	result := CaptureLifecycle(source)
 	require.Equal(t, "available", result.State)
 	require.Len(t, result.Cut.Entries, 1)
 	require.Equal(t, "failed", result.Cut.Entries[0].LastCompleted.Outcome)
-	require.Equal(t, "limit_exceeded", result.Cut.Entries[0].Profiles.State)
-	require.Equal(t, "available", source.cut.Entries[0].Info.Profiles.Snapshot().State, "admission must not mutate a source-owned cut")
+	require.Equal(t, "available", result.Cut.Entries[0].Profiles.State)
+	require.Equal(t, "available", source.cut.Entries[0].Info.Profiles.Snapshot().State, "publication must not mutate a source-owned cut")
 }

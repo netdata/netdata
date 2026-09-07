@@ -6,9 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -22,6 +20,7 @@ import (
 type executionTestHandler struct {
 	gosnmp.Handler
 	walkRoots []string
+	walkPDUs  []gosnmp.SnmpPDU
 }
 
 func (*executionTestHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
@@ -42,12 +41,17 @@ func (*executionTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 }
 func (h *executionTestHandler) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
 	h.walkRoots = append(h.walkRoots, oid)
-	return nil, errors.New("synthetic failure")
+	return h.walkPDUs, errors.New("synthetic failure")
 }
 
 // Use the real collector/observer boundary, including a failed profile with no
 // retained values; the archive fixture supplies only the surrounding sweep.
-func collectExecutionTestCapture(tb testing.TB, limits topologyAcquisitionLimits) *topologyAcquisitionCapture {
+func collectExecutionTestCapture(tb testing.TB) *topologyAcquisitionCapture {
+	tb.Helper()
+	return collectSourceTestCapture(tb, nil)
+}
+
+func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologyAcquisitionCapture {
 	tb.Helper()
 	const root = "1.3.6.1.4.1.99999.1"
 	recorder := newTopologyAcquisitionRecorder(topologyAcquisitionAttemptID{
@@ -59,12 +63,13 @@ func collectExecutionTestCapture(tb testing.TB, limits topologyAcquisitionLimits
 		},
 		topologyTargetResolutionEvidence{
 			outcome: topologyTargetResolutionEmpty,
-		}, limits)
-	handler := &executionTestHandler{}
+		})
+	handler := &executionTestHandler{walkPDUs: pdus}
+	observer := recorder.beginContext(0, "", "")
 	collector := ddsnmpcollector.New(ddsnmpcollector.Config{
-		SnmpClient:                 handler,
+		SnmpClient:                 recorder.sourceClient(0, handler),
 		Log:                        logger.New(),
-		InitialAcquisitionObserver: recorder.beginContext(0, "", ""),
+		InitialAcquisitionObserver: observer,
 		Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
 				{MetricTagConfig: ddprofiledefinition.MetricTagConfig{
@@ -94,13 +99,13 @@ func collectExecutionTestCapture(tb testing.TB, limits topologyAcquisitionLimits
 }
 
 func TestTopologyExecutionAccountingRetentionArchiveInspection(t *testing.T) {
-	capture := collectExecutionTestCapture(t, defaultTopologyAcquisitionLimits)
+	capture := collectExecutionTestCapture(t)
 	require.Equal(t, diagnosticCaptureAvailable, capture.state)
 	profile := capture.evidence.collectionContexts[0].profiles[0]
 	require.NotNil(t, profile.execution)
 	require.EqualValues(t, 1, profile.execution.Preparation.GetRequests)
-	require.Len(t, profile.execution.Walks, 1)
-	require.True(t, profile.execution.Walks[0].Failed)
+	require.Len(t, profile.execution.WalkOperations, 1)
+	require.NotEmpty(t, capture.evidence.collectionContexts[0].sources[profile.execution.WalkOperations[0]-1].Failure.Reason)
 	require.Empty(t, profile.values)
 
 	scenario := newLLDPDirectScenario()
@@ -144,53 +149,21 @@ func TestTopologyExecutionAccountingRetentionArchiveInspection(t *testing.T) {
 	require.Equal(t, encoded.Bytes(), reencoded.Bytes())
 }
 
-func TestTopologyExecutionAccountingAdmission(t *testing.T) {
-	full := collectExecutionTestCapture(t, defaultTopologyAcquisitionLimits)
-	for _, byBytes := range []bool{false, true} {
-		for _, delta := range []uint64{0, 1} {
-			t.Run(fmt.Sprintf("bytes=%t/below=%d", byBytes, delta), func(t *testing.T) {
-				limits := defaultTopologyAcquisitionLimits
-				if byBytes {
-					limits.maxLogicalBytes = full.logicalBytes - delta
-				} else {
-					limits.maxRecords = full.recordCount - delta
-				}
-				capture := collectExecutionTestCapture(t, limits)
-				if delta == 0 {
-					require.Equal(t, diagnosticCaptureAvailable, capture.state)
-					require.NotNil(t, capture.evidence.collectionContexts[0].profiles[0].execution)
-				} else {
-					require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
-					require.Nil(t, capture.evidence)
-				}
-			})
-		}
-	}
-}
-
-func TestTopologyExecutionAccountingShapeIncludesExecutedRoots(t *testing.T) {
-	const firstRoot = "1.3.6.1.4.1.99999.1"
-	const secondRoot = "1.3.6.1.4.1.99999.200"
+func TestTopologyExecutionAccountingShapeIncludesOperationReferences(t *testing.T) {
 	report := ddsnmpcollector.AcquisitionProfileReport{
-		Outcome: ddsnmpcollector.AcquisitionProfileOutcomeFailed,
-		Execution: &ddsnmpcollector.AcquisitionExecutionReport{
-			Walks: []ddsnmpcollector.AcquisitionWalkReport{
-				{RootOID: firstRoot},
-				{RootOID: secondRoot, Failed: true},
-			},
-		},
+		Outcome:   ddsnmpcollector.AcquisitionProfileOutcomeFailed,
+		Execution: &ddsnmpcollector.AcquisitionExecutionReport{WalkOperations: []uint64{1, 2}},
 	}
 	records, logicalBytes, err := topologyAcquisitionProfileShape(topologySemanticEventTopologyMetrics, report, nil)
 	require.NoError(t, err)
-	// Profile + execution header + two walks; no configured routes or values.
 	require.EqualValues(t, 4, records)
-	// Profile header, preparation/execution and aggregate fields, walk headers/roots.
-	require.EqualValues(t, 96+88+2*32+len(firstRoot)+len(secondRoot), logicalBytes)
+	require.EqualValues(t, 96+88+2*8, logicalBytes)
 }
 
 func TestTopologyExecutionAccountingPresence(t *testing.T) {
-	for _, recorded := range []bool{false, true} {
-		t.Run(fmt.Sprint(recorded), func(t *testing.T) {
+	for name, tc := range map[string]struct{ recorded bool }{"unobserved": {}, "observed": {true}} {
+		t.Run(name, func(t *testing.T) {
+			recorded := tc.recorded
 			profile := topologyAcquisitionProfileEvidence{
 				outcome: ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
 			}
@@ -214,23 +187,19 @@ func TestTopologyExecutionAccountingPresence(t *testing.T) {
 }
 
 func TestTopologyExecutionAccountingRejectsInvalidMeasurements(t *testing.T) {
-	for _, e := range []*snmpdiag.Execution{
-		{Preparation: snmpdiag.Preparation{
-			ElapsedNanos: -1,
-		}},
-		{Preparation: snmpdiag.Preparation{
-			SNMPErrors: -1,
-		}},
-		{Walks: []snmpdiag.Walk{{RootOID: "1.3", ElapsedNanos: -1}}},
-		{Walks: []snmpdiag.Walk{{ElapsedNanos: int64(time.Second)}}},
+	for name, tc := range map[string]struct{ preparation snmpdiag.Preparation }{
+		"negative duration":    {snmpdiag.Preparation{ElapsedNanos: -1}},
+		"negative error count": {snmpdiag.Preparation{SNMPErrors: -1}},
 	} {
-		_, err := restoreArchiveExecution(e)
-		require.Error(t, err)
+		t.Run(name, func(t *testing.T) {
+			_, err := restoreArchiveExecution(&snmpdiag.Execution{Preparation: tc.preparation})
+			require.Error(t, err)
+		})
 	}
 }
 
 func BenchmarkTopologyExecutionAccounting(b *testing.B) {
-	capture := collectExecutionTestCapture(b, defaultTopologyAcquisitionLimits)
+	capture := collectExecutionTestCapture(b)
 	_, diagnostics := newTopologyScenarioReplayFixture(b, newLLDPDirectScenario())
 	diagnostics.topology.devices[0].latestAttempt = capture
 	b.Run("archive", func(b *testing.B) {

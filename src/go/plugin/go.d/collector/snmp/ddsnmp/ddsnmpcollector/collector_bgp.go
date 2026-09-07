@@ -24,6 +24,10 @@ const (
 )
 
 type bgpValueContext struct {
+	processing                *processingObserver
+	field                     string
+	fieldLeaf                 string
+	processingStage           string
 	pdus                      map[string]gosnmp.SnmpPDU
 	rowIndex                  string
 	rowPDUs                   map[string]gosnmp.SnmpPDU
@@ -128,7 +132,15 @@ func (c *Collector) collectScalarBGPRows(
 		var pdus map[string]gosnmp.SnmpPDU
 		var err error
 		if len(oids) > 0 {
+			source := sourceRecorder(c.scalarCollector.snmpClient)
+			cursor := source.Cursor()
 			pdus, err = c.scalarCollector.getScalarValues(oids, stats)
+			if source != nil && route != nil {
+				requests := source.requestsSince(cursor)
+				for _, oid := range oids {
+					bindSourceGETs(route, requests, oid, "primary")
+				}
+			}
 			if err != nil {
 				if route != nil {
 					route.Outcome = AcquisitionRouteOutcomeFailed
@@ -222,6 +234,7 @@ func (c *Collector) collectTableBGPRows(
 		metricsCfg := bgpConfigAsMetricsConfig(cfg)
 
 		outcome := walkPass.walk(c.tableCollector, cfg.Table.OID, stats)
+		bindSourceWalk(route, outcome.sourceOperation, cfg.Table.OID, "primary")
 		if outcome.err != nil {
 			if route != nil {
 				route.Outcome = AcquisitionRouteOutcomeFailed
@@ -239,7 +252,8 @@ func (c *Collector) collectTableBGPRows(
 			continue
 		}
 
-		if err := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkPass, stats); err != nil {
+		dependencyErr := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkPass, stats, route)
+		if err := dependencyErr; err != nil {
 			if route != nil {
 				route.Outcome = AcquisitionRouteOutcomeFailed
 				route.FailureClass = AcquisitionFailureClassDependency
@@ -250,10 +264,11 @@ func (c *Collector) collectTableBGPRows(
 		}
 
 		ctx := &tableProcessingContext{
-			config:         metricsCfg,
-			pdus:           pdus,
-			walkedData:     walkPass.walkedData,
-			tableNameToOID: tableNameToOID,
+			processingRoute: route,
+			config:          metricsCfg,
+			pdus:            pdus,
+			walkedData:      walkPass.walkedData,
+			tableNameToOID:  tableNameToOID,
 		}
 		ctx.columnOIDs = buildColumnOIDs(metricsCfg)
 		ctx.orderedTags = buildOrderedTags(metricsCfg)
@@ -317,10 +332,12 @@ func (c *Collector) walkBGPTableDependencies(
 	tableNameToOID map[string]string,
 	walkPass *tableWalkPass,
 	stats *ddsnmp.CollectionStats,
+	route *AcquisitionRouteReport,
 ) error {
 	var errs []error
 	for _, depOID := range bgpTableDependencies(cfg, metricsCfg, tableNameToOID) {
 		outcome := walkPass.walk(c.tableCollector, depOID, stats)
+		bindSourceWalk(route, outcome.sourceOperation, depOID, "dependency")
 		if outcome.err != nil {
 			errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
 		}
@@ -342,14 +359,14 @@ func (c *Collector) buildScalarBGPRow(
 		Tags:            parseStaticTags(cfg.StaticTags),
 	}
 
-	bgpCtx := bgpValueContext{pdus: pdus}
+	bgpCtx := bgpValueContext{pdus: pdus, processing: processingFor(route, rowKey)}
 	if err := c.populateBGPRow(&row, cfg, bgpCtx); err != nil {
 		return ddsnmp.BGPRow{}, false, err
 	}
 
 	if len(cfg.MetricTags) > 0 {
 		tags := make(map[string]string)
-		ta := tagAdder{tags: tags}
+		ta := tagAdder{tags: tags, processing: bgpCtx.processing}
 		for _, tagCfg := range cfg.MetricTags {
 			if tagCfg.Symbol.OID == "" {
 				continue
@@ -366,9 +383,11 @@ func (c *Collector) buildScalarBGPRow(
 	}
 
 	if !bgpRowHasSignals(row) {
+		bgpCtx.processing.record("row", "", "no_signals")
 		return ddsnmp.BGPRow{}, false, nil
 	}
 	if !bgpRowIdentityComplete(row) {
+		bgpCtx.processing.record("row", "", "incomplete_identity")
 		return ddsnmp.BGPRow{}, false, nil
 	}
 
@@ -394,7 +413,9 @@ func (c *Collector) buildTableBGPRow(
 		tableName:  cfg.Table.Name,
 	}
 	crossTableCtx.rowTags = rowData.tags
+	processing := processingFor(ctx.processingRoute, rowIndex)
 	rowCtx := &tableRowProcessingContext{
+		processing:         processing,
 		config:             ctx.config,
 		columnOIDs:         ctx.columnOIDs,
 		crossTableCtx:      crossTableCtx,
@@ -417,6 +438,7 @@ func (c *Collector) buildTableBGPRow(
 
 	var requiredDependencyMissing bool
 	bgpCtx := bgpValueContext{
+		processing:                processing,
 		rowIndex:                  rowIndex,
 		rowPDUs:                   rowPDUs,
 		tableName:                 cfg.Table.Name,
@@ -432,6 +454,11 @@ func (c *Collector) buildTableBGPRow(
 	}
 
 	if !bgpRowHasSignals(row) || !bgpRowIdentityComplete(row) {
+		if !bgpRowHasSignals(row) {
+			bgpCtx.processing.record("row", "", "no_signals")
+		} else {
+			bgpCtx.processing.record("row", "", "incomplete_identity")
+		}
 		if requiredDependencyMissing && dependencyRejected != nil {
 			(*dependencyRejected)++
 		}
@@ -444,69 +471,69 @@ func (c *Collector) buildTableBGPRow(
 func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.BGPConfig, ctx bgpValueContext) error {
 	var err error
 
-	if row.Identity.RoutingInstance, err = c.bgpTextValue(cfg.Identity.RoutingInstance, ctx); err != nil {
+	if row.Identity.RoutingInstance, err = c.bgpTextValue(cfg.Identity.RoutingInstance, ctx.forField("identity.routing_instance")); err != nil {
 		return fmt.Errorf("identity.routing_instance: %w", err)
 	}
-	if row.Identity.Neighbor, err = c.bgpTextValue(cfg.Identity.Neighbor, ctx); err != nil {
+	if row.Identity.Neighbor, err = c.bgpTextValue(cfg.Identity.Neighbor, ctx.forField("identity.neighbor")); err != nil {
 		return fmt.Errorf("identity.neighbor: %w", err)
 	}
-	if row.Identity.RemoteAS, err = c.bgpTextValue(cfg.Identity.RemoteAS, ctx); err != nil {
+	if row.Identity.RemoteAS, err = c.bgpTextValue(cfg.Identity.RemoteAS, ctx.forField("identity.remote_as")); err != nil {
 		return fmt.Errorf("identity.remote_as: %w", err)
 	}
-	if row.Identity.AddressFamily, err = c.bgpAddressFamilyValue(cfg.Identity.AddressFamily.BGPValueConfig, ctx); err != nil {
+	if row.Identity.AddressFamily, err = c.bgpAddressFamilyValue(cfg.Identity.AddressFamily.BGPValueConfig, ctx.forField("identity.address_family")); err != nil {
 		return fmt.Errorf("identity.address_family: %w", err)
 	}
-	if row.Identity.SubsequentAddressFamily, err = c.bgpSubsequentAddressFamilyValue(cfg.Identity.SubsequentAddressFamily.BGPValueConfig, ctx); err != nil {
+	if row.Identity.SubsequentAddressFamily, err = c.bgpSubsequentAddressFamilyValue(cfg.Identity.SubsequentAddressFamily.BGPValueConfig, ctx.forField("identity.subsequent_address_family")); err != nil {
 		return fmt.Errorf("identity.subsequent_address_family: %w", err)
 	}
-	row.Descriptors.LocalAddress = c.bgpOptionalTextValue(cfg.Descriptors.LocalAddress, ctx)
-	row.Descriptors.LocalAS = c.bgpOptionalTextValue(cfg.Descriptors.LocalAS, ctx)
-	row.Descriptors.LocalIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.LocalIdentifier, ctx)
-	row.Descriptors.PeerIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.PeerIdentifier, ctx)
-	row.Descriptors.PeerType = c.bgpOptionalTextValue(cfg.Descriptors.PeerType, ctx)
-	row.Descriptors.BGPVersion = c.bgpOptionalTextValue(cfg.Descriptors.BGPVersion, ctx)
-	row.Descriptors.Description = c.bgpOptionalTextValue(cfg.Descriptors.Description, ctx)
+	row.Descriptors.LocalAddress = c.bgpOptionalTextValue(cfg.Descriptors.LocalAddress, ctx.forField("descriptors.local_address"))
+	row.Descriptors.LocalAS = c.bgpOptionalTextValue(cfg.Descriptors.LocalAS, ctx.forField("descriptors.local_as"))
+	row.Descriptors.LocalIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.LocalIdentifier, ctx.forField("descriptors.local_identifier"))
+	row.Descriptors.PeerIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.PeerIdentifier, ctx.forField("descriptors.peer_identifier"))
+	row.Descriptors.PeerType = c.bgpOptionalTextValue(cfg.Descriptors.PeerType, ctx.forField("descriptors.peer_type"))
+	row.Descriptors.BGPVersion = c.bgpOptionalTextValue(cfg.Descriptors.BGPVersion, ctx.forField("descriptors.bgp_version"))
+	row.Descriptors.Description = c.bgpOptionalTextValue(cfg.Descriptors.Description, ctx.forField("descriptors.description"))
 
-	if err := c.populateBGPStateValue(&row.State, cfg.State, ctx); err != nil {
+	if err := c.populateBGPStateValue(&row.State, cfg.State, ctx.forField("state")); err != nil {
 		return fmt.Errorf("state: %w", err)
 	}
-	if err := c.populateBGPStateValue(&row.Previous, cfg.Previous, ctx); err != nil {
+	if err := c.populateBGPStateValue(&row.Previous, cfg.Previous, ctx.forField("previous_state")); err != nil {
 		return fmt.Errorf("previous_state: %w", err)
 	}
-	if err := c.populateBGPBool(&row.Admin.Enabled, cfg.Admin.Enabled, ctx); err != nil {
+	if err := c.populateBGPBool(&row.Admin.Enabled, cfg.Admin.Enabled, ctx.forField("admin.enabled")); err != nil {
 		return fmt.Errorf("admin.enabled: %w", err)
 	}
-	if err := c.populateBGPConnection(&row.Connection, cfg.Connection, ctx); err != nil {
+	if err := c.populateBGPConnection(&row.Connection, cfg.Connection, ctx.forField("connection")); err != nil {
 		return fmt.Errorf("connection: %w", err)
 	}
-	if err := c.populateBGPTraffic(&row.Traffic, cfg.Traffic, ctx); err != nil {
+	if err := c.populateBGPTraffic(&row.Traffic, cfg.Traffic, ctx.forField("traffic")); err != nil {
 		return fmt.Errorf("traffic: %w", err)
 	}
-	if err := c.populateBGPTransitions(&row.Transitions, cfg.Transitions, ctx); err != nil {
+	if err := c.populateBGPTransitions(&row.Transitions, cfg.Transitions, ctx.forField("transitions")); err != nil {
 		return fmt.Errorf("transitions: %w", err)
 	}
-	if err := c.populateBGPTimers(&row.Timers, cfg.Timers, ctx); err != nil {
+	if err := c.populateBGPTimers(&row.Timers, cfg.Timers, ctx.forField("timers")); err != nil {
 		return fmt.Errorf("timers: %w", err)
 	}
-	if err := c.populateBGPLastError(&row.LastError, cfg.LastError, ctx); err != nil {
+	if err := c.populateBGPLastError(&row.LastError, cfg.LastError, ctx.forField("last_error")); err != nil {
 		return fmt.Errorf("last_error: %w", err)
 	}
-	if err := c.populateBGPLastNotifications(&row.LastNotify, cfg.LastNotify, ctx); err != nil {
+	if err := c.populateBGPLastNotifications(&row.LastNotify, cfg.LastNotify, ctx.forField("last_notifications")); err != nil {
 		return fmt.Errorf("last_notifications: %w", err)
 	}
-	if err := c.populateBGPReasons(&row.Reasons, cfg.Reasons, ctx); err != nil {
+	if err := c.populateBGPReasons(&row.Reasons, cfg.Reasons, ctx.forField("reasons")); err != nil {
 		return fmt.Errorf("reasons: %w", err)
 	}
-	if err := c.populateBGPText(&row.Restart.State, cfg.Restart.State, ctx); err != nil {
+	if err := c.populateBGPText(&row.Restart.State, cfg.Restart.State, ctx.forField("graceful_restart.state")); err != nil {
 		return fmt.Errorf("graceful_restart.state: %w", err)
 	}
-	if err := c.populateBGPRoutes(&row.Routes, cfg.Routes, ctx); err != nil {
+	if err := c.populateBGPRoutes(&row.Routes, cfg.Routes, ctx.forField("routes")); err != nil {
 		return fmt.Errorf("routes: %w", err)
 	}
-	if err := c.populateBGPRouteLimits(&row.RouteLimits, cfg.RouteLimits, ctx); err != nil {
+	if err := c.populateBGPRouteLimits(&row.RouteLimits, cfg.RouteLimits, ctx.forField("route_limits")); err != nil {
 		return fmt.Errorf("route_limits: %w", err)
 	}
-	if err := c.populateBGPDeviceCounts(&row.Device, cfg.Device, ctx); err != nil {
+	if err := c.populateBGPDeviceCounts(&row.Device, cfg.Device, ctx.forField("device_counts")); err != nil {
 		return fmt.Errorf("device_counts: %w", err)
 	}
 
@@ -550,7 +577,9 @@ func (c *Collector) populateBGPInt64(dst *ddsnmp.BGPInt64, cfg ddprofiledefiniti
 	if !ok {
 		return nil
 	}
-	raw, _, _, _ := c.bgpRawTextValue(cfg, ctx)
+	rawContext := ctx
+	rawContext.processingStage = "raw_text"
+	raw, _, _, _ := c.bgpRawTextValue(cfg, rawContext)
 	*dst = ddsnmp.BGPInt64{
 		Has:       true,
 		Value:     value,
@@ -601,6 +630,7 @@ func (c *Collector) populateBGPBool(dst *ddsnmp.BGPBool, cfg ddprofiledefinition
 	}
 	value, err := bgpParseBool(text)
 	if err != nil {
+		ctx.record(bgpValueSymbol(cfg), sourceOID, "conversion")
 		return err
 	}
 	*dst = ddsnmp.BGPBool{
@@ -617,10 +647,10 @@ func (c *Collector) populateBGPConnection(
 	cfg ddprofiledefinition.BGPConnectionConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.EstablishedUptime, cfg.EstablishedUptime, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.EstablishedUptime, cfg.EstablishedUptime, ctx.forField("connection.established_uptime")); err != nil {
 		return fmt.Errorf("established_uptime: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.LastReceivedUpdateAge, cfg.LastReceivedUpdateAge, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.LastReceivedUpdateAge, cfg.LastReceivedUpdateAge, ctx.forField("connection.last_received_update_age")); err != nil {
 		return fmt.Errorf("last_received_update_age: %w", err)
 	}
 	return nil
@@ -631,32 +661,32 @@ func (c *Collector) populateBGPDirectional(
 	cfg ddprofiledefinition.BGPDirectionalConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.Received, cfg.Received, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Received, cfg.Received, ctx.forLeaf("received")); err != nil {
 		return fmt.Errorf("received: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Sent, cfg.Sent, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Sent, cfg.Sent, ctx.forLeaf("sent")); err != nil {
 		return fmt.Errorf("sent: %w", err)
 	}
 	return nil
 }
 
 func (c *Collector) populateBGPTraffic(dst *ddsnmp.BGPTraffic, cfg ddprofiledefinition.BGPTrafficConfig, ctx bgpValueContext) error {
-	if err := c.populateBGPDirectional(&dst.Messages, cfg.Messages, ctx); err != nil {
+	if err := c.populateBGPDirectional(&dst.Messages, cfg.Messages, ctx.forField("traffic.messages")); err != nil {
 		return fmt.Errorf("messages: %w", err)
 	}
-	if err := c.populateBGPDirectional(&dst.Updates, cfg.Updates, ctx); err != nil {
+	if err := c.populateBGPDirectional(&dst.Updates, cfg.Updates, ctx.forField("traffic.updates")); err != nil {
 		return fmt.Errorf("updates: %w", err)
 	}
-	if err := c.populateBGPDirectional(&dst.Notifications, cfg.Notifications, ctx); err != nil {
+	if err := c.populateBGPDirectional(&dst.Notifications, cfg.Notifications, ctx.forField("traffic.notifications")); err != nil {
 		return fmt.Errorf("notifications: %w", err)
 	}
-	if err := c.populateBGPDirectional(&dst.RouteRefreshes, cfg.RouteRefreshes, ctx); err != nil {
+	if err := c.populateBGPDirectional(&dst.RouteRefreshes, cfg.RouteRefreshes, ctx.forField("traffic.route_refreshes")); err != nil {
 		return fmt.Errorf("route_refreshes: %w", err)
 	}
-	if err := c.populateBGPDirectional(&dst.Opens, cfg.Opens, ctx); err != nil {
+	if err := c.populateBGPDirectional(&dst.Opens, cfg.Opens, ctx.forField("traffic.opens")); err != nil {
 		return fmt.Errorf("opens: %w", err)
 	}
-	if err := c.populateBGPDirectional(&dst.Keepalives, cfg.Keepalives, ctx); err != nil {
+	if err := c.populateBGPDirectional(&dst.Keepalives, cfg.Keepalives, ctx.forField("traffic.keepalives")); err != nil {
 		return fmt.Errorf("keepalives: %w", err)
 	}
 	return nil
@@ -667,55 +697,55 @@ func (c *Collector) populateBGPTransitions(
 	cfg ddprofiledefinition.BGPTransitionsConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.Established, cfg.Established, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Established, cfg.Established, ctx.forField("transitions.established")); err != nil {
 		return fmt.Errorf("established: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Down, cfg.Down, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Down, cfg.Down, ctx.forField("transitions.down")); err != nil {
 		return fmt.Errorf("down: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Up, cfg.Up, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Up, cfg.Up, ctx.forField("transitions.up")); err != nil {
 		return fmt.Errorf("up: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Flaps, cfg.Flaps, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Flaps, cfg.Flaps, ctx.forField("transitions.flaps")); err != nil {
 		return fmt.Errorf("flaps: %w", err)
 	}
 	return nil
 }
 
 func (c *Collector) populateBGPTimers(dst *ddsnmp.BGPTimers, cfg ddprofiledefinition.BGPTimersConfig, ctx bgpValueContext) error {
-	if err := c.populateBGPTimerPair(&dst.Negotiated, cfg.Negotiated, ctx); err != nil {
+	if err := c.populateBGPTimerPair(&dst.Negotiated, cfg.Negotiated, ctx.forField("timers.negotiated")); err != nil {
 		return fmt.Errorf("negotiated: %w", err)
 	}
-	if err := c.populateBGPTimerPair(&dst.Configured, cfg.Configured, ctx); err != nil {
+	if err := c.populateBGPTimerPair(&dst.Configured, cfg.Configured, ctx.forField("timers.configured")); err != nil {
 		return fmt.Errorf("configured: %w", err)
 	}
 	return nil
 }
 
 func (c *Collector) populateBGPTimerPair(dst *ddsnmp.BGPTimerPair, cfg ddprofiledefinition.BGPTimerPairConfig, ctx bgpValueContext) error {
-	if err := c.populateBGPInt64(&dst.ConnectRetry, cfg.ConnectRetry, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.ConnectRetry, cfg.ConnectRetry, ctx.forLeaf("connect_retry")); err != nil {
 		return fmt.Errorf("connect_retry: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.HoldTime, cfg.HoldTime, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.HoldTime, cfg.HoldTime, ctx.forLeaf("hold_time")); err != nil {
 		return fmt.Errorf("hold_time: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.KeepaliveTime, cfg.KeepaliveTime, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.KeepaliveTime, cfg.KeepaliveTime, ctx.forLeaf("keepalive_time")); err != nil {
 		return fmt.Errorf("keepalive_time: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.MinASOriginationInterval, cfg.MinASOriginationInterval, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.MinASOriginationInterval, cfg.MinASOriginationInterval, ctx.forLeaf("min_as_origination_interval")); err != nil {
 		return fmt.Errorf("min_as_origination_interval: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.MinRouteAdvertisementInterval, cfg.MinRouteAdvertisementInterval, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.MinRouteAdvertisementInterval, cfg.MinRouteAdvertisementInterval, ctx.forLeaf("min_route_advertisement_interval")); err != nil {
 		return fmt.Errorf("min_route_advertisement_interval: %w", err)
 	}
 	return nil
 }
 
 func (c *Collector) populateBGPLastError(dst *ddsnmp.BGPLastError, cfg ddprofiledefinition.BGPLastErrorConfig, ctx bgpValueContext) error {
-	if err := c.populateBGPInt64(&dst.Code, cfg.Code, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Code, cfg.Code, ctx.forField("last_error.code")); err != nil {
 		return fmt.Errorf("code: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Subcode, cfg.Subcode, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Subcode, cfg.Subcode, ctx.forField("last_error.subcode")); err != nil {
 		return fmt.Errorf("subcode: %w", err)
 	}
 	return nil
@@ -726,10 +756,10 @@ func (c *Collector) populateBGPLastNotifications(
 	cfg ddprofiledefinition.BGPLastNotifyConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPLastNotification(&dst.Received, cfg.Received, ctx); err != nil {
+	if err := c.populateBGPLastNotification(&dst.Received, cfg.Received, ctx.forField("last_notifications.received")); err != nil {
 		return fmt.Errorf("received: %w", err)
 	}
-	if err := c.populateBGPLastNotification(&dst.Sent, cfg.Sent, ctx); err != nil {
+	if err := c.populateBGPLastNotification(&dst.Sent, cfg.Sent, ctx.forField("last_notifications.sent")); err != nil {
 		return fmt.Errorf("sent: %w", err)
 	}
 	return nil
@@ -740,33 +770,33 @@ func (c *Collector) populateBGPLastNotification(
 	cfg ddprofiledefinition.BGPLastNotificationConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.Code, cfg.Code, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Code, cfg.Code, ctx.forLeaf("code")); err != nil {
 		return fmt.Errorf("code: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Subcode, cfg.Subcode, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Subcode, cfg.Subcode, ctx.forLeaf("subcode")); err != nil {
 		return fmt.Errorf("subcode: %w", err)
 	}
-	if err := c.populateBGPText(&dst.Reason, cfg.Reason, ctx); err != nil {
+	if err := c.populateBGPText(&dst.Reason, cfg.Reason, ctx.forLeaf("reason")); err != nil {
 		return fmt.Errorf("reason: %w", err)
 	}
 	return nil
 }
 
 func (c *Collector) populateBGPReasons(dst *ddsnmp.BGPReasons, cfg ddprofiledefinition.BGPReasonsConfig, ctx bgpValueContext) error {
-	if err := c.populateBGPText(&dst.LastDown, cfg.LastDown, ctx); err != nil {
+	if err := c.populateBGPText(&dst.LastDown, cfg.LastDown, ctx.forField("reasons.last_down")); err != nil {
 		return fmt.Errorf("last_down: %w", err)
 	}
-	if err := c.populateBGPText(&dst.Unavailability, cfg.Unavailability, ctx); err != nil {
+	if err := c.populateBGPText(&dst.Unavailability, cfg.Unavailability, ctx.forField("reasons.unavailability")); err != nil {
 		return fmt.Errorf("unavailability: %w", err)
 	}
 	return nil
 }
 
 func (c *Collector) populateBGPRoutes(dst *ddsnmp.BGPRoutes, cfg ddprofiledefinition.BGPRoutesConfig, ctx bgpValueContext) error {
-	if err := c.populateBGPRouteCounters(&dst.Current, cfg.Current, ctx); err != nil {
+	if err := c.populateBGPRouteCounters(&dst.Current, cfg.Current, ctx.forField("routes.current")); err != nil {
 		return fmt.Errorf("current: %w", err)
 	}
-	if err := c.populateBGPRouteCounters(&dst.Total, cfg.Total, ctx); err != nil {
+	if err := c.populateBGPRouteCounters(&dst.Total, cfg.Total, ctx.forField("routes.total")); err != nil {
 		return fmt.Errorf("total: %w", err)
 	}
 	return nil
@@ -777,25 +807,25 @@ func (c *Collector) populateBGPRouteCounters(
 	cfg ddprofiledefinition.BGPRouteCountersConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.Received, cfg.Received, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Received, cfg.Received, ctx.forLeaf("received")); err != nil {
 		return fmt.Errorf("received: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Accepted, cfg.Accepted, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Accepted, cfg.Accepted, ctx.forLeaf("accepted")); err != nil {
 		return fmt.Errorf("accepted: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Rejected, cfg.Rejected, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Rejected, cfg.Rejected, ctx.forLeaf("rejected")); err != nil {
 		return fmt.Errorf("rejected: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Active, cfg.Active, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Active, cfg.Active, ctx.forLeaf("active")); err != nil {
 		return fmt.Errorf("active: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Advertised, cfg.Advertised, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Advertised, cfg.Advertised, ctx.forLeaf("advertised")); err != nil {
 		return fmt.Errorf("advertised: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Suppressed, cfg.Suppressed, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Suppressed, cfg.Suppressed, ctx.forLeaf("suppressed")); err != nil {
 		return fmt.Errorf("suppressed: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Withdrawn, cfg.Withdrawn, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Withdrawn, cfg.Withdrawn, ctx.forLeaf("withdrawn")); err != nil {
 		return fmt.Errorf("withdrawn: %w", err)
 	}
 	return nil
@@ -806,13 +836,13 @@ func (c *Collector) populateBGPRouteLimits(
 	cfg ddprofiledefinition.BGPRouteLimitsConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.Limit, cfg.Limit, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Limit, cfg.Limit, ctx.forField("route_limits.limit")); err != nil {
 		return fmt.Errorf("limit: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.Threshold, cfg.Threshold, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Threshold, cfg.Threshold, ctx.forField("route_limits.threshold")); err != nil {
 		return fmt.Errorf("threshold: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.ClearThreshold, cfg.ClearThreshold, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.ClearThreshold, cfg.ClearThreshold, ctx.forField("route_limits.clear_threshold")); err != nil {
 		return fmt.Errorf("clear_threshold: %w", err)
 	}
 	return nil
@@ -823,16 +853,16 @@ func (c *Collector) populateBGPDeviceCounts(
 	cfg ddprofiledefinition.BGPDeviceCountsConfig,
 	ctx bgpValueContext,
 ) error {
-	if err := c.populateBGPInt64(&dst.Peers, cfg.Peers, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.Peers, cfg.Peers, ctx.forField("device_counts.peers")); err != nil {
 		return fmt.Errorf("peers: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.InternalPeers, cfg.InternalPeers, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.InternalPeers, cfg.InternalPeers, ctx.forField("device_counts.ibgp_peers")); err != nil {
 		return fmt.Errorf("ibgp_peers: %w", err)
 	}
-	if err := c.populateBGPInt64(&dst.ExternalPeers, cfg.ExternalPeers, ctx); err != nil {
+	if err := c.populateBGPInt64(&dst.ExternalPeers, cfg.ExternalPeers, ctx.forField("device_counts.ebgp_peers")); err != nil {
 		return fmt.Errorf("ebgp_peers: %w", err)
 	}
-	counts, err := c.bgpPeerStateCounts(cfg.States, ctx)
+	counts, err := c.bgpPeerStateCounts(cfg.States, ctx.forField("device_counts.states"))
 	if err != nil {
 		return fmt.Errorf("states: %w", err)
 	}
@@ -850,7 +880,7 @@ func (c *Collector) bgpPeerStateCounts(
 	counts := make(map[ddprofiledefinition.BGPPeerState]int64)
 	add := func(state ddprofiledefinition.BGPPeerState, valueCfg ddprofiledefinition.BGPValueConfig) error {
 		var value ddsnmp.BGPInt64
-		if err := c.populateBGPInt64(&value, valueCfg, ctx); err != nil {
+		if err := c.populateBGPInt64(&value, valueCfg, ctx.forLeaf(string(state))); err != nil {
 			return err
 		}
 		if value.Has {
@@ -955,6 +985,9 @@ func (c *Collector) bgpRawTextValue(
 	sym := bgpValueSymbol(cfg)
 	if sym.OID == "" && (cfg.Index != 0 || cfg.IndexFromEnd != 0 || len(cfg.IndexTransform) > 0) {
 		value, err := c.bgpIndexValue(cfg, ctx.rowIndex)
+		if err != nil {
+			ctx.record(sym, "", "index_processing")
+		}
 		return value, "", err == nil, err
 	}
 
@@ -969,14 +1002,17 @@ func (c *Collector) bgpRawTextValue(
 	value, err = convPduToStringf(pdu, sym.Format)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {
+			ctx.record(sym, pdu.Name, "empty_date")
 			return "", "", false, nil
 		}
+		ctx.record(sym, pdu.Name, "conversion")
 		return "", "", false, err
 	}
 
 	if sym.ExtractValueCompiled != nil {
 		sm := sym.ExtractValueCompiled.FindStringSubmatch(value)
 		if len(sm) < 2 {
+			ctx.record(sym, pdu.Name, "extract_mismatch")
 			return "", "", false, fmt.Errorf("extract_value did not match value %q", value)
 		}
 		value = sm[1]
@@ -984,6 +1020,7 @@ func (c *Collector) bgpRawTextValue(
 	if sym.MatchPatternCompiled != nil {
 		sm := sym.MatchPatternCompiled.FindStringSubmatch(value)
 		if len(sm) == 0 {
+			ctx.record(sym, pdu.Name, "pattern_mismatch")
 			return "", "", false, fmt.Errorf("match_pattern %q did not match value %q", sym.MatchPattern, value)
 		}
 		value = replaceSubmatches(sym.MatchValue, sm)
@@ -1007,6 +1044,7 @@ func (c *Collector) bgpNumericValue(
 		}
 		value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
 		if err != nil {
+			ctx.record(sym, "", "conversion")
 			return 0, "", false, err
 		}
 		return value, "", true, nil
@@ -1023,8 +1061,10 @@ func (c *Collector) bgpNumericValue(
 	value, err = c.scalarCollector.valProc.processValue(sym, pdu)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {
+			ctx.record(sym, pdu.Name, "empty_date")
 			return 0, "", false, nil
 		}
+		ctx.record(sym, pdu.Name, "conversion")
 		return 0, "", false, err
 	}
 
@@ -1039,15 +1079,22 @@ func (c *Collector) lookupBGPValuePDU(
 	sourceOID := trimOID(sym.OID)
 	if cfg.Table == "" || cfg.Table == ctx.tableName {
 		pdu, ok := ctx.lookupPDU(sym.OID)
+		if !ok {
+			ctx.record(sym, sourceOID, "missing_input")
+		}
 		return pdu, sourceOID, ok, nil
 	}
 	if ctx.crossTableCtx == nil {
 		pdu, ok := ctx.lookupPDU(sym.OID)
+		if !ok {
+			ctx.record(sym, sourceOID, "missing_input")
+		}
 		return pdu, sourceOID, ok, nil
 	}
 
 	refTableOID, err := c.tableCollector.rowProcessor.crossTableResolver.findReferencedTableOID(cfg.Table, ctx.crossTableCtx.tableNameToOID)
 	if err != nil {
+		ctx.record(sym, sourceOID, "dependency_processing")
 		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
 	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(
@@ -1056,10 +1103,12 @@ func (c *Collector) lookupBGPValuePDU(
 		ctx.crossTableCtx.walkedData,
 	)
 	if err != nil {
+		ctx.record(sym, sourceOID, "dependency_processing")
 		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
 	lookupIndex, err := c.tableCollector.rowProcessor.crossTableResolver.transformIndex(ctx.rowIndex, cfg.IndexTransform)
 	if err != nil {
+		ctx.record(sym, sourceOID, "dependency_processing")
 		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 	}
 	tagCfg := ddprofiledefinition.MetricTagConfig{
@@ -1076,6 +1125,7 @@ func (c *Collector) lookupBGPValuePDU(
 			ctx.crossTableCtx,
 		)
 		if err != nil {
+			ctx.record(sym, sourceOID, "dependency_processing")
 			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
 		}
 	}
@@ -1083,6 +1133,7 @@ func (c *Collector) lookupBGPValuePDU(
 	fullOID := sourceOID + "." + lookupIndex
 	pdu, ok := refTablePDUs[fullOID]
 	if !ok {
+		ctx.record(sym, fullOID, "missing_dependency")
 		if ctx.requiredDependencyMissing != nil {
 			*ctx.requiredDependencyMissing = true
 		}

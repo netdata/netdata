@@ -13,17 +13,16 @@ type topologyDiagnosticProvider struct {
 	registry *topologyRegistry
 	aborted  *atomic.Pointer[topologyAbortedSweepDiagnostic]
 	source   deviceLifecycleSource
-	limits   topologyAcquisitionLimits
 }
 
 func (p *topologyDiagnosticProvider) Capture() (snmpdiag.Snapshot, error) {
-	diagnostics, limits := captureTopologyCut(p.registry, p.aborted.Load(), p.limits)
+	diagnostics := captureTopologyCut(p.registry, p.aborted.Load())
 	diagnostics.lifecycle.state = diagnosticCaptureAvailable
 	snapshot, err := newTopologyDiagnosticArchiveSnapshotV1(diagnostics)
 	if err != nil {
 		return snmpdiag.Snapshot{}, err
 	}
-	snapshot.Lifecycle = snmpdiag.CaptureLifecycle(p.source, limits.maxRecords, limits.maxLogicalBytes)
+	snapshot.Lifecycle = snmpdiag.CaptureLifecycle(p.source)
 	return snapshot, nil
 }
 

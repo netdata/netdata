@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gosnmp/gosnmp"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -83,15 +85,17 @@ type topologyAcquisitionAttemptEvidence struct {
 }
 
 type topologyAcquisitionContextEvidence struct {
-	interruption snmputils.Failure
-	failures     ddsnmp.CollectionFailures
-	ordinal      uint32
-	vlanID       string
-	vlanName     string
-	client       topologyAcquisitionPhaseEvidence
-	connect      topologyAcquisitionPhaseEvidence
-	collection   topologyAcquisitionPhaseEvidence
-	profiles     []topologyAcquisitionProfileEvidence
+	sources        []ddsnmp.SourceOperation
+	sourceRecorder *ddsnmpcollector.SourceRecorder
+	interruption   snmputils.Failure
+	failures       ddsnmp.CollectionFailures
+	ordinal        uint32
+	vlanID         string
+	vlanName       string
+	client         topologyAcquisitionPhaseEvidence
+	connect        topologyAcquisitionPhaseEvidence
+	collection     topologyAcquisitionPhaseEvidence
+	profiles       []topologyAcquisitionProfileEvidence
 }
 
 type topologyAcquisitionProfileEvidence struct {
@@ -114,8 +118,8 @@ type topologyAcquisitionCapture struct {
 }
 
 type topologyAcquisitionRecorder struct {
-	attemptID      topologyAcquisitionAttemptID
-	limits         topologyAcquisitionLimits
+	attemptID topologyAcquisitionAttemptID
+
 	state          diagnosticCaptureState
 	reason         diagnosticCaptureReason
 	recordCount    uint64
@@ -138,11 +142,9 @@ func newTopologyAcquisitionRecorder(
 	id topologyAcquisitionAttemptID,
 	device topologySemanticDeviceInput,
 	target topologyTargetResolutionEvidence,
-	limits topologyAcquisitionLimits,
 ) (recorder *topologyAcquisitionRecorder) {
 	recorder = &topologyAcquisitionRecorder{
 		attemptID:      id,
-		limits:         limits,
 		state:          diagnosticCaptureAvailable,
 		projectProfile: projectTopologyAcquisitionProfileValues,
 	}
@@ -152,9 +154,8 @@ func newTopologyAcquisitionRecorder(
 		}
 	}()
 	records, logicalBytes := topologyAcquisitionAttemptShape(device, target)
-	if !recorder.admit(records, logicalBytes) {
-		return recorder
-	}
+	recorder.recordCount += records
+	recorder.logicalBytes += logicalBytes
 	recorder.evidence = &topologyAcquisitionAttemptEvidence{
 		id:     id,
 		device: cloneTopologySemanticDeviceInput(device),
@@ -235,9 +236,8 @@ func (r *topologyAcquisitionRecorder) beginContext(ordinal uint32, vlanID, vlanN
 		}
 	}()
 	records, logicalBytes := topologyAcquisitionContextShape(vlanID, vlanName)
-	if !r.admit(records, logicalBytes) {
-		return nil
-	}
+	r.recordCount += records
+	r.logicalBytes += logicalBytes
 	for _, context := range r.evidence.collectionContexts {
 		if context.ordinal == ordinal {
 			r.fail(diagnosticCaptureReasonProjectionError)
@@ -291,9 +291,8 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 		o.recorder.fail(diagnosticCaptureReasonProjectionError)
 		return
 	}
-	if !o.recorder.admit(records, logicalBytes) {
-		return
-	}
+	o.recorder.recordCount += records
+	o.recorder.logicalBytes += logicalBytes
 	if o.recorder.projectProfile == nil {
 		o.recorder.fail(diagnosticCaptureReasonProjectionError)
 		return
@@ -302,9 +301,7 @@ func (o topologyAcquisitionProfileObserver) ObserveProfile(
 		report.Routes[i].RootOID = strings.Clone(report.Routes[i].RootOID)
 	}
 	if report.Execution != nil {
-		for i := range report.Execution.Walks {
-			report.Execution.Walks[i].RootOID = strings.Clone(report.Execution.Walks[i].RootOID)
-		}
+
 	}
 	context.profiles = append(context.profiles, topologyAcquisitionProfileEvidence{
 		identity:     report.Identity,
@@ -335,11 +332,13 @@ func topologyAcquisitionProfileShape(
 	if len(report.TopologyValueReferences) != len(profile.TopologyMetrics) {
 		return 0, 0, errors.New("topology acquisition value-reference count mismatch")
 	}
-	for _, metric := range profile.TopologyMetrics {
+	for i, metric := range profile.TopologyMetrics {
 		if !topologySemanticMetricConsumed(eventKind, metric.TopologyKind) {
 			continue
 		}
 		records++
+		ref := report.TopologyValueReferences[i]
+		logicalBytes += uint64(len(ref.RowIndex) + len(ref.Field))
 		logicalBytes += uint64(len(metric.TopologyKind)) + topologySemanticFilteredStringMapBytes(
 			metric.Tags,
 			func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
@@ -370,14 +369,19 @@ func topologyAcquisitionReportShape(routes []ddsnmpcollector.AcquisitionRouteRep
 	logicalBytes := uint64(96)
 	for _, route := range routes {
 		logicalBytes += uint64(64 + len(route.RootOID))
+		records += uint64(len(route.Sources) + len(route.Processing))
+		for _, binding := range route.Sources {
+			logicalBytes += uint64(40 + len(binding.OID) + len(binding.Role))
+		}
+		for _, event := range route.Processing {
+			logicalBytes += uint64(80 + len(event.RowIndex) + len(event.Field) + len(event.OID) + len(event.Reason) + len(event.Stage))
+		}
 	}
 	if execution != nil {
-		records += uint64(1 + len(execution.Walks))
+		records += uint64(1 + len(execution.WalkOperations))
 		// Execution header/preparation plus the two new aggregate statistics.
 		logicalBytes += 88
-		for _, walk := range execution.Walks {
-			logicalBytes += uint64(32 + len(walk.RootOID))
-		}
+		logicalBytes += 8 * uint64(len(execution.WalkOperations))
 	}
 	return records, logicalBytes
 }
@@ -452,17 +456,28 @@ func (r *topologyAcquisitionRecorder) finish() *topologyAcquisitionCapture {
 	if r == nil {
 		return &topologyAcquisitionCapture{state: diagnosticCaptureUnavailable, reason: diagnosticCaptureReasonProjectionError}
 	}
+	if r.evidence != nil {
+		for i := range r.evidence.collectionContexts {
+			context := &r.evidence.collectionContexts[i]
+			if context.sourceRecorder != nil {
+				context.sources = context.sourceRecorder.Finish()
+				context.sourceRecorder = nil
+			}
+		}
+	}
 	records, logicalBytes := r.recordCount, r.logicalBytes
 	if r.evidence != nil {
+		for _, context := range r.evidence.collectionContexts {
+			cr, cb := ddsnmp.SourceOperationsShape(context.sources)
+			records += cr
+			logicalBytes += cb
+		}
 		for _, context := range []**ddsnmp.ProfileContext{&r.evidence.profileContext, &r.evidence.vlanProfileContext} {
 			if *context == nil {
 				continue
 			}
 			cr, cb := (*context).Shape()
-			if cr > r.limits.maxRecords-records || cb > r.limits.maxLogicalBytes-logicalBytes {
-				*context, _ = ddsnmp.RestoreProfileContext(ddsnmp.ProfileContextData{State: "limit_exceeded"}, 0, 0)
-				continue
-			}
+
 			records += cr
 			logicalBytes += cb
 		}
@@ -477,200 +492,11 @@ func (r *topologyAcquisitionRecorder) finish() *topologyAcquisitionCapture {
 	}
 }
 
-type topologyAcquisitionUsage struct {
-	contextCaptures []*topologyAcquisitionCapture
-	contextRecords  uint64
-	contextBytes    uint64
-	limits          topologyAcquisitionLimits
-	recordCount     uint64
-	logicalBytes    uint64
-}
-
-func newTopologyAcquisitionUsage(
-	entries []ddsnmp.DeviceEntry,
-	seen map[ddsnmp.DeviceRegistrationID]bool,
-	selected map[ddsnmp.DeviceRegistrationID]bool,
-	previousStates map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
-	states map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
-	limits topologyAcquisitionLimits,
-) topologyAcquisitionUsage {
-	removed := 0
-	for registrationID := range previousStates {
-		if !seen[registrationID] {
-			removed++
-		}
-	}
-	rows := uint64(len(entries) + removed)
-	usage := topologyAcquisitionUsage{
-		limits:       limits,
-		recordCount:  1 + rows,
-		logicalBytes: topologyDiagnosticCutLogicalBytes + rows*topologyDiagnosticRowLogicalBytes,
-	}
-	for _, entry := range entries {
-		if selected[entry.RegistrationID] {
-			continue
-		}
-		states[entry.RegistrationID] = usage.includeState(states[entry.RegistrationID])
-	}
-	return usage
-}
-
-func (u *topologyAcquisitionUsage) includeState(state deviceRefreshState) deviceRefreshState {
-	originalSuccess := acquisitionCaptureFromGeneration(state.generation)
-	if originalSuccess != nil {
-		admitted := u.include(originalSuccess)
-		if admitted != originalSuccess {
-			generation := *state.generation
-			generation.acquisition = admitted
-			state.generation = &generation
-		}
-	}
-	if state.latestAttempt != nil {
-		if originalSuccess != nil && state.latestAttempt == originalSuccess {
-			state.latestAttempt = state.generation.acquisition
-		} else {
-			state.latestAttempt = u.include(state.latestAttempt)
-		}
-	}
-	return state
-}
-
-func (u *topologyAcquisitionUsage) includeRetainedSuccess(state deviceRefreshState) deviceRefreshState {
-	original := acquisitionCaptureFromGeneration(state.generation)
-	if original == nil {
-		return state
-	}
-	admitted := u.include(original)
-	if admitted != original {
-		generation := *state.generation
-		generation.acquisition = admitted
-		state.generation = &generation
-	}
-	if state.latestAttempt == original {
-		state.latestAttempt = admitted
-	}
-	return state
-}
-
-// Optional profile context yields to replay evidence across the entire sweep.
-// Captures carrying context are privately cloned before admission so reclaiming
-// their optional budget cannot mutate a previously published generation.
-func (u *topologyAcquisitionUsage) include(capture *topologyAcquisitionCapture) *topologyAcquisitionCapture {
-	if capture == nil || capture.state != diagnosticCaptureAvailable {
-		return capture
-	}
-	cr, cb := acquisitionProfileContextShape(capture)
-	fits := func(records, size uint64) bool {
-		return records <= u.limits.maxRecords && size <= u.limits.maxLogicalBytes
-	}
-	if !fits(u.recordCount+capture.recordCount, u.logicalBytes+capture.logicalBytes) {
-		baseRecords, baseBytes := capture.recordCount-cr, capture.logicalBytes-cb
-		// Do not discard useful context when the incoming replay itself cannot fit.
-		if !fits(u.recordCount-u.contextRecords+baseRecords, u.logicalBytes-u.contextBytes+baseBytes) {
-			reason := diagnosticCaptureReasonGlobalByteLimit
-			if u.recordCount-u.contextRecords+baseRecords > u.limits.maxRecords {
-				reason = diagnosticCaptureReasonGlobalRecordLimit
-			}
-			return limitTopologyAcquisitionCapture(capture, reason)
-		}
-		if cr != 0 || cb != 0 {
-			capture = cloneAcquisitionContextCapture(capture)
-			discardAcquisitionProfileContext(capture)
-			cr, cb = 0, 0
-		}
-		if !fits(u.recordCount+baseRecords, u.logicalBytes+baseBytes) {
-			for _, previous := range u.contextCaptures {
-				discardAcquisitionProfileContext(previous)
-			}
-			u.recordCount -= u.contextRecords
-			u.logicalBytes -= u.contextBytes
-			u.contextRecords, u.contextBytes = 0, 0
-			u.contextCaptures = nil
-		}
-	}
-	if cr != 0 || cb != 0 {
-		capture = cloneAcquisitionContextCapture(capture)
-		u.contextCaptures = append(u.contextCaptures, capture)
-		u.contextRecords += cr
-		u.contextBytes += cb
-	}
-	u.recordCount += capture.recordCount
-	u.logicalBytes += capture.logicalBytes
-	return capture
-}
-
-func acquisitionProfileContextShape(capture *topologyAcquisitionCapture) (records, size uint64) {
-	if capture == nil || capture.evidence == nil {
-		return 0, 0
-	}
-	for _, c := range []*ddsnmp.ProfileContext{capture.evidence.profileContext, capture.evidence.vlanProfileContext} {
-		r, b := c.Shape()
-		records += r
-		size += b
-	}
-	return records, size
-}
-
-func cloneAcquisitionContextCapture(capture *topologyAcquisitionCapture) *topologyAcquisitionCapture {
-	clone := *capture
-	evidence := *capture.evidence
-	clone.evidence = &evidence
-	return &clone
-}
-
-func discardAcquisitionProfileContext(capture *topologyAcquisitionCapture) {
-	records, size := acquisitionProfileContextShape(capture)
-	capture.recordCount -= records
-	capture.logicalBytes -= size
-	for _, c := range []**ddsnmp.ProfileContext{&capture.evidence.profileContext, &capture.evidence.vlanProfileContext} {
-		if *c != nil {
-			*c, _ = ddsnmp.RestoreProfileContext(ddsnmp.ProfileContextData{State: "limit_exceeded"}, 0, 0)
-		}
-	}
-}
-
 func acquisitionCaptureFromGeneration(generation *topologyDeviceGeneration) *topologyAcquisitionCapture {
 	if generation == nil {
 		return nil
 	}
 	return generation.acquisition
-}
-
-func limitTopologyAcquisitionCapture(
-	capture *topologyAcquisitionCapture,
-	reason diagnosticCaptureReason,
-) *topologyAcquisitionCapture {
-	if capture == nil {
-		return nil
-	}
-	limited := *capture
-	limited.state = diagnosticCaptureLimitExceeded
-	limited.reason = reason
-	limited.evidence = nil
-	return &limited
-}
-
-func (r *topologyAcquisitionRecorder) admit(records, logicalBytes uint64) bool {
-	if r == nil || r.state != diagnosticCaptureAvailable {
-		return false
-	}
-	if records > r.limits.maxRecords-r.recordCount {
-		r.limit(diagnosticCaptureReasonRecordLimit)
-		return false
-	}
-	if logicalBytes > r.limits.maxLogicalBytes-r.logicalBytes {
-		r.limit(diagnosticCaptureReasonByteLimit)
-		return false
-	}
-	r.recordCount += records
-	r.logicalBytes += logicalBytes
-	return true
-}
-
-func (r *topologyAcquisitionRecorder) limit(reason diagnosticCaptureReason) {
-	r.state = diagnosticCaptureLimitExceeded
-	r.reason = reason
-	r.evidence = nil
 }
 
 func (r *topologyAcquisitionRecorder) fail(reason diagnosticCaptureReason) {
@@ -680,4 +506,13 @@ func (r *topologyAcquisitionRecorder) fail(reason diagnosticCaptureReason) {
 	r.state = diagnosticCaptureUnavailable
 	r.reason = reason
 	r.evidence = nil
+}
+
+func (r *topologyAcquisitionRecorder) sourceClient(ordinal uint32, client gosnmp.Handler) gosnmp.Handler {
+	context := r.contextByOrdinal(ordinal)
+	if context == nil {
+		return client
+	}
+	context.sourceRecorder = &ddsnmpcollector.SourceRecorder{}
+	return context.sourceRecorder.Wrap(client)
 }

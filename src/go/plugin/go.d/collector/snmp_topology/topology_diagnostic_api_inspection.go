@@ -200,6 +200,7 @@ func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult
 			return diagnosticDeviceCaptureInspection{}, err
 		}
 		accounting := diagnosticContextAccounting{
+			Sources:      context.sources,
 			Interruption: context.interruption, Failures: context.failures,
 			Client: client, Connect: connect, Collection: collection,
 			Ordinal: context.ordinal, VLANID: context.vlanID, VLANName: context.vlanName,
@@ -214,7 +215,16 @@ func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult
 			if err != nil {
 				return diagnosticDeviceCaptureInspection{}, err
 			}
+			routes := make([]snmpdiag.Route, 0, len(profile.routes))
+			for _, route := range profile.routes {
+				wire, err := newTopologyDiagnosticArchiveRouteV1(route)
+				if err != nil {
+					return diagnosticDeviceCaptureInspection{}, err
+				}
+				routes = append(routes, wire)
+			}
 			accounting.Profiles = append(accounting.Profiles, diagnosticProfileAccounting{
+				Routes: routes,
 				Identity: snmpdiag.ProfileIdentity{
 					Ordinal: profile.identity.Ordinal, RouteDigest: hex.EncodeToString(profile.identity.RouteDigest[:]),
 				},
@@ -374,6 +384,8 @@ func newDiagnosticSourceFact(result topologyInspectionSourceFact) diagnosticSour
 	}
 	if result.metric != nil {
 		converted.Metric = &diagnosticMetricFact{
+			RowIndex:     result.metric.rowIndex,
+			Field:        result.metric.field,
 			RouteOrdinal: result.metric.routeOrdinal,
 			RowOrdinal:   result.metric.rowOrdinal,
 			ValueOrdinal: result.metric.valueOrdinal,

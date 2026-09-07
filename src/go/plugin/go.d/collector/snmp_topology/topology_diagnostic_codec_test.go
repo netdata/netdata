@@ -65,20 +65,18 @@ func newTopologyDiagnosticArchiveDocumentV1(
 
 // Native-cut tests inspect immutability and retention before wire conversion.
 func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
-	diagnostics, limits := captureTopologyCut(
+	diagnostics := captureTopologyCut(
 		c.topologyRegistry,
 		c.lastAbortedTopologyDiagnostic.Load(),
-		c.currentTopologyDiagnosticGlobalLimits(),
 	)
-	diagnostics.lifecycle = acquireTopologyJobLifecycleCut(c.diagnosticProvider.source, limits)
+	diagnostics.lifecycle = acquireTopologyJobLifecycleCut(c.diagnosticProvider.source)
 	return diagnostics
 }
 
 func acquireTopologyJobLifecycleCut(
 	source deviceLifecycleSource,
-	limits topologyAcquisitionLimits,
 ) topologyJobLifecycleDiagnosticCut {
-	projected := snmpdiag.CaptureLifecycle(source, limits.maxRecords, limits.maxLogicalBytes)
+	projected := snmpdiag.CaptureLifecycle(source)
 	result, err := restoreArchiveLifecycle(projected)
 	if err != nil {
 		return topologyJobLifecycleDiagnosticCut{

@@ -130,8 +130,7 @@ func contextSource(p *Profile) ProfileSource {
 }
 
 // Context observes the completed projection; it never runs selectors again.
-// Admission precedes materialization of the detached report.
-func (v ProjectedView) Context(maxRecords, maxBytes uint64) *ProfileContext {
+func (v ProjectedView) Context() *ProfileContext {
 	d := ProfileContextData{State: "available", Consumers: v.consumers, BGPMode: v.bgpMode, TopologyKinds: v.topologyKinds}
 	if v.resolved == nil {
 		return nil
@@ -181,9 +180,7 @@ func (v ProjectedView) Context(maxRecords, maxBytes uint64) *ProfileContext {
 		size += uint64(128 + len(source.ID) + len(source.Class) + len(p.selectionOrigin) + len(p.matchedSelector))
 		shapeExtensions(p.extensionHierarchy)
 	}
-	if records > maxRecords || size > maxBytes {
-		return &ProfileContext{data: ProfileContextData{State: "limit_exceeded"}, records: 1, bytes: 32}
-	}
+
 	acquisitionSources := make([]string, 0, len(v.profiles))
 	for _, p := range v.profiles {
 		acquisitionSources = append(acquisitionSources, p.SourceFile)
@@ -234,7 +231,7 @@ func (v ProjectedView) Context(maxRecords, maxBytes uint64) *ProfileContext {
 		d.Selected = append(d.Selected, row)
 	}
 	c := &ProfileContext{data: d, records: records, bytes: size}
-	if _, err := validateProfileContext(d, maxRecords, maxBytes); err != nil {
+	if _, err := validateProfileContext(d); err != nil {
 		return &ProfileContext{data: ProfileContextData{State: "unavailable"}}
 	}
 	c.data = c.Snapshot()
@@ -242,8 +239,8 @@ func (v ProjectedView) Context(maxRecords, maxBytes uint64) *ProfileContext {
 }
 
 // RestoreProfileContext validates portable evidence before making it immutable.
-func RestoreProfileContext(d ProfileContextData, maxRecords, maxBytes uint64) (*ProfileContext, error) {
-	c, err := validateProfileContext(d, maxRecords, maxBytes)
+func RestoreProfileContext(d ProfileContextData) (*ProfileContext, error) {
+	c, err := validateProfileContext(d)
 	if err != nil || c == nil {
 		return c, err
 	}
@@ -251,8 +248,8 @@ func RestoreProfileContext(d ProfileContextData, maxRecords, maxBytes uint64) (*
 	return c, nil
 }
 
-func validateProfileContext(d ProfileContextData, maxRecords, maxBytes uint64) (*ProfileContext, error) {
-	if d.State == "not_attempted" || d.State == "limit_exceeded" || d.State == "unavailable" {
+func validateProfileContext(d ProfileContextData) (*ProfileContext, error) {
+	if d.State == "not_attempted" || d.State == "unavailable" {
 		if d.ManualPolicy != "" || d.ManualApplied || d.BGPMode != "" || d.SysObjectID != "" || d.SysDescr != "" ||
 			len(d.ManualProfiles)+len(d.MissingManualProfiles)+len(d.Consumers)+len(d.TopologyKinds)+len(d.Selected) != 0 {
 			return nil, fmt.Errorf("unavailable profile context contains evidence")
@@ -294,9 +291,7 @@ func validateProfileContext(d ProfileContextData, maxRecords, maxBytes uint64) (
 	if d.BGPMode != "full" && d.BGPMode != "absent" && d.BGPMode != "topology_peers" {
 		return nil, fmt.Errorf("invalid BGP projection")
 	}
-	if uint64(len(d.Selected)) > maxRecords || c.records > maxRecords || c.bytes > maxBytes {
-		return nil, fmt.Errorf("profile context exceeds limits")
-	}
+
 	projected := make(map[int]bool)
 	acquisition := make(map[uint32]bool)
 	for _, p := range d.Selected {
@@ -326,9 +321,7 @@ func validateProfileContext(d ProfileContextData, maxRecords, maxBytes uint64) (
 		}
 		c.records++
 		c.bytes += uint64(128 + len(p.Source.ID) + len(p.Source.Class) + len(p.Origin) + len(p.MatchedSelector))
-		if c.records > maxRecords || c.bytes > maxBytes || uint64(len(p.Extensions)) > maxRecords-c.records {
-			return nil, fmt.Errorf("profile context exceeds limits")
-		}
+
 		for i, e := range p.Extensions {
 			if !validSource(e.Source) || e.Parent < 0 || e.Parent > i {
 				return nil, fmt.Errorf("invalid profile extension")
@@ -342,8 +335,6 @@ func validateProfileContext(d ProfileContextData, maxRecords, maxBytes uint64) (
 			return nil, fmt.Errorf("noncontiguous profile order")
 		}
 	}
-	if c.records > maxRecords || c.bytes > maxBytes {
-		return nil, fmt.Errorf("profile context exceeds limits")
-	}
+
 	return c, nil
 }
