@@ -44,7 +44,6 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 		deviceInput,
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionLiteral, addresses: targets},
-		defaultTopologyAcquisitionLimits,
 	)
 	mainObserver := recorder.beginContext(0, "", "")
 
@@ -233,7 +232,6 @@ func TestTopologyAcquisitionFailedProfileDoesNotRetainValues(t *testing.T) {
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 		topologySemanticDeviceInput{hostname: "192.0.2.1"},
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		defaultTopologyAcquisitionLimits,
 	)
 	observer := recorder.beginContext(0, "", "")
 	metrics := &ddsnmp.ProfileMetrics{
@@ -336,14 +334,13 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	)
 	report.Routes[0].RootOID = value(512)
 	report.Execution = &ddsnmpcollector.AcquisitionExecutionReport{
-		Walks: []ddsnmpcollector.AcquisitionWalkReport{{RootOID: value(560)}},
+		WalkOperations: []uint64{1},
 	}
 
 	recorder := newTopologyAcquisitionRecorder(
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 		input,
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		defaultTopologyAcquisitionLimits,
 	)
 	observer := recorder.beginContext(0, value(528), value(544))
 	observer.ObserveProfile(report, pms)
@@ -363,7 +360,6 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	requireStringOutsideBacking(t, backing, context.vlanID)
 	requireStringOutsideBacking(t, backing, context.vlanName)
 	requireStringOutsideBacking(t, backing, profile.routes[0].RootOID)
-	requireStringOutsideBacking(t, backing, profile.execution.Walks[0].RootOID)
 	requireStringOutsideBacking(t, backing, profile.values.metadata["vendor"].Value)
 	requireStringOutsideBacking(t, backing, profile.values.tags[tagLldpLocSysName])
 	requireStringOutsideBacking(t, backing, profile.values.metrics[0].tags[tagTopoIfIndex])
@@ -481,7 +477,6 @@ func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 		input,
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		defaultTopologyAcquisitionLimits,
 	)
 	observer := recorder.beginContext(0, "", "")
 	pms := []*ddsnmp.ProfileMetrics{{
@@ -551,45 +546,6 @@ func TestTopologyAcquisitionReplayIgnoresFailedVLANContextValues(t *testing.T) {
 	require.Equal(t, want.observation, got.observation)
 }
 
-func TestTopologyAcquisitionCaptureLimitFailsOpen(t *testing.T) {
-	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
-	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
-	builder := newTopologyBuilderFromSemanticInput(input, nil, collectedAt, time.Minute)
-	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
-		input,
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		topologyAcquisitionLimits{
-			maxRecords:      1,
-			maxLogicalBytes: 4096,
-		})
-
-	applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventSysUptime, sysUptime: 1234})
-	recorder.beginContext(0, "", "")
-	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
-	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
-	require.Nil(t, capture.evidence)
-	require.EqualValues(t, 1234, builder.localDevice.SysUptime, "capture limits must not change live ingestion")
-}
-
-func TestTopologyAcquisitionVnodeLabelsCountAsRecords(t *testing.T) {
-	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
-		topologySemanticDeviceInput{
-			hostname:    "192.0.2.1",
-			vnodeLabels: map[string]string{"site": "lab"},
-		},
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1024},
-	)
-
-	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureLimitExceeded, capture.state)
-	require.Equal(t, diagnosticCaptureReasonRecordLimit, capture.reason)
-	require.Nil(t, capture.evidence)
-}
-
 func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
@@ -600,7 +556,6 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 			topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 			input,
 			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-			defaultTopologyAcquisitionLimits,
 		)
 		observer := recorder.beginContext(0, "", "")
 		pms := []*ddsnmp.ProfileMetrics{{BGPRows: []ddsnmp.BGPRow{{
@@ -627,7 +582,6 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 			topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 			input,
 			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-			defaultTopologyAcquisitionLimits,
 		)
 		observer := recorder.beginContext(0, "", "")
 		recorder.projectProfile = func(
@@ -660,7 +614,6 @@ func completeTestTopologyAcquisitionEvidence(t *testing.T) *topologyAcquisitionA
 		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
 		input,
 		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
-		defaultTopologyAcquisitionLimits,
 	)
 	observer := recorder.beginContext(0, "", "")
 	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{

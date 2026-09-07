@@ -367,7 +367,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
-		SnmpClient: mockHandler,
+		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 		InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
@@ -384,9 +384,10 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 	require.Empty(t, pm.Metrics)
 	require.Empty(t, pm.TopologyMetrics)
 	require.Len(t, pm.LicenseRows, 2)
-	require.Len(t, report.Execution.Walks, 1)
-	assert.Equal(t, "1.3.6.1.4.1.99999.2", report.Execution.Walks[0].RootOID)
-	assert.False(t, report.Execution.Walks[0].Failed)
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 1)
+	assert.Equal(t, "1.3.6.1.4.1.99999.2", walks[0].RequestedOIDs[0])
+	assert.Empty(t, walks[0].Failure.Reason)
 
 	rowsByID := make(map[string]ddsnmp.LicenseRow, len(pm.LicenseRows))
 	for _, row := range pm.LicenseRows {

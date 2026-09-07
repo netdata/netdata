@@ -106,26 +106,18 @@ type topologyDiagnosticCutInput struct {
 	seen           map[ddsnmp.DeviceRegistrationID]bool
 	previousStates map[ddsnmp.DeviceRegistrationID]deviceRefreshState
 	states         map[ddsnmp.DeviceRegistrationID]deviceRefreshState
-	limits         topologyAcquisitionLimits
 }
 
 type topologyDiagnosticCutProjector func(topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error)
 
-func captureTopologyCut(registry *topologyRegistry, aborted *topologyAbortedSweepDiagnostic, limits topologyAcquisitionLimits) (topologyDiagnostics, topologyAcquisitionLimits) {
+func captureTopologyCut(registry *topologyRegistry, aborted *topologyAbortedSweepDiagnostic) topologyDiagnostics {
 	diagnostics := topologyDiagnostics{lastAborted: aborted}
 	if generation := registry.acquireGeneration(); generation != nil {
 		diagnostics.producerScopeID = generation.producerScopeID
 		diagnostics.topology = generation.diagnostic
 	}
-	if diagnostics.topology != nil {
-		if diagnostics.topology.recordCount >= limits.maxRecords || diagnostics.topology.logicalBytes >= limits.maxLogicalBytes {
-			limits = topologyAcquisitionLimits{}
-		} else {
-			limits.maxRecords -= diagnostics.topology.recordCount
-			limits.maxLogicalBytes -= diagnostics.topology.logicalBytes
-		}
-	}
-	return diagnostics, limits
+
+	return diagnostics
 }
 
 func (c *Collector) projectCommittedTopologyDiagnosticCut(input topologyDiagnosticCutInput) (cut *topologySweepDiagnosticCut) {
@@ -176,20 +168,7 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 	rowCount := uint64(len(input.entries) + len(removedIDs))
 	records := 1 + rowCount
 	logicalBytes := uint64(topologyDiagnosticCutLogicalBytes) + rowCount*topologyDiagnosticRowLogicalBytes
-	if records > input.limits.maxRecords {
-		cut.captureState = diagnosticCaptureLimitExceeded
-		cut.captureReason = diagnosticCaptureReasonRecordLimit
-		cut.recordCount = 1
-		cut.logicalBytes = topologyDiagnosticCutLogicalBytes
-		return cut, nil
-	}
-	if logicalBytes > input.limits.maxLogicalBytes {
-		cut.captureState = diagnosticCaptureLimitExceeded
-		cut.captureReason = diagnosticCaptureReasonByteLimit
-		cut.recordCount = 1
-		cut.logicalBytes = topologyDiagnosticCutLogicalBytes
-		return cut, nil
-	}
+
 	countedCaptures := make(map[*topologyAcquisitionCapture]bool)
 	for _, entry := range input.entries {
 		state := input.states[entry.RegistrationID]
@@ -198,20 +177,7 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 				continue
 			}
 			countedCaptures[capture] = true
-			if capture.recordCount > input.limits.maxRecords-records {
-				cut.captureState = diagnosticCaptureLimitExceeded
-				cut.captureReason = diagnosticCaptureReasonGlobalRecordLimit
-				cut.recordCount = 1
-				cut.logicalBytes = topologyDiagnosticCutLogicalBytes
-				return cut, nil
-			}
-			if capture.logicalBytes > input.limits.maxLogicalBytes-logicalBytes {
-				cut.captureState = diagnosticCaptureLimitExceeded
-				cut.captureReason = diagnosticCaptureReasonGlobalByteLimit
-				cut.recordCount = 1
-				cut.logicalBytes = topologyDiagnosticCutLogicalBytes
-				return cut, nil
-			}
+
 			records += capture.recordCount
 			logicalBytes += capture.logicalBytes
 		}

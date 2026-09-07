@@ -163,6 +163,7 @@ type Phase struct {
 }
 
 type ContextEvidence struct {
+	Sources      []ddsnmp.SourceOperation  `json:"source_operations,omitempty"`
 	Interruption snmputils.Failure         `json:"interruption"`
 	Failures     ddsnmp.CollectionFailures `json:"failures"`
 	Ordinal      uint32                    `json:"ordinal"`
@@ -190,16 +191,18 @@ type ProfileIdentity struct {
 }
 
 type Route struct {
-	Ordinal      uint32 `json:"ordinal"`
-	Kind         string `json:"kind"`
-	RootOID      string `json:"root_oid"`
-	Source       string `json:"source"`
-	Outcome      string `json:"outcome"`
-	FailureClass string `json:"failure_class"`
-	Rows         uint64 `json:"rows"`
-	Values       uint64 `json:"values"`
-	Missing      uint64 `json:"missing"`
-	Rejected     uint64 `json:"rejected"`
+	Sources      []ddsnmp.SourceBinding   `json:"source_bindings,omitempty"`
+	Processing   []ddsnmp.ProcessingEvent `json:"processing_events,omitempty"`
+	Ordinal      uint32                   `json:"ordinal"`
+	Kind         string                   `json:"kind"`
+	RootOID      string                   `json:"root_oid"`
+	Source       string                   `json:"source"`
+	Outcome      string                   `json:"outcome"`
+	FailureClass string                   `json:"failure_class"`
+	Rows         uint64                   `json:"rows"`
+	Values       uint64                   `json:"values"`
+	Missing      uint64                   `json:"missing"`
+	Rejected     uint64                   `json:"rejected"`
 }
 
 type ProfileValues struct {
@@ -216,6 +219,8 @@ type MetaTag struct {
 }
 
 type MetricValue struct {
+	RowIndex     string            `json:"row_index,omitempty"`
+	Field        string            `json:"field,omitempty"`
 	RouteOrdinal uint32            `json:"route_ordinal"`
 	RowOrdinal   uint32            `json:"row_ordinal"`
 	ValueOrdinal uint32            `json:"value_ordinal"`
@@ -309,8 +314,8 @@ type ErrorStats struct {
 }
 
 type Execution struct {
-	Preparation Preparation `json:"preparation"`
-	Walks       []Walk      `json:"walks"`
+	Preparation    Preparation `json:"preparation"`
+	WalkOperations []uint64    `json:"walk_operations"`
 }
 
 type Preparation struct {
@@ -320,10 +325,4 @@ type Preparation struct {
 	SNMPErrors       int64 `json:"snmp_errors"`
 	MissingOIDs      int64 `json:"missing_oids"`
 	ProcessingErrors int64 `json:"processing_errors"`
-}
-
-type Walk struct {
-	RootOID      string `json:"root_oid"`
-	ElapsedNanos int64  `json:"elapsed_ns"`
-	Failed       bool   `json:"failed"`
 }

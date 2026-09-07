@@ -10,7 +10,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -25,7 +24,7 @@ func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	c.logMatchedProfiles(matchedProfiles, si.SysObjectID)
 
 	view := resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP)
-	c.recordProfileContext(view.Context(diagnostics.MaxRecords, diagnostics.MaxLogicalBytes))
+	c.recordProfileContext(view.Context())
 	profiles := view.Profiles()
 	if profilesHaveBGP(profiles) {
 		c.enableBGPIntegration()

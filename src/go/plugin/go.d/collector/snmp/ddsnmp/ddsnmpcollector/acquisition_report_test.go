@@ -441,7 +441,7 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
-		SnmpClient: mockHandler,
+		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
@@ -462,8 +462,9 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 	require.True(t, ok)
 	assert.Equal(t, AcquisitionRouteSourceNone, dependencyRoute.Source)
 	assert.Equal(t, AcquisitionRouteOutcomeNotObserved, dependencyRoute.Outcome)
-	require.Len(t, report.Execution.Walks, 1)
-	assert.Equal(t, source.Table.OID, report.Execution.Walks[0].RootOID)
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 1)
+	assert.Equal(t, source.Table.OID, walks[0].RequestedOIDs[0])
 }
 
 func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot(t *testing.T) {
@@ -497,7 +498,7 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 
 	var reports []AcquisitionProfileReport
 	collector := New(Config{
-		SnmpClient: mockHandler,
+		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{topology, owner},
 		Log:        logger.New(),
 		InitialAcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
@@ -523,8 +524,8 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 	assert.Zero(t, dependencyRoute.Values)
 	var roots []string
 	for _, report := range reports {
-		for _, walk := range report.Execution.Walks {
-			roots = append(roots, walk.RootOID)
+		for _, walk := range testWalkSources(t, collector, report.Execution) {
+			roots = append(roots, walk.RequestedOIDs[0])
 		}
 	}
 	assert.ElementsMatch(t, []string{source.Table.OID, dependency.Table.OID}, roots,
@@ -628,9 +629,9 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].TopologyMetrics, 2)
 	require.Len(t, report.TopologyValueReferences, 2)
-	assert.Equal(t, AcquisitionValueReference{RouteOrdinal: 0, RowOrdinal: 0, ValueOrdinal: 0},
+	assert.Equal(t, AcquisitionValueReference{RowIndex: "7", Field: "firstValue", RouteOrdinal: 0, RowOrdinal: 0, ValueOrdinal: 0},
 		report.TopologyValueReferences[0])
-	assert.Equal(t, AcquisitionValueReference{RouteOrdinal: 1, RowOrdinal: 0, ValueOrdinal: 0},
+	assert.Equal(t, AcquisitionValueReference{RowIndex: "9", Field: "secondValue", RouteOrdinal: 1, RowOrdinal: 0, ValueOrdinal: 0},
 		report.TopologyValueReferences[1])
 }
 
@@ -752,7 +753,7 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
-		SnmpClient: mockHandler,
+		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
@@ -773,9 +774,10 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 	assert.Equal(t, AcquisitionRouteOutcomeFailed, report.Routes[1].Outcome)
 	assert.Equal(t, AcquisitionFailureClassTransport, report.Routes[1].FailureClass)
 	assert.NotContains(t, report.String(), "private BGP timeout")
-	require.Len(t, report.Execution.Walks, 1)
-	assert.Equal(t, "1.3.6.1.4.1.99999.30.1", report.Execution.Walks[0].RootOID)
-	assert.True(t, report.Execution.Walks[0].Failed)
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 1)
+	assert.Equal(t, "1.3.6.1.4.1.99999.30.1", walks[0].RequestedOIDs[0])
+	assert.NotEmpty(t, walks[0].Failure.Reason)
 }
 
 func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *testing.T) {

@@ -8,7 +8,9 @@ import "time"
 // configured route consuming it. Nil means execution accounting was not recorded.
 type AcquisitionExecutionReport struct {
 	Preparation AcquisitionPreparationStats
-	Walks       []AcquisitionWalkReport
+	// One-based IDs into the context's SourceRecorder output. A shared operation
+	// is charged once, while each logical consumer has its own SourceBinding.
+	WalkOperations []uint64
 }
 
 type AcquisitionPreparationStats struct {
@@ -18,14 +20,6 @@ type AcquisitionPreparationStats struct {
 	SNMPErrors       int64
 	MissingOIDs      int64
 	ProcessingErrors int64
-}
-
-// AcquisitionWalkReport measures one Handler call, including client retries but
-// excluding later PDU-map/row processing. Failed does not classify terminal PDUs.
-type AcquisitionWalkReport struct {
-	RootOID string
-	Elapsed time.Duration
-	Failed  bool
 }
 
 func (c *acquisitionProfileCollection) executionReport() *AcquisitionExecutionReport {

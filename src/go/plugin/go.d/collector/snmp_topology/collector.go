@@ -92,8 +92,6 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 			return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 		},
 		now:                          time.Now,
-		acquisitionLimits:            defaultTopologyAcquisitionLimits,
-		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
 		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
 		store:                        metricStore,
 		metrics:                      newCollectorMetrics(metricStore),
@@ -102,7 +100,6 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		registry: c.topologyRegistry,
 		aborted:  &c.lastAbortedTopologyDiagnostic,
 		source:   deviceStore,
-		limits:   c.currentTopologyDiagnosticGlobalLimits(),
 	}
 	return c
 }
@@ -127,13 +124,12 @@ type (
 		store   metrix.CollectorStore
 		metrics *collectorMetrics
 
-		topologyProfiles             func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient                func() gosnmp.Handler
-		newDdSnmpColl                func(ddsnmpcollector.Config) ddCollector
-		resolveTargetIPs             func(context.Context, string) ([]netip.Addr, error)
-		now                          func() time.Time
-		acquisitionLimits            topologyAcquisitionLimits
-		diagnosticGlobalLimits       topologyAcquisitionLimits
+		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
+		newSnmpClient    func() gosnmp.Handler
+		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
+		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
+		now              func() time.Time
+
 		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
 		diagnosticPublisher          *snmpdiag.Publisher
 		diagnosticProvider           *topologyDiagnosticProvider
@@ -312,14 +308,6 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		}
 	}
 	selectedCount = len(plans)
-	acquisitionUsage := newTopologyAcquisitionUsage(
-		entries,
-		seen,
-		selected,
-		previousStates,
-		nextStates,
-		c.currentTopologyDiagnosticGlobalLimits(),
-	)
 
 	phase = topologyDiagnosticSweepPhaseTargetResolution
 	c.resolveTopologyTargetManagementIPs(
@@ -339,7 +327,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		hasActiveRegistration = true
 		state := nextStates[plan.registrationID]
 		state.lastAttempt = attemptedAt
-		perDeviceLimits := c.currentTopologyAcquisitionLimits()
+
 		attemptID := topologyAcquisitionAttemptID{
 			registrationID: plan.registrationID,
 			ordinal:        state.attemptOrdinal + 1,
@@ -349,7 +337,6 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 			attemptID,
 			plan.device,
 			plan.target,
-			perDeviceLimits,
 		)
 		if ctx.Err() != nil {
 			break
@@ -359,23 +346,18 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 
 		state.attemptOrdinal = attemptID.ordinal
 		state.outcome = outcome
+		state.latestAttempt = attempt
 		switch outcome {
 		case deviceRefreshOutcomeSuccess:
-			attempt = acquisitionUsage.include(attempt)
 			snapshot.acquisition = attempt
-			state.latestAttempt = attempt
 			successfulSnapshots[plan.registrationID] = snapshot
 			state.lastSuccess = completedAt
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
 		case deviceRefreshOutcomeNoProfiles:
-			state = acquisitionUsage.includeRetainedSuccess(state)
-			state.latestAttempt = acquisitionUsage.include(attempt)
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
 		default:
-			state = acquisitionUsage.includeRetainedSuccess(state)
-			state.latestAttempt = acquisitionUsage.include(attempt)
 			if ctx.Err() != nil {
 				break
 			}
@@ -437,7 +419,6 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		seen:           seen,
 		previousStates: previousStates,
 		states:         nextStates,
-		limits:         c.currentTopologyDiagnosticGlobalLimits(),
 	})
 	c.topologyRegistry.publishGeneration(generation)
 	if c.diagnosticPublisher != nil {
@@ -482,13 +463,11 @@ func (c *Collector) refreshDeviceTopology(
 	attemptID topologyAcquisitionAttemptID,
 	dev ddsnmp.DeviceConnectionInfo,
 	target topologyTargetResolutionEvidence,
-	acquisitionLimits topologyAcquisitionLimits,
 ) (*topologyDeviceSnapshot, deviceRefreshOutcome, *topologyAcquisitionCapture) {
 	recorder := newTopologyAcquisitionRecorder(
 		attemptID,
 		topologySemanticDeviceInputFromConnection(dev),
 		target,
-		acquisitionLimits,
 	)
 	mainObserver := recorder.beginContext(0, "", "")
 	if ctx.Err() != nil {
@@ -515,6 +494,7 @@ func (c *Collector) refreshDeviceTopology(
 			ctx.client = successfulAcquisitionPhase()
 		}
 	}
+	snmpClient = recorder.sourceClient(0, snmpClient)
 	if dev.MaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(dev.MaxRepetitions)
 	}
@@ -748,20 +728,6 @@ func closeSNMPClientOnContextCancel(ctx context.Context, client gosnmp.Handler) 
 	return func() { close(done) }
 }
 
-func (c *Collector) currentTopologyAcquisitionLimits() topologyAcquisitionLimits {
-	if c.acquisitionLimits.maxRecords == 0 || c.acquisitionLimits.maxLogicalBytes == 0 {
-		return defaultTopologyAcquisitionLimits
-	}
-	return c.acquisitionLimits
-}
-
-func (c *Collector) currentTopologyDiagnosticGlobalLimits() topologyAcquisitionLimits {
-	if c.diagnosticGlobalLimits.maxRecords == 0 || c.diagnosticGlobalLimits.maxLogicalBytes == 0 {
-		return defaultTopologyDiagnosticGlobalLimits
-	}
-	return c.diagnosticGlobalLimits
-}
-
 func (c *Collector) currentTime() time.Time {
 	if c != nil && c.now != nil {
 		return c.now()
@@ -867,7 +833,7 @@ func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) ([]*dds
 		return c.topologyProfiles(dev), nil
 	}
 	view := resolveTopologyProfileView(dev)
-	return view.Profiles(), view.Context(snmpdiag.MaxRecords, snmpdiag.MaxLogicalBytes)
+	return view.Profiles(), view.Context()
 }
 
 func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {

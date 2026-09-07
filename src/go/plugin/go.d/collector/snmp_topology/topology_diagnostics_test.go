@@ -5,11 +5,9 @@ package snmptopology
 import (
 	"context"
 	"errors"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
-	"weak"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -175,87 +173,6 @@ func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *test
 	}
 }
 
-func TestTopologyAcquisitionUsageBoundsAliasedRetainedEvidenceDeterministically(t *testing.T) {
-	firstCapture := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	secondCapture := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	first := &topologyDeviceGeneration{acquisition: firstCapture}
-	second := &topologyDeviceGeneration{acquisition: secondCapture}
-	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
-		2: {generation: second, latestAttempt: secondCapture},
-		1: {generation: first, latestAttempt: firstCapture},
-	}
-	entries := []ddsnmp.DeviceEntry{{RegistrationID: 1}, {RegistrationID: 2}}
-	seen := map[ddsnmp.DeviceRegistrationID]bool{1: true, 2: true}
-
-	usage := newTopologyAcquisitionUsage(entries, seen, nil, states, states, topologyAcquisitionLimits{
-		maxRecords:      10,
-		maxLogicalBytes: 1000,
-	})
-	require.Equal(t, diagnosticCaptureAvailable, states[1].generation.acquisition.state)
-	require.Same(t, states[1].generation.acquisition, states[1].latestAttempt)
-	require.Equal(t, diagnosticCaptureLimitExceeded, states[2].generation.acquisition.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, states[2].generation.acquisition.reason)
-	require.Nil(t, states[2].generation.acquisition.evidence)
-	require.Same(t, states[2].generation.acquisition, states[2].latestAttempt)
-	require.NotSame(t, second, states[2].generation)
-	require.Equal(t, uint64(9), usage.recordCount)
-	require.Equal(t, uint64(348), usage.logicalBytes)
-}
-
-func TestTopologyAcquisitionUsagePrioritizesRetainedSuccessOverLatestFailure(t *testing.T) {
-	retainedSuccess := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	latestFailure := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 1, logicalBytes: 10, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	generation := &topologyDeviceGeneration{acquisition: retainedSuccess}
-	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
-		1: {generation: generation, latestAttempt: latestFailure},
-	}
-	entries := []ddsnmp.DeviceEntry{{RegistrationID: 1}}
-	seen := map[ddsnmp.DeviceRegistrationID]bool{1: true}
-
-	usage := newTopologyAcquisitionUsage(entries, seen, nil, states, states, topologyAcquisitionLimits{
-		maxRecords:      8,
-		maxLogicalBytes: 1000,
-	})
-	require.Equal(t, diagnosticCaptureAvailable, states[1].generation.acquisition.state)
-	require.Same(t, retainedSuccess, states[1].generation.acquisition)
-	require.Equal(t, diagnosticCaptureLimitExceeded, states[1].latestAttempt.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, states[1].latestAttempt.reason)
-	require.Nil(t, states[1].latestAttempt.evidence)
-	require.Equal(t, uint64(8), usage.recordCount)
-}
-
-func TestTopologyAcquisitionUsageDoesNotRetainGloballyRejectedCapture(t *testing.T) {
-	usage := topologyAcquisitionUsage{
-		limits: topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1},
-	}
-	rejected := &topologyAcquisitionCapture{
-		state:        diagnosticCaptureAvailable,
-		recordCount:  2,
-		logicalBytes: 2,
-		evidence:     &topologyAcquisitionAttemptEvidence{},
-	}
-	pointer := weak.Make(rejected)
-	limited := usage.include(rejected)
-	require.Equal(t, diagnosticCaptureLimitExceeded, limited.state)
-	require.Nil(t, limited.evidence)
-	rejected = nil
-
-	for range 3 {
-		runtime.GC()
-		runtime.Gosched()
-	}
-	require.Nil(t, pointer.Value(), "global admission retained the rejected full capture")
-	runtime.KeepAlive(usage)
-}
-
 func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T) {
 	base := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	registrationID := ddsnmp.DeviceRegistrationID(1)
@@ -276,7 +193,6 @@ func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T
 		states: map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
 			registrationID: {generation: generation},
 		},
-		limits: defaultTopologyDiagnosticGlobalLimits,
 	})
 	require.NoError(t, err)
 	require.Len(t, cut.devices, 1)
@@ -292,46 +208,6 @@ func TestAcquireTopologyDiagnosticsContainsLifecyclePanic(t *testing.T) {
 	diagnostics := coll.acquireTopologyDiagnostics()
 	require.Equal(t, diagnosticCaptureUnavailable, diagnostics.lifecycle.state)
 	require.Equal(t, diagnosticCaptureReasonProjectionPanic, diagnostics.lifecycle.reason)
-}
-
-func TestAcquireTopologyDiagnosticsBoundsLifecycleCut(t *testing.T) {
-	coll, store := newTestSNMPTopologyCollectorWithStore()
-	coll.diagnosticGlobalLimits = topologyAcquisitionLimits{maxRecords: 2, maxLogicalBytes: 1 << 20}
-	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10"})
-	store.RegisterJob("job-b", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.20"})
-
-	diagnostics := coll.acquireTopologyDiagnostics()
-	require.Equal(t, diagnosticCaptureLimitExceeded, diagnostics.lifecycle.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, diagnostics.lifecycle.reason)
-	require.NotZero(t, diagnostics.lifecycle.cut.Sequence)
-	require.Empty(t, diagnostics.lifecycle.cut.Entries)
-}
-
-func TestCollectorDiagnosticCutLimitDoesNotAffectTopologyCommit(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
-	mockHandler := snmpmock.NewMockHandler(ctrl)
-	expectTopologyRefreshSNMPClient(mockHandler, dev)
-
-	coll, store := newTestSNMPTopologyCollectorWithStore()
-	store.Register("job-a", dev)
-	coll.diagnosticGlobalLimits = topologyAcquisitionLimits{maxRecords: 10, maxLogicalBytes: 64}
-	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
-	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
-	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
-	}
-
-	stats := coll.refreshTopology(context.Background())
-	require.Zero(t, stats.errors)
-	require.Equal(t, 1, coll.topologyRegistry.acquireGeneration().deviceCount())
-	diagnostics := coll.acquireTopologyDiagnostics()
-	require.NotNil(t, diagnostics.topology)
-	require.Equal(t, diagnosticCaptureLimitExceeded, diagnostics.topology.captureState)
-	require.Equal(t, diagnosticCaptureReasonByteLimit, diagnostics.topology.captureReason)
-	require.Empty(t, diagnostics.topology.devices)
 }
 
 func TestCollectorDiagnosticsConcurrentLifecycleAndGenerationReads(t *testing.T) {

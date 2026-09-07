@@ -10,7 +10,7 @@ import (
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
-// Presence distinguishes recorded zero work from archives predating accounting.
+// Presence distinguishes recorded zero work from unobserved execution.
 // This allowlist is shared by the archive and selected-device inspection.
 func newTopologyDiagnosticArchiveExecutionV1(
 	execution *ddsnmpcollector.AcquisitionExecutionReport,
@@ -28,14 +28,7 @@ func newTopologyDiagnosticArchiveExecutionV1(
 			MissingOIDs:      p.MissingOIDs,
 			ProcessingErrors: p.ProcessingErrors,
 		},
-		Walks: make([]snmpdiag.Walk, 0, len(execution.Walks)),
-	}
-	for _, walk := range execution.Walks {
-		result.Walks = append(result.Walks, snmpdiag.Walk{
-			RootOID:      walk.RootOID,
-			ElapsedNanos: int64(walk.Elapsed),
-			Failed:       walk.Failed,
-		})
+		WalkOperations: execution.WalkOperations,
 	}
 	return result
 }
@@ -59,15 +52,6 @@ func restoreArchiveExecution(e *snmpdiag.Execution) (*ddsnmpcollector.Acquisitio
 			ProcessingErrors: p.ProcessingErrors,
 		},
 	}
-	for _, walk := range e.Walks {
-		if walk.ElapsedNanos < 0 || walk.RootOID == "" {
-			return nil, errors.New("invalid walk measurement")
-		}
-		result.Walks = append(result.Walks, ddsnmpcollector.AcquisitionWalkReport{
-			RootOID: walk.RootOID,
-			Elapsed: time.Duration(walk.ElapsedNanos),
-			Failed:  walk.Failed,
-		})
-	}
+	result.WalkOperations = e.WalkOperations
 	return result, nil
 }

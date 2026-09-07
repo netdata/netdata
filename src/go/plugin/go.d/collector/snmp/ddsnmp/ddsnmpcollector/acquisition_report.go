@@ -105,15 +105,19 @@ type AcquisitionProfileReport struct {
 // profile route. Slice position joins it to the corresponding ProfileMetrics
 // topology metric or BGP row supplied to the observer.
 type AcquisitionValueReference struct {
+	RowIndex     string
+	Field        string
 	RouteOrdinal uint32
 	RowOrdinal   uint32
 	ValueOrdinal uint32
 }
 
-// AcquisitionRouteReport contains only the bounded terminal state of one
-// configured route. It deliberately contains no profile path, packet, decoded
-// value, or error text.
+// AcquisitionRouteReport records one configured route's outcome, source bindings
+// and processing omissions. It contains no profile path, packet, decoded value
+// or error text.
 type AcquisitionRouteReport struct {
+	Sources      []ddsnmp.SourceBinding
+	Processing   []ddsnmp.ProcessingEvent
 	Ordinal      uint32
 	Kind         AcquisitionRouteKind
 	RootOID      string
@@ -166,12 +170,13 @@ type acquisitionTopologyTableScope struct {
 	routeIndexes map[int]int
 }
 
-func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, count int) {
+func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, rowIndex string, metrics []ddsnmp.Metric) {
 	if o == nil || o.collection == nil {
 		return
 	}
-	for valueOrdinal := range count {
+	for valueOrdinal, metric := range metrics {
 		o.collection.addTopologyValueReference(AcquisitionValueReference{
+			RowIndex: rowIndex, Field: metric.Name,
 			RouteOrdinal: o.routeOrdinal,
 			RowOrdinal:   rowOrdinal,
 			ValueOrdinal: uint32(valueOrdinal),
@@ -246,10 +251,10 @@ func (o *acquisitionTopologyScalarObserver) rejected(index int) {
 	}
 }
 
-func (o *acquisitionTopologyScalarObserver) value(index int) {
+func (o *acquisitionTopologyScalarObserver) value(index int, field string) {
 	if route := o.route(index); route != nil {
 		setAcquisitionScalarRouteValue(route)
-		o.collection.addTopologyValueReference(AcquisitionValueReference{RouteOrdinal: route.Ordinal})
+		o.collection.addTopologyValueReference(AcquisitionValueReference{RouteOrdinal: route.Ordinal, Field: field})
 	}
 }
 
@@ -725,6 +730,13 @@ func (c *acquisitionProfileCollection) syncTableRoutes() {
 		observation := binding.observation
 		if route == nil || request == nil || observation == nil {
 			continue
+		}
+
+		if request.route != nil {
+			bindSourceWalk(route, request.route.sourceOperation, request.route.oid, "primary")
+			for _, dependency := range request.dependencies {
+				bindSourceWalk(route, dependency.sourceOperation, dependency.oid, "dependency")
+			}
 		}
 		switch {
 		case request.missing:

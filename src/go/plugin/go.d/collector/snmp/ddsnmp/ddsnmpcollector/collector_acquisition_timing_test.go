@@ -79,7 +79,7 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 	expectSNMPGetError(handler, oids[10:], errors.New("second batch failed"))
 	var report AcquisitionProfileReport
 	collector := New(Config{
-		SnmpClient: handler,
+		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 		InitialAcquisitionObserver: AcquisitionObserverFunc(
@@ -97,7 +97,7 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 	assert.Equal(t, p.Elapsed, report.Stats.Timing.Preparation)
 	assert.Positive(t, p.Elapsed)
 	assert.Zero(t, report.Stats.Timing.Scalar)
-	assert.Empty(t, report.Execution.Walks)
+	assert.Empty(t, testWalkSources(t, collector, report.Execution))
 
 	// A failed preparation retries; the already-missing OID stays suppressed.
 	expectSNMPGet(handler, oids[1:], pdus[1:])
@@ -168,53 +168,61 @@ func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
 }
 
 func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
-	for _, version := range []gosnmp.SnmpVersion{gosnmp.Version1, gosnmp.Version2c} {
-		for _, failed := range []bool{false, true} {
-			t.Run(fmt.Sprintf("version=%v/failed=%v", version, failed), func(t *testing.T) {
-				ctrl, handler := setupMockHandler(t)
-				defer ctrl.Finish()
-				const root = "1.3.6.1.4.1.99999.1"
-				metric := ddprofiledefinition.MetricsConfig{
-					Table: ddprofiledefinition.SymbolConfig{
-						OID:  root,
-						Name: "table",
-					},
-					Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}},
-				}
-				var callErr error
-				if failed {
-					callErr = errors.New("walk failure")
-				}
-				handler.EXPECT().Version().Return(version)
-				walk := func(string) ([]gosnmp.SnmpPDU, error) { time.Sleep(time.Millisecond); return nil, callErr }
-				if version == gosnmp.Version1 {
-					handler.EXPECT().WalkAll(root).DoAndReturn(walk)
-				} else {
-					handler.EXPECT().BulkWalkAll(root).DoAndReturn(walk)
-				}
-				var reports []AcquisitionProfileReport
-				collector := New(Config{
-					SnmpClient: handler,
-					Log:        logger.New(),
-					Profiles: []*ddsnmp.Profile{
-						createTestProfile("a.yaml", []ddprofiledefinition.MetricsConfig{metric}),
-						createTestProfile("b.yaml", []ddprofiledefinition.MetricsConfig{metric}),
-					},
-					InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) }),
-				})
-				_, err := collector.Collect()
-				assert.Equal(t, failed, err != nil)
-				require.Len(t, reports, 2)
-				require.Len(t, reports[0].Execution.Walks, 1)
-				assert.Empty(t, reports[1].Execution.Walks, "shared consumer must not duplicate work")
-				recorded := reports[0].Execution.Walks[0]
-				assert.Equal(t, root, recorded.RootOID)
-				assert.Equal(t, failed, recorded.Failed)
-				assert.GreaterOrEqual(t, recorded.Elapsed, time.Millisecond)
-				assert.EqualValues(t, 1, reports[0].Stats.SNMP.WalkRequests)
-				assert.Zero(t, reports[1].Stats.SNMP.WalkRequests)
+	for name, tc := range map[string]struct {
+		version gosnmp.SnmpVersion
+		failed  bool
+	}{
+		"v1 success": {version: gosnmp.Version1},
+		"v1 failure": {version: gosnmp.Version1, failed: true},
+		"v2 success": {version: gosnmp.Version2c},
+		"v2 failure": {version: gosnmp.Version2c, failed: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			version, failed := tc.version, tc.failed
+			ctrl, handler := setupMockHandler(t)
+			defer ctrl.Finish()
+			const root = "1.3.6.1.4.1.99999.1"
+			metric := ddprofiledefinition.MetricsConfig{
+				Table: ddprofiledefinition.SymbolConfig{
+					OID:  root,
+					Name: "table",
+				},
+				Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}},
+			}
+			var callErr error
+			if failed {
+				callErr = errors.New("walk failure")
+			}
+			handler.EXPECT().Version().Return(version)
+			walk := func(string) ([]gosnmp.SnmpPDU, error) { time.Sleep(time.Millisecond); return nil, callErr }
+			if version == gosnmp.Version1 {
+				handler.EXPECT().WalkAll(root).DoAndReturn(walk)
+			} else {
+				handler.EXPECT().BulkWalkAll(root).DoAndReturn(walk)
+			}
+			var reports []AcquisitionProfileReport
+			collector := New(Config{
+				SnmpClient: new(SourceRecorder).Wrap(handler),
+				Log:        logger.New(),
+				Profiles: []*ddsnmp.Profile{
+					createTestProfile("a.yaml", []ddprofiledefinition.MetricsConfig{metric}),
+					createTestProfile("b.yaml", []ddprofiledefinition.MetricsConfig{metric}),
+				},
+				InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) }),
 			})
-		}
+			_, err := collector.Collect()
+			assert.Equal(t, failed, err != nil)
+			require.Len(t, reports, 2)
+			walks := testWalkSources(t, collector, reports[0].Execution)
+			require.Len(t, walks, 1)
+			assert.Empty(t, testWalkSources(t, collector, reports[1].Execution), "shared consumer must not duplicate work")
+			recorded := walks[0]
+			assert.Equal(t, root, recorded.RequestedOIDs[0])
+			assert.Equal(t, failed, recorded.Failure.Reason != "")
+			assert.GreaterOrEqual(t, time.Duration(recorded.ElapsedNanos), time.Millisecond)
+			assert.EqualValues(t, 1, reports[0].Stats.SNMP.WalkRequests)
+			assert.Zero(t, reports[1].Stats.SNMP.WalkRequests)
+		})
 	}
 }
 
@@ -238,7 +246,7 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 	profile.Definition.BGP = []ddprofiledefinition.BGPConfig{crossTableBGPTestConfig(), crossTableBGPTestConfig()}
 	var report AcquisitionProfileReport
 	collector := New(Config{
-		SnmpClient: handler,
+		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{profile},
 		InitialAcquisitionObserver: AcquisitionObserverFunc(
@@ -249,15 +257,16 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Error(t, metrics[0].BGPCollectError)
-	require.Len(t, report.Execution.Walks, 3, "memoized BGP anchor and failed dependency must not add executions")
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 3, "memoized BGP anchor and failed dependency must not add executions")
 	var roots []string
-	for _, walk := range report.Execution.Walks {
-		roots = append(roots, walk.RootOID)
+	for _, walk := range walks {
+		roots = append(roots, walk.RequestedOIDs[0])
 	}
 	assert.Equal(t, []string{anchor, anchor, dependency}, roots)
-	assert.False(t, report.Execution.Walks[0].Failed)
-	assert.False(t, report.Execution.Walks[1].Failed)
-	assert.True(t, report.Execution.Walks[2].Failed)
+	assert.Empty(t, walks[0].Failure.Reason)
+	assert.Empty(t, walks[1].Failure.Reason)
+	assert.NotEmpty(t, walks[2].Failure.Reason)
 	assert.EqualValues(t, 3, report.Stats.SNMP.WalkRequests)
 	assert.EqualValues(t, 1, report.Stats.Errors.SNMP)
 }

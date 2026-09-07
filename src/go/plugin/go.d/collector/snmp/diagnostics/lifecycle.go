@@ -4,7 +4,6 @@ package diagnostics
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -84,15 +83,13 @@ func NewLifecycle(cut ddsnmp.DeviceLifecycleCut) (Lifecycle, error) {
 	return result, nil
 }
 
-const MaxRecords uint64 = 250_000
-const MaxLogicalBytes uint64 = 64 << 20
 const LifecycleCutLogicalBytes uint64 = 32
 
 type LifecycleSource interface {
 	LifecycleCut() ddsnmp.DeviceLifecycleCut
 }
 
-func CaptureLifecycle(source LifecycleSource, maxRecords, maxBytes uint64) (result Lifecycle) {
+func CaptureLifecycle(source LifecycleSource) (result Lifecycle) {
 	result = Lifecycle{
 		State:  "unavailable",
 		Reason: "projection_error",
@@ -109,40 +106,6 @@ func CaptureLifecycle(source LifecycleSource, maxRecords, maxBytes uint64) (resu
 		return result
 	}
 	cut := source.LifecycleCut()
-	records := uint64(1 + len(cut.Entries))
-	size := LifecycleCutLogicalBytes
-	for _, entry := range cut.Entries {
-		size += LifecycleEntryLogicalBytes(entry.Info.Hostname, entry.Info.SNMPVersion)
-	}
-	if records > maxRecords || size > maxBytes {
-		result = Lifecycle{
-			State:  "limit_exceeded",
-			Reason: "global_byte_limit",
-			Cut: LifecycleCut{
-				Sequence:   cut.Sequence,
-				CapturedAt: cut.CapturedAt,
-			},
-		}
-		if records > maxRecords {
-			result.Reason = "global_record_limit"
-		}
-		return result
-	}
-	cut.Entries = slices.Clone(cut.Entries)
-	for i := range cut.Entries {
-		context := cut.Entries[i].Info.Profiles
-		if context == nil {
-			continue
-		}
-		contextRecords, contextBytes := context.Shape()
-		if contextRecords > maxRecords-records || contextBytes > maxBytes-size {
-			limited, _ := ddsnmp.RestoreProfileContext(ddsnmp.ProfileContextData{State: "limit_exceeded"}, 0, 0)
-			cut.Entries[i].Info.Profiles = limited
-			continue
-		}
-		records += contextRecords
-		size += contextBytes
-	}
 	projected, err := NewLifecycle(cut)
 	if err != nil {
 		return result

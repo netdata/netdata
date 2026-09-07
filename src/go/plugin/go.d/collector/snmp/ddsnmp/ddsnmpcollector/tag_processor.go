@@ -11,8 +11,9 @@ import (
 )
 
 type tagAdder struct {
-	tags     map[string]string
-	observed *bool
+	processing *processingObserver
+	tags       map[string]string
+	observed   *bool
 }
 
 func (ta *tagAdder) addTags(tags map[string]string) {
@@ -43,6 +44,7 @@ func newGlobalTagProcessor() *globalTagProcessor {
 func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU, ta tagAdder) error {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
+		ta.processing.record(metricTagDisplayName(cfg), cfg.Symbol.OID, "missing_input")
 		return nil
 	}
 	return p.tp.processTag(cfg, pdu, ta)
@@ -55,6 +57,7 @@ func (p *globalTagProcessor) processTagObserved(
 ) (bool, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
+		ta.processing.record(metricTagDisplayName(cfg), cfg.Symbol.OID, "missing_input")
 		return false, nil
 	}
 	observed := false
@@ -78,8 +81,10 @@ func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, 
 	val, err := convPduToStringf(pdu, cfg.Symbol.Format)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {
+			ta.processing.record(tagName, pdu.Name, "empty_date")
 			return nil
 		}
+		ta.processing.record(tagName, pdu.Name, "conversion")
 		return err
 	}
 
@@ -94,14 +99,20 @@ func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, 
 			for name, tmpl := range cfg.Tags {
 				ta.addTag(name, replaceSubmatches(tmpl, sm))
 			}
+		} else {
+			ta.processing.record(tagName, pdu.Name, "pattern_mismatch")
 		}
 	case cfg.Symbol.ExtractValueCompiled != nil:
 		if sm := cfg.Symbol.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
 			ta.addTag(tagName, sm[1])
+		} else {
+			ta.processing.record(tagName, pdu.Name, "extract_mismatch")
 		}
 	case cfg.Symbol.MatchPatternCompiled != nil:
 		if sm := cfg.Symbol.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
 			ta.addTag(tagName, replaceSubmatches(cfg.Symbol.MatchValue, sm))
+		} else {
+			ta.processing.record(tagName, pdu.Name, "pattern_mismatch")
 		}
 	default:
 		ta.addTag(tagName, val)

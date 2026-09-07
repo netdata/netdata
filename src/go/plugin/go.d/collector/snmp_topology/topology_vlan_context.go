@@ -29,7 +29,7 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 	view := resolveTopologyVLANProfileView(dev)
 	profiles := view.Profiles()
 	if recorder.evidence != nil {
-		recorder.evidence.vlanProfileContext = view.Context(recorder.limits.maxRecords, recorder.limits.maxLogicalBytes)
+		recorder.evidence.vlanProfileContext = view.Context()
 		if len(profiles) == 0 {
 			recorder.evidence.vlanProfiles = topologyAcquisitionPhaseEvidence{outcome: topologyAcquisitionPhaseEmpty}
 		} else {
@@ -46,6 +46,7 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 
 		pms, progress, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles, observer)
 		if captured := recorder.contextByOrdinal(contextOrdinal); captured != nil {
+			captured.sources = progress.sources
 			captured.client, captured.connect = progress.client, progress.connect
 			captured.interruption, captured.failures = progress.interruption, progress.failures
 		}

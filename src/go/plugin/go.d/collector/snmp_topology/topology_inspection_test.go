@@ -75,26 +75,6 @@ func TestInspectTopologyDeviceKeepsIncompleteCutsUndetermined(t *testing.T) {
 	require.Equal(t, topologyInspectionUndetermined, report.typedIdentity.state)
 }
 
-func TestInspectTopologyDevicePreservesLimitedLifecycleCutIdentity(t *testing.T) {
-	coll, store := newTestSNMPTopologyCollectorWithStore()
-	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10"})
-	store.RegisterJob("job-b", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.20"})
-	registrationID := store.LifecycleCut().Entries[0].RegistrationID
-	coll.diagnosticGlobalLimits = topologyAcquisitionLimits{maxRecords: 2, maxLogicalBytes: 1 << 20}
-	diagnostics := coll.acquireTopologyDiagnostics()
-	require.Equal(t, diagnosticCaptureLimitExceeded, diagnostics.lifecycle.state)
-	require.NotZero(t, diagnostics.lifecycle.cut.Sequence)
-	require.False(t, diagnostics.lifecycle.cut.CapturedAt.IsZero())
-
-	report, err := inspectTopologyDevice(diagnostics, newLLDPDirectScenario().opts, registrationID)
-	require.NoError(t, err)
-	require.Equal(t, topologyInspectionUndetermined, report.lifecycle.membership.state)
-	require.Equal(t, diagnosticCaptureLimitExceeded, report.lifecycle.captureState)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, report.lifecycle.captureReason)
-	require.Equal(t, diagnostics.lifecycle.cut.Sequence, report.lifecycle.sequence)
-	require.Equal(t, diagnostics.lifecycle.cut.CapturedAt, report.lifecycle.capturedAt)
-}
-
 func TestInspectTopologyDeviceDoesNotFlattenWholeGraphReplayFailure(t *testing.T) {
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
@@ -424,17 +404,9 @@ func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability
 
 func TestInspectTopologyLinkPreservesDiagnosticCutFailure(t *testing.T) {
 	scenario := newLLDPDirectScenario()
-	limitedCut, err := projectTopologyDiagnosticCut(topologyDiagnosticCutInput{
-		sequence:    7,
-		startedAt:   topologyScenarioCollectedAt,
-		publishedAt: topologyScenarioCollectedAt,
-		entries: []ddsnmp.DeviceEntry{
-			{RegistrationID: 1},
-		},
-		limits: topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1024},
-	})
-	require.NoError(t, err)
-	require.Equal(t, diagnosticCaptureLimitExceeded, limitedCut.captureState)
+	unavailableCut := unavailableTopologyDiagnosticCut(topologyDiagnosticCutInput{
+		sequence: 7, startedAt: topologyScenarioCollectedAt, publishedAt: topologyScenarioCollectedAt,
+	}, diagnosticCaptureReasonProjectionError)
 
 	subject := topologyInspectionLinkSubject{
 		srcIdentity: "ip:192.0.2.1",
@@ -443,13 +415,13 @@ func TestInspectTopologyLinkPreservesDiagnosticCutFailure(t *testing.T) {
 		protocol:    "lldp",
 		direction:   "bidirectional",
 	}
-	report, err := inspectTopologyLink(topologyDiagnostics{topology: limitedCut}, scenario.opts, subject)
+	report, err := inspectTopologyLink(topologyDiagnostics{topology: unavailableCut}, scenario.opts, subject)
 	require.NoError(t, err)
-	require.Equal(t, diagnosticCaptureLimitExceeded, report.diagnosticCut.captureState)
-	require.Equal(t, diagnosticCaptureReasonRecordLimit, report.diagnosticCut.captureReason)
+	require.Equal(t, diagnosticCaptureUnavailable, report.diagnosticCut.captureState)
+	require.Equal(t, diagnosticCaptureReasonProjectionError, report.diagnosticCut.captureReason)
 	require.Equal(t, uint64(7), report.diagnosticCut.sequence)
-	require.Equal(t, limitedCut.startedAt, report.diagnosticCut.startedAt)
-	require.Equal(t, limitedCut.publishedAt, report.diagnosticCut.publishedAt)
+	require.Equal(t, unavailableCut.startedAt, report.diagnosticCut.startedAt)
+	require.Equal(t, unavailableCut.publishedAt, report.diagnosticCut.publishedAt)
 	require.Empty(t, report.source.contexts)
 	require.Equal(t, topologyInspectionUndetermined, report.graphLink.membership.state)
 	require.Equal(t, topologyInspectionUndetermined, report.typedLink.state)
@@ -458,7 +430,6 @@ func TestInspectTopologyLinkPreservesDiagnosticCutFailure(t *testing.T) {
 		sequence:    8,
 		startedAt:   topologyScenarioCollectedAt,
 		publishedAt: topologyScenarioCollectedAt,
-		limits:      topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1024},
 	})
 	require.NoError(t, err)
 	report, err = inspectTopologyLink(topologyDiagnostics{topology: availableCut}, scenario.opts, subject)

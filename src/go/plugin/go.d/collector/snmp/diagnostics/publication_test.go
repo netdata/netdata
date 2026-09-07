@@ -170,7 +170,7 @@ func TestPublisherFencesReplacementRemovalAndRetiredCleanup(t *testing.T) {
 		Hostname: "switch.example",
 	})
 	snapshot := Snapshot{
-		Lifecycle:       CaptureLifecycle(store, MaxRecords, MaxLogicalBytes),
+		Lifecycle:       CaptureLifecycle(store),
 		ProducerScopeID: "incumbent",
 	}
 	incumbent := &testTopologySource{
@@ -289,7 +289,7 @@ func TestPublisherReplacementDoesNotBlockOwnershipChanges(t *testing.T) {
 		snapshot: Snapshot{
 			ProducerScopeID: "incumbent",
 			Topology:        &Sweep{},
-			Lifecycle:       CaptureLifecycle(store, MaxRecords, MaxLogicalBytes),
+			Lifecycle:       CaptureLifecycle(store),
 		},
 	}
 	successor := &testTopologySource{

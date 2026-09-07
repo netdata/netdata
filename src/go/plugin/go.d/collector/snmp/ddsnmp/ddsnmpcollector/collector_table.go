@@ -72,6 +72,7 @@ type (
 	}
 
 	tableProcessingContext struct {
+		processingRoute *AcquisitionRouteReport
 		// === Input data (set when context is created) ===
 
 		// config is the metric configuration for this table
@@ -344,6 +345,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 		crossTableCtx.rowTags = row.tags
 
 		rowCtx := &tableRowProcessingContext{
+			processing:         ctx.acquisition.processing(index),
 			config:             ctx.config,
 			columnOIDs:         ctx.columnOIDs,
 			crossTableCtx:      crossTableCtx,
@@ -364,7 +366,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 		}
 
 		metrics = append(metrics, rowMetrics...)
-		ctx.acquisition.addValueReferences(currentRowOrdinal, len(rowMetrics))
+		ctx.acquisition.addValueReferences(currentRowOrdinal, index, rowMetrics)
 	}
 
 	if len(errs) > 0 {
@@ -484,7 +486,7 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 				metrics = append(metrics, *metric)
 			}
 		}
-		ctx.acquisition.addValueReferences(currentRowOrdinal, len(metrics)-valueStart)
+		ctx.acquisition.addValueReferences(currentRowOrdinal, index, metrics[valueStart:])
 	}
 
 	if errorCount > 0 {
@@ -507,18 +509,13 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats, ex
 	stats.SNMP.WalkRequests++
 
 	useWalk := tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk
-	var started time.Time
-	if execution != nil {
-		started = time.Now()
-	}
 	if useWalk {
 		resp, err = tc.snmpClient.WalkAll(oid)
 	} else {
 		resp, err = tc.snmpClient.BulkWalkAll(oid)
 	}
-	if execution != nil {
-		elapsed := time.Since(started)
-		execution.Walks = append(execution.Walks, AcquisitionWalkReport{RootOID: trimOID(oid), Elapsed: elapsed, Failed: err != nil})
+	if operation := sourceRecorder(tc.snmpClient).Cursor(); execution != nil && operation != 0 {
+		execution.WalkOperations = append(execution.WalkOperations, operation)
 	}
 	if err != nil {
 		return nil, err

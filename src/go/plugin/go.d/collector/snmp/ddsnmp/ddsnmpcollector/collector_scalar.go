@@ -57,7 +57,13 @@ func (sc *scalarCollector) collectObserved(
 		return nil, nil
 	}
 
+	source := sourceRecorder(sc.snmpClient)
+	cursor := source.Cursor()
 	pdus, err := sc.getScalarValues(oids, stats)
+	if source != nil {
+		requests := source.requestsSince(cursor)
+		observer.bindSource(requests, prof.Definition.Metrics)
+	}
 	if err != nil {
 		if observer != nil {
 			observer.failUnfinished(AcquisitionFailureClassTransport)
@@ -147,7 +153,7 @@ func (sc *scalarCollector) processScalarMetricsObserved(
 
 		if metric != nil {
 			if observer != nil {
-				observer.value(i)
+				observer.value(i, cfg.Symbol.Name)
 			}
 			metrics = append(metrics, *metric)
 		} else {
@@ -171,16 +177,20 @@ func (sc *scalarCollector) processScalarMetric(
 	observer *acquisitionTopologyScalarObserver,
 	configIndex int,
 ) (*ddsnmp.Metric, error) {
+	processing := observer.processing(configIndex)
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
+		processing.record(cfg.Symbol.Name, cfg.Symbol.OID, "missing_input")
 		return nil, nil
 	}
 
 	value, err := sc.valProc.processValue(cfg.Symbol, pdu)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {
+			processing.record(cfg.Symbol.Name, pdu.Name, "empty_date")
 			return nil, nil
 		}
+		processing.record(cfg.Symbol.Name, pdu.Name, "conversion")
 		return nil, fmt.Errorf("error processing value for OID %s (%s): %w", cfg.Symbol.Name, cfg.Symbol.OID, err)
 	}
 
@@ -188,7 +198,7 @@ func (sc *scalarCollector) processScalarMetric(
 	var tags map[string]string
 	if len(cfg.MetricTags) > 0 {
 		tags = make(map[string]string)
-		ta := tagAdder{tags: tags}
+		ta := tagAdder{tags: tags, processing: processing}
 		for _, tagCfg := range cfg.MetricTags {
 			if tagCfg.Symbol.OID == "" {
 				continue

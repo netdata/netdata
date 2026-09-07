@@ -54,3 +54,5 @@ func recordCollectionFailure(dst *ddsnmp.FailureCount, err error, operation, rea
 	}
 	dst.Record(f)
 }
+
+func (c *diagnosticClient) SourceRecorder() *SourceRecorder { return sourceRecorder(c.Handler) }

@@ -86,7 +86,13 @@ func (gc *globalTagsCollector) processDynamicTagsObserved(
 		return nil
 	}
 
+	source := sourceRecorder(gc.snmpClient)
+	cursor := source.Cursor()
 	pdus, err := gc.fetchTagValues(oids, stats)
+	if source != nil {
+		requests := source.requestsSince(cursor)
+		observer.bindSource(requests)
+	}
 	if err != nil {
 		observer.failUnfinished(AcquisitionFailureClassTransport)
 		return fmt.Errorf("failed to fetch global tag values: %w", err)
@@ -101,7 +107,7 @@ func (gc *globalTagsCollector) processDynamicTagsObserved(
 			continue
 		}
 
-		ta := tagAdder{tags: globalTags}
+		ta := tagAdder{tags: globalTags, processing: observer.processing(i)}
 
 		var observed bool
 		var err error
