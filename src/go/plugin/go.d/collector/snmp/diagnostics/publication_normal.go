@@ -3,11 +3,13 @@
 package diagnostics
 
 import (
+	"container/heap"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type NormalCheckpoint interface{ CaptureNormal() (*NormalDevice, error) }
@@ -20,15 +22,18 @@ type NormalWriter struct {
 	registration, runtime uint64
 	version               uint64
 	pending               NormalCheckpoint
-	queued                bool
+	index                 int
+	writing               bool
+	due                   time.Time
 }
 
 type normalPublication struct {
 	onDisk   map[uint64]uint64
 	writers  map[string]*NormalWriter
 	sequence uint64
-	queue    []*NormalWriter
+	queue    normalQueue
 	retired  []normalRetirement
+	closed   bool
 	// Run's serial writer owns activation and disk cleanup.
 	activated    bool
 	prunePending bool
@@ -39,6 +44,10 @@ func (p *Publisher) ReplaceNormal(previous, owner string, registration uint64) *
 		return nil
 	}
 	p.mu.Lock()
+	if p.normal.closed {
+		p.mu.Unlock()
+		return nil
+	}
 	if p.normal.writers == nil {
 		p.normal.writers = make(map[string]*NormalWriter)
 	}
@@ -47,7 +56,7 @@ func (p *Publisher) ReplaceNormal(previous, owner string, registration uint64) *
 	var writer *NormalWriter
 	if registration != 0 {
 		p.normal.sequence++
-		writer = &NormalWriter{publisher: p, owner: owner, registration: registration, runtime: p.normal.sequence}
+		writer = &NormalWriter{publisher: p, owner: owner, registration: registration, runtime: p.normal.sequence, index: -1}
 		p.normal.writers[owner] = writer
 	}
 	p.mu.Unlock()
@@ -60,6 +69,10 @@ func (p *Publisher) RemoveNormal(owner string) {
 		return
 	}
 	p.mu.Lock()
+	if p.normal.closed {
+		p.mu.Unlock()
+		return
+	}
 	p.retireNormalLocked(owner)
 	p.mu.Unlock()
 	p.notify()
@@ -68,6 +81,9 @@ func (p *Publisher) RemoveNormal(owner string) {
 func (p *Publisher) retireNormalLocked(owner string) {
 	if writer := p.normal.writers[owner]; writer != nil {
 		delete(p.normal.writers, owner)
+		if writer.index >= 0 {
+			heap.Remove(&p.normal.queue, writer.index)
+		}
 		writer.pending = nil
 		p.normal.retired = append(p.normal.retired, normalRetirement{registration: writer.registration, runtime: writer.runtime})
 	}
@@ -81,49 +97,54 @@ func (w *NormalWriter) Update(cut NormalCheckpoint) {
 	}
 	p := w.publisher
 	p.mu.Lock()
-	if p.normal.writers[w.owner] == w {
+	notify := false
+	if !p.normal.closed && p.normal.writers[w.owner] == w {
 		w.version++
 		w.pending = cut
+		notify = w.index < 0 && !w.writing
 		p.queueNormalLocked(w)
 	}
 	p.mu.Unlock()
-	p.notify()
-}
-
-func (p *Publisher) queueNormalLocked(w *NormalWriter) {
-	if !w.queued && w.pending != nil {
-		w.queued = true
-		p.normal.queue = append(p.normal.queue, w)
+	if notify {
+		p.notify()
 	}
 }
 
 var errNormalRetired = errors.New("normal runtime retired before publication")
 
 func (p *Publisher) publishNormal(ctx context.Context) error {
+	return p.publishNormalPending(ctx, false)
+}
+
+func (p *Publisher) publishNormalPending(ctx context.Context, final bool) error {
 	p.mu.Lock()
 	through := len(p.normal.queue)
 	p.mu.Unlock()
+	now := time.Now()
 	var errs []error
 	for range through {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		p.mu.Lock()
-		writer := p.normal.queue[0]
-		p.normal.queue[0] = nil
-		p.normal.queue = p.normal.queue[1:]
-		writer.queued = false
+		if len(p.normal.queue) == 0 || (!final && p.normal.queue[0].due.After(now)) {
+			p.mu.Unlock()
+			break
+		}
+		writer := heap.Pop(&p.normal.queue).(*NormalWriter)
+		writer.writing = true
 		cut, version := writer.pending, writer.version
 		p.mu.Unlock()
-		if cut == nil {
-			continue
-		}
 		err := p.publishNormalCut(ctx, writer, cut)
 		p.mu.Lock()
+		writer.writing = false
 		if err == nil && writer.version == version {
 			writer.pending = nil
 		}
-		if p.normal.writers[writer.owner] == writer {
+		if err != nil {
+			writer.due = time.Now().Add(publicationRetryEvery)
+		}
+		if !final && p.normal.writers[writer.owner] == writer {
 			p.queueNormalLocked(writer)
 		}
 		p.mu.Unlock()
@@ -131,6 +152,13 @@ func (p *Publisher) publishNormal(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 		// The next loop holds only one source cut, never a batch of device snapshots.
+	}
+	// A committed device file stays on its own cadence even if the small run
+	// index cannot be activated yet. Retry the index without re-encoding it.
+	if len(p.normal.onDisk) > 0 && ctx.Err() == nil {
+		if err := p.activateNormal(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if err := p.cleanupNormal(ctx); err != nil {
 		errs = append(errs, err)
@@ -173,12 +201,22 @@ func (p *Publisher) publishNormalCut(ctx context.Context, writer *NormalWriter, 
 			p.normal.onDisk = make(map[uint64]uint64)
 		}
 		p.normal.onDisk[writer.registration] = writer.runtime
+		writer.due = time.Now().Add(normalPublicationEvery)
 		return nil
 	}
 	if err := p.writeFile(ctx, path, document, replace); err != nil {
 		return err
 	}
-	return p.activateNormal(ctx)
+	return nil
+}
+
+// Finalize runs only after Run has joined. Admission is sealed before taking
+// one finite pass; collection finishing later cannot extend process shutdown.
+func (p *Publisher) Finalize(ctx context.Context) error {
+	p.mu.Lock()
+	p.normal.closed = true
+	p.mu.Unlock()
+	return p.publishNormalPending(ctx, true)
 }
 
 type normalRetirement struct{ registration, runtime uint64 }

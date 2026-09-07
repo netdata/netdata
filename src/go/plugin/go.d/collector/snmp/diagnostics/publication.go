@@ -167,12 +167,22 @@ func (p *Publisher) Run(ctx context.Context) {
 	p.flush(ctx)
 	retry := time.NewTicker(publicationRetryEvery)
 	defer retry.Stop()
+	normal := time.NewTimer(0)
+	defer normal.Stop()
 	for {
+		var normalReady <-chan time.Time
+		if due, ok := p.normalDeadline(); ok {
+			normal.Reset(max(0, time.Until(due)))
+			normalReady = normal.C
+		} else {
+			normal.Stop()
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-p.changed:
 		case <-p.source.LifecycleChanges():
+		case <-normalReady:
 		case <-retry.C: // Retry dirty files only; unchanged state does not serialize.
 		}
 		p.flush(ctx)

@@ -49,7 +49,7 @@ func normalTestProfile() *ddsnmp.Profile {
 	}}
 }
 
-func normalTestDocument(t *testing.T, c *Collector, directory string) *diagnostics.NormalDevice {
+func normalTestDocument(t *testing.T, c *Collector) *diagnostics.NormalDevice {
 	t.Helper()
 	device, err := c.normal.cut.CaptureNormal()
 	require.NoError(t, err)
@@ -60,26 +60,7 @@ func normalTestDocument(t *testing.T, c *Collector, directory string) *diagnosti
 	document, err := diagnostics.Read(&archive, diagnostics.DefaultReadLimits())
 	require.NoError(t, err)
 	require.NoError(t, document.Normal.Validate())
-	var published *diagnostics.NormalDevice
-	require.Eventually(t, func() bool {
-		files, err := diagnostics.ListNormalFiles(directory)
-		if err != nil || len(files) != 1 {
-			return false
-		}
-		data, err := os.ReadFile(filepath.Join(directory, diagnostics.NormalDirectory, files[0].RunID, files[0].Filename))
-		if err != nil {
-			return false
-		}
-		archive, err := diagnostics.Read(bytes.NewReader(data), diagnostics.DefaultReadLimits())
-		if err != nil || archive.Normal == nil || archive.Normal.Latest.ID != device.Latest.ID {
-			return false
-		}
-		published = archive.Normal
-		return true
-	}, 5*time.Second, time.Millisecond)
-	require.NoError(t, published.Validate())
-	assert.Equal(t, document.Normal.Latest, published.Latest)
-	return published
+	return document.Normal
 }
 
 func TestNormalEvidenceRealCollection(t *testing.T) {
@@ -198,7 +179,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			poll = 1
 			firstSamples := c.Collect(t.Context())
 			require.NotEmpty(t, firstSamples)
-			first := normalTestDocument(t, c, directory)
+			first := normalTestDocument(t, c)
 			require.Equal(t, tc.failure == "cached", first.Latest.Failed)
 			if bgpMissing {
 				require.Empty(t, first.Latest.BGP.Entries)
@@ -218,7 +199,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			assert.NotContains(t, firstSamples, metricIDFromName("_hidden"))
 			poll = 2
 			secondSamples := c.Collect(t.Context())
-			second := normalTestDocument(t, c, directory)
+			second := normalTestDocument(t, c)
 			assert.Equal(t, tc.failure != "missing" && tc.failure != "cached", second.Latest.Failed)
 			if tc.failure == "metrics" {
 				assert.Empty(t, secondSamples)
@@ -233,7 +214,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			}
 			poll = 3
 			require.NotEmpty(t, c.Collect(t.Context()))
-			third := normalTestDocument(t, c, directory)
+			third := normalTestDocument(t, c)
 			assert.False(t, third.Latest.Failed)
 			if tc.failure != "missing" {
 				require.NotNil(t, third.LastFailure)
@@ -248,6 +229,17 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			assert.Equal(t, firstSamples, first.Latest.Samples, "retained first document remains independent")
 			cancel()
 			<-done
+			require.NoError(t, publisher.Finalize(t.Context()))
+			files, err = diagnostics.ListNormalFiles(directory)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+			data, err := os.ReadFile(filepath.Join(directory, diagnostics.NormalDirectory, files[0].RunID, files[0].Filename))
+			require.NoError(t, err)
+			published, err := diagnostics.Read(bytes.NewReader(data), diagnostics.DefaultReadLimits())
+			require.NoError(t, err)
+			require.NoError(t, published.Normal.Validate())
+			assert.Equal(t, third.Latest, published.Normal.Latest)
+			assert.Equal(t, third.LastFailure, published.Normal.LastFailure)
 			creator.JobConfigLifecycle.Remove(identity)
 			files, err = diagnostics.ListNormalFiles(directory)
 			require.NoError(t, err)
