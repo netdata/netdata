@@ -50,26 +50,89 @@ struct exchange_workload {
 struct exchange_queue {
     RRDSET *st_exchange_queue_active_mailbox;
     RRDSET *st_exchange_queue_external_active_remote_delivery;
+    RRDSET *st_exchange_queue_external_largest_delivery;
     RRDSET *st_exchange_queue_internal_active_remote_delivery;
+    RRDSET *st_exchange_queue_internal_largest_delivery;
+    RRDSET *st_exchange_queue_retry_mailbox_delivery;
     RRDSET *st_exchange_queue_unreachable;
     RRDSET *st_exchange_queue_poison;
+    RRDSET *st_exchange_queue_messages_queued_for_delivery_total;
+    RRDSET *st_exchange_queue_messages_submitted_total;
+    RRDSET *st_exchange_queue_messages_delayed_total;
+    RRDSET *st_exchange_queue_messages_completed_delivery_total;
+    RRDSET *st_exchange_queue_aggregate_shadow_queue_length;
+    RRDSET *st_exchange_queue_submission_queue_length;
+    RRDSET *st_exchange_queue_delay_queue_length;
+    RRDSET *st_exchange_queue_items_completed_delivery_total;
+    RRDSET *st_exchange_queue_items_queued_for_delivery_expired_total;
+    RRDSET *st_exchange_queue_items_queued_for_delivery_total;
+    RRDSET *st_exchange_queue_items_resubmitted_total;
 
     RRDDIM *rd_exchange_queue_active_mailbox;
     RRDDIM *rd_exchange_queue_external_active_remote_delivery;
+    RRDDIM *rd_exchange_queue_external_largest_delivery;
     RRDDIM *rd_exchange_queue_internal_active_remote_delivery;
+    RRDDIM *rd_exchange_queue_internal_largest_delivery;
+    RRDDIM *rd_exchange_queue_retry_mailbox_delivery;
     RRDDIM *rd_exchange_queue_unreachable;
     RRDDIM *rd_exchange_queue_poison;
+    RRDDIM *rd_exchange_queue_messages_queued_for_delivery_total;
+    RRDDIM *rd_exchange_queue_messages_submitted_total;
+    RRDDIM *rd_exchange_queue_messages_delayed_total;
+    RRDDIM *rd_exchange_queue_messages_completed_delivery_total;
+    RRDDIM *rd_exchange_queue_aggregate_shadow_queue_length;
+    RRDDIM *rd_exchange_queue_submission_queue_length;
+    RRDDIM *rd_exchange_queue_delay_queue_length;
+    RRDDIM *rd_exchange_queue_items_completed_delivery_total;
+    RRDDIM *rd_exchange_queue_items_queued_for_delivery_expired_total;
+    RRDDIM *rd_exchange_queue_items_queued_for_delivery_total;
+    RRDDIM *rd_exchange_queue_items_resubmitted_total;
 
     COUNTER_DATA exchangeTransportQueuesActiveMailboxDelivery;
     COUNTER_DATA exchangeTransportQueuesExternalActiveRemoteDelivery;
+    COUNTER_DATA exchangeTransportQueuesExternalLargestDelivery;
     COUNTER_DATA exchangeTransportQueuesInternalActiveRemoteDelivery;
+    COUNTER_DATA exchangeTransportQueuesInternalLargestDelivery;
+    COUNTER_DATA exchangeTransportQueuesRetryMailboxDelivery;
     COUNTER_DATA exchangeTransportQueuesUnreachable;
     COUNTER_DATA exchangeTransportQueuesPoison;
+    COUNTER_DATA exchangeTransportQueuesMessagesQueuedForDeliveryTotal;
+    COUNTER_DATA exchangeTransportQueuesMessagesSubmittedTotal;
+    COUNTER_DATA exchangeTransportQueuesMessagesDelayedTotal;
+    COUNTER_DATA exchangeTransportQueuesMessagesCompletedDeliveryTotal;
+    COUNTER_DATA exchangeTransportQueuesAggregateShadowQueueLength;
+    COUNTER_DATA exchangeTransportQueuesSubmissionQueueLength;
+    COUNTER_DATA exchangeTransportQueuesDelayQueueLength;
+    COUNTER_DATA exchangeTransportQueuesItemsCompletedDeliveryTotal;
+    COUNTER_DATA exchangeTransportQueuesItemsQueuedForDeliveryExpiredTotal;
+    COUNTER_DATA exchangeTransportQueuesItemsQueuedForDeliveryTotal;
+    COUNTER_DATA exchangeTransportQueuesItemsResubmittedTotal;
+};
+
+struct exchange_ad_access_process {
+    RRDSET *st_exchange_ldap_read_time;
+    RRDSET *st_exchange_ldap_search_time;
+    RRDSET *st_exchange_ldap_write_time;
+    RRDSET *st_exchange_ldap_timeout_errors;
+    RRDSET *st_exchange_ldap_long_running_ops;
+
+    RRDDIM *rd_exchange_ldap_read_time;
+    RRDDIM *rd_exchange_ldap_search_time;
+    RRDDIM *rd_exchange_ldap_write_time;
+    RRDDIM *rd_exchange_ldap_timeout_errors;
+    RRDDIM *rd_exchange_ldap_long_running_ops;
+
+    COUNTER_DATA exchangeLDAPReadTime;
+    COUNTER_DATA exchangeLDAPSearchTime;
+    COUNTER_DATA exchangeLDAPWriteTime;
+    COUNTER_DATA exchangeLDAPTimeoutErrors;
+    COUNTER_DATA exchangeLDAPLongRunningOps;
 };
 
 DICTIONARY *exchange_proxies;
 DICTIONARY *exchange_workloads;
 DICTIONARY *exchange_queues;
+DICTIONARY *exchange_ad_access_processes;
 
 static void exchange_proxy_initialize_variables(struct exchange_proxy *ep)
 {
@@ -110,9 +173,23 @@ static void exchange_queue_initialize_variables(struct exchange_queue *eq)
 {
     eq->exchangeTransportQueuesActiveMailboxDelivery.key = "Active Mailbox Delivery Queue Length";
     eq->exchangeTransportQueuesExternalActiveRemoteDelivery.key = "External Active Remote Delivery Queue Length";
+    eq->exchangeTransportQueuesExternalLargestDelivery.key = "External Largest Delivery Queue Length";
     eq->exchangeTransportQueuesInternalActiveRemoteDelivery.key = "Internal Active Remote Delivery Queue Length";
+    eq->exchangeTransportQueuesInternalLargestDelivery.key = "Internal Largest Delivery Queue Length";
+    eq->exchangeTransportQueuesRetryMailboxDelivery.key = "Retry Mailbox Delivery Queue Length";
     eq->exchangeTransportQueuesPoison.key = "Poison Queue Length";
     eq->exchangeTransportQueuesUnreachable.key = "Unreachable Queue Length";
+    eq->exchangeTransportQueuesMessagesQueuedForDeliveryTotal.key = "Messages Queued For Delivery Total";
+    eq->exchangeTransportQueuesMessagesSubmittedTotal.key = "Messages Submitted Total";
+    eq->exchangeTransportQueuesMessagesDelayedTotal.key = "Messages Delayed Total";
+    eq->exchangeTransportQueuesMessagesCompletedDeliveryTotal.key = "Messages Completed Delivery Total";
+    eq->exchangeTransportQueuesAggregateShadowQueueLength.key = "Aggregate Shadow Queue Length";
+    eq->exchangeTransportQueuesSubmissionQueueLength.key = "Submission Queue Length";
+    eq->exchangeTransportQueuesDelayQueueLength.key = "Delay Queue Length";
+    eq->exchangeTransportQueuesItemsCompletedDeliveryTotal.key = "Items Completed Delivery Total";
+    eq->exchangeTransportQueuesItemsQueuedForDeliveryExpiredTotal.key = "Items Queued For Delivery Expired Total";
+    eq->exchangeTransportQueuesItemsQueuedForDeliveryTotal.key = "Items Queued For Delivery Total";
+    eq->exchangeTransportQueuesItemsResubmittedTotal.key = "Items Resubmitted Total";
 }
 
 static void
@@ -121,6 +198,23 @@ dict_exchange_insert_queue_cb(const DICTIONARY_ITEM *item __maybe_unused, void *
     struct exchange_queue *eq = value;
 
     exchange_queue_initialize_variables(eq);
+}
+
+static void exchange_ad_access_initialize_variables(struct exchange_ad_access_process *ea)
+{
+    ea->exchangeLDAPReadTime.key = "LDAP Read Time";
+    ea->exchangeLDAPSearchTime.key = "LDAP Search Time";
+    ea->exchangeLDAPWriteTime.key = "LDAP Write Time";
+    ea->exchangeLDAPTimeoutErrors.key = "LDAP Timeout Errors/sec";
+    ea->exchangeLDAPLongRunningOps.key = "Long Running LDAP Operations/min";
+}
+
+static void dict_exchange_insert_ad_access_cb(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct exchange_ad_access_process *ea = value;
+
+    exchange_ad_access_initialize_variables(ea);
 }
 
 static void initialize(void)
@@ -136,6 +230,249 @@ static void initialize(void)
     exchange_queues = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_queue));
     dictionary_register_insert_callback(exchange_queues, dict_exchange_insert_queue_cb, NULL);
+
+    exchange_ad_access_processes = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_ad_access_process));
+    dictionary_register_insert_callback(exchange_ad_access_processes, dict_exchange_insert_ad_access_cb, NULL);
+}
+
+static void netdata_exchange_ldap_read_time(struct exchange_ad_access_process *ea, char *process, int update_every)
+{
+    if (unlikely(!ea->st_exchange_ldap_read_time)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_ad_access_%s_ldap_read_time_sec", process);
+
+        ea->st_exchange_ldap_read_time = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "ad_access",
+            "exchange.ldap_read_time_sec",
+            "Time to send an LDAP read request and receive a response.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_LDAP_READ_TIME,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ea->rd_exchange_ldap_read_time =
+            rrddim_add(ea->st_exchange_ldap_read_time, "read", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ea->st_exchange_ldap_read_time->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        ea->st_exchange_ldap_read_time, ea->rd_exchange_ldap_read_time, (collected_number)ea->exchangeLDAPReadTime.current.Data);
+    rrdset_done(ea->st_exchange_ldap_read_time);
+}
+
+static void netdata_exchange_ldap_search_time(struct exchange_ad_access_process *ea, char *process, int update_every)
+{
+    if (unlikely(!ea->st_exchange_ldap_search_time)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_ad_access_%s_ldap_search_time_sec", process);
+
+        ea->st_exchange_ldap_search_time = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "ad_access",
+            "exchange.ldap_search_time_sec",
+            "Time to send an LDAP search request and receive a response.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_LDAP_SEARCH_TIME,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ea->rd_exchange_ldap_search_time =
+            rrddim_add(ea->st_exchange_ldap_search_time, "search", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ea->st_exchange_ldap_search_time->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        ea->st_exchange_ldap_search_time,
+        ea->rd_exchange_ldap_search_time,
+        (collected_number)ea->exchangeLDAPSearchTime.current.Data);
+    rrdset_done(ea->st_exchange_ldap_search_time);
+}
+
+static void netdata_exchange_ldap_write_time(struct exchange_ad_access_process *ea, char *process, int update_every)
+{
+    if (unlikely(!ea->st_exchange_ldap_write_time)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_ad_access_%s_ldap_write_time_sec", process);
+
+        ea->st_exchange_ldap_write_time = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "ad_access",
+            "exchange.ldap_write_time_sec",
+            "Time to send an LDAP add, modify, or delete request and receive a response.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_LDAP_WRITE_TIME,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ea->rd_exchange_ldap_write_time =
+            rrddim_add(ea->st_exchange_ldap_write_time, "write", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ea->st_exchange_ldap_write_time->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        ea->st_exchange_ldap_write_time,
+        ea->rd_exchange_ldap_write_time,
+        (collected_number)ea->exchangeLDAPWriteTime.current.Data);
+    rrdset_done(ea->st_exchange_ldap_write_time);
+}
+
+static void netdata_exchange_ldap_timeout_errors(struct exchange_ad_access_process *ea, char *process, int update_every)
+{
+    if (unlikely(!ea->st_exchange_ldap_timeout_errors)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_ad_access_%s_ldap_timeout_errors_total", process);
+
+        ea->st_exchange_ldap_timeout_errors = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "ad_access",
+            "exchange.ldap_timeout_errors_total",
+            "LDAP timeout errors.",
+            "errors/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_LDAP_TIMEOUT_ERRORS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ea->rd_exchange_ldap_timeout_errors =
+            rrddim_add(ea->st_exchange_ldap_timeout_errors, "timeouts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ea->st_exchange_ldap_timeout_errors->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        ea->st_exchange_ldap_timeout_errors,
+        ea->rd_exchange_ldap_timeout_errors,
+        (collected_number)ea->exchangeLDAPTimeoutErrors.current.Data);
+    rrdset_done(ea->st_exchange_ldap_timeout_errors);
+}
+
+static void netdata_exchange_ldap_long_running_ops(
+    struct exchange_ad_access_process *ea, char *process, int update_every)
+{
+    if (unlikely(!ea->st_exchange_ldap_long_running_ops)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_ad_access_%s_ldap_long_running_ops_per_sec", process);
+
+        ea->st_exchange_ldap_long_running_ops = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "ad_access",
+            "exchange.ldap_long_running_ops_per_sec",
+            "Long running LDAP operations.",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_LDAP_LONG_RUNNING_OPS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ea->rd_exchange_ldap_long_running_ops =
+            rrddim_add(ea->st_exchange_ldap_long_running_ops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ea->st_exchange_ldap_long_running_ops->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        ea->st_exchange_ldap_long_running_ops,
+        ea->rd_exchange_ldap_long_running_ops,
+        (collected_number)ea->exchangeLDAPLongRunningOps.current.Data);
+    rrdset_done(ea->st_exchange_ldap_long_running_ops);
+}
+
+static void netdata_exchange_ad_access(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct exchange_ad_access_process *ea =
+            dictionary_set(exchange_ad_access_processes, windows_shared_buffer, NULL, sizeof(*ea));
+        if (!ea)
+            continue;
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ea->exchangeLDAPReadTime))
+            netdata_exchange_ldap_read_time(ea, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ea->exchangeLDAPSearchTime))
+            netdata_exchange_ldap_search_time(ea, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ea->exchangeLDAPWriteTime))
+            netdata_exchange_ldap_write_time(ea, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ea->exchangeLDAPTimeoutErrors))
+            netdata_exchange_ldap_timeout_errors(ea, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ea->exchangeLDAPLongRunningOps))
+            netdata_exchange_ldap_long_running_ops(ea, windows_shared_buffer, update_every);
+    }
+}
+
+static void netdata_exchange_mapihttp_active_user_count(COUNTER_DATA *value, int update_every)
+{
+    static RRDSET *st_exchange_mapihttp_active_user_count = NULL;
+    static RRDDIM *rd_exchange_mapihttp_active_user_count = NULL;
+
+    if (unlikely(!st_exchange_mapihttp_active_user_count)) {
+        st_exchange_mapihttp_active_user_count = rrdset_create_localhost(
+            "exchange",
+            "mapihttp_emsmdb_active_user_count",
+            NULL,
+            "mapihttp",
+            "exchange.mapihttp_emsmdb_active_user_count",
+            "Unique MAPI HTTP EMSMDB users active in the last 2 minutes.",
+            "users",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_MAPIHTTP_ACTIVE_USER_COUNT,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_exchange_mapihttp_active_user_count = rrddim_add(
+            st_exchange_mapihttp_active_user_count, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_exchange_mapihttp_active_user_count,
+        rd_exchange_mapihttp_active_user_count,
+        (collected_number)value->current.Data);
+    rrdset_done(st_exchange_mapihttp_active_user_count);
+}
+
+static void netdata_exchange_mapihttp(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA exchangeMapiHTTPActiveUserCount = {.key = "Active User Count"};
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeMapiHTTPActiveUserCount))
+        netdata_exchange_mapihttp_active_user_count(&exchangeMapiHTTPActiveUserCount, update_every);
 }
 
 static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int update_every)
@@ -1204,6 +1541,507 @@ static void netdata_exchange_queue_poison(struct exchange_queue *eq, char *mailb
     rrdset_done(eq->st_exchange_queue_poison);
 }
 
+static void netdata_exchange_queue_retry_mailbox_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_retry_mailbox_delivery)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_retry_mailbox_delivery", mailbox);
+
+        eq->st_exchange_queue_retry_mailbox_delivery = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_retry_mailbox_delivery",
+            "Retry Mailbox Delivery Queue length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_RETRY_MAILBOX_DELIVERY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_retry_mailbox_delivery = rrddim_add(
+            eq->st_exchange_queue_retry_mailbox_delivery, "retry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_retry_mailbox_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_retry_mailbox_delivery,
+        eq->rd_exchange_queue_retry_mailbox_delivery,
+        (collected_number)eq->exchangeTransportQueuesRetryMailboxDelivery.current.Data);
+    rrdset_done(eq->st_exchange_queue_retry_mailbox_delivery);
+}
+
+static void netdata_exchange_queue_external_largest_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_external_largest_delivery)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_external_largest_delivery", mailbox);
+
+        eq->st_exchange_queue_external_largest_delivery = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_external_largest_delivery",
+            "External Largest Delivery Queue length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_EXTERNAL_LARGEST_DELIVERY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_external_largest_delivery = rrddim_add(
+            eq->st_exchange_queue_external_largest_delivery, "largest", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_external_largest_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_external_largest_delivery,
+        eq->rd_exchange_queue_external_largest_delivery,
+        (collected_number)eq->exchangeTransportQueuesExternalLargestDelivery.current.Data);
+    rrdset_done(eq->st_exchange_queue_external_largest_delivery);
+}
+
+static void netdata_exchange_queue_internal_largest_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_internal_largest_delivery)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_internal_largest_delivery", mailbox);
+
+        eq->st_exchange_queue_internal_largest_delivery = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_internal_largest_delivery",
+            "Internal Largest Delivery Queue length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_INTERNAL_LARGEST_DELIVERY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_internal_largest_delivery = rrddim_add(
+            eq->st_exchange_queue_internal_largest_delivery, "largest", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_internal_largest_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_internal_largest_delivery,
+        eq->rd_exchange_queue_internal_largest_delivery,
+        (collected_number)eq->exchangeTransportQueuesInternalLargestDelivery.current.Data);
+    rrdset_done(eq->st_exchange_queue_internal_largest_delivery);
+}
+
+static void netdata_exchange_queue_messages_queued_for_delivery_total(
+    struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_messages_queued_for_delivery_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_messages_queued_for_delivery_total", mailbox);
+
+        eq->st_exchange_queue_messages_queued_for_delivery_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_messages_queued_for_delivery_total",
+            "Messages queued for delivery.",
+            "messages/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_MESSAGES_QUEUED_FOR_DELIVERY_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_messages_queued_for_delivery_total = rrddim_add(
+            eq->st_exchange_queue_messages_queued_for_delivery_total, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_messages_queued_for_delivery_total->rrdlabels,
+            "mailbox",
+            mailbox,
+            RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_messages_queued_for_delivery_total,
+        eq->rd_exchange_queue_messages_queued_for_delivery_total,
+        (collected_number)eq->exchangeTransportQueuesMessagesQueuedForDeliveryTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_messages_queued_for_delivery_total);
+}
+
+static void netdata_exchange_queue_messages_submitted_total(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_messages_submitted_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_messages_submitted_total", mailbox);
+
+        eq->st_exchange_queue_messages_submitted_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_messages_submitted_total",
+            "Messages submitted.",
+            "messages/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_MESSAGES_SUBMITTED_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_messages_submitted_total = rrddim_add(
+            eq->st_exchange_queue_messages_submitted_total, "submitted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_messages_submitted_total->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_messages_submitted_total,
+        eq->rd_exchange_queue_messages_submitted_total,
+        (collected_number)eq->exchangeTransportQueuesMessagesSubmittedTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_messages_submitted_total);
+}
+
+static void netdata_exchange_queue_messages_delayed_total(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_messages_delayed_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_messages_delayed_total", mailbox);
+
+        eq->st_exchange_queue_messages_delayed_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_messages_delayed_total",
+            "Messages delayed.",
+            "messages/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_MESSAGES_DELAYED_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_messages_delayed_total = rrddim_add(
+            eq->st_exchange_queue_messages_delayed_total, "delayed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(eq->st_exchange_queue_messages_delayed_total->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_messages_delayed_total,
+        eq->rd_exchange_queue_messages_delayed_total,
+        (collected_number)eq->exchangeTransportQueuesMessagesDelayedTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_messages_delayed_total);
+}
+
+static void netdata_exchange_queue_messages_completed_delivery_total(
+    struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_messages_completed_delivery_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(
+            id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_messages_completed_delivery_total", mailbox);
+
+        eq->st_exchange_queue_messages_completed_delivery_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_messages_completed_delivery_total",
+            "Messages completed delivery.",
+            "messages/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_MESSAGES_COMPLETED_DELIVERY_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_messages_completed_delivery_total = rrddim_add(
+            eq->st_exchange_queue_messages_completed_delivery_total,
+            "delivered",
+            NULL,
+            1,
+            1,
+            RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_messages_completed_delivery_total->rrdlabels,
+            "mailbox",
+            mailbox,
+            RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_messages_completed_delivery_total,
+        eq->rd_exchange_queue_messages_completed_delivery_total,
+        (collected_number)eq->exchangeTransportQueuesMessagesCompletedDeliveryTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_messages_completed_delivery_total);
+}
+
+static void netdata_exchange_queue_aggregate_shadow_queue_length(
+    struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_aggregate_shadow_queue_length)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_aggregate_shadow_queue_length", mailbox);
+
+        eq->st_exchange_queue_aggregate_shadow_queue_length = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_aggregate_shadow_queue_length",
+            "Current number of messages in shadow queues.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_AGGREGATE_SHADOW_QUEUE_LENGTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_aggregate_shadow_queue_length = rrddim_add(
+            eq->st_exchange_queue_aggregate_shadow_queue_length, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_aggregate_shadow_queue_length->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_aggregate_shadow_queue_length,
+        eq->rd_exchange_queue_aggregate_shadow_queue_length,
+        (collected_number)eq->exchangeTransportQueuesAggregateShadowQueueLength.current.Data);
+    rrdset_done(eq->st_exchange_queue_aggregate_shadow_queue_length);
+}
+
+static void netdata_exchange_queue_submission_queue_length(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_submission_queue_length)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_submission_queue_length", mailbox);
+
+        eq->st_exchange_queue_submission_queue_length = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_submission_queue_length",
+            "Submission Queue Length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_SUBMISSION_QUEUE_LENGTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_submission_queue_length = rrddim_add(
+            eq->st_exchange_queue_submission_queue_length, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_submission_queue_length->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_submission_queue_length,
+        eq->rd_exchange_queue_submission_queue_length,
+        (collected_number)eq->exchangeTransportQueuesSubmissionQueueLength.current.Data);
+    rrdset_done(eq->st_exchange_queue_submission_queue_length);
+}
+
+static void netdata_exchange_queue_delay_queue_length(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_delay_queue_length)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_delay_queue_length", mailbox);
+
+        eq->st_exchange_queue_delay_queue_length = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_delay_queue_length",
+            "Delay Queue Length.",
+            "messages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_DELAY_QUEUE_LENGTH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_delay_queue_length =
+            rrddim_add(eq->st_exchange_queue_delay_queue_length, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(eq->st_exchange_queue_delay_queue_length->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_delay_queue_length,
+        eq->rd_exchange_queue_delay_queue_length,
+        (collected_number)eq->exchangeTransportQueuesDelayQueueLength.current.Data);
+    rrdset_done(eq->st_exchange_queue_delay_queue_length);
+}
+
+static void netdata_exchange_queue_items_completed_delivery_total(
+    struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_items_completed_delivery_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_items_completed_delivery_total", mailbox);
+
+        eq->st_exchange_queue_items_completed_delivery_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_items_completed_delivery_total",
+            "Items completed delivery.",
+            "items/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_ITEMS_COMPLETED_DELIVERY_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_items_completed_delivery_total = rrddim_add(
+            eq->st_exchange_queue_items_completed_delivery_total, "completed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_items_completed_delivery_total->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_items_completed_delivery_total,
+        eq->rd_exchange_queue_items_completed_delivery_total,
+        (collected_number)eq->exchangeTransportQueuesItemsCompletedDeliveryTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_items_completed_delivery_total);
+}
+
+static void netdata_exchange_queue_items_queued_for_delivery_expired_total(
+    struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_items_queued_for_delivery_expired_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(
+            id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_items_queued_for_delivery_expired_total", mailbox);
+
+        eq->st_exchange_queue_items_queued_for_delivery_expired_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_items_queued_for_delivery_expired_total",
+            "Items queued for delivery that expired.",
+            "items/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_ITEMS_QUEUED_FOR_DELIVERY_EXPIRED_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_items_queued_for_delivery_expired_total = rrddim_add(
+            eq->st_exchange_queue_items_queued_for_delivery_expired_total,
+            "expired",
+            NULL,
+            1,
+            1,
+            RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_items_queued_for_delivery_expired_total->rrdlabels,
+            "mailbox",
+            mailbox,
+            RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_items_queued_for_delivery_expired_total,
+        eq->rd_exchange_queue_items_queued_for_delivery_expired_total,
+        (collected_number)eq->exchangeTransportQueuesItemsQueuedForDeliveryExpiredTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_items_queued_for_delivery_expired_total);
+}
+
+static void netdata_exchange_queue_items_queued_for_delivery_total(
+    struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_items_queued_for_delivery_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_items_queued_for_delivery_total", mailbox);
+
+        eq->st_exchange_queue_items_queued_for_delivery_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_items_queued_for_delivery_total",
+            "Items queued for delivery.",
+            "items/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_ITEMS_QUEUED_FOR_DELIVERY_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_items_queued_for_delivery_total = rrddim_add(
+            eq->st_exchange_queue_items_queued_for_delivery_total, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_items_queued_for_delivery_total->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_items_queued_for_delivery_total,
+        eq->rd_exchange_queue_items_queued_for_delivery_total,
+        (collected_number)eq->exchangeTransportQueuesItemsQueuedForDeliveryTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_items_queued_for_delivery_total);
+}
+
+static void netdata_exchange_queue_items_resubmitted_total(struct exchange_queue *eq, char *mailbox, int update_every)
+{
+    if (unlikely(!eq->st_exchange_queue_items_resubmitted_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_items_resubmitted_total", mailbox);
+
+        eq->st_exchange_queue_items_resubmitted_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "queue",
+            "exchange.transport_queues_items_resubmitted_total",
+            "Items resubmitted.",
+            "items/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_QUEUE_ITEMS_RESUBMITTED_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        eq->rd_exchange_queue_items_resubmitted_total = rrddim_add(
+            eq->st_exchange_queue_items_resubmitted_total, "resubmitted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(
+            eq->st_exchange_queue_items_resubmitted_total->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        eq->st_exchange_queue_items_resubmitted_total,
+        eq->rd_exchange_queue_items_resubmitted_total,
+        (collected_number)eq->exchangeTransportQueuesItemsResubmittedTotal.current.Data);
+    rrdset_done(eq->st_exchange_queue_items_resubmitted_total);
+}
+
 static void netdata_exchange_queues(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -1233,14 +2071,58 @@ static void netdata_exchange_queues(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesExternalActiveRemoteDelivery))
             netdata_exchange_queue_external_active_remote_delivery(eq, windows_shared_buffer, update_every);
 
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesExternalLargestDelivery))
+            netdata_exchange_queue_external_largest_delivery(eq, windows_shared_buffer, update_every);
+
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesInternalActiveRemoteDelivery))
             netdata_exchange_queue_internal_active_remote_delivery(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesInternalLargestDelivery))
+            netdata_exchange_queue_internal_largest_delivery(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesRetryMailboxDelivery))
+            netdata_exchange_queue_retry_mailbox_delivery(eq, windows_shared_buffer, update_every);
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesUnreachable))
             netdata_exchange_queue_unreachable(eq, windows_shared_buffer, update_every);
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesPoison))
             netdata_exchange_queue_poison(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesMessagesQueuedForDeliveryTotal))
+            netdata_exchange_queue_messages_queued_for_delivery_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesMessagesSubmittedTotal))
+            netdata_exchange_queue_messages_submitted_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesMessagesDelayedTotal))
+            netdata_exchange_queue_messages_delayed_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(
+                pDataBlock, pObjectType, &eq->exchangeTransportQueuesMessagesCompletedDeliveryTotal))
+            netdata_exchange_queue_messages_completed_delivery_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesAggregateShadowQueueLength))
+            netdata_exchange_queue_aggregate_shadow_queue_length(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesSubmissionQueueLength))
+            netdata_exchange_queue_submission_queue_length(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesDelayQueueLength))
+            netdata_exchange_queue_delay_queue_length(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesItemsCompletedDeliveryTotal))
+            netdata_exchange_queue_items_completed_delivery_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(
+                pDataBlock, pObjectType, &eq->exchangeTransportQueuesItemsQueuedForDeliveryExpiredTotal))
+            netdata_exchange_queue_items_queued_for_delivery_expired_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesItemsQueuedForDeliveryTotal))
+            netdata_exchange_queue_items_queued_for_delivery_total(eq, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesItemsResubmittedTotal))
+            netdata_exchange_queue_items_resubmitted_total(eq, windows_shared_buffer, update_every);
     }
 }
 
@@ -1250,8 +2132,10 @@ struct netdata_exchange_objects {
 } exchange_obj[] = {
     {.fnct = netdata_exchange_owa, .object = "MSExchange OWA"},
     {.fnct = netdata_exchange_active_sync, .object = "MSExchange ActiveSync"},
+    {.fnct = netdata_exchange_ad_access, .object = "MSExchange ADAccess Processes"},
     {.fnct = netdata_exchange_auto_discover, .object = "MSExchangeAutodiscover"},
     {.fnct = netdata_exchange_availability_service, .object = "MSExchange Availability Service"},
+    {.fnct = netdata_exchange_mapihttp, .object = "MSExchange MapiHttp Emsmdb"},
     {.fnct = netdata_exchange_rpc, .object = "MSExchange RpcClientAccess"},
     {.fnct = netdata_exchange_proxy, .object = "MSExchange HttpProxy"},
     {.fnct = netdata_exchange_workload, .object = "MSExchange WorkloadManagement Workloads"},
