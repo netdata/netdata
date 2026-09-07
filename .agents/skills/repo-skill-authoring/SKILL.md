@@ -13,23 +13,22 @@ home. When an owner document and this skill disagree, the owner wins and this fi
 
 | Task | Read |
 |---|---|
-| create a skill | Where The Rules Live, Authoring Rules, Creating A Skill; `change-method.md` "Mechanical Hygiene" |
-| add or change rules in an existing skill | Authoring Rules; `change-method.md` "Recorded Findings And Owners", "Mechanical Hygiene", "Close" |
-| slim, split, or restructure a skill | Authoring Rules, then all of `change-method.md`; the method is not optional |
-| periodic rot pass | Rot Signals |
-| review a skill change | `change-method.md` "Review Round": the two lenses and what each reviewer receives |
+| create a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, `./SKILL.md#creating-a-skill`; `./change-method.md#review-round`, `./change-method.md#mechanical-hygiene` |
+| add or change rules in an existing skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`; `./change-method.md#recorded-findings-and-owners`, `./change-method.md#mechanical-hygiene`, `./change-method.md#close` |
+| slim, split, or restructure a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, then all of `./change-method.md#changing-a-skill`; the method is not optional |
+| periodic rot pass | `./SKILL.md#rot-signals` |
+| review a skill change | `./change-method.md#review-round`: the two lenses and what each reviewer receives |
 
 ## Where The Rules Live
 
-Owner sections, cited by anchor so the audit catches a renamed heading. Read the row for the obligation it names; a row
-names the subject and never copies the requirement text.
+Owner sections, cited by anchor so the audit catches a renamed heading. Read the row for the obligation it names.
 
 | Owner section | What you must get from it |
 |---|---|
-| `AGENTS.md#project-skills` | where runtime skills live; the same-PR rule for gap-closing and pointer-fixing updates; the slimming pass every skill change ends with and what it reports; the public-skill convention (audience boundary, symlinks, script shape, token safety, the live how-tos catalog); the grouped skills index |
+| `AGENTS.md#project-skills` | where runtime skills live; the same-PR rule for gap-closing and pointer-fixing updates; the slimming pass every skill change ends with and what it reports; the public-skill convention (audience boundary, symlinks, script shape, token safety, the live how-tos catalog); output/reference skill trees and their no-rename rule; the grouped skills index |
 | `AGENTS.md#durable-ai-facing-artifact-formatting` | retrieval structure, requirement words next to the action, prose width, reflow-only commits |
-| `AGENTS.md#sensitive-data-in-durable-artifacts` | a skill is public even when local; sanitized evidence only |
-| `AGENTS.md#enforcement` | what `.agents/sow/audit.sh` hard-fails on and what the PR gate `.github/workflows/sow.yml` re-checks. Facts the audit script itself owns: its path and anchor scans read tracked files (`git grep`, `git ls-files`), the anchor collector reads only files under `.agents/skills/` and `docs/netdata-ai/skills/`, and index entries resolve to directories only when written as a bullet whose first token is the backticked skill name followed by a colon, inside the block that ends at the `Public skills (` line |
+| `AGENTS.md#sensitive-data-in-durable-artifacts` | the public-artifact assumption and the sanitized-evidence requirement |
+| `AGENTS.md#enforcement` | what `.agents/sow/audit.sh` hard-fails on and what the PR gate `.github/workflows/sow.yml` re-checks |
 | `AGENTS.md#local-only-working-directory` | evidence goes under `.local/audits/<dir>/`; this skill's row names the directory after the skill or SOW topic under change |
 | `AGENTS.md#clean-end-state-over-less-churn` | the target is recorded before options are generated; the disclosure of what is removed and what is excluded; the reference search when a path is replaced; how coupled cleanup is handled |
 | `AGENTS.md#working-with-the-user` | the user-decision format and when a decision is recorded |
@@ -37,22 +36,28 @@ names the subject and never copies the requirement text.
 | `AGENTS.md#when-a-sow-is-required`, `AGENTS.md#followup-discipline`, `AGENTS.md#artifact-maintenance-gate` | a skill change is non-trivial work with a SOW; how deferred items are tracked; what every close records |
 | `AGENTS.md#git-and-pr-workflow` | staging, and which git actions need explicit approval (deleting a file among them) |
 | `AGENTS.md#open-source-reference-evidence` | the citation form for an owner outside this repository |
-| `.agents/skills/README.md#naming`, `.agents/skills/README.md#areas` | the name form, frontmatter `name` equals the directory, the area minting rule and its same-change obligation; the no-nesting rule is in the README's opening paragraph |
-| `.agents/skills/README.md#owner-section-citations` | pointing at a fact's owner rather than restating it is a MUST there; the anchor form and slug rules; the marker paragraph for a private owner document, none for a Learn-published one |
+| `.agents/skills/README.md#naming`, `.agents/skills/README.md#areas` | the name form and the area minting rule with its same-change obligation; the no-nesting rule is in the README's opening paragraph |
+| `.agents/skills/README.md#owner-section-citations` | the point-rather-than-restate rule and the anchor form (a MUST) with its slug rules; the marker paragraph for a private owner document, none for a Learn-published one |
 | `.agents/skills/README.md#finding-a-skill` | the index is the map; the frontmatter description is the trigger; the cross-reference for a skill serving two areas |
 
 ## Authoring Rules
 
-Every bullet is a MUST unless it says SHOULD or MAY.
+Every requirement below is a MUST unless it says SHOULD or MAY; a sentence stating a fact or a consequence is marked as
+such by its wording.
 
 Ownership and pointing:
 
 - Search for the owner before writing a fact: the shipped format document, an `ARCHITECTURE.md`, a tool `README.md`,
-  a published operator page, a code-tree `README.md`, a sibling skill. A skill that restates any of them rots.
-- An owner is a hand-maintained file. A generated page (generator banner, or listed as a generator's output) or a
-  symlink into generated output (`git ls-files -s <path>` shows mode `120000`; `readlink <path>`) is never an owner or
-  an authority.
-- Cite the repository path, never a bare filename; several documents in this tree share a basename.
+  a published operator page, a code-tree `README.md`, a sibling skill, a script or workflow. A skill that restates any
+  of them rots.
+- An owner is a hand-maintained file. A generated page (an opening HTML comment carrying `startmeta` and
+  `meta_yaml:`, a `DO NOT EDIT` banner, or a file `integrations-lifecycle` lists as generator output) or a symlink into
+  generated output (`git ls-files -s <path>` shows mode `120000`; `readlink <path>`) is never an owner or an authority.
+- When the only owner of a fact is a script or a workflow (`.agents/sow/audit.sh`, `.github/workflows/sow.yml`),
+  attribute the fact to that file, not to the prose section that names the script: a section that does not state the
+  fact cannot be checked against it, and renaming the section never exposes the drift.
+- Cite the repository path, never a bare filename; several documents in this tree share a basename. Inside a skill,
+  cite a section of its own files as `./<file>.md#<anchor>` so the audit checks it.
 - An owner outside this repository cannot be an anchor citation: read it from the local mirror (`repo-mirror-sources`)
   and cite it as `owner/repo @ commit` (`AGENTS.md#open-source-reference-evidence`). A fact whose only owner is out of
   repo stays in the skill, labelled with what verified it and when, or as unverifiable; never delete what you cannot
@@ -73,12 +78,15 @@ Ownership and pointing:
 Citations and claims:
 
 - Cite symbols and paths, never line numbers; never promise that line numbers track a branch.
-- No PR, commit, issue, or SOW identifiers and no session labels (option letters, inventory ids) in a skill.
+- No PR, issue, or SOW identifiers of this repository, no commit hashes of this repository, and no session labels
+  (option letters, inventory ids) in a skill. A commit hash appears only inside an `owner/repo @ commit` citation of an
+  out-of-repo owner.
 - Write each code-dependent sentence from the symbol, not from old skill text or a quick read, and state what a
   consumer relies on rather than how the producer gets there.
 - Qualify every "the code enforces" claim with the tool, the mode, and the severity (error or warning); keep enforced
   checks and hand-reviewed rules in separate lists.
-- Keep the permissive half of a rule: a MAY clause is a rule, inventoried and preserved on its own.
+- Keep the permissive half of a rule: a MAY clause is a rule, inventoried as its own row and mapped separately from
+  its prohibition.
 - A documented command runs as written: repository-root paths, where to run it from, the interpreter or environment
   it needs. A launcher's internal path resolution is a separate fact.
 - No hard-coded aggregates, counts, or percentages that regeneration or the next slim changes; give the recompute
@@ -92,20 +100,25 @@ Structure and routing:
 
 - Every file is routed from `SKILL.md`; a router or index lists only files that exist (a bare name is invisible to the
   audit's path scan); no stubs.
-- When a skill serves more than one audience, `SKILL.md` routes by audience and a topic file SHOULD serve one.
-- The live how-tos catalog MUST binds public skills only; a runtime skill's `how-tos/INDEX.md` is optional: keep it
-  when `SKILL.md` routes it and every listed file exists, otherwise list the how-tos in `SKILL.md`.
+- When a skill serves more than one audience, `SKILL.md` routes by audience and a topic file SHOULD serve one. Split
+  into two skills only when the audiences differ and the seam cuts no shared step and no facts that change together;
+  otherwise one skill with a router.
+- The live how-tos catalog requirement (`AGENTS.md#project-skills`) binds public skills only. In a runtime skill an
+  index file in any subdirectory (`how-tos/INDEX.md`, `recipes/INDEX.md`) is optional: keep it when `SKILL.md` routes
+  it and every listed file exists, otherwise list the files in `SKILL.md`.
 - A peer skill gets one routing sentence. A one-way prerequisite MAY be declared (an entry-point skill, a
-  read-this-first skill); two skills never require each other. When two skills claim one directory, each carries one
-  boundary line.
+  read-this-first skill).
+- Two skills MUST NOT require each other. When two skills claim one directory, each carries one boundary line.
 - The trigger (the frontmatter description) enumerates the phrases users type and carries "not for" clauses toward
   neighbouring skills; the `AGENTS.md` index entry matches it, including every producer, subcommand, or binary name.
-- Recommended skeleton, each element with the skill that shows it: frontmatter trigger (all); an owners block with
-  anchors and one clause per owner (`topology-authoring` as a table, `collectors-snmp-trap-profiles` as bullets); a
-  task router (`collectors-prometheus-profiles`); a rule sheet split into what the code enforces and rules with no
-  code owner (`collectors-prometheus-profiles`, `topology-authoring`); a workflow (all); validation commands
-  (`collectors-snmp-trap-profiles`); a how-to list (`collectors-prometheus-profiles`, `topology-authoring`); a one-file
-  rule sheet when there is one audience (`collectors-snmp-profiles`, `collectors-snmp-trap-profiles`).
+- Recommended skeleton, each element with the skill that shows it: frontmatter trigger (all); an owners block with one
+  row per owner and anchors where a section is meant (`topology-authoring` as a table, `collectors-snmp-trap-profiles`
+  as anchored bullets); a task router (`collectors-prometheus-profiles`); a rule sheet split into what the code
+  enforces and rules with no code owner (`collectors-prometheus-profiles`, `topology-authoring`); a workflow section
+  (`collectors-prometheus-profiles`, `topology-authoring`) or ordered required-checks lists (`collectors-snmp-profiles`,
+  `collectors-snmp-trap-profiles`); validation commands (`collectors-snmp-profiles`, `collectors-snmp-trap-profiles`);
+  a how-to list (`collectors-prometheus-profiles`, `topology-authoring`); a one-file rule sheet when there is one
+  audience (`collectors-snmp-profiles`, `collectors-snmp-trap-profiles`).
 
 ## Creating A Skill
 
@@ -116,19 +129,22 @@ Structure and routing:
 3. Write the trigger with the phrases users type and the "not for" clauses; write `SKILL.md` on the skeleton above; add
    a supporting file only when `SKILL.md` routes it.
 4. If the skill writes output, add its row to the table in `AGENTS.md#local-only-working-directory`.
-5. Add the index entry under its area in `AGENTS.md#project-skills`, in the form the audit resolves (Where The Rules
-   Live, the `AGENTS.md#enforcement` row), and the cross-reference `.agents/skills/README.md#finding-a-skill` asks for.
-6. `git add` the new files (the audit's path and anchor scans read tracked files; nothing in CI runs the audit), run
-   `bash .agents/sow/audit.sh`, then one review round with the correctness lens plus a trigger-coverage check (there
-   is no inventory yet, so no preservation lens).
+5. Add the index entry under its area in `AGENTS.md#project-skills`. The audit (`.agents/sow/audit.sh`) resolves an
+   entry to its directory only when it is a bullet whose first token is the backticked skill name followed by a colon,
+   inside the block between the `Skills index (` and `Public skills (` lines. When the skill serves two areas, add the
+   cross-reference `.agents/skills/README.md#finding-a-skill` asks for.
+6. `git add` the new files (the audit's path and anchor scans read tracked files; CI runs no skills check), run
+   `bash .agents/sow/audit.sh`, then one review round with the correctness lens of `./change-method.md#review-round`
+   plus a trigger-coverage check. A creation has no inventory, so no preservation map and no preservation lens.
 
 ## Rot Signals
 
 Run this over a skill periodically and before extending it. A cluster of hits is a slim; a single hit is a one-line fix
 in the same change.
 
-- Line-number citations; PR, commit, issue, or SOW identifiers; a promise that line numbers track a branch (grep for
-  them; only legacy four-digit SOW identifiers are automated, by the audit).
+- Line-number citations; PR, commit, issue, or SOW identifiers; a promise that line numbers track a branch. Grep for
+  them: the audit automates only legacy four-digit SOW identifiers, not dated SOW ids, line numbers, or PR and commit
+  references.
 - A code-side document now exists for facts the skill states.
 - "Authoritative design", "Spec -", Status, Migration Notes, Schema Additions Required, phase history, open review
   questions.
@@ -138,14 +154,14 @@ in the same change.
 - Hard-coded counts or percentages.
 - Index entry and frontmatter disagree; a new producer, subcommand, or flag the trigger does not name.
 - No task router: every task opens most of the skill; `SKILL.md` narrative paid on every trigger.
-- Audit anchor failures after an owner document edit; a relative link the audit does not check that no longer
-  resolves (`change-method.md` "Recorded Findings And Owners" lists what it checks).
+- Audit anchor failures after an owner document edit; a link the audit does not check that no longer resolves
+  (`./change-method.md#recorded-findings-and-owners` lists what it checks).
 - A generated page or symlink in an authority list.
 - An owner section named in prose instead of cited by anchor.
 
 ## Maintaining This Skill
 
-This skill has no code-side owner; nothing feeds it but skill work. A lesson or rot signal learned while changing any
-skill lands here in the same SOW, and that SOW's Artifact Maintenance Gate says so. When the method itself changes, a
-fresh-context agent runs the method from this skill, `AGENTS.md`, and the README alone; what it misses is the
-under-specified line, fixed in the same SOW.
+Nothing feeds this skill but skill work. A lesson or rot signal learned while changing any skill lands here in the
+same SOW, and that SOW's Artifact Maintenance Gate says so. When the method itself changes, a fresh-context agent runs
+the method from this skill, `AGENTS.md`, and the README alone; what it misses is the under-specified line, fixed in the
+same SOW.

@@ -514,8 +514,8 @@ files, and other docs written so future AI agents can execute repository rules c
 
 ### Open-Source Reference Evidence
 
-When SOW evidence comes from another open-source repository, cite the upstream repository and the checked commit,
-never the workstation path:
+When evidence in a SOW or a skill comes from another open-source repository, cite the upstream repository and the
+checked commit, never the workstation path:
 
 ```text
 owner/repo @ commit
@@ -659,9 +659,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `repo-pr-reviews`: PR comment and review iteration
   - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
     reset-to-default safety; `--repo` scoping
-  - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; skill rot; the authoring
-    rules (point at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change
-    method (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
+  - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
+    at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change method
+    (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
@@ -730,13 +730,14 @@ renames:
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
-| `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change; `<subject>` is the directory name of the skill under change (distinct from that skill's own pinned output directory) or the SOW topic |
+| `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
 | `query-snmp-traps` (public) | `query-snmp-traps/` | saved trap query results from its how-tos |
 
 A new runtime skill picks a `<dir>` equal to its topic; a public skill uses its skill name; `repo-skill-authoring` is
-the exception, writing under the name of the skill it changes. All record the row here.
+the exception: its `<subject>` is the directory name of the skill under change (distinct from that skill's own pinned
+directory) or the SOW topic. All record the row here.
 
 ### Per-User Secrets
 
