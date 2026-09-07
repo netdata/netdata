@@ -27,8 +27,9 @@ published contract and are exempt from the naming rule below.
   reduced to their text; then lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else
   dropped; spaces become hyphens; a repeated heading gets `-1`, `-2`, and this repository's check gives a further
   suffix to a generated slug that collides with a literal title, which GitHub may not). Cite only such headings:
-  non-ASCII titles, setext headings, and titles that collide with generated suffixes are outside the convention. Paths are repo-relative (with or without a leading
-  `/`), or relative to the citing file when they start with `./` or `../`. URLs are written with their scheme.
+  non-ASCII titles, setext headings, and titles that collide with generated suffixes are outside the convention. Paths
+  are repo-relative (with or without a leading `/`), or relative to the citing file when they start with `./` or
+  `../`. URLs are written with their scheme.
 - `.agents/sow/audit.sh` fails when the cited file or a heading with that slug is missing, so renaming or removing a
   heading in an owner document is caught until every citing skill is updated. Headings and citations inside fenced
   code blocks or multi-line HTML comments are not scanned.
