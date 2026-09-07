@@ -15,8 +15,9 @@ under learn `docs/` is deleted and rebuilt on every ingest (`../authoring-bounda
    for presence, validity, and global uniqueness and runs in `.github/workflows/check-markdown.yml`.
 5. Add source-level regression coverage for the objective defect (map ownership, description presence, heading
    structure, resolvable links); a word count is not a completeness measure.
-6. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`) and a disposable ingest with `--local-repo`
-   (`docs/.map/README.md#2-test-the-changes`); inspect the generated MDX for title, description, H1, body, and links.
+6. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`) and a disposable ingest with
+   `--local-repo` (`docs/.map/README.md#2-test-the-changes`); inspect the generated MDX for title, description, H1,
+   body, and links.
 
 Origin: the `Clocks` and `Socket` nodes, whose sources are `src/libnetdata/clocks/README.md` and
 `src/libnetdata/socket/README.md`, rendered empty; the sources were the fix and `test_descriptions.py` now covers them.

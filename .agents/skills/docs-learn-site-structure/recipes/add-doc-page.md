@@ -16,8 +16,9 @@ checks that catch the silent failures.
    (`../mapping.md#file-path-and-slug`). Check for a sibling that sanitizes to the same name.
 4. Write cross-references as repository-relative `.md` paths (`../mapping.md#links-between-pages`); keep MDX-hostile
    text in inline code (`../mdx-rules.md`).
-5. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`), then the local ingest (`docs/.map/README.md#2-test-the-changes`),
-   and confirm the page appears at the predicted path under learn `docs/` with the expected frontmatter.
+5. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`), then the local ingest
+   (`docs/.map/README.md#2-test-the-changes`), and confirm the page appears at the predicted path under learn `docs/`
+   with the expected frontmatter.
 6. Open one PR here with the page and the map change. `.github/workflows/check-markdown.yml` runs the real ingest
    against the PR (`../pipeline.md#verification-before-merging-here`).
 7. After merge, `trigger-learn-update.yml` dispatches the learn ingest; a learn maintainer merges the ingest PR;

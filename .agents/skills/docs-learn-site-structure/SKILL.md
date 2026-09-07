@@ -71,6 +71,7 @@ Hand-reviewed, because no code checks them:
   (`./mapping.md#links-between-pages`).
 - Text that MDX reads as a tag (`<word>`, `<` before a digit, generics) is wrapped in inline code or rephrased
   (`./mdx-rules.md`).
-- Run `docs/.map/validate_map_schema.py` before opening a map PR (`./mapping.md#what-is-checked-and-by-what`); nothing in CI runs it.
+- Run `docs/.map/validate_map_schema.py` before opening a map PR (`./mapping.md#what-is-checked-and-by-what`);
+  nothing in CI runs it.
 - Learn paths in committed text use the `${NETDATA_REPOS_DIR}/learn/...` form; facts about learn code carry the
   `owner/repo @ commit` they were verified against.

@@ -9,8 +9,9 @@ a move (`./move-doc-page.md`): the old route is redirected by the next ingest.
    name; a collision between non-integration pages aborts ingest.
 3. `meta.path` does not rename the page's own segment; on a leaf it adds a directory segment above it
    (`../mapping.md#rows-ingest-reads-from-the-map`). The last segment always follows `label`.
-4. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`) and the local ingest (`docs/.map/README.md#2-test-the-changes`); the
-   file under learn `docs/` is renamed and a redirect entry appears for the old route.
+4. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`) and the local ingest
+   (`docs/.map/README.md#2-test-the-changes`); the file under learn `docs/` is renamed and a redirect entry appears for
+   the old route.
 5. Update first-party links to the page in this repository (they are rewritten by ingest only if written as
    repository-relative `.md` paths, `../mapping.md#links-between-pages`); external links keep working through the
    redirect.
