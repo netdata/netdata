@@ -19,6 +19,7 @@ type tableRouteState uint8
 
 const (
 	tableRoutePending tableRouteState = iota
+	tableRouteDormant
 	tableRouteNeedsFresh
 	tableRouteCached
 	tableRouteFresh
@@ -42,6 +43,7 @@ type tableCollectionScope struct {
 	profileSource  string
 	mode           tableSymbolMode
 	stats          *ddsnmp.CollectionStats
+	execution      *AcquisitionExecutionReport
 	requests       []*tableCollectionRequest
 	tableNameToOID map[string]string
 	acquisition    map[*tableCollectionRequest]*acquisitionTableObservation
@@ -99,6 +101,10 @@ func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency 
 
 func (g *tableRouteGraph) dependencies(req *tableCollectionRequest) []*tableCollectionRoute {
 	return g.dependenciesByRequest[req]
+}
+
+func (g *tableRouteGraph) hasDependents(route *tableCollectionRoute) bool {
+	return len(g.dependentsByRoute[route]) > 0
 }
 
 func (g *tableRouteGraph) dependents(route *tableCollectionRoute) []*tableCollectionRoute {
@@ -190,7 +196,7 @@ func (s *tableCollectionSession) resolve() {
 	routes := s.sortedRoutes()
 	var freshQueue []freshRouteWork
 	for _, route := range routes {
-		if routeNeedsFresh(route) {
+		if s.routeNeedsFresh(route) {
 			s.requireFresh(route, freshTriggerForRoute(route), &freshQueue)
 		}
 	}
@@ -202,6 +208,8 @@ func (s *tableCollectionSession) resolve() {
 		if trigger := s.stageCached(route); trigger != nil {
 			s.requireFresh(route, trigger, &freshQueue)
 			s.resolveFreshQueue(&freshQueue)
+		} else if s.isDependencyOnlyTopologyRoute(route) {
+			route.state = tableRouteDormant
 		} else {
 			route.state = tableRouteCached
 		}
@@ -324,6 +332,25 @@ func routeNeedsFresh(route *tableCollectionRoute) bool {
 	return !hasCacheOwner
 }
 
+func (s *tableCollectionSession) routeNeedsFresh(route *tableCollectionRoute) bool {
+	if s.isDependencyOnlyTopologyRoute(route) {
+		return false
+	}
+	return routeNeedsFresh(route)
+}
+
+func (s *tableCollectionSession) isDependencyOnlyTopologyRoute(route *tableCollectionRoute) bool {
+	if !s.graph.hasDependents(route) {
+		return false
+	}
+	for _, req := range route.requests {
+		if req.scope.mode != tableSymbolModePresence || len(req.config.Symbols) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func freshTriggerForRoute(route *tableCollectionRoute) *tableCollectionRequest {
 	var cacheIneligible *tableCollectionRequest
 	var cacheOwner *tableCollectionRequest
@@ -425,7 +452,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 
 func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
-	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats)
+	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
 		route.state = tableRouteFailed
@@ -510,6 +537,9 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 		}
 
 		switch req.route.state {
+		case tableRouteDormant:
+			// The owner had no eligible rows, so this dependency was never observed.
+			continue
 		case tableRouteCached:
 			tablesSeen[req.route.oid] = true
 			if acquisition != nil {

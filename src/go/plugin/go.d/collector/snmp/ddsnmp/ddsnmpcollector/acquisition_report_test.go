@@ -56,6 +56,9 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 	assert.Equal(t, uint32(0), got[0].report.Identity.Ordinal)
 	assert.Equal(t, AcquisitionProfileOutcomeFailed, got[0].report.Outcome)
 	assert.Equal(t, AcquisitionFailurePhasePrepare, got[0].report.FailurePhase)
+	assert.Equal(t, int64(1), got[0].report.Stats.SNMP.GetRequests)
+	assert.Equal(t, int64(1), got[0].report.Stats.SNMP.GetOIDs)
+	assert.Equal(t, int64(1), got[0].report.Stats.Errors.SNMP)
 	assert.True(t, got[0].hasMetrics)
 	require.Len(t, got[0].report.Routes, 1)
 	assert.Equal(t, AcquisitionRouteKindProfileTagScalar, got[0].report.Routes[0].Kind)
@@ -117,6 +120,9 @@ func TestCollector_InitialAcquisitionObserverReportsProfileInputsOnce(t *testing
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "lab", metrics[0].Tags["site"])
 	assert.NotContains(t, metrics[0].DeviceMetadata, "serial_number")
+	assert.Equal(t, int64(2), metrics[0].Stats.SNMP.GetRequests)
+	assert.Equal(t, int64(2), metrics[0].Stats.SNMP.GetOIDs)
+	assert.Equal(t, int64(1), metrics[0].Stats.Errors.MissingOIDs)
 	require.Len(t, reports, 1)
 
 	first := acquisitionRoutesByKind(reports[0].Routes)
@@ -410,6 +416,56 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 	assert.Equal(t, uint64(4), routes[dependency.Table.OID].Values)
 }
 
+func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	dependency, source := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999.57")
+	profile := &ddsnmp.Profile{
+		SourceFile: "dormant-topology-dependency.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
+			Kind:          ddsnmp.KindArpEntry,
+			MetricsConfig: source,
+		}}},
+	}
+	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
+	var dependencyRoot string
+	for _, cfg := range profile.Definition.Topology {
+		if cfg.Table.Name == dependency.Table.Name && len(cfg.Symbols) == 0 {
+			dependencyRoot = cfg.Table.OID
+			break
+		}
+	}
+	require.NotEmpty(t, dependencyRoot)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, nil)
+
+	var report AcquisitionProfileReport
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+		InitialAcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+			report = value
+		}),
+	})
+	_, err := collector.Collect()
+	require.NoError(t, err)
+
+	require.Len(t, report.Routes, 2)
+	routes := make(map[string]AcquisitionRouteReport, len(report.Routes))
+	for _, route := range report.Routes {
+		routes[route.RootOID] = route
+	}
+	assert.Equal(t, AcquisitionRouteSourceWalk, routes[source.Table.OID].Source)
+	assert.Equal(t, AcquisitionRouteOutcomeEmpty, routes[source.Table.OID].Outcome)
+	dependencyRoute, ok := routes[dependencyRoot]
+	require.True(t, ok)
+	assert.Equal(t, AcquisitionRouteSourceNone, dependencyRoute.Source)
+	assert.Equal(t, AcquisitionRouteOutcomeNotObserved, dependencyRoute.Outcome)
+	require.Len(t, report.Execution.Walks, 1)
+	assert.Equal(t, source.Table.OID, report.Execution.Walks[0].RootOID)
+}
+
 func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
@@ -465,6 +521,14 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 	assert.Equal(t, AcquisitionRouteOutcomeEmpty, dependencyRoute.Outcome)
 	assert.Zero(t, dependencyRoute.Rows)
 	assert.Zero(t, dependencyRoute.Values)
+	var roots []string
+	for _, report := range reports {
+		for _, walk := range report.Execution.Walks {
+			roots = append(roots, walk.RootOID)
+		}
+	}
+	assert.ElementsMatch(t, []string{source.Table.OID, dependency.Table.OID}, roots,
+		"record actual shared roots, not the narrower configured dependency root")
 }
 
 func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTableFails(t *testing.T) {
@@ -709,6 +773,9 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 	assert.Equal(t, AcquisitionRouteOutcomeFailed, report.Routes[1].Outcome)
 	assert.Equal(t, AcquisitionFailureClassTransport, report.Routes[1].FailureClass)
 	assert.NotContains(t, report.String(), "private BGP timeout")
+	require.Len(t, report.Execution.Walks, 1)
+	assert.Equal(t, "1.3.6.1.4.1.99999.30.1", report.Execution.Walks[0].RootOID)
+	assert.True(t, report.Execution.Walks[0].Failed)
 }
 
 func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *testing.T) {

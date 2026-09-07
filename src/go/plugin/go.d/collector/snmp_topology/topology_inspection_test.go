@@ -521,6 +521,42 @@ func TestInspectTopologyGraphLinkReturnsDuplicateCandidates(t *testing.T) {
 	require.Equal(t, -1, match.index)
 }
 
+func TestInspectTopologyGraphLinkAtSelectsNULIdentity(t *testing.T) {
+	data := topologymodel.Data{Actors: []topologymodel.Actor{
+		{
+			ActorID: "segment-a",
+			Match:   topologymodel.Match{Hostnames: []string{"segment:bridge\x00device\x00port"}},
+		},
+		{
+			ActorID: "device-b",
+			Match:   topologymodel.Match{IPAddresses: []string{"192.0.2.2"}},
+		},
+	}}
+	allocator := graph.NewActorHandleAllocator()
+	for i := range data.Actors {
+		data.Actors[i].ActorHandle = allocator.Next()
+	}
+	data.Links = []topologymodel.Link{{
+		LinkType:       "bridge",
+		Protocol:       "fdb",
+		Direction:      "observed",
+		SrcActorHandle: data.Actors[0].ActorHandle,
+		DstActorHandle: data.Actors[1].ActorHandle,
+	}}
+
+	subject, ok := topologyInspectionSubjectFromLink(data, 0)
+	require.True(t, ok)
+	require.Contains(t, subject.srcIdentity, "\x00")
+
+	match := inspectTopologyGraphLinkAt(data, 0)
+	require.Equal(t, topologyInspectionPresent, match.membership.state)
+	require.Equal(t, 1, match.membership.candidates)
+	require.Equal(t, 0, match.index)
+	require.Equal(t, data.Links, match.links)
+	require.Equal(t, topologyInspectionPresent, match.srcActors.membership.state)
+	require.Equal(t, topologyInspectionPresent, match.dstActors.membership.state)
+}
+
 func TestTopologyInspectionLinkSubjectReturnsParallelBGPRoutingInstancesAsCandidates(t *testing.T) {
 	scenario := newTopologyScenario("inspection-parallel-bgp")
 	left := scenario.Router("router-left", "192.0.2.61", "02:00:00:00:61:01", "192.0.2.61", "65001")
@@ -532,6 +568,7 @@ func TestTopologyInspectionLinkSubjectReturnsParallelBGPRoutingInstancesAsCandid
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
 	replay := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
 
+	var indexes []int
 	var subjects []topologyInspectionLinkSubject
 	for i, link := range replay.data.Links {
 		if topologyInspectionLinkFamily(link) != topologymodel.BGPAdjacencyLinkType {
@@ -539,8 +576,10 @@ func TestTopologyInspectionLinkSubjectReturnsParallelBGPRoutingInstancesAsCandid
 		}
 		subject, ok := topologyInspectionSubjectFromLink(replay.data, i)
 		require.True(t, ok)
+		indexes = append(indexes, i)
 		subjects = append(subjects, subject)
 	}
+	require.Len(t, indexes, 2)
 	require.Len(t, subjects, 2)
 	require.Equal(t, subjects[0], subjects[1])
 	match := inspectTopologyGraphLink(replay.data, subjects[0])
@@ -553,6 +592,18 @@ func TestTopologyInspectionLinkSubjectReturnsParallelBGPRoutingInstancesAsCandid
 		routingInstances[link.Detail.BGP.RoutingInstance] = true
 	}
 	require.Equal(t, map[string]bool{"blue": true, "red": true}, routingInstances)
+
+	for _, index := range indexes {
+		report, err := inspectTopologyLinkAt(diagnostics, scenario.opts, index)
+		require.NoError(t, err)
+		require.Equal(t, topologyInspectionPresent, report.graphLink.membership.state)
+		require.Equal(t, 1, report.graphLink.membership.candidates)
+		require.Equal(t, index, report.graphLink.index)
+		require.Equal(t, []topologymodel.Link{replay.data.Links[index]}, report.graphLink.links)
+		require.Equal(t, topologyInspectionPresent, report.typedLink.state)
+		require.Equal(t, index, report.typedLink.row)
+		require.Equal(t, subjects[0], report.subject)
+	}
 }
 
 func setTopologyInspectionLifecycleCut(diagnostics *topologyDiagnostics, registrationIDs ...ddsnmp.DeviceRegistrationID) {

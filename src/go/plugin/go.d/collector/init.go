@@ -3,8 +3,12 @@
 package collector
 
 import (
+	"maps"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
@@ -15,6 +19,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apcupsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor"
+
 	// _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400" // Moved to ibm.d.plugin (requires CGO)
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/beanstalk"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
@@ -144,7 +149,9 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zookeeper"
 )
 
-func init() {
+// NewRegistry gives each Agent its own shared SNMP state and publisher.
+func NewRegistry(varLibDir string) (collectorapi.Registry, *snmpdiag.Publisher) {
+	registry := maps.Clone(collectorapi.DefaultRegistry)
 	// These collectors share SNMP state; wire them together here instead of
 	// exposing package-global registries from the individual collector packages.
 	deviceStore := ddsnmp.NewDeviceStore()
@@ -157,7 +164,9 @@ func init() {
 		MaxConcurrent: reversedns.DefaultMaxConcurrent,
 	})
 
-	snmp.Register(deviceStore)
-	snmptopology.Register(deviceStore, trapEnrichment, reverseDNS)
-	snmptraps.Register(deviceStore, trapEnrichment, reverseDNS)
+	publisher := snmpdiag.NewPublisher(deviceStore, varLibDir)
+	registry["snmp"] = snmp.Creator(deviceStore)
+	registry["snmp_topology"] = snmptopology.Creator(deviceStore, trapEnrichment, reverseDNS, publisher)
+	registry["snmp_traps"] = snmptraps.Creator(deviceStore, trapEnrichment, reverseDNS)
+	return registry, publisher
 }

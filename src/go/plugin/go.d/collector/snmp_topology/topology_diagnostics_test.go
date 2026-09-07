@@ -287,7 +287,7 @@ func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T
 
 func TestAcquireTopologyDiagnosticsContainsLifecyclePanic(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
-	coll.deviceLifecycleSource = panickingTopologyLifecycleSource{}
+	coll.diagnosticProvider.source = panickingTopologyLifecycleSource{}
 
 	diagnostics := coll.acquireTopologyDiagnostics()
 	require.Equal(t, diagnosticCaptureUnavailable, diagnostics.lifecycle.state)

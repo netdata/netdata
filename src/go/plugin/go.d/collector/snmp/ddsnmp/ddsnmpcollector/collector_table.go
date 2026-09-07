@@ -498,7 +498,7 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 
 // SNMP operations
 
-func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
+func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats, execution *AcquisitionExecutionReport) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 
 	var resp []gosnmp.SnmpPDU
@@ -506,10 +506,19 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 
 	stats.SNMP.WalkRequests++
 
-	if tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk {
+	useWalk := tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk
+	var started time.Time
+	if execution != nil {
+		started = time.Now()
+	}
+	if useWalk {
 		resp, err = tc.snmpClient.WalkAll(oid)
 	} else {
 		resp, err = tc.snmpClient.BulkWalkAll(oid)
+	}
+	if execution != nil {
+		elapsed := time.Since(started)
+		execution.Walks = append(execution.Walks, AcquisitionWalkReport{RootOID: trimOID(oid), Elapsed: elapsed, Failed: err != nil})
 	}
 	if err != nil {
 		return nil, err
@@ -529,29 +538,7 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 }
 
 func (tc *tableCollector) snmpGet(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
-
-	for chunk := range slices.Chunk(oids, tc.snmpClient.MaxOids()) {
-		stats.SNMP.GetRequests++
-		stats.SNMP.GetOIDs += int64(len(chunk))
-
-		result, err := tc.snmpClient.Get(chunk)
-		if err != nil {
-			stats.Errors.SNMP++
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				stats.Errors.MissingOIDs++
-				tc.missingOIDs[trimOID(pdu.Name)] = true
-				continue
-			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
-	}
-
-	return pdus, nil
+	return getSNMPValues(tc.snmpClient, oids, tc.missingOIDs, stats)
 }
 
 func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map[string]string {

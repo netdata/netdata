@@ -53,7 +53,7 @@ func (c *topologyBuilder) deriveLocalBridgeMACFromInterfacePhysAddress(localMana
 
 	localManagementIP = topologyutil.NormalizeIPAddress(localManagementIP)
 	if localManagementIP != "" {
-		ifIndex := strings.TrimSpace(c.ifIndexByIP[localManagementIP])
+		ifIndex := strings.TrimSpace(c.ipIfIndex(localManagementIP))
 		if ifIndex != "" {
 			if status, ok := c.ifStatusByIndex[ifIndex]; ok {
 				if mac := topologyutil.NormalizeMAC(status.mac); mac != "" && mac != "00:00:00:00:00:00" {

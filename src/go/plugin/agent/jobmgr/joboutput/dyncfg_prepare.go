@@ -223,6 +223,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				),
 				autoDetectionRetryToken{},
 				nil,
+				jobConfigFailure(err, "activation"),
 			)
 		}
 		if candidatePreparationBusy(err) ||
@@ -479,6 +480,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 				dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
 				autoDetectionRetryToken{},
 				nil,
+				jobConfigFailure(err, "activation"),
 			)
 		}
 		if candidatePreparationBusy(err) ||

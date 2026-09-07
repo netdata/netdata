@@ -15,7 +15,7 @@ import (
 )
 
 func TestSNMPTopologyCreatorOwnsTopologyFunction(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	creator := Creator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver(), nil)
 	require.Nil(t, creator.Create)
 	require.NotNil(t, creator.CreateV2)
 	require.Equal(t, collectorapi.InstancePolicySingle, creator.InstancePolicy)
@@ -47,29 +47,29 @@ func TestSNMPTopologyCreatorRequiresSharedDependencies(t *testing.T) {
 		"nil-device-store": {
 			store:     nil,
 			traps:     NewTrapEnrichmentHandle(),
-			wantPanic: "snmp_topology Register requires a non-nil device store",
+			wantPanic: "snmp_topology Creator requires a non-nil device store",
 		},
 		"nil-trap-handle": {
 			store:     ddsnmp.NewDeviceStore(),
 			traps:     nil,
-			wantPanic: "snmp_topology Register requires a non-nil trap enrichment handle",
+			wantPanic: "snmp_topology Creator requires a non-nil trap enrichment handle",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.PanicsWithValue(t, tc.wantPanic, func() {
-				_ = newCreator(tc.store, tc.traps, newTestReverseDNSResolver())
+				_ = Creator(tc.store, tc.traps, newTestReverseDNSResolver(), nil)
 			})
 		})
 	}
-	require.PanicsWithValue(t, "snmp_topology Register requires a non-nil reverse DNS resolver", func() {
-		_ = newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), nil)
+	require.PanicsWithValue(t, "snmp_topology Creator requires a non-nil reverse DNS resolver", func() {
+		_ = Creator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), nil, nil)
 	})
 }
 
 func TestSNMPTopologyFunctionAvailabilityBecomesReadyAfterRenderableObservation(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	creator := Creator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver(), nil)
 	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.Nil(t, methods[0].Available)
@@ -114,13 +114,14 @@ func TestSNMPTopologyFunctionAvailabilityChangesOnlyWithPublishedGeneration(t *t
 }
 
 func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	creator := Creator(ddsnmp.NewDeviceStore(), NewTrapEnrichmentHandle(), newTestReverseDNSResolver(), nil)
 	methods := creator.SharedFunctions()
 	require.Len(t, methods, 1)
 	require.Nil(t, methods[0].Available)
 
 	coll, ok := creator.CreateV2().(*Collector)
 	require.True(t, ok)
+
 	builder := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(builder)
 	publishTestTopologyBuilder(coll.topologyRegistry, builder)

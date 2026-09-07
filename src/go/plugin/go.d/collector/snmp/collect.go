@@ -95,18 +95,14 @@ func (c *Collector) ensureInitialized() error {
 		return errors.New("snmp client not initialized")
 	}
 
-	if c.sysInfo != nil {
+	if c.initialized {
 		return nil
 	}
 
-	si, err := snmputils.GetSysInfo(c.snmpClient)
-	if err != nil {
+	if err := c.ensureDeviceProfile(); err != nil {
 		return err
 	}
-
-	if c.snmpProfiles == nil {
-		c.snmpProfiles = c.setupProfiles(si)
-	}
+	si := c.sysInfo
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
@@ -118,15 +114,12 @@ func (c *Collector) ensureInitialized() error {
 		})
 	}
 
-	if c.ddSnmpColl == nil && !c.PingOnly && !c.Ping.Enabled {
-		return errors.New("no profiles found and ping disabled")
-	}
-
 	if c.CreateVnode {
 		if c.ddSnmpColl == nil {
 			c.vnode = c.setupVnode(si, nil)
 		} else {
 			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
+			c.captureCollectionFailures()
 			if err != nil {
 				return err
 			}
@@ -134,13 +127,12 @@ func (c *Collector) ensureInitialized() error {
 		}
 	}
 
-	c.sysInfo = si
-
 	if c.PingOnly || c.Ping.Enabled {
 		c.addPingCharts()
 	}
 
 	c.registerDeviceState(si, nil)
+	c.initialized = true
 
 	return nil
 }
@@ -198,11 +190,11 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
-		return nil, fmt.Errorf("init: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
 
 	if err := snmpClient.Connect(); err != nil {
-		return nil, fmt.Errorf("connect: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
 
 	if snmpClient.Version() == gosnmp.Version1 {
@@ -219,7 +211,7 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	} else {
 		ok, err := c.adjustMaxRepetitions(snmpClient)
 		if err != nil {
-			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
+			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
 		}
 		if !ok {
 			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")

@@ -83,6 +83,33 @@ func inspectTopologyGraphLink(
 	return result
 }
 
+func inspectTopologyGraphLinkAt(
+	data topologymodel.Data,
+	index int,
+) topologyInspectionGraphLinkResult {
+	link := data.Links[index]
+	return topologyInspectionGraphLinkResult{
+		membership: topologyInspectionStage{state: topologyInspectionPresent, candidates: 1},
+		srcActors:  inspectTopologyActorHandle(data, link.SrcActorHandle),
+		dstActors:  inspectTopologyActorHandle(data, link.DstActorHandle),
+		links:      []topologymodel.Link{link},
+		index:      index,
+	}
+}
+
+func inspectTopologyActorHandle(
+	data topologymodel.Data,
+	handle topologymodel.ActorHandle,
+) topologyInspectionActorResult {
+	indexes := make([]int, 0, 1)
+	for i := range data.Actors {
+		if data.Actors[i].ActorHandle == handle {
+			indexes = append(indexes, i)
+		}
+	}
+	return topologyInspectionActorsAt(data, indexes)
+}
+
 func topologyInspectionLinkMatches(
 	link topologymodel.Link,
 	srcHandles map[topologymodel.ActorHandle]struct{},

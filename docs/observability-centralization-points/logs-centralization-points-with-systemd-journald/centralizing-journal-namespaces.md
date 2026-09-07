@@ -1,6 +1,7 @@
 # Centralizing systemd-journal Namespace Logs to a Central systemd-journal-remote Server
 
-This guide explains how to forward `systemd-journald` logs from journal _namespaces_ to a remote server using `systemd-journal-upload`, particularly for distributions running systemd versions **prior to 254**, which lack native namespace support.
+You forward `systemd-journald` logs from journal _namespaces_ to a remote server with `systemd-journal-upload`. This
+applies to distributions running systemd versions **prior to 254**, which lack native namespace support.
 
 ## Current Limitations
 
@@ -10,7 +11,7 @@ Starting with systemd 254, the new `--namespace=NAMESPACE` option simplifies thi
 
 ## Prerequisites
 
-This guide assumes you have:
+You need:
 
 - Configured `systemd-journal-upload` on your local machine
 - Set up and enabled `systemd-journal-remote` on your central server
@@ -19,7 +20,7 @@ The solution will send namespace logs to the same destination as your regular sy
 
 ## Solution
 
-We'll create a dedicated `systemd-journal-upload@<namespace>` unit for each namespace. A helper script automatically locates the appropriate journal directory and launches `systemd-journal-upload` with the correct parameters.
+Each namespace gets a dedicated `systemd-journal-upload@<namespace>` unit. A helper script automatically locates the appropriate journal directory and launches `systemd-journal-upload` with the correct parameters.
 
 **Advantages**:
 
@@ -147,7 +148,7 @@ systemd-journal-upload --namespace=*
 
 This single command uploads logs from all namespaces, including the default one, interleaved together. This approach greatly simplifies deployment by eliminating the need for multiple `systemd-journal-upload` instances.
 
-Until systemd 254+ becomes widely adopted, the per-namespace approach described in this guide remains the most reliable method.
+On systemd versions prior to 254, the per-namespace units described above remain the way to forward namespace logs.
 
 ## Additional Resources
 

@@ -59,7 +59,6 @@ func (sc *scalarCollector) collectObserved(
 
 	pdus, err := sc.getScalarValues(oids, stats)
 	if err != nil {
-		stats.Errors.SNMP++
 		if observer != nil {
 			observer.failUnfinished(AcquisitionFailureClassTransport)
 		}
@@ -113,29 +112,7 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 }
 
 func (sc *scalarCollector) getScalarValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
-	maxOids := sc.snmpClient.MaxOids()
-
-	for chunk := range slices.Chunk(oids, maxOids) {
-		stats.SNMP.GetOIDs += int64(len(chunk))
-		stats.SNMP.GetRequests++
-
-		result, err := sc.snmpClient.Get(chunk)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				sc.missingOIDs[trimOID(pdu.Name)] = true
-				stats.Errors.MissingOIDs++
-				continue
-			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
-	}
-
-	return pdus, nil
+	return getSNMPValues(sc.snmpClient, oids, sc.missingOIDs, stats)
 }
 
 // processScalarMetrics converts PDUs into metrics

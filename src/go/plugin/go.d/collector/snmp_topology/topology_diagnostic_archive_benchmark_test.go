@@ -4,6 +4,8 @@ package snmptopology
 
 import (
 	"bytes"
+	jsonv1 "encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
@@ -15,6 +17,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
@@ -70,7 +73,7 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 				for b.Loop() {
 					if _, err := readTopologyDiagnosticArchive(
 						bytes.NewReader(encoded.Bytes()),
-						defaultTopologyDiagnosticArchiveReadLimits(),
+						snmpdiag.DefaultReadLimits(),
 					); err != nil {
 						b.Fatal(err)
 					}
@@ -284,3 +287,5 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 		topology:        cut,
 	}
 }
+
+var topologyDiagnosticArchiveWriterJSONOptions = jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.EscapeForHTML(false))

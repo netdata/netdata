@@ -119,9 +119,10 @@ cleanup:
 void pulse_daemon_memory_system_do(bool extended) {
     if(!extended) return;
 
-    // last observed glibc mmap count. static because mallinfo2() below may be skipped on
-    // this call while netdata.memory_maps (which consumes it) still updates every step;
-    // it is therefore a last-known value, at most PULSE_GLIBC_MALLINFO_UPDATE_EVERY stale.
+    // last observed glibc mmap count. static because mallinfo2() below may be skipped on this
+    // call while netdata.memory_maps (which consumes it) still updates every step; it is
+    // therefore a last-known value, lagging by roughly the configured interval, plus up to one
+    // pulse step of alignment, plus one mallinfo2() call.
     static size_t glibc_mmaps = 0;
 
     bool have_mallinfo = false;
@@ -164,15 +165,20 @@ void pulse_daemon_memory_system_do(bool extended) {
     static usec_t mallinfo_last_ut = 0;
     usec_t mallinfo_now_ut = now_monotonic_usec();
 
-    // half a second of slack: our heartbeat ticks on absolute second boundaries, so the
-    // elapsed time at the tick we want can land a few usec short of the interval. Without
-    // the slack we would skip to the next tick and the chart would miss a sample.
+    // half a second of slack: mallinfo2() completes between aligned pulse ticks, so without the
+    // slack a tick that falls just short of the interval would defer the sample to the next one.
     usec_t mallinfo_step_ut = (usec_t)mallinfo_every * USEC_PER_SEC - USEC_PER_SEC / 2;
 
     if(!mallinfo_last_ut || mallinfo_now_ut - mallinfo_last_ut >= mallinfo_step_ut) {
-        mallinfo_last_ut = mallinfo_now_ut;
-
         struct mallinfo2 mi = mallinfo2();
+
+        // Stamped after the call, not before it. mallinfo2() walks every arena and on a large
+        // heap it can outrun the configured interval; stamping before would make the next tick
+        // fire immediately and run the calls back to back, defeating the only purpose of the
+        // "glibc mallinfo update every" setting - bounding what this costs. The interval
+        // separates completed measurements.
+        mallinfo_last_ut = now_monotonic_usec();
+
         glibc_mmaps = mi.hblks;
         if(mi.hblkhd || mi.fordblks) {
             static RRDSET *st_mallinfo = NULL;

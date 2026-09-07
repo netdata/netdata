@@ -65,6 +65,9 @@ type topologyScenarioPort struct {
 	mac        string
 	ip         string
 	netmask    string
+	modernIPv4 bool
+	prefixIP   string
+	prefixLen  int
 }
 
 type topologyScenarioPortPair struct {
@@ -161,6 +164,18 @@ func (p *topologyScenarioPort) IPv4(cidr string) *topologyScenarioPort {
 	ip, netmask := topologyScenarioIPv4CIDR(cidr)
 	p.ip = ip
 	p.netmask = netmask
+	return p
+}
+
+func (p *topologyScenarioPort) ModernIPv4(cidr string) *topologyScenarioPort {
+	p.IPv4(cidr)
+	_, prefix, err := net.ParseCIDR(strings.TrimSpace(cidr))
+	if err != nil || prefix.IP.To4() == nil {
+		return p
+	}
+	p.modernIPv4 = true
+	p.prefixIP = prefix.IP.String()
+	p.prefixLen, _ = prefix.Mask.Size()
 	return p
 }
 
@@ -311,11 +326,25 @@ func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice)
 			}),
 		)
 		if port.ip != "" && port.netmask != "" {
-			metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindIpIfIndex, map[string]string{
-				tagTopoIfIndex: strconv.Itoa(port.ifIndex),
-				tagTopoIPAddr:  port.ip,
-				tagTopoIPMask:  port.netmask,
-			}))
+			if port.modernIPv4 {
+				ifIndex := strconv.Itoa(port.ifIndex)
+				metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindIpIfIndex, map[string]string{
+					tagTopoIPSource: topoIPSourceModern,
+					tagTopoIfIndex:  ifIndex,
+					tagTopoIPAddr:   port.ip,
+					tagTopoIPType:   "unicast",
+					tagTopoIPPrefix: fmt.Sprintf("%s.%s.1.4.%s.%d", ipAddressPrefixOriginOID, ifIndex, port.prefixIP, port.prefixLen),
+					tagTopoIPStatus: "preferred",
+					tagTopoIPRow:    "active",
+				}))
+			} else {
+				metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindIpIfIndex, map[string]string{
+					tagTopoIPSource: topoIPSourceLegacy,
+					tagTopoIfIndex:  strconv.Itoa(port.ifIndex),
+					tagTopoIPAddr:   port.ip,
+					tagTopoIPMask:   port.netmask,
+				}))
+			}
 		}
 	}
 	for _, pair := range s.lldp {

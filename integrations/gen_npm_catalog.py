@@ -618,6 +618,8 @@ GENERIC_NAMES = {
     'generic-ups.yaml': 'Generic UPS (UPS-MIB)',
     'meraki-cloud-controller.yaml': 'Cisco Meraki (Cloud Controller)',
     'ubiquiti-net-snmp.yaml': 'Ubiquiti Net-SNMP Devices',
+    'mikrotik-router.yaml': 'MikroTik Router',
+    'mikrotik-swos.yaml': 'MikroTik Switch',
 }
 
 
@@ -839,10 +841,12 @@ def build_topology_modules():
          'reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system '
          'name, '
          'and management address.',
-         'Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the '
+         'Netdata reads the LLDP-MIB or LLDP-V2-MIB local and remote neighbor tables over SNMP and stitches the links '
+         'into the '
          '`topology:snmp` '
          'view.',
-         'Discovered automatically on devices that expose the LLDP-MIB.'),
+         'Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently '
+         'enabled for Palo Alto firewalls.'),
         ('CDP Topology', ['cdp', 'cisco', 'topology', 'l2', 'snmp', 'npm'],
          'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache '
          'table '
@@ -968,7 +972,8 @@ def build_topology_modules():
 def build_syslog_modules():
     """Static syslog catalog entry. Netdata has no native syslog listener; an
     OpenTelemetry Collector with a syslog receiver forwards device syslog over
-    OTLP/gRPC to the Agent's otel plugin, which stores it as journal logs."""
+    OTLP/gRPC to the Agent's otel plugin, which stores it in Netdata's indexed
+    log store."""
     return [make_entry(
         name='Syslog from Network Devices',
         link='',
@@ -980,12 +985,12 @@ def build_syslog_modules():
             'syslog '
             'receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which '
             'stores '
-            'it as structured journal logs you explore and query in the Logs tab.',
+            'it in Netdata\'s indexed log store you explore and query in the Logs tab.',
             'Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog '
             'receiver '
             'pointed at the Agent\'s OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent\'s otel plugin writes '
             'the '
-            'records to systemd-compatible journal files.',
+            'records to Netdata\'s indexed log store.',
             'Not auto-detected. Configure an OpenTelemetry Collector syslog receiver to forward to the Agent\'s OTLP '
             'endpoint.',
             # The otel plugin is built for Linux and macOS only, as a single instance

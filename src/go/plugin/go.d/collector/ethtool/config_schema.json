@@ -29,9 +29,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "optical_interfaces": {
       "ui:placeholder": "enp1s0 enp1s1 enp2s0"
     },

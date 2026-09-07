@@ -164,6 +164,7 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		prof.SourceFile, _ = filepath.Abs(filename)
 	}
 	originID := profileOriginID(filename, extendsPaths)
+	prof.sourceOrigin = profileSource(filename, extendsPaths)
 	setLicensingOriginProfileID(&prof, originID)
 	setBGPOriginProfileID(&prof, originID)
 
@@ -195,6 +196,7 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 
 		extInfo := &extensionInfo{
 			name:       name,
+			origin:     mergedBase.sourceOrigin,
 			sourceFile: mergedBase.SourceFile,
 			extensions: mergedBase.extensionHierarchy,
 		}

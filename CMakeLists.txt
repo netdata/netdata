@@ -95,8 +95,36 @@ include(NetdataCompilerFlags)
 if(OS_MACOS)
   enable_language(OBJC)
   if(OSLOG AND FOUNDATION)
-    add_compile_definitions(HAVE_OSLOG)
+    # macos-logs.plugin needs OSLogStore, which only exists in the 10.15 SDK and later;
+    # the OSLog framework alone (10.12 SDK) is not sufficient.
+    include(CheckOBJCSourceCompiles)
+    check_objc_source_compiles("
+#import <OSLog/OSLog.h>
+int main(void) { OSLogStore *store = nil; return store != nil; }
+" HAVE_OSLOG_STORE)
+    if(HAVE_OSLOG_STORE)
+      add_compile_definitions(HAVE_OSLOG)
+    endif()
   endif()
+
+  # The oldest macOS this source tree is expected to run on (the deployment target floor,
+  # not an SDK version). Collectors that need a newer SDK guard themselves at the source
+  # level and degrade to unavailable, so raising this floor must be a deliberate change to
+  # this value rather than an accident.
+  set(NETDATA_MACOS_MINIMUM_VERSION "10.6")
+
+  # Only validated when the deployment target is explicit; an unset target means the
+  # toolchain default applies, which is always at least as new as the floor.
+  if(CMAKE_OSX_DEPLOYMENT_TARGET AND
+     CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS NETDATA_MACOS_MINIMUM_VERSION)
+    message(FATAL_ERROR
+      "CMAKE_OSX_DEPLOYMENT_TARGET is ${CMAKE_OSX_DEPLOYMENT_TARGET}, but netdata requires "
+      "macOS ${NETDATA_MACOS_MINIMUM_VERSION} or later.\n"
+      "Either raise the deployment target, or lower NETDATA_MACOS_MINIMUM_VERSION in "
+      "CMakeLists.txt and add the source-level guards the older SDK needs.")
+  endif()
+
+  message(STATUS "macOS minimum supported version: ${NETDATA_MACOS_MINIMUM_VERSION}")
 endif()
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
@@ -1610,6 +1638,7 @@ set(API_PLUGIN_FILES
         src/web/api/queries/latest/latest.c
         src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
+        src/web/api/queries/weights-ranking.h
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
         src/web/api/formatters/rrd2json.h
@@ -2245,6 +2274,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-terminal-services.c
         src/collectors/windows.plugin/perflib-netframework.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
@@ -3261,7 +3291,7 @@ if(OS_WINDOWS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
-if(OS_MACOS AND OSLOG AND FOUNDATION)
+if(OS_MACOS AND OSLOG AND FOUNDATION AND HAVE_OSLOG_STORE)
         add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
         target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
         target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
@@ -3326,19 +3356,23 @@ if(ENABLE_PLUGIN_EBPF)
 
     # GLOB_RECURSE descends into subdirectories, so netipc/*.go covers
     # protocol/, service/, and transport/ even though no .go files exist at
-    # netipc/'s root level.  go.mod and go.sum are listed explicitly so a
-    # Go-version bump or new transitive dep in go/plugins triggers a rebuild.
+    # netipc/'s root level. Keep fixed workspace and module files out of the
+    # recursive glob so CMake does not scan their parent trees on every build.
     file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
-            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
-            "${CMAKE_SOURCE_DIR}/go.work"
-            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
-            "${CMAKE_SOURCE_DIR}/src/go/go.sum"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
+    # go.work is optional; watch its exact path so appearance or removal regenerates the graph.
+    file(GLOB EBPF_GO_WORKSPACE_FILE CONFIGURE_DEPENDS LIST_DIRECTORIES false
+            "${CMAKE_SOURCE_DIR}/go.work")
+    list(APPEND EBPF_GO_PLUGIN_FILES
+            ${EBPF_GO_WORKSPACE_FILE}
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
+            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/go/go.sum")
 
     set(EBPF_GO_LIBBPF_LIB_DIR lib)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
@@ -3450,6 +3484,17 @@ if(OS_LINUX AND MNL_FOUND)
         target_compile_options(local-sockets-mnl-test PRIVATE ${MNL_CFLAGS_OTHER})
         target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
         target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
+endif()
+
+if(OS_LINUX)
+        add_executable(local-sockets-namespaces-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_namespaces.c)
+        target_compile_options(local-sockets-namespaces-test PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(local-sockets-namespaces-test PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(local-sockets-namespaces-test libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)

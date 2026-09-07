@@ -6,7 +6,6 @@ import (
 	"math"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -79,33 +78,7 @@ func (c *topologyBuilder) updateIfNameByIndex(tags map[string]string) {
 }
 
 func (c *topologyBuilder) updateIfIndexByIP(tags map[string]string) {
-	ifIndex := strings.TrimSpace(tags[tagTopoIfIndex])
-	if ifIndex == "" {
-		return
-	}
-
-	ip := topologyutil.NormalizeIPAddress(tags[tagTopoIPAddr])
-	if ip == "" {
-		return
-	}
-
-	c.ifIndexByIP[ip] = ifIndex
-	mask := topologyutil.NormalizeIPAddress(tags[tagTopoIPMask])
-	if mask != "" {
-		c.ifNetmaskByIP[ip] = mask
-		c.l3InterfacesByIP[ip] = topologymodel.L3Interface{
-			IP:      ip,
-			Netmask: mask,
-			IfIndex: ifIndex,
-		}
-	}
-	if isEligibleManagementInterfaceAddress(ip, mask) {
-		c.appendLocalManagementAddress(topologymodel.ManagementAddress{
-			Address:     ip,
-			AddressType: managementAddressTypeFromIP(ip),
-			Source:      "ip_mib",
-		})
-	}
+	c.updateIPAddressCandidate(tags)
 }
 
 func (c *topologyBuilder) updateBridgePortMap(tags map[string]string) {

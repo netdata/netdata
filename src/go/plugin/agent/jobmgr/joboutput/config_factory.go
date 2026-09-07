@@ -186,21 +186,22 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	snapshot secretresolver.AtomicScopeSnapshot,
 	resultErr error,
 ) {
+	defer func() { resultErr = withJobConfigFailure(resultErr, "configuration", "") }()
 	hasReferences := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			snapshot = nil
 			if hasReferences {
 				redactLifecycle = true
-				resultErr = invalidJobConfiguration(errors.New(
+				resultErr = withJobConfigFailure(invalidJobConfiguration(errors.New(
 					"job output: applying resolved configuration failed; details redacted",
-				))
+				)), "configuration", "panic")
 				return
 			}
 			redactLifecycle = false
-			resultErr = invalidJobConfiguration(
+			resultErr = withJobConfigFailure(invalidJobConfiguration(
 				errors.New("job output: applying configuration panicked"),
-			)
+			), "configuration", "panic")
 		}
 	}()
 	resolveCtx := logger.ContextWithLogger(
@@ -238,7 +239,7 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
 		return false, nil, invalidJobConfiguration(
-			errors.New("job output: serialized configuration exceeds maximum size"),
+			withJobConfigFailure(errors.New("job output: serialized configuration exceeds maximum size"), "configuration", "result_limit"),
 		)
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {

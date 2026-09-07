@@ -4,8 +4,10 @@ package snmptopology
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/stretchr/testify/require"
 )
@@ -18,14 +20,14 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "v-test"))
 
-	archive, err := ReadDiagnosticArchive(
+	archive, err := readTestDiagnosticArchive(
 		bytes.NewReader(encoded.Bytes()),
-		DefaultDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
 	require.Equal(t, DiagnosticArchiveIdentity{
-		Format:               topologyDiagnosticArchiveFormat,
-		Version:              topologyDiagnosticArchiveVersion,
+		Format:               snmpdiag.Format,
+		Version:              snmpdiag.Version,
 		ProducerAgentVersion: "v-test",
 	}, archive.Identity())
 
@@ -81,6 +83,32 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.Equal(t, 1, link.TypedLink.Membership.Candidates)
 	require.NotEmpty(t, link.Source.Contexts)
 	require.Equal(t, wantReplay.Stats, link.Stats)
+
+	linkAt, err := archive.InspectLinkAt(query, 0)
+	require.NoError(t, err)
+	directLinkAtReport, err := inspectTopologyLinkAt(diagnostics, scenario.opts, 0)
+	require.NoError(t, err)
+	directLinkAt, err := newDiagnosticLinkInspection(directLinkAtReport)
+	require.NoError(t, err)
+	require.Equal(t, directLinkAt, linkAt)
+	require.Equal(t, 0, linkAt.GraphLink.SelectedIndex)
+	require.Equal(t, 0, linkAt.TypedLink.Row)
+}
+
+func TestDiagnosticArchiveAPIRejectsInvalidExactLinkIndexes(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
+	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
+	require.NoError(t, err)
+
+	query := diagnosticQueryOptionsFromInternal(newLLDPDirectScenario().opts)
+	for _, index := range []int{-1, 1_000_000} {
+		_, err := archive.InspectLinkAt(query, index)
+		require.ErrorContains(t, err, "link index")
+	}
 }
 
 func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
@@ -89,7 +117,7 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
-	archive, err := ReadDiagnosticArchive(bytes.NewReader(encoded.Bytes()), DefaultDiagnosticArchiveReadLimits())
+	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -152,4 +180,12 @@ func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
+}
+
+func readTestDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*DiagnosticArchive, error) {
+	d, err := snmpdiag.Read(r, limits)
+	if err != nil {
+		return nil, err
+	}
+	return InspectDiagnosticDocument(d)
 }

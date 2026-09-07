@@ -28,7 +28,7 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 		"uses-trap-if-index": {
 			setup: func(cache *topologyBuilder) {
 				cache.localDevice.ManagementIP = "192.0.2.30"
-				cache.ifIndexByIP["192.0.2.10"] = "99"
+				cache.ipAddressesByIP["192.0.2.10"] = resolvedIPAddress{ifIndex: "99"}
 				cache.ifNamesByIndex["7"] = "Gi0/7"
 				cache.ifNamesByIndex["99"] = "Gi0/99"
 				cache.lldpRemotes["7:2"] = &lldpRemote{localPortNum: "7", sysName: "dist-b"}
@@ -59,7 +59,7 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 		},
 		"does-not-infer-interface-from-source-ip": {
 			setup: func(cache *topologyBuilder) {
-				cache.ifIndexByIP["192.0.2.10"] = "7"
+				cache.ipAddressesByIP["192.0.2.10"] = resolvedIPAddress{ifIndex: "7"}
 				cache.ifNamesByIndex["7"] = "Gi0/7"
 				cache.lldpRemotes["7:1"] = &lldpRemote{sysName: "dist-a"}
 			},
@@ -74,7 +74,7 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 				cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{{
 					Address: "192.0.2.10", AddressType: "ipv4", Source: "lldp_local",
 				}}
-				cache.ifIndexByIP["192.0.2.10"] = "7"
+				cache.ipAddressesByIP["192.0.2.10"] = resolvedIPAddress{ifIndex: "7"}
 			},
 			source:              "192.0.2.10",
 			wantDeviceStatus:    "matched",

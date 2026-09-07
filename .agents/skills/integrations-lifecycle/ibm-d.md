@@ -1,216 +1,111 @@
 # ibm.d generation chain
 
-ibm.d is a Go collector framework whose modules generate their
-own `metadata.yaml` (and `README.md`, `config_schema.json`,
-`zz_generated_contexts.go`) from a small set of authoritative
-inputs. This is fundamentally different from go.d / python.d /
-charts.d collectors where `metadata.yaml` is hand-edited.
+ibm.d modules generate their own `metadata.yaml`, `config_schema.json`, and `zz_generated_contexts.go` from a small set
+of authoritative inputs. This differs from every other collector family, where `metadata.yaml` is hand-edited.
 
-**Maintainer rule**: for any ibm.d module, NEVER edit
-`metadata.yaml`, `README.md`, or `config_schema.json` directly.
-Edit `contexts.yaml`, `config.go`, or `module.yaml`, then run
-`go generate ./...`.
+**Maintainer rule**: for any ibm.d module, NEVER edit `metadata.yaml`, `config_schema.json`, or the module's `README.md`
+directly. Edit `contexts/contexts.yaml`, `config.go`, or `module.yaml`, then run `go generate`. Hand edits to generated
+files are silently overwritten on the next `go generate`; the DO-NOT-EDIT banner is the only signal.
 
 ## Layout per module
 
 ```
 src/go/plugin/ibm.d/modules/<module-dir>/
 ├── module.yaml                # display name, descriptions, icon, categories, link
-├── config.go                  # Config struct -- parsed via Go AST
+├── config.go                  # Config struct, parsed via Go AST
 ├── contexts/
 │   ├── contexts.yaml          # metric definitions: classes -> contexts -> dimensions
 │   ├── doc.go                 # //go:generate go run ../../../metricgen/main.go ...
-│   └── zz_generated_contexts.go  # GENERATED -- DO NOT EDIT
-├── generate.go                # //go:generate go run ../../docgen ...
-├── metadata.yaml              # GENERATED -- DO NOT EDIT (consumed by gen_integrations.py)
-├── README.md                  # GENERATED -- DO NOT EDIT
-├── config_schema.json         # GENERATED -- DO NOT EDIT
+│   └── zz_generated_contexts.go  # GENERATED (package doc says DO NOT EDIT)
+├── generate.go                # //go:generate go run <path-to-docgen> ...
+├── metadata.yaml              # GENERATED (first line: `# Generated metadata.yaml for <module> module`)
+├── README.md                  # a tracked SYMLINK to integrations/<slug>.md, created by the pipeline (see the trap below)
+├── config_schema.json         # GENERATED (pure JSON, no banner)
 └── <module-source>.go ...     # the collector implementation (hand-written)
 ```
 
-`websphere/` is a special parent: its sub-modules
-`websphere/{jmx,mp,pmi}/` each have their own
-`metadata.yaml`, `module.yaml`, etc. `gen_integrations.py:35`
-adds `src/go/plugin/ibm.d/modules/websphere` separately to
-`COLLECTOR_SOURCES` so these one-level-deeper paths get picked
-up.
+`websphere/` is a special parent: its sub-modules `websphere/{jmx,mp,pmi}/` each have their own `metadata.yaml`,
+`module.yaml`, and contexts. `COLLECTOR_SOURCES` in `integrations/_common.py` lists
+`src/go/plugin/ibm.d/modules/websphere` separately because the module glob is one level deep.
 
 The guide uses two distinct identifiers:
 
-- `<module-dir>` is the path relative to
-  `src/go/plugin/ibm.d/modules/`, such as `db2` or
-  `websphere/pmi`. Use it in filesystem paths and `go generate`.
-- `<module-name>` is the exact `name` value in that directory's
-  `module.yaml`, such as `db2` or `websphere_pmi`. Use it for
-  docgen's `-module` argument and the integrations selector
-  `ibm.d.plugin/<module-name>`.
+- `<module-dir>` is the path relative to `src/go/plugin/ibm.d/modules/`, such as `db2` or `websphere/pmi`. Use it in
+  filesystem paths and `go generate`.
+- `<module-name>` is the exact `name` value in that directory's `module.yaml`, such as `db2` or `websphere_pmi`. Use it
+  for docgen's `-module` argument and the integrations selector `ibm.d.plugin/<module-name>`.
 
-The values happen to match for top-level modules. They differ for
-all three nested WebSphere modules.
+The values match for top-level modules and differ for all three nested WebSphere modules.
 
 ## The two generators
 
-### `metricgen` -- contexts.yaml -> zz_generated_contexts.go
+### `metricgen`: `contexts.yaml` to `zz_generated_contexts.go`
 
-Repo path: `src/go/plugin/ibm.d/metricgen/main.go`.
+`src/go/plugin/ibm.d/metricgen/main.go` reads `contexts/contexts.yaml` (classes, contexts, dimensions) and writes the Go
+file that registers those contexts with the ibm.d framework. The directive is in `contexts/doc.go`.
 
-Reads a module's `contexts/contexts.yaml`. The file declares
-classes -> contexts -> dimensions in a structured form:
+### `docgen`: `contexts.yaml` + `config.go` + `module.yaml` to `metadata.yaml` + `README.md` + `config_schema.json`
 
-```yaml
-classes:
-  - name: connection
-    contexts:
-      - name: connection_count
-        title: Connection count
-        units: connections
-        family: connections
-        type: line
-        dimensions:
-          - name: total
-          - name: active
-```
+`src/go/plugin/ibm.d/docgen/main.go`. Inputs per module:
 
-Writes `contexts/zz_generated_contexts.go` -- a Go source file
-that registers these contexts with the ibm.d framework so the
-collector can emit metrics by name. The generated file is
-committed.
+- `contexts/contexts.yaml`, the same structure `metricgen` reads;
+- `config.go`, parsed via Go AST (`docgen/config_parser.go`) into config field records;
+- `module.yaml`: name, display name, overview `description`, frontmatter `page_description`, icon, categories, keywords,
+  link. `page_description` becomes `meta.monitored_instance.description`, the explicit page meta description
+  (`description-authoring.md`).
 
-Triggered by:
+Outputs per module: `metadata.yaml` from the `metadataTemplate` constant in `docgen/main.go`, `config_schema.json` built
+programmatically by `generateConfigSchema`, and a README from `readmeTemplate` (`generateReadme`). The metadata template
+hardcodes scaffolding that the module does not control: the default `update_every: 1` option, `endpoint:
+dummy://localhost`, and a fixed "Enable monitoring interface" prerequisite. Richer metadata content means extending the
+template or `module.yaml`, never editing the generated file; `module.yaml` is the right place for static prose because
+it survives regeneration.
 
-```go
-//go:generate go run ../../../metricgen/main.go ...
-```
+**The README trap.** Every ibm.d module's `README.md` is a tracked symlink to `integrations/<slug>.md`, made by the
+integrations pipeline like any single-integration directory. `generateReadme` opens `README.md` with `os.Create`, which
+follows the symlink, so a local `go generate` overwrites the tracked generated integration page with docgen's README
+content and leaves it modified in `git status`. In CI this is masked because `gen_docs_integrations.py` runs afterwards
+and rewrites the page. Locally, never stage that page; regenerate it with the pipeline or leave it to the post-merge
+regeneration PR.
 
-at `src/go/plugin/ibm.d/modules/<module-dir>/contexts/doc.go:5`.
-
-### `docgen` -- contexts.yaml + config.go + module.yaml -> metadata.yaml + README.md + config_schema.json
-
-Repo path: `src/go/plugin/ibm.d/docgen/main.go`.
-
-Inputs (per module):
-
-- `contexts/contexts.yaml` -- the same metric structure
-  metricgen reads. Parsed as `Config` with `Class` entries
-  (`docgen/main.go:28-55`).
-- `config.go` -- the Go `Config` struct. Parsed via Go AST
-  (`docgen/config_parser.go`) to extract `ConfigField` records
-  (`docgen/main.go:57-78`).
-- `module.yaml` -- module-level metadata: name, display name,
-  overview `description`, frontmatter `page_description`, icon,
-  categories, and link. `page_description` is the authoritative
-  source for an explicit integration-page description.
-
-Outputs (per module):
-
-- `metadata.yaml` -- written from `metadataTemplate`
-  (`docgen/main.go:562`). The generated file opens with the
-  banner: `# Generated metadata.yaml for <module> module`.
-  When `module.yaml` sets `page_description`, docgen emits it as
-  `meta.monitored_instance.description`; the repository-wide
-  documentation generator then uses that value for page
-  frontmatter. The file also carries hardcoded scaffolding
-  (default `update_every: 1` option,
-  `endpoint: dummy://localhost`, and a fixed prerequisite
-  "Enable monitoring interface") plus dynamic content extracted
-  from `contexts.yaml` and `config.go`. Authors who want richer
-  metadata content must extend the template or `module.yaml`,
-  not edit the generated file.
-- `config_schema.json` -- written from a separate template
-  (`docgen/main.go:528`). Used by the dashboard's DYNCFG
-  editor.
-- `README.md` -- written from a readme template
-  (`docgen/main.go:552`). Includes module info, metric tables,
-  config tables. Banner depends on the template.
-
-Triggered by:
+The docgen directive lives in `generate.go`:
 
 ```go
 //go:generate go run <relative-path-to-docgen> -module=<module-name> -contexts=contexts/contexts.yaml -config=config.go -module-info=module.yaml
 ```
 
-at `src/go/plugin/ibm.d/modules/<module-dir>/generate.go:3`. The
-relative path to docgen is `../../docgen` for top-level modules and
-`../../../docgen` for nested WebSphere modules.
+The relative path is `../../docgen` for top-level modules and `../../../docgen` for the nested WebSphere modules.
 
-## End-to-end edit recipe (ibm.d module)
+## End-to-end edit recipe
 
-1. Edit one of:
-   - `contexts/contexts.yaml` to add/change/remove a metric
-     class, context, or dimension;
-   - `config.go` to add/change/remove a config field;
-   - `module.yaml` to change the display name, overview or page
-     description, categories, icon, etc.
-2. Run from the repo root:
+1. Edit one of `contexts/contexts.yaml` (metric class, context, dimension), `config.go` (config field), or `module.yaml`
+   (display name, descriptions, categories, icon).
+2. From the Go module root (there is no `go.mod` at the repository root, so the repo-root form fails with "does not
+   contain main module"):
+
    ```bash
-   go generate ./src/go/plugin/ibm.d/modules/<module-dir>/...
+   cd src/go && go generate ./plugin/ibm.d/modules/<module-dir>/...
    ```
-   This invokes BOTH `metricgen` (on `contexts.yaml`) and
-   `docgen` (on the module).
-3. Inspect and validate ALL generated files:
-   - `metadata.yaml`
-   - `README.md`
-   - `config_schema.json`
-   - `contexts/zz_generated_contexts.go`
-   For a documentation-only `module.yaml` change, leave the derived metadata,
-   README, and integration pages to the post-merge generated-artifact PR. If
-   `contexts.yaml` or `config.go` changes runtime behavior, commit the required
-   runtime outputs (`contexts/zz_generated_contexts.go` and/or
-   `config_schema.json`) in the source PR so compiled code and configuration
-   stay synchronized. The post-merge route is not a substitute for runtime
-   correctness.
-4. Run the integrations regen locally to update the
-   per-integration `.md` and the umbrella pages:
+
+   This runs BOTH `metricgen` and `docgen`. `./plugin/ibm.d/modules/websphere/...` hits all three WebSphere sub-modules;
+   both workflows run `./plugin/ibm.d/modules/...` for every module.
+3. Inspect the generated files. Delivery follows `consistency.md`, "Delivery boundary": the runtime outputs
+   `contexts/zz_generated_contexts.go` and `config_schema.json` ship in the source PR with the change that produced them
+   (both workflows fail on drift there); `metadata.yaml` and the integration page (including the one docgen just wrote
+   through the README symlink) go through the post-merge regeneration PR.
+4. `go generate` does not run the integrations pipeline. Validate the derived metadata locally:
+
    ```bash
-   ./integrations/pip.sh
    python3 integrations/gen_integrations.py
-   python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>
-   python3 integrations/gen_doc_collector_page.py
-   python3 integrations/gen_doc_secrets_page.py
+   python3 integrations/gen_docs_integrations.py --check
    ```
-5. Confirm the generated diff contains only the expected derived changes.
-   After the source PR merges, `generate-integrations.yml` runs this producer
-   chain again and opens the separate generated-artifact PR containing the
-   generated documentation files, `<plugin-dir>/integrations/<slug>.md`, and
-   umbrella pages. Runtime outputs required by step 3 have already shipped in
-   the source PR.
 
-## Why ibm.d is generated this way
+   Regenerating the page (`python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>`) is optional; it
+   also repairs the page `go generate` overwrote through the README symlink.
+5. Confirm the diff contains only the expected changes, then undo every change to `metadata.yaml`, `README.md`, and
+   `integrations/<slug>.md` before committing; they arrive through the post-merge PR.
 
-ibm.d collectors are typically heavy: many metrics, many
-config fields, dense documentation. Generating ensures
-consistency between:
-- the runtime metric registration
-  (`zz_generated_contexts.go`),
-- the integration metadata (`metadata.yaml`),
-- the dashboard schema (`config_schema.json`),
-- the user-facing documentation (`README.md`).
+## What generation does and does not cover
 
-It is the closest thing this repo has to enforcement of the
-collector consistency rule for the integration-page side
-(metadata + README + config_schema), but it does NOT cover
-taxonomy.yaml, the stock `.conf`, or `health.d/<...>.conf` --
-those still need manual sync unless a module-specific generator
-adds coverage.
-
-## Risks and gotchas
-
-- **Hand edits to generated files are silently overwritten on
-  next `go generate`.** No warning. The DO-NOT-EDIT banner is
-  the only signal.
-- **`module.yaml` is the right place for static prose** (e.g.
-  description text) that the metadata template inlines. Edits
-  to that file survive regeneration; edits to the generated
-  `metadata.yaml` do not.
-- **The metadata template hardcodes some scaffolding** (e.g.
-  `endpoint: dummy://localhost`). Modules that need different
-  scaffolding must extend the template at
-  `docgen/main.go:562+` -- editing the generated `metadata.yaml`
-  is not a fix.
-- **`go generate` does not auto-run `gen_integrations.py`**.
-  After regenerating ibm.d files, you still need to run the
-  integrations pipeline to refresh the per-integration `.md`
-  and umbrella pages.
-- **`websphere/` sub-modules each have their own generation
-  cycle**. Running `go generate ./src/go/plugin/ibm.d/modules/websphere/...`
-  hits all three (`jmx`, `mp`, `pmi`).
+Generation keeps runtime metric registration, integration metadata, and the DynCfg schema consistent by construction. It
+does NOT cover the stock `.conf` or `health.d/<...>.conf`; those still need manual sync under the consistency rule.

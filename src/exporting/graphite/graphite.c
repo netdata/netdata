@@ -82,69 +82,12 @@ void sanitize_graphite_label_value(char *dst, const char *src, size_t len)
     *dst = '\0';
 }
 
-static size_t graphite_utf8_decode(const char *src, size_t len, uint32_t *codepoint) {
-    const uint8_t *s = (const uint8_t *)src;
-    uint32_t cp = s[0];
-    uint32_t minimum = 0;
-    size_t bytes = 1;
-
-    if(cp < 0x80)
-        goto done;
-    else if((cp & 0xE0) == 0xC0) {
-        cp &= 0x1F;
-        minimum = 0x80;
-        bytes = 2;
-    }
-    else if((cp & 0xF0) == 0xE0) {
-        cp &= 0x0F;
-        minimum = 0x800;
-        bytes = 3;
-    }
-    else if((cp & 0xF8) == 0xF0) {
-        cp &= 0x07;
-        minimum = 0x10000;
-        bytes = 4;
-    }
-    else
-        goto done;
-
-    if(bytes > len)
-        goto invalid;
-
-    for(size_t i = 1; i < bytes; i++) {
-        if((s[i] & 0xC0) != 0x80)
-            goto invalid;
-
-        cp = (cp << 6) | (s[i] & 0x3F);
-    }
-
-    if(cp < minimum || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
-        goto invalid;
-
-done:
-    *codepoint = cp;
-    return bytes;
-
-invalid:
-    *codepoint = s[0];
-    return 1;
-}
-
-static bool graphite_unicode_is_whitespace(uint32_t codepoint) {
-    return (codepoint >= 0x0009 && codepoint <= 0x000D) ||
-           (codepoint >= 0x001C && codepoint <= 0x0020) ||
-           codepoint == 0x0085 || codepoint == 0x00A0 || codepoint == 0x1680 ||
-           (codepoint >= 0x2000 && codepoint <= 0x200A) ||
-           codepoint == 0x2028 || codepoint == 0x2029 || codepoint == 0x202F ||
-           codepoint == 0x205F || codepoint == 0x3000;
-}
-
 static void sanitize_graphite_metric_path_value(char *dst, const char *src, size_t len) {
     while(*src && len) {
         uint32_t codepoint;
-        size_t bytes = graphite_utf8_decode(src, len, &codepoint);
+        size_t bytes = exporting_utf8_decode(src, len, &codepoint);
 
-        if(codepoint == ';' || graphite_unicode_is_whitespace(codepoint))
+        if(codepoint == ';' || exporting_unicode_is_whitespace(codepoint))
             memset(dst, '_', bytes);
         else
             memcpy(dst, src, bytes);

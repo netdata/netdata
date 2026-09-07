@@ -10,12 +10,11 @@ import (
 	"testing"
 	"time"
 
-	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
-
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/snmptrapsfunc"
+	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,8 +70,8 @@ func TestSNMPTrapsLogsMethodAvailabilityTracksAllJournalLeases(t *testing.T) {
 }
 
 func TestSNMPTrapsLogsMethodAvailabilityIsCreatorScoped(t *testing.T) {
-	firstCreator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
-	secondCreator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	firstCreator := Creator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	secondCreator := Creator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	firstLogs := firstCreator.AgentFunctions()[0]
 	secondLogs := secondCreator.AgentFunctions()[0]
 

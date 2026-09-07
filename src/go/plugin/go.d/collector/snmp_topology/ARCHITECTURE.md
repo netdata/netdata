@@ -4,6 +4,17 @@ This is a maintainer-oriented map of `snmp_topology`. It explains the main
 runtime path and package boundaries. It intentionally avoids per-OID and
 per-protocol details; those live in the profile definitions and focused tests.
 
+**Place in the documentation set.** This document owns the collector's
+internals: runtime order, package boundaries, the graph build, the diagnostic
+tooling, and the validation commands. What the emitted payload means is owned
+by `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` (its SNMP/L2 Shape
+section); the SNMP profile `topology:` rows are owned by the SNMP profile format
+and the `collectors-snmp-profiles` project skill. The project skill
+`.agents/skills/topology-authoring/SKILL.md` cites sections of this document by
+heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer
+exists, so renaming or removing a heading here updates the skill in the same
+change.
+
 ## Short Version
 
 `snmp_topology` is a single-instance go.d collector that periodically builds an
@@ -220,22 +231,55 @@ root. Compact route/row/value references join the
 synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
 reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
 definitions, and error text are excluded. With no observer, profile digests, route reports, and value references are not
-built.
+built. Optional execution accounting records preparation elapsed/request/error counters and one root/duration/error
+record per actual Handler walk, owned by the same profile charged for the work. Shared consumers and memoized outcomes
+do not duplicate executions. Walk timing ends before local PDU-map/row processing; phase totals remain inclusive.
+Preparation is finalized on all exits and included in profile totals, while scalar timing covers both ordinary and
+topology scalars, including failure. Execution storage is transferred with the report and charged to existing capture
+record/logical-byte limits before retention; it has no row-proportional timing records.
+
+Archive v1 stores execution accounting as an additive optional `execution` block. Absence means not recorded and survives
+decode/re-encode; it must not be interpreted as zero or inferred from route counts. Historical aggregate statistics keep
+their historical incomplete coverage. The selected-device inspection exposes context/profile statistics and executions
+for latest attempt and retained success separately; summary and link responses remain compact. These measurements do
+not affect replay, graph identity, acquisition policy, or partial-refresh behavior. See the
+[diagnostics tool](../../../../tools/snmp-topology-diagnostics/README.md#collection-cost) for interpretation and exclusions.
 
 BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
 every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
 OIDs already classified unavailable by collector state. Table rows without required identity/signals are rejected.
 Optional absent descriptors are not missing; cross-table failures that reject a row or tag use the dependency class.
 Synthetic table-dependency units have no semantic rows, so they report zero rows and count only received varbinds below
-their configured root as values.
+their configured root as values. A dependency left dormant because its anchor had no eligible rows keeps source `none`
+and outcome `not_observed`; it is not reported as an empty cache result.
 
 The standard capabilities have separate owners:
 
 - `generic-device.yaml` and `generic-ups.yaml` extend
-  `_std-topology-ip-mib.yaml`. This baseline walks the legacy IPv4
-  `ipAddrTable` and provides address, interface-index, and netmask facts for L3
-  subnet enrichment. The address comes from the indexed row suffix; the `.2`
-  ifIndex and `.3` netmask columns are the required readable PDUs.
+  `_std-topology-ip-mib.yaml`. This baseline keeps the legacy `ipAddrTable` and
+  also collects RFC 4293 `ipAddressTable` IPv4 rows. The modern anchor is the
+  readable `ipAddressIfIndex` column constrained by the IPv4 address-type and
+  four-octet-length indexes; its type, prefix pointer, address status, and row
+  status columns are walked only when the anchor returns a descendant.
+  Unsupported and IPv6-only agents therefore pay for one empty modern logical
+  anchor walk, while a non-empty structurally scoped anchor activates five
+  IPv4-scoped logical walks and returns at most five required varbinds per row.
+  A malformed descendant under `.1.4` can activate those dependency walks, but
+  the topology consumer rejects it unless its remaining suffix is exactly four
+  decimal octets in `0..255`. A logical walk can require multiple SNMP
+  request/response exchanges
+  for pagination, termination, or transport fallback; the bound here is on
+  selected roots and returned row data, not a claim of one wire packet. The
+  address itself is derived from the not-accessible row index without using the
+  general SNMP hex/IP parser, so malformed components cannot alias to another
+  IPv4 identity.
+- Both IP-MIB sources feed one canonical per-IP record. Valid legacy facts take
+  precedence; a valid modern prefix may fill a missing legacy mask only when
+  the interface index agrees. Modern rows must be active unicast addresses in
+  preferred or deprecated state. A valid `ipAddressPrefix` RowPointer is decoded
+  only when it targets the exact `ipAddressPrefixOrigin` row for the same
+  interface and containing IPv4 prefix; a missing, `0.0`, or malformed pointer
+  retains address/interface inventory without a netmask.
 - `_std-topology-interface-mib.yaml` owns interface identity and state.
 - `_std-topology-bridge-base-mib.yaml` owns bridge identity and bridge-port to
   ifIndex mapping.
@@ -281,6 +325,7 @@ Ingestion is split by source area:
 - `topology_cache_cdp.go`
 - `topology_cache_fdb.go`
 - `topology_cache_interfaces.go`
+- `topology_ip_addresses.go`
 - `topology_cache_stp_arp.go`
 - `topology_l3_interfaces.go`
 - `topology_ospf_neighbors.go`
@@ -499,7 +544,16 @@ Current L3 subnet segments are single-routing-context. `L3Interface` has no
 VRF/routing-context field, so segment identity is producer scope plus
 subnet/prefix. Identical subnet/prefix values in multiple VRFs inside the same
 producer scope are therefore one logical segment until collection adds routing
-context and segment identity includes it.
+context and segment identity includes it. Nothing downstream may present these
+segments as VRF-aware before that happens.
+
+The producer scope in a segment id is a stable identifier of the emitting
+Agent: its public registry id (`netdata.public.unique.id`, read through
+`pluginconfig.RegistryUniqueID()`). When no stable scope id is available,
+`applyTopologyL3SubnetSegments` drops every candidate segment
+(`SuppressedNoProducerScope`) rather than falling back to a process-local or
+random id, so identical private subnets seen by different Agents cannot collide
+after Cloud aggregation.
 
 ## Internal Packages
 
@@ -660,15 +714,21 @@ identity representation of the retained observation after shaping; it is not
 claimed to be the registration itself or proof that one registration caused a
 collapsed actor.
 
-Link inspection resolves both endpoints through exact normalized actor identity
-keys, then matches the existing link family, protocol, and direction. These
-fields define a candidate subject rather than a unique link identity; the full
-matching graph rows retain interface, subnet, adjacency, routing-instance, and
-other parallel-link details. Endpoint reversal is accepted for bidirectional
-links and unordered direct L3/OSPF/BGP adjacencies; ordered STP and
-subnet-membership roles remain exact. Zero matches is `absent` only after the
-relevant stage completed, one is `present`, and multiple actor or link matches
-is `undetermined` with every candidate returned.
+Link inspection has two selectors with distinct purposes. Exact inspection
+selects one existing graph link by its zero-based replay index, derives its
+ordinary subject and family-wide source context, and maps the same index to the
+typed link row. The index belongs to one archive and query option set; it is not
+a persistent link identity.
+
+Candidate inspection resolves both endpoints through exact normalized actor
+identity keys, then matches the existing link family, protocol, and direction.
+These fields can describe a link that is absent but do not define a unique link
+identity; the full matching graph rows retain interface, subnet, adjacency,
+routing-instance, and other parallel-link details. Endpoint reversal is
+accepted for bidirectional links and unordered direct L3/OSPF/BGP adjacencies;
+ordered STP and subnet-membership roles remain exact. Zero matches is `absent`
+only after the relevant stage completed, one is `present`, and multiple actor
+or link matches is `undetermined` with every candidate returned.
 
 Every link report also carries the committed diagnostic cut's capture state,
 reason, sequence, and timestamps. A cut rejected by projection or diagnostic
@@ -762,7 +822,7 @@ operation:
 - `summary` reports cut state/counts and an ordered registration inventory;
 - `replay` returns the unchanged production topology-v1 payload; and
 - `inspect-device` and `inspect-link` return typed positive-allowlist projections of the existing offline inspection
-  reports.
+  reports; link inspection accepts either an existing replay index or the candidate identity selector.
 
 The collector's diagnostic facade owns the command request/report DTOs beside the adapter that constructs them from
 private topology state. The command depends only on that facade; it does not own a second archive model, replay engine,
@@ -856,3 +916,21 @@ git diff -- src/go/plugin/go.d/collector/snmp_topology/testdata/topology_v1_norm
 ```
 
 An unchanged golden is expected for internal ownership and generation refactors.
+
+### Scenario Golden Suite
+
+`TestSNMPTopologyScenarioGoldens` starts from synthetic SNMP-shaped `ddsnmp`
+inputs, runs the real cache, registry, and Function rendering path, validates
+the final `topology.v1` payload, and compares it with one full-payload oracle
+per golden scenario (`topologyScenarioGoldenCases`, currently five of the
+eighteen scenarios; all eighteen run `TestSNMPTopologyScenarioSemantics` with
+assertions and a determinism check, and only the five also have an oracle). The
+oracles are bulky
+and live in the external `netdata/testdata` repository under
+`snmp/topology-scenarios/`, checked out at `src/go/testdata/` (gitignored);
+`NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR` overrides that location. When
+neither is present the suite skips (it fails instead only under
+`-update-snmp-topology-scenario-goldens`), so a green `go test` run without the
+checkout says nothing about the golden payloads; check the test output for the
+skip line before trusting it. The per-render normalized golden above stays
+tracked in this repository.

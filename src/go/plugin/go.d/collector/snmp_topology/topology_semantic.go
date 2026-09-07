@@ -6,13 +6,13 @@ import (
 	"net/netip"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 type topologySemanticEventKind uint8
@@ -121,8 +121,8 @@ var defaultTopologyAcquisitionLimits = topologyAcquisitionLimits{
 }
 
 var defaultTopologyDiagnosticGlobalLimits = topologyAcquisitionLimits{
-	maxRecords:      250_000,
-	maxLogicalBytes: 64 << 20,
+	maxRecords:      snmpdiag.MaxRecords,
+	maxLogicalBytes: snmpdiag.MaxLogicalBytes,
 }
 
 type diagnosticCaptureState uint8
@@ -410,7 +410,8 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 		}
 	case ddsnmp.KindIpIfIndex:
 		switch key {
-		case tagTopoIfIndex, tagTopoIPAddr, tagTopoIPMask:
+		case tagTopoIfIndex, tagTopoIPAddr, tagTopoIPMask, tagTopoIPSource,
+			tagTopoIPType, tagTopoIPPrefix, tagTopoIPStatus, tagTopoIPRow:
 			return true
 		}
 	case ddsnmp.KindBridgePortIfIndex:
@@ -438,7 +439,7 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 			tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype:
 			return true
 		}
-	case ddsnmp.KindLldpRemManAddr, ddsnmp.KindLldpRemManAddrCompat:
+	case ddsnmp.KindLldpRemManAddr:
 		switch key {
 		case
 			tagLldpLocPortNum, tagLldpRemIndex, tagLldpRemMgmtAddr, tagLldpRemMgmtAddrSubtype,
@@ -446,7 +447,6 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 			tagLldpRemMgmtAddrOID:
 			return true
 		}
-		return topologySemanticLldpRemOctetTagAllowed(key)
 	case ddsnmp.KindCdpCache:
 		switch key {
 		case
@@ -505,10 +505,4 @@ func topologySemanticBGPTagAllowed(key string) bool {
 	default:
 		return false
 	}
-}
-
-func topologySemanticLldpRemOctetTagAllowed(key string) bool {
-	suffix := strings.TrimPrefix(key, tagLldpRemMgmtAddrOctetPref)
-	index, err := strconv.Atoi(suffix)
-	return err == nil && index >= 1 && index <= 16 && strconv.Itoa(index) == suffix
 }

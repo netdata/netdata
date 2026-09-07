@@ -5,7 +5,13 @@ package snmptopology
 import (
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 const (
@@ -13,11 +19,6 @@ const (
 	diagnosticStatePresent      = "present"
 	diagnosticStateAbsent       = "absent"
 )
-
-type DiagnosticReadLimits struct {
-	MaxCompressedBytes int64
-	MaxDecodedBytes    int64
-}
 
 type DiagnosticQueryOptions struct {
 	CollapseActorsByIP     bool   `json:"collapse_actors_by_ip"`
@@ -88,13 +89,17 @@ type DiagnosticSummary struct {
 }
 
 type diagnosticLifecycleRegistration struct {
-	Hostname      string    `json:"hostname"`
-	Port          int       `json:"port"`
-	SNMPVersion   string    `json:"snmp_version"`
-	Phase         string    `json:"phase"`
-	Outcome       string    `json:"outcome"`
-	CompletedAt   time.Time `json:"completed_at"`
-	TopologyReady bool      `json:"topology_ready"`
+	CollectionFailures ddsnmp.CollectionFailures     `json:"collection_failures"`
+	PreparationFailure collectorapi.JobConfigFailure `json:"preparation_failure"`
+	Failure            snmputils.Failure             `json:"failure"`
+	Profiles           ddsnmp.ProfileContextData     `json:"profile_context"`
+	Hostname           string                        `json:"hostname"`
+	Port               int                           `json:"port"`
+	SNMPVersion        string                        `json:"snmp_version"`
+	Phase              string                        `json:"phase"`
+	Outcome            string                        `json:"outcome"`
+	CompletedAt        time.Time                     `json:"completed_at"`
+	TopologyReady      bool                          `json:"topology_ready"`
 }
 
 type diagnosticEvidenceReference struct {
@@ -103,28 +108,32 @@ type diagnosticEvidenceReference struct {
 }
 
 type diagnosticAcquisitionEvidenceSummary struct {
-	Hostname        string                `json:"hostname"`
-	SysObjectID     string                `json:"sys_object_id"`
-	SysName         string                `json:"sys_name"`
-	Vendor          string                `json:"vendor"`
-	Model           string                `json:"model"`
-	TargetOutcome   string                `json:"target_outcome"`
-	TargetAddresses []string              `json:"target_addresses,omitempty"`
-	CollectedAt     time.Time             `json:"collected_at"`
-	FreshForNanos   int64                 `json:"fresh_for_ns"`
-	Client          diagnosticPhaseStatus `json:"client"`
-	Connect         diagnosticPhaseStatus `json:"connect"`
-	Profiles        diagnosticPhaseStatus `json:"profiles"`
-	Collection      diagnosticPhaseStatus `json:"collection"`
-	SysUptime       diagnosticPhaseStatus `json:"sys_uptime"`
-	VLANProfiles    diagnosticPhaseStatus `json:"vlan_profiles"`
-	Contexts        int                   `json:"contexts"`
-	ProfileRuns     int                   `json:"profile_runs"`
+	Interruption       snmputils.Failure         `json:"interruption"`
+	ProfileContext     ddsnmp.ProfileContextData `json:"profile_context"`
+	VLANProfileContext ddsnmp.ProfileContextData `json:"vlan_profile_context"`
+	Hostname           string                    `json:"hostname"`
+	SysObjectID        string                    `json:"sys_object_id"`
+	SysName            string                    `json:"sys_name"`
+	Vendor             string                    `json:"vendor"`
+	Model              string                    `json:"model"`
+	TargetOutcome      string                    `json:"target_outcome"`
+	TargetAddresses    []string                  `json:"target_addresses,omitempty"`
+	CollectedAt        time.Time                 `json:"collected_at"`
+	FreshForNanos      int64                     `json:"fresh_for_ns"`
+	Client             diagnosticPhaseStatus     `json:"client"`
+	Connect            diagnosticPhaseStatus     `json:"connect"`
+	Profiles           diagnosticPhaseStatus     `json:"profiles"`
+	Collection         diagnosticPhaseStatus     `json:"collection"`
+	SysUptime          diagnosticPhaseStatus     `json:"sys_uptime"`
+	VLANProfiles       diagnosticPhaseStatus     `json:"vlan_profiles"`
+	Contexts           int                       `json:"contexts"`
+	ProfileRuns        int                       `json:"profile_runs"`
 }
 
 type diagnosticPhaseStatus struct {
-	Outcome string `json:"outcome"`
-	Failure string `json:"failure"`
+	Detail  snmputils.Failure `json:"detail"`
+	Outcome string            `json:"outcome"`
+	Failure string            `json:"failure"`
 }
 
 type diagnosticCaptureSummary struct {
@@ -206,6 +215,31 @@ type diagnosticCaptureInspection struct {
 	Capture    *diagnosticCaptureSummary `json:"capture,omitempty"`
 }
 
+type diagnosticDeviceCaptureInspection struct {
+	diagnosticCaptureInspection
+	CollectionContexts []diagnosticContextAccounting `json:"collection_contexts,omitempty"`
+}
+
+type diagnosticContextAccounting struct {
+	Interruption snmputils.Failure             `json:"interruption"`
+	Failures     ddsnmp.CollectionFailures     `json:"failures"`
+	Client       diagnosticPhaseStatus         `json:"client"`
+	Connect      diagnosticPhaseStatus         `json:"connect"`
+	Collection   diagnosticPhaseStatus         `json:"collection"`
+	Ordinal      uint32                        `json:"ordinal"`
+	VLANID       string                        `json:"vlan_id"`
+	VLANName     string                        `json:"vlan_name"`
+	Profiles     []diagnosticProfileAccounting `json:"profiles"`
+}
+
+type diagnosticProfileAccounting struct {
+	Identity     snmpdiag.ProfileIdentity `json:"identity"`
+	Outcome      string                   `json:"outcome"`
+	FailurePhase string                   `json:"failure_phase"`
+	Stats        snmpdiag.CollectionStats `json:"stats"`
+	Execution    *snmpdiag.Execution      `json:"execution,omitempty"`
+}
+
 type diagnosticGraphActor struct {
 	Index        int                     `json:"index"`
 	ActorID      string                  `json:"actor_id"`
@@ -250,19 +284,19 @@ type diagnosticRowInspection struct {
 }
 
 type DiagnosticDeviceInspection struct {
-	RegistrationID  uint64                        `json:"registration_id"`
-	Query           DiagnosticQueryOptions        `json:"query"`
-	Lifecycle       diagnosticLifecycleInspection `json:"lifecycle"`
-	Sweep           diagnosticSweepInspection     `json:"sweep"`
-	Removed         diagnosticRemovedInspection   `json:"removed"`
-	LatestAttempt   diagnosticCaptureInspection   `json:"latest_attempt"`
-	RetainedSuccess diagnosticCaptureInspection   `json:"retained_success"`
-	SameAttempt     bool                          `json:"same_attempt"`
-	Observation     diagnosticStageReport         `json:"observation"`
-	GraphIdentity   diagnosticActorInspection     `json:"graph_identity"`
-	TypedIdentity   diagnosticRowInspection       `json:"typed_identity"`
-	GraphStats      map[string]any                `json:"graph_stats,omitempty"`
-	LastAborted     *diagnosticAbortedSweep       `json:"last_aborted_sweep,omitempty"`
+	RegistrationID  uint64                            `json:"registration_id"`
+	Query           DiagnosticQueryOptions            `json:"query"`
+	Lifecycle       diagnosticLifecycleInspection     `json:"lifecycle"`
+	Sweep           diagnosticSweepInspection         `json:"sweep"`
+	Removed         diagnosticRemovedInspection       `json:"removed"`
+	LatestAttempt   diagnosticDeviceCaptureInspection `json:"latest_attempt"`
+	RetainedSuccess diagnosticDeviceCaptureInspection `json:"retained_success"`
+	SameAttempt     bool                              `json:"same_attempt"`
+	Observation     diagnosticStageReport             `json:"observation"`
+	GraphIdentity   diagnosticActorInspection         `json:"graph_identity"`
+	TypedIdentity   diagnosticRowInspection           `json:"typed_identity"`
+	GraphStats      map[string]any                    `json:"graph_stats,omitempty"`
+	LastAborted     *diagnosticAbortedSweep           `json:"last_aborted_sweep,omitempty"`
 }
 
 type diagnosticSourceFact struct {

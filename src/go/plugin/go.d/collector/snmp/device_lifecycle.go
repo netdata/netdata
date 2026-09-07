@@ -5,6 +5,8 @@ package snmp
 import (
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -23,7 +25,7 @@ func (c *Collector) beginDeviceLifecycle() {
 	}
 	c.deviceLifecycleMu.Lock()
 	c.deviceLifecycleInfo = info
-	publish := !c.deviceLifecycleManaged || c.deviceLifecycleCommitted
+	publish := !c.deviceLifecycleManaged
 	c.deviceLifecycleMu.Unlock()
 	if !publish {
 		return
@@ -38,23 +40,35 @@ func (c *Collector) completeDeviceLifecycle(phase ddsnmp.DeviceLifecyclePhase, e
 	if err != nil {
 		outcome = ddsnmp.DeviceLifecycleOutcomeFailed
 	}
-	c.recordDeviceLifecycle(phase, outcome)
+	c.recordDeviceLifecycle(phase, outcome, snmputils.ClassifyFailure(err))
 }
 
 func (c *Collector) recordDeviceLifecycle(
 	phase ddsnmp.DeviceLifecyclePhase,
 	outcome ddsnmp.DeviceLifecycleOutcome,
+	failures ...snmputils.Failure,
 ) {
 	status := ddsnmp.DeviceLifecycleStatus{
 		Phase:       phase,
 		Outcome:     outcome,
 		CompletedAt: time.Now(),
 	}
+	if outcome == ddsnmp.DeviceLifecycleOutcomeFailed {
+		status.Failure = snmputils.Failure{Reason: "panic"}
+	}
+	if len(failures) != 0 {
+		status.Failure = failures[0]
+	}
 	c.deviceLifecycleMu.Lock()
+	if phase == ddsnmp.DeviceLifecyclePhaseCollect {
+		status.CollectionFailures = c.deviceCollectionFailures
+	}
 	c.deviceLifecycleStatus = status
-	publish := !c.deviceLifecycleManaged || c.deviceLifecycleCommitted
+	managed := c.deviceLifecycleManaged
+	writer := c.deviceWriter
 	c.deviceLifecycleMu.Unlock()
-	if !publish {
+	if managed {
+		writer.RecordLifecycle(status)
 		return
 	}
 	c.reportDeviceLifecycle(func(store deviceLifecycleStore) {
@@ -88,7 +102,7 @@ func (c *Collector) commitDeviceLifecycle(previousOwner string) {
 				Warningf("failed to update SNMP job lifecycle diagnostics")
 		}
 	}()
-	c.deviceStore.ReplaceJob(
+	c.deviceWriter = c.deviceStore.ReplaceJob(
 		previousOwner,
 		c.deviceLifecycleOwner,
 		c.deviceLifecycleInfo,
@@ -119,4 +133,42 @@ func (c *Collector) reportDeviceLifecycle(report func(deviceLifecycleStore)) {
 		}
 	}()
 	report(c.deviceLifecycleStore)
+}
+
+func (c *Collector) recordProfileContext(context *ddsnmp.ProfileContext) {
+	c.deviceLifecycleMu.Lock()
+	c.deviceLifecycleInfo.Profiles = context
+	info := c.deviceLifecycleInfo
+	managed, writer := c.deviceLifecycleManaged, c.deviceWriter
+	c.deviceLifecycleMu.Unlock()
+	if managed {
+		writer.RecordProfileContext(context)
+		return
+	}
+	c.reportDeviceLifecycle(func(store deviceLifecycleStore) { store.RegisterJob(c.deviceStoreOwnerKey(), info) })
+}
+
+func lifecycleFailureError(wrapper, cause error, operation, reason string) error {
+	f := snmputils.ClassifyFailure(cause)
+	if f.Operation == "" {
+		f.Operation = operation
+	}
+	if reason != "" && f.Reason == "unknown" {
+		f.Reason = reason
+	}
+	return snmputils.WithFailureDetail(wrapper, f)
+}
+
+func (c *Collector) recordCollectionFailures(failures ddsnmp.CollectionFailures) {
+	c.deviceLifecycleMu.Lock()
+	c.deviceCollectionFailures.Merge(failures)
+	c.deviceLifecycleMu.Unlock()
+}
+
+func (c *Collector) captureCollectionFailures() {
+	if source, ok := c.ddSnmpColl.(interface {
+		CollectionFailures() ddsnmp.CollectionFailures
+	}); ok {
+		c.recordCollectionFailures(source.CollectionFailures())
+	}
 }

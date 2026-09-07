@@ -37,6 +37,7 @@ type Config struct {
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
+	Services        []composition.ProcessService
 	ModuleRegistry  collectorapi.Registry
 	RunModule       string
 	RunJob          []string
@@ -78,6 +79,7 @@ type Agent struct {
 
 	DiscoveryProviders []discovery.ProviderFactory
 
+	Services       []composition.ProcessService
 	ModuleRegistry collectorapi.Registry
 	In             io.Reader
 	Out            io.Writer
@@ -107,6 +109,7 @@ func New(cfg Config) *Agent {
 		IsInsideK8s:               cfg.IsInsideK8s,
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
+		Services:                  cfg.Services,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
 		In:                        os.Stdin,
 		Out:                       safewriter.Stdout,
@@ -187,6 +190,7 @@ func (a *Agent) run(ctx context.Context) error {
 		InitialSecrets:        a.setupSecretStoreConfigs(),
 		InitialVnodes:         a.setupVnodeRegistry(),
 		Runtime:               a.setupRuntimeService(),
+		Services:              a.Services,
 		KeepAlive:             !a.runModePolicy.IsTerminal,
 		ShutdownTimeout:       a.ShutdownTimeout,
 	})

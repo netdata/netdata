@@ -112,12 +112,12 @@ type L3Subnet struct {
 }
 
 func L3SubnetForInterface(row L3Interface) (L3Subnet, bool) {
-	ip, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.IP))
-	if err != nil || !ip.Is4() {
+	ip, ok := topologyutil.ParseIPAddress(row.IP)
+	if !ok || !ip.Is4() {
 		return L3Subnet{}, false
 	}
-	netmask, err := netip.ParseAddr(topologyutil.NormalizeIPAddress(row.Netmask))
-	if err != nil || !netmask.Is4() {
+	netmask, ok := topologyutil.ParseIPAddress(row.Netmask)
+	if !ok || !netmask.Is4() {
 		return L3Subnet{}, false
 	}
 	network, ok := netaddr.NetworkAddress(ip, netmask)

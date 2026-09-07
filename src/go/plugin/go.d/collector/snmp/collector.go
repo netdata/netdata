@@ -10,11 +10,10 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
@@ -24,14 +23,10 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-// Register registers the SNMP collector with its shared SNMP-family device store.
-func Register(store *ddsnmp.DeviceStore) {
-	collectorapi.Register("snmp", newCreator(store))
-}
-
-func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
+// Creator constructs registration with explicit SNMP-family dependencies.
+func Creator(store *ddsnmp.DeviceStore) collectorapi.Creator {
 	if store == nil {
-		panic("snmp Register requires a non-nil device store")
+		panic("snmp Creator requires a non-nil device store")
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
@@ -120,10 +115,12 @@ type (
 		seenProfiles             map[string]bool
 		deviceStore              *ddsnmp.DeviceStore
 		deviceLifecycleStore     deviceLifecycleStore
+		deviceWriter             *ddsnmp.DeviceWriter
 		deviceLifecycleMu        sync.Mutex
 		deviceLifecycleOwner     string
 		deviceLifecycleInfo      ddsnmp.DeviceLifecycleInfo
 		deviceLifecycleStatus    ddsnmp.DeviceLifecycleStatus
+		deviceCollectionFailures ddsnmp.CollectionFailures
 		deviceLifecyclePending   *ddsnmp.DeviceConnectionInfo
 		deviceLifecycleManaged   bool
 		deviceLifecycleCommitted bool
@@ -144,6 +141,7 @@ type (
 
 		sysInfo              *snmputils.SysInfo
 		snmpProfiles         []*ddsnmp.Profile
+		initialized          bool
 		deviceMetadataSynced bool
 
 		adjMaxRepetitions uint32
@@ -174,17 +172,17 @@ func (c *Collector) Init(context.Context) (err error) {
 	}()
 
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation failed: %v", err)
+		return lifecycleFailureError(fmt.Errorf("config validation failed: %v", err), err, "configuration", "invalid_configuration")
 	}
 
 	if _, err := c.initSNMPClient(); err != nil {
-		return fmt.Errorf("failed to initialize SNMP client: %v", err)
+		return lifecycleFailureError(fmt.Errorf("failed to initialize SNMP client: %v", err), err, "client", "invalid_configuration")
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
 		pr, err := c.initPinger()
 		if err != nil {
-			return fmt.Errorf("failed to initialize ping client: %v", err)
+			return lifecycleFailureError(fmt.Errorf("failed to initialize ping client: %v", err), err, "ping", "")
 		}
 		c.pingClient = pr
 	}
@@ -207,18 +205,18 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 	if c.snmpClient == nil {
 		snmpClient, err := c.initAndConnectSNMPClient()
 		if err != nil {
-			return fmt.Errorf("failed to init and connect SNMP client: %v", err)
+			return lifecycleFailureError(fmt.Errorf("failed to init and connect SNMP client: %v", err), err, "connect", "")
 		}
 		c.snmpClient = snmpClient
 	}
 
-	if _, err := snmputils.GetSysInfo(c.snmpClient); err != nil {
+	if err := c.ensureDeviceProfile(); err != nil {
 		return err
 	}
 
 	if c.PingOnly && c.pingClient != nil {
 		if _, err := c.pingClient.Probe(ctx, c.Hostname); err != nil && isPingUnrecoverableError(err) {
-			return fmt.Errorf("ping check failed: %v", err)
+			return lifecycleFailureError(fmt.Errorf("ping check failed: %v", err), err, "ping", "")
 		}
 	}
 
@@ -230,6 +228,15 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	c.deviceLifecycleMu.Lock()
+	c.deviceCollectionFailures = ddsnmp.CollectionFailures{}
+	c.deviceLifecycleMu.Unlock()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			c.recordDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed)
+			panic(recovered)
+		}
+	}()
 	mx, err := c.collect(ctx)
 	c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, err)
 	if err != nil {

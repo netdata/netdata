@@ -24,7 +24,7 @@ A profile tells the Netdata SNMP trap plugin:
 
 Trap profiles do **not** define journal field names manually. The plugin derives indexed `TRAP_VAR_*` journal fields
 from received non-sensitive, non-redundant event varbinds, and also keeps the complete structured audit copy in
-`TRAP_JSON` (see the SNMP trap subsystem design doc). Profiles may define optional trap-to-metric rules and chart
+`TRAP_JSON`. Profiles may define optional trap-to-metric rules and chart
 definitions. Listener jobs still decide whether to enable those rules through `profile_metrics`.
 
 A profile is a single YAML file. One file per vendor by convention; stock profiles ship under `default/` and are
@@ -552,7 +552,8 @@ entry:
 ## Cardinality discipline
 
 The trap subsystem enforces cardinality discipline at the metric / label surface only — the journal (including the
-rendered MESSAGE) has no cardinality restriction. See the trap subsystem design doc §4 for full rationale.
+rendered MESSAGE) has no cardinality restriction. Only labels create time series, so only labels can multiply the
+metric space; journal fields are indexed storage and carry the per-event detail instead.
 
 In profile terms:
 

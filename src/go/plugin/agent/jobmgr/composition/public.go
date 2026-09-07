@@ -39,6 +39,12 @@ func ContainsOnlyProcessControlErrors(err error, allowed ...error) bool {
 	return jobmgr.ContainsOnlyErrorLeaves(err, allowed...)
 }
 
+// ProcessService runs alongside all run generations. It must return when ctx
+// is canceled and handle its own operational failures without stopping jobs.
+type ProcessService interface {
+	Run(context.Context)
+}
+
 type RuntimeService interface {
 	runtimecomp.Service
 	Start(pluginName string, output io.Writer)
@@ -64,6 +70,8 @@ type Config struct {
 	InitialSecrets []secretstore.Config           // initial secret store configs
 	InitialVnodes  map[string]*vnodes.VirtualNode // file-configured vnodes
 
+	Services []ProcessService // optional process-owned background services
+
 	Runtime RuntimeService // runtime service (charts/host-scope; nil disables runtime charts)
 
 	ShutdownTimeout time.Duration // per-run shutdown budget
@@ -83,6 +91,7 @@ type Process struct {
 	attempted bool       // Run has been attempted (once)
 	result    error      // terminal run result
 
+	services   []ProcessService
 	runtime    RuntimeService // runtime service (started/stopped around Run)
 	pluginName string         // plugin name
 }
@@ -178,6 +187,7 @@ func NewProcess(config Config) (*Process, error) {
 		started:    make(chan struct{}),
 		done:       make(chan struct{}),
 		runtime:    config.Runtime,
+		services:   slices.Clone(config.Services),
 		pluginName: config.PluginName,
 	}, nil
 }
@@ -200,7 +210,18 @@ func (p *Process) Run(ctx context.Context) error {
 			Owner: p.core.frames,
 		})
 	}
+	stopServices := p.startServices(ctx)
+	stop := func() error {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), p.core.config.ShutdownTimeout)
+		defer cancel()
+		return stopServices(shutdownCtx)
+	}
+	defer stop()
+	p.core.config.StopServices = stopServices
 	result := p.core.run(ctx, p.controls)
+	if err := stop(); err != nil && !errors.Is(result, err) {
+		result = errors.Join(result, err)
+	}
 	p.mu.Lock()
 	p.result = result
 	close(p.done)
@@ -278,4 +299,50 @@ func cloneSecretConfigs(configs []secretstore.Config) ([]secretstore.Config, err
 		cloned[index] = clone
 	}
 	return cloned, nil
+}
+
+func (p *Process) startServices(ctx context.Context) func(context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	var completions []<-chan struct{}
+	for _, service := range p.services {
+		if service == nil {
+			continue
+		}
+		done := make(chan struct{})
+		completions = append(completions, done)
+		go func() {
+			defer close(done)
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					jobmgr.ObserveDiagnostic(p.core.diagnostics, jobmgr.DiagnosticEvent{
+						Level: jobmgr.DiagnosticError,
+						Name:  "process service panicked",
+						Err:   fmt.Errorf("%v", recovered),
+					})
+				}
+			}()
+			service.Run(ctx)
+		}()
+	}
+	var once sync.Once
+	var stopErr error
+	return func(shutdownCtx context.Context) error {
+		once.Do(func() {
+			cancel()
+			for _, done := range completions {
+				select {
+				case <-done:
+					continue
+				default:
+				}
+				select {
+				case <-done:
+				case <-shutdownCtx.Done():
+					stopErr = fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err())
+					return
+				}
+			}
+		})
+		return stopErr
+	}
 }

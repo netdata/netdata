@@ -14,7 +14,8 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
@@ -97,13 +98,18 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 			operation: "inspect-link",
 			want:      `"family": "lldp"`,
 		},
+		"inspect link by index": {
+			args:      []string{"inspect-link", "--archive", path, "--link-index", "3"},
+			operation: "inspect-link-at",
+			want:      `"selected_index": 0`,
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			fake := &fakeDiagnosticArchive{}
 			openCalls := 0
-			opener := func(_ io.Reader, limits snmptopology.DiagnosticReadLimits) (diagnosticArchive, error) {
+			opener := func(_ io.Reader, limits snmpdiag.ReadLimits) (diagnosticArchive, error) {
 				openCalls++
 				fake.limits = limits
 				return fake, nil
@@ -132,11 +138,14 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 					t.Fatalf("explicit boolean query options were not forwarded: %+v", fake.query)
 				}
 			}
-			if tc.operation == "inspect-device" || tc.operation == "inspect-link" {
+			if tc.operation == "inspect-device" || strings.HasPrefix(tc.operation, "inspect-link") {
 				if !fake.query.CollapseActorsByIP || !fake.query.EliminateNonIPInferred ||
 					fake.query.MapType != "managed_fabric" || fake.query.Depth != "all" {
 					t.Fatalf("default query options were not forwarded: %+v", fake.query)
 				}
+			}
+			if tc.operation == "inspect-link-at" && fake.linkIndex != 3 {
+				t.Fatalf("link index=%d, want 3", fake.linkIndex)
 			}
 			if !strings.Contains(stdout.String(), tc.want) {
 				t.Fatalf("stdout missing %q:\n%s", tc.want, stdout.String())
@@ -188,6 +197,12 @@ func TestRunRealArchiveMatchesDirectOperations(t *testing.T) {
 			},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
 				return archive.InspectLink(query, link)
+			},
+		},
+		"inspect link by index": {
+			args: []string{"inspect-link", "--archive", archivePath, "--link-index", "0"},
+			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
+				return archive.InspectLinkAt(query, 0)
 			},
 		},
 	}
@@ -313,6 +328,30 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 			code: 1,
 			want: "link direction",
 		},
+		"missing link selector": {
+			args: []string{"inspect-link", "--archive", validArchive},
+			code: 2,
+			want: "link selector",
+		},
+		"negative link index": {
+			args: []string{"inspect-link", "--archive", validArchive, "--link-index", "-1"},
+			code: 2,
+			want: "--link-index must be zero or greater",
+		},
+		"mixed link selectors": {
+			args: []string{
+				"inspect-link", "--archive", validArchive, "--link-index", "0",
+				"--source-identity", "actor:a", "--destination-identity", "actor:b",
+				"--family", "lldp", "--direction", "bidirectional",
+			},
+			code: 2,
+			want: "mutually exclusive",
+		},
+		"link index out of range": {
+			args: []string{"inspect-link", "--archive", validArchive, "--link-index", "1000000"},
+			code: 1,
+			want: "link index",
+		},
 	}
 
 	for name, tc := range tests {
@@ -331,8 +370,9 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 type fakeDiagnosticArchive struct {
 	operation      string
 	operationCalls int
-	limits         snmptopology.DiagnosticReadLimits
+	limits         snmpdiag.ReadLimits
 	query          snmptopology.DiagnosticQueryOptions
+	linkIndex      int
 }
 
 func (a *fakeDiagnosticArchive) Identity() snmptopology.DiagnosticArchiveIdentity {
@@ -372,6 +412,17 @@ func (a *fakeDiagnosticArchive) InspectLink(
 	a.operationCalls++
 	a.query = options
 	return snmptopology.DiagnosticLinkInspection{Subject: subject}, nil
+}
+
+func (a *fakeDiagnosticArchive) InspectLinkAt(
+	options snmptopology.DiagnosticQueryOptions,
+	index int,
+) (snmptopology.DiagnosticLinkInspection, error) {
+	a.operation = "inspect-link-at"
+	a.operationCalls++
+	a.query = options
+	a.linkIndex = index
+	return snmptopology.DiagnosticLinkInspection{}, nil
 }
 
 func writeGoldenDiagnosticArchive(t testing.TB) string {
@@ -420,9 +471,9 @@ func readReplayableDiagnosticArchive(t testing.TB) *snmptopology.DiagnosticArchi
 	if err != nil {
 		t.Fatal(err)
 	}
-	archive, err := snmptopology.ReadDiagnosticArchive(
+	archive, err := openDiagnosticArchive(
 		bytes.NewReader(fixture),
-		snmptopology.DefaultDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	if err != nil {
 		t.Fatal(err)

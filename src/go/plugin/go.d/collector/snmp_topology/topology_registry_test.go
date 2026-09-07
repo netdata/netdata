@@ -441,9 +441,10 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 		ManagementIP:  "10.0.0.1",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "198.51.100.1",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "198.51.100.1",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	cacheA.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "2",
@@ -461,9 +462,10 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 		ManagementIP:  "10.0.0.2",
 	}
 	cacheB.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "198.51.100.2",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "198.51.100.2",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	cacheB.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "7",
@@ -500,9 +502,10 @@ func TestTopologyRegistry_WeakDevicesUseSelectedManagementIPIdentity(t *testing.
 		cache := newTopologyBuilder()
 		cache.updateTime = time.Now().Add(time.Duration(i) * time.Millisecond)
 		cache.updateIfIndexByIP(map[string]string{
-			tagTopoIfIndex: "1",
-			tagTopoIPAddr:  ip,
-			tagTopoIPMask:  "255.255.255.0",
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "1",
+			tagTopoIPAddr:   ip,
+			tagTopoIPMask:   "255.255.255.0",
 		})
 		cache.finalize()
 		publishTestTopologyBuilder(registry, cache)
@@ -539,9 +542,10 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 		ManagementIP:  "10.0.0.1",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "203.0.113.1",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "203.0.113.1",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cacheA.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "2",
@@ -559,9 +563,10 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 		ManagementIP:  "10.0.0.2",
 	}
 	cacheB.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "203.0.113.2",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "203.0.113.2",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cacheB.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "7",
@@ -579,9 +584,10 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 		ManagementIP:  "10.0.0.3",
 	}
 	cacheC.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "9",
-		tagTopoIPAddr:  "203.0.113.3",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "9",
+		tagTopoIPAddr:   "203.0.113.3",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cacheC.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "9",
@@ -662,9 +668,10 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 		},
 	})
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "198.51.100.1",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "198.51.100.1",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 
 	cacheB := newTopologyBuilder()
@@ -683,9 +690,10 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 		},
 	}})
 	cacheB.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "198.51.100.2",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "198.51.100.2",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 
 	publishTestTopologyBuilder(registry, cacheA)
@@ -1044,9 +1052,10 @@ func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *t
 		ManagementIP:  "192.0.2.10",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "1",
-		tagTopoIPAddr:  "192.0.2.20",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "1",
+		tagTopoIPAddr:   "192.0.2.20",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 
 	cacheB := newTopologyBuilder()
@@ -1096,9 +1105,10 @@ func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testi
 		ManagementIP:  "192.0.2.10",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "1",
-		tagTopoIPAddr:  "192.0.2.11",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "1",
+		tagTopoIPAddr:   "192.0.2.11",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 
 	cacheB := newTopologyBuilder()
@@ -1186,9 +1196,10 @@ func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing
 		ManagementIP:  "10.0.0.1",
 	}
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "198.51.100.1",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "198.51.100.1",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	cache.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "2",
@@ -1196,8 +1207,9 @@ func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing
 		tagTopoIfDescr: "Uplink",
 	})
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "3",
-		tagTopoIPAddr:  "2001:db8::1",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "3",
+		tagTopoIPAddr:   "2001:db8::1",
 	})
 
 	snapshot, ok := snapshotTestTopologyBuilder(cache)

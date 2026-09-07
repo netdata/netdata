@@ -167,7 +167,7 @@ Replace `162` with your configured port when using a custom listener port.
 
 ## Journal and OTLP preflight
 
-On Linux, direct journal storage is enabled by default for listener jobs. The job writes trap data under the configured Netdata log directory and is exposed as an SNMP trap log source. For the exact per-job path and how the `journalctl --directory` path is built, see [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md).
+Direct journal storage is enabled by default for listener jobs on every platform. The job writes trap data under the configured Netdata log directory and is exposed as an SNMP trap log source. For the exact per-job path and how the `journalctl --directory` path is built, see [Journal and Querying](/docs/npm/snmp-traps/journal-and-querying.md).
 
 For direct-journal jobs, confirm that the Netdata log directory exists and is writable by the service that runs `go.d.plugin`. Standard systemd packages run the Netdata service as root with group `netdata`; if you changed the service user, run equivalent checks as that user.
 

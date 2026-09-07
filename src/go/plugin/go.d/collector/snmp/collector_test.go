@@ -14,18 +14,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/gosnmp/gosnmp"
+	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
-
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,8 +49,8 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollectorCreatorRequiresDeviceStore(t *testing.T) {
-	require.PanicsWithValue(t, "snmp Register requires a non-nil device store", func() {
-		_ = newCreator(nil)
+	require.PanicsWithValue(t, "snmp Creator requires a non-nil device store", func() {
+		_ = Creator(nil)
 	})
 }
 
@@ -267,7 +267,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 	collr := New(store)
 	collr.Hostname = ""
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -286,7 +286,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 
 func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 	config := map[string]any{
 		"hostname":  "switch-a.example",
@@ -323,7 +323,7 @@ func TestCollectorRejectedManagedCandidateDoesNotRemoveIncumbentConnection(t *te
 	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{Hostname: "incumbent.example"})
 	collr := New(store)
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 
 	hook.Bind(identity, job)
 	collr.Cleanup(context.Background())
@@ -337,7 +337,7 @@ func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
 	collr := New(store)
 	collr.Config = prepareV2Config()
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -383,7 +383,9 @@ func TestCollectorLifecycleRecordsPanicsAsFailures(t *testing.T) {
 		collr := New(store)
 		collr.Config = prepareV2Config()
 		mockSNMP := snmpmock.NewMockHandler(ctrl)
-		mockSNMP.EXPECT().WalkAll(gomock.Any()).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+		mockSNMP.EXPECT().MaxOids().Return(20)
+		mockSNMP.EXPECT().Version().Return(gosnmp.Version2c)
+		mockSNMP.EXPECT().Get(gomock.Any()).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
 			panic("check panic")
 		})
 		collr.snmpClient = mockSNMP
@@ -403,7 +405,7 @@ func TestCollectorManagedConnectionCollectedBeforeReconcileIsPublishedAtReconcil
 	collr.Config = prepareV2Config()
 	collr.ManualProfiles = []string{"profile-a"}
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := newCreator(store).JobConfigLifecycle
+	hook := Creator(store).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -603,6 +605,44 @@ func TestCollector_Check(t *testing.T) {
 			},
 		},
 
+		"success: chunks sysInfo by configured max OIDs": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpectWithMaxOids(m, 2)
+				gomock.InOrder(
+					m.EXPECT().MaxOids().Return(2),
+					m.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
+							{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
+						}},
+						nil,
+					),
+					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
+							{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
+						}},
+						nil,
+					),
+					m.EXPECT().Get([]string{snmputils.OidSysLocation}).Return(
+						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+							{Name: snmputils.OidSysLocation, Value: []byte("mock sysLocation"), Type: gosnmp.OctetString},
+						}},
+						nil,
+					),
+				)
+
+				c := newTestSNMPCollector()
+				c.Config = prepareV2Config()
+				c.Options.MaxOIDs = 2
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
+			},
+		},
+
 		"failure: SNMP connect error": {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
@@ -618,17 +658,14 @@ func TestCollector_Check(t *testing.T) {
 			},
 		},
 
-		"failure: sysInfo walk error": {
+		"failure: sysInfo query error": {
 			wantErr: true,
 			prepare: func(m *snmpmock.MockHandler) *Collector {
-				// Normal init succeeds
 				setMockClientInitExpect(m)
-				// But sysInfo retrieval (WalkAll on system tree) fails
-				// If your helper is too opinionated, stub directly:
-				// The collector ultimately calls WalkAll on the system OID tree.
+				m.EXPECT().MaxOids().Return(20)
 				m.EXPECT().
-					WalkAll(gomock.Any()).
-					Return(nil, errors.New("walk failed"))
+					Get(sysInfoOIDsForTest()).
+					Return(nil, errors.New("query failed"))
 
 				c := newTestSNMPCollector()
 				c.Config = prepareV2Config()
@@ -716,6 +753,152 @@ func TestCollector_Check(t *testing.T) {
 	}
 }
 
+func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
+	tests := map[string]struct {
+		pdus           []gosnmp.SnmpPDU
+		pingEnabled    bool
+		pingOnly       bool
+		manualProfiles []string
+		wantErr        string
+		wantAbsent     []string
+		wantContextOID string
+	}{
+		"empty system query": {
+			wantErr: "SNMP system scalar query returned no PDUs",
+		},
+		"partial system query with ordinary ping enabled": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte("private description")},
+				{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("private hostname")},
+			},
+			pingEnabled: true,
+			wantErr:     "without sysObjectID",
+			wantAbsent:  []string{"private description", "private hostname"},
+		},
+		"unmatched system object": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.2.1.999"},
+			},
+			manualProfiles: []string{"generic-device"},
+			wantErr:        "no SNMP metric profiles available for sysObjectID \"1.3.6.1.2.1.999\"",
+			wantAbsent:     []string{"manual_profiles"},
+			wantContextOID: "1.3.6.1.2.1.999",
+		},
+		"invalid manual profile": {
+			manualProfiles: []string{"profile-that-does-not-exist"},
+			wantErr:        "SNMP system scalar query returned no PDUs",
+		},
+		"topology-only manual profile": {
+			manualProfiles: []string{"topology-role-qbridge"},
+			wantErr:        "SNMP system scalar query returned no PDUs",
+		},
+		"applicable manual metric profile": {
+			manualProfiles: []string{"generic-device"},
+		},
+		"reported Cisco ASR identity": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9.1.1166"},
+			},
+		},
+		"explicit ping only": {
+			pingOnly: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			client := snmpmock.NewMockHandler(ctrl)
+			client.EXPECT().MaxOids().Return(20)
+			client.EXPECT().Version().Return(gosnmp.Version2c)
+			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
+
+			collr := newTestSNMPCollector()
+			collr.Config = prepareV2Config()
+			collr.CreateVnode = false
+			collr.Ping.Enabled = tc.pingEnabled
+			collr.PingOnly = tc.pingOnly
+			collr.ManualProfiles = tc.manualProfiles
+			collr.snmpClient = client
+
+			err := collr.Check(context.Background())
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			if tc.wantContextOID != "" {
+				context := collr.deviceLifecycleInfo.Profiles.Snapshot()
+				require.Equal(t, "available", context.State)
+				require.Equal(t, tc.wantContextOID, context.SysObjectID)
+				require.Empty(t, context.Selected)
+				require.False(t, context.ManualApplied)
+				require.Equal(t, "no_profiles", collr.deviceLifecycleStatus.Failure.Reason)
+			}
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			for _, value := range tc.wantAbsent {
+				assert.NotContains(t, err.Error(), value)
+			}
+		})
+	}
+}
+
+func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(20)
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
+	}}, nil).Times(1)
+
+	collr := newTestSNMPCollector()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpClient = client
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return &mockDdSnmpCollector{} }
+
+	require.NoError(t, collr.Check(context.Background()))
+	require.NoError(t, collr.ensureInitialized())
+	assert.Equal(t, "1.3.6.1.4.1.14988.1", collr.sysInfo.SysObjectID)
+}
+
+func TestSysInfoDiagnosticOmitsRawSystemValues(t *testing.T) {
+	si := &snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.9.1.1166",
+		Descr:       "private description",
+		Contact:     "private contact",
+		Name:        "private hostname",
+		Location:    "private location",
+		Vendor:      "Cisco",
+		Category:    "Router",
+		Model:       "ASR 1000",
+		Probe: snmputils.SysInfoProbe{
+			PDUCount:        5,
+			SeenSysDescr:    true,
+			SeenSysObjectID: true,
+			SeenSysContact:  true,
+			SeenSysName:     true,
+			SeenSysLocation: true,
+		},
+	}
+
+	diagnostic := formatSysInfoDiagnostic(si)
+	assert.Contains(t, diagnostic, si.SysObjectID)
+	assert.Contains(t, diagnostic, "pdu_count=5")
+	assert.Contains(t, diagnostic, "sys_object_id=true")
+	for _, raw := range []string{si.Descr, si.Contact, si.Name, si.Location} {
+		assert.NotContains(t, diagnostic, raw)
+	}
+}
+
 func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -783,32 +966,34 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			want: map[string]int64{
 				// scalar → "snmp_device_prof_<name>"
-				"snmp_device_prof_test_stats_errors_processing_scalar":    0,
-				"snmp_device_prof_test_stats_errors_processing_table":     0,
-				"snmp_device_prof_test_stats_errors_processing_licensing": 0,
-				"snmp_device_prof_test_stats_errors_processing_bgp":       0,
-				"snmp_device_prof_test_stats_errors_snmp":                 0,
-				"snmp_device_prof_test_stats_metrics_rows":                0,
-				"snmp_device_prof_test_stats_metrics_licensing":           0,
-				"snmp_device_prof_test_stats_metrics_bgp":                 0,
-				"snmp_device_prof_test_stats_metrics_scalar":              0,
-				"snmp_device_prof_test_stats_metrics_table":               0,
-				"snmp_device_prof_test_stats_metrics_tables":              0,
-				"snmp_device_prof_test_stats_metrics_virtual":             0,
-				"snmp_device_prof_test_stats_snmp_get_oids":               0,
-				"snmp_device_prof_test_stats_snmp_get_requests":           0,
-				"snmp_device_prof_test_stats_snmp_tables_cached":          0,
-				"snmp_device_prof_test_stats_snmp_tables_walked":          0,
-				"snmp_device_prof_test_stats_snmp_walk_pdus":              0,
-				"snmp_device_prof_test_stats_snmp_walk_requests":          0,
-				"snmp_device_prof_test_stats_table_cache_hits":            0,
-				"snmp_device_prof_test_stats_table_cache_misses":          0,
-				"snmp_device_prof_test_stats_timings_scalar":              0,
-				"snmp_device_prof_test_stats_timings_table":               0,
-				"snmp_device_prof_test_stats_timings_licensing":           0,
-				"snmp_device_prof_test_stats_timings_bgp":                 0,
-				"snmp_device_prof_test_stats_timings_virtual":             0,
-				"snmp_device_prof_uptime":                                 123,
+				"snmp_device_prof_test_stats_errors_processing_scalar":      0,
+				"snmp_device_prof_test_stats_errors_processing_preparation": 0,
+				"snmp_device_prof_test_stats_errors_processing_table":       0,
+				"snmp_device_prof_test_stats_errors_processing_licensing":   0,
+				"snmp_device_prof_test_stats_errors_processing_bgp":         0,
+				"snmp_device_prof_test_stats_errors_snmp":                   0,
+				"snmp_device_prof_test_stats_metrics_rows":                  0,
+				"snmp_device_prof_test_stats_metrics_licensing":             0,
+				"snmp_device_prof_test_stats_metrics_bgp":                   0,
+				"snmp_device_prof_test_stats_metrics_scalar":                0,
+				"snmp_device_prof_test_stats_metrics_table":                 0,
+				"snmp_device_prof_test_stats_metrics_tables":                0,
+				"snmp_device_prof_test_stats_metrics_virtual":               0,
+				"snmp_device_prof_test_stats_snmp_get_oids":                 0,
+				"snmp_device_prof_test_stats_snmp_get_requests":             0,
+				"snmp_device_prof_test_stats_snmp_tables_cached":            0,
+				"snmp_device_prof_test_stats_snmp_tables_walked":            0,
+				"snmp_device_prof_test_stats_snmp_walk_pdus":                0,
+				"snmp_device_prof_test_stats_snmp_walk_requests":            0,
+				"snmp_device_prof_test_stats_table_cache_hits":              0,
+				"snmp_device_prof_test_stats_table_cache_misses":            0,
+				"snmp_device_prof_test_stats_timings_scalar":                0,
+				"snmp_device_prof_test_stats_timings_preparation":           0,
+				"snmp_device_prof_test_stats_timings_table":                 0,
+				"snmp_device_prof_test_stats_timings_licensing":             0,
+				"snmp_device_prof_test_stats_timings_bgp":                   0,
+				"snmp_device_prof_test_stats_timings_virtual":               0,
+				"snmp_device_prof_uptime":                                   123,
 			},
 		},
 		"collects table multivalue metric": {
@@ -847,33 +1032,35 @@ func TestCollector_Collect(t *testing.T) {
 			want: map[string]int64{
 				// table key: "snmp_device_prof_<name>_<sorted tag values>_<subkey>"
 				// here tags = {"ifName":"eth0"} → key part becomes "_eth0"
-				"snmp_device_prof_test_stats_errors_processing_scalar":    0,
-				"snmp_device_prof_test_stats_errors_processing_table":     0,
-				"snmp_device_prof_test_stats_errors_processing_licensing": 0,
-				"snmp_device_prof_test_stats_errors_processing_bgp":       0,
-				"snmp_device_prof_test_stats_errors_snmp":                 0,
-				"snmp_device_prof_test_stats_metrics_rows":                0,
-				"snmp_device_prof_test_stats_metrics_licensing":           0,
-				"snmp_device_prof_test_stats_metrics_bgp":                 0,
-				"snmp_device_prof_test_stats_metrics_scalar":              0,
-				"snmp_device_prof_test_stats_metrics_table":               0,
-				"snmp_device_prof_test_stats_metrics_tables":              0,
-				"snmp_device_prof_test_stats_metrics_virtual":             0,
-				"snmp_device_prof_test_stats_snmp_get_oids":               0,
-				"snmp_device_prof_test_stats_snmp_get_requests":           0,
-				"snmp_device_prof_test_stats_snmp_tables_cached":          0,
-				"snmp_device_prof_test_stats_snmp_tables_walked":          0,
-				"snmp_device_prof_test_stats_snmp_walk_pdus":              0,
-				"snmp_device_prof_test_stats_snmp_walk_requests":          0,
-				"snmp_device_prof_test_stats_table_cache_hits":            0,
-				"snmp_device_prof_test_stats_table_cache_misses":          0,
-				"snmp_device_prof_test_stats_timings_scalar":              0,
-				"snmp_device_prof_test_stats_timings_table":               0,
-				"snmp_device_prof_test_stats_timings_licensing":           0,
-				"snmp_device_prof_test_stats_timings_bgp":                 0,
-				"snmp_device_prof_test_stats_timings_virtual":             0,
-				"snmp_device_prof_if_octets_eth0_in":                      1,
-				"snmp_device_prof_if_octets_eth0_out":                     2,
+				"snmp_device_prof_test_stats_errors_processing_scalar":      0,
+				"snmp_device_prof_test_stats_errors_processing_preparation": 0,
+				"snmp_device_prof_test_stats_errors_processing_table":       0,
+				"snmp_device_prof_test_stats_errors_processing_licensing":   0,
+				"snmp_device_prof_test_stats_errors_processing_bgp":         0,
+				"snmp_device_prof_test_stats_errors_snmp":                   0,
+				"snmp_device_prof_test_stats_metrics_rows":                  0,
+				"snmp_device_prof_test_stats_metrics_licensing":             0,
+				"snmp_device_prof_test_stats_metrics_bgp":                   0,
+				"snmp_device_prof_test_stats_metrics_scalar":                0,
+				"snmp_device_prof_test_stats_metrics_table":                 0,
+				"snmp_device_prof_test_stats_metrics_tables":                0,
+				"snmp_device_prof_test_stats_metrics_virtual":               0,
+				"snmp_device_prof_test_stats_snmp_get_oids":                 0,
+				"snmp_device_prof_test_stats_snmp_get_requests":             0,
+				"snmp_device_prof_test_stats_snmp_tables_cached":            0,
+				"snmp_device_prof_test_stats_snmp_tables_walked":            0,
+				"snmp_device_prof_test_stats_snmp_walk_pdus":                0,
+				"snmp_device_prof_test_stats_snmp_walk_requests":            0,
+				"snmp_device_prof_test_stats_table_cache_hits":              0,
+				"snmp_device_prof_test_stats_table_cache_misses":            0,
+				"snmp_device_prof_test_stats_timings_scalar":                0,
+				"snmp_device_prof_test_stats_timings_preparation":           0,
+				"snmp_device_prof_test_stats_timings_table":                 0,
+				"snmp_device_prof_test_stats_timings_licensing":             0,
+				"snmp_device_prof_test_stats_timings_bgp":                   0,
+				"snmp_device_prof_test_stats_timings_virtual":               0,
+				"snmp_device_prof_if_octets_eth0_in":                        1,
+				"snmp_device_prof_if_octets_eth0_out":                       2,
 			},
 		},
 	}
@@ -1028,36 +1215,38 @@ func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	got := collr.Collect(context.Background())
 
 	assert.Equal(t, map[string]int64{
-		"snmp_device_prof_test_stats_errors_processing_scalar":    0,
-		"snmp_device_prof_test_stats_errors_processing_table":     0,
-		"snmp_device_prof_test_stats_errors_processing_licensing": 0,
-		"snmp_device_prof_test_stats_errors_processing_bgp":       0,
-		"snmp_device_prof_test_stats_errors_snmp":                 0,
-		"snmp_device_prof_test_stats_metrics_rows":                0,
-		"snmp_device_prof_test_stats_metrics_licensing":           0,
-		"snmp_device_prof_test_stats_metrics_bgp":                 0,
-		"snmp_device_prof_test_stats_metrics_scalar":              0,
-		"snmp_device_prof_test_stats_metrics_table":               0,
-		"snmp_device_prof_test_stats_metrics_tables":              0,
-		"snmp_device_prof_test_stats_metrics_virtual":             0,
-		"snmp_device_prof_test_stats_snmp_get_oids":               0,
-		"snmp_device_prof_test_stats_snmp_get_requests":           0,
-		"snmp_device_prof_test_stats_snmp_tables_cached":          0,
-		"snmp_device_prof_test_stats_snmp_tables_walked":          0,
-		"snmp_device_prof_test_stats_snmp_walk_pdus":              0,
-		"snmp_device_prof_test_stats_snmp_walk_requests":          0,
-		"snmp_device_prof_test_stats_table_cache_hits":            0,
-		"snmp_device_prof_test_stats_table_cache_misses":          0,
-		"snmp_device_prof_test_stats_timings_scalar":              0,
-		"snmp_device_prof_test_stats_timings_table":               0,
-		"snmp_device_prof_test_stats_timings_licensing":           0,
-		"snmp_device_prof_test_stats_timings_bgp":                 0,
-		"snmp_device_prof_test_stats_timings_virtual":             0,
-		"snmp_device_prof_uptime":                                 123,
-		"ping_rtt_min":                                            (10 * time.Millisecond).Microseconds(),
-		"ping_rtt_max":                                            (20 * time.Millisecond).Microseconds(),
-		"ping_rtt_avg":                                            (15 * time.Millisecond).Microseconds(),
-		"ping_rtt_stddev":                                         (5 * time.Millisecond).Microseconds(),
+		"snmp_device_prof_test_stats_errors_processing_scalar":      0,
+		"snmp_device_prof_test_stats_errors_processing_preparation": 0,
+		"snmp_device_prof_test_stats_errors_processing_table":       0,
+		"snmp_device_prof_test_stats_errors_processing_licensing":   0,
+		"snmp_device_prof_test_stats_errors_processing_bgp":         0,
+		"snmp_device_prof_test_stats_errors_snmp":                   0,
+		"snmp_device_prof_test_stats_metrics_rows":                  0,
+		"snmp_device_prof_test_stats_metrics_licensing":             0,
+		"snmp_device_prof_test_stats_metrics_bgp":                   0,
+		"snmp_device_prof_test_stats_metrics_scalar":                0,
+		"snmp_device_prof_test_stats_metrics_table":                 0,
+		"snmp_device_prof_test_stats_metrics_tables":                0,
+		"snmp_device_prof_test_stats_metrics_virtual":               0,
+		"snmp_device_prof_test_stats_snmp_get_oids":                 0,
+		"snmp_device_prof_test_stats_snmp_get_requests":             0,
+		"snmp_device_prof_test_stats_snmp_tables_cached":            0,
+		"snmp_device_prof_test_stats_snmp_tables_walked":            0,
+		"snmp_device_prof_test_stats_snmp_walk_pdus":                0,
+		"snmp_device_prof_test_stats_snmp_walk_requests":            0,
+		"snmp_device_prof_test_stats_table_cache_hits":              0,
+		"snmp_device_prof_test_stats_table_cache_misses":            0,
+		"snmp_device_prof_test_stats_timings_scalar":                0,
+		"snmp_device_prof_test_stats_timings_preparation":           0,
+		"snmp_device_prof_test_stats_timings_table":                 0,
+		"snmp_device_prof_test_stats_timings_licensing":             0,
+		"snmp_device_prof_test_stats_timings_bgp":                   0,
+		"snmp_device_prof_test_stats_timings_virtual":               0,
+		"snmp_device_prof_uptime":                                   123,
+		"ping_rtt_min":                                              (10 * time.Millisecond).Microseconds(),
+		"ping_rtt_max":                                              (20 * time.Millisecond).Microseconds(),
+		"ping_rtt_avg":                                              (15 * time.Millisecond).Microseconds(),
+		"ping_rtt_stddev":                                           (5 * time.Millisecond).Microseconds(),
 	}, got)
 }
 
@@ -1406,7 +1595,18 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().Connect().Return(nil).AnyTimes()
 }
 
+func setMockClientInitExpectWithMaxOids(m *snmpmock.MockHandler, maxOids int) {
+	setMockClientSetterExpectWithoutMaxOids(m)
+	m.EXPECT().SetMaxOids(maxOids).Times(2)
+	m.EXPECT().Connect().Return(nil).AnyTimes()
+}
+
 func setMockClientSetterExpect(m *snmpmock.MockHandler) {
+	setMockClientSetterExpectWithoutMaxOids(m)
+	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
+}
+
+func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
@@ -1415,7 +1615,6 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().SetPort(gomock.Any()).AnyTimes()
 	m.EXPECT().SetRetries(gomock.Any()).AnyTimes()
 	m.EXPECT().SetMaxRepetitions(gomock.Any()).AnyTimes()
-	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
 	m.EXPECT().SetLogger(gomock.Any()).AnyTimes()
 	m.EXPECT().SetTimeout(gomock.Any()).AnyTimes()
 	m.EXPECT().SetCommunity(gomock.Any()).AnyTimes()
@@ -1428,11 +1627,107 @@ func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
+	m.EXPECT().MaxOids().Return(20).MinTimes(1)
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
 		{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
-	}, nil).MinTimes(1)
+	}}, nil).MinTimes(1)
+}
+
+func sysInfoOIDsForTest() []string {
+	return []string{
+		snmputils.OidSysDescr,
+		snmputils.OidSysObject,
+		snmputils.OidSysContact,
+		snmputils.OidSysName,
+		snmputils.OidSysLocation,
+	}
+}
+
+func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
+	const metadataOID = "1.3.6.1.4.1.99999.1.0"
+	tests := map[string]struct {
+		getErr        error
+		staticVendor  bool
+		attempts      int
+		outcome       ddsnmp.DeviceLifecycleOutcome
+		reason        string
+		profiles, get uint64
+		processing    int64
+	}{
+		"authentication failure before initialization": {
+			getErr:   gosnmp.ErrWrongDigest,
+			attempts: 2,
+			outcome:  ddsnmp.DeviceLifecycleOutcomeFailed,
+			reason:   "wrong_digest",
+			profiles: 1,
+			get:      1,
+		},
+		"processing failure before initialization": {
+			attempts:   2,
+			outcome:    ddsnmp.DeviceLifecycleOutcomeFailed,
+			reason:     "processing",
+			profiles:   1,
+			processing: 1,
+		},
+		"partial metadata failures survive successful collection": {
+			staticVendor: true,
+			attempts:     1,
+			outcome:      ddsnmp.DeviceLifecycleOutcomeSuccess,
+			processing:   2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := snmpmock.NewMockHandler(gomock.NewController(t))
+			handler.EXPECT().MaxOids().Return(20).AnyTimes()
+			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{}, nil)
+			var packet *gosnmp.SnmpPacket
+			if tc.getErr == nil {
+				packet = &gosnmp.SnmpPacket{
+					Variables: []gosnmp.SnmpPDU{{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")}},
+				}
+			}
+			handler.EXPECT().Get([]string{metadataOID}).Return(packet, tc.getErr).Times(2)
+			collector := newTestSNMPCollector()
+			collector.Config = prepareV2Config()
+			collector.Ping.Enabled = false
+			collector.CreateVnode = true
+			collector.snmpClient = handler
+			fields := map[string]ddprofiledefinition.MetadataField{
+				"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serial", Format: "uint32"}},
+			}
+			if tc.staticVendor {
+				fields["vendor"] = ddprofiledefinition.MetadataField{Value: "synthetic"}
+			}
+			collector.snmpProfiles = []*ddsnmp.Profile{{SourceFile: "metadata.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+				Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: fields}},
+			}}}
+			for range tc.attempts {
+				metrics := collector.Collect(context.Background())
+				status := collector.deviceLifecycleStatus
+				require.Equal(t, tc.outcome, status.Outcome)
+				require.Equal(t, tc.reason, status.Failure.Reason)
+				if tc.outcome == ddsnmp.DeviceLifecycleOutcomeFailed {
+					require.Nil(t, metrics)
+					require.Equal(t, "metadata", status.Failure.Operation)
+				}
+				require.Equal(t, tc.profiles, status.CollectionFailures.Profiles.Count, "retries are separate attempts")
+				require.Equal(t, tc.get, status.CollectionFailures.GET.Count)
+				require.Equal(
+					t,
+					tc.processing,
+					status.CollectionFailures.Processing.Preparation,
+					"successful collection must retain earlier metadata failures",
+				)
+				if tc.get != 0 {
+					require.Equal(t, tc.reason, status.CollectionFailures.GET.Last.Reason)
+				}
+			}
+		})
+	}
 }

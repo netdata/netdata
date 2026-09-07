@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/go-units"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 )
 
@@ -33,9 +34,10 @@ type diagnosticArchive interface {
 		snmptopology.DiagnosticQueryOptions,
 		snmptopology.DiagnosticLinkSubject,
 	) (snmptopology.DiagnosticLinkInspection, error)
+	InspectLinkAt(snmptopology.DiagnosticQueryOptions, int) (snmptopology.DiagnosticLinkInspection, error)
 }
 
-type archiveOpener func(io.Reader, snmptopology.DiagnosticReadLimits) (diagnosticArchive, error)
+type archiveOpener func(io.Reader, snmpdiag.ReadLimits) (diagnosticArchive, error)
 
 type commandOptions struct {
 	archivePath       string
@@ -44,6 +46,8 @@ type commandOptions struct {
 	query             snmptopology.DiagnosticQueryOptions
 	registrationID    uint64
 	link              snmptopology.DiagnosticLinkSubject
+	linkIndex         int
+	linkIndexSet      bool
 }
 
 func main() {
@@ -53,9 +57,9 @@ func main() {
 func run(arguments []string, stdout, stderr io.Writer) int {
 	return runWithOpener(arguments, stdout, stderr, func(
 		reader io.Reader,
-		limits snmptopology.DiagnosticReadLimits,
+		limits snmpdiag.ReadLimits,
 	) (diagnosticArchive, error) {
-		return snmptopology.ReadDiagnosticArchive(reader, limits)
+		return openDiagnosticArchive(reader, limits)
 	})
 }
 
@@ -110,7 +114,7 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 }
 
 func parseCommandOptions(operation string, arguments []string, stderr io.Writer) (commandOptions, int) {
-	defaults := snmptopology.DefaultDiagnosticArchiveReadLimits()
+	defaults := snmpdiag.DefaultReadLimits()
 	options := commandOptions{
 		maxCompressedSize: formatDefaultSize(defaults.MaxCompressedBytes),
 		maxDecodedSize:    formatDefaultSize(defaults.MaxDecodedBytes),
@@ -142,6 +146,7 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 	case "inspect-device":
 		flags.Uint64Var(&options.registrationID, "registration-id", 0, "device registration ID")
 	case "inspect-link":
+		flags.IntVar(&options.linkIndex, "link-index", -1, "zero-based link index in this archive and query replay")
 		flags.StringVar(&options.link.SourceIdentity, "source-identity", "", "source actor identity key")
 		flags.StringVar(&options.link.DestinationIdentity, "destination-identity", "", "destination actor identity key")
 		flags.StringVar(&options.link.Family, "family", "", "link family")
@@ -154,6 +159,11 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		}
 		return commandOptions{}, 2
 	}
+	flags.Visit(func(value *flag.Flag) {
+		if value.Name == "link-index" {
+			options.linkIndexSet = true
+		}
+	})
 	if flags.NArg() != 0 {
 		fmt.Fprintf(stderr, "error: unexpected arguments: %v\n", flags.Args())
 		return commandOptions{}, 2
@@ -166,14 +176,27 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		fmt.Fprintln(stderr, "error: --registration-id must be greater than zero")
 		return commandOptions{}, 2
 	}
-	if operation == "inspect-link" &&
-		(options.link.SourceIdentity == "" || options.link.DestinationIdentity == "" ||
-			options.link.Family == "" || options.link.Direction == "") {
-		fmt.Fprintln(
-			stderr,
-			"error: --source-identity, --destination-identity, --family, and --direction are required",
-		)
-		return commandOptions{}, 2
+	if operation == "inspect-link" {
+		hasCompositeSelector := options.link.SourceIdentity != "" || options.link.DestinationIdentity != "" ||
+			options.link.Family != "" || options.link.Protocol != "" || options.link.Direction != ""
+		if options.linkIndexSet && hasCompositeSelector {
+			fmt.Fprintln(stderr, "error: --link-index and identity-based link selectors are mutually exclusive")
+			return commandOptions{}, 2
+		}
+		if options.linkIndexSet {
+			if options.linkIndex < 0 {
+				fmt.Fprintln(stderr, "error: --link-index must be zero or greater")
+				return commandOptions{}, 2
+			}
+		} else if options.link.SourceIdentity == "" || options.link.DestinationIdentity == "" ||
+			options.link.Family == "" || options.link.Direction == "" {
+			fmt.Fprintln(
+				stderr,
+				"error: a link selector is required: use --link-index or --source-identity, "+
+					"--destination-identity, --family, and --direction",
+			)
+			return commandOptions{}, 2
+		}
 	}
 	return options, -1
 }
@@ -218,24 +241,27 @@ func executeOperation(operation string, archive diagnosticArchive, options comma
 	case "inspect-device":
 		return archive.InspectDevice(options.query, options.registrationID)
 	case "inspect-link":
+		if options.linkIndexSet {
+			return archive.InspectLinkAt(options.query, options.linkIndex)
+		}
 		return archive.InspectLink(options.query, options.link)
 	default:
 		return nil, fmt.Errorf("unknown operation %q", operation)
 	}
 }
 
-func readLimits(compressed, decoded string) (snmptopology.DiagnosticReadLimits, error) {
-	maxCompressedBytes, err := units.RAMInBytes(compressed)
-	if err != nil || maxCompressedBytes <= 0 {
-		return snmptopology.DiagnosticReadLimits{}, fmt.Errorf("invalid maximum compressed size %q", compressed)
+func readLimits(compressed, decoded string) (snmpdiag.ReadLimits, error) {
+	MaxCompressedBytes, err := units.RAMInBytes(compressed)
+	if err != nil || MaxCompressedBytes <= 0 {
+		return snmpdiag.ReadLimits{}, fmt.Errorf("invalid maximum compressed size %q", compressed)
 	}
-	maxDecodedBytes, err := units.RAMInBytes(decoded)
-	if err != nil || maxDecodedBytes <= 0 {
-		return snmptopology.DiagnosticReadLimits{}, fmt.Errorf("invalid maximum decoded size %q", decoded)
+	MaxDecodedBytes, err := units.RAMInBytes(decoded)
+	if err != nil || MaxDecodedBytes <= 0 {
+		return snmpdiag.ReadLimits{}, fmt.Errorf("invalid maximum decoded size %q", decoded)
 	}
-	return snmptopology.DiagnosticReadLimits{
-		MaxCompressedBytes: maxCompressedBytes,
-		MaxDecodedBytes:    maxDecodedBytes,
+	return snmpdiag.ReadLimits{
+		MaxCompressedBytes: MaxCompressedBytes,
+		MaxDecodedBytes:    MaxDecodedBytes,
 	}, nil
 }
 
@@ -263,4 +289,12 @@ func usage(writer io.Writer) {
 
 func operationUsage(writer io.Writer, operation string) {
 	fmt.Fprintf(writer, "usage: snmp-topology-diagnostics %s --archive PATH [options]\n", operation)
+}
+
+func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*snmptopology.DiagnosticArchive, error) {
+	document, err := snmpdiag.Read(r, limits)
+	if err != nil {
+		return nil, err
+	}
+	return snmptopology.InspectDiagnosticDocument(document)
 }

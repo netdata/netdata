@@ -1,5 +1,9 @@
 # Functions Validation (CLI + Containers)
 
+**Place in the documentation set.** The project skill `.agents/skills/topology-authoring/SKILL.md` cites sections
+of this document by heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer exists, so
+renaming or removing a heading here updates the skill in the same change.
+
 ## TL;DR
 - Bring up databases with Docker Compose.
 - Use `go.d.plugin --function` with the configs in `./config`.

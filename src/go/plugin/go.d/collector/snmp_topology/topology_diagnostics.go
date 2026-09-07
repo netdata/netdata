@@ -111,10 +111,9 @@ type topologyDiagnosticCutInput struct {
 
 type topologyDiagnosticCutProjector func(topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error)
 
-func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
-	limits := c.currentTopologyDiagnosticGlobalLimits()
-	diagnostics := topologyDiagnostics{lastAborted: c.lastAbortedTopologyDiagnostic.Load()}
-	if generation := c.topologyRegistry.acquireGeneration(); generation != nil {
+func captureTopologyCut(registry *topologyRegistry, aborted *topologyAbortedSweepDiagnostic, limits topologyAcquisitionLimits) (topologyDiagnostics, topologyAcquisitionLimits) {
+	diagnostics := topologyDiagnostics{lastAborted: aborted}
+	if generation := registry.acquireGeneration(); generation != nil {
 		diagnostics.producerScopeID = generation.producerScopeID
 		diagnostics.topology = generation.diagnostic
 	}
@@ -126,43 +125,7 @@ func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
 			limits.maxLogicalBytes -= diagnostics.topology.logicalBytes
 		}
 	}
-	diagnostics.lifecycle = acquireTopologyJobLifecycleCut(c.deviceLifecycleSource, limits)
-	return diagnostics
-}
-
-func acquireTopologyJobLifecycleCut(source deviceLifecycleSource, limits topologyAcquisitionLimits) (result topologyJobLifecycleDiagnosticCut) {
-	result.state = diagnosticCaptureAvailable
-	defer func() {
-		if recover() != nil {
-			result = topologyJobLifecycleDiagnosticCut{
-				state:  diagnosticCaptureUnavailable,
-				reason: diagnosticCaptureReasonProjectionPanic,
-			}
-		}
-	}()
-	if source == nil {
-		result.state = diagnosticCaptureUnavailable
-		result.reason = diagnosticCaptureReasonProjectionError
-		return result
-	}
-	result.cut = source.LifecycleCut()
-	records := uint64(1 + len(result.cut.Entries))
-	logicalBytes := uint64(topologyDiagnosticCutLogicalBytes)
-	for _, entry := range result.cut.Entries {
-		logicalBytes += uint64(64 + len(entry.Info.Hostname) + len(entry.Info.SNMPVersion))
-	}
-	if records > limits.maxRecords {
-		result.state = diagnosticCaptureLimitExceeded
-		result.reason = diagnosticCaptureReasonGlobalRecordLimit
-		result.cut.Entries = nil
-		return result
-	}
-	if logicalBytes > limits.maxLogicalBytes {
-		result.state = diagnosticCaptureLimitExceeded
-		result.reason = diagnosticCaptureReasonGlobalByteLimit
-		result.cut.Entries = nil
-	}
-	return result
+	return diagnostics, limits
 }
 
 func (c *Collector) projectCommittedTopologyDiagnosticCut(input topologyDiagnosticCutInput) (cut *topologySweepDiagnosticCut) {

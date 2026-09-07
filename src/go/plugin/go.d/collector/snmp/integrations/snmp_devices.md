@@ -200,7 +200,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
 | **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
-|  | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
+|  | ping.enabled | Enable ICMP round-trip measurements alongside SNMP profile metrics. This option does not enable profile-less operation; use `ping_only` for that. When disabled, no ping metrics are collected. | yes | no |
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
@@ -788,7 +788,9 @@ Normalized licensing rows for the selected SNMP device. Each row represents one 
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -820,14 +822,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m snmp -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `snmp` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -835,7 +837,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep snmp
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -845,7 +847,7 @@ grep snmp /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -853,12 +855,14 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep snmp
 ```
 
-### Collect Live Data for Netdata Support
+### Other Problems
+
+#### Collect Live Data for Netdata Support
 
 For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.
 
 
-### Debugging Gaps on Charts
+#### Debugging Gaps on Charts
 
 If your SNMP charts show gaps, it means the collector could not finish metric collection before the next scheduled run. This usually happens when SNMP tables take longer to collect than your configured `update_every`.
 
@@ -882,6 +886,13 @@ For example, if a run needs ~4.4 seconds and `update_every` is 1 second, 4 cycle
 Open **SNMP → Internal → Stats** in the dashboard.  
 The **SNMP profile collection timings** chart shows how long each part of the SNMP polling takes.  
 Table metrics are usually the slowest and often determine the total collection time.
+
+The `preparation` dimension includes profile tags and device metadata acquisition, plus cached-input copying.
+Its GET requests and errors are also included in the profile statistics; `processing_preparation` counts
+failures while interpreting these values. GET and walk request counts are logical client calls, not network
+packets or retries. Profile timing totals exclude connection setup and discovery-only work, so they are not
+a complete device-refresh wall-clock measurement. These charts publish statistics for successful profiles;
+failed topology attempts can be examined in topology diagnostic archives.
 
 **Step 3: Increase the data collection interval**
 
