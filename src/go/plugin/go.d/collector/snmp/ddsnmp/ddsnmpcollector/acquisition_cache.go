@@ -108,6 +108,7 @@ func (c *acquisitionProfileCollection) restoreInputRoutes(routes []AcquisitionRo
 	}
 	for _, route := range routes {
 		route.Source = AcquisitionRouteSourceCache
+		route.Reused = true
 		c.routes[route.Ordinal] = route
 	}
 }

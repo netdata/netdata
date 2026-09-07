@@ -139,6 +139,25 @@ func ValidateSourceBindings(bindings []SourceBinding, requests []map[string]stru
 	return nil
 }
 
+// IsFailure distinguishes failed processing from ordinary omitted input/output.
+// Rejection counts describe row acceptance and must not decide failure retention.
+func (e ProcessingEvent) IsFailure() bool {
+	failed, _ := processingReason(e.Reason)
+	return failed
+}
+
+// Validation and classification share the same closed reason vocabulary.
+func processingReason(reason string) (failed, valid bool) {
+	switch reason {
+	case "missing_input", "missing_dependency", "empty_date", "sentinel", "no_signals", "incomplete_identity":
+		return false, true
+	case "conversion", "pattern_mismatch", "extract_mismatch", "index_processing", "dependency_processing":
+		return true, true
+	default:
+		return true, false
+	}
+}
+
 func ValidateProcessingEvents(events []ProcessingEvent) error {
 	for _, event := range events {
 		if event.Stage != "" && event.Stage != "raw_text" {
@@ -147,9 +166,7 @@ func ValidateProcessingEvents(events []ProcessingEvent) error {
 		if event.Field == "" {
 			return fmt.Errorf("processing event has no field")
 		}
-		switch event.Reason {
-		case "missing_input", "missing_dependency", "conversion", "empty_date", "pattern_mismatch", "extract_mismatch", "index_processing", "dependency_processing", "no_signals", "incomplete_identity":
-		default:
+		if _, valid := processingReason(event.Reason); !valid {
 			return fmt.Errorf("invalid processing reason")
 		}
 	}

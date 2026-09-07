@@ -123,6 +123,9 @@ type AcquisitionValueReference struct {
 // and processing omissions. It contains no profile path, packet, decoded value
 // or error text.
 type AcquisitionRouteReport struct {
+	// Reused means the complete outcome belongs to an earlier attempt, not a
+	// fresh value GET that merely used cached table structure.
+	Reused           bool
 	Sources          []ddsnmp.SourceBinding
 	DiscardedSources []ddsnmp.SourceBinding
 	Processing       []ddsnmp.ProcessingEvent
@@ -857,7 +860,7 @@ func (c *acquisitionProfileCollection) report(
 	report.BGPValueReferences = c.bgpValueReferences
 	report.MetricValueReferences = c.metricValueReferences
 	report.LicenseValueReferences = c.licenseValueReferences
-	if outcome == AcquisitionProfileOutcomeSuccess && routesHaveFailures(report.Routes) {
+	if outcome == AcquisitionProfileOutcomeSuccess && report.HasFailures() {
 		report.Outcome = AcquisitionProfileOutcomePartial
 	}
 	c.releaseReportStorage()
@@ -885,11 +888,27 @@ func (c *acquisitionProfileCollection) releaseReportStorage() {
 	c.metadata = nil
 }
 
-func routesHaveFailures(routes []AcquisitionRouteReport) bool {
-	for _, route := range routes {
-		switch route.Outcome {
-		case AcquisitionRouteOutcomeFailed, AcquisitionRouteOutcomeRejected, AcquisitionRouteOutcomePartial:
+// HasFailures classifies work in this attempt. Reused outcomes and ordinary
+// omissions stay visible in the report without creating a new failed attempt.
+func (r AcquisitionProfileReport) HasFailures() bool {
+	if r.Outcome == AcquisitionProfileOutcomeFailed {
+		return true
+	}
+	p := r.Stats.Errors.Processing
+	if r.Stats.Errors.SNMP > 0 || p.Preparation+p.Scalar+p.Table+p.BGP+p.Licensing > 0 {
+		return true
+	}
+	for _, route := range r.Routes {
+		if route.Reused {
+			continue
+		}
+		if route.Outcome == AcquisitionRouteOutcomeFailed {
 			return true
+		}
+		for _, event := range route.Processing {
+			if event.IsFailure() {
+				return true
+			}
 		}
 	}
 	return false

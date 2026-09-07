@@ -74,6 +74,9 @@ func (d *NormalDevice) Validate() error {
 		}
 		for _, profile := range attempt.Profiles {
 			for _, route := range profile.Acquisition.Routes {
+				if err := ddsnmp.ValidateProcessingEvents(route.Processing); err != nil {
+					return err
+				}
 				for _, bindings := range [][]ddsnmp.SourceBinding{route.Sources, route.DiscardedSources} {
 					for _, binding := range bindings {
 						context := binding.ContextID

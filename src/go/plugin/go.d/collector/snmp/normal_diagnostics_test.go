@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,13 +85,18 @@ func normalTestDocument(t *testing.T, c *Collector, directory string) *diagnosti
 func TestNormalEvidenceRealCollection(t *testing.T) {
 	for name, tc := range map[string]struct{ failure string }{
 		"total collection failure":                 {"metrics"},
+		"malformed BGP value":                      {"bgp_conversion"},
+		"absent BGP table signals":                 {"missing_bgp_table"},
+		"absent BGP identity":                      {"missing_bgp_identity"},
 		"partial BGP failure":                      {"bgp"},
 		"malformed licensing timer":                {"license"},
+		"absent BGP signals with available tags":   {"missing_bgp_tags"},
 		"ordinary absent BGP signals":              {"missing_bgp"},
 		"ordinary absent timer":                    {"missing"},
 		"cached rejected tag is not a new failure": {"cached"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			bgpMissing := strings.HasPrefix(tc.failure, "missing_bgp")
 			handler, cleanup := mockInit(t)
 			defer cleanup()
 			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
@@ -105,7 +111,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 						packet.Variables = append(packet.Variables, gosnmp.SnmpPDU{Name: oid, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.99999"})
 						continue
 					}
-					if poll == 2 && (((tc.failure == "metrics" || tc.failure == "missing_bgp") && oid == normalTestRoot+".1.0") || (tc.failure == "bgp" && oid == normalTestRoot+".5.0")) {
+					if poll == 2 && (((tc.failure == "metrics" || bgpMissing) && oid == normalTestRoot+".1.0") || (tc.failure == "bgp" && oid == normalTestRoot+".5.0")) {
 						return nil, errors.New("synthetic timeout")
 					}
 					value := 7
@@ -119,7 +125,14 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 						value = 6
 					}
 					pdu := gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Integer, Value: value}
-					if tc.failure == "missing_bgp" && oid == normalTestRoot+".5.0" {
+					if poll == 2 && tc.failure == "bgp_conversion" && oid == normalTestRoot+".7.0" {
+						pdu.Type, pdu.Value = gosnmp.OctetString, "invalid"
+					}
+					missingBGPOID := normalTestRoot + ".5.0"
+					if tc.failure == "missing_bgp_identity" {
+						missingBGPOID = normalTestRoot + ".6.0"
+					}
+					if bgpMissing && oid == missingBGPOID {
 						pdu.Type, pdu.Value = gosnmp.NoSuchObject, nil
 					}
 					if tc.failure == "cached" && oid == normalTestRoot+".6.0" {
@@ -152,6 +165,23 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			// Inject profile input only; Init, Check, all acquisition, normalization
 			// and consumer commits run through their production implementations.
 			c.snmpProfiles = []*ddsnmp.Profile{normalTestProfile()}
+			if tc.failure == "bgp_conversion" {
+				c.snmpProfiles[0].Definition.BGP[0].Connection.EstablishedUptime = ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: normalTestRoot + ".7.0", Name: "uptime"}}
+			}
+			if tc.failure == "missing_bgp_identity" {
+				c.snmpProfiles[0].Definition.BGP[0].Identity.Neighbor = ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: normalTestRoot + ".6.0", Name: "neighbor"}}
+			}
+			if tc.failure == "missing_bgp_table" {
+				cfg := &c.snmpProfiles[0].Definition.BGP[0]
+				root := normalTestRoot + ".20"
+				cfg.Table = ddprofiledefinition.SymbolConfig{OID: root, Name: "peers"}
+				cfg.State.Symbol.OID = root + ".1"
+				cfg.MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: root + ".2", Name: "site"}}}
+				handler.EXPECT().BulkWalkAll(root).Return([]gosnmp.SnmpPDU{{Name: root + ".2.1", Type: gosnmp.OctetString, Value: "site"}}, nil).AnyTimes()
+			}
+			if tc.failure == "missing_bgp_tags" {
+				c.snmpProfiles[0].Definition.BGP[0].MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site"}}}
+			}
 			if tc.failure == "cached" {
 				c.snmpProfiles[0].Definition.MetricTags = []ddprofiledefinition.GlobalMetricTagConfig{{MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site", ExtractValue: "^([0-9]+)$", ExtractValueCompiled: regexp.MustCompile("^([0-9]+)$")}}}}
 			}
@@ -170,7 +200,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			require.NotEmpty(t, firstSamples)
 			first := normalTestDocument(t, c, directory)
 			require.Equal(t, tc.failure == "cached", first.Latest.Failed)
-			if tc.failure == "missing_bgp" {
+			if bgpMissing {
 				require.Empty(t, first.Latest.BGP.Entries)
 			} else {
 				require.Len(t, first.Latest.BGP.Entries, 1)

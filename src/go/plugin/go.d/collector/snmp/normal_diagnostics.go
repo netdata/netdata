@@ -117,7 +117,7 @@ func (c *Collector) finishNormalAttempt(err error, samples map[string]int64) {
 		attempt.document.NegativeCauses = collector.NegativeCauses()
 	}
 	for _, profile := range attempt.document.Profiles {
-		if normalProfileFailed(profile.Acquisition) {
+		if profile.Acquisition.HasFailures() {
 			attempt.document.Failed = true
 		}
 	}
@@ -144,39 +144,6 @@ func normalSourcesFailed(sources []*ddsnmp.SourceOperation) bool {
 	for _, source := range sources {
 		if source.Failure.Reason != "" {
 			return true
-		}
-	}
-	return false
-}
-
-func normalProfileFailed(report ddsnmpcollector.AcquisitionProfileReport) bool {
-	if report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed {
-		return true
-	}
-	p := report.Stats.Errors.Processing
-	if p.Preparation+p.Scalar+p.Table+p.BGP+p.Licensing > 0 {
-		return true
-	}
-	for _, route := range report.Routes {
-		if route.Source == ddsnmpcollector.AcquisitionRouteSourceCache &&
-			(route.Kind == ddsnmpcollector.AcquisitionRouteKindProfileTagScalar || route.Kind == ddsnmpcollector.AcquisitionRouteKindMetadataScalar) {
-			// Preserve the original failed attempt; reusing its cached omissions
-			// is not new failed work on every later poll.
-			continue
-		}
-		if route.Outcome == ddsnmpcollector.AcquisitionRouteOutcomeFailed || route.Rejected > 0 {
-			return true
-		}
-		for _, event := range route.Processing {
-			switch event.Reason {
-			case "missing_input", "empty_date", "sentinel":
-			case "no_signals":
-				if route.Outcome != ddsnmpcollector.AcquisitionRouteOutcomeMissing {
-					return true
-				}
-			default:
-				return true
-			}
 		}
 	}
 	return false

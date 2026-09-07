@@ -645,7 +645,7 @@ func (c *Collector) licenseRawTextValue(cfg ddprofiledefinition.LicenseValueConf
 	if sym.ExtractValueCompiled != nil {
 		sm := sym.ExtractValueCompiled.FindStringSubmatch(value)
 		if len(sm) < 2 {
-			ctx.record(cfg, pdu.Name, "extract_value")
+			ctx.record(cfg, pdu.Name, "extract_mismatch")
 			return "", false, fmt.Errorf("extract_value did not match value %q", value)
 		}
 		value = sm[1]
@@ -653,7 +653,7 @@ func (c *Collector) licenseRawTextValue(cfg ddprofiledefinition.LicenseValueConf
 	if sym.MatchPatternCompiled != nil {
 		sm := sym.MatchPatternCompiled.FindStringSubmatch(value)
 		if len(sm) == 0 {
-			ctx.record(cfg, pdu.Name, "match_pattern")
+			ctx.record(cfg, pdu.Name, "pattern_mismatch")
 			return "", false, fmt.Errorf("match_pattern %q did not match value %q", sym.MatchPattern, value)
 		}
 		value = replaceSubmatches(sym.MatchValue, sm)
