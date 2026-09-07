@@ -112,9 +112,9 @@ type AcquisitionValueReference struct {
 	ValueOrdinal uint32
 }
 
-// AcquisitionRouteReport contains only the bounded terminal state of one
-// configured route. It deliberately contains no profile path, packet, decoded
-// value, or error text.
+// AcquisitionRouteReport records one configured route's outcome, source bindings
+// and processing omissions. It contains no profile path, packet, decoded value
+// or error text.
 type AcquisitionRouteReport struct {
 	Sources      []ddsnmp.SourceBinding
 	Processing   []ddsnmp.ProcessingEvent

@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// Processing observes only attempted non-success outcomes; it never changes
+// processingObserver records only attempted non-success outcomes; it never changes
 // production error handling, counters or whether a row is accepted.
 type processingObserver struct {
 	route *AcquisitionRouteReport

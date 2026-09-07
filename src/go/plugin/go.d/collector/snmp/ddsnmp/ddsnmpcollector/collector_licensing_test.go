@@ -384,9 +384,10 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 	require.Empty(t, pm.Metrics)
 	require.Empty(t, pm.TopologyMetrics)
 	require.Len(t, pm.LicenseRows, 2)
-	require.Len(t, testWalkSources(t, collector, report.Execution), 1)
-	assert.Equal(t, "1.3.6.1.4.1.99999.2", testWalkSources(t, collector, report.Execution)[0].RequestedOIDs[0])
-	assert.False(t, testWalkSources(t, collector, report.Execution)[0].Failure.Reason != "")
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 1)
+	assert.Equal(t, "1.3.6.1.4.1.99999.2", walks[0].RequestedOIDs[0])
+	assert.Empty(t, walks[0].Failure.Reason)
 
 	rowsByID := make(map[string]ddsnmp.LicenseRow, len(pm.LicenseRows))
 	for _, row := range pm.LicenseRows {

@@ -97,10 +97,6 @@ func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency 
 	g.dependentsByRoute[dependency][req.route.oid] = req.route
 }
 
-func (g *tableRouteGraph) dependencies(req *tableCollectionRequest) []*tableCollectionRoute {
-	return req.dependencies
-}
-
 func (g *tableRouteGraph) hasDependents(route *tableCollectionRoute) bool {
 	return len(g.dependentsByRoute[route]) > 0
 }
@@ -441,7 +437,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 			if len(req.config.Symbols) == 0 || !tableHasEligibleRows(req.config, route.pdus) {
 				continue
 			}
-			for _, dependency := range s.graph.dependencies(req) {
+			for _, dependency := range req.dependencies {
 				s.requireFresh(dependency, freshTriggerForRoute(dependency), queue)
 			}
 		}

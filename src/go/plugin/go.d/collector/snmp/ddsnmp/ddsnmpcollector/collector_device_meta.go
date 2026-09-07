@@ -217,9 +217,6 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	return nil
 }
 
-func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool) (string, error) {
-	return dc.processSymbolValueObserved(cfg, pdus, lastSymbol, nil)
-}
 func (dc *deviceMetadataCollector) processSymbolValueObserved(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool, processing *processingObserver) (string, error) {
 	pdu, ok := pdus[trimOID(cfg.OID)]
 	if !ok {

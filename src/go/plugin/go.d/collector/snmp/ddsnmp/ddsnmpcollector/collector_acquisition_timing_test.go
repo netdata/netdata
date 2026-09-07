@@ -213,9 +213,10 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 			_, err := collector.Collect()
 			assert.Equal(t, failed, err != nil)
 			require.Len(t, reports, 2)
-			require.Len(t, testWalkSources(t, collector, reports[0].Execution), 1)
+			walks := testWalkSources(t, collector, reports[0].Execution)
+			require.Len(t, walks, 1)
 			assert.Empty(t, testWalkSources(t, collector, reports[1].Execution), "shared consumer must not duplicate work")
-			recorded := testWalkSources(t, collector, reports[0].Execution)[0]
+			recorded := walks[0]
 			assert.Equal(t, root, recorded.RequestedOIDs[0])
 			assert.Equal(t, failed, recorded.Failure.Reason != "")
 			assert.GreaterOrEqual(t, time.Duration(recorded.ElapsedNanos), time.Millisecond)
@@ -256,15 +257,16 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Error(t, metrics[0].BGPCollectError)
-	require.Len(t, testWalkSources(t, collector, report.Execution), 3, "memoized BGP anchor and failed dependency must not add executions")
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 3, "memoized BGP anchor and failed dependency must not add executions")
 	var roots []string
-	for _, walk := range testWalkSources(t, collector, report.Execution) {
+	for _, walk := range walks {
 		roots = append(roots, walk.RequestedOIDs[0])
 	}
 	assert.Equal(t, []string{anchor, anchor, dependency}, roots)
-	assert.False(t, testWalkSources(t, collector, report.Execution)[0].Failure.Reason != "")
-	assert.False(t, testWalkSources(t, collector, report.Execution)[1].Failure.Reason != "")
-	assert.True(t, testWalkSources(t, collector, report.Execution)[2].Failure.Reason != "")
+	assert.Empty(t, walks[0].Failure.Reason)
+	assert.Empty(t, walks[1].Failure.Reason)
+	assert.NotEmpty(t, walks[2].Failure.Reason)
 	assert.EqualValues(t, 3, report.Stats.SNMP.WalkRequests)
 	assert.EqualValues(t, 1, report.Stats.Errors.SNMP)
 }

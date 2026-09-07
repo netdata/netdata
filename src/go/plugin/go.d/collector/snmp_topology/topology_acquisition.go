@@ -376,7 +376,7 @@ func topologyAcquisitionReportShape(routes []ddsnmpcollector.AcquisitionRouteRep
 	}
 	if execution != nil {
 		records += uint64(1 + len(execution.WalkOperations))
-		// Execution header/preparation plus the two new aggregate statistics.
+		// Execution header, preparation measurements and operation references.
 		logicalBytes += 88
 		logicalBytes += 8 * uint64(len(execution.WalkOperations))
 	}
@@ -469,12 +469,11 @@ func (r *topologyAcquisitionRecorder) finish() *topologyAcquisitionCapture {
 			records += cr
 			logicalBytes += cb
 		}
-		for _, context := range []**ddsnmp.ProfileContext{&r.evidence.profileContext, &r.evidence.vlanProfileContext} {
-			if *context == nil {
+		for _, context := range []*ddsnmp.ProfileContext{r.evidence.profileContext, r.evidence.vlanProfileContext} {
+			if context == nil {
 				continue
 			}
-			cr, cb := (*context).Shape()
-
+			cr, cb := context.Shape()
 			records += cr
 			logicalBytes += cb
 		}

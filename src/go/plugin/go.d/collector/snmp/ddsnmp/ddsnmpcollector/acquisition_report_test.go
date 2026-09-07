@@ -462,8 +462,9 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 	require.True(t, ok)
 	assert.Equal(t, AcquisitionRouteSourceNone, dependencyRoute.Source)
 	assert.Equal(t, AcquisitionRouteOutcomeNotObserved, dependencyRoute.Outcome)
-	require.Len(t, testWalkSources(t, collector, report.Execution), 1)
-	assert.Equal(t, source.Table.OID, testWalkSources(t, collector, report.Execution)[0].RequestedOIDs[0])
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 1)
+	assert.Equal(t, source.Table.OID, walks[0].RequestedOIDs[0])
 }
 
 func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot(t *testing.T) {
@@ -773,9 +774,10 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 	assert.Equal(t, AcquisitionRouteOutcomeFailed, report.Routes[1].Outcome)
 	assert.Equal(t, AcquisitionFailureClassTransport, report.Routes[1].FailureClass)
 	assert.NotContains(t, report.String(), "private BGP timeout")
-	require.Len(t, testWalkSources(t, collector, report.Execution), 1)
-	assert.Equal(t, "1.3.6.1.4.1.99999.30.1", testWalkSources(t, collector, report.Execution)[0].RequestedOIDs[0])
-	assert.True(t, testWalkSources(t, collector, report.Execution)[0].Failure.Reason != "")
+	walks := testWalkSources(t, collector, report.Execution)
+	require.Len(t, walks, 1)
+	assert.Equal(t, "1.3.6.1.4.1.99999.30.1", walks[0].RequestedOIDs[0])
+	assert.NotEmpty(t, walks[0].Failure.Reason)
 }
 
 func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *testing.T) {

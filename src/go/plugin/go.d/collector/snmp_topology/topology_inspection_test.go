@@ -404,7 +404,7 @@ func TestInspectTopologyLinkSourceContextIsFamilyWideAndKeepsCaptureAvailability
 
 func TestInspectTopologyLinkPreservesDiagnosticCutFailure(t *testing.T) {
 	scenario := newLLDPDirectScenario()
-	limitedCut := unavailableTopologyDiagnosticCut(topologyDiagnosticCutInput{
+	unavailableCut := unavailableTopologyDiagnosticCut(topologyDiagnosticCutInput{
 		sequence: 7, startedAt: topologyScenarioCollectedAt, publishedAt: topologyScenarioCollectedAt,
 	}, diagnosticCaptureReasonProjectionError)
 
@@ -415,13 +415,13 @@ func TestInspectTopologyLinkPreservesDiagnosticCutFailure(t *testing.T) {
 		protocol:    "lldp",
 		direction:   "bidirectional",
 	}
-	report, err := inspectTopologyLink(topologyDiagnostics{topology: limitedCut}, scenario.opts, subject)
+	report, err := inspectTopologyLink(topologyDiagnostics{topology: unavailableCut}, scenario.opts, subject)
 	require.NoError(t, err)
 	require.Equal(t, diagnosticCaptureUnavailable, report.diagnosticCut.captureState)
 	require.Equal(t, diagnosticCaptureReasonProjectionError, report.diagnosticCut.captureReason)
 	require.Equal(t, uint64(7), report.diagnosticCut.sequence)
-	require.Equal(t, limitedCut.startedAt, report.diagnosticCut.startedAt)
-	require.Equal(t, limitedCut.publishedAt, report.diagnosticCut.publishedAt)
+	require.Equal(t, unavailableCut.startedAt, report.diagnosticCut.startedAt)
+	require.Equal(t, unavailableCut.publishedAt, report.diagnosticCut.publishedAt)
 	require.Empty(t, report.source.contexts)
 	require.Equal(t, topologyInspectionUndetermined, report.graphLink.membership.state)
 	require.Equal(t, topologyInspectionUndetermined, report.typedLink.state)

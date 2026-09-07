@@ -252,8 +252,7 @@ func (c *Collector) collectTableBGPRows(
 			continue
 		}
 
-		dependencyErr := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkPass, stats, route)
-		if err := dependencyErr; err != nil {
+		if err := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkPass, stats, route); err != nil {
 			if route != nil {
 				route.Outcome = AcquisitionRouteOutcomeFailed
 				route.FailureClass = AcquisitionFailureClassDependency
@@ -1077,14 +1076,7 @@ func (c *Collector) lookupBGPValuePDU(
 	ctx bgpValueContext,
 ) (gosnmp.SnmpPDU, string, bool, error) {
 	sourceOID := trimOID(sym.OID)
-	if cfg.Table == "" || cfg.Table == ctx.tableName {
-		pdu, ok := ctx.lookupPDU(sym.OID)
-		if !ok {
-			ctx.record(sym, sourceOID, "missing_input")
-		}
-		return pdu, sourceOID, ok, nil
-	}
-	if ctx.crossTableCtx == nil {
+	if cfg.Table == "" || cfg.Table == ctx.tableName || ctx.crossTableCtx == nil {
 		pdu, ok := ctx.lookupPDU(sym.OID)
 		if !ok {
 			ctx.record(sym, sourceOID, "missing_input")
