@@ -56,7 +56,7 @@ Ownership and pointing:
   generated output (`git ls-files -s <path>` shows mode `120000`; `readlink <path>`) is never an owner or an authority.
 - When the only owner of a fact is a script or a workflow (`.agents/sow/audit.sh`, `.github/workflows/sow.yml`),
   attribute the fact to that file, not to the prose section that names the script: a section that does not state the
-  fact cannot be checked against it, and renaming the section never exposes the drift.
+  fact cannot be checked against it.
 - Cite the repository path, never a bare filename; several documents in this tree share a basename. A one-segment
   path names a repository-root file. Inside a skill, cite a section of its own files as `./<file>.md#<anchor>`.
 - An owner outside this repository cannot be an anchor citation: read it from the local mirror (`repo-mirror-sources`)
@@ -67,8 +67,8 @@ Ownership and pointing:
   section, not just the file.
 - A pointer row carries one clause naming the subject; copying the requirement text creates a second owner.
 - A keep-list fact with no owner is a user-owned fork: keep it in the skill, add it to the section of an existing
-  code-side document that already covers the mechanism, or open a separate change for a new developer document.
-  Present the options; never mint a second owner inside the skill.
+  code-side document that covers the mechanism, or open a separate change for a new developer document. Never mint a
+  second owner inside the skill.
 - Developer procedure stays in the skill; a shipped operator document keeps only the operator form.
 - Do not transcribe schemas, enum members, finding codes, or code; the reader opens the file.
 - Design records rot once the code ships its own document. Propose retiring them, with the relocation target and the

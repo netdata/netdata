@@ -1,10 +1,10 @@
 # Changing A Skill
 
-The method for editing, slimming, splitting, or restructuring an existing skill. It exists because past slims lost
-rules through the same gaps: inventories that hid sub-clauses and MAY halves, preservation maps with range rows, facts
-relocated from prose instead of from the symbol, and enforcement claims nobody qualified. Every step below closes one
-of those gaps. The rules the rewrite must satisfy are in `./SKILL.md#authoring-rules`. There is no size
-target: the end state is defined by those rules, and line counts are reported, not aimed at.
+The method for editing, slimming, splitting, or restructuring an existing skill. Past slims lost rules through
+inventories that hid sub-clauses and MAY halves, preservation maps with range rows, facts relocated from prose instead
+of the symbol, and unqualified enforcement claims; each step below closes one of those gaps. The rules the rewrite must
+satisfy are in `./SKILL.md#authoring-rules`. There is no size target: the end state is defined by those rules, and
+line counts are reported, not aimed at.
 
 Where things go: the SOW is opened first (`planning`; the evidence round is analysis, not implementation) and holds
 the decisions, the recorded target, dispositions, and validation evidence; the evidence files named below, the review
@@ -106,9 +106,9 @@ finding, CRITICAL vs TODO. The blocker bar, verify-before-acting, the one-round 
   whose owner is unavailable on the machine as unverifiable.
 
 Probe every fix wrong-to-right and on the normal case (for prose: run the documented commands and re-resolve the
-cited anchors and paths); hold user edit requests until the round closes, or tell the
-reviewers to review the tree as it is. A PR bot review is triaged
-the same way: fix real issues, add no machinery for unlikely edge cases; the mechanics are in `repo-pr-reviews`.
+cited anchors and paths); hold user edit requests until the round closes, or tell the reviewers to review the tree as
+it is. A PR bot review is triaged the same way: fix real issues, add no machinery for unlikely edge cases; the
+mechanics are in `repo-pr-reviews`.
 
 Recurrence seen in skills: findings clustering in relocated prose written from documents, and in descriptions of what
 a tool does. The class fix is contract-only text with a symbol per sentence, or a pointer at the tool, not another
