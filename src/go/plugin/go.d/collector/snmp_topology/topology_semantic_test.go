@@ -13,11 +13,11 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
@@ -37,13 +37,13 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		VnodeGUID:      "vnode-guid",
 		VnodeLabels:    map[string]string{"site": "lab"},
 	}
-	deviceInput := topologySemanticDeviceInputFromConnection(dev)
+	deviceInput := topologyDeviceInputFromConnection(dev)
 	targets := []netip.Addr{netip.MustParseAddr("192.0.2.1")}
 	builder := newTopologyBuilderFromSemanticInput(deviceInput, targets, collectedAt, freshFor)
 	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 		deviceInput,
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionLiteral, addresses: targets},
+		topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionLiteral, Addresses: targets},
 	)
 	mainObserver := recorder.beginContext(0, "", "")
 
@@ -177,10 +177,10 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 
 	live, _ := freezeTopologyBuilder(builder)
 	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.NotNil(t, capture.evidence)
-	require.NotZero(t, capture.recordCount)
-	require.NotZero(t, capture.logicalBytes)
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	require.NotNil(t, capture.Evidence)
+	require.NotZero(t, capture.RecordCount)
+	require.NotZero(t, capture.LogicalBytes)
 
 	dev.VnodeLabels["site"] = "changed"
 	pms[0].DeviceMetadata[tagLldpLocChassisID] = ddsnmp.MetaTag{Value: "ffffffffffff"}
@@ -188,18 +188,17 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	pms[0].TopologyMetrics[0].Tags[tagTopoIfName] = "changed"
 	pms[0].BGPRows[0].Identity.Neighbor = "198.51.100.2"
 
-	beforeReplay := cloneTopologyAcquisitionEvidence(capture.evidence)
-	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
-	require.NoError(t, err)
-	require.Equal(t, beforeReplay, capture.evidence)
-	require.Equal(t, live.observation, replayed.observation)
-	require.Equal(t, live.hasObservation, replayed.hasObservation)
-	require.Equal(t, live.collectedAt, replayed.collectedAt)
-	require.Equal(t, live.freshFor, replayed.freshFor)
+	beforeReplay := cloneTopologyAcquisitionEvidence(capture.Evidence)
+	replayed, present := replayTopologyAcquisitionEvidence(capture.Evidence)
+	require.True(t, present)
+	require.Equal(t, beforeReplay, capture.Evidence)
+	require.Equal(t, live.observation, replayed)
+	require.Equal(t, live.hasObservation, present)
+	require.Equal(t, live.collectedAt, replayed.CollectedAt)
 
-	requireRetainedStringsExclude(t, capture.evidence.device, dev.Community, dev.V3AuthKey, dev.V3PrivKey,
+	requireRetainedStringsExclude(t, capture.Evidence.Device, dev.Community, dev.V3AuthKey, dev.V3PrivKey,
 		dev.ManualProfiles[0])
-	requireRetainedStringsExclude(t, capture.evidence.collectionContexts,
+	requireRetainedStringsExclude(t, capture.Evidence.CollectionContexts,
 		pms[0].Source,
 		pms[0].TopologyMetrics[0].Name,
 		"must-not-appear-unused-metadata",
@@ -211,27 +210,27 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		"must-not-appear-non-vlan-context-row",
 		"must-not-appear-invalid-octet-tag",
 	)
-	requireRetainedStringsContain(t, capture.evidence.collectionContexts, "Gi1/0/7")
-	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metadata, tagLldpLocChassisID)
-	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.tags, tagLldpLocSysName)
-	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[0].tags, tagTopoIfIndex)
-	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[2].tags, tagLldpRemMgmtAddrLen)
+	requireRetainedStringsContain(t, capture.Evidence.CollectionContexts, "Gi1/0/7")
+	require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.Metadata, tagLldpLocChassisID)
+	require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.Tags, tagLldpLocSysName)
+	require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.TopologyMetrics[0].Tags, tagTopoIfIndex)
+	require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.TopologyMetrics[2].Tags, tagLldpRemMgmtAddrLen)
 	for _, tag := range []string{
 		tagTopoIPSource, tagTopoIfIndex, tagTopoIPAddr, tagTopoIPType,
 		tagTopoIPPrefix, tagTopoIPStatus, tagTopoIPRow,
 	} {
-		require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.metrics[3].tags, tag)
+		require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.TopologyMetrics[3].Tags, tag)
 	}
-	require.Contains(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows[0].tags, "neighbor")
-	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.metadata, tagOSPFRouterID)
-	require.Contains(t, capture.evidence.collectionContexts[1].profiles[0].values.tags, tagBridgeBaseAddress)
+	require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.BGPRows[0].Tags, "neighbor")
+	require.Contains(t, capture.Evidence.CollectionContexts[1].Profiles[0].Values.Metadata, tagOSPFRouterID)
+	require.Contains(t, capture.Evidence.CollectionContexts[1].Profiles[0].Values.Tags, tagBridgeBaseAddress)
 }
 
 func TestTopologyAcquisitionFailedProfileDoesNotRetainValues(t *testing.T) {
 	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
-		topologySemanticDeviceInput{hostname: "192.0.2.1"},
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
+		topologydiag.DeviceInput{Hostname: "192.0.2.1"},
+		topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 	)
 	observer := recorder.beginContext(0, "", "")
 	metrics := &ddsnmp.ProfileMetrics{
@@ -261,29 +260,29 @@ func TestTopologyAcquisitionFailedProfileDoesNotRetainValues(t *testing.T) {
 	), metrics)
 	capture := recorder.finish()
 
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.Len(t, capture.evidence.collectionContexts, 1)
-	require.Len(t, capture.evidence.collectionContexts[0].profiles, 1)
-	profile := capture.evidence.collectionContexts[0].profiles[0]
-	require.Equal(t, ddsnmpcollector.AcquisitionProfileOutcomeFailed, profile.outcome)
-	require.NotEmpty(t, profile.routes)
-	require.Empty(t, profile.values)
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	require.Len(t, capture.Evidence.CollectionContexts, 1)
+	require.Len(t, capture.Evidence.CollectionContexts[0].Profiles, 1)
+	profile := capture.Evidence.CollectionContexts[0].Profiles[0]
+	require.Equal(t, ddsnmpcollector.AcquisitionProfileOutcomeFailed, profile.Outcome)
+	require.NotEmpty(t, profile.Routes)
+	require.Empty(t, profile.Values)
 }
 
 func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	backing := strings.Repeat("abcdefghijklmnopqrstuvwxyz", 1<<15)
 	value := func(offset int) string { return backing[offset : offset+8] }
-	input := topologySemanticDeviceInput{
-		hostname:    value(0),
-		sysObjectID: value(16),
-		sysName:     value(32),
-		sysDescr:    value(48),
-		sysContact:  value(64),
-		sysLocation: value(80),
-		vendor:      value(96),
-		model:       value(112),
-		vnodeGUID:   value(128),
-		vnodeLabels: map[string]string{value(144): value(160)},
+	input := topologydiag.DeviceInput{
+		Hostname:    value(0),
+		SysObjectID: value(16),
+		SysName:     value(32),
+		SysDescr:    value(48),
+		SysContact:  value(64),
+		SysLocation: value(80),
+		Vendor:      value(96),
+		Model:       value(112),
+		VnodeGUID:   value(128),
+		VnodeLabels: map[string]string{value(144): value(160)},
 	}
 	pms := &ddsnmp.ProfileMetrics{
 		DeviceMetadata: map[string]ddsnmp.MetaTag{
@@ -338,42 +337,42 @@ func TestTopologyAcquisitionRetainedStringsOwnTheirBacking(t *testing.T) {
 	}
 
 	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 		input,
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 	)
 	observer := recorder.beginContext(0, value(528), value(544))
 	observer.ObserveProfile(report, pms)
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.NotNil(t, capture.evidence)
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	require.NotNil(t, capture.Evidence)
 
-	context := capture.evidence.collectionContexts[0]
-	profile := context.profiles[0]
-	requireStringOutsideBacking(t, backing, capture.evidence.device.hostname)
-	requireStringOutsideBacking(t, backing, capture.evidence.device.sysName)
-	for key, retained := range capture.evidence.device.vnodeLabels {
+	context := capture.Evidence.CollectionContexts[0]
+	profile := context.Profiles[0]
+	requireStringOutsideBacking(t, backing, capture.Evidence.Device.Hostname)
+	requireStringOutsideBacking(t, backing, capture.Evidence.Device.SysName)
+	for key, retained := range capture.Evidence.Device.VnodeLabels {
 		requireStringOutsideBacking(t, backing, key)
 		requireStringOutsideBacking(t, backing, retained)
 	}
-	requireStringOutsideBacking(t, backing, context.vlanID)
-	requireStringOutsideBacking(t, backing, context.vlanName)
-	requireStringOutsideBacking(t, backing, profile.routes[0].RootOID)
-	requireStringOutsideBacking(t, backing, profile.values.metadata["vendor"].Value)
-	requireStringOutsideBacking(t, backing, profile.values.tags[tagLldpLocSysName])
-	requireStringOutsideBacking(t, backing, profile.values.metrics[0].tags[tagTopoIfIndex])
-	requireStringOutsideBacking(t, backing, profile.values.metrics[0].tags[tagTopoIfName])
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].originProfileID)
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].table)
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].rowKey)
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].structuralID)
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].neighbor)
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].remoteAS)
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].description)
-	requireStringOutsideBacking(t, backing, string(profile.values.bgpRows[0].state))
-	requireStringOutsideBacking(t, backing, profile.values.bgpRows[0].tags["neighbor"])
-	requireRetainedStringsOutsideBacking(t, backing, capture.evidence.device)
+	requireStringOutsideBacking(t, backing, context.VLANID)
+	requireStringOutsideBacking(t, backing, context.VLANName)
+	requireStringOutsideBacking(t, backing, profile.Routes[0].RootOID)
+	requireStringOutsideBacking(t, backing, profile.Values.Metadata["vendor"].Value)
+	requireStringOutsideBacking(t, backing, profile.Values.Tags[tagLldpLocSysName])
+	requireStringOutsideBacking(t, backing, profile.Values.TopologyMetrics[0].Tags[tagTopoIfIndex])
+	requireStringOutsideBacking(t, backing, profile.Values.TopologyMetrics[0].Tags[tagTopoIfName])
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].OriginProfileID)
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].Table)
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].RowKey)
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].StructuralID)
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].Neighbor)
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].RemoteAS)
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].Description)
+	requireStringOutsideBacking(t, backing, string(profile.Values.BGPRows[0].State))
+	requireStringOutsideBacking(t, backing, profile.Values.BGPRows[0].Tags["neighbor"])
+	requireRetainedStringsOutsideBacking(t, backing, capture.Evidence.Device)
 	requireRetainedStringsOutsideBacking(t, backing, context)
 	runtime.KeepAlive(backing)
 }
@@ -472,11 +471,11 @@ func requireStringOutsideBacking(t *testing.T, backing, retained string) {
 
 func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
-	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
+	input := topologydiag.DeviceInput{Hostname: "192.0.2.1"}
 	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 		input,
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 	)
 	observer := recorder.beginContext(0, "", "")
 	pms := []*ddsnmp.ProfileMetrics{{
@@ -493,46 +492,32 @@ func TestTopologyAcquisitionCaptureIgnoresRejectedBGPRows(t *testing.T) {
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(collectedAt, time.Minute, 0)
 	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.Len(t, capture.evidence.collectionContexts, 1)
-	require.True(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpFailed)
-	require.Empty(t, capture.evidence.collectionContexts[0].profiles[0].values.bgpRows)
-	requireRetainedStringsExclude(t, capture.evidence.collectionContexts, pms[0].BGPRows[0].OriginProfileID)
-}
-
-func TestTopologyAcquisitionReplayRejectsMissingOrReorderedContexts(t *testing.T) {
-	evidence := completeTestTopologyAcquisitionEvidence(t)
-
-	missing := cloneTopologyAcquisitionEvidence(evidence)
-	missing.collectionContexts = nil
-	_, err := replayTopologyAcquisitionEvidence(missing)
-	require.ErrorContains(t, err, "main acquisition context")
-
-	reordered := cloneTopologyAcquisitionEvidence(evidence)
-	reordered.collectionContexts = append(reordered.collectionContexts, topologyAcquisitionContextEvidence{ordinal: 0})
-	_, err = replayTopologyAcquisitionEvidence(reordered)
-	require.ErrorContains(t, err, "acquisition context order")
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	require.Len(t, capture.Evidence.CollectionContexts, 1)
+	require.True(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.BGPFailed)
+	require.Empty(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.BGPRows)
+	requireRetainedStringsExclude(t, capture.Evidence.CollectionContexts, pms[0].BGPRows[0].OriginProfileID)
 }
 
 func TestTopologyAcquisitionReplayIgnoresFailedVLANContextValues(t *testing.T) {
 	evidence := completeTestTopologyAcquisitionEvidence(t)
-	want, err := replayTopologyAcquisitionEvidence(evidence)
-	require.NoError(t, err)
+	want, present := replayTopologyAcquisitionEvidence(evidence)
+	require.True(t, present)
 
 	failed := cloneTopologyAcquisitionEvidence(evidence)
-	failed.collectionContexts = append(failed.collectionContexts, topologyAcquisitionContextEvidence{
-		ordinal:    1,
-		vlanID:     "100",
-		vlanName:   "users",
-		client:     successfulAcquisitionPhase(),
-		connect:    successfulAcquisitionPhase(),
-		collection: failedAcquisitionPhase(topologyAcquisitionFailureCollection),
-		profiles: []topologyAcquisitionProfileEvidence{{
-			identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
-			outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-			values: topologyAcquisitionProfileValues{metrics: []topologyAcquisitionMetricValue{{
-				kind: ddsnmp.KindFdbEntry,
-				tags: map[string]string{
+	failed.CollectionContexts = append(failed.CollectionContexts, topologydiag.AcquisitionContextEvidence{
+		Ordinal:    1,
+		VLANID:     "100",
+		VLANName:   "users",
+		Client:     successfulAcquisitionPhase(),
+		Connect:    successfulAcquisitionPhase(),
+		Collection: failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection),
+		Profiles: []topologydiag.AcquisitionProfileEvidence{{
+			Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
+			Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
+			Values: topologydiag.AcquisitionProfileValues{TopologyMetrics: []topologydiag.AcquisitionMetricValue{{
+				Kind: ddsnmp.KindFdbEntry,
+				Tags: map[string]string{
 					tagFdbMac:        "00:11:22:33:44:55",
 					tagFdbBridgePort: "7",
 					tagFdbStatus:     "learned",
@@ -541,21 +526,21 @@ func TestTopologyAcquisitionReplayIgnoresFailedVLANContextValues(t *testing.T) {
 		}},
 	})
 
-	got, err := replayTopologyAcquisitionEvidence(failed)
-	require.NoError(t, err)
-	require.Equal(t, want.observation, got.observation)
+	got, present := replayTopologyAcquisitionEvidence(failed)
+	require.True(t, present)
+	require.Equal(t, want, got)
 }
 
 func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
-	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
+	input := topologydiag.DeviceInput{Hostname: "192.0.2.1"}
 
 	t.Run("projection error", func(t *testing.T) {
 		builder := newTopologyBuilderFromSemanticInput(input, nil, collectedAt, time.Minute)
 		recorder := newTopologyAcquisitionRecorder(
-			topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+			topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 			input,
-			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+			topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 		)
 		observer := recorder.beginContext(0, "", "")
 		pms := []*ddsnmp.ProfileMetrics{{BGPRows: []ddsnmp.BGPRow{{
@@ -570,25 +555,25 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 			0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, pms[0],
 		), pms[0])
 		capture := recorder.finish()
-		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
-		require.Equal(t, diagnosticCaptureReasonProjectionError, capture.reason)
-		require.Nil(t, capture.evidence)
+		require.Equal(t, topologydiag.CaptureUnavailable, capture.State)
+		require.Equal(t, topologydiag.CaptureReasonProjectionError, capture.Reason)
+		require.Nil(t, capture.Evidence)
 		require.Len(t, builder.bgpPeersByKey, 1, "projection errors must not change live ingestion")
 	})
 
 	t.Run("projection panic", func(t *testing.T) {
 		builder := newTopologyBuilderFromSemanticInput(input, nil, collectedAt, time.Minute)
 		recorder := newTopologyAcquisitionRecorder(
-			topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+			topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 			input,
-			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+			topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 		)
 		observer := recorder.beginContext(0, "", "")
 		recorder.projectProfile = func(
 			topologySemanticEventKind,
 			ddsnmpcollector.AcquisitionProfileReport,
 			*ddsnmp.ProfileMetrics,
-		) topologyAcquisitionProfileValues {
+		) topologydiag.AcquisitionProfileValues {
 			panic("projection panic")
 		}
 
@@ -600,20 +585,20 @@ func TestTopologyAcquisitionCaptureErrorAndPanicFailOpen(t *testing.T) {
 			}, &ddsnmp.ProfileMetrics{})
 		})
 		capture := recorder.finish()
-		require.Equal(t, diagnosticCaptureUnavailable, capture.state)
-		require.Equal(t, diagnosticCaptureReasonProjectionPanic, capture.reason)
+		require.Equal(t, topologydiag.CaptureUnavailable, capture.State)
+		require.Equal(t, topologydiag.CaptureReasonProjectionPanic, capture.Reason)
 		require.EqualValues(t, 1234, builder.localDevice.SysUptime)
 	})
 }
 
-func completeTestTopologyAcquisitionEvidence(t *testing.T) *topologyAcquisitionAttemptEvidence {
+func completeTestTopologyAcquisitionEvidence(t *testing.T) *topologydiag.AcquisitionAttemptEvidence {
 	t.Helper()
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
-	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
+	input := topologydiag.DeviceInput{Hostname: "192.0.2.1"}
 	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 		input,
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 	)
 	observer := recorder.beginContext(0, "", "")
 	observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
@@ -623,8 +608,8 @@ func completeTestTopologyAcquisitionEvidence(t *testing.T) *topologyAcquisitionA
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(collectedAt, time.Minute, 1)
 	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	return capture.evidence
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	return capture.Evidence
 }
 
 func acquisitionReportForMetrics(
@@ -676,11 +661,11 @@ func acquisitionReportForMetrics(
 	return report
 }
 
-func cloneTopologyAcquisitionEvidence(value *topologyAcquisitionAttemptEvidence) *topologyAcquisitionAttemptEvidence {
+func cloneTopologyAcquisitionEvidence(value *topologydiag.AcquisitionAttemptEvidence) *topologydiag.AcquisitionAttemptEvidence {
 	if value == nil {
 		return nil
 	}
 	cloned := *value
-	cloned.collectionContexts = slices.Clone(value.collectionContexts)
+	cloned.CollectionContexts = slices.Clone(value.CollectionContexts)
 	return &cloned
 }

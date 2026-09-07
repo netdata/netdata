@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,9 @@ type executionTestHandler struct {
 }
 
 func (*executionTestHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*executionTestHandler) MaxOids() int                { return 10 }
+
+func (*executionTestHandler) MaxOids() int { return 10 }
+
 func (*executionTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	packet := &gosnmp.SnmpPacket{}
 	for _, oid := range oids {
@@ -39,6 +41,7 @@ func (*executionTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	}
 	return packet, nil
 }
+
 func (h *executionTestHandler) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
 	h.walkRoots = append(h.walkRoots, oid)
 	return h.walkPDUs, errors.New("synthetic failure")
@@ -46,28 +49,28 @@ func (h *executionTestHandler) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error)
 
 // Use the real collector/observer boundary, including a failed profile with no
 // retained values; the archive fixture supplies only the surrounding sweep.
-func collectExecutionTestCapture(tb testing.TB) *topologyAcquisitionCapture {
+func collectExecutionTestCapture(tb testing.TB) *topologydiag.AcquisitionCapture {
 	tb.Helper()
 	return collectSourceTestCapture(tb, nil)
 }
 
-func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologyAcquisitionCapture {
+func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologydiag.AcquisitionCapture {
 	tb.Helper()
 	const root = "1.3.6.1.4.1.99999.1"
-	recorder := newTopologyAcquisitionRecorder(topologyAcquisitionAttemptID{
-		registrationID: 1,
-		ordinal:        2,
+	recorder := newTopologyAcquisitionRecorder(topologydiag.AcquisitionAttemptID{
+		RegistrationID: 1,
+		Ordinal:        2,
 	},
-		topologySemanticDeviceInput{
-			hostname: "192.0.2.1",
+		topologydiag.DeviceInput{
+			Hostname: "192.0.2.1",
 		},
-		topologyTargetResolutionEvidence{
-			outcome: topologyTargetResolutionEmpty,
+		topologydiag.TargetResolutionEvidence{
+			Outcome: topologydiag.TargetResolutionEmpty,
 		})
 	handler := &executionTestHandler{walkPDUs: pdus}
 	observer := recorder.beginContext(0, "", "")
 	collector := ddsnmpcollector.New(ddsnmpcollector.Config{
-		SnmpClient:                 recorder.sourceClient(0, handler),
+		SnmpClient:                 recorder.sourceClient(handler),
 		Log:                        logger.New(),
 		InitialAcquisitionObserver: observer,
 		Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
@@ -94,59 +97,44 @@ func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologyAcq
 	_, err := collector.Collect()
 	require.Error(tb, err)
 	require.Equal(tb, []string{root}, handler.walkRoots)
-	recorder.completeContext(0, failedAcquisitionPhase(topologyAcquisitionFailureCollection))
+	recorder.completeContext(0, failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection))
 	return recorder.finish()
 }
 
 func TestTopologyExecutionAccountingRetentionArchiveInspection(t *testing.T) {
 	capture := collectExecutionTestCapture(t)
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	profile := capture.evidence.collectionContexts[0].profiles[0]
-	require.NotNil(t, profile.execution)
-	require.EqualValues(t, 1, profile.execution.Preparation.GetRequests)
-	require.Len(t, profile.execution.WalkOperations, 1)
-	require.NotEmpty(t, capture.evidence.collectionContexts[0].sources[profile.execution.WalkOperations[0]-1].Failure.Reason)
-	require.Empty(t, profile.values)
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	profile := capture.Evidence.CollectionContexts[0].Profiles[0]
+	require.NotNil(t, profile.Execution)
+	require.EqualValues(t, 1, profile.Execution.Preparation.GetRequests)
+	require.Len(t, profile.Execution.WalkOperations, 1)
+	require.NotEmpty(t, capture.Evidence.CollectionContexts[0].Sources[profile.Execution.WalkOperations[0]-1].Failure.Reason)
+	require.Empty(t, profile.Values)
 
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
-	before, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+	before, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.True(t, ok)
-	diagnostics.topology.devices[0].latestAttempt = capture
+	diagnostics.Topology.Devices[0].LatestAttempt = capture
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "v-test"))
-	archive, err := readTopologyDiagnosticArchive(
+	archive, err := readTestDiagnosticArchive(
 		bytes.NewReader(encoded.Bytes()),
 		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
-	restored := archive.diagnostics.topology.devices[0].latestAttempt.evidence.collectionContexts[0].profiles[0]
-	require.Equal(t, profile.execution, restored.execution)
-	require.Equal(t, profile.stats, restored.stats)
-	require.Nil(
-		t,
-		archive.diagnostics.topology.devices[0].acquisition.evidence.collectionContexts[0].profiles[0].execution,
-		"historical retained success must not acquire fabricated measurements",
-	)
-	inspection, err := inspectTopologyDevice(archive.diagnostics, scenario.opts, 1)
+	public, err := archive.InspectDevice(testDiagnosticQuery(scenario.opts), 1)
 	require.NoError(t, err)
-	public, err := newDiagnosticDeviceInspection(inspection)
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
 	require.NoError(t, err)
-	require.Equal(
-		t,
-		newTopologyDiagnosticArchiveExecutionV1(profile.execution),
-		public.LatestAttempt.CollectionContexts[0].Profiles[0].Execution,
-	)
+	expected := testLatestArchiveCapture(t, &document, 0).Evidence.CollectionContexts[0].Profiles[0]
+	require.Equal(t, expected.Execution, public.LatestAttempt.CollectionContexts[0].Profiles[0].Execution)
+	require.Equal(t, expected.Stats, public.LatestAttempt.CollectionContexts[0].Profiles[0].Stats)
 	require.Nil(t, public.RetainedSuccess.CollectionContexts[0].Profiles[0].Execution)
-	after, ok, err := replayTopologyDiagnostics(archive.diagnostics, scenario.opts)
+	after, err := archive.Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.True(t, ok)
 	require.Equal(t, before, after, "execution evidence must not change graph replay")
 
-	var reencoded bytes.Buffer
-	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&reencoded, archive.diagnostics, "v-test"))
-	require.Equal(t, encoded.Bytes(), reencoded.Bytes())
 }
 
 func TestTopologyExecutionAccountingShapeIncludesOperationReferences(t *testing.T) {
@@ -160,48 +148,10 @@ func TestTopologyExecutionAccountingShapeIncludesOperationReferences(t *testing.
 	require.EqualValues(t, 96+88+2*8, logicalBytes)
 }
 
-func TestTopologyExecutionAccountingPresence(t *testing.T) {
-	for name, tc := range map[string]struct{ recorded bool }{"unobserved": {}, "observed": {true}} {
-		t.Run(name, func(t *testing.T) {
-			recorded := tc.recorded
-			profile := topologyAcquisitionProfileEvidence{
-				outcome: ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
-			}
-			if recorded {
-				profile.execution = &ddsnmpcollector.AcquisitionExecutionReport{}
-			}
-			dto, err := newTopologyDiagnosticArchiveProfileEvidenceV1(profile)
-			require.NoError(t, err)
-			raw, err := json.Marshal(dto)
-			require.NoError(t, err)
-			var decoded snmpdiag.ProfileEvidence
-			require.NoError(t, json.Unmarshal(raw, &decoded))
-			restored, err := restoreArchiveProfileEvidence(decoded)
-			require.NoError(t, err)
-			require.Equal(t, recorded, restored.execution != nil)
-			again, err := newTopologyDiagnosticArchiveProfileEvidenceV1(restored)
-			require.NoError(t, err)
-			require.Equal(t, dto, again)
-		})
-	}
-}
-
-func TestTopologyExecutionAccountingRejectsInvalidMeasurements(t *testing.T) {
-	for name, tc := range map[string]struct{ preparation snmpdiag.Preparation }{
-		"negative duration":    {snmpdiag.Preparation{ElapsedNanos: -1}},
-		"negative error count": {snmpdiag.Preparation{SNMPErrors: -1}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := restoreArchiveExecution(&snmpdiag.Execution{Preparation: tc.preparation})
-			require.Error(t, err)
-		})
-	}
-}
-
 func BenchmarkTopologyExecutionAccounting(b *testing.B) {
 	capture := collectExecutionTestCapture(b)
 	_, diagnostics := newTopologyScenarioReplayFixture(b, newLLDPDirectScenario())
-	diagnostics.topology.devices[0].latestAttempt = capture
+	diagnostics.Topology.Devices[0].LatestAttempt = capture
 	b.Run("archive", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
@@ -211,12 +161,11 @@ func BenchmarkTopologyExecutionAccounting(b *testing.B) {
 			}
 		}
 	})
-	b.Run("device_accounting", func(b *testing.B) {
+	archive := openTestDiagnosticCut(b, diagnostics)
+	b.Run("device_inspection", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			if _, err := newDiagnosticDeviceCaptureInspection(topologyInspectionCaptureResult{
-				capture: capture,
-			}); err != nil {
+			if _, err := archive.InspectDevice(testDiagnosticQuery(newLLDPDirectScenario().opts), 1); err != nil {
 				b.Fatal(err)
 			}
 		}

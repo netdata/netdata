@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
 type topologySemanticEventKind uint8
@@ -51,51 +52,23 @@ func applyTopologySemanticEvent(builder *topologyBuilder, event topologySemantic
 	}
 }
 
-type topologySemanticDeviceInput struct {
-	hostname    string
-	sysObjectID string
-	sysName     string
-	sysDescr    string
-	sysContact  string
-	sysLocation string
-	vendor      string
-	model       string
-	vnodeGUID   string
-	vnodeLabels map[string]string
-}
-
-func topologySemanticDeviceInputFromConnection(dev ddsnmp.DeviceConnectionInfo) topologySemanticDeviceInput {
-	return topologySemanticDeviceInput{
-		hostname:    dev.Hostname,
-		sysObjectID: dev.SysObjectID,
-		sysName:     dev.SysName,
-		sysDescr:    dev.SysDescr,
-		sysContact:  dev.SysContact,
-		sysLocation: dev.SysLocation,
-		vendor:      dev.Vendor,
-		model:       dev.Model,
-		vnodeGUID:   dev.VnodeGUID,
-		vnodeLabels: dev.VnodeLabels,
-	}
-}
-
-func (d topologySemanticDeviceInput) connectionInfo() ddsnmp.DeviceConnectionInfo {
-	return ddsnmp.DeviceConnectionInfo{
-		Hostname:    d.hostname,
-		SysObjectID: d.sysObjectID,
-		SysName:     d.sysName,
-		SysDescr:    d.sysDescr,
-		SysContact:  d.sysContact,
-		SysLocation: d.sysLocation,
-		Vendor:      d.vendor,
-		Model:       d.model,
-		VnodeGUID:   d.vnodeGUID,
-		VnodeLabels: d.vnodeLabels,
+func topologyDeviceInputFromConnection(dev ddsnmp.DeviceConnectionInfo) topologydiag.DeviceInput {
+	return topologydiag.DeviceInput{
+		Hostname:    dev.Hostname,
+		SysObjectID: dev.SysObjectID,
+		SysName:     dev.SysName,
+		SysDescr:    dev.SysDescr,
+		SysContact:  dev.SysContact,
+		SysLocation: dev.SysLocation,
+		Vendor:      dev.Vendor,
+		Model:       dev.Model,
+		VnodeGUID:   dev.VnodeGUID,
+		VnodeLabels: dev.VnodeLabels,
 	}
 }
 
 func newTopologyBuilderFromSemanticInput(
-	device topologySemanticDeviceInput,
+	device topologydiag.DeviceInput,
 	targets []netip.Addr,
 	collectedAt time.Time,
 	freshFor time.Duration,
@@ -103,98 +76,30 @@ func newTopologyBuilderFromSemanticInput(
 	builder := newTopologyBuilder()
 	builder.updateTime = collectedAt
 	builder.staleAfter = freshFor
-	builder.agentID = device.hostname
-	builder.localDevice = buildLocalTopologyDevice(device.connectionInfo())
+	builder.agentID = device.Hostname
+	builder.localDevice = buildLocalTopologyDevice(device.ConnectionInfo())
 	builder.targetManagementIPs = slices.Clone(targets)
 	return builder
-}
-
-type diagnosticCaptureState uint8
-
-const (
-	diagnosticCaptureUnknown diagnosticCaptureState = iota
-	diagnosticCaptureAvailable
-	diagnosticCaptureUnavailable
-)
-
-type diagnosticCaptureReason uint8
-
-const (
-	diagnosticCaptureReasonNone diagnosticCaptureReason = iota
-	diagnosticCaptureReasonProjectionError
-	diagnosticCaptureReasonProjectionPanic
-)
-
-type topologyAcquisitionProfileValues struct {
-	metadata  map[string]ddsnmp.MetaTag
-	tags      map[string]string
-	metrics   []topologyAcquisitionMetricValue
-	bgpRows   []topologyAcquisitionBGPRowValue
-	bgpFailed bool
-}
-
-type topologyAcquisitionMetricValue struct {
-	rowIndex     string
-	field        string
-	routeOrdinal uint32
-	rowOrdinal   uint32
-	valueOrdinal uint32
-	kind         ddsnmp.TopologyKind
-	tags         map[string]string
-}
-
-type topologyAcquisitionBGPRowValue struct {
-	routeOrdinal uint32
-	rowOrdinal   uint32
-	valueOrdinal uint32
-
-	originProfileID string
-	table           string
-	rowKey          string
-	structuralID    string
-	kind            ddprofiledefinition.BGPRowKind
-
-	routingInstance string
-	neighbor        string
-	remoteAS        string
-	localAddress    string
-	localAS         string
-	localIdentifier string
-	peerIdentifier  string
-	peerType        string
-	bgpVersion      string
-	description     string
-
-	adminHas       bool
-	adminEnabled   bool
-	stateHas       bool
-	state          ddprofiledefinition.BGPPeerState
-	stateRaw       string
-	establishedHas bool
-	established    int64
-	updateAgeHas   bool
-	updateAge      int64
-	tags           map[string]string
 }
 
 func projectTopologyAcquisitionMetrics(
 	eventKind topologySemanticEventKind,
 	metrics []ddsnmp.Metric,
 	references []ddsnmpcollector.AcquisitionValueReference,
-) []topologyAcquisitionMetricValue {
-	result := make([]topologyAcquisitionMetricValue, 0, len(metrics))
+) []topologydiag.AcquisitionMetricValue {
+	result := make([]topologydiag.AcquisitionMetricValue, 0, len(metrics))
 	for i, metric := range metrics {
 		if !topologySemanticMetricConsumed(eventKind, metric.TopologyKind) {
 			continue
 		}
-		result = append(result, topologyAcquisitionMetricValue{
-			rowIndex:     strings.Clone(references[i].RowIndex),
-			field:        strings.Clone(references[i].Field),
-			routeOrdinal: references[i].RouteOrdinal,
-			rowOrdinal:   references[i].RowOrdinal,
-			valueOrdinal: references[i].ValueOrdinal,
-			kind:         metric.TopologyKind,
-			tags: cloneTopologySemanticStringTags(
+		result = append(result, topologydiag.AcquisitionMetricValue{
+			RowIndex:     strings.Clone(references[i].RowIndex),
+			Field:        strings.Clone(references[i].Field),
+			RouteOrdinal: references[i].RouteOrdinal,
+			RowOrdinal:   references[i].RowOrdinal,
+			ValueOrdinal: references[i].ValueOrdinal,
+			Kind:         metric.TopologyKind,
+			Tags: cloneTopologySemanticStringTags(
 				metric.Tags,
 				func(key string) bool { return topologySemanticMetricTagAllowed(metric.TopologyKind, key) },
 			),
@@ -206,38 +111,38 @@ func projectTopologyAcquisitionMetrics(
 func projectTopologyAcquisitionBGPRows(
 	rows []ddsnmp.BGPRow,
 	references []ddsnmpcollector.AcquisitionValueReference,
-) []topologyAcquisitionBGPRowValue {
-	result := make([]topologyAcquisitionBGPRowValue, 0, len(rows))
+) []topologydiag.AcquisitionBGPRowValue {
+	result := make([]topologydiag.AcquisitionBGPRowValue, 0, len(rows))
 	for i, row := range rows {
-		result = append(result, topologyAcquisitionBGPRowValue{
-			routeOrdinal:    references[i].RouteOrdinal,
-			rowOrdinal:      references[i].RowOrdinal,
-			valueOrdinal:    references[i].ValueOrdinal,
-			originProfileID: strings.Clone(row.OriginProfileID),
-			table:           strings.Clone(row.Table),
-			rowKey:          strings.Clone(row.RowKey),
-			structuralID:    strings.Clone(row.StructuralID),
-			kind:            row.Kind,
-			routingInstance: strings.Clone(row.Identity.RoutingInstance),
-			neighbor:        strings.Clone(row.Identity.Neighbor),
-			remoteAS:        strings.Clone(row.Identity.RemoteAS),
-			localAddress:    strings.Clone(row.Descriptors.LocalAddress),
-			localAS:         strings.Clone(row.Descriptors.LocalAS),
-			localIdentifier: strings.Clone(row.Descriptors.LocalIdentifier),
-			peerIdentifier:  strings.Clone(row.Descriptors.PeerIdentifier),
-			peerType:        strings.Clone(row.Descriptors.PeerType),
-			bgpVersion:      strings.Clone(row.Descriptors.BGPVersion),
-			description:     strings.Clone(row.Descriptors.Description),
-			adminHas:        row.Admin.Enabled.Has,
-			adminEnabled:    row.Admin.Enabled.Value,
-			stateHas:        row.State.Has,
-			state:           ddprofiledefinition.BGPPeerState(strings.Clone(string(row.State.State))),
-			stateRaw:        strings.Clone(row.State.Raw),
-			establishedHas:  row.Connection.EstablishedUptime.Has,
-			established:     row.Connection.EstablishedUptime.Value,
-			updateAgeHas:    row.Connection.LastReceivedUpdateAge.Has,
-			updateAge:       row.Connection.LastReceivedUpdateAge.Value,
-			tags:            cloneTopologySemanticStringTags(row.Tags, topologySemanticBGPTagAllowed),
+		result = append(result, topologydiag.AcquisitionBGPRowValue{
+			RouteOrdinal:    references[i].RouteOrdinal,
+			RowOrdinal:      references[i].RowOrdinal,
+			ValueOrdinal:    references[i].ValueOrdinal,
+			OriginProfileID: strings.Clone(row.OriginProfileID),
+			Table:           strings.Clone(row.Table),
+			RowKey:          strings.Clone(row.RowKey),
+			StructuralID:    strings.Clone(row.StructuralID),
+			Kind:            row.Kind,
+			RoutingInstance: strings.Clone(row.Identity.RoutingInstance),
+			Neighbor:        strings.Clone(row.Identity.Neighbor),
+			RemoteAS:        strings.Clone(row.Identity.RemoteAS),
+			LocalAddress:    strings.Clone(row.Descriptors.LocalAddress),
+			LocalAS:         strings.Clone(row.Descriptors.LocalAS),
+			LocalIdentifier: strings.Clone(row.Descriptors.LocalIdentifier),
+			PeerIdentifier:  strings.Clone(row.Descriptors.PeerIdentifier),
+			PeerType:        strings.Clone(row.Descriptors.PeerType),
+			BGPVersion:      strings.Clone(row.Descriptors.BGPVersion),
+			Description:     strings.Clone(row.Descriptors.Description),
+			AdminHas:        row.Admin.Enabled.Has,
+			AdminEnabled:    row.Admin.Enabled.Value,
+			StateHas:        row.State.Has,
+			State:           ddprofiledefinition.BGPPeerState(strings.Clone(string(row.State.State))),
+			StateRaw:        strings.Clone(row.State.Raw),
+			EstablishedHas:  row.Connection.EstablishedUptime.Has,
+			Established:     row.Connection.EstablishedUptime.Value,
+			UpdateAgeHas:    row.Connection.LastReceivedUpdateAge.Has,
+			UpdateAge:       row.Connection.LastReceivedUpdateAge.Value,
+			Tags:            cloneTopologySemanticStringTags(row.Tags, topologySemanticBGPTagAllowed),
 		})
 	}
 	return result
@@ -258,24 +163,24 @@ func portableTopologySemanticOrigin(value string) bool {
 	return true
 }
 
-func cloneTopologySemanticDeviceInput(value topologySemanticDeviceInput) topologySemanticDeviceInput {
-	value.hostname = strings.Clone(value.hostname)
-	value.sysObjectID = strings.Clone(value.sysObjectID)
-	value.sysName = strings.Clone(value.sysName)
-	value.sysDescr = strings.Clone(value.sysDescr)
-	value.sysContact = strings.Clone(value.sysContact)
-	value.sysLocation = strings.Clone(value.sysLocation)
-	value.vendor = strings.Clone(value.vendor)
-	value.model = strings.Clone(value.model)
-	value.vnodeGUID = strings.Clone(value.vnodeGUID)
-	value.vnodeLabels = cloneTopologySemanticStringMap(value.vnodeLabels)
+func cloneTopologyDeviceInput(value topologydiag.DeviceInput) topologydiag.DeviceInput {
+	value.Hostname = strings.Clone(value.Hostname)
+	value.SysObjectID = strings.Clone(value.SysObjectID)
+	value.SysName = strings.Clone(value.SysName)
+	value.SysDescr = strings.Clone(value.SysDescr)
+	value.SysContact = strings.Clone(value.SysContact)
+	value.SysLocation = strings.Clone(value.SysLocation)
+	value.Vendor = strings.Clone(value.Vendor)
+	value.Model = strings.Clone(value.Model)
+	value.VnodeGUID = strings.Clone(value.VnodeGUID)
+	value.VnodeLabels = cloneTopologySemanticStringMap(value.VnodeLabels)
 	return value
 }
 
-func topologySemanticDeviceLogicalBytes(value topologySemanticDeviceInput) uint64 {
-	return uint64(len(value.hostname)+len(value.sysObjectID)+len(value.sysName)+len(value.sysDescr)+
-		len(value.sysContact)+len(value.sysLocation)+len(value.vendor)+len(value.model)+len(value.vnodeGUID)) +
-		topologySemanticStringMapBytes(value.vnodeLabels)
+func topologySemanticDeviceLogicalBytes(value topologydiag.DeviceInput) uint64 {
+	return uint64(len(value.Hostname)+len(value.SysObjectID)+len(value.SysName)+len(value.SysDescr)+
+		len(value.SysContact)+len(value.SysLocation)+len(value.Vendor)+len(value.Model)+len(value.VnodeGUID)) +
+		topologySemanticStringMapBytes(value.VnodeLabels)
 }
 
 func topologySemanticStringMapBytes(values map[string]string) uint64 {

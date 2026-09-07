@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologydiag
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 
 // Presence distinguishes recorded zero work from unobserved execution.
 // This allowlist is shared by the archive and selected-device inspection.
-func newTopologyDiagnosticArchiveExecutionV1(
+func newArchiveExecutionV1(
 	execution *ddsnmpcollector.AcquisitionExecutionReport,
 ) *snmpdiag.Execution {
 	if execution == nil {

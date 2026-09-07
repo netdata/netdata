@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologydiag
 
 import (
 	"encoding/hex"
@@ -14,7 +14,7 @@ import (
 )
 
 func newDiagnosticDeviceInspection(
-	report topologyDeviceInspection,
+	report deviceInspection,
 ) (DiagnosticDeviceInspection, error) {
 	lifecycle, err := newDiagnosticLifecycleInspection(report.lifecycle)
 	if err != nil {
@@ -58,7 +58,7 @@ func newDiagnosticDeviceInspection(
 }
 
 func newDiagnosticLinkInspection(
-	report topologyLinkInspection,
+	report linkInspection,
 ) (DiagnosticLinkInspection, error) {
 	cut, err := newDiagnosticCutInspection(report.diagnosticCut)
 	if err != nil {
@@ -92,7 +92,7 @@ func newDiagnosticLinkInspection(
 }
 
 func newDiagnosticLifecycleInspection(
-	result topologyInspectionLifecycleResult,
+	result inspectionLifecycleResult,
 ) (diagnosticLifecycleInspection, error) {
 	capture, err := newDiagnosticCaptureStatus(result.captureState, result.captureReason)
 	if err != nil {
@@ -115,7 +115,7 @@ func newDiagnosticLifecycleInspection(
 }
 
 func newDiagnosticCutInspection(
-	result topologyInspectionDiagnosticCutResult,
+	result inspectionDiagnosticCutResult,
 ) (diagnosticCutInspection, error) {
 	capture, err := newDiagnosticCaptureStatus(result.captureState, result.captureReason)
 	if err != nil {
@@ -130,9 +130,9 @@ func newDiagnosticCutInspection(
 }
 
 func newDiagnosticSweepInspection(
-	result topologyInspectionSweepResult,
+	result inspectionSweepResult,
 ) (diagnosticSweepInspection, error) {
-	cut, err := newDiagnosticCutInspection(result.topologyInspectionDiagnosticCutResult)
+	cut, err := newDiagnosticCutInspection(result.inspectionDiagnosticCutResult)
 	if err != nil {
 		return diagnosticSweepInspection{}, err
 	}
@@ -151,7 +151,7 @@ func newDiagnosticSweepInspection(
 }
 
 func newDiagnosticRemovedInspection(
-	result topologyInspectionRemovedResult,
+	result inspectionRemovedResult,
 ) diagnosticRemovedInspection {
 	converted := diagnosticRemovedInspection{
 		Membership: diagnosticStage(result.membership),
@@ -164,7 +164,7 @@ func newDiagnosticRemovedInspection(
 }
 
 func newDiagnosticCaptureInspection(
-	result topologyInspectionCaptureResult,
+	result inspectionCaptureResult,
 ) (diagnosticCaptureInspection, error) {
 	capture, err := newDiagnosticCaptureSummary(result.capture)
 	if err != nil {
@@ -177,47 +177,47 @@ func newDiagnosticCaptureInspection(
 	}, nil
 }
 
-func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult) (diagnosticDeviceCaptureInspection, error) {
+func newDiagnosticDeviceCaptureInspection(result inspectionCaptureResult) (diagnosticDeviceCaptureInspection, error) {
 	capture, err := newDiagnosticCaptureInspection(result)
 	if err != nil {
 		return diagnosticDeviceCaptureInspection{}, err
 	}
 	converted := diagnosticDeviceCaptureInspection{diagnosticCaptureInspection: capture}
-	if result.capture == nil || result.capture.evidence == nil {
+	if result.capture == nil || result.capture.Evidence == nil {
 		return converted, nil
 	}
-	for _, context := range result.capture.evidence.collectionContexts {
-		client, err := newDiagnosticPhaseStatus(context.client)
+	for _, context := range result.capture.Evidence.CollectionContexts {
+		client, err := newDiagnosticPhaseStatus(context.Client)
 		if err != nil {
 			return diagnosticDeviceCaptureInspection{}, err
 		}
-		connect, err := newDiagnosticPhaseStatus(context.connect)
+		connect, err := newDiagnosticPhaseStatus(context.Connect)
 		if err != nil {
 			return diagnosticDeviceCaptureInspection{}, err
 		}
-		collection, err := newDiagnosticPhaseStatus(context.collection)
+		collection, err := newDiagnosticPhaseStatus(context.Collection)
 		if err != nil {
 			return diagnosticDeviceCaptureInspection{}, err
 		}
 		accounting := diagnosticContextAccounting{
-			Sources:      context.sources,
-			Interruption: context.interruption, Failures: context.failures,
+			Sources:      context.Sources,
+			Interruption: context.Interruption, Failures: context.Failures,
 			Client: client, Connect: connect, Collection: collection,
-			Ordinal: context.ordinal, VLANID: context.vlanID, VLANName: context.vlanName,
-			Profiles: make([]diagnosticProfileAccounting, 0, len(context.profiles)),
+			Ordinal: context.Ordinal, VLANID: context.VLANID, VLANName: context.VLANName,
+			Profiles: make([]diagnosticProfileAccounting, 0, len(context.Profiles)),
 		}
-		for _, profile := range context.profiles {
-			outcome, err := topologyDiagnosticArchiveProfileOutcomeName(profile.outcome)
+		for _, profile := range context.Profiles {
+			outcome, err := archiveProfileOutcomeName(profile.Outcome)
 			if err != nil {
 				return diagnosticDeviceCaptureInspection{}, err
 			}
-			phase, err := topologyDiagnosticArchiveProfileFailurePhaseName(profile.failurePhase)
+			phase, err := archiveProfileFailurePhaseName(profile.FailurePhase)
 			if err != nil {
 				return diagnosticDeviceCaptureInspection{}, err
 			}
-			routes := make([]snmpdiag.Route, 0, len(profile.routes))
-			for _, route := range profile.routes {
-				wire, err := newTopologyDiagnosticArchiveRouteV1(route)
+			routes := make([]snmpdiag.Route, 0, len(profile.Routes))
+			for _, route := range profile.Routes {
+				wire, err := newArchiveRouteV1(route)
 				if err != nil {
 					return diagnosticDeviceCaptureInspection{}, err
 				}
@@ -226,11 +226,11 @@ func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult
 			accounting.Profiles = append(accounting.Profiles, diagnosticProfileAccounting{
 				Routes: routes,
 				Identity: snmpdiag.ProfileIdentity{
-					Ordinal: profile.identity.Ordinal, RouteDigest: hex.EncodeToString(profile.identity.RouteDigest[:]),
+					Ordinal: profile.Identity.Ordinal, RouteDigest: hex.EncodeToString(profile.Identity.RouteDigest[:]),
 				},
 				Outcome: outcome, FailurePhase: phase,
-				Stats:     newTopologyDiagnosticArchiveCollectionStatsV1(profile.stats),
-				Execution: newTopologyDiagnosticArchiveExecutionV1(profile.execution),
+				Stats:     newArchiveCollectionStatsV1(profile.Stats),
+				Execution: newArchiveExecutionV1(profile.Execution),
 			})
 		}
 		converted.CollectionContexts = append(converted.CollectionContexts, accounting)
@@ -239,7 +239,7 @@ func newDiagnosticDeviceCaptureInspection(result topologyInspectionCaptureResult
 }
 
 func newDiagnosticActorInspection(
-	result topologyInspectionActorResult,
+	result inspectionActorResult,
 ) diagnosticActorInspection {
 	converted := diagnosticActorInspection{
 		Membership:    diagnosticStage(result.membership),
@@ -306,15 +306,15 @@ func newDiagnosticActorDetails(actor topologymodel.Actor) (diagnosticActorDetail
 	return details, present
 }
 
-func newDiagnosticRowInspection(result topologyInspectionRowResult) diagnosticRowInspection {
+func newDiagnosticRowInspection(result inspectionRowResult) diagnosticRowInspection {
 	return diagnosticRowInspection{
-		Membership: diagnosticStage(result.topologyInspectionStage),
+		Membership: diagnosticStage(result.inspectionStage),
 		Row:        result.row,
 	}
 }
 
 func newDiagnosticSourceInspection(
-	result topologyInspectionSourceResult,
+	result inspectionSourceResult,
 ) (diagnosticSourceInspection, error) {
 	converted := diagnosticSourceInspection{
 		Contexts: make([]diagnosticSourceContext, 0, len(result.contexts)),
@@ -330,7 +330,7 @@ func newDiagnosticSourceInspection(
 }
 
 func newDiagnosticSourceContext(
-	result topologyInspectionSourceContext,
+	result inspectionSourceContext,
 ) (diagnosticSourceContext, error) {
 	latest, err := newDiagnosticCaptureInspection(result.latestAttempt)
 	if err != nil {
@@ -358,7 +358,7 @@ func newDiagnosticSourceContext(
 }
 
 func newDiagnosticSourceCaptureContext(
-	result topologyInspectionSourceCaptureContext,
+	result inspectionSourceCaptureContext,
 ) (diagnosticSourceCaptureContext, error) {
 	capture, err := newDiagnosticCaptureInspection(result.capture)
 	if err != nil {
@@ -376,7 +376,7 @@ func newDiagnosticSourceCaptureContext(
 	return converted, nil
 }
 
-func newDiagnosticSourceFact(result topologyInspectionSourceFact) diagnosticSourceFact {
+func newDiagnosticSourceFact(result inspectionSourceFact) diagnosticSourceFact {
 	converted := diagnosticSourceFact{
 		RegistrationID: uint64(result.registrationID),
 		ContextOrdinal: result.contextOrdinal,
@@ -384,13 +384,13 @@ func newDiagnosticSourceFact(result topologyInspectionSourceFact) diagnosticSour
 	}
 	if result.metric != nil {
 		converted.Metric = &diagnosticMetricFact{
-			RowIndex:     result.metric.rowIndex,
-			Field:        result.metric.field,
-			RouteOrdinal: result.metric.routeOrdinal,
-			RowOrdinal:   result.metric.rowOrdinal,
-			ValueOrdinal: result.metric.valueOrdinal,
-			Kind:         string(result.metric.kind),
-			Tags:         cloneStringMap(result.metric.tags),
+			RowIndex:     result.metric.RowIndex,
+			Field:        result.metric.Field,
+			RouteOrdinal: result.metric.RouteOrdinal,
+			RowOrdinal:   result.metric.RowOrdinal,
+			ValueOrdinal: result.metric.ValueOrdinal,
+			Kind:         string(result.metric.Kind),
+			Tags:         cloneStringMap(result.metric.Tags),
 		}
 	}
 	if result.bgp != nil {
@@ -399,44 +399,44 @@ func newDiagnosticSourceFact(result topologyInspectionSourceFact) diagnosticSour
 	return converted
 }
 
-func newDiagnosticBGPFact(row *topologyAcquisitionBGPRowValue) *diagnosticBGPFact {
+func newDiagnosticBGPFact(row *AcquisitionBGPRowValue) *diagnosticBGPFact {
 	if row == nil {
 		return nil
 	}
 	return &diagnosticBGPFact{
-		RouteOrdinal:    row.routeOrdinal,
-		RowOrdinal:      row.rowOrdinal,
-		ValueOrdinal:    row.valueOrdinal,
-		OriginProfileID: row.originProfileID,
-		Table:           row.table,
-		RowKey:          row.rowKey,
-		StructuralID:    row.structuralID,
-		Kind:            string(row.kind),
-		RoutingInstance: row.routingInstance,
-		Neighbor:        row.neighbor,
-		RemoteAS:        row.remoteAS,
-		LocalAddress:    row.localAddress,
-		LocalAS:         row.localAS,
-		LocalIdentifier: row.localIdentifier,
-		PeerIdentifier:  row.peerIdentifier,
-		PeerType:        row.peerType,
-		BGPVersion:      row.bgpVersion,
-		Description:     row.description,
-		AdminHas:        row.adminHas,
-		AdminEnabled:    row.adminEnabled,
-		StateHas:        row.stateHas,
-		State:           string(row.state),
-		StateRaw:        row.stateRaw,
-		EstablishedHas:  row.establishedHas,
-		Established:     row.established,
-		UpdateAgeHas:    row.updateAgeHas,
-		UpdateAge:       row.updateAge,
-		Tags:            cloneStringMap(row.tags),
+		RouteOrdinal:    row.RouteOrdinal,
+		RowOrdinal:      row.RowOrdinal,
+		ValueOrdinal:    row.ValueOrdinal,
+		OriginProfileID: row.OriginProfileID,
+		Table:           row.Table,
+		RowKey:          row.RowKey,
+		StructuralID:    row.StructuralID,
+		Kind:            string(row.Kind),
+		RoutingInstance: row.RoutingInstance,
+		Neighbor:        row.Neighbor,
+		RemoteAS:        row.RemoteAS,
+		LocalAddress:    row.LocalAddress,
+		LocalAS:         row.LocalAS,
+		LocalIdentifier: row.LocalIdentifier,
+		PeerIdentifier:  row.PeerIdentifier,
+		PeerType:        row.PeerType,
+		BGPVersion:      row.BGPVersion,
+		Description:     row.Description,
+		AdminHas:        row.AdminHas,
+		AdminEnabled:    row.AdminEnabled,
+		StateHas:        row.StateHas,
+		State:           string(row.State),
+		StateRaw:        row.StateRaw,
+		EstablishedHas:  row.EstablishedHas,
+		Established:     row.Established,
+		UpdateAgeHas:    row.UpdateAgeHas,
+		UpdateAge:       row.UpdateAge,
+		Tags:            cloneStringMap(row.Tags),
 	}
 }
 
 func newDiagnosticGraphLinkInspection(
-	result topologyInspectionGraphLinkResult,
+	result inspectionGraphLinkResult,
 ) diagnosticGraphLinkInspection {
 	converted := diagnosticGraphLinkInspection{
 		Membership:        diagnosticStage(result.membership),
@@ -463,7 +463,7 @@ func newDiagnosticGraphLink(
 	actorIDs map[topologymodel.ActorHandle]string,
 ) diagnosticGraphLink {
 	converted := diagnosticGraphLink{
-		Family:             topologyInspectionLinkFamily(link),
+		Family:             inspectionLinkFamily(link),
 		Layer:              link.Layer,
 		Protocol:           link.Protocol,
 		Direction:          link.Direction,

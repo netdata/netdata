@@ -18,25 +18,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
 func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
-	cases := map[string]func(testing.TB) topologyDiagnostics{
-		"representative": func(tb testing.TB) topologyDiagnostics {
+	cases := map[string]func(testing.TB) topologydiag.Cut{
+		"representative": func(tb testing.TB) topologydiag.Cut {
 			_, diagnostics := newTopologyScenarioReplayFixture(tb, newMixedL2L3ControlScenario())
 			completeTopologyDiagnosticArchiveFixture(&diagnostics)
 			return diagnostics
 		},
-		"maximum_records": func(tb testing.TB) topologyDiagnostics {
+		"maximum_records": func(tb testing.TB) topologydiag.Cut {
 			return benchmarkTopologyArchiveDiagnostics(tb, 3, 83_000, 8)
 		},
-		"maximum_combined": func(tb testing.TB) topologyDiagnostics {
+		"maximum_combined": func(tb testing.TB) topologydiag.Cut {
 			return benchmarkTopologyArchiveDiagnostics(tb, 3, 83_000, 215)
 		},
-		"maximum_logical_bytes": func(tb testing.TB) topologyDiagnostics {
+		"maximum_logical_bytes": func(tb testing.TB) topologydiag.Cut {
 			return benchmarkTopologyArchiveDiagnostics(tb, 2, 7_500, 4_000)
 		},
-		"maximum_escaping": func(tb testing.TB) topologyDiagnostics {
+		"maximum_escaping": func(tb testing.TB) topologydiag.Cut {
 			return benchmarkTopologyArchiveDiagnosticsWithValue(tb, 2, 7_500, strings.Repeat("\x00", 4_000))
 		},
 	}
@@ -71,7 +72,7 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 			b.Run("read", func(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
-					if _, err := readTopologyDiagnosticArchive(
+					if _, err := readTestDiagnosticArchive(
 						bytes.NewReader(encoded.Bytes()),
 						snmpdiag.DefaultReadLimits(),
 					); err != nil {
@@ -85,7 +86,7 @@ func BenchmarkSNMPTopologyDiagnosticArchive(b *testing.B) {
 }
 
 func BenchmarkSNMPTopologyDiagnosticArchiveEncoderLevel(b *testing.B) {
-	cases := map[string]topologyDiagnostics{}
+	cases := map[string]topologydiag.Cut{}
 	_, cases["representative"] = newTopologyScenarioReplayFixture(b, newMixedL2L3ControlScenario())
 	cases["maximum_combined"] = benchmarkTopologyArchiveDiagnostics(b, 3, 83_000, 215)
 	levels := map[string]zstd.EncoderLevel{
@@ -156,7 +157,7 @@ func benchmarkTopologyArchiveDiagnostics(
 	deviceCount int,
 	metricsPerDevice int,
 	tagValueBytes int,
-) topologyDiagnostics {
+) topologydiag.Cut {
 	tb.Helper()
 	return benchmarkTopologyArchiveDiagnosticsWithValue(tb, deviceCount, metricsPerDevice, strings.Repeat("x", tagValueBytes))
 }
@@ -166,7 +167,7 @@ func benchmarkTopologyArchiveDiagnosticsWithValue(
 	deviceCount int,
 	metricsPerDevice int,
 	value string,
-) topologyDiagnostics {
+) topologydiag.Cut {
 	tb.Helper()
 	return benchmarkTopologyArchiveDiagnosticsWithMetric(
 		tb,
@@ -188,7 +189,7 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 	metricsPerDevice int,
 	kind ddsnmp.TopologyKind,
 	metricTags func(int) map[string]string,
-) topologyDiagnostics {
+) topologydiag.Cut {
 	tb.Helper()
 	const sequence = uint64(1)
 	publishedAt := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
@@ -214,9 +215,9 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 		}
 		profileMetrics := &ddsnmp.ProfileMetrics{TopologyMetrics: metrics}
 		recorder := newTopologyAcquisitionRecorder(
-			topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1},
-			topologySemanticDeviceInputFromConnection(info),
-			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+			topologydiag.AcquisitionAttemptID{RegistrationID: registrationID, Ordinal: 1},
+			topologyDeviceInputFromConnection(info),
+			topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 		)
 		observer := recorder.beginContext(0, "", "")
 		observer.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
@@ -235,9 +236,9 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 		recorder.completeContext(0, successfulAcquisitionPhase())
 		recorder.setCollectedShape(publishedAt, time.Hour, 3600)
 		capture := recorder.finish()
-		if capture.state != diagnosticCaptureAvailable {
+		if capture.State != topologydiag.CaptureAvailable {
 			tb.Fatalf("benchmark capture %d is unavailable: state=%d reason=%d records=%d bytes=%d",
-				registrationID, capture.state, capture.reason, capture.recordCount, capture.logicalBytes)
+				registrationID, capture.State, capture.Reason, capture.RecordCount, capture.LogicalBytes)
 		}
 		snapshot := &topologyDeviceSnapshot{
 			collectedAt: publishedAt,
@@ -250,7 +251,7 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 			latestAttempt: capture,
 			lastAttempt:   publishedAt,
 			lastSuccess:   publishedAt,
-			outcome:       deviceRefreshOutcomeSuccess,
+			outcome:       topologydiag.RefreshOutcomeSuccess,
 		}
 		entries = append(entries, ddsnmp.DeviceEntry{RegistrationID: registrationID, Info: info})
 		selected[registrationID] = true
@@ -268,21 +269,21 @@ func benchmarkTopologyArchiveDiagnosticsWithMetric(
 	if err != nil {
 		tb.Fatal(err)
 	}
-	if cut.captureState != diagnosticCaptureAvailable {
+	if cut.CaptureState != topologydiag.CaptureAvailable {
 		tb.Fatalf("benchmark cut is unavailable: state=%d reason=%d records=%d bytes=%d",
-			cut.captureState, cut.captureReason, cut.recordCount, cut.logicalBytes)
+			cut.CaptureState, cut.CaptureReason, cut.RecordCount, cut.LogicalBytes)
 	}
-	return topologyDiagnostics{
-		lifecycle: topologyJobLifecycleDiagnosticCut{
-			state:  diagnosticCaptureAvailable,
-			reason: diagnosticCaptureReasonNone,
-			cut: ddsnmp.DeviceLifecycleCut{
+	return topologydiag.Cut{
+		Lifecycle: topologydiag.LifecycleCut{
+			State:  topologydiag.CaptureAvailable,
+			Reason: topologydiag.CaptureReasonNone,
+			Cut: ddsnmp.DeviceLifecycleCut{
 				Sequence:   1,
 				CapturedAt: publishedAt,
 			},
 		},
-		producerScopeID: "benchmark-scope",
-		topology:        cut,
+		ProducerScopeID: "benchmark-scope",
+		Topology:        cut,
 	}
 }
 
