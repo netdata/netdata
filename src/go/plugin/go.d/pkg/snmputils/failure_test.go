@@ -117,3 +117,59 @@ func TestFailureValidation(t *testing.T) {
 		t.Run(name, func(t *testing.T) { require.Equal(t, tc.valid, tc.failure.Valid()) })
 	}
 }
+
+func TestFailureAnnotationsStayValid(t *testing.T) {
+	packetCause := WithPacketFailure(context.DeadlineExceeded, "get", &gosnmp.SnmpPacket{
+		Error:      gosnmp.GenErr,
+		ErrorIndex: 2,
+	})
+	for name, tc := range map[string]struct {
+		cause            error
+		packet           *gosnmp.SnmpPacket
+		packetAnnotation bool
+		reason           string
+		want             Failure
+	}{
+		"nil failure":        {},
+		"nil packet failure": {packetAnnotation: true},
+		"nil response": {cause: context.DeadlineExceeded, packetAnnotation: true, want: Failure{
+			Operation: "get",
+			Reason:    "deadline",
+		}},
+		"successful response with failure": {cause: context.DeadlineExceeded, packetAnnotation: true, packet: &gosnmp.SnmpPacket{}, want: Failure{
+			Operation: "get",
+			Reason:    "deadline",
+		}},
+		"preserve packet details": {cause: packetCause, want: Failure{
+			Operation:    "get",
+			Reason:       "packet_error",
+			PacketStatus: uint8(gosnmp.GenErr),
+			ErrorIndex:   2,
+		}},
+		"override packet reason": {cause: packetCause, reason: "processing", want: Failure{
+			Operation: "get",
+			Reason:    "processing",
+		}},
+		"invalid override": {cause: packetCause, reason: "not-allowed", want: Failure{
+			Reason: "unknown",
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var annotated error
+			if tc.packetAnnotation {
+				annotated = WithPacketFailure(tc.cause, "get", tc.packet)
+			} else {
+				annotated = WithFailure(tc.cause, "get", tc.reason)
+			}
+			if tc.cause == nil {
+				require.NoError(t, annotated)
+			} else {
+				require.Equal(t, tc.cause.Error(), annotated.Error())
+				require.ErrorIs(t, annotated, tc.cause)
+			}
+			failure := ClassifyFailure(annotated)
+			require.Equal(t, tc.want, failure)
+			require.True(t, failure.Valid())
+		})
+	}
+}

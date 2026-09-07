@@ -49,7 +49,7 @@ func recordCollectionFailure(dst *ddsnmp.FailureCount, err error, operation, rea
 	}
 	f := snmputils.ClassifyFailure(err)
 	f.Operation = operation
-	if reason != "" {
+	if reason != "" && f.Reason == "unknown" {
 		f.Reason = reason
 	}
 	dst.Record(f)

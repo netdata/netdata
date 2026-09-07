@@ -301,7 +301,7 @@ func newTopologyDiagnosticArchiveCollectionStatsV1(
 
 func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	id topologyAcquisitionAttemptID,
-	budget *profileContextRestoreBudget,
+	budget *diagnosticRestoreBudget,
 ) (*topologyAcquisitionAttemptEvidence, error) {
 	targetOutcome, err := topologyDiagnosticArchiveParseTargetOutcome(e.Target.Outcome)
 	if err != nil {
@@ -342,22 +342,12 @@ func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 	if err != nil {
 		return nil, fmt.Errorf("vlan_profiles phase: %w", err)
 	}
-	profileContext, err := budget.restore(e.ProfileContext)
-	if err != nil {
-		return nil, err
-	}
-	vlanProfileContext, err := budget.restore(e.VLANProfileContext)
-	if err != nil {
-		return nil, err
-	}
 	if !e.Interruption.Valid() {
 		return nil, fmt.Errorf("invalid interruption")
 	}
 	result := &topologyAcquisitionAttemptEvidence{
-		interruption:       e.Interruption,
-		profileContext:     profileContext,
-		vlanProfileContext: vlanProfileContext,
-		id:                 id,
+		interruption: e.Interruption,
+		id:           id,
 		device: topologySemanticDeviceInput{
 			hostname:    e.Device.Hostname,
 			sysObjectID: e.Device.SysObjectID,
@@ -385,17 +375,32 @@ func restoreArchiveAcquisitionEvidence(e snmpdiag.AcquisitionEvidence,
 		sysUptimeValue:     e.SysUptimeValue,
 		collectionContexts: make([]topologyAcquisitionContextEvidence, 0, len(e.CollectionContexts)),
 	}
+	if err := budget.take(topologyAcquisitionAttemptShape(result.device, result.target)); err != nil {
+		return nil, err
+	}
 	for _, context := range e.CollectionContexts {
-		reconstructed, err := restoreArchiveContextEvidence(context)
+		reconstructed, err := restoreArchiveContextEvidence(context, budget)
 		if err != nil {
 			return nil, fmt.Errorf("collection context %d: %w", context.Ordinal, err)
 		}
 		result.collectionContexts = append(result.collectionContexts, reconstructed)
 	}
+	profileContext, err := budget.restore(e.ProfileContext)
+	if err != nil {
+		return nil, err
+	}
+	vlanProfileContext, err := budget.restore(e.VLANProfileContext)
+	if err != nil {
+		return nil, err
+	}
+	result.profileContext, result.vlanProfileContext = profileContext, vlanProfileContext
 	return result, nil
 }
 
-func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence) (topologyAcquisitionContextEvidence, error) {
+func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence, budget *diagnosticRestoreBudget) (topologyAcquisitionContextEvidence, error) {
+	if err := budget.take(topologyAcquisitionContextShape(c.VLANID, c.VLANName)); err != nil {
+		return topologyAcquisitionContextEvidence{}, err
+	}
 	client, err := restoreArchivePhase(c.Client)
 	if err != nil {
 		return topologyAcquisitionContextEvidence{}, fmt.Errorf("client phase: %w", err)
@@ -427,9 +432,31 @@ func restoreArchiveContextEvidence(c snmpdiag.ContextEvidence) (topologyAcquisit
 		if err != nil {
 			return topologyAcquisitionContextEvidence{}, fmt.Errorf("profile %d: %w", profile.Identity.Ordinal, err)
 		}
+		if err := budget.take(restoredAcquisitionProfileShape(reconstructed)); err != nil {
+			return topologyAcquisitionContextEvidence{}, err
+		}
 		result.profiles = append(result.profiles, reconstructed)
 	}
 	return result, nil
+}
+
+func restoredAcquisitionProfileShape(profile topologyAcquisitionProfileEvidence) (uint64, uint64) {
+	records, size := topologyAcquisitionReportShape(profile.routes, profile.execution)
+	values := profile.values
+	records += uint64(len(values.metrics)) + uint64(len(values.bgpRows))
+	for _, metric := range values.metrics {
+		size += uint64(len(metric.kind)) + topologySemanticStringMapBytes(metric.tags)
+	}
+	for key, value := range values.metadata {
+		size += uint64(len(key) + len(value.Value) + 1)
+	}
+	size += topologySemanticStringMapBytes(values.tags)
+	for _, row := range values.bgpRows {
+		size += topologySemanticBGPRowLogicalBytes(topologySemanticBGPRowFromAcquisition(row))
+		// Count unexpected tags too; imported data has not passed producer filtering.
+		size += topologySemanticStringMapBytes(row.tags) - topologySemanticFilteredStringMapBytes(row.tags, topologySemanticBGPTagAllowed)
+	}
+	return records, size
 }
 
 func restoreArchiveProfileEvidence(p snmpdiag.ProfileEvidence) (topologyAcquisitionProfileEvidence, error) {

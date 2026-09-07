@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -186,4 +187,82 @@ func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
 	require.Equal(t, "wrong_digest", failures.Profiles.Last.Reason)
 	require.Equal(t, "wrong_digest", failures.GET.Last.Reason)
 	require.EqualValues(t, 1, failures.Processing.Preparation)
+}
+
+func TestCollectionFailuresPreserveDependencyReasons(t *testing.T) {
+	for surface, spec := range map[string]struct {
+		definition                       ddprofiledefinition.ProfileDefinition
+		mainOID, dependencyOID, valueOID string
+		licensing                        bool
+	}{
+		"BGP": {definition: ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{crossTableBGPTestConfig()},
+		}, mainOID: "1.3.6.1.4.1.99999.70.1", dependencyOID: "1.3.6.1.4.1.99999.70.2", valueOID: "1.3.6.1.4.1.99999.70.1.1.4.192.0.2.1.1.1"},
+		"licensing": {licensing: true, definition: ddprofiledefinition.ProfileDefinition{
+			Licensing: []ddprofiledefinition.LicensingConfig{{
+				OriginProfileID: "synthetic-license.yaml",
+				Table: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.6.1.4.1.99999.6",
+					Name: "licenseIfTable",
+				},
+				Identity: ddprofiledefinition.LicenseIdentityConfig{
+					ID: ddprofiledefinition.LicenseValueConfig{
+						Index: 1,
+					},
+				},
+				State: ddprofiledefinition.LicenseStateConfig{
+					LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
+						Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.4.1.99999.6.1",
+							Name: "licenseState",
+						},
+					},
+				},
+				MetricTags: ddprofiledefinition.MetricTagConfigList{{Tag: "if_name", Table: "ifXTable", Symbol: ddprofiledefinition.SymbolConfigCompat{
+					OID:  "1.3.6.1.2.1.31.1.1.1.1",
+					Name: "ifName",
+				}}},
+			}},
+		}, mainOID: "1.3.6.1.4.1.99999.6", dependencyOID: "1.3.6.1.2.1.31.1.1.1.1", valueOID: "1.3.6.1.4.1.99999.6.1.1"},
+	} {
+		t.Run(surface, func(t *testing.T) {
+			for name, tc := range map[string]struct {
+				cause            error
+				walkReason, want string
+			}{
+				"digest":   {gosnmp.ErrWrongDigest, "wrong_digest", "wrong_digest"},
+				"deadline": {context.DeadlineExceeded, "deadline", "deadline"},
+				"unknown":  {errors.New("synthetic transport error"), "unknown", "dependency"},
+			} {
+				t.Run(name, func(t *testing.T) {
+					ctrl, handler := setupMockHandler(t)
+					defer ctrl.Finish()
+					expectSNMPWalk(handler, gosnmp.Version2c, spec.mainOID, []gosnmp.SnmpPDU{
+						createGauge32PDU(spec.valueOID, 42),
+					})
+					handler.EXPECT().Version().Return(gosnmp.Version2c)
+					handler.EXPECT().BulkWalkAll(spec.dependencyOID).Return(nil, tc.cause)
+					c := New(Config{
+						SnmpClient: handler,
+						Log:        logger.New(),
+						Profiles: []*ddsnmp.Profile{{
+							SourceFile: "synthetic.yaml", Definition: spec.definition.Clone(),
+						}},
+					})
+					results, err := c.Collect()
+					require.NoError(t, err)
+					require.Len(t, results, 1)
+					f := c.CollectionFailures()
+					require.True(t, f.Valid())
+					failure := f.BGP
+					if spec.licensing {
+						failure = f.Licensing
+					}
+					require.EqualValues(t, 1, failure.Count)
+					require.Equal(t, tc.walkReason, f.WALK.Last.Reason)
+					require.Equal(t, tc.want, failure.Last.Reason)
+				})
+			}
+		})
+	}
 }

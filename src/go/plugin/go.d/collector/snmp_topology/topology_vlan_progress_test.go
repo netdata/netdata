@@ -70,7 +70,7 @@ func TestProfileContextRestoreBudgetIsShared(t *testing.T) {
 	context, err := ddsnmp.RestoreProfileContext(data, 250000, 64<<20)
 	require.NoError(t, err)
 	records, size := context.Shape()
-	budget := profileContextRestoreBudget{records: 2 * records, bytes: 2 * size}
+	budget := diagnosticRestoreBudget{records: 2 * records, bytes: 2 * size}
 	_, err = budget.restore(data)
 	require.NoError(t, err)
 	_, err = budget.restore(data)

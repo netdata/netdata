@@ -281,7 +281,7 @@ func restoreArchiveSnapshot(s snmpdiag.Snapshot) (topologyDiagnostics, error) {
 }
 
 func restoreArchiveLifecycle(l snmpdiag.Lifecycle) (topologyJobLifecycleDiagnosticCut, error) {
-	budget := profileContextRestoreBudget{records: snmpdiag.MaxRecords, bytes: snmpdiag.MaxLogicalBytes}
+	budget := diagnosticRestoreBudget{records: snmpdiag.MaxRecords, bytes: snmpdiag.MaxLogicalBytes}
 	if uint64(len(l.Cut.Entries))+1 > budget.records {
 		return topologyJobLifecycleDiagnosticCut{}, errors.New("job lifecycle exceeds record limit")
 	}
@@ -365,7 +365,11 @@ func restoreArchiveLifecycle(l snmpdiag.Lifecycle) (topologyJobLifecycleDiagnost
 }
 
 func restoreArchiveSweep(s snmpdiag.Sweep) (*topologySweepDiagnosticCut, error) {
-	budget := profileContextRestoreBudget{records: snmpdiag.MaxRecords, bytes: snmpdiag.MaxLogicalBytes}
+	budget := diagnosticRestoreBudget{records: snmpdiag.MaxRecords, bytes: snmpdiag.MaxLogicalBytes}
+	rows := uint64(len(s.Devices)) + uint64(len(s.Removed))
+	if err := budget.take(1+rows, topologyDiagnosticCutLogicalBytes+rows*topologyDiagnosticRowLogicalBytes); err != nil {
+		return nil, err
+	}
 	state, err := topologyDiagnosticArchiveParseCaptureState(s.CaptureState)
 	if err != nil {
 		return nil, fmt.Errorf("topology sweep capture state: %w", err)
@@ -430,7 +434,7 @@ func restoreArchiveSweep(s snmpdiag.Sweep) (*topologySweepDiagnosticCut, error) 
 func restoreArchiveDevice(
 	d snmpdiag.Device,
 	sweepGeneration uint64,
-	budget *profileContextRestoreBudget,
+	budget *diagnosticRestoreBudget,
 ) (topologySweepDeviceDiagnostic, error) {
 	registrationID := ddsnmp.DeviceRegistrationID(d.RegistrationID)
 	if registrationID == 0 {
@@ -527,7 +531,7 @@ func restoreArchiveDevice(
 
 func restoreArchiveCapture(c snmpdiag.Capture,
 	registrationID ddsnmp.DeviceRegistrationID,
-	budget *profileContextRestoreBudget,
+	budget *diagnosticRestoreBudget,
 ) (*topologyAcquisitionCapture, error) {
 	state, err := topologyDiagnosticArchiveParseCaptureState(c.State)
 	if err != nil {
@@ -692,11 +696,20 @@ func topologyDiagnosticArchiveParseSweepPhase(value string) (topologyDiagnosticS
 	return topologyDiagnosticArchiveParseEnum[topologyDiagnosticSweepPhase](value, topologyDiagnosticArchiveSweepPhaseNames)
 }
 
-// Profile evidence shares each cut's existing ceiling, including during restore.
-// Decrement only after validation, before retaining the next detached context.
-type profileContextRestoreBudget struct{ records, bytes uint64 }
+// Admission counts actual evidence, never the archive's reported usage counters.
+// Profile and non-profile evidence share the same cut ceiling.
+type diagnosticRestoreBudget struct{ records, bytes uint64 }
 
-func (b *profileContextRestoreBudget) restore(data ddsnmp.ProfileContextData) (*ddsnmp.ProfileContext, error) {
+func (b *diagnosticRestoreBudget) take(records, size uint64) error {
+	if records > b.records || size > b.bytes {
+		return errors.New("diagnostic evidence exceeds limits")
+	}
+	b.records -= records
+	b.bytes -= size
+	return nil
+}
+
+func (b *diagnosticRestoreBudget) restore(data ddsnmp.ProfileContextData) (*ddsnmp.ProfileContext, error) {
 	c, err := ddsnmp.RestoreProfileContext(data, b.records, b.bytes)
 	if err != nil {
 		return nil, err

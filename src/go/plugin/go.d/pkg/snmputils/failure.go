@@ -44,16 +44,22 @@ func WithFailure(err error, operation, reason string) error {
 	}
 	if reason != "" {
 		f.Reason = reason
+		if reason != "packet_error" {
+			f.PacketStatus, f.ErrorIndex = 0, 0
+		}
 	}
-	return &classifiedFailure{cause: err, failure: f}
+	return WithFailureDetail(err, f)
 }
 
 func WithPacketFailure(err error, operation string, packet *gosnmp.SnmpPacket) error {
 	if err == nil {
 		return nil
 	}
+	if packet == nil || packet.Error == gosnmp.NoError {
+		return WithFailure(err, operation, "")
+	}
 	f := Failure{Operation: operation, Reason: "packet_error", PacketStatus: uint8(packet.Error), ErrorIndex: uint32(packet.ErrorIndex)}
-	return &classifiedFailure{cause: err, failure: f}
+	return WithFailureDetail(err, f)
 }
 
 func ClassifyFailure(err error) Failure {

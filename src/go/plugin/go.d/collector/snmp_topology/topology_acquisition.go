@@ -151,11 +151,7 @@ func newTopologyAcquisitionRecorder(
 			recorder.fail(diagnosticCaptureReasonProjectionPanic)
 		}
 	}()
-	records := uint64(1 + len(target.addresses) + len(device.vnodeLabels))
-	logicalBytes := topologySemanticDeviceLogicalBytes(device) + 96 + 7*snmputils.FailureLogicalBytes + 64
-	for _, address := range target.addresses {
-		logicalBytes += uint64(len(address.String()))
-	}
+	records, logicalBytes := topologyAcquisitionAttemptShape(device, target)
 	if !recorder.admit(records, logicalBytes) {
 		return recorder
 	}
@@ -174,6 +170,19 @@ func newTopologyAcquisitionRecorder(
 		vlanProfiles: notObservedAcquisitionPhase(),
 	}
 	return recorder
+}
+
+func topologyAcquisitionAttemptShape(device topologySemanticDeviceInput, target topologyTargetResolutionEvidence) (uint64, uint64) {
+	records := uint64(1 + len(target.addresses) + len(device.vnodeLabels))
+	logicalBytes := topologySemanticDeviceLogicalBytes(device) + 96 + 7*snmputils.FailureLogicalBytes + 64
+	for _, address := range target.addresses {
+		logicalBytes += uint64(len(address.String()))
+	}
+	return records, logicalBytes
+}
+
+func topologyAcquisitionContextShape(vlanID, vlanName string) (uint64, uint64) {
+	return 1, uint64(48+len(vlanID)+len(vlanName)) + 4*snmputils.FailureLogicalBytes + ddsnmp.CollectionFailuresLogicalBytes
 }
 
 func notObservedAcquisitionPhase() topologyAcquisitionPhaseEvidence {
@@ -225,7 +234,8 @@ func (r *topologyAcquisitionRecorder) beginContext(ordinal uint32, vlanID, vlanN
 			r.fail(diagnosticCaptureReasonProjectionPanic)
 		}
 	}()
-	if !r.admit(1, uint64(48+len(vlanID)+len(vlanName))+4*snmputils.FailureLogicalBytes+ddsnmp.CollectionFailuresLogicalBytes) {
+	records, logicalBytes := topologyAcquisitionContextShape(vlanID, vlanName)
+	if !r.admit(records, logicalBytes) {
 		return nil
 	}
 	for _, context := range r.evidence.collectionContexts {
@@ -315,19 +325,7 @@ func topologyAcquisitionProfileShape(
 	if report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeUnknown {
 		return 0, 0, errors.New("unknown acquisition profile outcome")
 	}
-	records := uint64(1 + len(report.Routes))
-	logicalBytes := uint64(96)
-	for _, route := range report.Routes {
-		logicalBytes += uint64(64 + len(route.RootOID))
-	}
-	if report.Execution != nil {
-		records += uint64(1 + len(report.Execution.Walks))
-		// Execution header/preparation plus the two new aggregate statistics.
-		logicalBytes += 88
-		for _, walk := range report.Execution.Walks {
-			logicalBytes += uint64(32 + len(walk.RootOID))
-		}
-	}
+	records, logicalBytes := topologyAcquisitionReportShape(report.Routes, report.Execution)
 	if profile == nil || report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed {
 		return records, logicalBytes, nil
 	}
@@ -365,6 +363,23 @@ func topologyAcquisitionProfileShape(
 		}
 	}
 	return records, logicalBytes, nil
+}
+
+func topologyAcquisitionReportShape(routes []ddsnmpcollector.AcquisitionRouteReport, execution *ddsnmpcollector.AcquisitionExecutionReport) (uint64, uint64) {
+	records := uint64(1 + len(routes))
+	logicalBytes := uint64(96)
+	for _, route := range routes {
+		logicalBytes += uint64(64 + len(route.RootOID))
+	}
+	if execution != nil {
+		records += uint64(1 + len(execution.Walks))
+		// Execution header/preparation plus the two new aggregate statistics.
+		logicalBytes += 88
+		for _, walk := range execution.Walks {
+			logicalBytes += uint64(32 + len(walk.RootOID))
+		}
+	}
+	return records, logicalBytes
 }
 
 func projectTopologyAcquisitionProfileValues(

@@ -249,7 +249,7 @@ func (f *Factory) build(
 	}
 	vnode, err := f.lookupVNode(config)
 	if err != nil {
-		return ConstructedJob{}, withJobConfigFailure(err, "vnode", "")
+		return ConstructedJob{}, err
 	}
 	var job RuntimeJob
 	var variant JobVariant
