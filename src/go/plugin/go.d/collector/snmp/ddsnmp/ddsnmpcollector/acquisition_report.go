@@ -108,8 +108,9 @@ type AcquisitionProfileReport struct {
 }
 
 // AcquisitionValueReference identifies one borrowed decoded value within its
-// profile route. Slice position joins it to the corresponding ProfileMetrics
-// topology metric or BGP row supplied to the observer.
+// profile route. Topology, BGP and licensing references follow their observed
+// output slices. Ordinary metric references describe acquisition output before
+// normalization, duplicate selection, virtual derivation and hidden filtering.
 type AcquisitionValueReference struct {
 	RowIndex     string
 	Field        string

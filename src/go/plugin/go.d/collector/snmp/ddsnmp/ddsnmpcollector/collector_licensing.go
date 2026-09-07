@@ -855,7 +855,7 @@ func (c *Collector) licensingScalarOIDs(cfg ddprofiledefinition.LicensingConfig)
 		sym := licenseValueSymbol(valueCfg)
 		if sym.OID != "" {
 			oid := trimOID(sym.OID)
-			if c.missingOIDs[oid] {
+			if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
 				missingOIDs = append(missingOIDs, sym.OID)
 				return
 			}
@@ -867,7 +867,7 @@ func (c *Collector) licensingScalarOIDs(cfg ddprofiledefinition.LicensingConfig)
 	for _, tagCfg := range cfg.MetricTags {
 		if tagCfg.Symbol.OID != "" {
 			oid := trimOID(tagCfg.Symbol.OID)
-			if c.missingOIDs[oid] {
+			if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
 				missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
 				continue
 			}

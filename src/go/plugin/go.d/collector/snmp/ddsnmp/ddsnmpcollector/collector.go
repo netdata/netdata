@@ -39,7 +39,7 @@ func New(cfg Config) *Collector {
 		tableIdentity:             buildTableIdentity(cfg.Profiles),
 	}
 
-	cfg.SnmpClient = &diagnosticClient{Handler: cfg.SnmpClient, failures: &coll.failures, negativeCauses: &coll.negativeCauses}
+	cfg.SnmpClient = &diagnosticClient{Handler: cfg.SnmpClient, failures: &coll.failures, negative: &coll.negative}
 
 	for _, prof := range cfg.Profiles {
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
@@ -63,7 +63,7 @@ type (
 		log                       *logger.Logger
 		profiles                  map[string]*profileState
 		missingOIDs               map[string]bool
-		negativeCauses            map[string]AcquisitionNegativeCause
+		negative                  negativeEvidence
 		regularScalarNamesScratch map[string]struct{}
 		tableCache                *tableCache
 		tableIdentity             *tableIdentity
@@ -274,7 +274,7 @@ func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 }
 
 func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
-	snmpClient = &diagnosticClient{Handler: snmpClient, failures: &c.failures, negativeCauses: &c.negativeCauses}
+	snmpClient = &diagnosticClient{Handler: snmpClient, failures: &c.failures, negative: &c.negative}
 	if c.globalTagsCollector != nil {
 		c.globalTagsCollector.snmpClient = snmpClient
 	}

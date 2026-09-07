@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -184,6 +185,45 @@ func TestRecurringDependencySettlementEvidence(t *testing.T) {
 					assert.NotEqual(t, "get", operation.Method)
 				}
 			}
+		})
+	}
+}
+
+func TestRecurringNegativeEvidenceIgnoresDynamicInstances(t *testing.T) {
+	for name, tc := range map[string]struct{ polls int }{"short churn": {3}, "longer churn": {20}} {
+		t.Run(name, func(t *testing.T) {
+			const root, scalar = "1.3.6.1.4.1.99999.82", "1.3.6.1.4.1.99999.83.0"
+			poll := 0
+			handler := &sourceTestHandler{
+				get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+					packet := &gosnmp.SnmpPacket{}
+					for _, oid := range oids {
+						packet.Variables = append(packet.Variables, gosnmp.SnmpPDU{Name: oid, Type: gosnmp.NoSuchInstance})
+					}
+					return packet, nil
+				},
+				walk: func(string) ([]gosnmp.SnmpPDU, error) {
+					return []gosnmp.SnmpPDU{createGauge32PDU(fmt.Sprintf("%s.1.%d", root, poll), 7)}, nil
+				},
+			}
+			profile := createTestProfile("churn.yaml", []ddprofiledefinition.MetricsConfig{
+				{Symbol: ddprofiledefinition.SymbolConfig{OID: scalar, Name: "unsupported"}},
+				{Table: ddprofiledefinition.SymbolConfig{OID: root, Name: "table"}, Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}}},
+			})
+			collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+			for poll = 1; poll <= tc.polls; poll++ {
+				recorder := &SourceRecorder{ContextID: uint64(poll)}
+				collector.SetSNMPClient(recorder.Wrap(handler))
+				metrics, err := collector.Collect()
+				require.NoError(t, err)
+				require.Len(t, metrics[0].Metrics, 1)
+				recorder.Finish()
+			}
+			require.Greater(t, len(collector.missingOIDs), 1, "production cache still records dynamic missing instances")
+			causes := collector.NegativeCauses()
+			require.Len(t, causes, 1, "only the configured scalar suppresses future acquisition")
+			assert.Equal(t, scalar, causes[0].PDU.OID)
+			assert.EqualValues(t, 1, causes[0].ContextID)
 		})
 	}
 }

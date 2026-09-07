@@ -255,7 +255,7 @@ func (s *tableCollectionSession) buildRoutes() {
 				}
 			}
 
-			if s.collector.missingOIDs[trimOID(req.config.Table.OID)] {
+			if isMissingOID(s.collector.snmpClient, s.collector.missingOIDs, trimOID(req.config.Table.OID)) {
 				req.missing = true
 				req.scope.stats.Errors.MissingOIDs++
 				continue

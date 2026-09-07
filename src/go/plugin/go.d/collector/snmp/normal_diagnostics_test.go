@@ -86,6 +86,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 		"total collection failure":                 {"metrics"},
 		"partial BGP failure":                      {"bgp"},
 		"malformed licensing timer":                {"license"},
+		"ordinary absent BGP signals":              {"missing_bgp"},
 		"ordinary absent timer":                    {"missing"},
 		"cached rejected tag is not a new failure": {"cached"},
 	} {
@@ -104,7 +105,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 						packet.Variables = append(packet.Variables, gosnmp.SnmpPDU{Name: oid, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.99999"})
 						continue
 					}
-					if poll == 2 && ((tc.failure == "metrics" && oid == normalTestRoot+".1.0") || (tc.failure == "bgp" && oid == normalTestRoot+".5.0")) {
+					if poll == 2 && (((tc.failure == "metrics" || tc.failure == "missing_bgp") && oid == normalTestRoot+".1.0") || (tc.failure == "bgp" && oid == normalTestRoot+".5.0")) {
 						return nil, errors.New("synthetic timeout")
 					}
 					value := 7
@@ -118,6 +119,9 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 						value = 6
 					}
 					pdu := gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Integer, Value: value}
+					if tc.failure == "missing_bgp" && oid == normalTestRoot+".5.0" {
+						pdu.Type, pdu.Value = gosnmp.NoSuchObject, nil
+					}
 					if tc.failure == "cached" && oid == normalTestRoot+".6.0" {
 						pdu.Type, pdu.Value = gosnmp.OctetString, "invalid"
 					}
@@ -166,7 +170,11 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			require.NotEmpty(t, firstSamples)
 			first := normalTestDocument(t, c, directory)
 			require.Equal(t, tc.failure == "cached", first.Latest.Failed)
-			require.Len(t, first.Latest.BGP.Entries, 1)
+			if tc.failure == "missing_bgp" {
+				require.Empty(t, first.Latest.BGP.Entries)
+			} else {
+				require.Len(t, first.Latest.BGP.Entries, 1)
+			}
 			require.Len(t, first.Latest.Licensing.Rows, 1)
 			require.NotEmpty(t, first.Initialization)
 			require.Len(t, first.Latest.Profiles[0].HiddenMetrics, 1)

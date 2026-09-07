@@ -20,31 +20,51 @@ type AcquisitionNegativeCause struct {
 	PDU        ddsnmp.SourcePDU
 }
 
+type negativeEvidence struct {
+	eligible map[string]bool
+	causes   map[string]AcquisitionNegativeCause
+}
+
+// Only production suppression reads establish eligibility. Dynamic instance
+// GETs bypass this map, so their churn cannot grow retained diagnostic history.
+func isMissingOID(client gosnmp.Handler, missing map[string]bool, oid string) bool {
+	if observer, ok := client.(*diagnosticClient); ok && observer.negative != nil && observer.SourceRecorder() != nil {
+		if observer.negative.eligible == nil {
+			observer.negative.eligible = make(map[string]bool)
+		}
+		observer.negative.eligible[oid] = true
+	}
+	return missing[oid]
+}
+
 func (c *diagnosticClient) recordMissing(pdu gosnmp.SnmpPDU) {
 	source := c.SourceRecorder()
-	if source == nil || c.negativeCauses == nil {
+	if source == nil || c.negative == nil {
 		return
 	}
 	oid := trimOID(pdu.Name)
-	if _, exists := (*c.negativeCauses)[oid]; exists {
+	if !c.negative.eligible[oid] {
+		return
+	}
+	if _, exists := c.negative.causes[oid]; exists {
 		return
 	}
 	operation := source.Operation(source.Cursor())
 	if operation == nil {
 		return
 	}
-	if *c.negativeCauses == nil {
-		*c.negativeCauses = make(map[string]AcquisitionNegativeCause)
+	if c.negative.causes == nil {
+		c.negative.causes = make(map[string]AcquisitionNegativeCause)
 	}
-	(*c.negativeCauses)[oid] = AcquisitionNegativeCause{
+	c.negative.causes[oid] = AcquisitionNegativeCause{
 		ContextID: operation.ContextID, Operation: operation.Ordinal, ObservedAt: operation.StartedAt,
 		PDU: ddsnmp.SourcePDU{OID: strings.Clone(pdu.Name), Type: uint8(pdu.Type), Value: sourceValue(pdu.Value)},
 	}
 }
 
 func (c *Collector) NegativeCauses() []AcquisitionNegativeCause {
-	result := make([]AcquisitionNegativeCause, 0, len(c.negativeCauses))
-	for _, cause := range c.negativeCauses {
+	result := make([]AcquisitionNegativeCause, 0, len(c.negative.causes))
+	for _, cause := range c.negative.causes {
 		result = append(result, cause)
 	}
 	slices.SortFunc(result, func(a, b AcquisitionNegativeCause) int { return strings.Compare(a.PDU.OID, b.PDU.OID) })

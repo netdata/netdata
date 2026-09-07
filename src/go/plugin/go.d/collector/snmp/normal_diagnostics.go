@@ -170,6 +170,10 @@ func normalProfileFailed(report ddsnmpcollector.AcquisitionProfileReport) bool {
 		for _, event := range route.Processing {
 			switch event.Reason {
 			case "missing_input", "empty_date", "sentinel":
+			case "no_signals":
+				if route.Outcome != ddsnmpcollector.AcquisitionRouteOutcomeMissing {
+					return true
+				}
 			default:
 				return true
 			}

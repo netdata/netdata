@@ -88,7 +88,7 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 		}
 
 		oid := trimOID(cfg.Symbol.OID)
-		if sc.missingOIDs[oid] {
+		if isMissingOID(sc.snmpClient, sc.missingOIDs, oid) {
 			missingOIDs = append(missingOIDs, cfg.Symbol.OID)
 			continue
 		}
@@ -101,7 +101,7 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 			}
 
 			tagOID := trimOID(tagCfg.Symbol.OID)
-			if sc.missingOIDs[tagOID] {
+			if isMissingOID(sc.snmpClient, sc.missingOIDs, tagOID) {
 				missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
 				continue
 			}

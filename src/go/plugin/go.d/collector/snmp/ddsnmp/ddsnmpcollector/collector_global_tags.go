@@ -148,7 +148,7 @@ func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.
 		}
 
 		oid := trimOID(cfg.Symbol.OID)
-		if gc.missingOIDs[oid] {
+		if isMissingOID(gc.snmpClient, gc.missingOIDs, oid) {
 			missingOIDs = append(missingOIDs, cfg.Symbol.OID)
 			continue
 		}
