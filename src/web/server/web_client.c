@@ -776,8 +776,13 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
     size_t last_pos = w->header_parse_last_size;
 
     w->header_parse_last_size = buffer_strlen(w->response.data);
-    if(w->header_parse_last_size <= last_pos)
-        w->header_parse_tries++;
+
+    // Count every parse attempt, not only the ones that saw no new bytes.
+    // http_request_validate() is reached from the socket server only after
+    // web_client_receive() returned bytes > 0, so counting no-progress
+    // attempts alone would never increment here and the budget below would
+    // be unreachable in production.
+    w->header_parse_tries++;
 
     char *request_end = request + w->header_parse_last_size;
 
@@ -795,7 +800,7 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 netdata_log_info(
-                    "Disabling slow client after %zu attempts to parse without receiving more data (%zu bytes received)",
+                    "Disabling slow client after %zu attempts to read the request (%zu bytes received)",
                     w->header_parse_tries,
                     buffer_strlen(w->response.data));
                 w->header_parse_tries = 0;

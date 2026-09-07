@@ -10,8 +10,6 @@ struct web_client;
 
 extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 
-#define HTTP_REQ_MAX_HEADER_FETCH_TRIES 100
-
 extern int respect_web_browser_do_not_track_policy;
 extern const char *web_x_frame_options;
 
@@ -152,6 +150,19 @@ void web_client_set_conn_webrtc(struct web_client *w);
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_MAX_SIZE (1024 * 1024)
+
+// Number of parse attempts (i.e. receive events) a request may consume while it
+// is still incomplete. Completeness is checked before exhaustion, so a request
+// that completes on the attempt that would have exceeded this budget is still
+// served; only requests that remain incomplete are disconnected.
+//
+// Budgeted as one receive per 512 bytes of the maximum request size: a chosen
+// fragmentation allowance, not a guaranteed minimum receive size. A 1 MiB
+// request delivered in 1460-byte TCP segments needs ~719 receives, so this
+// leaves ~2.8x headroom. Requests fragmented more finely than the allowance are
+// rejected on purpose.
+#define HTTP_REQ_MAX_HEADER_FETCH_TRIES ((NETDATA_WEB_REQUEST_MAX_SIZE + 511) / 512)
+
 #define NETDATA_WEB_REQUEST_URL_DECODE_INITIAL_SIZE (4 * 1024)
 #define NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE (64 * 1024)
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512

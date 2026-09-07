@@ -248,7 +248,10 @@ int web_client_request_size_unittest(void)
 
         bool framing_state_seen = false;
         for (size_t offset = 0; offset < request_length;) {
-            size_t chunk_size = MIN((size_t)64, request_length - offset);
+            // 1024-byte fragments: a 1 MiB request costs ~1024 parse attempts,
+            // within HTTP_REQ_MAX_HEADER_FETCH_TRIES. Smaller fragments are
+            // rejected by the budget on purpose (see the exhaustion tests below).
+            size_t chunk_size = MIN((size_t)1024, request_length - offset);
             buffer_memcat(w->response.data, &request[offset], chunk_size);
             offset += chunk_size;
 
@@ -305,7 +308,7 @@ int web_client_request_size_unittest(void)
     size_t invalid_framing_state = w->header_parse_expected_size;
     WEB_CLIENT_TEST(invalid_framing_state != 0, "missing Content-Length framing state was not remembered");
 
-    char missing_content_length_body[64];
+    char missing_content_length_body[1024];
     memset(missing_content_length_body, 'b', sizeof(missing_content_length_body));
     while (buffer_strlen(w->response.data) < NETDATA_WEB_REQUEST_MAX_SIZE) {
         size_t chunk_size =
@@ -318,21 +321,37 @@ int web_client_request_size_unittest(void)
             w->header_parse_expected_size == invalid_framing_state,
             "missing Content-Length framing state changed while receiving body bytes");
     }
+    // Every parse attempt consumes budget now, including the ones that saw new
+    // bytes, so a growing request spends part of it - but delivering 1 MiB in
+    // 1024-byte fragments must stay well inside the allowance. Pin the exact
+    // count: a loose bound would still pass if the growth loop consumed the
+    // whole budget, which would silently make the exhaustion loop below vacuous.
+    // 40 header bytes + 1023 full 1024-byte fragments + one 984-byte remainder,
+    // plus the initial validation above = 1025 attempts.
     WEB_CLIENT_TEST(
-        w->header_parse_tries == 0,
-        "progressive POST without Content-Length consumed %zu retries",
-        w->header_parse_tries);
-    for (size_t attempt = 0; attempt < HTTP_REQ_MAX_HEADER_FETCH_TRIES; attempt++) {
+        w->header_parse_tries == 1025,
+        "progressive POST without Content-Length consumed %zu of %zu attempts, expected 1025",
+        w->header_parse_tries,
+        (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES);
+
+    // WEB_CLIENT_TEST only counts errors and keeps going, so the pin above may
+    // have failed. Clamp instead of subtracting blindly: an unsigned underflow
+    // here would spin this loop ~SIZE_MAX times and hang the run rather than
+    // failing it.
+    size_t remaining_attempts = (w->header_parse_tries <= (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES)
+                                    ? (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES - w->header_parse_tries
+                                    : 0;
+    for (size_t attempt = 0; attempt < remaining_attempts; attempt++) {
         WEB_CLIENT_TEST(
             http_request_validate(w) == HTTP_VALIDATION_INCOMPLETE,
-            "POST without Content-Length exhausted no-progress retries early");
+            "POST without Content-Length exhausted its attempt budget early");
         WEB_CLIENT_TEST(
             w->header_parse_expected_size == invalid_framing_state,
             "missing Content-Length framing state changed during no-progress validation");
     }
     WEB_CLIENT_TEST(
         http_request_validate(w) == HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
-        "POST without Content-Length did not exhaust its no-progress retry budget");
+        "POST without Content-Length did not exhaust its attempt budget");
     WEB_CLIENT_TEST(
         w->header_parse_expected_size == 0,
         "missing Content-Length framing state was not reset after retry exhaustion");
@@ -343,11 +362,42 @@ int web_client_request_size_unittest(void)
     buffer_strcat(w->response.data, "GET /api/v1/info");
     WEB_CLIENT_TEST(
         http_request_validate(w) == HTTP_VALIDATION_INCOMPLETE, "initial partial request was not incomplete");
-    for (size_t attempt = 0; attempt < HTTP_REQ_MAX_HEADER_FETCH_TRIES; attempt++)
+    // The initial validation above already consumed attempt #1, so only
+    // HTTP_REQ_MAX_HEADER_FETCH_TRIES - 1 further attempts remain.
+    for (size_t attempt = 0; attempt < (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES - 1; attempt++)
         WEB_CLIENT_TEST(http_request_validate(w) == HTTP_VALIDATION_INCOMPLETE, "no-progress request failed early");
     WEB_CLIENT_TEST(
         http_request_validate(w) == HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
         "no-progress request did not exhaust its retry budget");
+
+    // The production-reachable case: a client that keeps delivering bytes. The
+    // socket server only validates after web_client_receive() returned bytes>0,
+    // so every real validation of an incomplete request has seen new data. This
+    // is the case that could never exhaust the budget while the counter only
+    // incremented on no-progress attempts.
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "GET /api/v1/info");
+    HTTP_VALIDATION dribble = http_request_validate(w);
+    size_t dribble_attempts = 1;
+    while (dribble == HTTP_VALIDATION_INCOMPLETE && dribble_attempts < (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES + 10) {
+        buffer_memcat(w->response.data, "a", 1);
+        dribble = http_request_validate(w);
+        dribble_attempts++;
+    }
+    WEB_CLIENT_TEST(
+        dribble == HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
+        "request growing by one byte per attempt was not disconnected (validation %d after %zu attempts)",
+        (int)dribble,
+        dribble_attempts);
+    WEB_CLIENT_TEST(
+        dribble_attempts == (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES + 1,
+        "request growing by one byte per attempt was disconnected after %zu attempts, expected %zu",
+        dribble_attempts,
+        (size_t)HTTP_REQ_MAX_HEADER_FETCH_TRIES + 1);
+    WEB_CLIENT_TEST(
+        buffer_strlen(w->response.data) < NETDATA_WEB_REQUEST_MAX_SIZE,
+        "growing request hit the %zu byte size cap instead of the attempt budget",
+        (size_t)NETDATA_WEB_REQUEST_MAX_SIZE);
 
     web_client_reuse_from_cache(w);
     request = web_client_test_request(NETDATA_WEB_REQUEST_MAX_SIZE, &request_length);
