@@ -79,9 +79,10 @@ from the `netdata` checkout, so a page from any other repository still needs its
 So a merged docs PR normally reaches the ingest PR within minutes; the cron is the ceiling, not the expectation.
 
 `ingest.yml` (read the file for the steps): resolves the kickstart checksum from this repository's `master` (the
-step fails the workflow when the download or the 32-hex check fails), runs `ingest.py --fail-links`, classifies the output with `ingest/classify_ingest_result.py` (broken links become an issue
-labelled `broken-links`, not a failed workflow; an unclassifiable run fails), verifies the recovery state as a fixed
-point (snapshot, `--regenerate-grids-only`, identical snapshot), opens or updates the PR on branch `ingest` (title
+step fails the workflow when the download or the 32-hex check fails), runs `ingest.py --fail-links`, classifies the
+output with `ingest/classify_ingest_result.py` (broken links become an issue labelled `broken-links`, not a failed
+workflow; an unclassifiable run fails), verifies the recovery state as a fixed point (snapshot,
+`--regenerate-grids-only`, identical snapshot), opens or updates the PR on branch `ingest` (title
 "Ingest New Documentation", labels `ingest` and `automation`), and dispatches `rendered-link-integrity.yml` against
 that PR. The PR carries the regenerated `docs/`, `netlify.toml`, and the redirect catalogue; a person reviews those
 and merges it (`docs/.map/README.md#4-merge-the-learn-ingest-pr`).
