@@ -67,6 +67,9 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
   `--schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` from `src/go`
   (`src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`); it then calls
   `ValidateDecodedResponse`.
+- Go builders (`Table.Validate`) and the decoded semantic validator enforce typed-set member types and nullability
+  as errors across the compact-table codecs. Contract: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#compact-tables`;
+  validation workflow: `src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`.
 - The CLI tool (`src/go/tools/functions-validation`) counts a topology payload's rows as
   `max(actor rows, link rows)` (`topologyv1.GraphRowsFromDecodedData`) for its `--min-rows` and `--require-rows`
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
