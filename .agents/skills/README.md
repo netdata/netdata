@@ -59,4 +59,5 @@ published contract and are exempt from the naming rule below.
 
 The per-skill grouped index is the "Skills index" in the root `AGENTS.md`: skills under their area, an area's entry
 point marked where it has one, and a skill that serves two areas cross-referenced from the other. A skill's frontmatter
-description is its trigger.
+description is its trigger. How to create, edit, slim, or review a skill, and the rot signals to watch for:
+`repo-skill-authoring`.

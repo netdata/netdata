@@ -554,6 +554,8 @@ Project skills are memory of HOW to work here.
 - Every change to a skill MUST end with a slimming pass over the touched files: remove restatements, merged-in
   duplicates, and rules that now live elsewhere, keeping every rule (a removed directive is moved or superseded by a
   recorded decision, never dropped). Skills accrete bloat with each update; report line counts before and after.
+- How to create, edit, slim, split, or review a skill, and the rot signals to watch for: the runtime skill
+  `repo-skill-authoring`.
 
 Public skill convention (`docs/netdata-ai/skills/`):
 
@@ -656,6 +658,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `repo-pr-reviews`: PR comment and review iteration
   - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
     reset-to-default safety; `--repo` scoping
+  - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; skill rot; the authoring
+    rules (point at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change
+    method (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
@@ -724,6 +729,7 @@ renames:
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
+| `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, and review reports of a skill change, in a directory named after the skill or SOW topic under change |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
 | `query-snmp-traps` (public) | `query-snmp-traps/` | saved trap query results from its how-tos |
