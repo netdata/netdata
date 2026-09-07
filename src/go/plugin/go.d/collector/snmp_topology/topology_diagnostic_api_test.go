@@ -28,6 +28,7 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.Equal(t, DiagnosticArchiveIdentity{
 		Format:               snmpdiag.Format,
 		Version:              snmpdiag.Version,
+		Kind:                 snmpdiag.KindTopology,
 		ProducerAgentVersion: "v-test",
 	}, archive.Identity())
 

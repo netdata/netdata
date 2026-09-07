@@ -95,6 +95,18 @@ func TestTopologyDiagnosticArchiveRejectsMalformedAndUnsupportedInput(t *testing
 			mutate: func(document *snmpdiag.Document) { document.Format = "other" },
 			want:   "unsupported format",
 		},
+		"legacy envelope": {
+			mutate: func(document *snmpdiag.Document) { document.Format = "netdata.snmp_topology.diagnostics" },
+			want:   "unsupported format",
+		},
+		"missing kind": {
+			mutate: func(document *snmpdiag.Document) { document.Kind = "" },
+			want:   "unsupported document kind",
+		},
+		"topology in lifecycle file": {
+			mutate: func(document *snmpdiag.Document) { document.Kind = snmpdiag.KindLifecycle },
+			want:   "lifecycle document contains topology",
+		},
 		"version": {
 			mutate: func(document *snmpdiag.Document) { document.Version++ },
 			want:   "unsupported version",
@@ -359,7 +371,8 @@ func TestTopologyDiagnosticArchiveWriterPreservesV1StringSemantics(t *testing.T)
 
 func FuzzReadTopologyDiagnosticArchive(f *testing.F) {
 	seed := compressArchiveJSON(f, `{
-		"format":"netdata.snmp_topology.diagnostics",
+		"format":"netdata.snmp.diagnostics",
+        "kind":"topology",
 		"version":1,
 		"producer":{"agent_version":"v-test"},
 		"snapshot":{

@@ -136,16 +136,16 @@ func NewDeviceStore() *DeviceStore {
 
 // DeviceStore holds SNMP device connection state shared between SNMP-family modules.
 type DeviceStore struct {
-	mu                    sync.RWMutex
-	changes               chan struct{}
-	writers               map[string]*DeviceWriter
-	ownerRegistrations    map[string]DeviceRegistrationID
-	devices               map[DeviceRegistrationID]DeviceConnectionInfo
-	lifecycles            map[DeviceRegistrationID]deviceLifecycleRecord
-	byHostname            map[string]map[string]struct{}
-	lastRegistrationID    DeviceRegistrationID
-	configurationRevision uint64
-	lifecycleSequence     uint64
+	mu                 sync.RWMutex
+	changes            chan struct{}
+	writers            map[string]*DeviceWriter
+	ownerRegistrations map[string]DeviceRegistrationID
+	devices            map[DeviceRegistrationID]DeviceConnectionInfo
+	lifecycles         map[DeviceRegistrationID]deviceLifecycleRecord
+	byHostname         map[string]map[string]struct{}
+	lastRegistrationID DeviceRegistrationID
+	lifecycleRevision  uint64
+	lifecycleSequence  uint64
 }
 
 // RegisterJob starts or updates the credential-free lifecycle row for a
@@ -160,6 +160,9 @@ func (s *DeviceStore) RegisterJob(ownerKey string, info DeviceLifecycleInfo) {
 		s.ownerRegistrations[ownerKey] = registrationID
 	}
 	record := s.lifecycles[registrationID]
+	if !exists || record.info != info {
+		s.notifyLifecycleChangedLocked()
+	}
 	record.info = info
 	s.lifecycles[registrationID] = record
 	s.lifecycleSequence++
@@ -173,6 +176,9 @@ func (s *DeviceStore) RecordJobLifecycle(ownerKey string, status DeviceLifecycle
 	s.mu.Lock()
 	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
 		record := s.lifecycles[registrationID]
+		if !sameLifecycleStatus(record.lastCompleted, status) {
+			s.notifyLifecycleChangedLocked()
+		}
 		record.lastCompleted = status
 		s.lifecycles[registrationID] = record
 		s.lifecycleSequence++
@@ -246,8 +252,7 @@ func (s *DeviceStore) ReplaceJob(
 		s.addHostnameIndexLocked(ownerKey, cloned.Hostname)
 	}
 	s.lifecycleSequence++
-	s.configurationRevision++
-	s.notifyConfigurationChangedLocked()
+	s.notifyLifecycleChangedLocked()
 	writer := &DeviceWriter{store: s, owner: ownerKey}
 	if s.writers == nil {
 		s.writers = make(map[string]*DeviceWriter)
@@ -268,6 +273,9 @@ func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 
 func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo) {
 	s.ensureMapsLocked()
+	priorID := s.ownerRegistrations[ownerKey]
+	priorInfo := s.lifecycles[priorID].info
+	_, wasReady := s.devices[priorID]
 	registrationID, exists := s.ownerRegistrations[ownerKey]
 	if exists {
 		s.removeHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
@@ -283,6 +291,9 @@ func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo)
 	s.lifecycles[registrationID] = record
 	s.addHostnameIndexLocked(ownerKey, info.Hostname)
 	s.lifecycleSequence++
+	if !wasReady || priorInfo != record.info {
+		s.notifyLifecycleChangedLocked()
+	}
 }
 
 // Unregister removes a complete job incarnation from the store.
@@ -290,8 +301,7 @@ func (s *DeviceStore) Unregister(ownerKey string) {
 	s.mu.Lock()
 	if _, ok := s.ownerRegistrations[ownerKey]; ok {
 		s.removeRegistrationLocked(ownerKey)
-		s.configurationRevision++
-		s.notifyConfigurationChangedLocked()
+		s.notifyLifecycleChangedLocked()
 		s.lifecycleSequence++
 	}
 	s.mu.Unlock()
@@ -504,20 +514,22 @@ func (w *DeviceWriter) RecordLifecycle(status DeviceLifecycleStatus) {
 	}
 	id := s.ownerRegistrations[w.owner]
 	record := s.lifecycles[id]
+	if !sameLifecycleStatus(record.lastCompleted, status) {
+		s.notifyLifecycleChangedLocked()
+	}
 	record.lastCompleted = status
 	s.lifecycles[id] = record
 	s.lifecycleSequence++
 }
 
-// ConfigurationRevision fences snapshots across accepted job replacement/removal.
-func (s *DeviceStore) ConfigurationRevision() uint64 {
+func (s *DeviceStore) LifecycleChanges() <-chan struct{} { return s.changes }
+func (s *DeviceStore) LifecycleRevision() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.configurationRevision
+	return s.lifecycleRevision
 }
-
-func (s *DeviceStore) ConfigurationChanges() <-chan struct{} { return s.changes }
-func (s *DeviceStore) notifyConfigurationChangedLocked() {
+func (s *DeviceStore) notifyLifecycleChangedLocked() {
+	s.lifecycleRevision++
 	select {
 	case s.changes <- struct{}{}:
 	default:
@@ -537,7 +549,18 @@ func (w *DeviceWriter) RecordProfileContext(context *ProfileContext) {
 	}
 	id := s.ownerRegistrations[w.owner]
 	record := s.lifecycles[id]
+	if record.info.Profiles != context {
+		s.notifyLifecycleChangedLocked()
+	}
 	record.info.Profiles = context
 	s.lifecycles[id] = record
 	s.lifecycleSequence++
+}
+
+// A status file is a capture-time snapshot, not a per-poll heartbeat. Successful
+// polls with only a newer completion time must not trigger a global serialization.
+func sameLifecycleStatus(a, b DeviceLifecycleStatus) bool {
+	a.CompletedAt, b.CompletedAt = time.Time{}, time.Time{}
+	a.PreparationFailure.CompletedAt, b.PreparationFailure.CompletedAt = time.Time{}, time.Time{}
+	return a == b
 }

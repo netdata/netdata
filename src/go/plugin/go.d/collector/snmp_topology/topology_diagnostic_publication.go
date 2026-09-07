@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -14,17 +15,90 @@ type topologyDiagnosticProvider struct {
 	registry *topologyRegistry
 	aborted  *atomic.Pointer[topologydiag.AbortedSweep]
 	source   deviceLifecycleSource
+	mu       sync.Mutex
+	sequence uint64
+	history  []*topologyCheckpoint
 }
 
-func (p *topologyDiagnosticProvider) Capture() (snmpdiag.Snapshot, error) {
-	diagnostics := captureTopologyCut(p.registry, p.aborted.Load())
-	diagnostics.Lifecycle.State = topologydiag.CaptureAvailable
-	snapshot, err := topologydiag.NewSnapshot(diagnostics)
-	if err != nil {
-		return snmpdiag.Snapshot{}, err
+type topologyCheckpoint struct {
+	id  uint64
+	cut topologydiag.Cut
+}
+
+func (c *topologyCheckpoint) ID() uint64 { return c.id }
+func (c *topologyCheckpoint) Capture() (snmpdiag.Snapshot, error) {
+	return topologydiag.NewSnapshot(c.cut)
+}
+
+func (p *topologyDiagnosticProvider) Checkpoints() []snmpdiag.Checkpoint {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	result := make([]snmpdiag.Checkpoint, len(p.history))
+	for i, checkpoint := range p.history {
+		result[i] = checkpoint
 	}
-	snapshot.Lifecycle = snmpdiag.CaptureLifecycle(p.source)
-	return snapshot, nil
+	return result
+}
+
+func (c *Collector) recordDiagnosticCheckpoint() {
+	if c.diagnosticProvider == nil {
+		return
+	}
+	p := c.diagnosticProvider
+	cut := captureTopologyCut(p.registry, p.aborted.Load())
+	p.mu.Lock()
+	if cut.Topology == nil && cut.LastAborted == nil ||
+		len(p.history) > 0 && sameTopologyCheckpoint(p.history[len(p.history)-1].cut, cut) {
+		p.mu.Unlock()
+		return
+	}
+	cut.Lifecycle = captureCheckpointLifecycle(p.source)
+	p.sequence++
+	if len(p.history) == snmpdiag.CheckpointRetention {
+		copy(p.history, p.history[1:])
+		p.history = p.history[:len(p.history)-1]
+	}
+	p.history = append(p.history, &topologyCheckpoint{id: p.sequence, cut: cut})
+	p.mu.Unlock()
+	if c.diagnosticPublisher != nil {
+		c.diagnosticPublisher.TopologyUpdated(p)
+	}
+}
+
+func captureCheckpointLifecycle(source deviceLifecycleSource) (result topologydiag.LifecycleCut) {
+	result = topologydiag.LifecycleCut{State: topologydiag.CaptureUnavailable, Reason: topologydiag.CaptureReasonProjectionError}
+	defer func() {
+		if recover() != nil {
+			result = topologydiag.LifecycleCut{State: topologydiag.CaptureUnavailable, Reason: topologydiag.CaptureReasonProjectionPanic}
+		}
+	}()
+	if source != nil {
+		result = topologydiag.LifecycleCut{State: topologydiag.CaptureAvailable, Cut: source.LifecycleCut()}
+	}
+	return result
+}
+
+// Compare only the fixed-size state and immutable evidence identities. Sweep
+// clocks, selection bookkeeping and prior removal annotations are not new evidence.
+func sameTopologyCheckpoint(a, b topologydiag.Cut) bool {
+	if a.ProducerScopeID != b.ProducerScopeID || a.LastAborted != b.LastAborted {
+		return false
+	}
+	if a.Topology == nil || b.Topology == nil {
+		return a.Topology == b.Topology
+	}
+	x, y := a.Topology, b.Topology
+	if x.CaptureState != y.CaptureState || x.CaptureReason != y.CaptureReason || len(x.Devices) != len(y.Devices) {
+		return false
+	}
+	for i, left := range x.Devices {
+		right := y.Devices[i]
+		left.Selected, right.Selected = false, false
+		if left != right {
+			return false
+		}
+	}
+	return true
 }
 
 type topologyJobConfigLifecycle struct{ publisher *snmpdiag.Publisher }
@@ -51,11 +125,11 @@ func (h *topologyJobConfigLifecycle) Reconcile(_ collectorapi.JobConfigIdentity,
 	}
 	if job != nil {
 		if c, ok := job.Collector().(*Collector); ok {
-			h.publisher.SetTopology(snapshot.Identity().String(), c.diagnosticProvider, max(c.deviceCheckEvery(), c.refreshEvery()))
+			h.publisher.SetTopology(snapshot.Identity().String(), c.diagnosticProvider)
 			return
 		}
 	}
-	h.publisher.SetTopology(snapshot.Identity().String(), nil, snmpdiag.DefaultInterval)
+	h.publisher.SetTopology(snapshot.Identity().String(), nil)
 }
 
 func (h *topologyJobConfigLifecycle) Remove(id collectorapi.JobConfigIdentity) {

@@ -304,3 +304,54 @@ func BenchmarkDeviceWriterLifecycle(b *testing.B) {
 		})
 	}
 }
+
+func TestDeviceStoreLifecycleChangeNotifications(t *testing.T) {
+	for name, tc := range map[string]struct {
+		change     func(*DeviceStore, *DeviceWriter, DeviceLifecycleStatus)
+		wantChange bool
+	}{
+		"status transition": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			status.Outcome = DeviceLifecycleOutcomeFailed
+			w.RecordLifecycle(status)
+		}, true},
+		"poll timestamp only": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			status.CompletedAt = status.CompletedAt.Add(time.Second)
+			w.RecordLifecycle(status)
+		}, false},
+		"job poll timestamp only": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			status.CompletedAt = status.CompletedAt.Add(time.Second)
+			s.RecordJobLifecycle("job", status)
+		}, false},
+		"readiness": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			s.Register("job", DeviceConnectionInfo{Hostname: "switch.example"})
+		}, true},
+		"same identity": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			s.RegisterJob("job", DeviceLifecycleInfo{Hostname: "switch.example"})
+		}, false},
+		"changed identity": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			s.RegisterJob("job", DeviceLifecycleInfo{Hostname: "other.example"})
+		}, true},
+		"remove":        {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("job") }, true},
+		"remove absent": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("absent") }, false},
+		"new profile context": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			w.RecordProfileContext(&ProfileContext{})
+		}, true},
+		"same profile context": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { w.RecordProfileContext(nil) }, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := NewDeviceStore()
+			status := DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeSuccess, CompletedAt: time.Now()}
+			writer := store.ReplaceJob("", "job", DeviceLifecycleInfo{Hostname: "switch.example"}, status, nil)
+			<-store.LifecycleChanges()
+			revision := store.LifecycleRevision()
+			tc.change(store, writer, status)
+			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
+			select {
+			case <-store.LifecycleChanges():
+				require.True(t, tc.wantChange)
+			default:
+				require.False(t, tc.wantChange)
+			}
+		})
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -92,7 +93,7 @@ func runNormalSNMPFailurePublication(t *testing.T, config confgroup.Config) snmp
 	go func() { done <- process.Run(ctx) }()
 	var document snmpdiag.Document
 	require.Eventually(t, func() bool {
-		file, err := os.Open(snmpdiag.ArchivePath(dir))
+		file, err := os.Open(filepath.Join(snmpdiag.DirectoryPath(dir), snmpdiag.LifecycleFilename))
 		if err != nil {
 			return false
 		}
@@ -109,11 +110,11 @@ func runNormalSNMPFailurePublication(t *testing.T, config confgroup.Config) snmp
 	require.NoError(t, err)
 	_, err = archive.Replay(snmptopology.DefaultDiagnosticQueryOptions())
 	require.ErrorContains(t, err, "no replayable topology")
-	before, err := os.ReadFile(snmpdiag.ArchivePath(dir))
+	before, err := os.ReadFile(filepath.Join(snmpdiag.DirectoryPath(dir), snmpdiag.LifecycleFilename))
 	require.NoError(t, err)
 	require.NoError(t, process.Terminate(ctx))
 	require.NoError(t, <-done)
-	after, err := os.ReadFile(snmpdiag.ArchivePath(dir))
+	after, err := os.ReadFile(filepath.Join(snmpdiag.DirectoryPath(dir), snmpdiag.LifecycleFilename))
 	require.NoError(t, err)
 	require.Equal(t, before, after, "shutdown must preserve useful evidence, not publish cleared state")
 	return document

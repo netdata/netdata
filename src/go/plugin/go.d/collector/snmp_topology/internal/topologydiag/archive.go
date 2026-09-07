@@ -240,11 +240,8 @@ func newArchiveAbortV1(
 }
 
 func restoreArchiveDocument(d snmpdiag.Document) (Cut, error) {
-	if d.Format != snmpdiag.Format {
-		return Cut{}, fmt.Errorf("unsupported format %q", d.Format)
-	}
-	if d.Version != snmpdiag.Version {
-		return Cut{}, fmt.Errorf("unsupported version %d", d.Version)
+	if err := d.ValidateEnvelope(); err != nil {
+		return Cut{}, err
 	}
 	return restoreArchiveSnapshot(d.Snapshot)
 }

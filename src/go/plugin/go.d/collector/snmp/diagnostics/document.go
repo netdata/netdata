@@ -13,14 +13,19 @@ import (
 )
 
 type Document struct {
-	Format   string   `json:"format"`
-	Version  uint64   `json:"version"`
-	Producer Producer `json:"producer"`
-	Snapshot Snapshot `json:"snapshot"`
+	Format         string    `json:"format"`
+	Version        uint64    `json:"version"`
+	Producer       Producer  `json:"producer"`
+	Snapshot       Snapshot  `json:"snapshot"`
+	Kind           string    `json:"kind"`
+	PublishedAt    time.Time `json:"published_at"`
+	Checkpoint     uint64    `json:"checkpoint,omitempty"`
+	TopologyActive bool      `json:"topology_active,omitempty"`
 }
 
 type Producer struct {
 	AgentVersion string `json:"agent_version"`
+	RunID        string `json:"run_id"`
 }
 
 type Snapshot struct {

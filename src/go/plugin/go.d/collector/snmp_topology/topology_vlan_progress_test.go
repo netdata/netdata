@@ -40,7 +40,7 @@ func TestNonstandardPacketStatusSurvivesArchive(t *testing.T) {
 	writer := store.ReplaceJob("", "device", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.1"}, ddsnmp.DeviceLifecycleStatus{}, nil)
 	writer.RecordLifecycle(ddsnmp.DeviceLifecycleStatus{Phase: ddsnmp.DeviceLifecyclePhaseCheck, Outcome: ddsnmp.DeviceLifecycleOutcomeFailed, Failure: failure})
 	lifecycle := snmpdiag.CaptureLifecycle(store)
-	archive, err := InspectDiagnosticDocument(snmpdiag.Document{Format: snmpdiag.Format, Version: snmpdiag.Version, Snapshot: snmpdiag.Snapshot{Lifecycle: lifecycle}})
+	archive, err := InspectDiagnosticDocument(snmpdiag.Document{Format: snmpdiag.Format, Kind: snmpdiag.KindTopology, Version: snmpdiag.Version, Snapshot: snmpdiag.Snapshot{Lifecycle: lifecycle}})
 	require.NoError(t, err)
 	require.NotNil(t, archive)
 }

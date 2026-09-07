@@ -36,9 +36,14 @@ type DiagnosticLinkSubject struct {
 }
 
 type DiagnosticArchiveIdentity struct {
-	Format               string `json:"format"`
-	Version              uint64 `json:"version"`
-	ProducerAgentVersion string `json:"producer_agent_version"`
+	Kind                 string    `json:"kind"`
+	RunID                string    `json:"run_id"`
+	PublishedAt          time.Time `json:"published_at"`
+	Checkpoint           uint64    `json:"checkpoint,omitempty"`
+	TopologyActive       bool      `json:"topology_active,omitempty"`
+	Format               string    `json:"format"`
+	Version              uint64    `json:"version"`
+	ProducerAgentVersion string    `json:"producer_agent_version"`
 }
 
 type DiagnosticValidation struct {
