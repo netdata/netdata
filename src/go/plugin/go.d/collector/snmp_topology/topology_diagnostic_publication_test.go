@@ -24,7 +24,15 @@ func TestDiagnosticProviderAcquiresImmutableGenerationWithoutRefreshLock(t *test
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 	done := make(chan error, 1)
-	go func() { _, err := c.diagnosticProvider.Capture(); done <- err }()
+	go func() {
+		checkpoints := c.diagnosticProvider.Checkpoints()
+		if len(checkpoints) == 0 {
+			done <- errors.New("no committed checkpoint")
+			return
+		}
+		_, err := checkpoints[0].Capture()
+		done <- err
+	}()
 	select {
 	case err := <-done:
 		require.NoError(t, err)
