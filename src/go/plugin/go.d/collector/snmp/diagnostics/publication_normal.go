@@ -85,7 +85,11 @@ func (p *Publisher) retireNormalLocked(owner string) {
 			heap.Remove(&p.normal.queue, writer.index)
 		}
 		writer.pending = nil
-		p.normal.retired = append(p.normal.retired, normalRetirement{registration: writer.registration, runtime: writer.runtime})
+		// Unpublished runtimes own no file; the identity fence rejects any
+		// in-flight rename without creating a cleanup obligation.
+		if p.normal.onDisk[writer.registration] == writer.runtime {
+			p.normal.retired = append(p.normal.retired, normalRetirement{registration: writer.registration, runtime: writer.runtime})
+		}
 	}
 }
 

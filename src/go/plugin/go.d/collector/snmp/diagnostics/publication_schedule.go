@@ -36,6 +36,10 @@ func (q *normalQueue) Pop() any {
 
 func (p *Publisher) queueNormalLocked(w *NormalWriter) {
 	if w.index < 0 && !w.writing && w.pending != nil {
+		if w.due.IsZero() {
+			// First evidence is eligible now, behind already overdue work.
+			w.due = time.Now()
+		}
 		heap.Push(&p.normal.queue, w)
 	}
 }

@@ -28,9 +28,15 @@ func TestNormalPublicationSchedule(t *testing.T) {
 		want            []uint64
 	}
 	for name, tc := range map[string]struct {
-		duringWrite bool
-		steps       []step
+		duringWrite   bool
+		slowNewWriter bool
+		steps         []step
 	}{
+		"later registrations cannot overtake overdue evidence": {slowNewWriter: true, steps: []step{
+			{after: 10 * time.Second, device: 1, attempt: 2, want: []uint64{1}},
+			{after: 50 * time.Second, device: 2, attempt: 20, want: []uint64{1}},
+			{after: 4*time.Minute + time.Second, want: []uint64{1, 20, 2, 30}},
+		}},
 		"coalescing and quiet deadline": {steps: []step{
 			{after: 10 * time.Second, device: 1, attempt: 2, want: []uint64{1}},
 			{after: 10 * time.Second, device: 1, attempt: 3, want: []uint64{1}},
@@ -74,6 +80,9 @@ func TestNormalPublicationSchedule(t *testing.T) {
 				publishedIDs := func() []uint64 { writesMu.Lock(); defer writesMu.Unlock(); return slices.Clone(published) }
 				write := p.writeFile
 				p.writeFile = func(ctx context.Context, path string, d Document, replace func(string, string) error) error {
+					if tc.slowNewWriter && d.Normal != nil && d.Normal.RegistrationID == 2 {
+						time.Sleep(4*time.Minute + time.Second)
+					}
 					if d.Normal != nil && tc.duringWrite && d.Normal.Latest.ID == 1 {
 						writers[1].Update(&normalTestCut{attempt: 2})
 					}
@@ -84,6 +93,9 @@ func TestNormalPublicationSchedule(t *testing.T) {
 						writesMu.Lock()
 						published = append(published, d.Normal.Latest.ID)
 						writesMu.Unlock()
+						if tc.slowNewWriter && d.Normal.RegistrationID == 2 {
+							p.ReplaceNormal("", "late", 3).Update(&normalTestCut{attempt: 30})
+						}
 					}
 					return nil
 				}
@@ -244,6 +256,38 @@ func TestNormalFinalization(t *testing.T) {
 				}
 				require.Nil(t, p.ReplaceNormal("first", "new", 1))
 			})
+		})
+	}
+}
+
+func TestNormalCleanupTracksPublishedOwnership(t *testing.T) {
+	for name, published := range map[string]struct{ first bool }{
+		"no file was ever published":             {},
+		"one published file still needs cleanup": {first: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p, _ := testPublisher(t)
+			writer := p.ReplaceNormal("", "device", 1)
+			writer.Update(&normalTestCut{attempt: 1})
+			if published.first {
+				require.NoError(t, p.publishNormal(t.Context()))
+			}
+			denied := os.ErrPermission
+			removals := 0
+			p.writeFile = func(context.Context, string, Document, func(string, string) error) error { return denied }
+			p.remove = func(string) error { removals++; return denied }
+			for i := range 20 {
+				writer = p.ReplaceNormal("device", "device", 1)
+				writer.Update(&normalTestCut{attempt: uint64(i + 2)})
+				before := removals
+				require.ErrorIs(t, p.publishNormal(t.Context()), denied)
+				want := 0
+				if published.first {
+					want = 1
+				}
+				assert.Equal(t, want, removals-before, "cleanup must follow actual files, not replacement history")
+				require.Len(t, p.normal.retired, want)
+			}
 		})
 	}
 }

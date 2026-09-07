@@ -41,7 +41,7 @@ func Write(w io.Writer, document Document) error {
 }
 
 // One serial publisher reuses the compressor's workspace across device files.
-// Per-file construction would allocate megabytes on every ordinary SNMP poll.
+// Per-file construction would allocate megabytes on every device publication.
 type archiveEncoder struct{ encoder *zstd.Encoder }
 
 func newArchiveEncoder() (*archiveEncoder, error) {
