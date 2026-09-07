@@ -555,7 +555,8 @@ Project skills are memory of HOW to work here.
   duplicates, and rules that now live elsewhere, keeping every rule (a removed directive is moved or superseded by a
   recorded decision, never dropped). Skills accrete bloat with each update; report line counts before and after.
 - How to create, edit, slim, split, or review a skill, and the rot signals to watch for: the runtime skill
-  `repo-skill-authoring`.
+  `repo-skill-authoring`. It cites sections of this file and of `.agents/skills/README.md` by heading anchor, so a
+  heading rename in either fails the audit until that skill is updated.
 
 Public skill convention (`docs/netdata-ai/skills/`):
 
@@ -729,12 +730,13 @@ renames:
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
-| `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, and review reports of a skill change, in a directory named after the skill or SOW topic under change |
+| `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change; `<subject>` is the directory name of the skill under change (distinct from that skill's own pinned output directory) or the SOW topic |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
 | `query-snmp-traps` (public) | `query-snmp-traps/` | saved trap query results from its how-tos |
 
-A new runtime skill picks a `<dir>` equal to its topic; a public skill uses its skill name. Both record the row here.
+A new runtime skill picks a `<dir>` equal to its topic; a public skill uses its skill name; `repo-skill-authoring` is
+the exception, writing under the name of the skill it changes. All record the row here.
 
 ### Per-User Secrets
 
