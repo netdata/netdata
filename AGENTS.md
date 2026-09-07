@@ -523,7 +523,7 @@ relative/path/inside/repo:line
 ```
 
 Resolve `owner/repo` from the repository remote, record the checked commit, keep paths relative to the upstream
-root. Never write absolute paths into SOW evidence.
+root. Never write absolute paths into SOW or skill evidence.
 
 ### Specs
 

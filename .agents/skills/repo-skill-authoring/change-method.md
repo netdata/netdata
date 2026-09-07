@@ -132,7 +132,7 @@ tooling rules that have bitten, for the throwaway scripts:
   python3 -c 'import sys
   for f in sys.argv[1:]:
       for n, l in enumerate(open(f), 1):
-          if len(l.rstrip("\n")) > 120 and not l.startswith("|"): print(f"{f}:{n}")' $(git diff --name-only HEAD -- '*.md')
+          if len(l.rstrip("\n")) > 120 and not l.startswith("|"): print(f"{f}:{n}")' $(git diff --name-only --diff-filter=d HEAD -- '*.md')
   ```
 
 - never write an HTML comment opener literally in prose or a code span inside a skill: the headings after it stop
