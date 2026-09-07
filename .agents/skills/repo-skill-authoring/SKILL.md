@@ -79,7 +79,9 @@ Ownership and pointing:
 
 Citations and claims:
 
-- Cite symbols and paths, never line numbers; never promise that line numbers track a branch.
+- Cite symbols and paths, never line numbers of this repository; a `path:line` appears only inside an
+  `owner/repo @ commit` citation, where the commit pins it (`AGENTS.md#open-source-reference-evidence`). Never promise
+  that line numbers track a branch.
 - No PR, issue, or SOW identifiers of this repository, no commit hashes of this repository, and no session labels
   (option letters, inventory ids) in a skill. A commit hash appears only inside an `owner/repo @ commit` citation of an
   out-of-repo owner.
@@ -143,8 +145,8 @@ Structure and routing:
 Run this over a skill periodically and before extending it (an owner document is judged only by being hand-maintained
 and current). A cluster of hits is a slim; a single hit is a one-line fix in the same change.
 
-- Line-number citations; PR, commit, issue, or SOW identifiers; a promise that line numbers track a branch. Grep for
-  them; the audit automates only its legacy SOW-identifier check.
+- Line-number citations into this repository; PR, commit, issue, or SOW identifiers; a promise that line numbers track
+  a branch. Grep for them; the audit automates only its legacy SOW-identifier check.
 - A code-side document now exists for facts the skill states.
 - "Authoritative design", "Spec -", Status, Migration Notes, Schema Additions Required, phase history, open review
   questions.

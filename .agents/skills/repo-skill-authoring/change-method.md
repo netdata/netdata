@@ -120,24 +120,26 @@ The width and reflow-commit rules are `AGENTS.md#durable-ai-facing-artifact-form
 wrapped in its content commit; surviving prose at another width is rewrapped in a separate whitespace-only commit. The
 tooling rules that have bitten, for the throwaway scripts:
 
-- rewrap whole paragraphs with fence-, table-, and list-aware logic; a line starting with `- ` begins a paragraph;
+- rewrap whole paragraphs with fence-, table-, and list-aware logic; a line starting with a dash and a space (a
+  bullet) begins a paragraph;
 - assert that the whitespace-split token stream is unchanged after every rewrap; never auto-join short lines;
 - count characters, not bytes: BSD `awk length` counts bytes, so use Python; re-run the width check on every touched
-  file, including files outside the skill. From the repository root (it reports every non-table line; judge fenced
-  and frontmatter hits by the owner rule instead of rewrapping them):
+  file, including files outside the skill. From the repository root, after staging new files (it checks every
+  changed markdown file and reports every non-table line; judge fenced and frontmatter hits by the owner rule instead
+  of rewrapping them):
 
   ```bash
   python3 -c 'import sys
   for f in sys.argv[1:]:
       for n, l in enumerate(open(f), 1):
-          if len(l.rstrip("\n")) > 120 and not l.startswith("|"): print(f"{f}:{n}")' <files>
+          if len(l.rstrip("\n")) > 120 and not l.startswith("|"): print(f"{f}:{n}")' $(git diff --name-only HEAD -- '*.md')
   ```
 
 - never write an HTML comment opener literally in prose or a code span inside a skill: the headings after it stop
   being scanned (`.agents/skills/README.md#owner-section-citations`);
 - `git diff HEAD` before each commit;
-- on a sensitive-scan hit, phrase around the keyword, not around the value; `.agents/sow/scan-sensitive.sh` defines
-  the hits.
+- on a sensitive-scan hit, use the bracketed placeholders `AGENTS.md#sensitive-data-in-durable-artifacts` prescribes
+  and phrase around the keyword; `.agents/sow/scan-sensitive.sh` defines the hits.
 
 ## Close
 
