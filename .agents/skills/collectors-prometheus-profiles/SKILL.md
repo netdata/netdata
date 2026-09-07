@@ -119,22 +119,23 @@ user profiles. The validator has no user mode: its contributor-policy checks bel
   branches emitting the first two codes stay errors); a lifecycle cap that discards observed entities or dimensions; a
   chart with no visible dimension; bucket charts use `observations/s` and no algorithm other than `incremental`
   (omitting it is fine); explicit `area` or `stacked` raises a semantic-review warning; a selected series carrying a
-  label the chart neither uses nor excludes raises a warning. - Proof loaders and compiler
-  (`internal/promprofile/semantics`): `documentation.title` and `summary` required; the closed evidence `kind` set; the
-  `outcome` literals `drop_before_writer` and `retain_writable_unrendered`, with `metadata_only` bound to the latter; a
-  reusable component, label, or reduction policy in either document needs two consumers (compile stage,
-  `semantics/evidence.go`); every production `autogen.selector.deny` family is discharged by a
+  label the chart neither uses nor excludes raises a warning.
+- Proof loaders and compiler (`internal/promprofile/semantics`): `documentation.title` and `summary` required; the
+  closed evidence `kind` set; the `outcome` literals `drop_before_writer` and `retain_writable_unrendered`, with
+  `metadata_only` bound to the latter; a reusable component, label, or reduction policy in either document needs two
+  consumers (compile stage, `semantics/evidence.go`); every production `autogen.selector.deny` family is discharged by a
   `retain_writable_unrendered` exclusion naming it (`coverage.go`); `metadata_only` requires the conditions in
   `metric-types.md`, "Info families"; supports are accepted only in `PROFILE-DESIGN.composition.supports`; no other
-  strict schema has the field. - Integrations projection (`integrations/prometheus_profile_docs.py`, run by
-  `gen_integrations.py` and `integrations/tests/test_prometheus_profile_docs.py`): every stock profile, supporting ones
-  included, needs a direct row under some module in the top-level `profile_coverage.modules` of the Prometheus collector
-  `metadata.yaml` (generation raises `Stock Prometheus profiles without an integration mapping` otherwise); the
-  projection resolves the support closure from the design; the key is accepted only on `go.d.plugin/prometheus` modules
-  (a Python check, not the JSON schema); an unknown module id under it is recorded as a warning by `_common.py`, and
-  `gen_integrations.py` ends with `fail_on_warnings()`, so the generation run still fails; a semantic view and its
-  runtime chart must agree on family and chart identity (also enforced by the proof compiler,
-  `semantics/replay_route.go`); the view `question` is never rendered.
+  strict schema has the field.
+- Integrations projection (`integrations/prometheus_profile_docs.py`, run by `gen_integrations.py` and
+  `integrations/tests/test_prometheus_profile_docs.py`): every stock profile, supporting ones included, needs a direct
+  row under some module in the top-level `profile_coverage.modules` of the Prometheus collector `metadata.yaml`
+  (generation raises `Stock Prometheus profiles without an integration mapping` otherwise); the projection resolves the
+  support closure from the design; the key is accepted only on `go.d.plugin/prometheus` modules (a Python check, not the
+  JSON schema); an unknown module id under it is recorded as a warning by `_common.py`, and `gen_integrations.py` ends
+  with `fail_on_warnings()`, so the generation run still fails; a semantic view and its runtime chart must agree on
+  family and chart identity (also enforced by the proof compiler, `semantics/replay_route.go`); the view `question` is
+  never rendered.
 
 ### Review by hand
 

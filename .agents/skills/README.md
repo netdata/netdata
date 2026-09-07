@@ -22,10 +22,12 @@ published contract and are exempt from the naming rule below.
 ## Owner-Section Citations
 
 - A skill points at facts rather than restating them. When a skill depends on a specific section of the document that
-  owns a fact, it MUST cite the section as `<path>/<doc>.md#<anchor>`, where `<anchor>` is the heading's GitHub slug
-  (lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else dropped; spaces become hyphens;
-  a repeated heading gets `-1`, `-2`). Paths are repo-relative, or relative to the citing file when they start with
-  `./` or `../`.
+  owns a fact, it MUST cite the section as `<path>/<doc>.md#<anchor>`, where `<anchor>` is the heading's slug as
+  GitHub renders it for an ATX heading with a plain ASCII title (inline HTML removed and links reduced to their text;
+  then lowercase; letters, digits, spaces, hyphens, and underscores kept, everything else dropped; spaces become
+  hyphens; a repeated heading gets `-1`, `-2`). Cite only such headings: non-ASCII titles, setext headings, and a
+  literal title that collides with a generated suffix are outside the convention. Paths are repo-relative (with or
+  without a leading `/`), or relative to the citing file when they start with `./` or `../`.
 - `.agents/sow/audit.sh` fails when the cited file or a heading with that slug is missing, so renaming or removing a
   heading in an owner document is caught until every citing skill is updated.
 - A privately published owner document (one not mapped in `docs/.map/map.yaml`) that skills cite by section SHOULD

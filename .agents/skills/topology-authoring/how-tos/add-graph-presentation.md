@@ -24,7 +24,7 @@ highlight paths) to a `netdata.topology.v1` payload without making the UI domain
 3. For highlight paths, set `selection.actor_click.mode: highlight_path` with `path_table`, `path_actor_column`
    (`actor_ref`, the path member), and `path_order_column` (numeric). When the same table stores a different path per
    clicked actor, add `path_owner_column` (`actor_ref`, the clicked actor) and keep it a separate column from the
-   member column. The owner column is optional only for one shared global path.
+   member column. The owner column is optional for backward compatibility and for one shared global path.
 
    ```json
    {
@@ -36,15 +36,15 @@ highlight paths) to a `netdata.topology.v1` payload without making the UI domain
    }
    ```
 
-4. Keep path rows as actor-owned detail data (`role: actor_detail`, `owner: actor`), not graph links.
+4. Keep path rows as actor-owned detail data (`role: actor_detail`, `owner: actor`, `aggregation: append`), not
+   graph links.
 5. Update producer tests or fixtures so the new presentation path is exercised.
 
 ## Validation
 
 - Validate against `FUNCTION_TOPOLOGY_SCHEMA.json` and run `topologyv1.ValidateDecodedData` on `data` (see
   `../SKILL.md#what-the-code-enforces` for what each layer catches).
-- Add negative tests: missing label-policy columns, non-display label columns, a missing port-bullet source table, bad
-  highlight-path columns, an invalid token value.
+- Add the negative tests listed in `../SKILL.md#rules-without-a-code-owner`.
 - Add a frontend fixture in which two actors have different rows in the same path table and verify each click
   resolves only that actor's path.
 

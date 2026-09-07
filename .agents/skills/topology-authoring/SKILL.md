@@ -15,7 +15,7 @@ Read the owner for the plane you touch; do not work from memory of it.
 
 | Owner | Owns |
 |---|---|
-| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes); every object is `additionalProperties: false`. Type ids (`actor_types`, `link_types`, `evidence_types`, `table_types`) are open, tokens are closed. |
+| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the keyed registries (`actor_types`, `link_types`, `evidence_types`, `table_types`, overlay templates, aggregation scopes, `dictionaries`, `stats`, `extensions`) are open maps whose keys are producer-chosen ids, and `required_params[]` items are unconstrained. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | The payload contract, plane by plane, plus per-producer Shape sections and the aggregator rules a producer relies on. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Migration state per producer, Cloud aggregator and frontend scope, the CTS gate, and design that is not yet in the schema. |
 | `src/go/pkg/topology/v1` | Go builders and the semantic validator (`validate.go`, `validate_notification.go`). |
@@ -34,13 +34,15 @@ starts where those rows have become observations.
 | Function | Producer | Tests |
 |---|---|---|
 | `topology:network-connections` | `src/collectors/network-viewer.plugin/network-viewer-topology.c` (shared renderer; Windows main in `network-viewer-windows.c`, container rules in `network-viewer-topology-containers.c`) | `src/collectors/network-viewer.plugin/tests/validate_topology_payload.py`, `src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py`, fixtures under `src/collectors/network-viewer.plugin/tests/fixtures/topology/` |
-| `topology:streaming` | `src/web/api/functions/function-topology-streaming.c` | fixture `src/go/tools/functions-validation/fixtures/topology-v1/streaming.json` |
+| `topology:streaming` | `src/web/api/functions/function-topology-streaming.c` | no producer-level test; `src/go/tools/functions-validation/fixtures/topology-v1/streaming.json` is a hand-authored schema sample that does not mirror the emitted shape |
 | `topology:snmp` | `src/go/plugin/go.d/collector/snmp_topology/` (render in `internal/topologyv1`) | `topology_scenario_golden_test.go`, `internal/topologyv1/golden_test.go`, see `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#validation-checklist` |
-| vSphere | `src/go/plugin/go.d/collector/vsphere/func_topology*.go` | `func_topology_test.go` |
+| `topology:vsphere` | `src/go/plugin/go.d/collector/vsphere/func_topology*.go` | `func_topology_test.go` |
 | `topology:cato_networks` | `src/go/plugin/go.d/collector/cato_networks/topology.go`, `catofunc/topology.go` | `topology_test.go` |
 
-All five emit `netdata.topology.v1`; there is no pending producer migration. Cross-producer fixtures live in
-`src/go/tools/functions-validation/fixtures/topology-v1/`; the Cloud aggregator itself is not in this repository.
+All five emit `netdata.topology.v1`; no producer still emits a pre-v1 payload. Remaining per-producer refinements
+are tracked in `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md#current-migration-inventory`. Cross-producer
+fixtures live in `src/go/tools/functions-validation/fixtures/topology-v1/`; the Cloud aggregator itself is not in this
+repository.
 
 ## What The Code Enforces
 
@@ -50,10 +52,15 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
   violation is an error from any validator that loads the schema. It does not check cross-references or row counts.
 - Go semantic validator (`topologyv1.ValidateDecodedData` on `data`, `topologyv1.ValidateDecodedResponse` on a whole
   envelope; both return an error, there is no warning level): reference bounds, column-length equality with `rows`,
-  dictionary indexes, label-policy display types, search columns, every `ports.sources[]` rule, highlight-path
-  column types, every overlay-refs convention rule, correlation rules and point/claim key columns, all modal
-  projections, and the closed tokens again. Producer tests call `ValidateDecodedData`
-  (`cato_networks/topology_test.go` is the reference shape); the CLI tool calls `ValidateDecodedResponse`.
+  dictionary indexes, label-policy display types, search columns, the `ports.sources[]` rules except the
+  `actor_table` carve-out below (and `show_bullets` is read untyped, so only the schema rejects a non-boolean),
+  highlight-path column types, every overlay-refs convention rule, correlation rules and point/claim key columns, all
+  modal projections, and the presentation, correlation, and overlay token vocabularies. Structural tokens
+  (`orientation`, `direction_role`, `link_type.aggregation.*`, `evidence_type.role`, `table_type.role`, `owner`, and
+  `aggregation`, `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are schema-only; the Go
+  validator never reads them. Producer tests call `ValidateDecodedData` (`cato_networks/topology_test.go` is the
+  reference shape); the CLI tool calls `ValidateDecodedResponse` and needs
+  `--schema src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` to add the JSON Schema check.
 - The CLI tool (`src/go/tools/functions-validation`) counts a topology payload's rows as
   `max(actor rows, link rows)` (`topologyv1.GraphRowsFromDecodedData`) for its `--min-rows` and `--require-rows`
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
@@ -74,13 +81,14 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
 Each step names the owner section that holds the rules; read it before designing. Guide means
 `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
 
-1. Purpose and scale: name the graph users need and estimate actor, link, and evidence row counts and raw and gzip
-   payload size on realistic data before choosing shapes.
-   Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#mental-model`.
+1. Purpose and scale: name the graph users need, choose which plane carries what, and estimate actor, link, and
+   evidence row counts and raw payload size on realistic data before choosing shapes.
+   Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#mental-model` (planes),
+   `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#producer-checklist` (measure on realistic or captured fixtures).
 2. Actors: stable identity, display separate from identity, `identity` / `merge_identity` / `parent_identity`,
-   aggregation scopes.
+   `search`, and the aggregation scopes an actor type advertises.
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#required-actor-semantics`;
-   network-connections grouping:
+   scopes and grouping: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregation-rules`,
    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-actor-grouping`.
 3. Links and direction: compact renderable relationships, one-to-many detail in evidence, semantic link types per
    meaning, `orientation` plus `direction_role`.
@@ -89,20 +97,22 @@ Each step names the owner section that holds the rules; read it before designing
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#evidence-plane`,
    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#detail-tables`,
    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#actor-labels-and-modal-composition`.
-5. Overlays: templates once, compact refs per row, built with `topologyv1.NewActorOverlayRefsBuilder` or
-   `NewLinkOverlayRefsBuilder`; in go.d pass `job.Name()` as `collect_job`, never `job.FullName()`.
+5. Overlays: templates once, compact refs per row.
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#telemetry-overlays`.
+   Go builders: `topologyv1.NewActorOverlayRefsBuilder`, `NewLinkOverlayRefsBuilder` (`src/go/pkg/topology/v1`);
+   in go.d pass `job.Name()` as `collect_job`, never `job.FullName()`
+   (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape`).
 6. Correlation: rule classes, actions, points and claims, and what the aggregator does with them.
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#correlation-plane`,
    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregator-behavior`.
-7. Presentation and modals: type-level tokens only, `label_policy`, `search`, `ports.sources[]`, highlight paths,
-   modal recipes over existing sources; recipes in `how-tos/add-graph-presentation.md`.
+7. Presentation and modals: type-level tokens only, `label_policy`, `ports.sources[]`, highlight paths, modal
+   recipes over existing sources; recipes in `how-tos/add-graph-presentation.md`.
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#presentation-plane`,
    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#closed-token-vocabulary`,
    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#actor-labels-and-modal-composition`.
-8. Compact tables: `const` / `dict` / `values` codecs through `topologyv1.NewTableBuilder`, `MustTable`, and
-   `NewStringDictionary` in Go.
+8. Compact tables: `const` / `dict` / `values` codecs.
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#compact-tables`.
+   Go builders: `topologyv1.NewTableBuilder`, `MustTable`, `NewStringDictionary` (`src/go/pkg/topology/v1`).
 9. Notifications, if any: `data.notifications` only, origin kept separate from `affected_node_id`, CTS acceptance
    verified before Agents emit.
    Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#notifications`.
@@ -119,10 +129,11 @@ Each step names the owner section that holds the rules; read it before designing
 
 ## Rules Without A Code Owner
 
-- Raw captures of real payloads stay under `.local/` (repository rule, `AGENTS.md`). `actor_labels` and streaming
-  detail tables inherit the Function's sensitive-data classification
-  (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#actor-labels-and-modal-composition`,
-  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-shape`).
+- Raw captures of real payloads stay under `.local/` (repository rule, `AGENTS.md`). `actor_labels` inherits the
+  Function's sensitive-data classification
+  (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#actor-labels-and-modal-composition`); streaming
+  detail tables carry node and Cloud identifiers that never become graph labels and are redacted before they reach
+  logs, docs, SOWs, or review artifacts (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-shape`).
 - Sparse grouping columns: test that a consumer keeps actor identity for null or empty grouping keys instead of
   merging every null row into one bucket.
 - Fail explicitly on any size or row limit; never truncate a topology and present it as complete.
@@ -144,4 +155,5 @@ Each step names the owner section that holds the rules; read it before designing
   correlation wiring without exposing identifiers.
 
 Whenever you answer a developer question that needed analysis across more than one owner document and no how-to
-covers it, write the how-to here and list it above before finishing.
+covers it, write the how-to here and list it above before finishing. Developer recipes stay in this skill; operator
+recipes belong under `docs/netdata-ai/skills/`.

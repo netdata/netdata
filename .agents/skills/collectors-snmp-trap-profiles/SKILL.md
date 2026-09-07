@@ -20,7 +20,8 @@ This skill holds only what the documents below lack. Point at them; do not resta
   categories, severities, cardinality, operator overrides, generated stock profiles). It ships with the pack under
   `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/`, so it is operator-facing and must stay true to the loader.
 - `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md`: how the collector works (life of a trap, journal field
-  contract, package map, `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md#where-to-change-things`,
+  contract, package map, "Where To Change Things", and the validation commands; the sections a rule below relies on
+  are cited as `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md#where-to-change-things` and
   `src/go/plugin/go.d/collector/snmp_traps/ARCHITECTURE.md#validation`). Collector code changes start there, not here.
 - `docs/npm/snmp-traps/` (published operator docs): `trap-profiles.md` (override versus new profile), `configuration.md`
   (every job option), `field-reference.md` (every `TRAP_*` field), `metrics.md` (built-in charts and dimensions).

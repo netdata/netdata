@@ -181,6 +181,17 @@ vSphere:
 - VM-to-host and host/VM-to-network relationships are graph links with typed
   evidence.
 
+`topology:cato_networks`:
+
+- producer path: `src/go/plugin/go.d/collector/cato_networks/` (`topology.go`,
+  `catofunc/topology.go`);
+- the Function emits `netdata.topology.v1` directly from the Go collector and
+  never emitted an earlier schema;
+- actor types are `site`, `pop`, `device`, and `bgp_peer`; actor identity is a
+  producer-composed `id` with `account_id` and `site_id` as merge identities;
+- tests validate the payload with `topologyv1.ValidateDecodedData` and the JSON
+  Schema.
+
 ### Cloud Frontend
 
 The Cloud frontend compatibility work is outside this repository, but the
@@ -463,7 +474,8 @@ Required behavior:
 - preserve evidence rows when evidence policy is `preserve`;
 - count evidence rows when evidence policy is `count`;
 - preserve modal composition definitions and rewrite their type, table,
-  evidence, and column references after namespacing/deduplication;
+  evidence, and column references after namespacing/deduplication (the rules
+  are in the developer guide's Aggregator Behavior section);
 - do not materialize modal rows during aggregation unless the underlying
   canonical table is already being merged;
 - merge `actor_labels` after actor reference remapping and preserve repeated
@@ -534,12 +546,18 @@ Required test classes:
 ### Design Not Yet In The Schema
 
 These aggregator requirements are agreed design, not shipped contract. The
-schema has no fields for them, its type definitions reject unknown properties,
-and a producer must not emit them until the schema and the developer guide
-carry them.
+schema has no fields for them on the types they would extend, its record
+definitions reject unknown properties, and a producer must not emit them until
+the schema and the developer guide carry them. When they land they may take the
+most compact shape that fits the schema's style; exact field names are free as
+long as they are schema-valid, documented, and used uniformly by Agent, UI, and
+aggregator.
 
 - Four-dimension table merge policy. Today a table type declares one flat
-  `aggregation` value. The target policy has four dimensions: `key` (the
+  `aggregation` value; most of the `action` and `metrics` tokens below already
+  exist as values of that enum, so what is missing is the structure plus
+  `avg_weighted` and the whole `conflicts` dimension. The target policy has four
+  dimensions: `key` (the
   columns that identify equivalent rows), `action` (`deduplicate`, `append`,
   `set_union`, `merge_metrics`, `latest`, or `preserve`), `metrics` (a per
   numeric column operation such as `sum`, `min`, `max`, `avg_weighted`, or

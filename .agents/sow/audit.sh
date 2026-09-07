@@ -64,18 +64,36 @@ read_sow_status() {
 
 echo "${BLUE}=== SOW audit (cwd=$(pwd)) ===${NC}"
 
-# GitHub heading slugs of one markdown file, one per line, in document order: lowercase; letters, digits, spaces,
-# hyphens, and underscores kept, everything else dropped; spaces become hyphens; a repeated heading gets -1, -2, ...
-# Headings inside fenced code blocks are ignored.
+# Heading slugs of one markdown file, one per line, in document order, following GitHub's rule for ATX headings
+# whose rendered title is plain text: inline HTML tags are removed and markdown links reduce to their text, then the
+# title is lowercased; letters, digits, spaces, hyphens, and underscores are kept, everything else dropped; spaces
+# become hyphens; a repeated heading gets -1, -2, ... Fenced code blocks (``` or ~~~, up to three leading spaces,
+# closed only by a fence of the same character at least as long) are ignored. Non-ASCII titles, setext headings, and
+# a literal heading that collides with a generated suffix are outside the convention (see .agents/skills/README.md).
 md_heading_slugs() {
   awk '
-    /^(```|~~~)/ { infence = !infence; next }
-    infence { next }
+    function fence_len(str,   n) { n = 0; while (substr(str, n + 1, 1) == fchar) n++; return n }
+    {
+      line = $0
+      if (match(line, /^ {0,3}(`{3,}|~{3,})/)) {
+        t = substr(line, RSTART, RLENGTH); sub(/^ */, "", t)
+        c = substr(t, 1, 1); l = length(t)
+        if (!infence) { infence = 1; fchar = c; flen = l; next }
+        else if (c == fchar && l >= flen) { infence = 0; next }
+      }
+      if (infence) next
+    }
     /^#{1,6}[ \t]/ {
       h = $0
       sub(/^#+[ \t]+/, "", h)
       sub(/[ \t]+#+[ \t]*$/, "", h)
       sub(/[ \t]+$/, "", h)
+      gsub(/<[^>]*>/, "", h)
+      while (match(h, /\[[^]]*\]\([^)]*\)/)) {
+        link = substr(h, RSTART, RLENGTH)
+        text = link; sub(/\]\([^)]*\)$/, "", text); sub(/^\[/, "", text)
+        h = substr(h, 1, RSTART - 1) text substr(h, RSTART + RLENGTH)
+      }
       h = tolower(h)
       gsub(/[^a-z0-9 _-]/, "", h)
       gsub(/ /, "-", h)
@@ -291,7 +309,7 @@ if command -v rg >/dev/null 2>&1; then
       ok "spec reference resolves: $ref"
     else
       case " $relocated_specs " in
-        *" $refrel "*) fail "reference to a relocated spec — repoint to its committed home: $ref" ;;
+        *" $refrel "*) fail "reference to a relocated spec — repoint to its committed home, or to the document that now owns its facts: $ref" ;;
         *) warn "spec reference unresolved (specs are local-only; may be absent here): $ref" ;;
       esac
     fi
@@ -417,17 +435,18 @@ if [ -d .agents/skills ]; then
              -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
              | sed -E 's/^([^:]*):[0-9]+:(source "([^/.]*\/)?|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
   # Owner-section anchors. A skill cites a section of the document that owns a fact as `path/to/doc.md#anchor`
-  # (GitHub heading slug, see md_heading_slugs). The file must exist and a heading with that slug must exist, so
-  # renaming or removing a heading in an owner document fails here until every skill that cites it is updated.
-  # Paths are repo-relative, or relative to the citing file when they start with ./ or ../; tokens starting with /
-  # (URLs, absolute placeholders) are not citations.
+  # (heading slug, see md_heading_slugs). The file must exist and a heading with that slug must exist, so renaming
+  # or removing a heading in an owner document fails here until every skill that cites it is updated. Paths are
+  # repo-relative (with or without a leading /), or relative to the citing file when they start with ./ or ../.
+  # A token starting with // is the tail of a URL and is not a citation.
   while IFS='|' read -r file ref; do
     [ -n "$ref" ] || continue
-    case "$ref" in /*) continue ;; esac
+    case "$ref" in //*) continue ;; esac
     path=${ref%%#*}
     anchor=${ref#*#}
     case "$path" in
       ./*|../*) target="$(dirname "$file")/$path" ;;
+      /*) target="${path#/}" ;;
       *) target="$path" ;;
     esac
     if [ ! -f "$target" ]; then

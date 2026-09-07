@@ -93,6 +93,8 @@ topology skill, not to the public/operator query skills.
            color_slot: .value.presentation.color_slot,
            line_style: .value.presentation.line_style,
            width: .value.presentation.width,
+           opacity: .value.presentation.opacity,
+           arrow: .value.presentation.arrow,
            variable: .value.presentation.variable,
            layout: .value.presentation.layout
          }
@@ -163,7 +165,10 @@ emitter: `topology_v1_emit_link_type` calls in
 
 The `socket_exact` correlation rule should consume `endpoint_socket`
 through `correlation_link_types` and emit `correlated_socket` through
-`output_link_type`.
+`output_link_type`. Step 7 counts only `ownership`, `socket`, and
+`endpoint_socket` rows: `correlated_socket` is declared in the type registry,
+legend, and rule for the aggregator's output and is never emitted as a link
+row by this producer.
 
 ## Notes / gotchas
 

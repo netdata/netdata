@@ -548,7 +548,8 @@ context and segment identity includes it. Nothing downstream may present these
 segments as VRF-aware before that happens.
 
 The producer scope in a segment id is a stable identifier of the emitting
-producer (the parent Agent registry id). When no stable scope id is available,
+Agent: its public registry id (`netdata.public.unique.id`, read through
+`pluginconfig.RegistryUniqueID()`). When no stable scope id is available,
 `applyTopologyL3SubnetSegments` drops every candidate segment
 (`SuppressedNoProducerScope`) rather than falling back to a process-local or
 random id, so identical private subnets seen by different Agents cannot collide
@@ -921,10 +922,14 @@ An unchanged golden is expected for internal ownership and generation refactors.
 `TestSNMPTopologyScenarioGoldens` starts from synthetic SNMP-shaped `ddsnmp`
 inputs, runs the real cache, registry, and Function rendering path, validates
 the final `topology.v1` payload, and compares it with one full-payload oracle
-per scenario. The oracles are bulky and live in the external `netdata/testdata`
-repository under `snmp/topology-scenarios/`, checked out at
-`src/go/testdata/` (gitignored); `NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR`
-overrides that location. When neither is present the suite calls `t.Skip`, so a
-green `go test` run without the checkout says nothing about the scenario
-payloads; check the test output for the skip line before trusting it. The
-per-render normalized golden above stays tracked in this repository.
+per golden scenario (`topologyScenarioGoldenCases`, currently five of the
+eighteen scenarios; the rest are covered by `TestSNMPTopologyScenarioSemantics`
+with assertions and determinism checks but no oracle). The oracles are bulky
+and live in the external `netdata/testdata` repository under
+`snmp/topology-scenarios/`, checked out at `src/go/testdata/` (gitignored);
+`NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR` overrides that location. When
+neither is present the suite skips (it fails instead only under
+`-update-snmp-topology-scenario-goldens`), so a green `go test` run without the
+checkout says nothing about the golden payloads; check the test output for the
+skip line before trusting it. The per-render normalized golden above stays
+tracked in this repository.
