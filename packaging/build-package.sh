@@ -29,6 +29,9 @@ ${BUILD_DIR}
 -G
 Ninja"
 
+export CC=clang
+export CXX=clang++
+
 add_cmake_option() {
     CMAKE_ARGS="${CMAKE_ARGS}
 -D${1}=${2}"
