@@ -111,10 +111,10 @@ Likely homes:
   `pid`, or `container`, `process_name` by default) and `selections.mode`
   (`aggregated` or `detailed`, aggregated by default), parsed at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:474`; the
-  `mode:` and `__topology_mode:` token spellings are both accepted, as are the
-  other `key:value` option tokens the parser owns (the developer guide's
-  Network Connections Shape section describes them as the canonical option
-  form, not a compatibility layer);
+  option parser (`topology_apply_option_param`) owns the accepted spellings of
+  every option, including bare `aggregated` / `detailed` values and the `mode:`
+  and `__topology_mode:` prefixes (the developer guide's Network Connections
+  Shape section describes the option tokens as the canonical form);
 - response metadata exposes the `mode` selector at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:5134`;
 - actors, graph links, and optional socket evidence rows are emitted as compact

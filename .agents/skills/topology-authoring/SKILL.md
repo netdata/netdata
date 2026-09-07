@@ -15,7 +15,7 @@ Read the owner for the plane you touch; do not work from memory of it.
 
 | Owner | Owns |
 |---|---|
-| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the type registries (`actor_types`, `link_types`, `port_types`, `evidence_types`, `table_types`, `overlay_templates`, `aggregation_scopes`) are maps keyed by producer-chosen ids, and the other keyed maps (`dictionaries`, `stats`, `extensions`, `evidence`, `scale_keys`, `correlation.rules`, detail-table maps, `badge_map`, `link_aggregation.metrics`) are open; `required_params[]` items are objects with no further constraint. |
+| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the type registries, `evidence`, `scale_keys`, `correlation.rules`, and the maps under `data.tables.actor` / `.relationship` are maps keyed by producer-chosen ids (`propertyNames` = `id`); `dictionaries`, `stats`, `extensions`, `badge_map`, and `link_aggregation.metrics` are open maps; `required_params[]` items are objects with no further constraint. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | The payload contract, plane by plane, plus per-producer Shape sections and the aggregator rules a producer relies on. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Migration state per producer, Cloud aggregator and frontend scope, the CTS gate, and design that is not yet in the schema. |
 | `src/go/pkg/topology/v1` | Go builders and the semantic validator (`validate.go`, `validate_notification.go`). |
@@ -34,15 +34,15 @@ starts where those rows have become observations.
 | Function | Producer | Tests |
 |---|---|---|
 | `topology:network-connections` | `src/collectors/network-viewer.plugin/network-viewer-topology.c` (shared renderer; Windows main in `network-viewer-windows.c`, container rules in `network-viewer-topology-containers.c`) | `src/collectors/network-viewer.plugin/tests/validate_topology_payload.py`, `validate_topology_container_fixtures.py`, the C unit tests `test_network_viewer_topology_containers.c` and `test_network_viewer_apps_lookup_client.c`, and fixtures under `tests/fixtures/topology/` (all under `src/collectors/network-viewer.plugin/tests/`) |
-| `topology:streaming` | `src/web/api/functions/function-topology-streaming.c` | no producer-level test; `src/go/tools/functions-validation/fixtures/topology-v1/streaming.json` is a hand-authored schema sample that does not mirror the emitted shape |
+| `topology:streaming` | `src/web/api/functions/function-topology-streaming.c` (path facts from `src/streaming/stream-path.c`) | no producer-level test; `src/go/tools/functions-validation/fixtures/topology-v1/streaming.json` is a hand-authored schema sample that does not mirror the emitted shape |
 | `topology:snmp` | `src/go/plugin/go.d/collector/snmp_topology/` (render in `internal/topologyv1`) | `topology_scenario_golden_test.go`, `internal/topologyv1/golden_test.go`, see `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#validation-checklist` |
 | `topology:vsphere` | `src/go/plugin/go.d/collector/vsphere/func_topology*.go` | `func_topology_test.go` |
 | `topology:cato_networks` | `src/go/plugin/go.d/collector/cato_networks/topology.go`, `catofunc/topology.go` | `topology_test.go` |
 
 All five emit `netdata.topology.v1`; no producer still emits a pre-v1 payload. Remaining per-producer refinements
 are tracked in `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md#current-migration-inventory`. Cross-producer
-fixtures live in `src/go/tools/functions-validation/fixtures/topology-v1/`; the Cloud aggregator itself is not in this
-repository.
+fixtures live in `src/go/tools/functions-validation/fixtures/topology-v1/` (none for `topology:cato_networks`); the
+Cloud aggregator itself is not in this repository.
 
 ## What The Code Enforces
 
@@ -51,11 +51,12 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
 - JSON Schema (`FUNCTION_TOPOLOGY_SCHEMA.json`): structure, required fields, closed tokens, unknown properties. A
   violation is an error from any validator that loads the schema. It does not check cross-references or row counts.
 - Go semantic validator (`topologyv1.ValidateDecodedData` on `data`, `topologyv1.ValidateDecodedResponse` on a whole
-  envelope; both return an error, there is no warning level): reference bounds, column-length equality with `rows`,
+  envelope; both return an error, there is no warning level): actor and link reference bounds (evidence references
+  only where the table type declares `source_evidence`), column-length equality with `rows`,
   dictionary indexes, label-policy display types, search columns, the `ports.sources[]` rules except the
   `actor_table` carve-out below (and `show_bullets` is read untyped, so only the schema rejects a non-boolean),
-  highlight-path column types (including that `path_table` is owned by `actor`, the one use the validator makes of
-  `table_type.owner`), every overlay-refs convention rule except the id-pattern rule (schema-only), correlation rules
+  highlight-path column types (including that a `path_table` not under `data.tables.actor` is owned by `actor`, the
+  one use the validator makes of `table_type.owner`), every overlay-refs convention rule except the id-pattern rule (schema-only), correlation rules
   and point/claim key columns, all modal projections, and the presentation, correlation, and overlay token
   vocabularies. Structural tokens (`orientation`, `direction_role`, `link_type.aggregation.*`, `evidence_type.role`,
   `table_type.role` and `aggregation`, `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are
@@ -73,8 +74,8 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
   only), correlation `key_space` values (schema-required, never read), unknown optional column ids on `actor_table`
   port sources, and the owner of a detail table named as an `actor_table` source by port bullets, modal sections, or
   modal labels (a link- or evidence-owned table is accepted there).
-- `topology:network-connections` returns a Function error with HTTP `413` above its 64 MiB budget and never
-  truncates (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`).
+- The network-connections 64 MiB budget is a producer-side hard stop (a `413` Function error), not a validator check
+  (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`).
 - The SNMP scenario golden suite skips, not fails, without the external fixture checkout
   (`src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#scenario-golden-suite`). A green run without the
   skip line checked proves nothing.
@@ -143,7 +144,8 @@ Each step names the owner section that holds the rules; read it before designing
   merging every null row into one bucket.
 - Fail explicitly on any size or row limit; never truncate a topology and present it as complete.
 - Validators need negative tests: missing label-policy columns, non-display label columns, a missing port-bullet
-  source table, bad highlight-path columns, an invalid token, and a modal projection over a missing source.
+  source table, bad highlight-path columns, an invalid token, and a modal projection over a missing source. A producer
+  that emits `data.notifications` tests schema and semantic parity, omission of the field, and malformed entries.
 - A C producer can be syntax-checked without a full build: configure with
   `cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, then run the file's command from `build/compile_commands.json` with
   `-fsyntax-only`.

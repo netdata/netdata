@@ -68,10 +68,11 @@ echo "${BLUE}=== SOW audit (cwd=$(pwd)) ===${NC}"
 # Heading slugs of one markdown file, one per line, in document order, following GitHub's rule for ATX headings
 # (up to three leading spaces) whose rendered title is plain text: code spans are flattened, inline HTML tags are
 # removed, and markdown links reduce to their text; then the title is lowercased; letters, digits, spaces, hyphens,
-# and underscores are kept, everything else dropped; spaces become hyphens; a repeated slug gets -1, -2, ... with
-# GitHub's collision handling (a generated suffix skips titles that already exist). Fenced code blocks (``` or ~~~,
-# up to three leading spaces, closed only by a fence of the same character at least as long) and HTML comment blocks
-# are ignored. Non-ASCII titles and setext headings are outside the convention (see .agents/skills/README.md).
+# and underscores are kept, everything else dropped; spaces become hyphens; a repeated slug gets -1, -2, ...; a
+# generated suffix that collides with a literal title gets a further suffix (this script's disambiguation; GitHub's
+# own numbering differs there, so such titles are outside the convention). Fenced code blocks (``` or ~~~, up to
+# three leading spaces, closed only by a fence of the same character at least as long) and multi-line HTML comment
+# blocks are ignored. Non-ASCII titles and setext headings are outside the convention (see .agents/skills/README.md).
 md_heading_slugs() {
   md_markdown_lines "$1" | awk '
     /^ {0,3}#{1,6}[ \t]/ {
