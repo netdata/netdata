@@ -5,15 +5,16 @@ description: How to create, edit, slim, split, or review a skill under .agents/s
 
 # Skill Authoring
 
-Developer skill for assistants changing this repository's skills. The MUSTs live in the root `AGENTS.md` and
-`.agents/skills/README.md`; this skill points at them and states only the rules and the method that have no other
-home. When an owner document and this skill disagree, the owner wins and this file is fixed in the same change.
+Developer skill for assistants changing this repository's skills. The MUSTs that have another home live in the root
+`AGENTS.md` and `.agents/skills/README.md`; this skill points at them and states only the rules and the method that
+have no other home. When an owner document and this skill disagree, the owner wins and this file is fixed in the same
+change.
 
 ## Pick Your Task
 
 | Task | Read |
 |---|---|
-| create a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, `./SKILL.md#creating-a-skill`; `./change-method.md#review-round`, `./change-method.md#mechanical-hygiene` |
+| create a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, `./SKILL.md#creating-a-skill`; `./change-method.md#review-round`, `./change-method.md#mechanical-hygiene`, `./change-method.md#close` |
 | add or change rules in an existing skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`; `./change-method.md#recorded-findings-and-owners`, `./change-method.md#mechanical-hygiene`, `./change-method.md#close` |
 | slim, split, or restructure a skill | `./SKILL.md#where-the-rules-live`, `./SKILL.md#authoring-rules`, then all of `./change-method.md#changing-a-skill`; the method is not optional |
 | periodic rot pass | `./SKILL.md#rot-signals` |
@@ -21,7 +22,8 @@ home. When an owner document and this skill disagree, the owner wins and this fi
 
 ## Where The Rules Live
 
-Owner sections, cited by anchor so the audit catches a renamed heading. Read the row for the obligation it names.
+Owner sections, cited by anchor (`.agents/skills/README.md#owner-section-citations`). Read the row for the obligation it
+names.
 
 | Owner section | What you must get from it |
 |---|---|
@@ -29,21 +31,20 @@ Owner sections, cited by anchor so the audit catches a renamed heading. Read the
 | `AGENTS.md#durable-ai-facing-artifact-formatting` | retrieval structure, requirement words next to the action, prose width, reflow-only commits |
 | `AGENTS.md#sensitive-data-in-durable-artifacts` | the public-artifact assumption and the sanitized-evidence requirement |
 | `AGENTS.md#enforcement` | what `.agents/sow/audit.sh` hard-fails on and what the PR gate `.github/workflows/sow.yml` re-checks |
-| `AGENTS.md#local-only-working-directory` | evidence goes under `.local/audits/<dir>/`; this skill's row names the directory after the skill or SOW topic under change |
+| `AGENTS.md#local-only-working-directory` | where skill-change evidence goes, and how this skill's `<dir>` (the `<subject>` in `./change-method.md#changing-a-skill`) is named |
 | `AGENTS.md#clean-end-state-over-less-churn` | the target is recorded before options are generated; the disclosure of what is removed and what is excluded; the reference search when a path is replaced; how coupled cleanup is handled |
 | `AGENTS.md#working-with-the-user` | the user-decision format and when a decision is recorded |
 | `AGENTS.md#review` | the blocker bar, what to do with a finding before acting, red test first, checkpoint commits, when a round repeats, the recurrence guard |
-| `AGENTS.md#when-a-sow-is-required`, `AGENTS.md#followup-discipline`, `AGENTS.md#artifact-maintenance-gate` | a skill change is non-trivial work with a SOW; how deferred items are tracked; what every close records |
+| `AGENTS.md#when-a-sow-is-required`, `AGENTS.md#followup-discipline`, `AGENTS.md#validation-gate`, `AGENTS.md#artifact-maintenance-gate` | a skill change is non-trivial work with a SOW; how deferred items are tracked; what Validation must hold and what every close records |
 | `AGENTS.md#git-and-pr-workflow` | staging, and which git actions need explicit approval (deleting a file among them) |
 | `AGENTS.md#open-source-reference-evidence` | the citation form for an owner outside this repository |
-| `.agents/skills/README.md#naming`, `.agents/skills/README.md#areas` | the name form and the area minting rule with its same-change obligation; the no-nesting rule is in the README's opening paragraph |
+| `.agents/skills/README.md#skills`, `.agents/skills/README.md#naming`, `.agents/skills/README.md#areas` | the no-nesting rule; the name form; the area minting rule with its same-change obligation |
 | `.agents/skills/README.md#owner-section-citations` | the point-rather-than-restate rule and the anchor form (a MUST) with its slug rules; the marker paragraph for a private owner document, none for a Learn-published one |
 | `.agents/skills/README.md#finding-a-skill` | the index is the map; the frontmatter description is the trigger; the cross-reference for a skill serving two areas |
 
 ## Authoring Rules
 
-Every requirement below is a MUST unless it says SHOULD or MAY; a sentence stating a fact or a consequence is marked as
-such by its wording.
+Every requirement below is a MUST unless it says SHOULD or MAY.
 
 Ownership and pointing:
 
@@ -56,8 +57,8 @@ Ownership and pointing:
 - When the only owner of a fact is a script or a workflow (`.agents/sow/audit.sh`, `.github/workflows/sow.yml`),
   attribute the fact to that file, not to the prose section that names the script: a section that does not state the
   fact cannot be checked against it, and renaming the section never exposes the drift.
-- Cite the repository path, never a bare filename; several documents in this tree share a basename. Inside a skill,
-  cite a section of its own files as `./<file>.md#<anchor>` so the audit checks it.
+- Cite the repository path, never a bare filename; several documents in this tree share a basename. A one-segment
+  path names a repository-root file. Inside a skill, cite a section of its own files as `./<file>.md#<anchor>`.
 - An owner outside this repository cannot be an anchor citation: read it from the local mirror (`repo-mirror-sources`)
   and cite it as `owner/repo @ commit` (`AGENTS.md#open-source-reference-evidence`). A fact whose only owner is out of
   repo stays in the skill, labelled with what verified it and when, or as unverifiable; never delete what you cannot
@@ -131,9 +132,10 @@ Structure and routing:
 4. If the skill writes output, add its row to the table in `AGENTS.md#local-only-working-directory`.
 5. Add the index entry under its area in `AGENTS.md#project-skills`, in the bullet form the existing entries use, and,
    when the skill serves two areas, the cross-reference `.agents/skills/README.md#finding-a-skill` asks for.
-6. `git add` the new files first (the audit reads tracked files), run `bash .agents/sow/audit.sh` (nothing in CI
-   replaces it), then one review round with the correctness lens of `./change-method.md#review-round` plus a
-   trigger-coverage check. A creation has no inventory, so no preservation map and no preservation lens.
+6. Run the audit and close per `./change-method.md#close`, then one review round with the correctness lens of
+   `./change-method.md#review-round` plus a trigger-coverage check: the description names a phrase a user would type
+   for every task the router lists, and the index entry names every producer, subcommand, or binary the skill covers.
+   A creation has no inventory, so no preservation map and no preservation lens.
 
 ## Rot Signals
 
@@ -141,7 +143,7 @@ Run this over a skill periodically and before extending it. A cluster of hits is
 in the same change.
 
 - Line-number citations; PR, commit, issue, or SOW identifiers; a promise that line numbers track a branch. Grep for
-  them; do not assume the audit does.
+  them; the audit automates only its legacy SOW-identifier check.
 - A code-side document now exists for facts the skill states.
 - "Authoritative design", "Spec -", Status, Migration Notes, Schema Additions Required, phase history, open review
   questions.
