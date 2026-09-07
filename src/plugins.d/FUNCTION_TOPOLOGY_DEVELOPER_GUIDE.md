@@ -785,7 +785,8 @@ Example actor custom table type:
         "aggregation": "append",
         "columns": [
           {"id": "actor", "type": "actor_ref", "role": "reference"},
-          {"id": "hop", "type": "uint"},
+          {"id": "path_actor", "type": "actor_ref", "role": "reference"},
+          {"id": "path_index", "type": "uint"},
           {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
           {"id": "since", "type": "timestamp"}
         ]

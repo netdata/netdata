@@ -27,6 +27,10 @@ topology skill, not to the public/operator query skills.
    ```bash
    AGENT_URL="${AGENT_URL:-http://127.0.0.1:19999}"
    AGENT_URL="${AGENT_URL%/}"
+   case "$AGENT_URL" in
+     http://*) ;;
+     *) echo "this recipe supports plain-HTTP agents only (agents_query_agent speaks http://)" >&2; return 1 2>/dev/null || exit 1 ;;
+   esac
    AGENT_HOST="${AGENT_URL#http://}"
    AGENT_HOST="${AGENT_HOST%%/*}"
 

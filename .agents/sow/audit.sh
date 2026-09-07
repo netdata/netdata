@@ -71,8 +71,8 @@ echo "${BLUE}=== SOW audit (cwd=$(pwd)) ===${NC}"
 # and underscores are kept, everything else dropped; spaces become hyphens; a repeated slug gets -1, -2, ...; a
 # generated suffix that collides with a literal title gets a further suffix (this script's disambiguation; GitHub's
 # own numbering differs there, so such titles are outside the convention). Fenced code blocks (``` or ~~~, up to
-# three leading spaces, closed only by a fence of the same character at least as long) and multi-line HTML comment
-# blocks are ignored. Non-ASCII titles and setext headings are outside the convention (see .agents/skills/README.md).
+# three leading spaces, closed only by a fence of the same character at least as long with nothing but whitespace
+# after it) and HTML comment blocks (from an opener anywhere on a line to the next closer) are ignored. Non-ASCII titles and setext headings are outside the convention (see .agents/skills/README.md).
 md_heading_slugs() {
   md_markdown_lines "$1" | awk '
     /^ {0,3}#{1,6}[ \t]/ {
@@ -86,9 +86,10 @@ md_heading_slugs() {
       }
       gsub(/`/, "", h)
       gsub(/<[^>]*>/, "", h)
-      while (match(h, /\[[^]]*\]\([^)]*\)/)) {
+      while (match(h, /\[[^]]*\]\([^()]*(\([^()]*\)[^()]*)*\)/)) {
         link = substr(h, RSTART, RLENGTH)
-        text = link; sub(/\]\([^)]*\)$/, "", text); sub(/^\[/, "", text)
+        text = link; sub(/\]\([^()]*(\([^()]*\)[^()]*)*\)$/, "", text); sub(/^\[/, "", text)
+        if (text == link) break
         h = substr(h, 1, RSTART - 1) text substr(h, RSTART + RLENGTH)
       }
       h = tolower(h)
@@ -108,14 +109,19 @@ md_markdown_lines() {
     {
       line = $0
       if (incomment) { if (index(line, "-->")) incomment = 0; next }
-      if (!infence && match(line, /^ {0,3}<!--/) && !index(line, "-->")) { incomment = 1; next }
       if (match(line, /^ {0,3}(`{3,}|~{3,})/)) {
         t = substr(line, RSTART, RLENGTH); sub(/^ */, "", t)
         c = substr(t, 1, 1); l = length(t)
+        rest = substr(line, RSTART + RLENGTH)
         if (!infence) { infence = 1; fchar = c; flen = l; next }
-        else if (c == fchar && l >= flen) { infence = 0; next }
+        else if (c == fchar && l >= flen && rest ~ /^[ \t]*$/) { infence = 0; next }
       }
       if (infence) next
+      if ((o = index(line, "<!--")) > 0 && !index(substr(line, o), "-->")) {
+        incomment = 1
+        if (o > 1) print substr(line, 1, o - 1)
+        next
+      }
       print line
     }' "$1"
 }
@@ -472,7 +478,7 @@ if [ -d .agents/skills ]; then
     if [ ! -f "$target" ]; then
       fail "$file cites $ref but $target does not exist"
       skills_bad=1
-    elif ! md_heading_slugs "$target" | grep -Fxq -- "$anchor"; then
+    elif ! md_heading_slugs "$target" | grep -Fx -- "$anchor" >/dev/null; then
       fail "$file cites $ref but no heading in $target has the anchor #$anchor"
       skills_bad=1
     fi

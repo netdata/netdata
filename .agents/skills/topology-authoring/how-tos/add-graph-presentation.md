@@ -24,7 +24,8 @@ highlight paths) to a `netdata.topology.v1` payload without making the UI domain
 3. For highlight paths, set `selection.actor_click.mode: highlight_path` with `path_table`, `path_actor_column`
    (`actor_ref`, the path member), and `path_order_column` (numeric). When the same table stores a different path per
    clicked actor, add `path_owner_column` (`actor_ref`, the clicked actor) and keep it a separate column from the
-   member column. The owner column is optional for backward compatibility and for one shared global path.
+   member column. The owner column is optional for backward compatibility and for one shared global path. The
+   example below is the streaming producer's wiring (`function-topology-streaming.c`, table `stream_path`).
 
    ```json
    {
