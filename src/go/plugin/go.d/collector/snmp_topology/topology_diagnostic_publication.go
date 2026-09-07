@@ -7,18 +7,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
 type topologyDiagnosticProvider struct {
 	registry *topologyRegistry
-	aborted  *atomic.Pointer[topologyAbortedSweepDiagnostic]
+	aborted  *atomic.Pointer[topologydiag.AbortedSweep]
 	source   deviceLifecycleSource
 }
 
 func (p *topologyDiagnosticProvider) Capture() (snmpdiag.Snapshot, error) {
 	diagnostics := captureTopologyCut(p.registry, p.aborted.Load())
-	diagnostics.lifecycle.state = diagnosticCaptureAvailable
-	snapshot, err := newTopologyDiagnosticArchiveSnapshotV1(diagnostics)
+	diagnostics.Lifecycle.State = topologydiag.CaptureAvailable
+	snapshot, err := topologydiag.NewSnapshot(diagnostics)
 	if err != nil {
 		return snmpdiag.Snapshot{}, err
 	}
@@ -27,18 +28,23 @@ func (p *topologyDiagnosticProvider) Capture() (snmpdiag.Snapshot, error) {
 }
 
 type topologyJobConfigLifecycle struct{ publisher *snmpdiag.Publisher }
+
 type topologyConfigSnapshot struct {
 	id collectorapi.JobConfigIdentity
 }
 
 func (s topologyConfigSnapshot) Identity() collectorapi.JobConfigIdentity { return s.id }
+
 func (*topologyJobConfigLifecycle) Project(id collectorapi.JobConfigIdentity, _ map[string]any) collectorapi.JobConfigLifecycleSnapshot {
 	return topologyConfigSnapshot{id}
 }
+
 func (*topologyJobConfigLifecycle) Bind(collectorapi.JobConfigIdentity, collectorapi.RuntimeJob) {}
+
 func (*topologyJobConfigLifecycle) Capture(id collectorapi.JobConfigIdentity, _ collectorapi.RuntimeJob) collectorapi.JobConfigLifecycleSnapshot {
 	return topologyConfigSnapshot{id}
 }
+
 func (h *topologyJobConfigLifecycle) Reconcile(_ collectorapi.JobConfigIdentity, snapshot collectorapi.JobConfigLifecycleSnapshot, job collectorapi.RuntimeJob) {
 	if h.publisher == nil {
 		return
@@ -51,6 +57,7 @@ func (h *topologyJobConfigLifecycle) Reconcile(_ collectorapi.JobConfigIdentity,
 	}
 	h.publisher.SetTopology(snapshot.Identity().String(), nil, snmpdiag.DefaultInterval)
 }
+
 func (h *topologyJobConfigLifecycle) Remove(id collectorapi.JobConfigIdentity) {
 	if h.publisher != nil {
 		h.publisher.RemoveTopology(id.String())

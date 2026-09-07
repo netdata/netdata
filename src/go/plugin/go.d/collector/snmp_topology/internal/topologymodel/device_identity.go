@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologymodel
 
 import (
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func ensureTopologyObservationDeviceID(device topologymodel.Device, baseBridgeAddress string) string {
-	if mac := topologyPrimaryIdentityMAC(device.ChassisID, baseBridgeAddress); mac != "" {
+func ObservationDeviceID(device Device, baseBridgeAddress string) string {
+	if mac := primaryIdentityMAC(device.ChassisID, baseBridgeAddress); mac != "" {
 		return "macAddress:" + mac
 	}
-	if key := strings.TrimSpace(topologyDeviceKey(device)); key != "" {
+	if key := deviceKey(device); key != "" {
 		return key
 	}
 	if sysName := strings.TrimSpace(device.SysName); sysName != "" {
@@ -37,11 +36,27 @@ func ensureTopologyObservationDeviceID(device topologymodel.Device, baseBridgeAd
 	return "local-device"
 }
 
-func topologyPrimaryIdentityMAC(chassisID, baseBridgeAddress string) string {
+func primaryIdentityMAC(chassisID, baseBridgeAddress string) string {
 	for _, candidate := range []string{chassisID, baseBridgeAddress} {
 		if mac := topologyutil.NormalizeMAC(candidate); mac != "" && mac != "00:00:00:00:00:00" {
 			return mac
 		}
 	}
 	return ""
+}
+
+func deviceKey(dev Device) string {
+	chassisID := strings.TrimSpace(dev.ChassisID)
+	if chassisID == "" {
+		return ""
+	}
+	return strings.TrimSpace(dev.ChassisIDType) + ":" + chassisID
+}
+
+// LocalActorID applies the same fallback used by live local actor construction.
+func LocalActorID(localDeviceID string, device Device) string {
+	if id := strings.TrimSpace(localDeviceID); id != "" {
+		return id
+	}
+	return ObservationDeviceID(device, "")
 }

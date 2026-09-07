@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologydiag
 
 import (
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
-
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 const (

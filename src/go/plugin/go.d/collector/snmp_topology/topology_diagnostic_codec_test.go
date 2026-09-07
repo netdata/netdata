@@ -6,18 +6,24 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"strconv"
+	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/stretchr/testify/require"
 )
 
-func writeTopologyDiagnosticArchive(w io.Writer, diagnostics topologyDiagnostics) error {
+func writeTopologyDiagnosticArchive(w io.Writer, diagnostics topologydiag.Cut) error {
 	return writeTopologyDiagnosticArchiveWithProducerVersion(w, diagnostics, buildinfo.Version)
 }
 
 func writeTopologyDiagnosticArchiveWithProducerVersion(
 	w io.Writer,
-	diagnostics topologyDiagnostics,
+	diagnostics topologydiag.Cut,
 	producerVersion string,
 ) error {
 	if w == nil {
@@ -30,26 +36,11 @@ func writeTopologyDiagnosticArchiveWithProducerVersion(
 	return snmpdiag.Write(w, document)
 }
 
-func readTopologyDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (topologyDiagnosticArchive, error) {
-	document, err := snmpdiag.Read(r, limits)
-	if err != nil {
-		return topologyDiagnosticArchive{}, err
-	}
-	diagnostics, err := restoreArchiveDocument(document)
-	if err != nil {
-		return topologyDiagnosticArchive{}, fmt.Errorf("read SNMP topology diagnostic archive: %w", err)
-	}
-	return topologyDiagnosticArchive{
-		producerVersion: document.Producer.AgentVersion,
-		diagnostics:     diagnostics,
-	}, nil
-}
-
 func newTopologyDiagnosticArchiveDocumentV1(
-	diagnostics topologyDiagnostics,
+	diagnostics topologydiag.Cut,
 	producerVersion string,
 ) (snmpdiag.Document, error) {
-	snapshot, err := newTopologyDiagnosticArchiveSnapshotV1(diagnostics)
+	snapshot, err := topologydiag.NewSnapshot(diagnostics)
 	if err != nil {
 		return snmpdiag.Document{}, err
 	}
@@ -64,25 +55,46 @@ func newTopologyDiagnosticArchiveDocumentV1(
 }
 
 // Native-cut tests inspect immutability and retention before wire conversion.
-func (c *Collector) acquireTopologyDiagnostics() topologyDiagnostics {
+func (c *Collector) acquireTopologyDiagnostics() topologydiag.Cut {
 	diagnostics := captureTopologyCut(
 		c.topologyRegistry,
 		c.lastAbortedTopologyDiagnostic.Load(),
 	)
-	diagnostics.lifecycle = acquireTopologyJobLifecycleCut(c.diagnosticProvider.source)
 	return diagnostics
 }
 
-func acquireTopologyJobLifecycleCut(
-	source deviceLifecycleSource,
-) topologyJobLifecycleDiagnosticCut {
-	projected := snmpdiag.CaptureLifecycle(source)
-	result, err := restoreArchiveLifecycle(projected)
-	if err != nil {
-		return topologyJobLifecycleDiagnosticCut{
-			state:  diagnosticCaptureUnavailable,
-			reason: diagnosticCaptureReasonProjectionError,
+func openTestDiagnosticCut(tb testing.TB, cut topologydiag.Cut) *DiagnosticArchive {
+	tb.Helper()
+	document, err := newTopologyDiagnosticArchiveDocumentV1(cut, "v-test")
+	require.NoError(tb, err)
+	archive, err := InspectDiagnosticDocument(document)
+	require.NoError(tb, err)
+	return archive
+}
+
+func testDiagnosticQuery(options topologyoptions.QueryOptions) DiagnosticQueryOptions {
+	depth := strconv.Itoa(options.Depth)
+	if options.Depth == topologyoptions.DepthAllInternal {
+		depth = topologyoptions.DepthAll
+	}
+	return DiagnosticQueryOptions{
+		CollapseActorsByIP:     options.CollapseActorsByIP,
+		EliminateNonIPInferred: options.EliminateNonIPInferred,
+		MapType:                options.MapType,
+		InferenceStrategy:      options.InferenceStrategy,
+		ManagedDeviceFocus:     options.ManagedDeviceFocus,
+		Depth:                  depth,
+	}
+}
+
+func testLatestArchiveCapture(t testing.TB, document *snmpdiag.Document, index int) *snmpdiag.Capture {
+	t.Helper()
+	for i := range document.Snapshot.Topology.Devices[index].Captures {
+		capture := &document.Snapshot.Topology.Devices[index].Captures[i]
+		if slices.Contains(capture.Roles, "latest_attempt") {
+			return capture
 		}
 	}
-	return result
+	t.Fatal("archive has no latest attempt")
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/stretchr/testify/require"
@@ -78,9 +79,8 @@ func TestTopologyDiagnosticsReplayMatchesLiveTypedPayload(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, ok)
 
-			replayed, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+			replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 			require.NoError(t, err)
-			require.True(t, ok)
 			require.Equal(t,
 				topologyv1test.NormalizeData(t, live),
 				topologyv1test.NormalizeData(t, replayed),
@@ -99,9 +99,8 @@ func TestTopologyDiagnosticsReplayExcludesOnlyPTRDerivedPresentation(t *testing.
 	live, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(scenario.opts)
 	require.NoError(t, err)
 	require.True(t, ok)
-	replayed, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+	replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.True(t, ok)
 
 	liveNormalized := topologyv1test.NormalizeData(t, live)
 	replayedNormalized := topologyv1test.NormalizeData(t, replayed)
@@ -125,9 +124,8 @@ func TestTopologyDiagnosticsReplayUsesCompiledOUIKernel(t *testing.T) {
 	live, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(scenario.opts)
 	require.NoError(t, err)
 	require.True(t, ok)
-	replayed, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+	replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.True(t, ok)
 
 	liveNormalized := topologyv1test.NormalizeData(t, live)
 	replayedNormalized := topologyv1test.NormalizeData(t, replayed)
@@ -141,12 +139,13 @@ func TestTopologyDiagnosticsReplayUsesCompiledOUIKernel(t *testing.T) {
 func TestTopologyDiagnosticsReplayRejectsIncompleteRenderableEvidence(t *testing.T) {
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
-	require.NotEmpty(t, diagnostics.topology.devices)
-	diagnostics.topology.devices[0].acquisition = nil
+	require.NotEmpty(t, diagnostics.Topology.Devices)
+	diagnostics.Topology.Devices[0].Acquisition = nil
 
-	_, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+	_, err = InspectDiagnosticDocument(document)
 	require.Error(t, err)
-	require.False(t, ok)
 }
 
 func TestTopologyGenerationOwnsProducerScope(t *testing.T) {
@@ -159,9 +158,8 @@ func TestTopologyGenerationOwnsProducerScope(t *testing.T) {
 	live, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(scenario.opts)
 	require.NoError(t, err)
 	require.True(t, ok)
-	replayed, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+	replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.True(t, ok)
 	require.Equal(t,
 		topologyv1test.NormalizeData(t, live),
 		topologyv1test.NormalizeData(t, replayed),
@@ -171,18 +169,19 @@ func TestTopologyGenerationOwnsProducerScope(t *testing.T) {
 func TestTopologyDiagnosticsReplayRejectsMissingObservationTime(t *testing.T) {
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
-	require.NotNil(t, diagnostics.topology.devices[0].acquisition.evidence)
-	diagnostics.topology.devices[0].acquisition.evidence.collectedAt = time.Time{}
+	require.NotNil(t, diagnostics.Topology.Devices[0].Acquisition.Evidence)
+	diagnostics.Topology.Devices[0].Acquisition.Evidence.CollectedAt = time.Time{}
 
-	_, ok, err := replayTopologyDiagnostics(diagnostics, scenario.opts)
+	document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
+	require.NoError(t, err)
+	_, err = InspectDiagnosticDocument(document)
 	require.Error(t, err)
-	require.False(t, ok)
 }
 
 func newTopologyScenarioReplayFixture(
 	t testing.TB,
 	scenario *topologyScenario,
-) (*topologyRegistry, topologyDiagnostics) {
+) (*topologyRegistry, topologydiag.Cut) {
 	t.Helper()
 
 	const sequence = uint64(1)
@@ -207,9 +206,9 @@ func newTopologyScenarioReplayFixture(
 			BGPRows:         scenario.bgpRowsForDevice(device),
 		}
 		recorder := newTopologyAcquisitionRecorder(
-			topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1},
-			topologySemanticDeviceInputFromConnection(info),
-			topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+			topologydiag.AcquisitionAttemptID{RegistrationID: registrationID, Ordinal: 1},
+			topologyDeviceInputFromConnection(info),
+			topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 		)
 		observer := recorder.beginContext(0, "", "")
 		observer.ObserveProfile(acquisitionReportForMetrics(
@@ -220,7 +219,7 @@ func newTopologyScenarioReplayFixture(
 		recorder.completeContext(0, successfulAcquisitionPhase())
 		recorder.setCollectedShape(topologyScenarioCollectedAt, time.Hour, 3600)
 		capture := recorder.finish()
-		require.Equal(t, diagnosticCaptureAvailable, capture.state)
+		require.Equal(t, topologydiag.CaptureAvailable, capture.State)
 
 		snapshot, _ := freezeTopologyBuilder(scenario.cacheForDevice(t, device))
 		snapshot.acquisition = capture
@@ -236,7 +235,7 @@ func newTopologyScenarioReplayFixture(
 			attemptOrdinal: 1,
 			lastAttempt:    topologyScenarioCollectedAt,
 			lastSuccess:    topologyScenarioCollectedAt,
-			outcome:        deviceRefreshOutcomeSuccess,
+			outcome:        topologydiag.RefreshOutcomeSuccess,
 		}
 		states[registrationID] = state
 		entries = append(entries, ddsnmp.DeviceEntry{RegistrationID: registrationID, Info: info})
@@ -263,9 +262,9 @@ func newTopologyScenarioReplayFixture(
 	generation.diagnostic = cut
 	registry.publishGeneration(generation)
 
-	return registry, topologyDiagnostics{
-		producerScopeID: generation.producerScopeID,
-		topology:        generation.diagnostic,
+	return registry, topologydiag.Cut{
+		ProducerScopeID: generation.producerScopeID,
+		Topology:        generation.diagnostic,
 	}
 }
 

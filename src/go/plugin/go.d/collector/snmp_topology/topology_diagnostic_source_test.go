@@ -18,10 +18,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,24 +36,28 @@ func TestDiagnosticCaptureKeepsLargeEvidence(t *testing.T) {
 			states := make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState)
 			for i := 0; i < tc.devices; i++ {
 				id := ddsnmp.DeviceRegistrationID(i + 1)
-				recorder := newTopologyAcquisitionRecorder(topologyAcquisitionAttemptID{registrationID: id, ordinal: 1}, topologySemanticDeviceInput{hostname: "192.0.2.1", sysDescr: description}, testTopologyTarget())
+				recorder := newTopologyAcquisitionRecorder(topologydiag.AcquisitionAttemptID{RegistrationID: id, Ordinal: 1}, topologydiag.DeviceInput{Hostname: "192.0.2.1", SysDescr: description}, testTopologyTarget())
 				recorder.beginContext(0, "", "")
 				capture := recorder.finish()
-				require.Equal(t, diagnosticCaptureAvailable, capture.state)
-				require.Equal(t, description, capture.evidence.device.sysDescr)
+				require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+				require.Equal(t, description, capture.Evidence.Device.SysDescr)
 				entries = append(entries, ddsnmp.DeviceEntry{RegistrationID: id})
-				states[id] = deviceRefreshState{latestAttempt: capture, attemptOrdinal: 1, outcome: deviceRefreshOutcomeFailed}
+				states[id] = deviceRefreshState{latestAttempt: capture, attemptOrdinal: 1, outcome: topologydiag.RefreshOutcomeFailed}
 			}
 			cut, err := projectTopologyDiagnosticCut(topologyDiagnosticCutInput{sequence: 1, startedAt: time.Now(), publishedAt: time.Now(), entries: entries, states: states})
 			require.NoError(t, err)
-			require.Equal(t, diagnosticCaptureAvailable, cut.captureState)
+			require.Equal(t, topologydiag.CaptureAvailable, cut.CaptureState)
 			var archive bytes.Buffer
-			require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&archive, topologyDiagnostics{topology: cut}, "test"))
-			restored, err := readTopologyDiagnosticArchive(&archive, snmpdiag.DefaultReadLimits())
+			require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&archive, topologydiag.Cut{Topology: cut}, "test"))
+			document, err := snmpdiag.Read(&archive, snmpdiag.DefaultReadLimits())
 			require.NoError(t, err)
-			require.Len(t, restored.diagnostics.topology.devices, tc.devices)
-			for _, device := range restored.diagnostics.topology.devices {
-				require.Equal(t, description, device.latestAttempt.evidence.device.sysDescr)
+			restored, err := InspectDiagnosticDocument(document)
+			require.NoError(t, err)
+			summary, err := restored.Summary()
+			require.NoError(t, err)
+			require.Len(t, summary.Registrations, tc.devices)
+			for _, device := range document.Snapshot.Topology.Devices {
+				require.Equal(t, description, device.Captures[0].Evidence.Device.SysDescr)
 			}
 		})
 	}
@@ -68,15 +72,15 @@ func TestSourceEvidenceArchiveAndInspection(t *testing.T) {
 	capture := collectSourceTestCapture(t, pdus)
 	scenario := newLLDPDirectScenario()
 	_, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
-	diagnostics.topology.devices[0].latestAttempt = capture
+	diagnostics.Topology.Devices[0].LatestAttempt = capture
 	var encoded bytes.Buffer
 	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "test"))
 	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
 	require.NoError(t, err)
-	inspected, err := archive.InspectDevice(diagnosticQueryOptionsFromInternal(scenario.opts), 1)
+	inspected, err := archive.InspectDevice(testDiagnosticQuery(scenario.opts), 1)
 	require.NoError(t, err)
 	sources := inspected.LatestAttempt.CollectionContexts[0].Sources
-	require.Equal(t, capture.evidence.collectionContexts[0].sources, sources)
+	require.Equal(t, capture.Evidence.CollectionContexts[0].Sources, sources)
 	require.Len(t, sources, 2)
 	require.Len(t, sources[1].PDUs, 3, "partial duplicate and exceptional results survive downstream rejection")
 	require.Equal(t, []uint64{2}, inspected.LatestAttempt.CollectionContexts[0].Profiles[0].Execution.WalkOperations)
@@ -94,15 +98,17 @@ func TestSourceEvidenceImportRejectsInvalidReferences(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			capture := collectExecutionTestCapture(t)
-			dto, err := newTopologyDiagnosticArchiveContextEvidenceV1(capture.evidence.collectionContexts[0])
+			_, cut := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+			cut.Topology.Devices[0].LatestAttempt = capture
+			document, err := newTopologyDiagnosticArchiveDocumentV1(cut, "v-test")
 			require.NoError(t, err)
 			// Decode a separate document, as an imported archive would, before corrupting it.
-			data, err := json.Marshal(dto)
+			data, err := json.Marshal(document)
 			require.NoError(t, err)
-			var imported snmpdiag.ContextEvidence
+			var imported snmpdiag.Document
 			require.NoError(t, json.Unmarshal(data, &imported))
-			tc.mutate(&imported)
-			_, err = restoreArchiveContextEvidence(imported)
+			tc.mutate(&testLatestArchiveCapture(t, &imported, 0).Evidence.CollectionContexts[0])
+			_, err = InspectDiagnosticDocument(imported)
 			require.Error(t, err)
 		})
 	}
@@ -130,7 +136,7 @@ func TestVLANSourceEvidenceUsesActualContextCollection(t *testing.T) {
 			collector := newTestSNMPTopologyCollector()
 			collector.newSnmpClient = func() gosnmp.Handler { return handler }
 			profiles := []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{Kind: ddsnmp.KindIfName, MetricsConfig: ddprofiledefinition.MetricsConfig{Table: ddprofiledefinition.SymbolConfig{OID: root, Name: "table"}, Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}}}}}}}}
-			recorder := newTopologyAcquisitionRecorder(testTopologyAttemptID(1), topologySemanticDeviceInputFromConnection(dev), testTopologyTarget())
+			recorder := newTopologyAcquisitionRecorder(testTopologyAttemptID(1), topologyDeviceInputFromConnection(dev), testTopologyTarget())
 			observer := recorder.beginContext(1, tc.vlan, "synthetic")
 			_, progress, err := collectTopologyVLANContext(context.Background(), collector, dev, tc.vlan, profiles, observer)
 			require.Equal(t, tc.failed, err != nil)
@@ -139,7 +145,7 @@ func TestVLANSourceEvidenceUsesActualContextCollection(t *testing.T) {
 			require.Len(t, progress.sources[0].PDUs, 1)
 			require.Equal(t, "7", progress.sources[0].PDUs[0].Value.Text)
 			require.Equal(t, tc.failed, progress.sources[0].Failure.Reason != "")
-			require.Equal(t, []uint64{1}, recorder.contextByOrdinal(1).profiles[0].execution.WalkOperations)
+			require.Equal(t, []uint64{1}, recorder.contextByOrdinal(1).Profiles[0].Execution.WalkOperations)
 		})
 	}
 }
@@ -184,12 +190,12 @@ func BenchmarkTopologySourceEvidenceMemory(b *testing.B) {
 				var retained runtime.MemStats
 				runtime.ReadMemStats(&retained)
 				_, diagnostics := newTopologyScenarioReplayFixture(b, newLLDPDirectScenario())
-				diagnostics.topology.devices[0].latestAttempt = capture
+				diagnostics.Topology.Devices[0].LatestAttempt = capture
 				var archive bytes.Buffer
 				if err := writeTopologyDiagnosticArchiveWithProducerVersion(&archive, diagnostics, "benchmark"); err != nil {
 					b.Fatal(err)
 				}
-				restored, err := readTopologyDiagnosticArchive(bytes.NewReader(archive.Bytes()), snmpdiag.DefaultReadLimits())
+				restored, err := readTestDiagnosticArchive(bytes.NewReader(archive.Bytes()), snmpdiag.DefaultReadLimits())
 				if err != nil {
 					b.Fatal(err)
 				}

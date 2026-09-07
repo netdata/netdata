@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
 const (
@@ -16,85 +17,6 @@ const (
 
 type deviceLifecycleSource interface {
 	LifecycleCut() ddsnmp.DeviceLifecycleCut
-}
-
-type topologyJobLifecycleDiagnosticCut struct {
-	state  diagnosticCaptureState
-	reason diagnosticCaptureReason
-	cut    ddsnmp.DeviceLifecycleCut
-}
-
-type topologySweepDeviceDiagnostic struct {
-	registrationID ddsnmp.DeviceRegistrationID
-	selected       bool
-	outcome        deviceRefreshOutcome
-	lastAttempt    time.Time
-	lastSuccess    time.Time
-	nextRetry      time.Time
-
-	retainedSuccess    topologyEvidenceRef
-	hasRetainedSuccess bool
-	acquisition        *topologyAcquisitionCapture
-	latestAttempt      *topologyAcquisitionCapture
-	hasObservation     bool
-	expiresAt          time.Time
-	renderable         bool
-	expired            bool
-}
-
-type topologyRemovedDeviceDiagnostic struct {
-	registrationID     ddsnmp.DeviceRegistrationID
-	retainedSuccess    topologyEvidenceRef
-	hasRetainedSuccess bool
-}
-
-type topologySweepDiagnosticCut struct {
-	sequence      uint64
-	startedAt     time.Time
-	publishedAt   time.Time
-	captureState  diagnosticCaptureState
-	captureReason diagnosticCaptureReason
-	recordCount   uint64
-	logicalBytes  uint64
-	devices       []topologySweepDeviceDiagnostic
-	removed       []topologyRemovedDeviceDiagnostic
-}
-
-type topologyDiagnosticAbortReason uint8
-
-const (
-	topologyDiagnosticAbortUnknown topologyDiagnosticAbortReason = iota
-	topologyDiagnosticAbortCanceled
-	topologyDiagnosticAbortPanic
-)
-
-type topologyDiagnosticSweepPhase uint8
-
-const (
-	topologyDiagnosticSweepPhaseUnknown topologyDiagnosticSweepPhase = iota
-	topologyDiagnosticSweepPhaseRegistrationCut
-	topologyDiagnosticSweepPhaseTargetResolution
-	topologyDiagnosticSweepPhaseDeviceRefresh
-	topologyDiagnosticSweepPhaseCommit
-)
-
-type topologyAbortedSweepDiagnostic struct {
-	sequence              uint64
-	startedAt             time.Time
-	abortedAt             time.Time
-	reason                topologyDiagnosticAbortReason
-	phase                 topologyDiagnosticSweepPhase
-	activeRegistrationID  ddsnmp.DeviceRegistrationID
-	hasActiveRegistration bool
-	registrationCount     int
-	selectedCount         int
-}
-
-type topologyDiagnostics struct {
-	lifecycle       topologyJobLifecycleDiagnosticCut
-	producerScopeID string
-	topology        *topologySweepDiagnosticCut
-	lastAborted     *topologyAbortedSweepDiagnostic
 }
 
 type topologyDiagnosticCutInput struct {
@@ -108,23 +30,23 @@ type topologyDiagnosticCutInput struct {
 	states         map[ddsnmp.DeviceRegistrationID]deviceRefreshState
 }
 
-type topologyDiagnosticCutProjector func(topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error)
+type topologyDiagnosticCutProjector func(topologyDiagnosticCutInput) (*topologydiag.SweepCut, error)
 
-func captureTopologyCut(registry *topologyRegistry, aborted *topologyAbortedSweepDiagnostic) topologyDiagnostics {
-	diagnostics := topologyDiagnostics{lastAborted: aborted}
+func captureTopologyCut(registry *topologyRegistry, aborted *topologydiag.AbortedSweep) topologydiag.Cut {
+	diagnostics := topologydiag.Cut{LastAborted: aborted}
 	if generation := registry.acquireGeneration(); generation != nil {
-		diagnostics.producerScopeID = generation.producerScopeID
-		diagnostics.topology = generation.diagnostic
+		diagnostics.ProducerScopeID = generation.producerScopeID
+		diagnostics.Topology = generation.diagnostic
 	}
 
 	return diagnostics
 }
 
-func (c *Collector) projectCommittedTopologyDiagnosticCut(input topologyDiagnosticCutInput) (cut *topologySweepDiagnosticCut) {
-	cut = unavailableTopologyDiagnosticCut(input, diagnosticCaptureReasonProjectionError)
+func (c *Collector) projectCommittedTopologyDiagnosticCut(input topologyDiagnosticCutInput) (cut *topologydiag.SweepCut) {
+	cut = unavailableTopologyDiagnosticCut(input, topologydiag.CaptureReasonProjectionError)
 	defer func() {
 		if recover() != nil {
-			cut = unavailableTopologyDiagnosticCut(input, diagnosticCaptureReasonProjectionPanic)
+			cut = unavailableTopologyDiagnosticCut(input, topologydiag.CaptureReasonProjectionPanic)
 			c.Limit("snmp_topology:diagnostic-cut", 1, topologyRefreshWarningEvery).
 				Warningf("failed to project SNMP topology diagnostics")
 		}
@@ -141,13 +63,13 @@ func (c *Collector) projectCommittedTopologyDiagnosticCut(input topologyDiagnost
 	return projected
 }
 
-func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error) {
-	cut := &topologySweepDiagnosticCut{
-		sequence:      input.sequence,
-		startedAt:     input.startedAt,
-		publishedAt:   input.publishedAt,
-		captureState:  diagnosticCaptureAvailable,
-		captureReason: diagnosticCaptureReasonNone,
+func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologydiag.SweepCut, error) {
+	cut := &topologydiag.SweepCut{
+		Sequence:      input.sequence,
+		StartedAt:     input.startedAt,
+		PublishedAt:   input.publishedAt,
+		CaptureState:  topologydiag.CaptureAvailable,
+		CaptureReason: topologydiag.CaptureReasonNone,
 	}
 
 	seen := input.seen
@@ -169,89 +91,89 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologySw
 	records := 1 + rowCount
 	logicalBytes := uint64(topologyDiagnosticCutLogicalBytes) + rowCount*topologyDiagnosticRowLogicalBytes
 
-	countedCaptures := make(map[*topologyAcquisitionCapture]bool)
+	countedCaptures := make(map[*topologydiag.AcquisitionCapture]bool)
 	for _, entry := range input.entries {
 		state := input.states[entry.RegistrationID]
 		for _, capture := range stateAcquisitionCaptures(state) {
-			if capture == nil || capture.state != diagnosticCaptureAvailable || countedCaptures[capture] {
+			if capture == nil || capture.State != topologydiag.CaptureAvailable || countedCaptures[capture] {
 				continue
 			}
 			countedCaptures[capture] = true
 
-			records += capture.recordCount
-			logicalBytes += capture.logicalBytes
+			records += capture.RecordCount
+			logicalBytes += capture.LogicalBytes
 		}
 	}
-	cut.recordCount = records
-	cut.logicalBytes = logicalBytes
+	cut.RecordCount = records
+	cut.LogicalBytes = logicalBytes
 
-	cut.devices = make([]topologySweepDeviceDiagnostic, 0, len(input.entries))
+	cut.Devices = make([]topologydiag.SweepDevice, 0, len(input.entries))
 	for _, entry := range input.entries {
 		registrationID := entry.RegistrationID
 		state := input.states[registrationID]
-		row := topologySweepDeviceDiagnostic{
-			registrationID: registrationID,
-			selected:       input.selected[registrationID],
-			outcome:        state.outcome,
-			lastAttempt:    state.lastAttempt,
-			lastSuccess:    state.lastSuccess,
-			nextRetry:      state.nextRetry,
+		row := topologydiag.SweepDevice{
+			RegistrationID: registrationID,
+			Selected:       input.selected[registrationID],
+			Outcome:        state.outcome,
+			LastAttempt:    state.lastAttempt,
+			LastSuccess:    state.lastSuccess,
+			NextRetry:      state.nextRetry,
 		}
 		if generation := state.generation; generation != nil {
-			row.retainedSuccess = generation.evidenceRef
-			row.hasRetainedSuccess = true
-			row.acquisition = generation.acquisition
-			row.hasObservation = generation.hasObservation
-			row.expiresAt = generation.expiresAt
-			row.renderable = generation.hasObservation && generation.freshAt(input.publishedAt)
-			row.expired = !generation.expiresAt.IsZero() && input.publishedAt.After(generation.expiresAt)
+			row.RetainedSuccess = generation.evidenceRef
+			row.HasRetainedSuccess = true
+			row.Acquisition = generation.acquisition
+			row.HasObservation = generation.hasObservation
+			row.ExpiresAt = generation.expiresAt
+			row.Renderable = generation.hasObservation && generation.freshAt(input.publishedAt)
+			row.Expired = !generation.expiresAt.IsZero() && input.publishedAt.After(generation.expiresAt)
 		}
-		row.latestAttempt = state.latestAttempt
-		cut.devices = append(cut.devices, row)
+		row.LatestAttempt = state.latestAttempt
+		cut.Devices = append(cut.Devices, row)
 	}
 
-	cut.removed = make([]topologyRemovedDeviceDiagnostic, 0, len(removedIDs))
+	cut.Removed = make([]topologydiag.RemovedDevice, 0, len(removedIDs))
 	for _, registrationID := range removedIDs {
-		row := topologyRemovedDeviceDiagnostic{registrationID: registrationID}
+		row := topologydiag.RemovedDevice{RegistrationID: registrationID}
 		if generation := input.previousStates[registrationID].generation; generation != nil {
-			row.retainedSuccess = generation.evidenceRef
-			row.hasRetainedSuccess = true
+			row.RetainedSuccess = generation.evidenceRef
+			row.HasRetainedSuccess = true
 		}
-		cut.removed = append(cut.removed, row)
+		cut.Removed = append(cut.Removed, row)
 	}
 	return cut, nil
 }
 
-func stateAcquisitionCaptures(state deviceRefreshState) []*topologyAcquisitionCapture {
+func stateAcquisitionCaptures(state deviceRefreshState) []*topologydiag.AcquisitionCapture {
 	success := acquisitionCaptureFromGeneration(state.generation)
 	if success == nil {
 		if state.latestAttempt == nil {
 			return nil
 		}
-		return []*topologyAcquisitionCapture{state.latestAttempt}
+		return []*topologydiag.AcquisitionCapture{state.latestAttempt}
 	}
 	if state.latestAttempt == nil || state.latestAttempt == success {
-		return []*topologyAcquisitionCapture{success}
+		return []*topologydiag.AcquisitionCapture{success}
 	}
-	return []*topologyAcquisitionCapture{success, state.latestAttempt}
+	return []*topologydiag.AcquisitionCapture{success, state.latestAttempt}
 }
 
-func unavailableTopologyDiagnosticCut(input topologyDiagnosticCutInput, reason diagnosticCaptureReason) *topologySweepDiagnosticCut {
-	return &topologySweepDiagnosticCut{
-		sequence:      input.sequence,
-		startedAt:     input.startedAt,
-		publishedAt:   input.publishedAt,
-		captureState:  diagnosticCaptureUnavailable,
-		captureReason: reason,
-		recordCount:   1,
-		logicalBytes:  topologyDiagnosticCutLogicalBytes,
+func unavailableTopologyDiagnosticCut(input topologyDiagnosticCutInput, reason topologydiag.CaptureReason) *topologydiag.SweepCut {
+	return &topologydiag.SweepCut{
+		Sequence:      input.sequence,
+		StartedAt:     input.startedAt,
+		PublishedAt:   input.publishedAt,
+		CaptureState:  topologydiag.CaptureUnavailable,
+		CaptureReason: reason,
+		RecordCount:   1,
+		LogicalBytes:  topologyDiagnosticCutLogicalBytes,
 	}
 }
 
 func (c *Collector) publishAbortedTopologyDiagnostic(
 	startedAt time.Time,
-	reason topologyDiagnosticAbortReason,
-	phase topologyDiagnosticSweepPhase,
+	reason topologydiag.DiagnosticAbortReason,
+	phase topologydiag.DiagnosticSweepPhase,
 	activeRegistrationID ddsnmp.DeviceRegistrationID,
 	hasActiveRegistration bool,
 	registrationCount int,
@@ -260,16 +182,16 @@ func (c *Collector) publishAbortedTopologyDiagnostic(
 	if c == nil {
 		return
 	}
-	c.lastAbortedTopologyDiagnostic.Store(&topologyAbortedSweepDiagnostic{
-		sequence:              c.topologyDiagnosticAbortSequence.Add(1),
-		startedAt:             startedAt,
-		abortedAt:             safeTopologyDiagnosticTime(c),
-		reason:                reason,
-		phase:                 phase,
-		activeRegistrationID:  activeRegistrationID,
-		hasActiveRegistration: hasActiveRegistration,
-		registrationCount:     registrationCount,
-		selectedCount:         selectedCount,
+	c.lastAbortedTopologyDiagnostic.Store(&topologydiag.AbortedSweep{
+		Sequence:              c.topologyDiagnosticAbortSequence.Add(1),
+		StartedAt:             startedAt,
+		AbortedAt:             safeTopologyDiagnosticTime(c),
+		Reason:                reason,
+		Phase:                 phase,
+		ActiveRegistrationID:  activeRegistrationID,
+		HasActiveRegistration: hasActiveRegistration,
+		RegistrationCount:     registrationCount,
+		SelectedCount:         selectedCount,
 	})
 }
 

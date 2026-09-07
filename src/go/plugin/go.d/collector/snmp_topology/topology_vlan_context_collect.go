@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/gosnmp/gosnmp"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -30,9 +30,9 @@ func resolveTopologyVLANProfileView(dev ddsnmp.DeviceConnectionInfo) ddsnmp.Proj
 
 type topologyVLANProgress struct {
 	sources      []ddsnmp.SourceOperation
-	client       topologyAcquisitionPhaseEvidence
-	connect      topologyAcquisitionPhaseEvidence
-	collection   topologyAcquisitionPhaseEvidence
+	client       topologydiag.AcquisitionPhaseEvidence
+	connect      topologydiag.AcquisitionPhaseEvidence
+	collection   topologydiag.AcquisitionPhaseEvidence
 	interruption snmputils.Failure
 	failures     ddsnmp.CollectionFailures
 }
@@ -56,11 +56,11 @@ func collectTopologyVLANContext(
 	progress := newTopologyVLANProgress()
 	if strings.TrimSpace(vlanID) == "" {
 		err := fmt.Errorf("empty vlan id")
-		progress.client = failedAcquisitionPhase(topologyAcquisitionFailureVLANIdentifier, err)
+		progress.client = failedAcquisitionPhase(topologydiag.AcquisitionFailureVLANIdentifier, err)
 		return nil, progress, err
 	}
 	if _, err := strconv.Atoi(vlanID); err != nil {
-		progress.client = failedAcquisitionPhase(topologyAcquisitionFailureVLANIdentifier, err)
+		progress.client = failedAcquisitionPhase(topologydiag.AcquisitionFailureVLANIdentifier, err)
 		return nil, progress, fmt.Errorf("invalid vlan id '%s': %w", vlanID, err)
 	}
 	if err := ctx.Err(); err != nil {
@@ -90,7 +90,7 @@ func collectTopologyVLANContext(
 		progress.failures = source.CollectionFailures()
 	}
 	if err != nil {
-		progress.collection = failedAcquisitionPhase(topologyAcquisitionFailureCollection, err)
+		progress.collection = failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection, err)
 		progress.interruption = snmputils.ClassifyFailure(ctx.Err())
 		return nil, progress, err
 	}
@@ -115,7 +115,7 @@ func initTopologyVLANClient(
 	}
 	client, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
 	if err != nil {
-		progress.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration, err)
+		progress.client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
 		return nil, func() {}, progress, err
 	}
 	progress.client = successfulAcquisitionPhase()
@@ -133,7 +133,7 @@ func initTopologyVLANClient(
 		client.SetMaxRepetitions(dev.MaxRepetitions)
 	}
 	if err := client.Connect(); err != nil {
-		progress.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect, err)
+		progress.connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 		progress.interruption = snmputils.ClassifyFailure(ctx.Err())
 		return nil, func() {}, progress, err
 	}

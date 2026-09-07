@@ -10,13 +10,14 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
 func BenchmarkTopologyAcquisitionIngest(b *testing.B) {
 	for _, metricCount := range []int{100, 1000, 10_000} {
 		pms := benchmarkTopologyAcquisitionMetrics(metricCount)
 		report := acquisitionReportForMetrics(0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, pms[0])
-		input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
+		input := topologydiag.DeviceInput{Hostname: "192.0.2.1"}
 		collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
 		for _, acquisition := range []bool{false, true} {
@@ -27,9 +28,9 @@ func BenchmarkTopologyAcquisitionIngest(b *testing.B) {
 					var recorder *topologyAcquisitionRecorder
 					if acquisition {
 						recorder = newTopologyAcquisitionRecorder(
-							topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+							topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 							input,
-							topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+							topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 						)
 						observer := recorder.beginContext(0, "", "")
 						observer.ObserveProfile(report, pms[0])
@@ -40,7 +41,7 @@ func BenchmarkTopologyAcquisitionIngest(b *testing.B) {
 					applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventProfileTags, profiles: pms})
 					applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventTopologyMetrics, profiles: pms})
 					applyTopologySemanticEvent(builder, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
-					if recorder != nil && recorder.finish().state != diagnosticCaptureAvailable {
+					if recorder != nil && recorder.finish().State != topologydiag.CaptureAvailable {
 						b.Fatal("acquisition capture unavailable")
 					}
 				}
@@ -57,9 +58,9 @@ func BenchmarkTopologyAcquisitionReplay(b *testing.B) {
 		b.Run(fmt.Sprintf("metrics=%d", metricCount), func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				snapshot, err := replayTopologyAcquisitionEvidence(evidence)
-				if err != nil || snapshot == nil {
-					b.Fatalf("replay: snapshot=%v err=%v", snapshot, err)
+				snapshot, present := replayTopologyAcquisitionEvidence(evidence)
+				if !present {
+					b.Fatal("missing replay observation")
 				}
 				runtime.KeepAlive(snapshot)
 			}
@@ -81,13 +82,13 @@ func benchmarkTopologyAcquisitionMetrics(metricCount int) []*ddsnmp.ProfileMetri
 	return pms
 }
 
-func benchmarkTopologyAcquisitionEvidence(b *testing.B, pms []*ddsnmp.ProfileMetrics) *topologyAcquisitionAttemptEvidence {
+func benchmarkTopologyAcquisitionEvidence(b *testing.B, pms []*ddsnmp.ProfileMetrics) *topologydiag.AcquisitionAttemptEvidence {
 	b.Helper()
-	input := topologySemanticDeviceInput{hostname: "192.0.2.1"}
+	input := topologydiag.DeviceInput{Hostname: "192.0.2.1"}
 	recorder := newTopologyAcquisitionRecorder(
-		topologyAcquisitionAttemptID{registrationID: 1, ordinal: 1},
+		topologydiag.AcquisitionAttemptID{RegistrationID: 1, Ordinal: 1},
 		input,
-		topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty},
+		topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty},
 	)
 	observer := recorder.beginContext(0, "", "")
 	observer.ObserveProfile(acquisitionReportForMetrics(
@@ -96,8 +97,8 @@ func benchmarkTopologyAcquisitionEvidence(b *testing.B, pms []*ddsnmp.ProfileMet
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC), time.Hour, 1)
 	capture := recorder.finish()
-	if capture.state != diagnosticCaptureAvailable || capture.evidence == nil {
+	if capture.State != topologydiag.CaptureAvailable || capture.Evidence == nil {
 		b.Fatal("acquisition capture unavailable")
 	}
-	return capture.evidence
+	return capture.Evidence
 }

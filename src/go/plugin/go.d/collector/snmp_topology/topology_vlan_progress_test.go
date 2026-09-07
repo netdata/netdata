@@ -9,10 +9,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
-	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,9 +21,9 @@ func TestVLANPreClientCancellationDoesNotReportCollectionFailure(t *testing.T) {
 	cancel()
 	_, progress, err := collectTopologyVLANContext(ctx, newTestSNMPTopologyCollector(), ddsnmp.DeviceConnectionInfo{}, "100", nil, nil)
 	require.ErrorIs(t, err, context.Canceled)
-	require.Equal(t, topologyAcquisitionPhaseNotObserved, progress.client.outcome)
-	require.Equal(t, topologyAcquisitionPhaseNotObserved, progress.connect.outcome)
-	require.Equal(t, topologyAcquisitionPhaseNotObserved, progress.collection.outcome)
+	require.Equal(t, topologydiag.AcquisitionPhaseNotObserved, progress.client.Outcome)
+	require.Equal(t, topologydiag.AcquisitionPhaseNotObserved, progress.connect.Outcome)
+	require.Equal(t, topologydiag.AcquisitionPhaseNotObserved, progress.collection.Outcome)
 	require.Equal(t, "cancelled", progress.interruption.Reason)
 }
 

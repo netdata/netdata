@@ -91,10 +91,3 @@ func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 	}
 	return dev
 }
-
-func topologyDeviceKey(dev topologymodel.Device) string {
-	if dev.ChassisID == "" {
-		return ""
-	}
-	return dev.ChassisIDType + ":" + dev.ChassisID
-}

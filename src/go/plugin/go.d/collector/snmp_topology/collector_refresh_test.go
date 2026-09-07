@@ -15,17 +15,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
-	"github.com/stretchr/testify/require"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCollectorGetRegisteredDevicesUsesInjectedDeviceStore(t *testing.T) {
@@ -166,11 +165,11 @@ func TestCollectorRefreshPrunesUnregisteredDeviceStateFromPublishedGeneration(t 
 	require.Empty(t, coll.deviceStates)
 	require.Zero(t, coll.topologyRegistry.acquireGeneration().deviceCount())
 	diagnostics := coll.acquireTopologyDiagnostics()
-	require.NotNil(t, diagnostics.topology)
-	require.Empty(t, diagnostics.topology.devices)
-	require.Len(t, diagnostics.topology.removed, 1)
-	require.Equal(t, registrationID, diagnostics.topology.removed[0].registrationID)
-	require.True(t, diagnostics.topology.removed[0].hasRetainedSuccess)
+	require.NotNil(t, diagnostics.Topology)
+	require.Empty(t, diagnostics.Topology.Devices)
+	require.Len(t, diagnostics.Topology.Removed, 1)
+	require.Equal(t, registrationID, diagnostics.Topology.Removed[0].RegistrationID)
+	require.True(t, diagnostics.Topology.Removed[0].HasRetainedSuccess)
 }
 
 func TestCollectorRefreshKeepsDistinctRegistrationKeysForSharedEndpoint(t *testing.T) {
@@ -245,7 +244,7 @@ func TestCollectorRefreshTreatsReregisteredOwnerAsNewDevice(t *testing.T) {
 	coll.deviceStates[oldEntry.RegistrationID] = deviceRefreshState{
 		generation: oldGeneration,
 		nextRetry:  base.Add(time.Hour),
-		outcome:    deviceRefreshOutcomeSuccess,
+		outcome:    topologydiag.RefreshOutcomeSuccess,
 	}
 	coll.topologyRegistry.publishGeneration(newTopologyGeneration(
 		1, base, coll.topologyRegistry.producerScope(), coll.deviceStates,
@@ -260,7 +259,7 @@ func TestCollectorRefreshTreatsReregisteredOwnerAsNewDevice(t *testing.T) {
 	require.Zero(t, stats.errors)
 	require.NotEqual(t, oldEntry.RegistrationID, newEntry.RegistrationID)
 	require.NotContains(t, coll.deviceStates, oldEntry.RegistrationID)
-	require.Equal(t, deviceRefreshOutcomeSuccess, coll.deviceStates[newEntry.RegistrationID].outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeSuccess, coll.deviceStates[newEntry.RegistrationID].outcome)
 	require.NotSame(t, oldGeneration, coll.deviceStates[newEntry.RegistrationID].generation)
 }
 
@@ -454,21 +453,21 @@ func TestCollectorDeviceRefreshWarningsAreLimitedPerRegistrationAndFailureClass(
 			context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(),
 		)
 		require.Nil(t, snapshot)
-		require.Equal(t, deviceRefreshOutcomeFailed, outcome)
+		require.Equal(t, topologydiag.RefreshOutcomeFailed, outcome)
 	}
 	snapshot, outcome, collectionCapture := coll.refreshDeviceTopology(
 		context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(),
 	)
 	require.Nil(t, snapshot)
-	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureCollection), collectionCapture.evidence.collection)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureCollection),
-		collectionCapture.evidence.collectionContexts[0].collection)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, outcome)
+	require.Equal(t, failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection), collectionCapture.Evidence.Collection)
+	require.Equal(t, failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection),
+		collectionCapture.Evidence.CollectionContexts[0].Collection)
 	snapshot, outcome, _ = coll.refreshDeviceTopology(
 		context.Background(), testTopologyAttemptID(2), dev, testTopologyTarget(),
 	)
 	require.Nil(t, snapshot)
-	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, outcome)
 
 	require.Equal(t, 2, strings.Count(logs.String(), "failed to connect"), logs.String())
 	require.Equal(t, 1, strings.Count(logs.String(), "topology collection failed"), logs.String())
@@ -531,26 +530,26 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 	snapshot, outcome, capture := coll.refreshDeviceTopology(
 		context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(),
 	)
-	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeSuccess, outcome)
 	require.NotNil(t, snapshot)
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.Len(t, capture.evidence.collectionContexts, 1)
-	require.Len(t, capture.evidence.collectionContexts[0].profiles, 1)
-	capturedProfile := capture.evidence.collectionContexts[0].profiles[0]
-	require.Len(t, capturedProfile.routes, 1)
-	require.Equal(t, "1.3.6.1.2.1.2.2", capturedProfile.routes[0].RootOID)
-	require.Len(t, capturedProfile.values.metrics, 1)
-	require.EqualValues(t, 0, capturedProfile.values.metrics[0].routeOrdinal)
-	require.EqualValues(t, 0, capturedProfile.values.metrics[0].rowOrdinal)
-	require.EqualValues(t, 0, capturedProfile.values.metrics[0].valueOrdinal)
-	require.Equal(t, "Gi1/0/7", capturedProfile.values.metrics[0].tags[tagTopoIfName])
-	requireRetainedStringsExclude(t, capture.evidence.collectionContexts,
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	require.Len(t, capture.Evidence.CollectionContexts, 1)
+	require.Len(t, capture.Evidence.CollectionContexts[0].Profiles, 1)
+	capturedProfile := capture.Evidence.CollectionContexts[0].Profiles[0]
+	require.Len(t, capturedProfile.Routes, 1)
+	require.Equal(t, "1.3.6.1.2.1.2.2", capturedProfile.Routes[0].RootOID)
+	require.Len(t, capturedProfile.Values.TopologyMetrics, 1)
+	require.EqualValues(t, 0, capturedProfile.Values.TopologyMetrics[0].RouteOrdinal)
+	require.EqualValues(t, 0, capturedProfile.Values.TopologyMetrics[0].RowOrdinal)
+	require.EqualValues(t, 0, capturedProfile.Values.TopologyMetrics[0].ValueOrdinal)
+	require.Equal(t, "Gi1/0/7", capturedProfile.Values.TopologyMetrics[0].Tags[tagTopoIfName])
+	requireRetainedStringsExclude(t, capture.Evidence.CollectionContexts,
 		profileMetrics.Source, profileMetrics.TopologyMetrics[0].Name)
 
 	profileMetrics.TopologyMetrics[0].Tags[tagTopoIfName] = "mutated-after-observer"
-	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
-	require.NoError(t, err)
-	require.Equal(t, snapshot.observation, replayed.observation)
+	replayed, present := replayTopologyAcquisitionEvidence(capture.Evidence)
+	require.True(t, present)
+	require.Equal(t, snapshot.observation, replayed)
 }
 
 func TestCollectorRefreshRecordsSysUptimeFailureWithoutFailingTopology(t *testing.T) {
@@ -604,22 +603,22 @@ func TestCollectorRefreshRecordsSysUptimeFailureWithoutFailingTopology(t *testin
 			snapshot, outcome, capture := coll.refreshDeviceTopology(
 				context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(),
 			)
-			require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
+			require.Equal(t, topologydiag.RefreshOutcomeSuccess, outcome)
 			require.NotNil(t, snapshot)
-			require.Equal(t, successfulAcquisitionPhase(), capture.evidence.collection)
-			require.Equal(t, topologyAcquisitionPhaseFailed, capture.evidence.sysUptime.outcome)
-			require.Equal(t, topologyAcquisitionFailureSysUptime, capture.evidence.sysUptime.failure)
-			require.Equal(t, tc.want, capture.evidence.sysUptime.detail)
-			sources := capture.evidence.collectionContexts[0].sources
+			require.Equal(t, successfulAcquisitionPhase(), capture.Evidence.Collection)
+			require.Equal(t, topologydiag.AcquisitionPhaseFailed, capture.Evidence.SysUptime.Outcome)
+			require.Equal(t, topologydiag.AcquisitionFailureSysUptime, capture.Evidence.SysUptime.Failure)
+			require.Equal(t, tc.want, capture.Evidence.SysUptime.Detail)
+			sources := capture.Evidence.CollectionContexts[0].Sources
 			require.Len(t, sources, 1)
 			require.Equal(t, "get", sources[0].Method)
 			require.ElementsMatch(t, []string{snmputils.OidSnmpEngineTime, snmputils.OidHrSystemUptime, snmputils.OidSysUpTime}, sources[0].RequestedOIDs)
 			require.Equal(t, tc.packet != nil, sources[0].ResultPresent)
 			require.Equal(t, snmputils.ClassifyGetFailure(tc.packet, tc.err), sources[0].Failure)
-			requireRetainedStringsExclude(t, capture.evidence.collectionContexts, "private sysUptime failure")
-			replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
-			require.NoError(t, err)
-			require.Equal(t, snapshot.observation, replayed.observation)
+			requireRetainedStringsExclude(t, capture.Evidence.CollectionContexts, "private sysUptime failure")
+			replayed, present := replayTopologyAcquisitionEvidence(capture.Evidence)
+			require.True(t, present)
+			require.Equal(t, snapshot.observation, replayed)
 		})
 	}
 }
@@ -640,28 +639,28 @@ func TestCollectorRefreshRecordsClientConfigurationFailureInAttemptAndContext(t 
 		context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget(),
 	)
 	require.Nil(t, snapshot)
-	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, outcome)
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
 	require.Equal(
 		t,
 		failedAcquisitionPhase(
-			topologyAcquisitionFailureClientConfiguration,
+			topologydiag.AcquisitionFailureClientConfiguration,
 			snmputils.WithFailure(errors.New("missing user"), "client", "missing_v3_username"),
 		),
-		capture.evidence.client,
+		capture.Evidence.Client,
 	)
-	require.Equal(t, notObservedAcquisitionPhase(), capture.evidence.connect)
-	require.Len(t, capture.evidence.collectionContexts, 1)
+	require.Equal(t, notObservedAcquisitionPhase(), capture.Evidence.Connect)
+	require.Len(t, capture.Evidence.CollectionContexts, 1)
 	require.Equal(
 		t,
 		failedAcquisitionPhase(
-			topologyAcquisitionFailureClientConfiguration,
+			topologydiag.AcquisitionFailureClientConfiguration,
 			snmputils.WithFailure(errors.New("missing user"), "client", "missing_v3_username"),
 		),
-		capture.evidence.collectionContexts[0].client,
+		capture.Evidence.CollectionContexts[0].Client,
 	)
-	require.Equal(t, notObservedAcquisitionPhase(), capture.evidence.collectionContexts[0].connect)
-	require.Equal(t, notObservedAcquisitionPhase(), capture.evidence.collectionContexts[0].collection)
+	require.Equal(t, notObservedAcquisitionPhase(), capture.Evidence.CollectionContexts[0].Connect)
+	require.Equal(t, notObservedAcquisitionPhase(), capture.Evidence.CollectionContexts[0].Collection)
 }
 
 func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *testing.T) {
@@ -701,7 +700,7 @@ func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *t
 	firstStats := coll.refreshTopology(context.Background())
 	firstState := coll.deviceStates[registrationID]
 	require.Equal(t, 1, firstStats.errors)
-	require.Equal(t, deviceRefreshOutcomeFailed, firstState.outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, firstState.outcome)
 	require.Equal(t, base, firstState.lastAttempt)
 	require.True(t, firstState.lastSuccess.IsZero())
 	require.Equal(t, base.Add(defaultDeviceCheckEvery), firstState.nextRetry)
@@ -709,13 +708,13 @@ func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *t
 	require.Nil(t, firstState.generation)
 	require.EqualValues(t, 1, firstState.attemptOrdinal)
 	require.NotNil(t, firstState.latestAttempt)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureConnect), firstState.latestAttempt.evidence.connect)
-	firstCut := coll.acquireTopologyDiagnostics().topology
+	require.Equal(t, failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect), firstState.latestAttempt.Evidence.Connect)
+	firstCut := coll.acquireTopologyDiagnostics().Topology
 	require.NotNil(t, firstCut)
-	require.Len(t, firstCut.devices, 1)
-	require.True(t, firstCut.devices[0].selected)
-	require.Equal(t, deviceRefreshOutcomeFailed, firstCut.devices[0].outcome)
-	require.False(t, firstCut.devices[0].hasRetainedSuccess)
+	require.Len(t, firstCut.Devices, 1)
+	require.True(t, firstCut.Devices[0].Selected)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, firstCut.Devices[0].Outcome)
+	require.False(t, firstCut.Devices[0].HasRetainedSuccess)
 
 	now = base.Add(30 * time.Second)
 	skippedStats := coll.refreshTopology(context.Background())
@@ -723,54 +722,54 @@ func TestCollectorRefreshFailureUsesExponentialRetryAndPreservesLastSuccess(t *t
 	require.EqualValues(t, 1, coll.deviceStates[registrationID].attemptOrdinal)
 	require.Same(t, firstState.latestAttempt, coll.deviceStates[registrationID].latestAttempt)
 	require.Len(t, clients, 2, "refresh before nextRetry must not create a client")
-	skippedCut := coll.acquireTopologyDiagnostics().topology
+	skippedCut := coll.acquireTopologyDiagnostics().Topology
 	require.NotNil(t, skippedCut)
-	require.False(t, skippedCut.devices[0].selected)
-	require.Equal(t, deviceRefreshOutcomeFailed, skippedCut.devices[0].outcome)
+	require.False(t, skippedCut.Devices[0].Selected)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, skippedCut.Devices[0].Outcome)
 
 	now = base.Add(defaultDeviceCheckEvery)
 	successStats := coll.refreshTopology(context.Background())
 	successState := coll.deviceStates[registrationID]
 	require.Zero(t, successStats.errors)
-	require.Equal(t, deviceRefreshOutcomeSuccess, successState.outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeSuccess, successState.outcome)
 	require.Equal(t, now, successState.lastSuccess)
 	require.Equal(t, now.Add(defaultRefreshEvery), successState.nextRetry)
 	require.Zero(t, successState.consecutiveFailures)
 	require.NotNil(t, successState.generation)
-	require.Equal(t, diagnosticCaptureAvailable, successState.generation.acquisition.state)
-	require.NotNil(t, successState.generation.acquisition.evidence)
+	require.Equal(t, topologydiag.CaptureAvailable, successState.generation.acquisition.State)
+	require.NotNil(t, successState.generation.acquisition.Evidence)
 	require.Same(t, successState.generation.acquisition, successState.latestAttempt)
 	require.EqualValues(t, 2, successState.attemptOrdinal)
-	require.Equal(t, registrationID, successState.generation.evidenceRef.registrationID)
-	require.NotZero(t, successState.generation.evidenceRef.generation)
-	replayed, err := replayTopologyAcquisitionEvidence(successState.generation.acquisition.evidence)
-	require.NoError(t, err)
-	require.Equal(t, successState.generation.observation, replayed.observation)
+	require.Equal(t, registrationID, successState.generation.evidenceRef.RegistrationID)
+	require.NotZero(t, successState.generation.evidenceRef.Generation)
+	replayed, present := replayTopologyAcquisitionEvidence(successState.generation.acquisition.Evidence)
+	require.True(t, present)
+	require.Equal(t, successState.generation.observation, replayed)
 	lastSuccessGeneration := successState.generation
 
 	now = successState.nextRetry
 	failedStats := coll.refreshTopology(context.Background())
 	failedState := coll.deviceStates[registrationID]
 	require.Equal(t, 1, failedStats.errors)
-	require.Equal(t, deviceRefreshOutcomeFailed, failedState.outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, failedState.outcome)
 	require.Equal(t, successState.lastSuccess, failedState.lastSuccess)
 	require.Same(t, lastSuccessGeneration, failedState.generation)
 	require.EqualValues(t, 3, failedState.attemptOrdinal)
 	require.NotNil(t, failedState.latestAttempt)
 	require.NotSame(t, failedState.generation.acquisition, failedState.latestAttempt)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureConnect), failedState.latestAttempt.evidence.connect)
+	require.Equal(t, failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect), failedState.latestAttempt.Evidence.Connect)
 	require.Equal(t, now.Add(defaultDeviceCheckEvery), failedState.nextRetry)
 	require.EqualValues(t, 1, failedState.consecutiveFailures)
 	require.False(t, failedState.generation.freshAt(failedState.generation.expiresAt.Add(time.Nanosecond)),
 		"failure retention must not extend the last successful collection's display freshness")
-	failedCut := coll.acquireTopologyDiagnostics().topology
+	failedCut := coll.acquireTopologyDiagnostics().Topology
 	require.NotNil(t, failedCut)
-	require.True(t, failedCut.devices[0].selected)
-	require.Equal(t, deviceRefreshOutcomeFailed, failedCut.devices[0].outcome)
-	require.True(t, failedCut.devices[0].hasRetainedSuccess)
-	require.Equal(t, lastSuccessGeneration.evidenceRef, failedCut.devices[0].retainedSuccess)
-	require.Same(t, failedState.generation.acquisition, failedCut.devices[0].acquisition)
-	require.Same(t, failedState.latestAttempt, failedCut.devices[0].latestAttempt)
+	require.True(t, failedCut.Devices[0].Selected)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, failedCut.Devices[0].Outcome)
+	require.True(t, failedCut.Devices[0].HasRetainedSuccess)
+	require.Equal(t, lastSuccessGeneration.evidenceRef, failedCut.Devices[0].RetainedSuccess)
+	require.Same(t, failedState.generation.acquisition, failedCut.Devices[0].Acquisition)
+	require.Same(t, failedState.latestAttempt, failedCut.Devices[0].LatestAttempt)
 }
 
 func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(t *testing.T) {
@@ -801,12 +800,12 @@ func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(
 	builder := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(builder)
 	previous := freezeTestTopologyBuilder(registrationID, builder)
-	previousCapture := &topologyAcquisitionCapture{
-		attemptID:    topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 3},
-		state:        diagnosticCaptureAvailable,
-		recordCount:  1,
-		logicalBytes: 64,
-		evidence:     &topologyAcquisitionAttemptEvidence{},
+	previousCapture := &topologydiag.AcquisitionCapture{
+		AttemptID:    topologydiag.AcquisitionAttemptID{RegistrationID: registrationID, Ordinal: 3},
+		State:        topologydiag.CaptureAvailable,
+		RecordCount:  1,
+		LogicalBytes: 64,
+		Evidence:     &topologydiag.AcquisitionAttemptEvidence{},
 	}
 	previous.acquisition = previousCapture
 	coll.deviceStates[registrationID] = deviceRefreshState{
@@ -825,7 +824,7 @@ func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(
 	state := coll.deviceStates[registrationID]
 
 	require.Zero(t, stats.errors)
-	require.Equal(t, deviceRefreshOutcomeNoProfiles, state.outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeNoProfiles, state.outcome)
 	require.Equal(t, base, state.lastAttempt)
 	require.Equal(t, previousSuccess, state.lastSuccess)
 	require.Equal(t, base.Add(defaultRefreshEvery), state.nextRetry)
@@ -834,15 +833,15 @@ func TestCollectorRefreshWithoutProfilesRetainsLastSuccessAndUsesNormalInterval(
 	require.Same(t, previousCapture, state.generation.acquisition)
 	require.NotSame(t, previousCapture, state.latestAttempt)
 	require.EqualValues(t, 4, state.attemptOrdinal)
-	require.Equal(t, topologyAcquisitionPhaseEmpty, state.latestAttempt.evidence.profiles.outcome)
+	require.Equal(t, topologydiag.AcquisitionPhaseEmpty, state.latestAttempt.Evidence.Profiles.Outcome)
 	require.Same(t, previous, coll.topologyRegistry.acquireGeneration().devices[0])
-	cut := coll.acquireTopologyDiagnostics().topology
+	cut := coll.acquireTopologyDiagnostics().Topology
 	require.NotNil(t, cut)
-	require.Len(t, cut.devices, 1)
-	require.True(t, cut.devices[0].selected)
-	require.Equal(t, deviceRefreshOutcomeNoProfiles, cut.devices[0].outcome)
-	require.True(t, cut.devices[0].hasRetainedSuccess)
-	require.Equal(t, previous.evidenceRef, cut.devices[0].retainedSuccess)
+	require.Len(t, cut.Devices, 1)
+	require.True(t, cut.Devices[0].Selected)
+	require.Equal(t, topologydiag.RefreshOutcomeNoProfiles, cut.Devices[0].Outcome)
+	require.True(t, cut.Devices[0].HasRetainedSuccess)
+	require.Equal(t, previous.evidenceRef, cut.Devices[0].RetainedSuccess)
 }
 
 func TestFailedRefreshRetryDelayCapsAtRefreshInterval(t *testing.T) {
@@ -876,9 +875,9 @@ func TestCollectorRefreshTopologyRecoveringHandlesPanic(t *testing.T) {
 	require.Same(t, previous, coll.topologyRegistry.acquireGeneration())
 	require.Same(t, previousDevice, coll.deviceStates[previousDevice.registrationID].generation)
 	require.EqualValues(t, 1, coll.generationSequence)
-	aborted := coll.acquireTopologyDiagnostics().lastAborted
+	aborted := coll.acquireTopologyDiagnostics().LastAborted
 	require.NotNil(t, aborted)
-	require.Equal(t, topologyDiagnosticAbortPanic, aborted.reason)
+	require.Equal(t, topologydiag.DiagnosticAbortPanic, aborted.Reason)
 }
 
 func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
@@ -922,10 +921,10 @@ func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
 	coll.UpdateEvery = 3600
 	registerTestDeviceState(store, dev)
 	registrationID := store.Entries()[0].RegistrationID
-	previousAttempt := &topologyAcquisitionCapture{
-		attemptID: topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 7},
-		state:     diagnosticCaptureAvailable,
-		evidence:  &topologyAcquisitionAttemptEvidence{},
+	previousAttempt := &topologydiag.AcquisitionCapture{
+		AttemptID: topologydiag.AcquisitionAttemptID{RegistrationID: registrationID, Ordinal: 7},
+		State:     topologydiag.CaptureAvailable,
+		Evidence:  &topologydiag.AcquisitionAttemptEvidence{},
 	}
 	coll.deviceStates[registrationID] = deviceRefreshState{
 		attemptOrdinal: 7,
@@ -961,14 +960,14 @@ func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
 		require.Fail(t, "runner did not stop after context cancellation")
 	}
 	diagnostics := coll.acquireTopologyDiagnostics()
-	require.Nil(t, diagnostics.topology)
-	require.NotNil(t, diagnostics.lastAborted)
-	require.Equal(t, topologyDiagnosticAbortCanceled, diagnostics.lastAborted.reason)
-	require.Equal(t, topologyDiagnosticSweepPhaseDeviceRefresh, diagnostics.lastAborted.phase)
-	require.True(t, diagnostics.lastAborted.hasActiveRegistration)
-	require.Equal(t, registrationID, diagnostics.lastAborted.activeRegistrationID)
-	require.Equal(t, 1, diagnostics.lastAborted.registrationCount)
-	require.Equal(t, 1, diagnostics.lastAborted.selectedCount)
+	require.Nil(t, diagnostics.Topology)
+	require.NotNil(t, diagnostics.LastAborted)
+	require.Equal(t, topologydiag.DiagnosticAbortCanceled, diagnostics.LastAborted.Reason)
+	require.Equal(t, topologydiag.DiagnosticSweepPhaseDeviceRefresh, diagnostics.LastAborted.Phase)
+	require.True(t, diagnostics.LastAborted.HasActiveRegistration)
+	require.Equal(t, registrationID, diagnostics.LastAborted.ActiveRegistrationID)
+	require.Equal(t, 1, diagnostics.LastAborted.RegistrationCount)
+	require.Equal(t, 1, diagnostics.LastAborted.SelectedCount)
 	require.EqualValues(t, 7, coll.deviceStates[registrationID].attemptOrdinal)
 	require.Same(t, previousAttempt, coll.deviceStates[registrationID].latestAttempt)
 }
@@ -1082,7 +1081,7 @@ func TestCollectorVLANContextsRecordDistinctSuccessAndFailureEvidence(t *testing
 	}
 
 	collectedAt := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
-	deviceInput := topologySemanticDeviceInputFromConnection(dev)
+	deviceInput := topologyDeviceInputFromConnection(dev)
 	cache := newTopologyBuilderFromSemanticInput(deviceInput, nil, collectedAt, time.Minute)
 	cache.updateVtpVlanEntry(map[string]string{
 		tagVtpVlanIndex: "100",
@@ -1101,25 +1100,25 @@ func TestCollectorVLANContextsRecordDistinctSuccessAndFailureEvidence(t *testing
 
 	coll.collectTopologyVTPVLANContexts(context.Background(), cache, dev, recorder)
 	capture := recorder.finish()
-	require.Equal(t, diagnosticCaptureAvailable, capture.state)
-	require.Equal(t, successfulAcquisitionPhase(), capture.evidence.vlanProfiles)
-	require.Len(t, capture.evidence.collectionContexts, 3)
-	require.EqualValues(t, 1, capture.evidence.collectionContexts[1].ordinal)
-	require.Equal(t, "100", capture.evidence.collectionContexts[1].vlanID)
-	require.Equal(t, successfulAcquisitionPhase(), capture.evidence.collectionContexts[1].collection)
-	require.Len(t, capture.evidence.collectionContexts[1].profiles, 1)
-	require.EqualValues(t, 2, capture.evidence.collectionContexts[2].ordinal)
-	require.Equal(t, "200", capture.evidence.collectionContexts[2].vlanID)
-	require.Equal(t, failedAcquisitionPhase(topologyAcquisitionFailureConnect),
-		capture.evidence.collectionContexts[2].connect)
+	require.Equal(t, topologydiag.CaptureAvailable, capture.State)
+	require.Equal(t, successfulAcquisitionPhase(), capture.Evidence.VLANProfiles)
+	require.Len(t, capture.Evidence.CollectionContexts, 3)
+	require.EqualValues(t, 1, capture.Evidence.CollectionContexts[1].Ordinal)
+	require.Equal(t, "100", capture.Evidence.CollectionContexts[1].VLANID)
+	require.Equal(t, successfulAcquisitionPhase(), capture.Evidence.CollectionContexts[1].Collection)
+	require.Len(t, capture.Evidence.CollectionContexts[1].Profiles, 1)
+	require.EqualValues(t, 2, capture.Evidence.CollectionContexts[2].Ordinal)
+	require.Equal(t, "200", capture.Evidence.CollectionContexts[2].VLANID)
+	require.Equal(t, failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect),
+		capture.Evidence.CollectionContexts[2].Connect)
 	require.Equal(t, notObservedAcquisitionPhase(),
-		capture.evidence.collectionContexts[2].collection)
-	require.Empty(t, capture.evidence.collectionContexts[2].profiles)
+		capture.Evidence.CollectionContexts[2].Collection)
+	require.Empty(t, capture.Evidence.CollectionContexts[2].Profiles)
 
 	live, _ := freezeTopologyBuilder(cache)
-	replayed, err := replayTopologyAcquisitionEvidence(capture.evidence)
-	require.NoError(t, err)
-	require.Equal(t, live.observation, replayed.observation)
+	replayed, present := replayTopologyAcquisitionEvidence(capture.Evidence)
+	require.True(t, present)
+	require.Equal(t, live.observation, replayed)
 }
 
 func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
@@ -1191,8 +1190,8 @@ func TestCollectorResolveDeviceTargetManagementEvidenceDistinguishesEmptyUnavail
 			return nil, nil
 		}
 		got := coll.resolveDeviceTargetManagementEvidence(context.Background(), ddsnmp.DeviceConnectionInfo{})
-		require.Equal(t, topologyTargetResolutionEmpty, got.outcome)
-		require.Empty(t, got.addresses)
+		require.Equal(t, topologydiag.TargetResolutionEmpty, got.Outcome)
+		require.Empty(t, got.Addresses)
 	})
 
 	t.Run("resolver unavailable", func(t *testing.T) {
@@ -1201,8 +1200,8 @@ func TestCollectorResolveDeviceTargetManagementEvidenceDistinguishesEmptyUnavail
 		got := coll.resolveDeviceTargetManagementEvidence(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "switch.example",
 		})
-		require.Equal(t, topologyTargetResolutionUnavailable, got.outcome)
-		require.Empty(t, got.addresses)
+		require.Equal(t, topologydiag.TargetResolutionUnavailable, got.Outcome)
+		require.Empty(t, got.Addresses)
 	})
 
 	t.Run("lookup failed", func(t *testing.T) {
@@ -1213,8 +1212,8 @@ func TestCollectorResolveDeviceTargetManagementEvidenceDistinguishesEmptyUnavail
 		got := coll.resolveDeviceTargetManagementEvidence(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "switch.example",
 		})
-		require.Equal(t, topologyTargetResolutionFailed, got.outcome)
-		require.Empty(t, got.addresses)
+		require.Equal(t, topologydiag.TargetResolutionFailed, got.Outcome)
+		require.Empty(t, got.Addresses)
 	})
 }
 
@@ -1300,7 +1299,7 @@ func TestCollectorRefreshResolvesOnlyDueDNSTargets(t *testing.T) {
 		lastAttempt: time.Now(),
 		lastSuccess: time.Now(),
 		nextRetry:   time.Now().Add(time.Hour),
-		outcome:     deviceRefreshOutcomeSuccess,
+		outcome:     topologydiag.RefreshOutcomeSuccess,
 	}
 
 	mockHandler := snmpmock.NewMockHandler(ctrl)
@@ -1402,11 +1401,11 @@ func TestCollectorResolveTopologyTargetManagementIPsUsesStableBoundedSharedBudge
 	require.Less(t, elapsed, time.Second)
 	require.NoError(t, parent.Err())
 	for _, plan := range plans {
-		require.Empty(t, plan.target.addresses)
+		require.Empty(t, plan.target.Addresses)
 		if plan.registrationID <= topologyTargetLookupMaxWorkers {
-			require.Equal(t, topologyTargetResolutionFailed, plan.target.outcome)
+			require.Equal(t, topologydiag.TargetResolutionFailed, plan.target.Outcome)
 		} else {
-			require.Equal(t, topologyTargetResolutionUnavailable, plan.target.outcome)
+			require.Equal(t, topologydiag.TargetResolutionUnavailable, plan.target.Outcome)
 		}
 	}
 }
@@ -1442,12 +1441,12 @@ func TestCollectorResolveTopologyTargetManagementIPsAssociatesResultsAndBypasses
 	gotCalls := append([]string(nil), calls...)
 	mu.Unlock()
 	require.Equal(t, []string{"switch-a.example", "switch-b.example"}, gotCalls)
-	require.Equal(t, []netip.Addr{netip.MustParseAddr("10.0.0.2")}, plans[0].target.addresses)
-	require.Equal(t, topologyTargetResolutionResolved, plans[0].target.outcome)
-	require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, plans[1].target.addresses)
-	require.Equal(t, topologyTargetResolutionLiteral, plans[1].target.outcome)
-	require.Equal(t, []netip.Addr{netip.MustParseAddr("10.0.0.1")}, plans[2].target.addresses)
-	require.Equal(t, topologyTargetResolutionResolved, plans[2].target.outcome)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("10.0.0.2")}, plans[0].target.Addresses)
+	require.Equal(t, topologydiag.TargetResolutionResolved, plans[0].target.Outcome)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, plans[1].target.Addresses)
+	require.Equal(t, topologydiag.TargetResolutionLiteral, plans[1].target.Outcome)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("10.0.0.1")}, plans[2].target.Addresses)
+	require.Equal(t, topologydiag.TargetResolutionResolved, plans[2].target.Outcome)
 }
 
 func TestCollectorResolveDeviceTargetManagementIPsHonorsShorterDeviceTimeout(t *testing.T) {
@@ -1564,7 +1563,7 @@ func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
 		dev,
 		testTopologyTarget(netip.MustParseAddr("192.0.2.50")),
 	)
-	require.Equal(t, deviceRefreshOutcomeSuccess, outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeSuccess, outcome)
 	require.NotNil(t, generation)
 	snapshot := generation.observation
 	require.Len(t, snapshot.L2Observations, 1)
@@ -1741,7 +1740,7 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 		testTopologyTarget(netip.MustParseAddr("10.0.0.10")),
 	)
 	require.Nil(t, generation)
-	require.Equal(t, deviceRefreshOutcomeFailed, outcome)
+	require.Equal(t, topologydiag.RefreshOutcomeFailed, outcome)
 
 	visible := coll.topologyRegistry.acquireGeneration()
 	require.Same(t, publishedGeneration, visible.devices[0])
@@ -1759,16 +1758,16 @@ type blockingTopologyCollector struct {
 
 type ddCollectorFunc func() ([]*ddsnmp.ProfileMetrics, error)
 
-func testTopologyAttemptID(registrationID ddsnmp.DeviceRegistrationID) topologyAcquisitionAttemptID {
-	return topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1}
+func testTopologyAttemptID(registrationID ddsnmp.DeviceRegistrationID) topologydiag.AcquisitionAttemptID {
+	return topologydiag.AcquisitionAttemptID{RegistrationID: registrationID, Ordinal: 1}
 }
 
-func testTopologyTarget(addresses ...netip.Addr) topologyTargetResolutionEvidence {
-	outcome := topologyTargetResolutionEmpty
+func testTopologyTarget(addresses ...netip.Addr) topologydiag.TargetResolutionEvidence {
+	outcome := topologydiag.TargetResolutionEmpty
 	if len(addresses) > 0 {
-		outcome = topologyTargetResolutionLiteral
+		outcome = topologydiag.TargetResolutionLiteral
 	}
-	return topologyTargetResolutionEvidence{outcome: outcome, addresses: addresses}
+	return topologydiag.TargetResolutionEvidence{Outcome: outcome, Addresses: addresses}
 }
 
 func (f ddCollectorFunc) Collect() ([]*ddsnmp.ProfileMetrics, error) { return f() }
@@ -1911,7 +1910,7 @@ func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
 			}
 			for _, entry := range store.Entries() {
 				registrationID := entry.RegistrationID
-				attemptID := topologyAcquisitionAttemptID{registrationID: registrationID, ordinal: 1}
+				attemptID := topologydiag.AcquisitionAttemptID{RegistrationID: registrationID, Ordinal: 1}
 				capture := benchmarkRetainedTopologyAcquisitionCapture(b, attemptID, entry.Info, now)
 				coll.deviceStates[registrationID] = deviceRefreshState{
 					generation: &topologyDeviceGeneration{
@@ -1925,7 +1924,7 @@ func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
 					lastAttempt:    now,
 					lastSuccess:    now,
 					nextRetry:      now.Add(time.Hour),
-					outcome:        deviceRefreshOutcomeSuccess,
+					outcome:        topologydiag.RefreshOutcomeSuccess,
 				}
 			}
 			coll.topologyRegistry.publishGeneration(newTopologyGeneration(
@@ -1946,25 +1945,25 @@ func BenchmarkCollectorRefreshNoDueDevices(b *testing.B) {
 
 func benchmarkRetainedTopologyAcquisitionCapture(
 	b *testing.B,
-	attemptID topologyAcquisitionAttemptID,
+	attemptID topologydiag.AcquisitionAttemptID,
 	device ddsnmp.DeviceConnectionInfo,
 	collectedAt time.Time,
-) *topologyAcquisitionCapture {
+) *topologydiag.AcquisitionCapture {
 	b.Helper()
-	input := topologySemanticDeviceInputFromConnection(device)
+	input := topologyDeviceInputFromConnection(device)
 	recorder := newTopologyAcquisitionRecorder(
 		attemptID,
 		input,
-		topologyTargetResolutionEvidence{
-			outcome:   topologyTargetResolutionLiteral,
-			addresses: []netip.Addr{netip.MustParseAddr(device.Hostname)},
+		topologydiag.TargetResolutionEvidence{
+			Outcome:   topologydiag.TargetResolutionLiteral,
+			Addresses: []netip.Addr{netip.MustParseAddr(device.Hostname)},
 		},
 	)
-	recorder.evidence.client = successfulAcquisitionPhase()
-	recorder.evidence.connect = successfulAcquisitionPhase()
-	recorder.evidence.profiles = successfulAcquisitionPhase()
-	recorder.evidence.collection = successfulAcquisitionPhase()
-	recorder.evidence.sysUptime = successfulAcquisitionPhase()
+	recorder.evidence.Client = successfulAcquisitionPhase()
+	recorder.evidence.Connect = successfulAcquisitionPhase()
+	recorder.evidence.Profiles = successfulAcquisitionPhase()
+	recorder.evidence.Collection = successfulAcquisitionPhase()
+	recorder.evidence.SysUptime = successfulAcquisitionPhase()
 	observer := recorder.beginContext(0, "", "")
 	observer.ObserveProfile(acquisitionReportForMetrics(
 		0,
@@ -1974,7 +1973,7 @@ func benchmarkRetainedTopologyAcquisitionCapture(
 	recorder.completeContext(0, successfulAcquisitionPhase())
 	recorder.setCollectedShape(collectedAt, time.Hour, 1234)
 	capture := recorder.finish()
-	if capture.state != diagnosticCaptureAvailable || capture.evidence == nil {
+	if capture.State != topologydiag.CaptureAvailable || capture.Evidence == nil {
 		b.Fatal("retained acquisition capture unavailable")
 	}
 	return capture
@@ -1989,7 +1988,8 @@ func newBenchmarkTopologyRefreshSNMPHandler() *benchmarkTopologyRefreshSNMPHandl
 }
 
 func (*benchmarkTopologyRefreshSNMPHandler) Connect() error { return nil }
-func (*benchmarkTopologyRefreshSNMPHandler) Close() error   { return nil }
+
+func (*benchmarkTopologyRefreshSNMPHandler) Close() error { return nil }
 
 func (*benchmarkTopologyRefreshSNMPHandler) Get([]string) (*gosnmp.SnmpPacket, error) {
 	return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
@@ -2033,9 +2033,9 @@ func BenchmarkCollectorRefreshDueDeviceWithAcquisition(b *testing.B) {
 			}
 			generation := coll.topologyRegistry.acquireGeneration()
 			if generation == nil || generation.diagnostic == nil ||
-				generation.diagnostic.captureState != diagnosticCaptureAvailable ||
+				generation.diagnostic.CaptureState != topologydiag.CaptureAvailable ||
 				len(generation.devices) != 1 || generation.devices[0].acquisition == nil ||
-				generation.devices[0].acquisition.state != diagnosticCaptureAvailable {
+				generation.devices[0].acquisition.State != topologydiag.CaptureAvailable {
 				b.Fatal("warmup refresh did not publish complete acquisition diagnostics")
 			}
 

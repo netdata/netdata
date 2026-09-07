@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
 func (c *Collector) collectTopologyVTPVLANContexts(
@@ -29,11 +30,11 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 	view := resolveTopologyVLANProfileView(dev)
 	profiles := view.Profiles()
 	if recorder.evidence != nil {
-		recorder.evidence.vlanProfileContext = view.Context()
+		recorder.evidence.VLANProfileContext = view.Context()
 		if len(profiles) == 0 {
-			recorder.evidence.vlanProfiles = topologyAcquisitionPhaseEvidence{outcome: topologyAcquisitionPhaseEmpty}
+			recorder.evidence.VLANProfiles = topologydiag.AcquisitionPhaseEvidence{Outcome: topologydiag.AcquisitionPhaseEmpty}
 		} else {
-			recorder.evidence.vlanProfiles = successfulAcquisitionPhase()
+			recorder.evidence.VLANProfiles = successfulAcquisitionPhase()
 		}
 	}
 
@@ -46,9 +47,9 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 
 		pms, progress, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles, observer)
 		if captured := recorder.contextByOrdinal(contextOrdinal); captured != nil {
-			captured.sources = progress.sources
-			captured.client, captured.connect = progress.client, progress.connect
-			captured.interruption, captured.failures = progress.interruption, progress.failures
+			captured.Sources = progress.sources
+			captured.Client, captured.Connect = progress.client, progress.connect
+			captured.Interruption, captured.Failures = progress.interruption, progress.failures
 		}
 		recorder.completeContext(contextOrdinal, progress.collection)
 		if err != nil {

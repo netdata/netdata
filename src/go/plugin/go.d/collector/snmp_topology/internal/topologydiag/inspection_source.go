@@ -1,46 +1,46 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmptopology
+package topologydiag
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func inspectTopologyDiagnosticCut(cut *topologySweepDiagnosticCut) topologyInspectionDiagnosticCutResult {
+func inspectDiagnosticCut(cut *SweepCut) inspectionDiagnosticCutResult {
 	if cut == nil {
-		return topologyInspectionDiagnosticCutResult{}
+		return inspectionDiagnosticCutResult{}
 	}
-	return topologyInspectionDiagnosticCutResult{
-		captureState:  cut.captureState,
-		captureReason: cut.captureReason,
-		sequence:      cut.sequence,
-		startedAt:     cut.startedAt,
-		publishedAt:   cut.publishedAt,
+	return inspectionDiagnosticCutResult{
+		captureState:  cut.CaptureState,
+		captureReason: cut.CaptureReason,
+		sequence:      cut.Sequence,
+		startedAt:     cut.StartedAt,
+		publishedAt:   cut.PublishedAt,
 	}
 }
 
-func inspectTopologyLinkSourceContext(
-	devices []topologyDiagnosticReplayedDevice,
+func inspectLinkSourceContext(
+	devices []diagnosticReplayedDevice,
 	family string,
-) topologyInspectionSourceResult {
-	result := topologyInspectionSourceResult{
-		contexts: make([]topologyInspectionSourceContext, 0, len(devices)),
+) inspectionSourceResult {
+	result := inspectionSourceResult{
+		contexts: make([]inspectionSourceContext, 0, len(devices)),
 	}
 	for i := range devices {
 		device := &devices[i]
-		context := topologyInspectionSourceContext{
+		context := inspectionSourceContext{
 			registrationID:  device.registrationID,
-			latestAttempt:   inspectTopologyCapture(device.latestAttempt),
-			retainedSuccess: inspectTopologyCapture(device.retainedSuccess),
+			latestAttempt:   inspectCapture(device.latestAttempt),
+			retainedSuccess: inspectCapture(device.retainedSuccess),
 			sameAttempt:     device.latestAttempt != nil && device.latestAttempt == device.retainedSuccess,
 		}
 		if device.latestAttempt != nil {
-			context.captures = append(context.captures, topologyInspectionSourceCaptureContext{
+			context.captures = append(context.captures, inspectionSourceCaptureContext{
 				latestAttempt:   true,
 				retainedSuccess: context.sameAttempt,
 				capture:         context.latestAttempt,
-				facts: topologyInspectionCaptureFacts(
+				facts: inspectionCaptureFacts(
 					device.registrationID,
 					device.latestAttempt,
 					family,
@@ -48,10 +48,10 @@ func inspectTopologyLinkSourceContext(
 			})
 		}
 		if device.retainedSuccess != nil && !context.sameAttempt {
-			context.captures = append(context.captures, topologyInspectionSourceCaptureContext{
+			context.captures = append(context.captures, inspectionSourceCaptureContext{
 				retainedSuccess: true,
 				capture:         context.retainedSuccess,
-				facts: topologyInspectionCaptureFacts(
+				facts: inspectionCaptureFacts(
 					device.registrationID,
 					device.retainedSuccess,
 					family,
@@ -63,37 +63,37 @@ func inspectTopologyLinkSourceContext(
 	return result
 }
 
-func topologyInspectionCaptureFacts(
+func inspectionCaptureFacts(
 	registrationID ddsnmp.DeviceRegistrationID,
-	capture *topologyAcquisitionCapture,
+	capture *AcquisitionCapture,
 	family string,
-) []topologyInspectionSourceFact {
-	if capture == nil || capture.state != diagnosticCaptureAvailable || capture.evidence == nil {
+) []inspectionSourceFact {
+	if capture == nil || capture.State != CaptureAvailable || capture.Evidence == nil {
 		return nil
 	}
-	var facts []topologyInspectionSourceFact
-	for contextIndex := range capture.evidence.collectionContexts {
-		context := &capture.evidence.collectionContexts[contextIndex]
-		for profileIndex := range context.profiles {
-			profile := &context.profiles[profileIndex]
-			for metricIndex := range profile.values.metrics {
-				metric := &profile.values.metrics[metricIndex]
-				if topologyInspectionMetricMatchesFamily(metric.kind, family) {
-					facts = append(facts, topologyInspectionSourceFact{
+	var facts []inspectionSourceFact
+	for contextIndex := range capture.Evidence.CollectionContexts {
+		context := &capture.Evidence.CollectionContexts[contextIndex]
+		for profileIndex := range context.Profiles {
+			profile := &context.Profiles[profileIndex]
+			for metricIndex := range profile.Values.TopologyMetrics {
+				metric := &profile.Values.TopologyMetrics[metricIndex]
+				if inspectionMetricMatchesFamily(metric.Kind, family) {
+					facts = append(facts, inspectionSourceFact{
 						registrationID: registrationID,
-						contextOrdinal: context.ordinal,
-						profileOrdinal: profile.identity.Ordinal,
+						contextOrdinal: context.Ordinal,
+						profileOrdinal: profile.Identity.Ordinal,
 						metric:         metric,
 					})
 				}
 			}
 			if family == topologymodel.BGPAdjacencyLinkType {
-				for rowIndex := range profile.values.bgpRows {
-					facts = append(facts, topologyInspectionSourceFact{
+				for rowIndex := range profile.Values.BGPRows {
+					facts = append(facts, inspectionSourceFact{
 						registrationID: registrationID,
-						contextOrdinal: context.ordinal,
-						profileOrdinal: profile.identity.Ordinal,
-						bgp:            &profile.values.bgpRows[rowIndex],
+						contextOrdinal: context.Ordinal,
+						profileOrdinal: profile.Identity.Ordinal,
+						bgp:            &profile.Values.BGPRows[rowIndex],
 					})
 				}
 			}
@@ -102,7 +102,7 @@ func topologyInspectionCaptureFacts(
 	return facts
 }
 
-func topologyInspectionMetricMatchesFamily(kind ddsnmp.TopologyKind, family string) bool {
+func inspectionMetricMatchesFamily(kind ddsnmp.TopologyKind, family string) bool {
 	switch family {
 	case "lldp":
 		return kind == ddsnmp.KindLldpLocPort || kind == ddsnmp.KindLldpLocManAddr ||
