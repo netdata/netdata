@@ -77,12 +77,17 @@ cd "${LEARN_COPY}"
   --fail-links-netdata
 ```
 
-Build with the Netlify-pinned runtime:
+Build with the command and runtime Netlify uses. Both are the `[build]` table of `static.toml` in the Learn checkout
+(`command`, and `NODE_VERSION`, `NPM_VERSION`, `NODE_OPTIONS` under `environment`); read them rather than pinning
+values here, because the pins move with the site:
 
 ```bash
-NODE_OPTIONS=--max_old_space_size=4096 \
-  npx -y -p node@22.14.0 -p yarn@1.22.22 yarn build
+sed -n '/^\[build\]/,/^$/p' "${LEARN_COPY}/static.toml"
 ```
+
+Run the printed `command` inside `${LEARN_COPY}` with the printed `NODE_OPTIONS` exported and a Node matching
+`NODE_VERSION` (for example through `npx -y -p node@<NODE_VERSION> <command>`). The output directory is the table's
+`publish` value.
 
 Serve the static build for inspection:
 
