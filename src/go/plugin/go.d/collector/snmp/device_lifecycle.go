@@ -111,6 +111,10 @@ func (c *Collector) commitDeviceLifecycle(previousOwner string) {
 	)
 	c.deviceLifecyclePending = nil
 	c.deviceLifecycleCommitted = true
+	c.normalWriter = c.diagnosticPublisher.ReplaceNormal(previousOwner, c.deviceLifecycleOwner, uint64(c.deviceWriter.RegistrationID()))
+	if c.normal.cut != nil {
+		c.normalWriter.Update(c.normal.cut)
+	}
 }
 
 func (c *Collector) deviceLifecycleBoundTo(owner string) bool {

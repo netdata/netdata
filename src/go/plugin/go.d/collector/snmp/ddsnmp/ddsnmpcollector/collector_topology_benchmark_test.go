@@ -118,7 +118,7 @@ func BenchmarkCollector_AcquisitionAccounting(b *testing.B) {
 				cfg := Config{SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: profiles, Log: logger.New()}
 				b.ReportAllocs()
 				for b.Loop() {
-					cfg.InitialAcquisitionObserver = mode.new()
+					cfg.AcquisitionObserver = mode.new()
 					results, err := New(cfg).Collect()
 					if err != nil || len(results) != len(profiles) {
 						b.Fatalf("profiles=%d err=%v", len(results), err)
@@ -164,10 +164,10 @@ func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
 		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
 			b.Run(fmt.Sprintf("profiles=%d/observer=%s", profileCount, mode.name), func(b *testing.B) {
 				cfg := Config{
-					SnmpClient:                 &benchmarkTopologySNMPHandler{},
-					Profiles:                   profiles,
-					Log:                        logger.New(),
-					InitialAcquisitionObserver: mode.new(),
+					SnmpClient:          &benchmarkTopologySNMPHandler{},
+					Profiles:            profiles,
+					Log:                 logger.New(),
+					AcquisitionObserver: mode.new(),
 				}
 				b.ReportAllocs()
 				for b.Loop() {
@@ -197,10 +197,10 @@ func BenchmarkCollector_InitialCollectTopologyRows(b *testing.B) {
 				for b.Loop() {
 					observer := mode.new()
 					collector := New(Config{
-						SnmpClient:                 &benchmarkTopologySNMPHandler{pdus: pdus},
-						Profiles:                   []*ddsnmp.Profile{profile},
-						Log:                        log,
-						InitialAcquisitionObserver: observer,
+						SnmpClient:          &benchmarkTopologySNMPHandler{pdus: pdus},
+						Profiles:            []*ddsnmp.Profile{profile},
+						Log:                 log,
+						AcquisitionObserver: observer,
 					})
 					results, err := collector.Collect()
 					topologyCount := -1

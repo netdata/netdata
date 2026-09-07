@@ -490,6 +490,20 @@ type DeviceWriter struct {
 	owner string
 }
 
+// RegistrationID is available only while this accepted runtime owns the job.
+func (w *DeviceWriter) RegistrationID() DeviceRegistrationID {
+	if w == nil {
+		return 0
+	}
+	s := w.store
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.writers[w.owner] != w {
+		return 0
+	}
+	return s.ownerRegistrations[w.owner]
+}
+
 func (w *DeviceWriter) UpdateDevice(info DeviceConnectionInfo) {
 	if w == nil {
 		return

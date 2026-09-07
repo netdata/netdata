@@ -49,7 +49,8 @@ const (
 )
 
 type tableCacheEntry struct {
-	kind tableCacheEntryKind
+	kind     tableCacheEntryKind
+	evidence *AcquisitionCacheInput
 
 	// Index -> column OID -> full OID
 	oidMap map[string]map[string]string
@@ -116,7 +117,7 @@ func (tc *tableCache) getCachedData(cfg ddprofiledefinition.MetricsConfig) (oids
 	return entry.oidMap, entry.tagValues, true
 }
 
-func (tc *tableCache) cacheRows(cfg ddprofiledefinition.MetricsConfig, oidMap map[string]map[string]string, tagValues map[string]map[string]string, dependencies []string) {
+func (tc *tableCache) cacheRows(cfg ddprofiledefinition.MetricsConfig, oidMap map[string]map[string]string, tagValues map[string]map[string]string, dependencies []string, evidence *AcquisitionCacheInput) {
 	if len(oidMap) == 0 {
 		return
 	}
@@ -152,11 +153,18 @@ func (tc *tableCache) cacheRows(cfg ddprofiledefinition.MetricsConfig, oidMap ma
 	}
 
 	// Store the entry
-	tc.tables[tableOID][configID] = tableCacheEntry{
+	entry := tableCacheEntry{
 		kind:      tableCacheEntryRows,
 		oidMap:    oidsCopy,
 		tagValues: tagsCopy,
 	}
+	if evidence != nil {
+		item := *evidence
+		item.CreatedAt = time.Now().UTC()
+		item.OIDs, item.TableTags = oidsCopy, tagsCopy
+		entry.evidence = &item
+	}
+	tc.tables[tableOID][configID] = entry
 
 	// Update table-level metadata only if this is the first config for this table
 	if _, exists := tc.timestamps[tableOID]; !exists {
@@ -183,7 +191,7 @@ func (tc *tableCache) cacheRows(cfg ddprofiledefinition.MetricsConfig, oidMap ma
 
 // cacheMarker records a successful symbol-free auxiliary walk for route
 // planning. Markers never provide row data to cached collection.
-func (tc *tableCache) cacheMarker(cfg ddprofiledefinition.MetricsConfig) {
+func (tc *tableCache) cacheMarker(cfg ddprofiledefinition.MetricsConfig, evidence *AcquisitionCacheInput) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
@@ -195,7 +203,13 @@ func (tc *tableCache) cacheMarker(cfg ddprofiledefinition.MetricsConfig) {
 	if tc.tables[tableOID] == nil {
 		tc.tables[tableOID] = make(map[string]tableCacheEntry)
 	}
-	tc.tables[tableOID][tc.generateConfigID(cfg)] = tableCacheEntry{kind: tableCacheEntryMarker}
+	entry := tableCacheEntry{kind: tableCacheEntryMarker}
+	if evidence != nil {
+		item := *evidence
+		item.CreatedAt = time.Now().UTC()
+		entry.evidence = &item
+	}
+	tc.tables[tableOID][tc.generateConfigID(cfg)] = entry
 
 	if _, exists := tc.timestamps[tableOID]; !exists {
 		tc.timestamps[tableOID] = time.Now()

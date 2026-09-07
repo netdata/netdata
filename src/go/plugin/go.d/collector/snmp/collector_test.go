@@ -50,7 +50,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 
 func TestCollectorCreatorRequiresDeviceStore(t *testing.T) {
 	require.PanicsWithValue(t, "snmp Creator requires a non-nil device store", func() {
-		_ = Creator(nil)
+		_ = Creator(nil, nil)
 	})
 }
 
@@ -267,7 +267,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 	collr := New(store)
 	collr.Hostname = ""
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := Creator(store).JobConfigLifecycle
+	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -286,7 +286,7 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 
 func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
-	hook := Creator(store).JobConfigLifecycle
+	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 	config := map[string]any{
 		"hostname":  "switch-a.example",
@@ -323,7 +323,7 @@ func TestCollectorRejectedManagedCandidateDoesNotRemoveIncumbentConnection(t *te
 	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{Hostname: "incumbent.example"})
 	collr := New(store)
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := Creator(store).JobConfigLifecycle
+	hook := Creator(store, nil).JobConfigLifecycle
 
 	hook.Bind(identity, job)
 	collr.Cleanup(context.Background())
@@ -337,7 +337,7 @@ func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
 	collr := New(store)
 	collr.Config = prepareV2Config()
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := Creator(store).JobConfigLifecycle
+	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)
@@ -405,7 +405,7 @@ func TestCollectorManagedConnectionCollectedBeforeReconcileIsPublishedAtReconcil
 	collr.Config = prepareV2Config()
 	collr.ManualProfiles = []string{"profile-a"}
 	job := snmpLifecycleTestRuntimeJob{collector: collr}
-	hook := Creator(store).JobConfigLifecycle
+	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
 	hook.Bind(identity, job)

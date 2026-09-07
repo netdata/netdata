@@ -30,6 +30,9 @@ func getSNMPValues(
 			if !isPduWithData(pdu) {
 				stats.Errors.MissingOIDs++
 				missingOIDs[trimOID(pdu.Name)] = true
+				if observer, ok := client.(interface{ recordMissing(gosnmp.SnmpPDU) }); ok {
+					observer.recordMissing(pdu)
+				}
 				continue
 			}
 			pdus[trimOID(pdu.Name)] = pdu

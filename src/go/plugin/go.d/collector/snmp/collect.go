@@ -26,8 +26,15 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		ctx = context.Background()
 	}
 
+	initializing := !c.initialized
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
+	}
+
+	if initializing && c.normal.recorder != nil {
+		for ordinal := uint64(1); ordinal <= c.normal.recorder.Cursor(); ordinal++ {
+			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
+		}
 	}
 
 	if c.PingOnly {
@@ -106,11 +113,12 @@ func (c *Collector) ensureInitialized() error {
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:      c.snmpClient,
-			Profiles:        c.snmpProfiles,
-			Log:             c.Logger,
-			SysObjectID:     si.SysObjectID,
-			DisableBulkWalk: c.disableBulkWalk,
+			SnmpClient:          c.snmpClient,
+			Profiles:            c.snmpProfiles,
+			Log:                 c.Logger,
+			SysObjectID:         si.SysObjectID,
+			DisableBulkWalk:     c.disableBulkWalk,
+			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile),
 		})
 	}
 
@@ -209,7 +217,11 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	if c.adjMaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
 	} else {
-		ok, err := c.adjustMaxRepetitions(snmpClient)
+		probeClient := snmpClient
+		if c.normal != nil && c.normal.recorder != nil {
+			probeClient = c.normal.recorder.Wrap(snmpClient)
+		}
+		ok, err := c.adjustMaxRepetitions(probeClient)
 		if err != nil {
 			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
 		}

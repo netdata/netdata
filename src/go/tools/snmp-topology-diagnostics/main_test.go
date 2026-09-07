@@ -110,10 +110,10 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fake := &fakeDiagnosticArchive{}
 			openCalls := 0
-			opener := func(_ io.Reader, limits snmpdiag.ReadLimits) (diagnosticArchive, error) {
+			opener := func(_ io.Reader, limits snmpdiag.ReadLimits) (openedArchive, error) {
 				openCalls++
 				fake.limits = limits
-				return fake, nil
+				return openedArchive{topology: fake}, nil
 			}
 			var stdout, stderr bytes.Buffer
 			if exitCode := runWithOpener(tc.args, &stdout, &stderr, opener); exitCode != 0 {
@@ -479,7 +479,7 @@ func readReplayableDiagnosticArchive(t testing.TB) *snmptopology.DiagnosticArchi
 	if err != nil {
 		t.Fatal(err)
 	}
-	return archive
+	return archive.topology.(*snmptopology.DiagnosticArchive)
 }
 
 func TestRunDiagnosticDirectory(t *testing.T) {

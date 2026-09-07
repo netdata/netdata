@@ -18,8 +18,11 @@ import (
 
 // SourceRecorder belongs to one synchronous collection context. Finish transfers
 // its immutable evidence to the attempt; it retains neither clients nor profiles.
+// Each operation has independent ownership so a cache reference cannot pin the
+// other operations and payloads from its original collection.
 type SourceRecorder struct {
-	operations []ddsnmp.SourceOperation
+	ContextID  uint64
+	operations []*ddsnmp.SourceOperation
 	finished   bool
 }
 
@@ -48,7 +51,23 @@ func (r *SourceRecorder) Cursor() uint64 {
 	return uint64(len(r.operations))
 }
 
-func (r *SourceRecorder) Finish() []ddsnmp.SourceOperation {
+// Operation returns an immutable independently owned source, not a pointer into
+// the recorder's operation array. Cache generations can retain it directly.
+func (r *SourceRecorder) Operation(ordinal uint64) *ddsnmp.SourceOperation {
+	if r == nil || ordinal == 0 || ordinal > uint64(len(r.operations)) {
+		return nil
+	}
+	return r.operations[ordinal-1]
+}
+
+func (r *SourceRecorder) operationsSince(cursor uint64) []*ddsnmp.SourceOperation {
+	if r == nil || cursor >= uint64(len(r.operations)) {
+		return nil
+	}
+	return slices.Clone(r.operations[cursor:])
+}
+
+func (r *SourceRecorder) Finish() []*ddsnmp.SourceOperation {
 	if r == nil {
 		return nil
 	}
@@ -80,37 +99,37 @@ func (c *sourceClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	if packet != nil {
 		pdus = packet.Variables
 	}
-	c.recorder.record("get", oids, elapsed, packet != nil, pdus, snmputils.ClassifyGetFailure(packet, err))
+	c.recorder.record("get", oids, start, elapsed, packet != nil, pdus, snmputils.ClassifyGetFailure(packet, err))
 	return packet, err
 }
 
 func (c *sourceClient) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
 	start := time.Now()
 	values, err := c.Handler.WalkAll(oid)
-	c.recorder.recordWalk("walk", oid, time.Since(start), values, err)
+	c.recorder.recordWalk("walk", oid, start, time.Since(start), values, err)
 	return values, err
 }
 
 func (c *sourceClient) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
 	start := time.Now()
 	values, err := c.Handler.BulkWalkAll(oid)
-	c.recorder.recordWalk("bulk_walk", oid, time.Since(start), values, err)
+	c.recorder.recordWalk("bulk_walk", oid, start, time.Since(start), values, err)
 	return values, err
 }
 
-func (r *SourceRecorder) recordWalk(method, oid string, elapsed time.Duration, values []gosnmp.SnmpPDU, err error) {
+func (r *SourceRecorder) recordWalk(method, oid string, started time.Time, elapsed time.Duration, values []gosnmp.SnmpPDU, err error) {
 	failure := snmputils.ClassifyFailure(err)
 	if err != nil {
 		failure.Operation = "walk"
 	}
-	r.record(method, []string{oid}, elapsed, values != nil, values, failure)
+	r.record(method, []string{oid}, started, elapsed, values != nil, values, failure)
 }
 
-func (r *SourceRecorder) record(method string, oids []string, elapsed time.Duration, present bool, pdus []gosnmp.SnmpPDU, failure snmputils.Failure) {
+func (r *SourceRecorder) record(method string, oids []string, started time.Time, elapsed time.Duration, present bool, pdus []gosnmp.SnmpPDU, failure snmputils.Failure) {
 	if r == nil || r.finished {
 		return
 	}
-	operation := ddsnmp.SourceOperation{Method: method, ElapsedNanos: int64(elapsed), Failure: failure, ResultPresent: present,
+	operation := &ddsnmp.SourceOperation{ContextID: r.ContextID, Ordinal: uint64(len(r.operations)) + 1, StartedAt: started.UTC(), Method: method, ElapsedNanos: int64(elapsed), Failure: failure, ResultPresent: present,
 		RequestedOIDs: make([]string, len(oids)), PDUs: make([]ddsnmp.SourcePDU, len(pdus))}
 	for i, oid := range oids {
 		operation.RequestedOIDs[i] = strings.Clone(oid)
@@ -187,7 +206,7 @@ func bindSourceWalk(route *AcquisitionRouteReport, operation uint64, oid, role s
 	route.Sources = append(route.Sources, ddsnmp.SourceBinding{Operation: operation, OID: trimOID(oid), Role: role})
 }
 
-func (o *acquisitionTopologyScalarObserver) bindSource(requests map[string][]uint64, configs []ddprofiledefinition.MetricsConfig) {
+func (o *acquisitionScalarObserver) bindSource(requests map[string][]uint64, configs []ddprofiledefinition.MetricsConfig) {
 	if o == nil {
 		return
 	}

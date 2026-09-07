@@ -14,7 +14,8 @@ func (c *Collector) CollectionFailures() ddsnmp.CollectionFailures { return c.fa
 
 type diagnosticClient struct {
 	gosnmp.Handler
-	failures *ddsnmp.CollectionFailures
+	failures       *ddsnmp.CollectionFailures
+	negativeCauses *map[string]AcquisitionNegativeCause
 }
 
 func (c *diagnosticClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {

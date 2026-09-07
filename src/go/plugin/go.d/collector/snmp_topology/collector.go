@@ -540,12 +540,12 @@ func (c *Collector) refreshDeviceTopology(
 	}
 
 	coll := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient:                 snmpClient,
-		Profiles:                   profiles,
-		Log:                        c.Logger,
-		SysObjectID:                dev.SysObjectID,
-		DisableBulkWalk:            dev.DisableBulkWalk,
-		InitialAcquisitionObserver: mainObserver,
+		SnmpClient:          snmpClient,
+		Profiles:            profiles,
+		Log:                 c.Logger,
+		SysObjectID:         dev.SysObjectID,
+		DisableBulkWalk:     dev.DisableBulkWalk,
+		AcquisitionObserver: mainObserver,
 	})
 
 	pms, err := coll.Collect()

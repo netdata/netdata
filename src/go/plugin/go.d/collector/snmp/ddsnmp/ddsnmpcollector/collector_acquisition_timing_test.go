@@ -41,7 +41,7 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 				SnmpClient: handler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
-				InitialAcquisitionObserver: AcquisitionObserverFunc(
+				AcquisitionObserver: AcquisitionObserverFunc(
 					func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = value },
 				),
 			})
@@ -82,13 +82,14 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		InitialAcquisitionObserver: AcquisitionObserverFunc(
+		AcquisitionObserver: AcquisitionObserverFunc(
 			func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r },
 		),
 	})
 	_, err := collector.Collect()
 	require.Error(t, err)
 	require.NotNil(t, report.Execution)
+	firstReport := report
 	p := report.Execution.Preparation
 	assert.EqualValues(t, 2, p.GetRequests)
 	assert.EqualValues(t, 11, p.GetOIDs)
@@ -111,7 +112,8 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 	metrics, err = collector.Collect()
 	require.NoError(t, err)
 	assert.Zero(t, metrics[0].Stats.SNMP.GetRequests, "initialized inputs are cached")
-	assert.Equal(t, p, report.Execution.Preparation, "later collections must not mutate retained evidence")
+	assert.Equal(t, p, firstReport.Execution.Preparation, "later collections must not mutate retained evidence")
+	assert.Zero(t, report.Execution.Preparation.GetRequests)
 }
 
 func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
@@ -149,7 +151,7 @@ func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
 			Profiles:    []*ddsnmp.Profile{profile},
 			SysObjectID: base,
 			Log:         logger.New(),
-			InitialAcquisitionObserver: AcquisitionObserverFunc(
+			AcquisitionObserver: AcquisitionObserverFunc(
 				func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r },
 			),
 		},
@@ -208,7 +210,7 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 					createTestProfile("a.yaml", []ddprofiledefinition.MetricsConfig{metric}),
 					createTestProfile("b.yaml", []ddprofiledefinition.MetricsConfig{metric}),
 				},
-				InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) }),
+				AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) }),
 			})
 			_, err := collector.Collect()
 			assert.Equal(t, failed, err != nil)
@@ -249,7 +251,7 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{profile},
-		InitialAcquisitionObserver: AcquisitionObserverFunc(
+		AcquisitionObserver: AcquisitionObserverFunc(
 			func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r },
 		),
 	})

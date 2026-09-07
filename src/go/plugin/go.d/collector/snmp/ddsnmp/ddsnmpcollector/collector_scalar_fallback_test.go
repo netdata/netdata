@@ -57,7 +57,7 @@ func TestCollector_Collect_RegularScalarFallbackKeepsFirstSuccessfulMetric(t *te
 	pm := results[0]
 	require.Len(t, pm.Metrics, 2)
 	assert.Equal(t, ddsnmp.Metric{Name: "systemUptime", Value: 10, MetricType: "gauge", Profile: pm}, pm.Metrics[0])
-	assert.Equal(t, ddsnmp.Metric{Name: "selectedUptime", Value: 10, MetricType: "gauge", Profile: pm}, pm.Metrics[1])
+	assert.Equal(t, ddsnmp.Metric{Name: "selectedUptime", Value: 10, MetricType: "gauge", Profile: pm, IsVirtual: true}, pm.Metrics[1])
 	assert.Equal(t, int64(1), pm.Stats.Metrics.Scalar)
 	assert.Equal(t, int64(1), pm.Stats.Metrics.Virtual)
 	assert.Equal(t, int64(2), pm.Stats.SNMP.GetOIDs)

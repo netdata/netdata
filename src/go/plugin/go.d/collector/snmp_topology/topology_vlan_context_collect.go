@@ -29,7 +29,7 @@ func resolveTopologyVLANProfileView(dev ddsnmp.DeviceConnectionInfo) ddsnmp.Proj
 }
 
 type topologyVLANProgress struct {
-	sources      []ddsnmp.SourceOperation
+	sources      []*ddsnmp.SourceOperation
 	client       topologydiag.AcquisitionPhaseEvidence
 	connect      topologydiag.AcquisitionPhaseEvidence
 	collection   topologydiag.AcquisitionPhaseEvidence
@@ -80,7 +80,7 @@ func collectTopologyVLANContext(
 	sourceRecorder := &ddsnmpcollector.SourceRecorder{}
 	client = sourceRecorder.Wrap(client)
 	collector := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient: client, Profiles: profiles, Log: c.Logger, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, InitialAcquisitionObserver: observer,
+		SnmpClient: client, Profiles: profiles, Log: c.Logger, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, AcquisitionObserver: observer,
 	})
 	pms, err := collector.Collect()
 	progress.sources = sourceRecorder.Finish()

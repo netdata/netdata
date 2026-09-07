@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -41,6 +42,7 @@ type pendingCheckpoint struct {
 }
 
 type Publisher struct {
+	normal normalPublication
 	*logger.Logger
 	source     Source
 	directory  string
@@ -61,6 +63,7 @@ type Publisher struct {
 	fileSequence           uint64
 	initialized            bool
 	prunePending           bool
+	encoder                *archiveEncoder
 	rename                 func(string, string) error
 	remove                 func(string) error
 	writeFile              func(context.Context, string, Document, func(string, string) error) error
@@ -68,9 +71,22 @@ type Publisher struct {
 
 func NewPublisher(source Source, varLibDir string) *Publisher {
 	// A prior run may have published a complete checkpoint without finishing rotation.
-	return &Publisher{Logger: logger.New(), source: source, directory: DirectoryPath(varLibDir),
+	p := &Publisher{Logger: logger.New(), source: source, directory: DirectoryPath(varLibDir),
 		runID: uuid.NewString(), changed: make(chan struct{}, 1), prunePending: true,
-		rename: os.Rename, remove: os.Remove, writeFile: writeArchiveFile}
+		rename: os.Rename, remove: os.Remove}
+	p.writeFile = p.writeArchiveFile
+	return p
+}
+
+func (p *Publisher) writeArchiveFile(ctx context.Context, path string, document Document, replace func(string, string) error) error {
+	if p.encoder == nil {
+		var err error
+		p.encoder, err = newArchiveEncoder()
+		if err != nil {
+			return err
+		}
+	}
+	return writeArchiveFileWithEncoder(ctx, path, document, (*os.File).Close, replace, p.encoder.write)
 }
 
 // SetTopology admits only an accepted configuration and its already captured cuts.
@@ -172,6 +188,9 @@ func (p *Publisher) flush(ctx context.Context) {
 		p.warn(err)
 	}
 	if err := p.publishTopology(ctx); err != nil {
+		p.warn(err)
+	}
+	if err := p.publishNormal(ctx); err != nil {
 		p.warn(err)
 	}
 	if p.prunePending && ctx.Err() == nil {
@@ -298,9 +317,24 @@ func writeArchiveFileWithClose(
 	closeFile func(*os.File) error,
 	replace func(string, string) error,
 ) error {
+	return writeArchiveFileWithEncoder(ctx, path, document, closeFile, replace, Write)
+}
+
+func writeArchiveFileWithEncoder(
+	ctx context.Context,
+	path string,
+	document Document,
+	closeFile func(*os.File) error,
+	replace func(string, string) error,
+	encode func(io.Writer, Document) error,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	return writeAtomicFile(ctx, path, closeFile, func(w io.Writer) error { return encode(w, document) }, replace)
+}
+
+func writeAtomicFile(ctx context.Context, path string, closeFile func(*os.File) error, encode func(io.Writer) error, replace func(string, string) error) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -321,7 +355,7 @@ func writeArchiveFileWithClose(
 		_ = closeFile(file)
 		return err
 	}
-	encodeErr := Write(file, document)
+	encodeErr := encode(file)
 	closeErr := closeFile(file)
 	if err := errors.Join(encodeErr, closeErr); err != nil {
 		return err

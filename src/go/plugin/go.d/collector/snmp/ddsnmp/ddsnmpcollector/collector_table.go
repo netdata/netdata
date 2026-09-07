@@ -72,6 +72,7 @@ type (
 	}
 
 	tableProcessingContext struct {
+		cacheEvidence   *AcquisitionCacheInput
 		processingRoute *AcquisitionRouteReport
 		// === Input data (set when context is created) ===
 
@@ -239,7 +240,7 @@ func (tc *tableCollector) processTableData(ctx *tableProcessingContext, collecti
 		switch {
 		case len(ctx.rows) > 0 && dependenciesReady:
 			deps := extractTableDependencies(ctx.config, collectionCtx.tableNameToOID)
-			tc.tableCache.cacheRows(ctx.config, ctx.oidCache, ctx.tagCache, deps)
+			tc.tableCache.cacheRows(ctx.config, ctx.oidCache, ctx.tagCache, deps, ctx.cacheEvidence)
 			tc.log.Debugf("Cached table %s structure with %d rows", ctx.config.Table.Name, len(ctx.oidCache))
 		case len(ctx.rows) > 0:
 			tc.tableCache.invalidateConfig(ctx.config)
@@ -393,7 +394,17 @@ func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext, stats *d
 	}
 
 	// GET current values
+	source := sourceRecorder(tc.snmpClient)
+	cursor := source.Cursor()
 	pdus, err := tc.snmpGet(oidsToGet, stats)
+	if source != nil && ctx.acquisition != nil {
+		requests := source.requestsSince(cursor)
+		for _, oid := range oidsToGet {
+			for _, operation := range requests[trimOID(oid)] {
+				ctx.acquisition.candidateSources = append(ctx.acquisition.candidateSources, ddsnmp.SourceBinding{Operation: operation, OID: trimOID(oid), Role: "primary"})
+			}
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cached OIDs: %w", err)
 	}

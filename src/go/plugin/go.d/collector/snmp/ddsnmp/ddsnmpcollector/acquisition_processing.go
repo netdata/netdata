@@ -50,7 +50,7 @@ func (o *acquisitionTableObservation) processing(row string) *processingObserver
 	return processingFor(o.collection.route(int(o.routeOrdinal)), row)
 }
 
-func (o *acquisitionTopologyScalarObserver) processing(index int) *processingObserver {
+func (o *acquisitionScalarObserver) processing(index int) *processingObserver {
 	return processingFor(o.route(index), "")
 }
 

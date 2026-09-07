@@ -5,14 +5,16 @@ package snmp
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
 
 type snmpJobConfigLifecycle struct {
-	store *ddsnmp.DeviceStore
+	store     *ddsnmp.DeviceStore
+	publisher *diagnostics.Publisher
 }
 
-func newSNMPJobConfigLifecycle(store *ddsnmp.DeviceStore) collectorapi.JobConfigLifecycle {
-	return &snmpJobConfigLifecycle{store: store}
+func newSNMPJobConfigLifecycle(store *ddsnmp.DeviceStore, publisher *diagnostics.Publisher) collectorapi.JobConfigLifecycle {
+	return &snmpJobConfigLifecycle{store: store, publisher: publisher}
 }
 
 func (*snmpJobConfigLifecycle) Project(
@@ -71,6 +73,7 @@ func (l *snmpJobConfigLifecycle) Reconcile(
 	collector := snmpCollectorFromRuntimeJob(job)
 	if collector == nil || !collector.deviceLifecycleBoundTo(current.identity.String()) {
 		l.store.ReplaceJob(previous.String(), current.identity.String(), current.info, current.status, nil)
+		l.publisher.ReplaceNormal(previous.String(), current.identity.String(), 0)
 		return
 	}
 	collector.commitDeviceLifecycle(previous.String())
@@ -79,6 +82,7 @@ func (l *snmpJobConfigLifecycle) Reconcile(
 func (l *snmpJobConfigLifecycle) Remove(identity collectorapi.JobConfigIdentity) {
 	if l != nil && l.store != nil {
 		l.store.Unregister(identity.String())
+		l.publisher.RemoveNormal(identity.String())
 	}
 }
 

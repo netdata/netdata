@@ -14,7 +14,7 @@ import (
 )
 
 // AcquisitionObserver receives one terminal report for every selected profile
-// during the initial Collect call. The report and its Routes remain valid after
+// during each Collect call. The report and its Routes remain valid after
 // the call; ProfileMetrics is borrowed only for the duration of the call.
 type AcquisitionObserver interface {
 	ObserveProfile(AcquisitionProfileReport, *ddsnmp.ProfileMetrics)
@@ -53,6 +53,10 @@ const (
 	AcquisitionRouteKindTopologyTable
 	AcquisitionRouteKindBGPScalar
 	AcquisitionRouteKindBGPTable
+	AcquisitionRouteKindMetricScalar
+	AcquisitionRouteKindMetricTable
+	AcquisitionRouteKindLicenseScalar
+	AcquisitionRouteKindLicenseTable
 )
 
 type AcquisitionRouteSource uint8
@@ -99,6 +103,8 @@ type AcquisitionProfileReport struct {
 	Routes                  []AcquisitionRouteReport
 	TopologyValueReferences []AcquisitionValueReference
 	BGPValueReferences      []AcquisitionValueReference
+	MetricValueReferences   []AcquisitionValueReference
+	LicenseValueReferences  []AcquisitionValueReference
 }
 
 // AcquisitionValueReference identifies one borrowed decoded value within its
@@ -116,18 +122,19 @@ type AcquisitionValueReference struct {
 // and processing omissions. It contains no profile path, packet, decoded value
 // or error text.
 type AcquisitionRouteReport struct {
-	Sources      []ddsnmp.SourceBinding
-	Processing   []ddsnmp.ProcessingEvent
-	Ordinal      uint32
-	Kind         AcquisitionRouteKind
-	RootOID      string
-	Source       AcquisitionRouteSource
-	Outcome      AcquisitionRouteOutcome
-	FailureClass AcquisitionFailureClass
-	Rows         uint64
-	Values       uint64
-	Missing      uint64
-	Rejected     uint64
+	Sources          []ddsnmp.SourceBinding
+	DiscardedSources []ddsnmp.SourceBinding
+	Processing       []ddsnmp.ProcessingEvent
+	Ordinal          uint32
+	Kind             AcquisitionRouteKind
+	RootOID          string
+	Source           AcquisitionRouteSource
+	Outcome          AcquisitionRouteOutcome
+	FailureClass     AcquisitionFailureClass
+	Rows             uint64
+	Values           uint64
+	Missing          uint64
+	Rejected         uint64
 }
 
 func (r AcquisitionProfileReport) String() string {
@@ -142,6 +149,11 @@ type acquisitionProfileCollection struct {
 	topologyScalarRoutes    []int
 	topologyTableRoutes     map[int]int
 	bgpRoutes               []int
+	metricScalarRoutes      []int
+	metricTableRoutes       map[int]int
+	licenseRoutes           []int
+	metricValueReferences   []AcquisitionValueReference
+	licenseValueReferences  []AcquisitionValueReference
 	tableBindings           []acquisitionTableBinding
 	topologyValueReferences []AcquisitionValueReference
 	bgpValueReferences      []AcquisitionValueReference
@@ -156,16 +168,20 @@ type acquisitionTableBinding struct {
 }
 
 type acquisitionTableObservation struct {
-	collection         *acquisitionProfileCollection
-	routeOrdinal       uint32
-	processed          bool
-	rows               uint64
-	values             uint64
-	rejected           uint64
-	dependencyRejected uint64
+	collection          *acquisitionProfileCollection
+	routeOrdinal        uint32
+	processed           bool
+	rows                uint64
+	values              uint64
+	rejected            uint64
+	dependencyRejected  uint64
+	staging             bool
+	valueReferences     []AcquisitionValueReference
+	candidateReferences []AcquisitionValueReference
+	candidateSources    []ddsnmp.SourceBinding
 }
 
-type acquisitionTopologyTableScope struct {
+type acquisitionTableScope struct {
 	collection   *acquisitionProfileCollection
 	routeIndexes map[int]int
 }
@@ -175,16 +191,21 @@ func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, rowI
 		return
 	}
 	for valueOrdinal, metric := range metrics {
-		o.collection.addTopologyValueReference(AcquisitionValueReference{
+		reference := AcquisitionValueReference{
 			RowIndex: rowIndex, Field: metric.Name,
 			RouteOrdinal: o.routeOrdinal,
 			RowOrdinal:   rowOrdinal,
 			ValueOrdinal: uint32(valueOrdinal),
-		})
+		}
+		if o.staging {
+			o.candidateReferences = append(o.candidateReferences, reference)
+		} else {
+			o.valueReferences = append(o.valueReferences, reference)
+		}
 	}
 }
 
-type acquisitionTopologyScalarObserver struct {
+type acquisitionScalarObserver struct {
 	collection   *acquisitionProfileCollection
 	routeIndexes []int
 }
@@ -205,7 +226,7 @@ type acquisitionMetadataRoute struct {
 	field      ddprofiledefinition.MetadataField
 }
 
-func (o *acquisitionTopologyScalarObserver) start(
+func (o *acquisitionScalarObserver) start(
 	configs []ddprofiledefinition.MetricsConfig,
 	missingOIDs map[string]bool,
 ) {
@@ -231,7 +252,7 @@ func (o *acquisitionTopologyScalarObserver) start(
 	}
 }
 
-func (o *acquisitionTopologyScalarObserver) failUnfinished(class AcquisitionFailureClass) {
+func (o *acquisitionScalarObserver) failUnfinished(class AcquisitionFailureClass) {
 	if o == nil {
 		return
 	}
@@ -245,26 +266,26 @@ func (o *acquisitionTopologyScalarObserver) failUnfinished(class AcquisitionFail
 	}
 }
 
-func (o *acquisitionTopologyScalarObserver) rejected(index int) {
+func (o *acquisitionScalarObserver) rejected(index int) {
 	if route := o.route(index); route != nil {
 		setAcquisitionScalarRouteRejected(route)
 	}
 }
 
-func (o *acquisitionTopologyScalarObserver) value(index int, field string) {
+func (o *acquisitionScalarObserver) value(index int, field string) {
 	if route := o.route(index); route != nil {
 		setAcquisitionScalarRouteValue(route)
-		o.collection.addTopologyValueReference(AcquisitionValueReference{RouteOrdinal: route.Ordinal, Field: field})
+		o.collection.addMetricValueReference(route.Ordinal, AcquisitionValueReference{RouteOrdinal: route.Ordinal, Field: field})
 	}
 }
 
-func (o *acquisitionTopologyScalarObserver) empty(index int) {
+func (o *acquisitionScalarObserver) empty(index int) {
 	if route := o.route(index); route != nil && route.Outcome == AcquisitionRouteOutcomeNotObserved {
 		route.Outcome = AcquisitionRouteOutcomeEmpty
 	}
 }
 
-func (o *acquisitionTopologyScalarObserver) route(configIndex int) *AcquisitionRouteReport {
+func (o *acquisitionScalarObserver) route(configIndex int) *AcquisitionRouteReport {
 	if o == nil || configIndex < 0 || configIndex >= len(o.routeIndexes) {
 		return nil
 	}
@@ -459,7 +480,7 @@ func newAcquisitionProfileCollection(
 	for _, cfg := range def.Topology {
 		topologyMetrics = append(topologyMetrics, cfg.MetricsConfig)
 	}
-	collection.topologyScalarRoutes, collection.topologyTableRoutes = collection.addTopologyRoutes(topologyMetrics)
+	collection.topologyScalarRoutes, collection.topologyTableRoutes = collection.addMetricRoutes(topologyMetrics, AcquisitionRouteKindTopologyScalar, AcquisitionRouteKindTopologyTable)
 
 	collection.bgpRoutes = make([]int, len(def.BGP))
 	for i := range collection.bgpRoutes {
@@ -474,6 +495,14 @@ func newAcquisitionProfileCollection(
 		if cfg.Table.OID != "" {
 			collection.bgpRoutes[i] = collection.addRoute(AcquisitionRouteKindBGPTable, trimOID(cfg.Table.OID))
 		}
+	}
+	collection.metricScalarRoutes, collection.metricTableRoutes = collection.addMetricRoutes(def.Metrics, AcquisitionRouteKindMetricScalar, AcquisitionRouteKindMetricTable)
+	for _, cfg := range def.Licensing {
+		kind, root := AcquisitionRouteKindLicenseTable, trimOID(cfg.Table.OID)
+		if root == "" {
+			kind, root = AcquisitionRouteKindLicenseScalar, firstLicenseRouteOID(cfg)
+		}
+		collection.licenseRoutes = append(collection.licenseRoutes, collection.addRoute(kind, root))
 	}
 	collection.prepareProfileInputRoutes(profile, sysObjectID)
 	return collection
@@ -501,8 +530,9 @@ func (c *acquisitionProfileCollection) prepareProfileInputRoutes(profile *ddsnmp
 	}
 }
 
-func (c *acquisitionProfileCollection) addTopologyRoutes(
+func (c *acquisitionProfileCollection) addMetricRoutes(
 	configs []ddprofiledefinition.MetricsConfig,
+	scalarKind, tableKind AcquisitionRouteKind,
 ) (scalarRoutes []int, tableRoutes map[int]int) {
 	if c == nil {
 		return nil, nil
@@ -513,7 +543,7 @@ func (c *acquisitionProfileCollection) addTopologyRoutes(
 	}
 	for i, cfg := range configs {
 		if cfg.IsScalar() {
-			scalarRoutes[i] = c.addRoute(AcquisitionRouteKindTopologyScalar, trimOID(cfg.Symbol.OID))
+			scalarRoutes[i] = c.addRoute(scalarKind, trimOID(cfg.Symbol.OID))
 		}
 	}
 	for i, cfg := range configs {
@@ -521,7 +551,7 @@ func (c *acquisitionProfileCollection) addTopologyRoutes(
 			if tableRoutes == nil {
 				tableRoutes = make(map[int]int)
 			}
-			tableRoutes[i] = c.addRoute(AcquisitionRouteKindTopologyTable, trimOID(cfg.Table.OID))
+			tableRoutes[i] = c.addRoute(tableKind, trimOID(cfg.Table.OID))
 		}
 	}
 	return scalarRoutes, tableRoutes
@@ -573,21 +603,21 @@ func (c *acquisitionProfileCollection) bgpRoute(configIndex int) *AcquisitionRou
 	return c.route(c.bgpRoutes[configIndex])
 }
 
-func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionTopologyScalarObserver {
+func (c *acquisitionProfileCollection) topologyScalarObserver() *acquisitionScalarObserver {
 	if c == nil {
 		return nil
 	}
-	return &acquisitionTopologyScalarObserver{
+	return &acquisitionScalarObserver{
 		collection:   c,
 		routeIndexes: c.topologyScalarRoutes,
 	}
 }
 
-func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTopologyTableScope {
+func (c *acquisitionProfileCollection) topologyTableScope() *acquisitionTableScope {
 	if c == nil {
 		return nil
 	}
-	return &acquisitionTopologyTableScope{
+	return &acquisitionTableScope{
 		collection:   c,
 		routeIndexes: c.topologyTableRoutes,
 	}
@@ -698,7 +728,7 @@ func acquisitionMetadataFieldRootOID(field ddprofiledefinition.MetadataField) st
 	return ""
 }
 
-func (s *acquisitionTopologyTableScope) bind(
+func (s *acquisitionTableScope) bind(
 	configIndex int,
 	request *tableCollectionRequest,
 ) *acquisitionTableObservation {
@@ -733,6 +763,17 @@ func (c *acquisitionProfileCollection) syncTableRoutes() {
 		}
 
 		if request.route != nil {
+			if request.route.state == tableRouteCached {
+				route.Sources = append(route.Sources, observation.candidateSources...)
+				for _, ref := range observation.candidateReferences {
+					c.addMetricValueReference(route.Ordinal, ref)
+				}
+			} else {
+				route.DiscardedSources = observation.candidateSources
+				for _, ref := range observation.valueReferences {
+					c.addMetricValueReference(route.Ordinal, ref)
+				}
+			}
 			bindSourceWalk(route, request.route.sourceOperation, request.route.oid, "primary")
 			for _, dependency := range request.dependencies {
 				bindSourceWalk(route, dependency.sourceOperation, dependency.oid, "dependency")
@@ -813,6 +854,8 @@ func (c *acquisitionProfileCollection) report(
 	report.Routes = c.routes
 	report.TopologyValueReferences = c.topologyValueReferences
 	report.BGPValueReferences = c.bgpValueReferences
+	report.MetricValueReferences = c.metricValueReferences
+	report.LicenseValueReferences = c.licenseValueReferences
 	if outcome == AcquisitionProfileOutcomeSuccess && routesHaveFailures(report.Routes) {
 		report.Outcome = AcquisitionProfileOutcomePartial
 	}
@@ -829,6 +872,11 @@ func (c *acquisitionProfileCollection) releaseReportStorage() {
 	c.topologyScalarRoutes = nil
 	c.topologyTableRoutes = nil
 	c.bgpRoutes = nil
+	c.metricScalarRoutes = nil
+	c.metricTableRoutes = nil
+	c.licenseRoutes = nil
+	c.metricValueReferences = nil
+	c.licenseValueReferences = nil
 	c.tableBindings = nil
 	c.topologyValueReferences = nil
 	c.bgpValueReferences = nil
@@ -870,6 +918,12 @@ func acquisitionProfileRouteDigest(profile *ddsnmp.Profile) [32]byte {
 	}
 	def := profile.Definition
 
+	for _, cfg := range def.Metrics {
+		d.addMetric("metric", cfg)
+	}
+	for _, cfg := range def.Licensing {
+		d.addMetric("licensing", licensingConfigAsMetricsConfig(cfg))
+	}
 	for _, cfg := range def.Topology {
 		d.addMetric("topology:"+string(cfg.Kind), cfg.MetricsConfig)
 	}
