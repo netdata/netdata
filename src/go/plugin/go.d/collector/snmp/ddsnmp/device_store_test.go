@@ -304,3 +304,81 @@ func BenchmarkDeviceWriterLifecycle(b *testing.B) {
 		})
 	}
 }
+
+func TestDeviceStoreLifecycleChangeNotifications(t *testing.T) {
+	for name, tc := range map[string]struct {
+		change     func(*DeviceStore, *DeviceWriter, DeviceLifecycleStatus)
+		wantChange bool
+	}{
+		"status transition": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			status.Outcome = DeviceLifecycleOutcomeFailed
+			w.RecordLifecycle(status)
+		}, true},
+		"poll timestamp only": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			status.CompletedAt = status.CompletedAt.Add(time.Second)
+			w.RecordLifecycle(status)
+		}, false},
+		"job poll timestamp only": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			status.CompletedAt = status.CompletedAt.Add(time.Second)
+			s.RecordJobLifecycle("job", status)
+		}, false},
+		"readiness": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			s.Register("job", DeviceConnectionInfo{Hostname: "switch.example"})
+		}, true},
+		"same identity": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			s.RegisterJob("job", DeviceLifecycleInfo{Hostname: "switch.example"})
+		}, false},
+		"changed identity": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
+			s.RegisterJob("job", DeviceLifecycleInfo{Hostname: "other.example"})
+		}, true},
+		"remove":        {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("job") }, true},
+		"remove absent": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("absent") }, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := NewDeviceStore()
+			status := DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeSuccess, CompletedAt: time.Now()}
+			writer := store.ReplaceJob("", "job", DeviceLifecycleInfo{Hostname: "switch.example"}, status, nil)
+			<-store.LifecycleChanges()
+			revision := store.LifecycleRevision()
+			tc.change(store, writer, status)
+			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
+			select {
+			case <-store.LifecycleChanges():
+				require.True(t, tc.wantChange)
+			default:
+				require.False(t, tc.wantChange)
+			}
+		})
+	}
+}
+
+func TestDeviceWriterProfileContextChangeNotifications(t *testing.T) {
+	first, second := &ProfileContext{}, &ProfileContext{}
+	for name, tc := range map[string]struct {
+		previous   *ProfileContext
+		next       *ProfileContext
+		wantChange bool
+	}{
+		"still unset":          {nil, nil, false},
+		"first context":        {nil, first, true},
+		"same non-nil context": {first, first, false},
+		"replacement context":  {first, second, true},
+		"cleared context":      {first, nil, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := NewDeviceStore()
+			writer := store.ReplaceJob("", "job", DeviceLifecycleInfo{}, DeviceLifecycleStatus{}, nil)
+			writer.RecordProfileContext(tc.previous)
+			<-store.LifecycleChanges()
+			revision := store.LifecycleRevision()
+			writer.RecordProfileContext(tc.next)
+			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
+			select {
+			case <-store.LifecycleChanges():
+				require.True(t, tc.wantChange)
+			default:
+				require.False(t, tc.wantChange)
+			}
+		})
+	}
+}

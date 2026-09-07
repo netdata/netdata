@@ -1,8 +1,9 @@
 {
-  "format": "netdata.snmp_topology.diagnostics",
+  "format": "netdata.snmp.diagnostics",
   "version": 1,
   "producer": {
-    "agent_version": "v1.2.3"
+    "agent_version": "v1.2.3",
+    "run_id": ""
   },
   "snapshot": {
     "job_lifecycle_cut": {
@@ -108,5 +109,7 @@
       "registration_count": 1,
       "selected_count": 1
     }
-  }
+  },
+  "kind": "topology",
+  "published_at": "0001-01-01T00:00:00Z"
 }

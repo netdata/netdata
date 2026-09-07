@@ -193,6 +193,7 @@ func (c *Collector) publishAbortedTopologyDiagnostic(
 		RegistrationCount:     registrationCount,
 		SelectedCount:         selectedCount,
 	})
+	c.recordDiagnosticCheckpoint()
 }
 
 func safeTopologyDiagnosticTime(c *Collector) (now time.Time) {

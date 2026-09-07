@@ -4,7 +4,9 @@ package snmptopology
 
 import (
 	"context"
+	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -22,7 +24,15 @@ func TestDiagnosticProviderAcquiresImmutableGenerationWithoutRefreshLock(t *test
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 	done := make(chan error, 1)
-	go func() { _, err := c.diagnosticProvider.Capture(); done <- err }()
+	go func() {
+		checkpoints := c.diagnosticProvider.Checkpoints()
+		if len(checkpoints) == 0 {
+			done <- errors.New("no committed checkpoint")
+			return
+		}
+		_, err := checkpoints[0].Capture()
+		done <- err
+	}()
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -61,7 +71,15 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 	publisherDone := make(chan struct{})
 	go func() { publisher.Run(ctx); close(publisherDone) }()
 	read := func() (snmpdiag.Document, error) {
-		f, err := os.Open(snmpdiag.ArchivePath(dir))
+		directory := snmpdiag.DirectoryPath(dir)
+		entries, err := snmpdiag.ListCheckpoints(directory)
+		if err != nil {
+			return snmpdiag.Document{}, err
+		}
+		if len(entries) == 0 {
+			return snmpdiag.Document{}, errors.New("no checkpoints")
+		}
+		f, err := os.Open(filepath.Join(directory, snmpdiag.TopologyDirectory, entries[len(entries)-1].Filename))
 		if err != nil {
 			return snmpdiag.Document{}, err
 		}
@@ -72,8 +90,6 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 		d, err := read()
 		return err == nil && d.Snapshot.ProducerScopeID == incumbent.topologyRegistry.producerScope()
 	}, time.Second, time.Millisecond)
-	before, err := read()
-	require.NoError(t, err)
 	candidate, stopCandidate, candidateDone := start("candidate")
 	require.NotEqual(t,
 		incumbent.topologyRegistry.producerScope(), candidate.topologyRegistry.producerScope(),
@@ -81,12 +97,8 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 	)
 	hook.Bind(id, topologyLifecycleTestJob{candidate})
 	hook.Capture(id, topologyLifecycleTestJob{candidate})
-	// Wait for another real disk publication to prove that merely running the
-	// candidate did not select it as the diagnostic provider.
-	require.Eventually(t, func() bool {
-		d, err := read()
-		return err == nil && d.Snapshot.Lifecycle.Cut.CapturedAt.After(before.Snapshot.Lifecycle.Cut.CapturedAt)
-	}, 3*time.Second, 5*time.Millisecond)
+	// The candidate has completed a real generation, but is not admitted.
+	require.NotEmpty(t, candidate.diagnosticProvider.Checkpoints())
 	actual, err := read()
 	require.NoError(t, err)
 	require.Equal(t, incumbent.topologyRegistry.producerScope(), actual.Snapshot.ProducerScopeID)
@@ -98,22 +110,23 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 		d, err := read()
 		return err == nil && d.Snapshot.ProducerScopeID == candidate.topologyRegistry.producerScope()
 	}, time.Second, time.Millisecond)
-	// Stop the selected runner without config removal. A fresh publisher run
-	// forces a checkpoint without waiting for the 30-minute fallback interval.
-	cancel()
-	<-publisherDone
+	// Releasing the selected runner updates current status without erasing history.
 	stopCandidate()
 	require.NoError(t, <-candidateDone)
-	nextCtx, nextCancel := context.WithCancel(t.Context())
-	defer nextCancel()
-	nextDone := make(chan struct{})
-	go func() { publisher.Run(nextCtx); close(nextDone) }()
 	require.Eventually(t, func() bool {
-		d, err := read()
-		return err == nil && d.Snapshot.ProducerScopeID == "" && d.Snapshot.Topology == nil
+		f, err := os.Open(filepath.Join(snmpdiag.DirectoryPath(dir), snmpdiag.LifecycleFilename))
+		if err != nil {
+			return false
+		}
+		defer f.Close()
+		d, err := snmpdiag.Read(f, snmpdiag.DefaultReadLimits())
+		return err == nil && !d.TopologyActive
 	}, time.Second, time.Millisecond)
-	nextCancel()
-	<-nextDone
+	historical, err := read()
+	require.NoError(t, err)
+	require.Equal(t, "candidate", historical.Snapshot.ProducerScopeID)
+	cancel()
+	<-publisherDone
 	candidate.Cleanup(ctx)
 }
 
@@ -124,3 +137,35 @@ func (topologyLifecycleTestJob) ModuleName() string { return "snmp_topology" }
 func (topologyLifecycleTestJob) Name() string       { return "test" }
 func (topologyLifecycleTestJob) IsRunning() bool    { return true }
 func (j topologyLifecycleTestJob) Collector() any   { return j.c }
+
+func TestAbortedFirstSweepSurvivesProviderRelease(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	dir := t.TempDir()
+	publisher := snmpdiag.NewPublisher(store, dir)
+	coll.diagnosticPublisher = publisher
+	publisher.SetTopology("accepted", coll.diagnosticProvider)
+	aborted, abort := context.WithCancel(t.Context())
+	abort()
+	coll.refreshTopology(aborted)
+	coll.releaseDiagnosticProvider()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { defer close(done); publisher.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+	directory := snmpdiag.DirectoryPath(dir)
+	var entries []snmpdiag.CheckpointFile
+	require.Eventually(t, func() bool {
+		var err error
+		entries, err = snmpdiag.ListCheckpoints(directory)
+		return err == nil && len(entries) == 1
+	}, time.Second, time.Millisecond)
+	file, err := os.Open(filepath.Join(directory, snmpdiag.TopologyDirectory, entries[0].Filename))
+	require.NoError(t, err)
+	defer file.Close()
+	archive, err := snmpdiag.Read(file, snmpdiag.DefaultReadLimits())
+	require.NoError(t, err)
+	require.Nil(t, archive.Snapshot.Topology)
+	require.NotNil(t, archive.Snapshot.LastAborted)
+	require.Equal(t, "canceled", archive.Snapshot.LastAborted.Reason)
+	require.NotEmpty(t, archive.Producer.RunID)
+}

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/docker/go-units"
@@ -40,7 +41,8 @@ type diagnosticArchive interface {
 type archiveOpener func(io.Reader, snmpdiag.ReadLimits) (diagnosticArchive, error)
 
 type commandOptions struct {
-	archivePath       string
+	inputPath         string
+	checkpoint        uint64
 	maxCompressedSize string
 	maxDecodedSize    string
 	query             snmptopology.DiagnosticQueryOptions
@@ -85,7 +87,30 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 		return 2
 	}
 
-	file, err := os.Open(options.archivePath)
+	if operation == "list" {
+		info, err := os.Stat(options.inputPath)
+		if err != nil || !info.IsDir() || options.checkpoint != 0 {
+			fmt.Fprintln(stderr, "error: list requires a directory and does not select a checkpoint")
+			return 1
+		}
+		entries, err := snmpdiag.ListCheckpoints(options.inputPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: list checkpoints: %v\n", err)
+			return 1
+		}
+		if err := jsonv2.MarshalWrite(stdout, entries, outputJSONOptions); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintln(stdout)
+		return 0
+	}
+	path, err := resolveInput(options.inputPath, options.checkpoint)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: select input: %v\n", err)
+		return 1
+	}
+	file, err := os.Open(path)
 	if err != nil {
 		fmt.Fprintf(stderr, "error: open archive: %v\n", err)
 		return 1
@@ -126,7 +151,8 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		operationUsage(stderr, operation)
 		flags.PrintDefaults()
 	}
-	flags.StringVar(&options.archivePath, "archive", "", "path to a zstd-compressed diagnostic archive")
+	flags.StringVar(&options.inputPath, "input", "", "new-format diagnostic file or directory (latest topology checkpoint)")
+	flags.Uint64Var(&options.checkpoint, "checkpoint", 0, "checkpoint sequence to select from a directory")
 	flags.StringVar(
 		&options.maxCompressedSize,
 		"max-compressed-size",
@@ -168,8 +194,8 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		fmt.Fprintf(stderr, "error: unexpected arguments: %v\n", flags.Args())
 		return commandOptions{}, 2
 	}
-	if options.archivePath == "" {
-		fmt.Fprintln(stderr, "error: --archive is required")
+	if options.inputPath == "" {
+		fmt.Fprintln(stderr, "error: --input is required")
 		return commandOptions{}, 2
 	}
 	if operation == "inspect-device" && options.registrationID == 0 {
@@ -275,7 +301,7 @@ func formatDefaultSize(bytes int64) string {
 
 func knownOperation(operation string) bool {
 	switch operation {
-	case "validate", "summary", "replay", "inspect-device", "inspect-link":
+	case "list", "validate", "summary", "replay", "inspect-device", "inspect-link":
 		return true
 	default:
 		return false
@@ -283,12 +309,12 @@ func knownOperation(operation string) bool {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: snmp-topology-diagnostics <operation> --archive PATH [options]")
-	fmt.Fprintln(writer, "operations: validate, summary, replay, inspect-device, inspect-link")
+	fmt.Fprintln(writer, "usage: snmp-topology-diagnostics <operation> --input PATH [options]")
+	fmt.Fprintln(writer, "operations: list, validate, summary, replay, inspect-device, inspect-link")
 }
 
 func operationUsage(writer io.Writer, operation string) {
-	fmt.Fprintf(writer, "usage: snmp-topology-diagnostics %s --archive PATH [options]\n", operation)
+	fmt.Fprintf(writer, "usage: snmp-topology-diagnostics %s --input PATH [options]\n", operation)
 }
 
 func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*snmptopology.DiagnosticArchive, error) {
@@ -297,4 +323,33 @@ func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*snmptopolo
 		return nil, err
 	}
 	return snmptopology.InspectDiagnosticDocument(document)
+}
+
+func resolveInput(input string, sequence uint64) (string, error) {
+	info, err := os.Stat(input)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		if sequence != 0 {
+			return "", errors.New("--checkpoint requires a directory")
+		}
+		return input, nil
+	}
+	entries, err := snmpdiag.ListCheckpoints(input)
+	if err != nil {
+		return "", err
+	}
+	if len(entries) == 0 {
+		return "", errors.New("directory has no topology checkpoints; select lifecycle.zst for lifecycle inspection")
+	}
+	if sequence == 0 {
+		sequence = entries[len(entries)-1].Sequence
+	}
+	for _, entry := range entries {
+		if entry.Sequence == sequence {
+			return filepath.Join(input, snmpdiag.TopologyDirectory, entry.Filename), nil
+		}
+	}
+	return "", fmt.Errorf("checkpoint %d is not retained", sequence)
 }

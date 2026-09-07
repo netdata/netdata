@@ -8,234 +8,283 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"slices"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
-const DefaultInterval = 30 * time.Minute
-const firstEvidenceCheckEvery = time.Minute
-
-func ArchivePath(varLibDir string) string {
-	return filepath.Join(varLibDir, "snmp-topology", "diagnostics", "netdata-snmp-topology-diagnostics.zst")
-}
-func defaultArchivePath(varLibDir string) string {
-	dir := strings.TrimSpace(varLibDir)
-	if dir == "" {
-		dir = strings.TrimSpace(buildinfo.VarLibDir)
-	}
-	if dir == "" {
-		dir = buildinfo.DefaultVarLibDir
-	}
-	return ArchivePath(filepath.Clean(dir))
-}
+// CheckpointRetention is the approved history depth, not an evidence-size limit.
+const CheckpointRetention = 3
+const publicationRetryEvery = time.Minute
 
 type Source interface {
 	LifecycleSource
-	ConfigurationRevision() uint64
-	ConfigurationChanges() <-chan struct{}
+	LifecycleRevision() uint64
+	LifecycleChanges() <-chan struct{}
 }
 
-// TopologySource exposes only diagnostic snapshots, without connection state.
-type TopologySource interface{ Capture() (Snapshot, error) }
+// Checkpoint retains immutable native evidence. Conversion runs only on the writer.
+type Checkpoint interface {
+	ID() uint64
+	Capture() (Snapshot, error)
+}
+
+type TopologySource interface{ Checkpoints() []Checkpoint }
+
+type pendingCheckpoint struct {
+	sequence   uint64
+	checkpoint Checkpoint
+}
 
 type Publisher struct {
 	*logger.Logger
-	source                    Source
-	path                      string
-	mu                        sync.Mutex
-	topology                  TopologySource
-	owner                     string
-	revision                  uint64
-	publishedTopologyRevision uint64
-	interval                  time.Duration
-	changed                   chan struct{}
-	rename                    func(string, string) error
-	writeFile                 func(context.Context, string, Document, func(string, string) error) error
+	source     Source
+	directory  string
+	runID      string
+	mu         sync.Mutex
+	topology   TopologySource
+	owner      string
+	revision   uint64
+	acceptedID uint64
+	sequence   uint64
+	pending    []pendingCheckpoint
+	changed    chan struct{}
+
+	// The following state belongs exclusively to Run's serial writer.
+	lifecycleWritten       bool
+	lifecycleRevision      uint64
+	lifecycleOwnerRevision uint64
+	fileSequence           uint64
+	initialized            bool
+	prunePending           bool
+	rename                 func(string, string) error
+	remove                 func(string) error
+	writeFile              func(context.Context, string, Document, func(string, string) error) error
 }
 
 func NewPublisher(source Source, varLibDir string) *Publisher {
-	return &Publisher{
-		Logger:    logger.New(),
-		source:    source,
-		path:      defaultArchivePath(varLibDir),
-		interval:  DefaultInterval,
-		changed:   make(chan struct{}, 1),
-		writeFile: writeArchiveFile,
-		rename:    os.Rename,
-	}
+	// A prior run may have published a complete checkpoint without finishing rotation.
+	return &Publisher{Logger: logger.New(), source: source, directory: DirectoryPath(varLibDir),
+		runID: uuid.NewString(), changed: make(chan struct{}, 1), prunePending: true,
+		rename: os.Rename, remove: os.Remove, writeFile: writeArchiveFile}
 }
 
-// SetTopology is called only for an accepted configuration. Candidate captures
-// stay private until this boundary.
-func (p *Publisher) SetTopology(owner string, source TopologySource, interval time.Duration) {
+// SetTopology admits only an accepted configuration and its already captured cuts.
+func (p *Publisher) SetTopology(owner string, source TopologySource) {
 	p.mu.Lock()
-	p.owner = owner
-	p.topology = source
-	p.revision++
-	p.interval = DefaultInterval
-	if source != nil && interval > 0 {
-		p.interval = interval
+	if p.owner == owner && p.topology == source {
+		p.mu.Unlock()
+		return
 	}
+	p.owner, p.topology = owner, source
+	p.revision++
+	p.acceptedID = 0
 	p.mu.Unlock()
+	if source != nil {
+		p.TopologyUpdated(source)
+	}
 	p.notify()
 }
+
 func (p *Publisher) RemoveTopology(owner string) {
 	p.mu.Lock()
 	if p.owner == owner {
 		p.owner = ""
 		p.topology = nil
-		p.interval = DefaultInterval
 		p.revision++
-	}
-	p.mu.Unlock()
-	p.notify()
-}
-func (p *Publisher) ReleaseTopology(source TopologySource) {
-	p.mu.Lock()
-	if p.topology == source {
-		p.owner = ""
-		p.topology = nil
-		p.interval = DefaultInterval
-		p.revision++
+		p.acceptedID = 0
 	}
 	p.mu.Unlock()
 	p.notify()
 }
 
-// TopologyUpdated must remain independent of file replacement: collectors call
-// it while committing a generation. The writer filters coalesced notifications.
-func (p *Publisher) TopologyUpdated() { p.notify() }
-func (p *Publisher) needsInitialTopology() bool {
+func (p *Publisher) ReleaseTopology(source TopologySource) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.topology != nil && p.publishedTopologyRevision != p.revision
+	if p.topology == source {
+		p.owner = ""
+		p.topology = nil
+		p.revision++
+		p.acceptedID = 0
+	}
+	p.mu.Unlock()
+	p.notify()
 }
+
+// TopologyUpdated copies at most three references, never evidence or file data.
+// Admission happens here so accepted history survives a subsequent provider release.
+func (p *Publisher) TopologyUpdated(source TopologySource) {
+	checkpoints := source.Checkpoints()
+	p.mu.Lock()
+	if p.topology == source {
+		for _, checkpoint := range checkpoints {
+			if checkpoint.ID() <= p.acceptedID {
+				continue
+			}
+			p.acceptedID = checkpoint.ID()
+			p.sequence++
+			if len(p.pending) == CheckpointRetention {
+				copy(p.pending, p.pending[1:])
+				p.pending = p.pending[:len(p.pending)-1]
+			}
+			p.pending = append(p.pending, pendingCheckpoint{sequence: p.sequence, checkpoint: checkpoint})
+		}
+	}
+	p.mu.Unlock()
+	p.notify()
+}
+
 func (p *Publisher) notify() {
 	select {
 	case p.changed <- struct{}{}:
 	default:
 	}
 }
-func (p *Publisher) currentInterval() time.Duration {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.interval
-}
 
 func (p *Publisher) Run(ctx context.Context) {
 	if ctx.Err() != nil {
 		return
 	}
-	meaningful := p.publish(ctx, false)
-	p.mu.Lock()
-	scheduleRevision := p.revision
-	p.mu.Unlock()
-	periodic := time.NewTimer(p.currentInterval())
-	defer periodic.Stop()
-	first := time.NewTicker(firstEvidenceCheckEvery)
-	defer first.Stop()
+	p.flush(ctx)
+	retry := time.NewTicker(publicationRetryEvery)
+	defer retry.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-p.changed:
-			p.mu.Lock()
-			revision := p.revision
-			p.mu.Unlock()
-			if scheduleRevision != revision {
-				periodic.Reset(p.currentInterval())
-				scheduleRevision = revision
-			}
-			if !meaningful || p.needsInitialTopology() {
-				meaningful = p.publish(ctx, true) || meaningful
-			}
-		case <-p.source.ConfigurationChanges():
-			if !meaningful || p.needsInitialTopology() {
-				meaningful = p.publish(ctx, true) || meaningful
-			}
-		case <-first.C:
-			if !meaningful || p.needsInitialTopology() {
-				meaningful = p.publish(ctx, true) || meaningful
-			}
-		case <-periodic.C:
-			meaningful = p.publish(ctx, false) || meaningful
-			periodic.Reset(p.currentInterval())
+		case <-p.source.LifecycleChanges():
+		case <-retry.C: // Retry dirty files only; unchanged state does not serialize.
+		}
+		p.flush(ctx)
+	}
+}
+
+func (p *Publisher) flush(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
+	// A failed topology capture must not prevent independent lifecycle publication.
+	if err := p.publishLifecycle(ctx); err != nil {
+		p.warn(err)
+	}
+	if err := p.publishTopology(ctx); err != nil {
+		p.warn(err)
+	}
+	if p.prunePending && ctx.Err() == nil {
+		if err := p.prune(); err != nil {
+			p.warn(err)
 		}
 	}
 }
 
-func (p *Publisher) publish(ctx context.Context, requireMeaningful bool) (meaningful bool) {
+func (p *Publisher) document(kind string, snapshot Snapshot) Document {
+	return Document{Format: Format, Version: Version, Kind: kind,
+		Producer:    Producer{AgentVersion: buildinfo.Version, RunID: p.runID},
+		PublishedAt: time.Now().UTC(), Snapshot: snapshot}
+}
+
+func (p *Publisher) publishLifecycle(ctx context.Context) error {
+	revision := p.source.LifecycleRevision()
+	p.mu.Lock()
+	ownerRevision, active := p.revision, p.topology != nil
+	p.mu.Unlock()
+	if p.lifecycleWritten && p.lifecycleRevision == revision && p.lifecycleOwnerRevision == ownerRevision {
+		return nil
+	}
+	d := p.document(KindLifecycle, Snapshot{Lifecycle: CaptureLifecycle(p.source)})
+	d.TopologyActive = active
+	if err := p.writeFile(ctx, filepath.Join(p.directory, LifecycleFilename), d, p.rename); err != nil {
+		return err
+	}
+	p.lifecycleWritten, p.lifecycleRevision, p.lifecycleOwnerRevision = true, revision, ownerRevision
+	return nil
+}
+
+func (p *Publisher) publishTopology(ctx context.Context) (err error) {
 	defer func() {
-		if recovered := recover(); recovered != nil {
-			meaningful = false
-			p.warn(fmt.Errorf("capture panic: %v", recovered))
+		if v := recover(); v != nil {
+			err = fmt.Errorf("topology capture panic: %v", v)
 		}
 	}()
-	if ctx.Err() != nil {
-		return false
-	}
-	configRevision := p.source.ConfigurationRevision()
+	// Keep lifecycle publication progressing even if new cuts arrive faster
+	// than they can be written. Capture only the sequence, not old references.
 	p.mu.Lock()
-	source, revision := p.topology, p.revision
+	through := p.sequence
 	p.mu.Unlock()
-	snapshot := Snapshot{}
-	if source != nil {
-		var err error
-		snapshot, err = source.Capture()
-		if err != nil {
-			p.warn(err)
-			return false
+	for {
+		item, ok := p.nextCheckpoint(through)
+		if !ok {
+			return nil
 		}
-	} else {
-		snapshot.Lifecycle = CaptureLifecycle(p.source)
-	}
-	meaningful = len(snapshot.Lifecycle.Cut.Entries) > 0
-	if requireMeaningful && !meaningful {
-		return false
-	}
-	document := Document{
-		Format:  Format,
-		Version: Version,
-		Producer: Producer{
-			AgentVersion: buildinfo.Version,
-		},
-		Snapshot: snapshot,
-	}
-	err := p.writeFile(ctx, p.path, document, func(from, to string) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		p.mu.Lock()
-		current := p.revision == revision
-		p.mu.Unlock()
-		if !current || p.source.ConfigurationRevision() != configRevision {
-			return errors.New("diagnostic ownership changed during publication")
+		if !p.initialized {
+			entries, err := ListCheckpoints(p.directory)
+			if err != nil {
+				return err
+			}
+			if len(entries) > 0 {
+				p.fileSequence = entries[len(entries)-1].Sequence
+			}
+			p.initialized = true
 		}
-		// This is a historical checkpoint, not a live inventory pointer. A
-		// concurrent configuration change may leave this cut on disk; no
-		// collection or activation lock may be held during filesystem I/O.
-		if err := p.rename(from, to); err != nil {
+		if p.fileSequence == ^uint64(0) {
+			return errors.New("diagnostic checkpoint sequence exhausted")
+		}
+		snapshot, err := item.checkpoint.Capture()
+		if err != nil {
 			return err
 		}
-		p.mu.Lock()
-		if p.revision == revision && snapshot.Topology != nil {
-			p.publishedTopologyRevision = revision
+		d := p.document(KindTopology, snapshot)
+		d.Checkpoint = p.fileSequence + 1
+		path := filepath.Join(p.directory, TopologyDirectory, checkpointFilename(d.Checkpoint))
+		if err := p.writeFile(ctx, path, d, p.rename); err != nil {
+			return err
 		}
+		p.fileSequence = d.Checkpoint
+		p.mu.Lock()
+		p.pending = slices.DeleteFunc(p.pending, func(queued pendingCheckpoint) bool { return queued.sequence <= item.sequence })
 		p.mu.Unlock()
-		return nil
-	})
-	if err != nil {
-		p.warn(err)
-		return false
+		p.prunePending = true
+		if err := p.prune(); err != nil {
+			return err
+		}
 	}
-	return meaningful
 }
+
+// Select again after each write so slow IO pins only the in-flight cut, and
+// does not project history that newer submissions have already evicted.
+func (p *Publisher) nextCheckpoint(through uint64) (pendingCheckpoint, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.pending) == 0 || p.pending[0].sequence > through {
+		return pendingCheckpoint{}, false
+	}
+	return p.pending[0], true
+}
+
+func (p *Publisher) prune() error {
+	entries, err := ListCheckpoints(p.directory)
+	if err != nil {
+		return err
+	}
+	for len(entries) > CheckpointRetention {
+		if err := p.remove(filepath.Join(p.directory, TopologyDirectory, entries[0].Filename)); err != nil {
+			return err
+		}
+		entries = entries[1:]
+	}
+	p.prunePending = false
+	return nil
+}
+
 func (p *Publisher) warn(err error) {
-	p.Limit("snmp:diagnostic-archive", 1, time.Hour).Warningf("failed to publish SNMP diagnostic archive: %v", err)
+	p.Limit("snmp:diagnostic-publication", 1, time.Hour).Warningf("failed to publish SNMP diagnostics: %v", err)
 }
 
 func writeArchiveFile(ctx context.Context, path string, document Document, replace func(string, string) error) error {

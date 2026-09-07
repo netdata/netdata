@@ -46,6 +46,7 @@ func newTopologyDiagnosticArchiveDocumentV1(
 	}
 	return snmpdiag.Document{
 		Format:  snmpdiag.Format,
+		Kind:    snmpdiag.KindTopology,
 		Version: snmpdiag.Version,
 		Producer: snmpdiag.Producer{
 			AgentVersion: producerVersion,

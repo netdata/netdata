@@ -20,9 +20,9 @@ import (
 // DiagnosticArchive is one validated, owned SNMP topology diagnostic archive.
 // It exposes only the read-only operations needed by the source-only maintainer tool.
 type DiagnosticArchive struct {
-	producerVersion string
-	diagnostics     Cut
-	semantics       Semantics
+	identity    DiagnosticArchiveIdentity
+	diagnostics Cut
+	semantics   Semantics
 }
 
 // DefaultDiagnosticQueryOptions returns the production topology query defaults.
@@ -41,9 +41,12 @@ func InspectDiagnosticDocument(document snmpdiag.Document, semantics Semantics) 
 		return nil, fmt.Errorf("inspect SNMP diagnostic archive: %w", err)
 	}
 	return &DiagnosticArchive{
-		semantics:       semantics,
-		producerVersion: document.Producer.AgentVersion,
-		diagnostics:     diagnostics,
+		semantics: semantics,
+		identity: DiagnosticArchiveIdentity{Format: document.Format, Version: document.Version,
+			Kind: document.Kind, RunID: document.Producer.RunID, PublishedAt: document.PublishedAt,
+			Checkpoint: document.Checkpoint, TopologyActive: document.TopologyActive,
+			ProducerAgentVersion: document.Producer.AgentVersion},
+		diagnostics: diagnostics,
 	}, nil
 }
 
@@ -51,11 +54,7 @@ func (a *DiagnosticArchive) Identity() DiagnosticArchiveIdentity {
 	if a == nil {
 		return DiagnosticArchiveIdentity{}
 	}
-	return DiagnosticArchiveIdentity{
-		Format:               snmpdiag.Format,
-		Version:              snmpdiag.Version,
-		ProducerAgentVersion: a.producerVersion,
-	}
+	return a.identity
 }
 
 func (a *DiagnosticArchive) Summary() (DiagnosticSummary, error) {

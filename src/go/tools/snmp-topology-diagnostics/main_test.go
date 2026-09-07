@@ -17,6 +17,7 @@ import (
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunValidatesAndSummarizesArchive(t *testing.T) {
@@ -27,11 +28,11 @@ func TestRunValidatesAndSummarizesArchive(t *testing.T) {
 		want []string
 	}{
 		"validate": {
-			args: []string{"validate", "--archive", archivePath},
+			args: []string{"validate", "--input", archivePath},
 			want: []string{`"valid": true`, `"producer_agent_version": "v1.2.3"`},
 		},
 		"summary": {
-			args: []string{"summary", "--archive", archivePath},
+			args: []string{"summary", "--input", archivePath},
 			want: []string{`"producer_agent_version": "v1.2.3"`, `"registration_id": 7`},
 		},
 	}
@@ -66,18 +67,18 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 		want      string
 	}{
 		"validate": {
-			args:      []string{"validate", "--archive", path},
+			args:      []string{"validate", "--input", path},
 			operation: "validate",
 			want:      `"valid": true`,
 		},
 		"summary": {
-			args:      []string{"summary", "--archive", path},
+			args:      []string{"summary", "--input", path},
 			operation: "summary",
 			want:      `"producer_agent_version": ""`,
 		},
 		"replay": {
 			args: []string{
-				"replay", "--archive", path, "--map-type", "lldp_cdp_managed", "--depth", "2",
+				"replay", "--input", path, "--map-type", "lldp_cdp_managed", "--depth", "2",
 				"--collapse-actors-by-ip=false", "--eliminate-non-ip-inferred=false",
 				"--max-compressed-size", "1MiB", "--max-decoded-size", "2MiB",
 			},
@@ -85,13 +86,13 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 			want:      `"schema_version": "1"`,
 		},
 		"inspect device": {
-			args:      []string{"inspect-device", "--archive", path, "--registration-id", "7"},
+			args:      []string{"inspect-device", "--input", path, "--registration-id", "7"},
 			operation: "inspect-device",
 			want:      `"registration_id": 7`,
 		},
 		"inspect link": {
 			args: []string{
-				"inspect-link", "--archive", path,
+				"inspect-link", "--input", path,
 				"--source-identity", "actor:a", "--destination-identity", "actor:b", "--family", "lldp",
 				"--direction", "bidirectional",
 			},
@@ -99,7 +100,7 @@ func TestRunDispatchesReplayAndInspectionOnce(t *testing.T) {
 			want:      `"family": "lldp"`,
 		},
 		"inspect link by index": {
-			args:      []string{"inspect-link", "--archive", path, "--link-index", "3"},
+			args:      []string{"inspect-link", "--input", path, "--link-index", "3"},
 			operation: "inspect-link-at",
 			want:      `"selected_index": 0`,
 		},
@@ -168,28 +169,28 @@ func TestRunRealArchiveMatchesDirectOperations(t *testing.T) {
 		direct func(*snmptopology.DiagnosticArchive) (any, error)
 	}{
 		"validate": {
-			args: []string{"validate", "--archive", archivePath},
+			args: []string{"validate", "--input", archivePath},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
 				return snmptopology.DiagnosticValidation{Valid: true, Archive: archive.Identity()}, nil
 			},
 		},
 		"summary": {
-			args:   []string{"summary", "--archive", archivePath},
+			args:   []string{"summary", "--input", archivePath},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) { return archive.Summary() },
 		},
 		"replay": {
-			args:   []string{"replay", "--archive", archivePath},
+			args:   []string{"replay", "--input", archivePath},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) { return archive.Replay(query) },
 		},
 		"inspect device": {
-			args: []string{"inspect-device", "--archive", archivePath, "--registration-id", "1"},
+			args: []string{"inspect-device", "--input", archivePath, "--registration-id", "1"},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
 				return archive.InspectDevice(query, 1)
 			},
 		},
 		"inspect link": {
 			args: []string{
-				"inspect-link", "--archive", archivePath,
+				"inspect-link", "--input", archivePath,
 				"--source-identity", link.SourceIdentity,
 				"--destination-identity", link.DestinationIdentity,
 				"--family", link.Family,
@@ -200,7 +201,7 @@ func TestRunRealArchiveMatchesDirectOperations(t *testing.T) {
 			},
 		},
 		"inspect link by index": {
-			args: []string{"inspect-link", "--archive", archivePath, "--link-index", "0"},
+			args: []string{"inspect-link", "--input", archivePath, "--link-index", "0"},
 			direct: func(archive *snmptopology.DiagnosticArchive) (any, error) {
 				return archive.InspectLinkAt(query, 0)
 			},
@@ -261,7 +262,7 @@ func firstByteDifference(want, got []byte) string {
 
 func BenchmarkRunSummary(b *testing.B) {
 	archivePath := writeGoldenDiagnosticArchive(b)
-	arguments := []string{"summary", "--archive", archivePath}
+	arguments := []string{"summary", "--input", archivePath}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
@@ -285,35 +286,35 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 	}{
 		"missing operation": {code: 2, want: "usage:"},
 		"unknown operation": {args: []string{"other"}, code: 2, want: "unknown operation"},
-		"missing archive":   {args: []string{"validate"}, code: 2, want: "--archive is required"},
+		"missing archive":   {args: []string{"validate"}, code: 2, want: "--input is required"},
 		"invalid archive": {
-			args: []string{"validate", "--archive", invalidArchive},
+			args: []string{"validate", "--input", invalidArchive},
 			code: 1,
 			want: "read archive",
 		},
 		"invalid size": {
-			args: []string{"validate", "--archive", validArchive, "--max-compressed-size", "many"},
+			args: []string{"validate", "--input", validArchive, "--max-compressed-size", "many"},
 			code: 2,
 			want: "compressed size",
 		},
 		"query flag on validate": {
-			args: []string{"validate", "--archive", validArchive, "--map-type", "managed_fabric"},
+			args: []string{"validate", "--input", validArchive, "--map-type", "managed_fabric"},
 			code: 2,
 			want: "flag provided but not defined",
 		},
 		"compressed limit": {
-			args: []string{"validate", "--archive", validArchive, "--max-compressed-size", "1B"},
+			args: []string{"validate", "--input", validArchive, "--max-compressed-size", "1B"},
 			code: 1,
 			want: "compressed-byte limit",
 		},
 		"invalid selector": {
-			args: []string{"replay", "--archive", validArchive, "--map-type", "other"},
+			args: []string{"replay", "--input", validArchive, "--map-type", "other"},
 			code: 1,
 			want: "map type",
 		},
 		"missing link direction": {
 			args: []string{
-				"inspect-link", "--archive", validArchive,
+				"inspect-link", "--input", validArchive,
 				"--source-identity", "actor:a", "--destination-identity", "actor:b", "--family", "lldp",
 			},
 			code: 2,
@@ -321,7 +322,7 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 		},
 		"invalid link direction": {
 			args: []string{
-				"inspect-link", "--archive", validArchive,
+				"inspect-link", "--input", validArchive,
 				"--source-identity", "actor:a", "--destination-identity", "actor:b", "--family", "lldp",
 				"--direction", "sideways",
 			},
@@ -329,18 +330,18 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 			want: "link direction",
 		},
 		"missing link selector": {
-			args: []string{"inspect-link", "--archive", validArchive},
+			args: []string{"inspect-link", "--input", validArchive},
 			code: 2,
 			want: "link selector",
 		},
 		"negative link index": {
-			args: []string{"inspect-link", "--archive", validArchive, "--link-index", "-1"},
+			args: []string{"inspect-link", "--input", validArchive, "--link-index", "-1"},
 			code: 2,
 			want: "--link-index must be zero or greater",
 		},
 		"mixed link selectors": {
 			args: []string{
-				"inspect-link", "--archive", validArchive, "--link-index", "0",
+				"inspect-link", "--input", validArchive, "--link-index", "0",
 				"--source-identity", "actor:a", "--destination-identity", "actor:b",
 				"--family", "lldp", "--direction", "bidirectional",
 			},
@@ -348,7 +349,7 @@ func TestRunRejectsUsageArchiveAndSelectors(t *testing.T) {
 			want: "mutually exclusive",
 		},
 		"link index out of range": {
-			args: []string{"inspect-link", "--archive", validArchive, "--link-index", "1000000"},
+			args: []string{"inspect-link", "--input", validArchive, "--link-index", "1000000"},
 			code: 1,
 			want: "link index",
 		},
@@ -479,4 +480,56 @@ func readReplayableDiagnosticArchive(t testing.TB) *snmptopology.DiagnosticArchi
 		t.Fatal(err)
 	}
 	return archive
+}
+
+func TestRunDiagnosticDirectory(t *testing.T) {
+	directory := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(directory, snmpdiag.TopologyDirectory), 0700))
+	input, err := os.Open(replayableDiagnosticArchivePath())
+	require.NoError(t, err)
+	document, err := snmpdiag.Read(input, snmpdiag.DefaultReadLimits())
+	require.NoError(t, err)
+	require.NoError(t, input.Close())
+	write := func(path string, d snmpdiag.Document) {
+		file, err := os.Create(path)
+		require.NoError(t, err)
+		require.NoError(t, snmpdiag.Write(file, d))
+		require.NoError(t, file.Close())
+	}
+	for _, sequence := range []uint64{8, 9, 10} {
+		document.Checkpoint = sequence
+		write(filepath.Join(directory, snmpdiag.TopologyDirectory, fmt.Sprintf("checkpoint-%020d.zst", sequence)), document)
+	}
+	document.Kind = snmpdiag.KindLifecycle
+	document.Checkpoint = 0
+	document.Snapshot = snmpdiag.Snapshot{Lifecycle: document.Snapshot.Lifecycle}
+	lifecyclePath := filepath.Join(directory, snmpdiag.LifecycleFilename)
+	write(lifecyclePath, document)
+	empty := t.TempDir()
+	for name, tc := range map[string]struct {
+		args     []string
+		code     int
+		contains string
+	}{
+		"latest":              {[]string{"validate", "--input", directory}, 0, `"checkpoint": 10`},
+		"older":               {[]string{"validate", "--input", directory, "--checkpoint", "8"}, 0, `"checkpoint": 8`},
+		"list":                {[]string{"list", "--input", directory}, 0, `"sequence": 8`},
+		"lifecycle":           {[]string{"summary", "--input", lifecyclePath}, 0, `"kind": "lifecycle"`},
+		"missing checkpoint":  {[]string{"validate", "--input", directory, "--checkpoint", "7"}, 1, ""},
+		"empty":               {[]string{"validate", "--input", empty}, 1, ""},
+		"missing directory":   {[]string{"list", "--input", filepath.Join(empty, "absent")}, 1, ""},
+		"file with selection": {[]string{"validate", "--input", lifecyclePath, "--checkpoint", "8"}, 1, ""},
+		"old flag rejected":   {[]string{"validate", "--archive", lifecyclePath}, 2, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			require.Equal(t, tc.code, run(tc.args, &stdout, &stderr), stderr.String())
+			if tc.code == 0 {
+				require.Contains(t, stdout.String(), tc.contains)
+				require.Empty(t, stderr.String())
+			} else {
+				require.NotEmpty(t, stderr.String())
+			}
+		})
+	}
 }

@@ -413,9 +413,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		states:         nextStates,
 	})
 	c.topologyRegistry.publishGeneration(generation)
-	if c.diagnosticPublisher != nil {
-		c.diagnosticPublisher.TopologyUpdated()
-	}
+	c.recordDiagnosticCheckpoint()
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()
 	stats.duration = stats.completedAt.Sub(start)

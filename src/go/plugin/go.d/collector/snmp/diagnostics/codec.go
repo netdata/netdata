@@ -14,8 +14,10 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-const Format = "netdata.snmp_topology.diagnostics"
+const Format = "netdata.snmp.diagnostics"
 const Version = 1
+const KindLifecycle = "lifecycle"
+const KindTopology = "topology"
 
 var (
 	ErrCompressedLimit = errors.New("SNMP topology diagnostic archive compressed-byte limit exceeded")
@@ -95,11 +97,30 @@ func Read(r io.Reader, limits ReadLimits) (Document, error) {
 	if err != nil {
 		return Document{}, fmt.Errorf("decode diagnostic JSON: %w", err)
 	}
-	if document.Format != Format {
-		return Document{}, fmt.Errorf("unsupported format %q", document.Format)
-	}
-	if document.Version != Version {
-		return Document{}, fmt.Errorf("unsupported version %d", document.Version)
+	if err := document.ValidateEnvelope(); err != nil {
+		return Document{}, err
 	}
 	return document, nil
+}
+
+func (d Document) ValidateEnvelope() error {
+	if d.Format != Format {
+		return fmt.Errorf("unsupported format %q", d.Format)
+	}
+	if d.Version != Version {
+		return fmt.Errorf("unsupported version %d", d.Version)
+	}
+	switch d.Kind {
+	case KindLifecycle:
+		if d.Snapshot.Topology != nil || d.Snapshot.LastAborted != nil || d.Snapshot.ProducerScopeID != "" || d.Checkpoint != 0 {
+			return errors.New("lifecycle document contains topology checkpoint data")
+		}
+	case KindTopology:
+		if d.TopologyActive {
+			return errors.New("topology checkpoint contains current lifecycle status")
+		}
+	default:
+		return fmt.Errorf("unsupported document kind %q", d.Kind)
+	}
+	return nil
 }
