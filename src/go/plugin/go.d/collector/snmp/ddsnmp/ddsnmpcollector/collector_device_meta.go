@@ -176,7 +176,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 		switch {
 		case field.Symbol.OID != "":
 			// Single symbol
-			v, err := dc.processSymbolValueObserved(field.Symbol, pdus, true, observer.processing(name))
+			v, err := dc.processSymbolValueObserved(name, field.Symbol, pdus, true, observer.processing(name))
 			if err != nil {
 				stats.Errors.Processing.Preparation++
 				observer.rejected(name)
@@ -192,7 +192,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
 			for i, sym := range field.Symbols {
-				v, err := dc.processSymbolValueObserved(sym, pdus, i == len(field.Symbols)-1, observer.processing(name))
+				v, err := dc.processSymbolValueObserved(name, sym, pdus, i == len(field.Symbols)-1, observer.processing(name))
 				if err != nil {
 					stats.Errors.Processing.Preparation++
 					observer.rejected(name)
@@ -217,27 +217,27 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	return nil
 }
 
-func (dc *deviceMetadataCollector) processSymbolValueObserved(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool, processing *processingObserver) (string, error) {
+func (dc *deviceMetadataCollector) processSymbolValueObserved(fieldName string, cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool, processing *processingObserver) (string, error) {
 	pdu, ok := pdus[trimOID(cfg.OID)]
 	if !ok {
-		processing.record(cfg.Name, cfg.OID, "missing_input")
+		processing.record(fieldName, cfg.OID, "missing_input")
 		return "", nil
 	}
 
 	val, err := convPduToStringf(pdu, cfg.Format)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {
-			processing.record(cfg.Name, pdu.Name, "empty_date")
+			processing.record(fieldName, pdu.Name, "empty_date")
 			return "", nil
 		}
-		processing.record(cfg.Name, pdu.Name, "conversion")
+		processing.record(fieldName, pdu.Name, "conversion")
 		return "", err
 	}
 
 	if cfg.ExtractValueCompiled != nil {
 		sm := cfg.ExtractValueCompiled.FindStringSubmatch(val)
 		if len(sm) == 0 && !lastSymbol {
-			processing.record(cfg.Name, pdu.Name, "extract_mismatch")
+			processing.record(fieldName, pdu.Name, "extract_mismatch")
 			return "", nil
 		} else if len(sm) > 1 {
 			val = sm[1]
@@ -249,7 +249,7 @@ func (dc *deviceMetadataCollector) processSymbolValueObserved(cfg ddprofiledefin
 	if cfg.MatchPatternCompiled != nil {
 		sm := cfg.MatchPatternCompiled.FindStringSubmatch(val)
 		if len(sm) == 0 {
-			processing.record(cfg.Name, pdu.Name, "pattern_mismatch")
+			processing.record(fieldName, pdu.Name, "pattern_mismatch")
 			// Pattern didn't match - return empty string to indicate no match
 			// When match_pattern is specified, we only use the value if it matches
 			return "", nil

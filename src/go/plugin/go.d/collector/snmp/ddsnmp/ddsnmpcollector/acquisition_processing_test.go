@@ -123,3 +123,89 @@ func TestCrossTableProcessingEvidenceFollowsCollection(t *testing.T) {
 		})
 	}
 }
+
+func TestMetadataProcessingEvidenceUsesLogicalField(t *testing.T) {
+	const (
+		oid         = "1.3.6.1.4.1.99999.60.1.0"
+		fallbackOID = "1.3.6.1.4.1.99999.60.2.0"
+	)
+	for name, tc := range map[string]struct {
+		symbolName string
+		format     string
+		missing    bool
+		pattern    bool
+		fallback   bool
+		value      string
+		wantReason string
+		wantErr    bool
+	}{
+		"missing named symbol": {
+			symbolName: "vendorSerialNumber", missing: true, wantReason: "missing_input",
+		},
+		"missing unnamed symbol": {
+			missing: true, wantReason: "missing_input",
+		},
+		"invalid date conversion": {
+			symbolName: "vendorDate", format: "text_date", value: "not a date", wantReason: "conversion", wantErr: true,
+		},
+		"empty date": {
+			format: "snmp_dateandtime", wantReason: "empty_date",
+		},
+		"pattern omission": {
+			symbolName: "vendorSerialNumber", pattern: true, value: "unmatched", wantReason: "pattern_mismatch",
+		},
+		"fallback symbol omission": {
+			fallback: true, value: "unmatched", wantReason: "extract_mismatch",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			symbol := ddprofiledefinition.SymbolConfig{OID: oid, Name: tc.symbolName, Format: tc.format}
+			if tc.pattern {
+				symbol.MatchPatternCompiled = regexp.MustCompile("^never$")
+			}
+			field := ddprofiledefinition.MetadataField{Symbol: symbol}
+			if tc.fallback {
+				symbol.ExtractValueCompiled = regexp.MustCompile("^never(.)$")
+				field = ddprofiledefinition.MetadataField{
+					Symbols: []ddprofiledefinition.SymbolConfig{symbol, {OID: fallbackOID, Name: "fallbackSerialNumber"}},
+				}
+			}
+			profile := &ddsnmp.Profile{
+				SourceFile: "synthetic.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						ddprofiledefinition.MetadataDeviceResource: {
+							Fields: map[string]ddprofiledefinition.MetadataField{"serial_number": field},
+						},
+					},
+				},
+			}
+			handler := &sourceTestHandler{get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+				pdu := createStringPDU(oids[0], tc.value)
+				if oids[0] == fallbackOID {
+					pdu = createStringPDU(fallbackOID, "fallback value")
+				} else if tc.missing {
+					pdu = createNoSuchObjectPDU(oid)
+				}
+				return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{pdu}}, nil
+			}}
+			var report AcquisitionProfileReport
+			collector := New(Config{
+				SnmpClient: new(SourceRecorder).Wrap(handler),
+				Profiles:   []*ddsnmp.Profile{profile},
+				Log:        logger.New(),
+				InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+					report = r
+				}),
+			})
+			results, err := collector.Collect()
+			require.Equal(t, tc.wantErr, err != nil)
+			require.Len(t, report.Routes, 1)
+			require.Equal(t, []ddsnmp.ProcessingEvent{{Field: "serial_number", OID: oid, Reason: tc.wantReason}}, report.Routes[0].Processing)
+			if tc.fallback {
+				require.Len(t, results, 1)
+				require.Equal(t, "fallback value", results[0].DeviceMetadata["serial_number"].Value)
+			}
+		})
+	}
+}
