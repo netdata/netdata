@@ -298,36 +298,66 @@ func TestPublisherAdmitsAcceptedHistoryAcrossRelease(t *testing.T) {
 	require.True(t, readFile(t, filepath.Join(p.directory, LifecycleFilename)).TopologyActive)
 }
 func TestPublisherSlowWriterRetainsNewestThree(t *testing.T) {
-	p, _ := testPublisher(t)
-	source := &testTopologySource{}
-	p.SetTopology("topology", source)
-	entered, release := make(chan struct{}), make(chan struct{})
-	var once atomic.Bool
-	p.writeFile = func(ctx context.Context, path string, d Document, replace func(string, string) error) error {
-		if !once.Swap(true) {
-			close(entered)
-			<-release
-		}
-		return writeArchiveFile(ctx, path, d, replace)
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	done := make(chan struct{})
-	go func() { p.Run(ctx); close(done) }()
-	<-entered
-	for id := uint64(1); id <= 5; id++ {
-		source.add(id)
-		p.TopologyUpdated(source)
-	}
-	p.ReleaseTopology(source)
-	close(release)
-	require.Eventually(t, func() bool { entries, err := ListCheckpoints(p.directory); return err == nil && len(entries) == 3 }, time.Second, time.Millisecond)
-	cancel()
-	<-done
-	docs := topologyDocuments(t, p)
-	require.Len(t, docs, 3)
-	for i, d := range docs {
-		require.Equal(t, uint64(i+3), d.Snapshot.Topology.Sequence)
+	for name, tc := range map[string]struct {
+		blockedKind  string
+		preload      uint64
+		newest       uint64
+		wantCaptured []uint64
+	}{
+		"lifecycle write": {KindLifecycle, 0, 5, []uint64{3, 4, 5}},
+		"topology write":  {KindTopology, 3, 6, []uint64{1, 4, 5, 6}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p, _ := testPublisher(t)
+			source := &testTopologySource{}
+			var captured []uint64
+			add := func(id uint64) {
+				source.add(id)
+				source.checkpoints[len(source.checkpoints)-1].(*testCheckpoint).capture = func() (Snapshot, error) {
+					captured = append(captured, id)
+					return Snapshot{Topology: &Sweep{Sequence: id}, Lifecycle: testDocument(id).Snapshot.Lifecycle}, nil
+				}
+			}
+			for id := uint64(1); id <= tc.preload; id++ {
+				add(id)
+			}
+			p.SetTopology("topology", source)
+			entered, release := make(chan struct{}), make(chan struct{})
+			var once atomic.Bool
+			var completed atomic.Uint64
+			p.writeFile = func(ctx context.Context, path string, d Document, replace func(string, string) error) error {
+				if d.Kind == tc.blockedKind && !once.Swap(true) {
+					close(entered)
+					<-release
+				}
+				err := writeArchiveFile(ctx, path, d, replace)
+				if err == nil && d.Kind == KindTopology {
+					completed.Store(d.Snapshot.Topology.Sequence)
+				}
+				return err
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan struct{})
+			go func() { defer close(done); p.Run(ctx) }()
+			<-entered
+			for id := tc.preload + 1; id <= tc.newest; id++ {
+				add(id)
+				p.TopologyUpdated(source)
+			}
+			p.ReleaseTopology(source)
+			close(release)
+			defer func() { cancel(); <-done }()
+			require.Eventually(t, func() bool { return completed.Load() == tc.newest }, time.Second, time.Millisecond)
+			cancel()
+			<-done
+			require.Equal(t, tc.wantCaptured, captured, "evicted checkpoints must not be projected after a slow write")
+			require.Empty(t, p.pending, "completed files no longer need publisher-owned raw references")
+			docs := topologyDocuments(t, p)
+			require.Len(t, docs, 3)
+			for i, d := range docs {
+				require.Equal(t, tc.newest-2+uint64(i), d.Snapshot.Topology.Sequence)
+			}
+		})
 	}
 }
 func TestPublisherRunSerializesAndStopsAfterCancellation(t *testing.T) {
@@ -365,4 +395,27 @@ func TestPublisherRunSerializesAndStopsAfterCancellation(t *testing.T) {
 	require.EqualValues(t, 1, calls.Load())
 	p.Run(ctx)
 	require.EqualValues(t, 1, calls.Load())
+}
+
+func TestPublisherNewSubmissionsDoNotStarveLifecycle(t *testing.T) {
+	p, store := testPublisher(t)
+	writer := store.ReplaceJob("", "device", ddsnmp.DeviceLifecycleInfo{}, ddsnmp.DeviceLifecycleStatus{}, nil)
+	source := &testTopologySource{}
+	source.add(1)
+	p.SetTopology("topology", source)
+	var writes []string
+	p.writeFile = func(ctx context.Context, path string, d Document, replace func(string, string) error) error {
+		writes = append(writes, d.Kind)
+		if d.Kind == KindTopology && d.Snapshot.Topology.Sequence < 4 {
+			source.add(d.Snapshot.Topology.Sequence + 1)
+			p.TopologyUpdated(source)
+			writer.RecordLifecycle(ddsnmp.DeviceLifecycleStatus{Phase: ddsnmp.DeviceLifecyclePhaseCollect, Outcome: ddsnmp.DeviceLifecycleOutcomeFailed})
+		}
+		return writeArchiveFile(ctx, path, d, replace)
+	}
+	p.flush(t.Context())
+	require.Equal(t, []string{KindLifecycle, KindTopology}, writes)
+	p.flush(t.Context())
+	require.Equal(t, []string{KindLifecycle, KindTopology, KindLifecycle, KindTopology}, writes)
+	require.Equal(t, "failed", readFile(t, filepath.Join(p.directory, LifecycleFilename)).Snapshot.Lifecycle.Cut.Entries[0].LastCompleted.Outcome)
 }

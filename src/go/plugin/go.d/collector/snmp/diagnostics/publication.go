@@ -58,7 +58,6 @@ type Publisher struct {
 	lifecycleWritten       bool
 	lifecycleRevision      uint64
 	lifecycleOwnerRevision uint64
-	writtenSequence        uint64
 	fileSequence           uint64
 	initialized            bool
 	prunePending           bool
@@ -210,15 +209,18 @@ func (p *Publisher) publishTopology(ctx context.Context) (err error) {
 			err = fmt.Errorf("topology capture panic: %v", v)
 		}
 	}()
+	// Keep lifecycle publication progressing even if new cuts arrive faster
+	// than they can be written. Capture only the sequence, not old references.
 	p.mu.Lock()
-	pending := slices.Clone(p.pending)
+	through := p.sequence
 	p.mu.Unlock()
-	for _, item := range pending {
+	for {
+		item, ok := p.nextCheckpoint(through)
+		if !ok {
+			return nil
+		}
 		if ctx.Err() != nil {
 			return ctx.Err()
-		}
-		if item.sequence <= p.writtenSequence {
-			continue
 		}
 		if !p.initialized {
 			entries, err := ListCheckpoints(p.directory)
@@ -243,13 +245,26 @@ func (p *Publisher) publishTopology(ctx context.Context) (err error) {
 		if err := p.writeFile(ctx, path, d, p.rename); err != nil {
 			return err
 		}
-		p.fileSequence, p.writtenSequence = d.Checkpoint, item.sequence
+		p.fileSequence = d.Checkpoint
+		p.mu.Lock()
+		p.pending = slices.DeleteFunc(p.pending, func(queued pendingCheckpoint) bool { return queued.sequence <= item.sequence })
+		p.mu.Unlock()
 		p.prunePending = true
 		if err := p.prune(); err != nil {
 			return err
 		}
 	}
-	return nil
+}
+
+// Select again after each write so slow IO pins only the in-flight cut, and
+// does not project history that newer submissions have already evicted.
+func (p *Publisher) nextCheckpoint(through uint64) (pendingCheckpoint, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.pending) == 0 || p.pending[0].sequence > through {
+		return pendingCheckpoint{}, false
+	}
+	return p.pending[0], true
 }
 
 func (p *Publisher) prune() error {
