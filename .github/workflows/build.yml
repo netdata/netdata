@@ -1098,7 +1098,8 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/
+          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/
+          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
