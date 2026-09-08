@@ -58,6 +58,7 @@ create_legacy_compat_files() {
 }
 
 create_manifest() {
+    rm -f Manifest Manifest.sig
     for f in * ; do
         [ -f "${f}" ] || continue
         sha256="$(sha256sum -b "$f" | awk '{print $1}')"
