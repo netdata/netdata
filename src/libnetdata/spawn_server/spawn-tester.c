@@ -252,7 +252,10 @@ static void test_popen_echo_loop(POPEN_INSTANCE *pi, const char *msg, size_t ite
                    len, rc);
             exit(1);
         }
-        fflush(child_stdin);
+        if(fflush(child_stdin) != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot flush to plugin: %s", strerror(errno));
+            exit(1);
+        }
 
         char *s = fgets(buffer, (int)buffer_size, child_stdout);
         if (!s || strlen(s) != len) {
@@ -847,12 +850,17 @@ static void test_callback_signal_lifecycle(int argc, const char **argv) {
 // fix is about, which tests/manual/spawn-termination-macos.sh documents). Coverage that depends on
 // the caller's signal state is not coverage.
 //
+// Only the DISPOSITION needs modelling here. The daemon blocks SIGPIPE too, but that half needs no
+// help: spawn_server_event_loop() calls signals_block_all() and unblocks only SIGTERM and SIGCHLD,
+// so the callback child's inherited mask always carries SIGPIPE blocked and the sigdelset() in
+// spawn_server_run_callback() is exercised on every run, whatever our own mask is.
+//
 // It also makes the tester itself behave like the daemon: a write to a dead child's pipe returns
 // EPIPE and hits our own error path with a diagnostic, instead of killing the tester silently.
 static void ignore_sigpipe_like_the_daemon(void) {
-    struct sigaction ignore_pipe;
-    memset(&ignore_pipe, 0, sizeof(ignore_pipe));
-    ignore_pipe.sa_handler = SIG_IGN;
+    struct sigaction ignore_pipe = {
+        .sa_handler = SIG_IGN,
+    };
     sigemptyset(&ignore_pipe.sa_mask);
 
     if(sigaction(SIGPIPE, &ignore_pipe, NULL) == -1) {
@@ -888,9 +896,9 @@ int main(int argc, const char **argv) {
     nd_setenv(ENV_VAR_KEY, ENV_VAR_VALUE, 1);
 
 #if !defined(OS_WINDOWS)
-    // Only for the test driver: the plugin-* child modes above returned before this point, so a
-    // child we exec still gets whatever disposition the spawn server gives it - which is what the
-    // termination contract test measures.
+    // Only for the test driver, and it MUST stay below the plugin-* dispatch above: those early
+    // returns are the exec'd children. If they came through here they would ignore SIGPIPE
+    // themselves, after exec, and test_exec_child_dies_when_stdout_closes() could never fail.
     ignore_sigpipe_like_the_daemon();
 #endif
 
