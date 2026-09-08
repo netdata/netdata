@@ -448,8 +448,7 @@ topology:
   allows OctetString columns such as an ARP physical address to anchor a row.
   Scalar topology symbols retain their ordinary value semantics.
 - Topology rows do not use chart/export-only fields such as `chart_meta`,
-  `metric_type`, `mapping`, `transform`, `scale_factor`, `format`, or
-  `constant_value_one` on the row value symbol.
+  `metric_type`, `mapping`, `transform`, `scale_factor`, or `format` on the row value symbol.
 - Table topology row symbols also reject `extract_value`, `match_pattern`, and
   `match_value` because structural presence mode intentionally ignores the
   anchor PDU value. These transformations remain valid for scalar topology
@@ -873,6 +872,9 @@ supplies the symbol's default type; for table rows it supplies the default for
 each column. An explicit `symbol.metric_type` or `symbols[].metric_type` takes
 precedence. With neither override, Netdata derives the type from the SNMP PDU.
 Prefer setting the type on each symbol in new profiles.
+
+The retired `constant_value_one` field is ignored. Metric symbols still require an OID;
+this field neither generates a constant metric nor suppresses an OID-backed metric.
 
 
 ```yaml

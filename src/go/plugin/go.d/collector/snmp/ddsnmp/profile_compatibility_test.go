@@ -25,7 +25,12 @@ func TestLoadProfile_LegacyScalarInheritance(t *testing.T) {
 				if legacy {
 					return fmt.Sprintf("%s:\n  - OID: 1.2.3.0\n    name: example\n%s", section, kind)
 				}
-				return fmt.Sprintf("%s:\n  - symbol: {OID: 1.2.3.0, name: example}\n%s    MIB: %s\n", section, kind, description)
+				return fmt.Sprintf(
+					"%s:\n  - symbol: {OID: 1.2.3.0, name: example}\n%s    MIB: %s\n",
+					section,
+					kind,
+					description,
+				)
 			}
 			for name, tc := range map[string]struct{ base, middle, child, mib string }{
 				"legacy base":                        {base: row(true, ""), child: "extends: [base.yaml]\n"},
@@ -59,28 +64,69 @@ func TestLoadProfile_LegacyScalarInheritance(t *testing.T) {
 	}
 }
 
-func TestLoadProfile_RemovesConstantColumns(t *testing.T) {
+func TestLoadProfile_IgnoresRetiredConstantField(t *testing.T) {
 	for name, tc := range map[string]struct {
-		extra    string
-		wantRows int
+		base      string
+		raw       string
+		want      string
+		wantError bool
 	}{
-		"all constant": {wantRows: 0},
-		"mixed":        {extra: "      - {OID: 1.2.3.1, name: real}\n", wantRows: 1},
+		"scalar with OID": {
+			raw:  `metrics: [{symbol: {OID: 1.2.3.0, name: real, constant_value_one: true}}]`,
+			want: `metrics: [{symbol: {OID: 1.2.3.0, name: real}}]`,
+		},
+		"table with OID": {
+			raw:  `metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{OID: 1.2.3.1, name: real, constant_value_one: true}], metric_tags: [{index: 1}]}]`,
+			want: `metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{OID: 1.2.3.1, name: real}], metric_tags: [{index: 1}]}]`,
+		},
+		"false flag": {
+			raw:  `metrics: [{symbol: {OID: 1.2.3.0, name: real, constant_value_one: false}}]`,
+			want: `metrics: [{symbol: {OID: 1.2.3.0, name: real}}]`,
+		},
+		"uninterpreted flag value": {
+			raw:  `metrics: [{symbol: {OID: 1.2.3.0, name: real, constant_value_one: {ignored: value}}}]`,
+			want: `metrics: [{symbol: {OID: 1.2.3.0, name: real}}]`,
+		},
+		"OID-less column": {
+			raw:       `metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{name: presence, constant_value_one: true}], metric_tags: [{index: 1}]}]`,
+			wantError: true,
+		},
+		"OID-less column in mixed table": {
+			raw:       `metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{name: presence, constant_value_one: true}, {OID: 1.2.3.1, name: real}], metric_tags: [{index: 1}]}]`,
+			wantError: true,
+		},
+		"child symbol remains an ordinary override": {
+			base: `metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{OID: 1.2.3.1, name: real}], metric_tags: [{index: 1}]}]`,
+			raw: `extends: [base.yaml]
+metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{OID: 1.2.3.2, name: real, constant_value_one: true}], metric_tags: [{index: 1}]}]`,
+			want: `extends: [base.yaml]
+metrics: [{table: {OID: 1.2.3, name: example}, symbols: [{OID: 1.2.3.2, name: real}], metric_tags: [{index: 1}]}]`,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			raw := "metrics:\n  - table: {OID: 1.2.3, name: example}\n    symbols:\n      - {name: presence, constant_value_one: true}\n" + tc.extra + "    metric_tags: [{tag: index, index: 1}]\n"
-			file := filepath.Join(dir, "profile.yaml")
-			require.NoError(t, os.WriteFile(file, []byte(raw), 0600))
-			prof, err := loadProfile(file, multipath.New(dir))
-			require.NoError(t, err)
-			require.NoError(t, prepareLoadedProfile(prof))
-			require.Len(t, prof.Definition.Metrics, tc.wantRows)
-			if tc.wantRows > 0 {
-				require.Len(t, prof.Definition.Metrics[0].Symbols, 1)
-				assert.Equal(t, "real", prof.Definition.Metrics[0].Symbols[0].Name)
+			load := func(name, raw string) (*Profile, error) {
+				t.Helper()
+				file := filepath.Join(dir, name)
+				require.NoError(t, os.WriteFile(file, []byte(raw), 0600))
+				profile, err := loadProfile(file, multipath.New(dir))
+				if err != nil {
+					return nil, err
+				}
+				return profile, prepareLoadedProfile(profile)
 			}
-			require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(prof.Definition))
+			if tc.base != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "base.yaml"), []byte(tc.base), 0600))
+			}
+			got, err := load("profile.yaml", tc.raw)
+			if tc.wantError {
+				require.ErrorContains(t, err, "symbol oid missing")
+				return
+			}
+			require.NoError(t, err)
+			want, err := load("expected.yaml", tc.want)
+			require.NoError(t, err)
+			assert.Equal(t, want.Definition, got.Definition)
 		})
 	}
 }

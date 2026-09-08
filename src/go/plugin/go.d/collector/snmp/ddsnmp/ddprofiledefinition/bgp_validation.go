@@ -383,9 +383,6 @@ func validateEnrichBGPSymbol(path string, symbol *SymbolConfig) error {
 	if symbol.ScaleFactor != 0 {
 		errs = append(errs, fmt.Errorf("%s.symbol: scale_factor cannot be used in BGP rows", path))
 	}
-	if symbol.ConstantValueOne {
-		errs = append(errs, fmt.Errorf("%s.symbol: constant_value_one cannot be used in BGP rows", path))
-	}
 
 	return errors.Join(errs...)
 }

@@ -39,7 +39,6 @@ func TestMetadataConfig_Clone(t *testing.T) {
 									MatchValue:           "$1",
 									ScaleFactor:          100,
 									Format:               "mac_address",
-									ConstantValueOne:     true,
 									MetricType:           "gauge",
 								},
 							},

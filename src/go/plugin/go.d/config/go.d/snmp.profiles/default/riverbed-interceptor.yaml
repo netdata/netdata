@@ -57,26 +57,6 @@ metrics:
   #      OID: 1.3.6.1.4.1.17163.1.3.2.3.0
   # scalar string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
 
-  # TODO: need riverbed.interceptor.procStatus mapping
-  #  - MIB: INTERCEPTOR-MIB
-  #    table:
-  #      name: procTable
-  #      OID: 1.3.6.1.4.1.17163.1.3.2.5
-  #    symbols:
-  #      - name: riverbed.interceptor.proc
-  #        constant_value_one: true
-  #    metric_tags:
-  #      - tag: proc_index
-  #        index: 1
-  #      - tag: riverbed_interceptor_proc_name
-  #        symbol:
-  #          name: riverbed.interceptor.procName
-  #          OID: 1.3.6.1.4.1.17163.1.3.2.5.1.2
-  #      - tag: _riverbed_interceptor_proc_status
-  #        symbol:
-  #          OID: 1.3.6.1.4.1.17163.1.3.2.5.1.3
-  #          name: riverbed.interceptor.procStatus
-
   - MIB: INTERCEPTOR-MIB
     table:
       name: neighborTable

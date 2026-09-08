@@ -48,7 +48,7 @@ func TestDeviceMetadataCollector_SysobjectIDMetadataWithoutDeviceResource(t *tes
 	}
 }
 
-func TestTableRowProcessor_StockConstantColumnsHaveNoProcessingFailures(t *testing.T) {
+func TestTableRowProcessor_StockPowerSupplyMetrics(t *testing.T) {
 	prof, err := ddsnmp.LoadProfileByName("_hp-compaq-health")
 	require.NoError(t, err)
 	var cfg ddprofiledefinition.MetricsConfig

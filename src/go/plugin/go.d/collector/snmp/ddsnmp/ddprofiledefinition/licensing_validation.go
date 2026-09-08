@@ -364,9 +364,6 @@ func validateEnrichLicenseSymbol(path string, symbol *SymbolConfig) error {
 	if symbol.ScaleFactor != 0 {
 		errs = append(errs, fmt.Errorf("%s.symbol: scale_factor cannot be used in licensing rows", path))
 	}
-	if symbol.ConstantValueOne {
-		errs = append(errs, fmt.Errorf("%s.symbol: constant_value_one cannot be used in licensing rows", path))
-	}
 
 	return errors.Join(errs...)
 }

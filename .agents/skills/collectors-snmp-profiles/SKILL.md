@@ -32,7 +32,7 @@ in `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`; the developer workflow 
    `kind`. Do not mark topology rows by naming metrics `_topology_*`.
 7. Do not use chart/export-only value fields on topology row anchor symbols:
    `chart_meta`, `metric_type`, `mapping`, `transform`, `scale_factor`,
-   `format`, or `constant_value_one`.
+   or `format`.
 8. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
    topology row kind; topology-specific uptime acquisition belongs in collector
    code, not profile topology schema.
@@ -40,7 +40,7 @@ in `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`; the developer workflow 
    telemetry as underscore-prefixed hidden metrics or `_license_*` tag
    protocols.
 10. Licensing row value symbols may use `format` and exact `mapping`, but must
-   not use chart/export fields, transforms, scale factors, constant values, or
+   not use chart/export fields, transforms, scale factors, or
    underscore-prefixed generated names.
 11. For scalar licensing rows that combine multiple scalar signal OIDs into one
    license row, declare an explicit stable `id:`. For table licensing rows,
@@ -88,6 +88,7 @@ Put metric type overrides on each affected `symbol` or `symbols` entry instead o
 Legacy custom profile aliases remain supported; typed OID precedence is `symbol.OID`, then `from`, then legacy `OID`.
 Collection, boundary validation and inheritance identity use that same source. Prefer one OID source form per value.
 Metric and topology column rows require `table.OID`; `table.name` is optional for those rows.
+The retired `constant_value_one` key is ignored. Ordinary metric symbols still require OIDs; do not use the key to generate or suppress metrics.
 
 ## Index Rules
 

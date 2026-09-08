@@ -81,9 +81,6 @@ func validateEnrichTopologySymbol(path string, symbol *SymbolConfig, context sym
 	if symbol.Format != "" {
 		errs = append(errs, fmt.Errorf("%s: format cannot be used in topology rows", path))
 	}
-	if symbol.ConstantValueOne {
-		errs = append(errs, fmt.Errorf("%s: constant_value_one cannot be used in topology rows", path))
-	}
 	if context == topologyColumnSymbol {
 		if symbol.ExtractValue != "" {
 			errs = append(

@@ -472,22 +472,6 @@ func (p *Profile) validate() error {
 	return ddprofiledefinition.ValidateEnrichProfile(p.Definition)
 }
 
-func (p *Profile) removeConstantMetrics() {
-	if p.Definition == nil {
-		return
-	}
-
-	for i := range p.Definition.Metrics {
-		metric := &p.Definition.Metrics[i]
-		metric.Symbols = slices.DeleteFunc(metric.Symbols, func(symbol ddprofiledefinition.SymbolConfig) bool {
-			return symbol.ConstantValueOne
-		})
-	}
-	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(metric ddprofiledefinition.MetricsConfig) bool {
-		return metric.Symbol.ConstantValueOne || (!metric.IsScalar() && !metric.IsColumn())
-	})
-}
-
 // sortProfilesBySpecificity sorts profiles by their match specificity.
 // More specific profiles (longer OIDs, exact matches) come first.
 // The matchedOIDs map contains the OID that matched for each profile.

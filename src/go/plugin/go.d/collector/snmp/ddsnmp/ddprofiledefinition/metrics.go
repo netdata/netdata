@@ -95,9 +95,8 @@ type SymbolConfig struct {
 	MatchValue           string         `yaml:"match_value,omitempty"   json:"match_value,omitempty"`
 	MatchPatternCompiled *regexp.Regexp `yaml:"-"                       json:"-"`
 
-	ScaleFactor      float64 `yaml:"scale_factor,omitempty"       json:"scale_factor,omitempty"`
-	Format           string  `yaml:"format,omitempty"             json:"format,omitempty"`
-	ConstantValueOne bool    `yaml:"constant_value_one,omitempty" json:"constant_value_one,omitempty"`
+	ScaleFactor float64 `yaml:"scale_factor,omitempty" json:"scale_factor,omitempty"`
+	Format      string  `yaml:"format,omitempty"       json:"format,omitempty"`
 
 	// MetricType overrides the type derived from the SNMP PDU.
 	// Gauge and the monotonic-count spellings render absolute values; rate renders changes per second.

@@ -37,22 +37,12 @@ func validateEnrichSymbol(symbol *SymbolConfig, context symbolContext) error {
 		errs = append(errs, fmt.Errorf("symbol name missing: name=`%s` oid=`%s`", symbol.Name, symbol.OID))
 	}
 	if symbol.OID == "" {
-		if context == columnSymbol && !symbol.ConstantValueOne {
-			errs = append(
-				errs,
-				fmt.Errorf("symbol oid or constant_value_one missing: name=`%s` oid=`%s`", symbol.Name, symbol.OID),
-			)
-		} else if context != columnSymbol {
-			errs = append(errs, fmt.Errorf("symbol oid missing: name=`%s` oid=`%s`", symbol.Name, symbol.OID))
-		}
+		errs = append(errs, fmt.Errorf("symbol oid missing: name=`%s` oid=`%s`", symbol.Name, symbol.OID))
 	}
 	errs = append(errs, compileSymbolPatterns(symbol))
 	errs = append(errs, validateMapping(symbol.Mapping, context))
 	if symbol.Mapping.EffectiveMode() == MappingModeBitmask && symbol.Mapping.HasItems() && symbol.ScaleFactor != 0 {
 		errs = append(errs, errors.New("`scale_factor` cannot be used with `mapping.mode: bitmask`"))
-	}
-	if context != columnSymbol && symbol.ConstantValueOne {
-		errs = append(errs, errors.New("`constant_value_one` cannot be used outside of tables"))
 	}
 	if (context != columnSymbol && context != scalarSymbol) && symbol.MetricType != "" {
 		errs = append(
