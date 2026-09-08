@@ -33,7 +33,7 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
     mcp_schema_add_array_param(
         buffer, "nodes", "Filter nodes",
         "Show only alerts transitions for these nodes.\n"
-        "Use 'list_nodes' to discover available nodes.\n"
+        "Use '" MCP_TOOL_LIST_NODES "' to discover available nodes.\n"
         "If not specified, alerts transitions from all nodes are included. "
         "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]",
         false);

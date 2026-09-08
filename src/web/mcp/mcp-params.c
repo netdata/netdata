@@ -112,15 +112,11 @@ BUFFER *mcp_params_parse_array_to_pattern(
         buffer_free(wb);
         if (error) {
             buffer_flush(error);
-            if (allow_wildcards) {
-                buffer_sprintf(error, "The '%s' parameter has an invalid array format.", param_name);
-            } else {
-                buffer_sprintf(error,
-                        "The '%s' parameter must contain exact values, not patterns. "
-                        "Wildcards are not supported.", param_name);
-                if (list_tool)
-                    buffer_sprintf(error, " Use the '%s' tool to discover exact values.", list_tool);
-            }
+            buffer_sprintf(error,
+                    "The '%s' parameter must contain exact values, not patterns. "
+                    "Wildcards are not supported.", param_name);
+            if (list_tool)
+                buffer_sprintf(error, " Use the '%s' tool to discover exact values.", list_tool);
         }
         return NULL;
     } else if (result != 0) {
@@ -240,7 +236,7 @@ void mcp_schema_add_array_param(
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", title);
         buffer_json_member_add_string(buffer, "description", description);
-        if(required)
+        if (required)
             buffer_json_member_add_uint64(buffer, "minItems", 1);
         buffer_json_member_add_object(buffer, "items");
         buffer_json_member_add_string(buffer, "type", "string");

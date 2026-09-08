@@ -403,9 +403,10 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // Handle dimensions array parameter
     CLEAN_BUFFER *dimensions_buffer = NULL;
     
-    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
-        buffer_strcat(mcpc->error, " You must explicitly list every dimension you want to query.");
+        buffer_strcat(mcpc->error, " You must explicitly list every dimension you want to query. "
+                                   "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context.");
         return MCP_RC_BAD_REQUEST;
     }
     // Handle labels - expects a structured object only
