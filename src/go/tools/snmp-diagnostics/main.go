@@ -335,12 +335,12 @@ func knownOperation(operation string) bool {
 }
 
 func usage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: snmp-topology-diagnostics <operation> --input PATH [options]")
+	fmt.Fprintln(writer, "usage: snmp-diagnostics <operation> --input PATH [options]")
 	fmt.Fprintln(writer, "operations: list, validate, summary, replay, inspect-device, inspect-link")
 }
 
 func operationUsage(writer io.Writer, operation string) {
-	fmt.Fprintf(writer, "usage: snmp-topology-diagnostics %s --input PATH [options]\n", operation)
+	fmt.Fprintf(writer, "usage: snmp-diagnostics %s --input PATH [options]\n", operation)
 }
 
 func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (openedArchive, error) {

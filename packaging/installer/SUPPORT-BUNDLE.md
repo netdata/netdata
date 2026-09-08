@@ -1,6 +1,6 @@
 # netdata-support-bundle — the Netdata support bundle
 
-`netdata-support-bundle` collects a **sanitized diagnostic bundle** (tarball on POSIX
+`netdata-support-bundle` collects a **diagnostic bundle** (tarball on POSIX
 systems, zip on Windows) that users attach to support tickets, so support gets
 everything it needs on first contact instead of asking for it over multiple
 round trips.
@@ -49,16 +49,26 @@ Both scripts implement the same bundle contract: same directory layout, same
 **If you change one script, mirror the change in the other and update this
 document.**
 
+SNMP troubleshooting uses an explicit raw-evidence option:
+
+```sh
+sudo netdata-support-bundle --include-snmp-diagnostics
+```
+
+The Windows equivalent is `-IncludeSnmpDiagnostics`. Both add existing built-in
+SNMP evidence to the same archive. This evidence is **unsanitized**; share the
+bundle through a restricted support ticket. Default bundles omit these files.
+
 ## Design contract (do not regress these)
 
 | guarantee | implementation |
 |---|---|
-| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before each collector, so the hard runtime bound is deadline + one command timeout; size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
+| Minimize system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before collectors (blocking filesystem operations and final packaging are not a hard runtime bound); size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
 | Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
-| Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below. **One documented exception:** the streaming API key in `stream.conf` is kept verbatim (see "The streaming API key exception") |
+| Standard captures redact secrets | non-optional single-pass sanitizer; see "Sanitization" below. The streaming API key in `stream.conf` is kept verbatim (see "The streaming API key exception"). Explicitly included SNMP evidence bypasses sanitization entirely (see "Raw SNMP evidence") |
 | Source bytes preserved | collected files keep their byte-order mark, their per-line terminators (CRLF/CR/LF, including on lines the sanitizer rewrote) and a missing final newline, so an encoding fault in the user's file is still visible in the bundle |
-| PII pseudonymized by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
-| Caps cannot expose secrets | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
+| Standard captures pseudonymize PII by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
+| Text caps preserve sanitizer boundaries | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
 | Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
 
 ## Platform support
@@ -228,13 +238,67 @@ These are excluded by design. **Do not add them.**
 - `/etc/netdata/ssl/` and any `*.pem` / `*.key`
 - dbengine data files (metric data, GBs), `ml.db`, `registry.db` (person GUIDs
   and dashboard URLs)
-- metric values other than netdata's own bounded self-monitoring charts
+- metric values other than netdata's own bounded self-monitoring charts, except
+  values already captured in explicitly requested raw SNMP diagnostic files
 - anything outside netdata's own scope (no full system journals, no other
   services' logs, no packet captures)
 
+## Raw SNMP evidence
+
+`--include-snmp-diagnostics` / `-IncludeSnmpDiagnostics` copies the Agent's
+`<state-dir>/snmp/diagnostics/` into `06-state/snmp-diagnostics/`. No additional
+SNMP requests, decompression, format conversion, or installed decoder are needed.
+
+| Item | Why |
+|---|---|
+| `lifecycle.zst` | Current job preparation/collection outcomes, including devices unavailable to topology. |
+| `topology/checkpoint-*.zst` | Retained self-contained topology evidence and lifecycle cuts for historical reconstruction. |
+| `normal/runs.json` and indexed `normal/<run-id>/device-*.zst` | Current and previous-run per-device metric, BGP, licensing, failure, and source evidence. |
+| `06-state/snmp-diagnostics-status.txt` | Records whether inclusion was requested, missing/unreadable files, copy failures, and complete-file count. |
+
+Only recognized file names and the runs named by the copied `runs.json` are
+selected. Temporary files, unrelated names, symlinked directories/files, and
+Windows reparse points are withheld. An invalid run index is included as raw
+evidence, but no normal device directories are selected from it.
+
+These files contain original device-returned values and identifiers. The
+publisher excludes connection credentials, but arbitrary device data can still
+contain secrets or personal information. **Neither secret redaction nor PII
+obfuscation applies to this directory**, even when ordinary captures are
+sanitized. Preserve it for private support use; do not upload the bundle to a
+public issue. `--no-obfuscate` is independent of this option.
+
+The manifest marks raw entries `sanitized: false` and `pii_obfuscated: false`.
+When any raw files are included, aggregate `secrets_redacted` and
+`pii_obfuscated` are also false. Standard entries retain their own sanitization
+state. The `snmp_diagnostics` object records `requested`, `status`, and `files`;
+status is `not_requested`, `unavailable`, `partial`, or `complete`. Complete
+means all selected files copied successfully and lifecycle evidence was present;
+it is not a simultaneous directory snapshot or proof that every device produced
+evidence. If other files were copied but `lifecycle.zst` is missing, the result
+is `partial`. An empty store remains `unavailable`.
+
+Binary files are streamed whole through temporary staging names, then published
+only after a successful copy. Text tail limits do not apply and no new binary
+byte ceiling is imposed: staging and final archive space scale with the retained
+compressed evidence. The existing command timeout also applies to each binary
+copy (PowerShell checks between buffer operations); final packaging and blocking
+filesystem calls can exceed the collection deadline. Failed or timed-out copies
+are withheld rather than shipped truncated. Windows final ZIP creation uses
+streaming create mode, so packaging does not retain the complete evidence
+payload in memory.
+
+The Agent replaces individual files atomically and rotates them independently.
+A file can disappear between selection and opening; this produces a partial
+result. Files copied together can have different timestamps. The support script
+does not stop the Agent, retry until the directory stabilizes, or join historical
+records to the latest lifecycle cut. See
+[Collect SNMP troubleshooting data](../../docs/npm/device-metrics/collect-snmp-troubleshooting-data.md)
+for capture timing, terminal-mode behavior, and operator instructions.
+
 ## The streaming API key exception
 
-The **streaming API key** is the one credential-shaped value the bundle keeps
+Within standard sanitized captures, the **streaming API key** is kept
 verbatim, in `04-config/stream.conf` only — both the `api key` / `proxy api key`
 values and the parent-side `[<API_KEY>]` / `[<MACHINE_GUID>]` section headers.
 Streaming problems are diagnosed by comparing what the child sends with what the

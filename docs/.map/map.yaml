@@ -580,7 +580,7 @@ sidebar:
           - meta:
               label: Collect Troubleshooting Data
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md
-              description: Collect raw SNMP data without credentials for Netdata Support to investigate metrics and topology issues.
+              description: Include built-in SNMP diagnostics in a private support bundle for metrics, BGP, licensing, and topology issues.
           - meta:
               label: Anti-patterns
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/anti-patterns.md

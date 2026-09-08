@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# netdata-support-bundle - collect a sanitized diagnostic bundle for Netdata support tickets.
+# netdata-support-bundle - collect a diagnostic bundle for Netdata support tickets.
 # Windows counterpart of netdata-support-bundle. Same bundle layout, same MANIFEST
 # schema (netdata-support-bundle/v1), same sanitization rules.
 #
-# Secrets are always redacted, with ONE documented exception: the streaming API
-# key in stream.conf is kept verbatim (netdata/netdata#23448). Collected files
+# Standard captures redact secrets except the streaming API key in stream.conf
+# (netdata/netdata#23448). -IncludeSnmpDiagnostics adds raw SNMP files with neither
+# secret redaction nor PII obfuscation. Standard collected files
 # keep their original bytes - BOM, line terminators and a missing final newline
 # all survive redaction - and what was observed is recorded per file in
 # MANIFEST.json, so encoding faults stay diagnosable.
@@ -16,7 +17,7 @@
 #
 # Usage (run in an elevated PowerShell):
 #   powershell -ExecutionPolicy Bypass -File netdata-support-bundle.ps1 [-Output DIR]
-#              [-SinceHours 24] [-NoObfuscate] [-KeepStaging] [-SelfTest]
+#              [-SinceHours 24] [-NoObfuscate] [-IncludeSnmpDiagnostics] [-KeepStaging] [-SelfTest]
 #
 # Requires Windows PowerShell 5.1+ (ships with Windows Server 2016+) or
 # PowerShell 7. Output: netdata-support-bundle-<timestamp>.zip
@@ -27,6 +28,7 @@ param(
     [int]$SinceHours = 24,
     [int]$TimeoutSeconds = 10,
     [switch]$NoObfuscate,
+    [switch]$IncludeSnmpDiagnostics,
     [switch]$KeepStaging,
     [switch]$SelfTest,
     [switch]$Version
@@ -35,7 +37,9 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'SilentlyContinue'
 
-$ToolVersion = '1.1.0'
+$ToolVersion = '1.2.0'
+$script:SnmpFiles = 0
+$script:SnmpStatus = 'not_requested'
 if ($Version) { Write-Output "netdata-support-bundle $ToolVersion"; exit 0 }
 
 $Obfuscate = -not $NoObfuscate
@@ -575,16 +579,158 @@ if ($SelfTest) {
 }
 
 # --- manifest -------------------------------------------------------------------
-function Add-Manifest([string]$rel, [string]$kind, [string]$origin, [string]$title) {
+function Add-Manifest([string]$rel, [string]$kind, [string]$origin, [string]$title, [bool]$raw = $false) {
     $full = Join-Path $Work $rel
     $bytes = 0
     if (Test-Path $full) { $bytes = (Get-Item $full).Length }
     $row = [ordered]@{
         path = $rel.Replace('\', '/'); kind = $kind; origin = $origin; title = $title
-        bytes = [long]$bytes; pii_obfuscated = [bool]$Obfuscate
+        bytes = [long]$bytes; pii_obfuscated = [bool]($Obfuscate -and -not $raw); sanitized = -not $raw
     }
     [void]$script:ManifestRows.Add($row)
 }
+
+
+# --- SNMP diagnostics ----------------------------------------------------------
+function Add-SnmpNote([string]$message) {
+    [System.IO.File]::AppendAllText((Join-Path $Work '06-state\snmp-diagnostics-status.txt'), "$message`n", $script:Utf8NoBom)
+}
+
+function Test-SnmpDirectory([string]$path) {
+    try {
+        $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        return ($item.PSIsContainer -and -not ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint))
+    } catch { return $false }
+}
+
+function Save-SnmpFile([string]$src, [string]$rel) {
+    $full = Join-Path $Work ("06-state\snmp-diagnostics\" + $rel)
+    $inputStream = $null; $outputStream = $null
+    try {
+        if (Test-Deadline) { throw 'deadline reached' }
+        $item = Get-Item -LiteralPath $src -Force -ErrorAction Stop
+        if ($item.PSIsContainer -or ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            throw 'source is not a regular file'
+        }
+        New-Item -ItemType Directory -Path (Split-Path $full) -Force -ErrorAction Stop | Out-Null
+        # Delete sharing lets the Agent atomically replace a file while it is read.
+        $sharing = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+        $inputStream = [System.IO.File]::Open($src, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $sharing)
+        $outputStream = [System.IO.File]::Open("$full.tmp", [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $buffer = New-Object byte[] 65536
+        $copyDeadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            if ((Test-Deadline) -or (Get-Date) -gt $copyDeadline) { throw 'copy deadline reached' }
+            $outputStream.Write($buffer, 0, $count)
+        }
+        $outputStream.Dispose(); $outputStream = $null
+        $inputStream.Dispose(); $inputStream = $null
+        [System.IO.File]::Move("$full.tmp", $full)
+        $script:SnmpFiles++
+        Add-Manifest ("06-state\snmp-diagnostics\" + $rel) 'file' ("snmp/diagnostics/" + $rel.Replace('\', '/')) 'Original SNMP evidence (UNSANITIZED)' $true
+        Add-SnmpNote ($rel.Replace('\', '/') + ': copied')
+        return $true
+    } catch {
+        # Error text can contain machine-specific paths. Keep raw-copy status safe.
+        $script:SnmpStatus = 'partial'
+        Add-SnmpNote ($rel.Replace('\', '/') + ': unavailable or copy failed (withheld)')
+        return $false
+    } finally {
+        if ($outputStream) { $outputStream.Dispose() }
+        if ($inputStream) { $inputStream.Dispose() }
+        if (Test-Path -LiteralPath "$full.tmp") { Remove-Item -LiteralPath "$full.tmp" -Force }
+    }
+}
+
+function Get-SnmpRuns([string]$path) {
+    # Match the fixed Agent-written index, not arbitrary JSON/path expressions.
+    $uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    $pattern = '\A\s*\{\s*"current"\s*:\s*"(?<current>' + $uuid + ')"(?:\s*,\s*"previous"\s*:\s*"(?<previous>' + $uuid + ')")?\s*\}\s*\z'
+    $match = [regex]::Match([System.IO.File]::ReadAllText($path), $pattern)
+    if (-not $match.Success) { throw 'invalid normal run index' }
+    $current = $match.Groups['current'].Value
+    $previous = $match.Groups['previous'].Value
+    if ($current -eq $previous) { throw 'duplicate normal run identity' }
+    $current
+    if ($previous) { $previous }
+}
+
+function Save-SnmpDirectoryFiles([string]$root, [string]$relative, [string]$pattern) {
+    $directory = Join-Path $root $relative
+    if (-not (Test-SnmpDirectory $directory)) {
+        $script:SnmpStatus = 'partial'
+        Add-SnmpNote ($relative.Replace('\', '/') + ': directory unavailable or reparse point (withheld)')
+        return
+    }
+    try {
+        $files = @(Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop)
+        foreach ($file in $files) {
+            if ($file.Name -cmatch $pattern) {
+                Save-SnmpFile $file.FullName (Join-Path $relative $file.Name) | Out-Null
+            }
+        }
+    } catch {
+        $script:SnmpStatus = 'partial'
+        Add-SnmpNote ($relative.Replace('\', '/') + ': listing failed')
+    }
+}
+
+function Collect-SnmpDiagnostics {
+    New-Item -ItemType Directory -Path (Join-Path $Work '06-state') -Force | Out-Null
+    Write-Utf8 (Join-Path $Work '06-state\snmp-diagnostics-status.txt') ''
+    if (-not $IncludeSnmpDiagnostics) {
+        Add-SnmpNote 'Not requested. Use -IncludeSnmpDiagnostics to include original, UNSANITIZED evidence.'
+    } elseif (-not $LibDir -or -not (Test-Path -LiteralPath (Join-Path $LibDir 'snmp\diagnostics'))) {
+        $script:SnmpStatus = 'unavailable'
+        Add-SnmpNote 'No SNMP diagnostic directory found.'
+    } else {
+        $script:SnmpStatus = 'complete'
+        $root = Join-Path $LibDir 'snmp\diagnostics'
+        Add-SnmpNote 'Raw SNMP evidence requested: no secret redaction or PII obfuscation. Share privately.'
+        if (-not (Test-SnmpDirectory (Join-Path $LibDir 'snmp')) -or -not (Test-SnmpDirectory $root)) {
+            $script:SnmpStatus = 'partial'
+            Add-SnmpNote 'Diagnostic directory unavailable or reparse point (withheld).'
+        } else {
+            $lifecycleMissing = $false
+            if (Test-Path -LiteralPath (Join-Path $root 'lifecycle.zst')) {
+                Save-SnmpFile (Join-Path $root 'lifecycle.zst') 'lifecycle.zst' | Out-Null
+            } else {
+                $lifecycleMissing = $true
+                Add-SnmpNote 'lifecycle.zst: missing'
+            }
+            if (Test-Path -LiteralPath (Join-Path $root 'topology')) {
+                Save-SnmpDirectoryFiles $root 'topology' '^checkpoint-[0-9]{20}\.zst$'
+            }
+            if (Test-Path -LiteralPath (Join-Path $root 'normal')) {
+                if ((Test-SnmpDirectory (Join-Path $root 'normal')) -and
+                    (Save-SnmpFile (Join-Path $root 'normal\runs.json') 'normal\runs.json')) {
+                    try {
+                        $runs = @(Get-SnmpRuns (Join-Path $Work '06-state\snmp-diagnostics\normal\runs.json'))
+                        foreach ($run in $runs) {
+                            Save-SnmpDirectoryFiles $root ("normal\" + $run) '^device-[0-9]{20}\.zst$'
+                        }
+                    } catch {
+                        $script:SnmpStatus = 'partial'
+                        Add-SnmpNote 'normal/runs.json: invalid index; normal device files withheld.'
+                    }
+                } else {
+                    $script:SnmpStatus = 'partial'
+                    Add-SnmpNote 'normal: directory or run index unavailable (device files withheld).'
+                }
+            }
+            if ($script:SnmpFiles -gt 0 -and $lifecycleMissing) {
+                $script:SnmpStatus = 'partial'
+            }
+            if ($script:SnmpFiles -eq 0 -and $script:SnmpStatus -eq 'complete') {
+                $script:SnmpStatus = 'unavailable'
+                Add-SnmpNote 'No completed SNMP diagnostic files found.'
+            }
+        }
+    }
+    Add-SnmpNote "Result: $script:SnmpStatus; complete files copied: $script:SnmpFiles."
+    Add-Manifest '06-state\snmp-diagnostics-status.txt' 'file' 'generated' 'SNMP evidence collection status'
+}
+# --- end SNMP diagnostics ------------------------------------------------------
 
 # --- collectors -------------------------------------------------------------------
 # Launch a native netdata binary (netdata.exe / netdatacli.exe) DIRECTLY as a
@@ -949,6 +1095,7 @@ if (Test-Path $LogDir) {
 # 06-state
 # ============================================================================
 Show-Info 'collecting: state'
+Collect-SnmpDiagnostics
 $StatusFile = Join-Path $LibDir 'status-netdata.json'
 if (Test-Path $StatusFile) {
     Save-File '06-state\status-file.json' 'Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)' $StatusFile
@@ -1171,7 +1318,10 @@ agent process:    $(if ($NetdataProc) { "yes (pid $($NetdataProc.Id))" } else { 
 agent api:        $(if ($ApiOk) { 'reachable' } else { 'UNREACHABLE' })
 $(if ($CrashHint) { "last exit reason: $CrashHint   <-- check 06-state\status-file.json" })
 
+SNMP diagnostics: $script:SnmpStatus ($script:SnmpFiles raw files; UNSANITIZED when included)
+
 READ ORDER FOR TRIAGE:
+  SNMP issues         -> 06-state\snmp-diagnostics-status.txt, 06-state\snmp-diagnostics\
   crashes/won't start -> 06-state\status-file.json, 05-logs\eventlog-netdata.txt
   collector issues    -> 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
   streaming issues    -> 04-config\stream.conf, 07-runtime\node-instances.json, 01-system\clock-timesync.txt
@@ -1185,20 +1335,26 @@ Add-Manifest 'summary.txt' 'file' 'generated' 'Human summary'
 $readme = @"
 # Netdata Support Bundle (Windows)
 
-Generated by ``netdata-support-bundle.ps1``. Contents are SANITIZED: secrets (tokens, api
+Generated by ``netdata-support-bundle.ps1``. Standard captures are SANITIZED: secrets (tokens, api
 keys, passwords) are redacted; by default IPs, MACs, emails and
 hostnames are replaced with stable pseudonyms - consistent across all files.
 The pseudonym map stays on this machine, next to the zip - it is NOT in this
 bundle.
 
-**One deliberate exception:** the **streaming API key** is kept VERBATIM in
+**Streaming-key exception:** the **streaming API key** is kept VERBATIM in
 ``04-config\stream.conf`` (both ``api key`` values and ``[<API_KEY>]`` section
 headers). It is the value support needs to tell whether a child and its parent
 agree, so it is not treated as a secret. If your threat model differs, remove or
 mask it before sending the bundle. The same key IS still redacted where it
 appears in the Access event-log channel.
 
-Collected files keep their original bytes: a byte-order mark, CRLF or CR line
+**Optional raw SNMP evidence:** ``06-state/snmp-diagnostics/``, when included,
+is UNSANITIZED: no secret redaction or PII obfuscation. It preserves device
+responses, inventory and metric values. Share this bundle through a restricted
+support channel, never a public issue. See ``06-state/snmp-diagnostics-status.txt`` for
+missing files or copy failures; the directory is not one simultaneous snapshot.
+
+Collected text files keep their original bytes: a byte-order mark, CRLF or CR line
 endings and a missing final newline all survive redaction, so an encoding fault
 in a config file is still visible here.
 
@@ -1217,9 +1373,10 @@ $manifest = [ordered]@{
     tool_version = "$ToolVersion-windows"
     generated_utc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     runtime_seconds = $RuntimeSecs
-    pii_obfuscated = [bool]$Obfuscate
-    secrets_redacted = $true
-    # the one documented exception to secrets_redacted (netdata/netdata#23448)
+    pii_obfuscated = [bool]($Obfuscate -and $script:SnmpFiles -eq 0)
+    secrets_redacted = ($script:SnmpFiles -eq 0)
+    snmp_diagnostics = [ordered]@{ requested = [bool]$IncludeSnmpDiagnostics; status = $script:SnmpStatus; files = $script:SnmpFiles }
+    # the standard-capture exception to secrets_redacted (netdata/netdata#23448)
     streaming_api_key_redacted = $false
     agent_running = [bool]$NetdataProc
     agent_api_reachable = [bool]$ApiOk
@@ -1236,12 +1393,16 @@ $ZipPath = Join-Path $Output "$BundleName.zip"
 # build the zip inside the owner-only staging dir, then publish without
 # overwrite: Move-Item without -Force fails if the destination exists
 $StagingZip = Join-Path $Staging "$BundleName.zip"
-Compress-Archive -Path $Work -DestinationPath $StagingZip
 try {
+    # Create mode streams entries; Compress-Archive uses Update mode and buffers
+    # the complete evidence payload in memory until the archive is closed.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $Work, $StagingZip, [System.IO.Compression.CompressionLevel]::Optimal, $true)
     Move-Item -Path $StagingZip -Destination $ZipPath -ErrorAction Stop
 } catch {
     # Write-Error would be swallowed by $ErrorActionPreference='SilentlyContinue'
-    Show-Info "ERROR: could not publish $ZipPath ($_)"
+    Show-Info "ERROR: could not create or publish $ZipPath ($_)"
     if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force -ErrorAction SilentlyContinue }
     exit 1
 }

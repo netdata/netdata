@@ -112,14 +112,14 @@ refreshTopology(ctx)
   resolve planned DNS targets with up to eight workers under one shared 5s budget
   for each planned job, in registration-ID order:
     assign the next per-incarnation attempt ordinal
-    refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence, perDeviceAcquisitionLimits)
+    refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence)
     update lastAttempt, lastSuccess, nextRetry, outcome, and failure count
   prune state for jobs no longer registered
   activate successful snapshots with one publication-based freshness deadline
   atomically publish one immutable TopologyGeneration for the complete sweep
 
-refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence, acquisitionLimits)
-  start one bounded acquisition-attempt envelope and its main collection context
+refreshDeviceTopology(ctx, attemptID, device, targetResolutionEvidence)
+  start one acquisition-attempt envelope and its main collection context
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector and receive one terminal acquisition report per selected profile
@@ -207,12 +207,10 @@ removed since the preceding cut are recorded separately. A canceled or panicking
 topology generation and its cut unchanged and replaces only one bounded last-aborted marker. That marker records the
 sweep phase and, during device refresh, the active registration ID.
 
-Per-device acquisition limits are applied while an attempt is projected. One serial global latest-view
-record/logical-byte counter then admits distinct retained captures in registration order. A retained successful
-generation is admitted before a different latest failure or no-profile attempt, preserving replayable evidence when
-only one fits. Aliased captures count once. Evidence that does not fit is replaced by an explicit limit marker;
-collection and topology publication continue. Lifecycle rows are admitted independently against the remaining budget
-when diagnostics are acquired. There are no reservations, sessions, queues, or attempt ledgers.
+Completed captures retain evidence for the latest attempt and the retained successful generation. Aliased captures
+share ownership. Record and logical-byte counters describe retained state; they do not impose arbitrary per-device or
+global admission ceilings. Projection failures remain explicit and do not change collection or topology publication.
+The publisher retains three meaningful topology checkpoints, not every scheduling tick.
 
 ## Topology Profile Composition
 
@@ -221,29 +219,24 @@ additive: a device receives the combined topology rows from every matching
 selector and each profile's `extends` graph. The topology projection then keeps
 only topology-consumer fields and typed `topology:` rows.
 
-`ddsnmpcollector` exposes an optional synchronous acquisition observer. When enabled, it emits one terminal report for
-each selected profile, including preparation or table failures. A stable profile ordinal and route digest identify the
-configured logical acquisition units and distinguish processed, not-observed, empty, dependency-rejected,
-tag-rejected, partial, and failed acquisition. Reports cover topology rows, BGP rows, profile tags, and metadata used by
-the topology consumer; ordinary metric rows remain live collector inputs but are not diagnostic routes. Shared canonical
-WALKs remain a transport optimization: each logical unit keeps its configured root and counts only varbinds below that
-root. Compact route/row/value references join the
-synchronously borrowed topology and BGP results to their configured producing unit. These reports do not claim to
-reproduce the lower-level GET/WALK execution graph. Profile source paths, raw packets, copied decoded values, transform
-definitions, and error text are excluded. With no observer, profile digests, route reports, and value references are not
-built. Optional execution accounting records preparation elapsed/request/error counters and one root/duration/error
-record per actual Handler walk, owned by the same profile charged for the work. Shared consumers and memoized outcomes
-do not duplicate executions. Walk timing ends before local PDU-map/row processing; phase totals remain inclusive.
-Preparation is finalized on all exits and included in profile totals, while scalar timing covers both ordinary and
-topology scalars, including failure. Execution storage is transferred with the report and charged to existing capture
-record/logical-byte limits before retention; it has no row-proportional timing records.
+`ddsnmpcollector` exposes synchronous acquisition reporting and an optional source recorder. A stable profile ordinal
+and route digest identify logical acquisition units, with terminal outcomes for processed, not-observed, empty,
+dependency-rejected, tag-rejected, partial, and failed acquisition. Routes cover metrics, topology, BGP, licensing,
+profile tags, and metadata. Bindings associate each consuming route with its actual source operations; shared walks
+remain shared while logical routes keep their own configured roots and processing outcomes.
 
-Archive v1 stores execution accounting as an additive optional `execution` block. Absence means not recorded and survives
-decode/re-encode; it must not be interpreted as zero or inferred from route counts. Historical aggregate statistics keep
-their historical incomplete coverage. The selected-device inspection exposes context/profile statistics and executions
-for latest attempt and retained success separately; summary and link responses remain compact. These measurements do
-not affect replay, graph identity, acquisition policy, or partial-refresh behavior. See the
-[diagnostics tool](../../../../tools/snmp-topology-diagnostics/README.md#collection-cost) for interpretation and exclusions.
+Source operations preserve ordered returned OIDs and typed values from actual GET/WALK calls, including failed calls
+that returned partial data. Structured failure classifications replace free-form error text. These are decoded Handler
+results, not packets or a replayable SNMP server recording. Cached inputs retain references to their producing operations,
+so a later poll does not misrepresent cached data as newly fetched. Connection credentials, full profile programs, and
+raw error strings are excluded; arbitrary returned values remain sensitive.
+
+Execution accounting records preparation elapsed/request/error counters and references to executed walks in the source
+operation table. Shared consumers do not duplicate executions. Walk timing includes Handler processing, retries, and
+pagination, but ends before local PDU-map/row processing; profile phase totals remain inclusive. Preparation is finalized
+on all exits, and scalar timing includes failed and topology scalar work. Missing execution accounting means not recorded.
+A successful Handler return does not prove table completeness; terminal gosnmp response reasons are not yet available.
+See the [diagnostics tool](../../../../tools/snmp-diagnostics/README.md#collection-cost) for interpretation and exclusions.
 
 BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
 every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
@@ -332,7 +325,7 @@ Ingestion is split by source area:
 - `topology_bgp_peers.go`
 - `topology_vlan_context_*.go`
 
-Every completed device attempt retains a bounded acquisition envelope when projection succeeds. The envelope records its
+Every completed device attempt retains an acquisition envelope when projection succeeds. The envelope records its
 registration/attempt identity, target-resolution outcome and safe addresses, closed outcomes for the outer collection
 phases, and ordered main/VLAN collection contexts. Each context contains the collector's terminal per-profile route
 report and, for replayable profiles, one immutable copy of the topology-consumer values needed for replay. The report's
@@ -343,24 +336,23 @@ remain diagnostic; a successful attempt is also owned by the published device ge
 The live builder and the replay path share one ordered event dispatcher for system uptime, profile tags, topology rows,
 BGP rows, and successful VLAN-context rows. The retained values use positive per-event/per-topology-kind field
 allowlists and are copied synchronously from the collector's borrowed result. They keep only metadata, tags, topology
-rows, and BGP fallback tags consumed by those builder operations. Non-VLAN rows in VLAN events, credentials, profile
-source paths, metric names, ordinary metric values, transform definitions, raw packets, and error text are not copied.
+rows, and BGP fallback tags consumed by those builder operations. The semantic replay projection excludes non-VLAN rows in VLAN events, credentials, profile
+source paths, ordinary metric values, transform definitions, raw packets, and error text. Separate diagnostic source
+operations preserve the original decoded Handler values, including evidence from failed operations.
 Retained decoded strings are exact-sized copies so a small retained substring cannot keep a larger SNMP response buffer
-alive outside the logical-byte limit. Stable schema/profile tag keys may remain shared because they are not decoded
+alive unnecessarily. Stable schema/profile tag keys may remain shared because they are not decoded
 response data and their owners outlive the capture.
 
-Acquisition capture has direct per-device record and logical-byte limits. Values from failed profiles are not retained
-because replay skips those profiles. Limit exhaustion, projection errors, or
+Acquisition capture records its shape without per-device admission limits. Semantic values from failed profiles are not
+retained because replay skips those profiles; their source operations remain diagnostic evidence. Projection errors or
 projection panics mark the attempt unavailable and release partial evidence without changing collection, builder
 ingestion, or topology publication. Replay validates the completed shape, reconstructs the allowlisted values once,
 invokes the same event dispatcher, and ignores failed profiles and unsuccessful VLAN contexts.
 
-The optional ddsnmp producer creates temporary route reports and value references alongside the live initial collection.
-Their size is linear in the selected profile routes and collected topology/BGP values; they are delivered synchronously
-to the topology recorder, which owns admission of the immutable evidence selected for retention. Acquisition reporting
-is explicitly an initial-collection facility on a fresh ddsnmp collector. The observer is released when the initial
-`Collect` call returns; later calls continue normal collection and live-cache reuse without emitting acquisition reports.
-The old/new generation overlap remains governed by the topology refresh lifecycle.
+The ddsnmp producer delivers reports synchronously to the topology recorder, which owns the immutable evidence retained
+for that attempt. Topology refresh uses a fresh collector and performs its initial collection. Normal SNMP diagnostics
+use recurring attempts and preserve source references for reused caches across polls. The old/new topology generation
+overlap remains governed by the refresh lifecycle.
 
 `topology_cache_metric_dispatch.go` maps `ddsnmp.TopologyKind` values to the
 right builder ingester. Profile tags and device metadata are applied separately
@@ -689,7 +681,7 @@ The replay contract is hermetic:
 Live Function and offline replay use the same graph and renderer. Their typed
 topology structure is identical for the same scalar options; only PTR-derived
 presentation fields may differ. The live replay entry point consumes trusted,
-already-bounded in-memory diagnostics. The portable archive reader below owns
+owned in-memory diagnostics. The portable archive reader below owns
 the external byte, format, enum, role, and reference boundary before it exposes
 the same immutable diagnostic snapshot to replay or inspection.
 
@@ -731,8 +723,8 @@ only after the relevant stage completed, one is `present`, and multiple actor
 or link matches is `undetermined` with every candidate returned.
 
 Every link report also carries the committed diagnostic cut's capture state,
-reason, sequence, and timestamps. A cut rejected by projection or diagnostic
-limits therefore remains distinguishable from a successfully captured empty
+reason, sequence, and timestamps. A cut unavailable because of projection failure
+therefore remains distinguishable from a successfully captured empty
 cut before graph or source inspection begins.
 
 Source facts are reported only as family-wide context across registrations.
@@ -748,91 +740,85 @@ graph-wide context and never determine a subject's state. Any renderable-device
 replay failure makes graph and typed-output membership `undetermined` globally,
 while an independently replayable device observation remains available.
 
-## Portable Diagnostic Archive
+## Diagnostic Files And Publication
 
-`topology_diagnostic_archive*.go` defines one portable representation of the
-complete diagnostic snapshot. It is one root-versioned JSON document inside a
-zstd stream, not a member container:
+The shared `snmp/diagnostics` package owns the document DTOs, zstd codec, directory layout, and process-wide publisher.
+The topology-owned `internal/topologydiag` package owns immutable topology diagnostic cuts and replay reconstruction;
+the root collector adapts its native state to the shared transport. Normal SNMP capture has its own per-device model.
 
 ```text
-topologyDiagnostics
-  -> positive-allowlist archive-v1 DTO
-  -> one JSON value
-  -> one checksummed zstd stream
+<var-lib>/snmp/diagnostics/
+  lifecycle.zst
+  topology/checkpoint-00000000000000000001.zst
+  normal/runs.json
+  normal/<run-uuid>/device-00000000000000000007.zst
 ```
 
-The DTO mirrors only credential-free diagnostic state. It has no manifest,
-member paths, per-section revisions, checksums outside the zstd frame, captured
-profile programs, packet material, error text, or credential-bearing connection
-state. Producer Agent version is informational. The one archive version covers
-both the DTO and the replay kernel; changes to replay-affecting semantic, graph,
-enrichment, shaping, rendering, or compiled OUI behavior require a new archive
-version.
+Each `.zst` is one root-versioned JSON document in a checksummed zstd stream. The format is
+`netdata.snmp.diagnostics`; version 1 supports the `lifecycle`, `topology`, and `normal` document kinds. Only this layout
+is supported. Producer version and run ID qualify the evidence; registration IDs alone are not stable across runs.
 
-Each device owns a capture list. A capture entry has `latest_attempt`,
-`retained_success`, or both roles. One entry with both roles reconstructs one
-shared pointer; separate entries reconstruct distinct captures. This preserves
-the runtime lineage without a global object table or cross-device reference
-graph.
+- `lifecycle.zst` advances independently with the job lifecycle cut and topology activation state. It does not embed a
+  topology sweep or per-device normal evidence.
+- Topology checkpoints are self-contained historical samples, including their own lifecycle cut and aborted-sweep
+  marker. A meaningful change to retained topology evidence produces a checkpoint; routine scheduling ticks do not.
+  The last three completed checkpoints are retained. Never join a historical checkpoint to current lifecycle by ID.
+- Normal files contain one device's latest attempt, retained last failure, initialization sources, profile context,
+  emitted samples, metric decisions, BGP/licensing cache state, and referenced source operations. Captures advance in
+  memory each poll. First evidence is eligible immediately; successful publication schedules the next write five minutes
+  later. Pending polls replace the cut without postponing that deadline or adding scheduler entries.
+- `normal/runs.json` names the current and optional previous evidence-bearing run. A new run activates only after its
+  first file is written successfully; a restart that produces no evidence does not displace useful history. Current-run
+  removed-device files are cleaned up; previous-run files remain until a later evidence-bearing run replaces them.
 
-Writing and reading are invocation-local `io.Writer`/`io.Reader` operations.
-Both use one zstd worker. The writer streams JSON through zstd without retaining
-encoded Function output or imposing another byte ceiling on the already-bounded
-live snapshot. Stable JSON v2 is used with explicit JSON v1 compatibility
-options and HTML escaping disabled. Invalid in-memory strings receive the JSON
-v1 replacement behavior, so the writer always emits valid UTF-8.
+The publisher serializes writes asynchronously, reuses one zstd encoder, and atomically renames completed temporary
+files. Retention cleanup follows successful publication; IO failure can temporarily leave extra retained files. Evidence
+survives restart, but is never restored into live collection. Publication is best effort, without power-loss durability
+or a transaction across all files. It is disabled when go.d has a terminal on any standard stream. Daemon capture has
+no user-facing disable option. Publication failures do not stop metric collection or topology rendering.
 
-The reader performs one streaming decode: caller-bounded compressed input flows
-through one zstd decoder, then caller-bounded decoded bytes flow directly into
-JSON v2 and one owned DTO. Every invocation supplies both limits. The library
-provides generous defaults of 128 MiB compressed and 512 MiB decoded, and a
-maintainer tool can override either for a particular run. There is no compressed
-archive buffer, second decompression pass, DTO field classifier, allocation
-predictor, or generic token, string, depth, record, logical-byte,
-canonical-order, or replay-work policy.
+The support-bundle scripts include original files only with `--include-snmp-diagnostics` or `-IncludeSnmpDiagnostics`.
+They preserve compressed bytes and report incomplete copies. The files and decoded reports are sensitive: connection
+credentials are excluded, but device-returned values and inventory are not sanitized or pseudonymized. See
+[Collect SNMP troubleshooting data](../../../../../../docs/npm/device-metrics/collect-snmp-troubleshooting-data.md)
+for the operator workflow.
 
-Raw invalid UTF-8 is rejected during typed decoding rather than expanded by
-replacement. The two byte limits are operational stop conditions, not a typed
-allocation, exact process heap, or RSS guarantee. A deliberately hostile
-attachment can therefore remain expensive within the selected decoded-byte
-allowance; the initial source-only diagnostic tool deliberately favors a small,
-caller-controlled reader contract over schema-coupled allocation accounting.
+## Portable Archive Codec And Replay Boundary
 
-Reconstruction validates only the root format/version and the typed enum,
-capture-role/reference/generation, unique attempt-ordinal, registration,
-address, and value-to-route invariants needed for safe replay and honest
-inspection. BGP peer state remains an open scalar, matching live evidence rather
-than inventing a closed archive enum. Standard Go JSON unknown-field and
-duplicate-key behavior is intentional.
+The shared codec streams JSON through one zstd worker without imposing another producer byte ceiling. JSON v2 uses
+explicit JSON v1 compatibility options and disables HTML escaping. Invalid in-memory strings receive replacement
+behavior so the writer emits valid UTF-8.
 
-Archives are sensitive support attachments even though the Agent is the only
-supported producer. The reader's caller-selected byte limits stop oversized
-compressed input and decompression output. Zstd frame integrity detects
-accidental corruption; it does not authenticate an archive. Arbitrary semantic
-JSON editing, signing, sanitization, filesystem publication, retention, and
-runtime publication are separate contracts.
+Reading streams caller-bounded compressed bytes through one decoder into caller-bounded decoded JSON and an owned DTO.
+Default limits are 128 MiB compressed and 512 MiB decoded; the source-only inspection tool can override them. These are
+operational stop conditions, not exact heap/RSS guarantees. The reader does not buffer the whole compressed file,
+perform a second decompression pass, or apply schema-coupled allocation predictions. Raw invalid UTF-8 is rejected.
+
+Typed reconstruction validates the format, version, kind, enum, role, registration, address, and source/value-reference
+invariants required for honest inspection and replay. Topology device captures have `latest_attempt`, `retained_success`,
+or both roles: one entry with both roles reconstructs one shared capture. BGP peer state remains an open scalar.
+Standard Go JSON unknown-field and duplicate-key behavior is intentional. Replay-affecting semantics belong to the
+archive version contract, including graph, enrichment, shaping, rendering, and compiled OUI behavior.
+
+Zstd integrity detects accidental corruption; it does not authenticate an attachment. A hostile document can still be
+expensive within the selected decoded-byte limit. Sanitization, signing, and arbitrary semantic editing are not codec
+features.
 
 ## Maintainer Diagnostic Tool
 
-`src/go/tools/snmp-topology-diagnostics` is a source-only, read-only command for support and development use. It is run
-with `go run` and is not installed with the Agent. One invocation opens and reconstructs one archive, then executes one
-operation:
+`src/go/tools/snmp-diagnostics` is a source-only, read-only command run with `go run`; it is not installed with the Agent.
 
-- `validate` reports the identity of a fully validated archive;
-- `summary` reports cut state/counts and an ordered registration inventory;
-- `replay` returns the unchanged production topology-v1 payload; and
-- `inspect-device` and `inspect-link` return typed positive-allowlist projections of the existing offline inspection
-  reports; link inspection accepts either an existing replay index or the candidate identity selector.
+- `list` reports retained topology checkpoints and indexed normal-device files in a directory without decoding them.
+- `validate` and `summary` read a selected topology, lifecycle, or normal document.
+- `inspect-device` exposes lifecycle/topology stages or a normal device's attempts and cache/source lineage.
+- `replay` emits the production topology-v1 payload, and `inspect-link` inspects an existing replay index or candidate
+  identity selector. Both require topology evidence.
 
-The collector's diagnostic facade owns the command request/report DTOs beside the adapter that constructs them from
-private topology state. The command depends only on that facade; it does not own a second archive model, replay engine,
-backend registry, session, cache, daemon, or network service. Its query defaults come from production topology options;
-unknown map types, inference strategies, managed-device focus values, depths, and link families fail instead of silently
-selecting another request.
-
-Every successful operation emits one JSON document. Compressed and decoded limits are human-readable per-invocation
-flags initialized from the archive reader's defaults. Archives and their JSON reports remain sensitive support material;
-the command does not sanitize, upload, publish, or retain them.
+Directory input selects the newest topology checkpoint unless explicit selectors choose a checkpoint or a normal device
+in the current/previous run. Lifecycle inspection uses its file path explicitly. The command uses the shared diagnostic
+codec and the topology facade, with no second replay engine, daemon, or network service. Topology query defaults come
+from production; invalid query selectors fail. Successful operations emit one JSON document. Reports remain sensitive;
+the command does not sanitize or upload them. See the [tool README](../../../../tools/snmp-diagnostics/README.md).
 
 ## Trap Enrichment
 
