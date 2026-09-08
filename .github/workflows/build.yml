@@ -1087,8 +1087,8 @@ jobs:
         with:
           name: r2-artifacts
           path: artifacts
-      - name: Upload Versioned Artifacts
-        id: upload-versioned
+      - name: Upload Artifacts
+        id: upload
         env:
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
@@ -1098,19 +1098,7 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./v* s3:netdata-agent-artifacts/nightlies
-      - name: Upload Latest Artifacts
-        id: upload-latest
-        env:
-          RCLONE_CONFIG_S3_TYPE: "s3"
-          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
-          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
-          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
-          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
-          RCLONE_CONFIG_S3_REGION: "auto"
-        working-directory: artifacts
-        run: |
-          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/
+          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
