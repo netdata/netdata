@@ -1710,9 +1710,17 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // wait a bounded grace for the child to exit after SIGTERM. NOTE: timeout_ms is already
         // consumed above as the pre-kill grace (voluntary exit before SIGTERM); the post-SIGTERM
         // grace uses the fixed default so the caller's grace is not applied twice.
-        // No PID-reuse race on the RUNNING path: the spawn server reaps the child and only then
-        // sends the status report that makes timedwait return EXITED, so a RUNNING result means
-        // the child has not been reaped yet and its PID is still held.
+        //
+        // What the status channel does and does not guarantee: the spawn server reaps the child and
+        // only THEN sends the status report, so an EXITED result is authoritative - the child is
+        // reaped and this pid is done. RUNNING is not the negation of that. It is what
+        // spawn_server_exec_timedwait() returns when its poll expires (or the thread is cancelled),
+        // and a report landing just after that instant yields RUNNING for a child that is already
+        // reaped and whose pid the kernel has released. So RUNNING means "no report readable yet",
+        // NOT "the pid is still held", and neither the kills below nor the pre-kill grace above -
+        // which discards its poll result entirely and signals regardless - are protected against
+        // signalling a recycled pid. Closing that window needs the signalling to move into the
+        // spawn server, keyed by request id, so the same process that reaps also signals.
         int status;
         if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
             return status;
