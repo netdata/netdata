@@ -226,7 +226,12 @@ defaults preserve the same three states through inheritance.
 - A live metric identity must keep the same kind while its dimension is materialized. Kind changes are resolved for route
   planning, but an existing Netdata dimension keeps its creation-time wire algorithm until it expires and is recreated.
 
-Route-cache entries are immutable discovery results. Algorithm resolution happens after cache lookup, so a cached route
+Route-cache entries are immutable discovery results. Authored and successful autogen routes share the
+series-identity/revision cache. Autogen hits additionally validate current metric metadata (including its presence),
+exposed kind, source kind, and flatten role before reuse. A changed descriptor rebuilds the route; template reload
+clears the cache, and diagnostic planning bypasses it. Cached autogen discovery follows the same snapshot-membership
+retention as authored routes and trades additional retained route/guard memory for less per-cycle construction.
+Algorithm resolution happens after cache lookup, so a cached route
 cannot retain the effective algorithm from an earlier series kind. Only concrete algorithms reach accumulated dimension
 state and dimension actions; chart-level metadata retains the configured policy.
 
@@ -313,6 +318,19 @@ Notes:
 |--------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | Program            | Immutable compiled IR per revision                                                                                                          |
 | Engine state       | Serialized under `Engine.mu` for load/build transitions                                                                                     |
-| Route cache        | Series identity + revision keyed cache; retained by successful sequence, pruned on each build                                               |
+| Route cache        | Series identity + revision keyed authored/autogen discovery; autogen validates current metadata and kinds; retained by successful sequence, pruned on each build                                               |
 | Materialized state | Tracks existing chart/dimension instances for incremental create/update/remove decisions; persists across cycles, resets on template reload |
 | Determinism        | Sorted chart IDs and inferred dimensions provide stable action ordering                                                                     |
+
+## Performance Validation
+
+Steady collector-mode benchmarks must advance the successful collection sequence. Replanning a previously committed
+sequence intentionally deduplicates its updates, so a repeated-snapshot benchmark must instead use runtime planner mode.
+Benchmarks should verify emitted chart/dimension counts and values after warmup.
+
+`BenchmarkAutogenMixedChurn` measures a bounded population with stable, partially replaced, or fully replaced
+identities; `BenchmarkCollectExpiryRemovals` covers stable, partial, and mass expiry across chart/dimension shapes.
+Metric collection and fixture setup are outside those planner/expiry timers. Expiry scans retained charts and enabled
+dimensions but sorts only actual removals. Steady expiry allocates no removal memory; staging and output still scale
+with retained/output cardinality. Unit allocation envelopes guard these properties; elapsed benchmark timings are
+development-machine trends, not CI limits.
