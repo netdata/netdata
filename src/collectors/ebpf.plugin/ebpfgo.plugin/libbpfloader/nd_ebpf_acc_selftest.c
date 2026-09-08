@@ -145,9 +145,9 @@ static int nd_ebpf_key_delete_selftest(void)
             keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
         return 40;
 
-    /* An active unnamed slot has no verifiable owner and must keep the key. */
+    /* An active unnamed sibling is covered by the named owner's identity. */
     slots[0] = (struct nd_ebpf_key_delete_selftest_slot){.tgid = 0, .ct = 0, .counter = 5};
-    if (nd_ebpf_map_key_delete_eligible(
+    if (!nd_ebpf_map_key_delete_eligible(
             keys, 1, dead, 1, slots, slot_size, tgid_off, ct_off, 2, 7))
         return 41;
 

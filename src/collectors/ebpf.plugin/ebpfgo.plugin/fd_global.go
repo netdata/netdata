@@ -22,6 +22,7 @@ const (
 
 type fdGlobalDimension struct {
 	id        string
+	name      string
 	algorithm string
 }
 
@@ -56,8 +57,8 @@ var fdGlobalCharts = []fdGlobalChart{
 		context: "filesystem.file_descriptor",
 		order:   2195,
 		dimensions: []fdGlobalDimension{
-			{id: "open", algorithm: "incremental"},
-			{id: "close", algorithm: "incremental"},
+			{id: "do_sys_open", name: "open", algorithm: "incremental"},
+			{id: "__close_fd", name: "close", algorithm: "incremental"},
 		},
 	},
 	{
@@ -67,8 +68,8 @@ var fdGlobalCharts = []fdGlobalChart{
 		context: "filesystem.file_error",
 		order:   2196,
 		dimensions: []fdGlobalDimension{
-			{id: "open", algorithm: "incremental"},
-			{id: "close", algorithm: "incremental"},
+			{id: "do_sys_open", name: "open", algorithm: "incremental"},
+			{id: "__close_fd", name: "close", algorithm: "incremental"},
 		},
 		errorChart: true,
 	},
@@ -114,7 +115,7 @@ func emitFDGlobalChart(api *netdataapi.API, chart fdGlobalChart, updateEvery int
 	for _, dim := range chart.dimensions {
 		api.DIMENSION(netdataapi.DimensionOpts{
 			ID:         dim.id,
-			Name:       dim.id,
+			Name:       dim.name,
 			Algorithm:  dim.algorithm,
 			Multiplier: 1,
 			Divisor:    1,
@@ -134,8 +135,8 @@ func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, usecSi
 	defer pluginOutputMu.Unlock()
 
 	api.BEGIN(fdGlobalGroup, "file_descriptor", usecSince)
-	api.SET("open", int64(snapshot.OpenCall))
-	api.SET("close", int64(snapshot.CloseCall))
+	api.SET("do_sys_open", int64(snapshot.OpenCall))
+	api.SET("__close_fd", int64(snapshot.CloseCall))
 	api.END()
 
 	if !reportErrors {
@@ -143,8 +144,8 @@ func writeFDGlobal(api *netdataapi.API, snapshot libbpfloader.FDSnapshot, usecSi
 	}
 
 	api.BEGIN(fdGlobalGroup, "file_error", usecSince)
-	api.SET("open", int64(snapshot.OpenErr))
-	api.SET("close", int64(snapshot.CloseErr))
+	api.SET("do_sys_open", int64(snapshot.OpenErr))
+	api.SET("__close_fd", int64(snapshot.CloseErr))
 	api.END()
 }
 

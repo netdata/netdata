@@ -430,10 +430,18 @@ static inline size_t nd_ebpf_apps_snap_iterate(
         }
 
         /* Keep each named slot as a distinct identity for eviction.  Unnamed
-         * slots are kernel-zero-filled siblings of the entry; retain their
-         * counters by folding them into the first named slot's output row. */
+         * slots are kernel-zero-filled siblings; retain their counters by
+         * folding every slot into one reportable row for this map key. */
         uint32_t owner = nd_ebpf_snapshot_tgid(values, count, value_size, tgid_offset,
                                                count == 1 ? next_key : 0);
+        if (!owner)
+            goto next_map_key;
+
+        nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
+        void *dst = (char *)*items_buf + out_count * item_size;
+        memset(dst, 0, item_size);
+        *(uint32_t *)dst = owner;
+
         for (int i = 0; i < count; i++) {
             uint32_t slot_tgid;
             memcpy(&slot_tgid, (const char *)values + (size_t)i * value_size + tgid_offset,
@@ -455,13 +463,10 @@ static inline size_t nd_ebpf_apps_snap_iterate(
                 nd_ebpf_key_table_add(keys, next_key, slot_tgid, ct);
             }
 
-            nd_ebpf_snapshot_reserve(items_buf, items_cap, item_size, out_count);
-            void *dst = (char *)*items_buf + out_count * item_size;
-            memset(dst, 0, item_size);
-            *(uint32_t *)dst = slot_tgid;
             fold(dst, values, i);
-            out_count++;
         }
+        out_count++;
+next_map_key:
         key = next_key;
         memset((void *)values, 0, (size_t)count * value_size);
     }
@@ -896,22 +901,9 @@ static inline bool nd_ebpf_map_key_delete_eligible(
             fallback_ct = current_ct;
 
         if (!current_tgid) {
-            /* A zero TGID has no independently verifiable owner.  It is safe to
-             * ignore only an untouched slot; active unnamed counters must keep
-             * the key alive rather than being evicted speculatively. */
-            bool active = current_ct != 0;
-            if (!active) {
-                const unsigned char *slot_data = (const unsigned char *)values +
-                                                 (size_t)slot * value_size;
-                for (size_t byte = 0; byte < value_size; byte++) {
-                    if (slot_data[byte] != 0) {
-                        active = true;
-                        break;
-                    }
-                }
-            }
-            if (active)
-                return false;
+            /* A zero TGID is a kernel-zero-filled sibling of the named slot;
+             * its counters are covered by that slot's identity and must not
+             * veto deletion of a confirmed-dead map entry. */
             continue;
         }
 
