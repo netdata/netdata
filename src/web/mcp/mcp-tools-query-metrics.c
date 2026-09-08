@@ -319,11 +319,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Check if all required parameters are provided
     struct json_object *after_obj = NULL, *before_obj = NULL, *points_obj = NULL, *time_group_obj = NULL;
-    struct json_object *aggregation_obj = NULL, *dimensions_obj = NULL;
-
-    // 'dimensions' and 'group_by' are validated where they are parsed, so a missing parameter and an empty
-    // array give the same guidance
-    json_object_object_get_ex(params, "dimensions", &dimensions_obj);
+    struct json_object *aggregation_obj = NULL;
 
     if (!json_object_object_get_ex(params, "after", &after_obj) || !after_obj) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (Unix epoch timestamp in seconds, or negative value relative to 'before', or RFC3339 datetime string).");
@@ -397,12 +393,17 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // Handle dimensions array parameter
     CLEAN_BUFFER *dimensions_buffer = NULL;
     
+    // 'dimensions' and 'group_by' are validated here, where they are parsed, so that a missing parameter
+    // and an empty array give the same guidance
+    struct json_object *dimensions_obj = NULL;
     dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
         buffer_strcat(mcpc->error, " You must explicitly list every dimension you want to query. "
                                    "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context.");
         return MCP_RC_BAD_REQUEST;
     }
+    // the parse above proves 'dimensions' is a non-empty array of strings
+    json_object_object_get_ex(params, "dimensions", &dimensions_obj);
     // Handle labels - expects a structured object only
     CLEAN_BUFFER *labels_buffer = NULL;
     
@@ -494,7 +495,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
         buffer_strcat(mcpc->error, " This parameter defines how to group metrics. "
-                                   "Valid values are: 'dimension', 'instance', 'node', 'label'.");
+                                   "Valid values are: 'dimension', 'instance', 'node', 'label', "
+                                   "and they can be combined, e.g. [\"dimension\", \"node\"].");
         return MCP_RC_BAD_REQUEST;
     }
     
