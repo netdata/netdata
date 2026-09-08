@@ -319,13 +319,12 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Check if all required parameters are provided
     struct json_object *after_obj = NULL, *before_obj = NULL, *points_obj = NULL, *time_group_obj = NULL;
-    struct json_object *group_by_obj = NULL, *aggregation_obj = NULL, *dimensions_obj = NULL;
-    
-    if (!json_object_object_get_ex(params, "dimensions", &dimensions_obj) || !dimensions_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to get the list of dimensions for this metric/context.");
-        return MCP_RC_BAD_REQUEST;
-    }
-    
+    struct json_object *aggregation_obj = NULL, *dimensions_obj = NULL;
+
+    // 'dimensions' and 'group_by' are validated where they are parsed, so a missing parameter and an empty
+    // array give the same guidance
+    json_object_object_get_ex(params, "dimensions", &dimensions_obj);
+
     if (!json_object_object_get_ex(params, "after", &after_obj) || !after_obj) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (Unix epoch timestamp in seconds, or negative value relative to 'before', or RFC3339 datetime string).");
         return MCP_RC_BAD_REQUEST;
@@ -343,11 +342,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     if (!json_object_object_get_ex(params, "time_group", &time_group_obj) || !time_group_obj) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'time_group'. This parameter defines how to aggregate data points over time (e.g., 'average', 'min', 'max', 'sum').");
-        return MCP_RC_BAD_REQUEST;
-    }
-    
-    if (!json_object_object_get_ex(params, "group_by", &group_by_obj) || !group_by_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'group_by'. This parameter defines how to group metrics (e.g., 'dimension', 'instance', 'node', or combinations like 'dimension,node').");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -499,7 +493,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
-        buffer_strcat(mcpc->error, " Valid values are: 'dimension', 'instance', 'node', 'label'.");
+        buffer_strcat(mcpc->error, " This parameter defines how to group metrics. "
+                                   "Valid values are: 'dimension', 'instance', 'node', 'label'.");
         return MCP_RC_BAD_REQUEST;
     }
     
