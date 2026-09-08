@@ -65,6 +65,7 @@ func jobConfigLifecycleSnapshotIdentity(
 }
 
 type preparedJobConfigLifecycle struct {
+	failure  collectorapi.JobConfigFailure
 	identity collectorapi.JobConfigIdentity
 	snapshot collectorapi.JobConfigLifecycleSnapshot
 	runtime  collectorapi.RuntimeJob
@@ -128,6 +129,16 @@ func (dcjc *DynCfgJobController) prepareJobConfigLifecycleReconcile(
 	}
 	if snapshotIdentity, ok := jobConfigLifecycleSnapshotIdentity(snapshot); ok &&
 		next.valid && snapshotIdentity == next.identity {
+		if prepared.identity == next.identity && prepared.failure.Valid() {
+			if projector, ok := next.hook.(collectorapi.JobConfigFailureProjector); ok {
+				var enriched collectorapi.JobConfigLifecycleSnapshot
+				if callJobConfigLifecycle(func() { enriched = projector.ProjectFailure(snapshot, prepared.failure) }) {
+					if identity, valid := jobConfigLifecycleSnapshotIdentity(enriched); valid && identity == next.identity {
+						snapshot = enriched
+					}
+				}
+			}
+		}
 		return func() {
 			var runtime collectorapi.RuntimeJob
 			if prepared.identity == next.identity && prepared.runtime != nil {
@@ -208,4 +219,18 @@ func (dcjc *DynCfgJobController) jobConfigLifecycleHook(
 		return nil
 	}
 	return creator.JobConfigLifecycle
+}
+
+// FinalizeJobConfigLifecycles retires committed projections after all jobs and
+// graph mutations in this run have joined. Successor runs must not inherit them.
+func (dcjc *DynCfgJobController) FinalizeJobConfigLifecycles() {
+	if dcjc == nil || dcjc.graph == nil {
+		return
+	}
+	for _, id := range dcjc.graph.IDs() {
+		state := dcjc.currentJobConfigLifecycleGraphState(id)
+		if state.valid && state.hook != nil {
+			callJobConfigLifecycle(func() { state.hook.Remove(state.identity) })
+		}
+	}
 }

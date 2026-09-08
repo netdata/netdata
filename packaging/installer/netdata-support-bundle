@@ -4,7 +4,7 @@
 # shellcheck disable=SC2016  # the sh -c and awk mini-programs in the collectors
 # are intentionally single-quoted: they must reach the child shell/awk unexpanded.
 #
-# netdata-support-bundle - collect a sanitized diagnostic bundle for Netdata support tickets.
+# netdata-support-bundle - collect a diagnostic bundle for Netdata support tickets.
 #
 # What is collected and WHY each item is included is documented in
 # packaging/installer/SUPPORT-BUNDLE.md - read it before adding or changing
@@ -12,13 +12,14 @@
 #
 # Design contract:
 #   - Works with or without a running agent, with or without root (degrades gracefully).
-#   - Zero system impact: idle CPU/IO priority, per-command timeouts, global deadline,
+#   - Minimize system impact: idle CPU/IO priority, per-command timeouts, global deadline,
 #     size caps, strictly read-only outside its own staging dir.
-#   - Secrets are ALWAYS redacted (non-optional), with ONE documented exception:
+#   - Standard captures redact secrets, with a streaming configuration exception:
 #     the streaming API key in stream.conf is kept verbatim (it is what support
 #     needs to match a child against its parent - netdata/netdata#23448).
 #     PII (IPs, MACs, emails, hostnames) pseudonymized by default;
-#     --no-obfuscate disables PII pass only.
+#     --no-obfuscate disables PII pass only. Explicit --include-snmp-diagnostics
+#     adds raw SNMP files with neither secret redaction nor PII obfuscation.
 #   - Collected files keep their original bytes: BOM, line terminators and a
 #     missing final newline survive redaction, and what was observed is recorded
 #     per file in MANIFEST.json, so encoding faults stay diagnosable.
@@ -30,6 +31,7 @@
 #   --since HOURS        log window in hours (default: 24)
 #   --timeout SECONDS    per-command timeout (default: 10)
 #   --no-obfuscate       disable PII pseudonymization (secrets STILL redacted)
+#   --include-snmp-diagnostics  include original, UNSANITIZED SNMP evidence
 #   --keep-staging       keep staging dir for inspection
 #   --selftest           run the sanitizer regression vectors and exit
 #   -v, --version        print version
@@ -49,13 +51,16 @@ if [ -z "${ND_SUPPORT_BUNDLE_DEMOTED:-}" ]; then
   exec nice -n 19 sh "$0" "$@"
 fi
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 OUTDIR="/tmp"
 SINCE_HOURS=24
 CMD_TIMEOUT=10
 OBFUSCATE=1
 KEEP_STAGING=0
 SELFTEST=0
+INCLUDE_SNMP=0
+SNMP_FILES=0
+SNMP_STATUS=not_requested
 # checked before each collector; one in-flight command may overrun by up to
 # CMD_TIMEOUT, so the hard runtime bound is GLOBAL_DEADLINE + CMD_TIMEOUT
 GLOBAL_DEADLINE=240
@@ -70,6 +75,7 @@ while [ $# -gt 0 ]; do
     --since) need_val "$@"; SINCE_HOURS="$2"; shift 2 ;;
     --timeout) need_val "$@"; CMD_TIMEOUT="$2"; shift 2 ;;
     --no-obfuscate) OBFUSCATE=0; shift ;;
+    --include-snmp-diagnostics) INCLUDE_SNMP=1; shift ;;
     --keep-staging) KEEP_STAGING=1; shift ;;
     --selftest) SELFTEST=1; shift ;;
     -v|--version) echo "netdata-support-bundle $VERSION"; exit 0 ;;
@@ -647,19 +653,142 @@ sanitize_file() {
 }
 
 # --- manifest ----------------------------------------------------------------
-# manifest_add <rel-path> <kind:cmd|file|api> <origin> <title>
+# manifest_add <rel-path> <kind:cmd|file|api> <origin> <title> [raw:0|1]
 json_str() { # collapse newlines/tabs, escape backslashes and quotes
   _js="$1"
   printf '%s' "$_js" | tr '\n\t' '  ' | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 manifest_add() {
-  _rel="$1"; _kind="$2"; _origin="$3"; _title="$4"
+  _rel="$1"; _kind="$2"; _origin="$3"; _title="$4"; _raw="${5:-0}"
   _bytes=0; [ -f "$WORK/$_rel" ] && _bytes=$(wc -c < "$WORK/$_rel" | tr -d ' ')
-  printf '{"path":"%s","kind":"%s","origin":"%s","title":"%s","bytes":%s,"pii_obfuscated":%s}
+  printf '{"path":"%s","kind":"%s","origin":"%s","title":"%s","bytes":%s,"pii_obfuscated":%s,"sanitized":%s}
 ' \
     "$(json_str "$_rel")" "$_kind" "$(json_str "$_origin")" "$(json_str "$_title")" "$_bytes" \
-    "$([ "$OBFUSCATE" = "1" ] && echo true || echo false)" >> "$MANIFEST_ROWS"
+    "$([ "$OBFUSCATE" = "1" ] && [ "$_raw" = "0" ] && echo true || echo false)" \
+    "$([ "$_raw" = "0" ] && echo true || echo false)" >> "$MANIFEST_ROWS"
 }
+
+
+# --- SNMP diagnostics ----------------------------------------------------------
+# Only the Agent-owned layout is accepted. No decompression or text sanitization:
+# changing returned bytes or identifiers would destroy the evidence being copied.
+snmp_note() {
+  printf '%s\n' "$1" >> "$WORK/06-state/snmp-diagnostics-status.txt"
+}
+
+snmp_copy() {
+  _sc_src="$1"; _sc_rel="$2"; _sc_out="$WORK/06-state/snmp-diagnostics/$_sc_rel"
+  if deadline_exceeded; then
+    snmp_note "$_sc_rel: skipped (deadline)"; SNMP_STATUS=partial; return 1
+  fi
+  if [ -h "$_sc_src" ] || [ ! -f "$_sc_src" ] || [ ! -r "$_sc_src" ]; then
+    snmp_note "$_sc_rel: unavailable (missing, unreadable, or symlink)"; SNMP_STATUS=partial; return 1
+  fi
+  # cp -P preserves a leaf symlink instead of following it if the source changes.
+  # A staged symlink is rejected below, never included as evidence.
+  if mkdir -p "$(dirname "$_sc_out")" &&
+     run_capped "$CMD_TIMEOUT" cp -P "$_sc_src" "$_sc_out.tmp" 2>>"$ERRORS" &&
+     [ ! -h "$_sc_out.tmp" ] && [ -f "$_sc_out.tmp" ] &&
+     mv "$_sc_out.tmp" "$_sc_out"; then
+    SNMP_FILES=$((SNMP_FILES + 1))
+    manifest_add "06-state/snmp-diagnostics/$_sc_rel" file "snmp/diagnostics/$_sc_rel" "Original SNMP evidence (UNSANITIZED)" 1
+    snmp_note "$_sc_rel: copied"
+    return 0
+  fi
+  rm -f "$_sc_out.tmp"
+  snmp_note "$_sc_rel: copy failed (withheld)"; SNMP_STATUS=partial; return 1
+}
+
+snmp_runs() {
+  # Parse only the small, fixed index written by the Agent: current, then optional
+  # previous. Field contents are never treated as paths until canonical UUID checks.
+  awk '
+    function uuid(s, a) {
+      return s !~ /[^0-9a-f-]/ && split(s,a,"-")==5 &&
+        length(a[1])==8 && length(a[2])==4 && length(a[3])==4 && length(a[4])==4 && length(a[5])==12
+    }
+    { text=text $0 "\n" }
+    END {
+      n=split(text,v,/["]/)
+      if ((n!=5 && n!=9) || v[1]!~/^[[:space:]]*[{][[:space:]]*$/ ||
+          v[2]!="current" || v[3]!~/^[[:space:]]*:[[:space:]]*$/ || !uuid(v[4]) ||
+          v[n]!~/^[[:space:]]*[}][[:space:]]*$/) exit 1
+      if (n==9 && (v[5]!~/^[[:space:]]*,[[:space:]]*$/ || v[6]!="previous" ||
+          v[7]!~/^[[:space:]]*:[[:space:]]*$/ || !uuid(v[8]) || v[4]==v[8])) exit 1
+      print v[4]; if (n==9) print v[8]
+    }' "$1"
+}
+
+snmp_directory() {
+  [ ! -h "$1" ] && [ -d "$1" ] && [ -r "$1" ] && [ -x "$1" ]
+}
+
+collect_snmp_diagnostics() {
+  mkdir -p "$WORK/06-state"
+  : > "$WORK/06-state/snmp-diagnostics-status.txt"
+  if [ "$INCLUDE_SNMP" != "1" ]; then
+    snmp_note "Not requested. Use --include-snmp-diagnostics to include original, UNSANITIZED evidence."
+  elif [ -z "$LIBDIR" ] || [ ! -e "$LIBDIR/snmp/diagnostics" ]; then
+    SNMP_STATUS=unavailable
+    snmp_note "No SNMP diagnostic directory found."
+  else
+    SNMP_STATUS=complete
+    _sd_root="$LIBDIR/snmp/diagnostics"
+    snmp_note "Raw SNMP evidence requested: no secret redaction or PII obfuscation. Share privately."
+    if ! snmp_directory "$LIBDIR/snmp" || ! snmp_directory "$_sd_root"; then
+      SNMP_STATUS=partial
+      snmp_note "Diagnostic directory unavailable or symlinked (withheld)."
+    else
+      _sd_lifecycle_missing=0
+      if [ -e "$_sd_root/lifecycle.zst" ] || [ -h "$_sd_root/lifecycle.zst" ]; then
+        snmp_copy "$_sd_root/lifecycle.zst" lifecycle.zst || :
+      else
+        _sd_lifecycle_missing=1
+        snmp_note "lifecycle.zst: missing"
+      fi
+      if [ -e "$_sd_root/topology" ] || [ -h "$_sd_root/topology" ]; then
+        if snmp_directory "$_sd_root/topology"; then
+          for _sd_file in "$_sd_root"/topology/checkpoint-*.zst; do
+            _sd_name=${_sd_file##*/}
+            printf '%s\n' "$_sd_name" | grep -Eq '^checkpoint-[0-9]{20}\.zst$' || continue
+            snmp_copy "$_sd_file" "topology/$_sd_name" || :
+          done
+        else
+          SNMP_STATUS=partial; snmp_note "topology: directory unavailable or symlinked (withheld)."
+        fi
+      fi
+      if [ -e "$_sd_root/normal" ] || [ -h "$_sd_root/normal" ]; then
+        if snmp_directory "$_sd_root/normal" && snmp_copy "$_sd_root/normal/runs.json" normal/runs.json; then
+          if _sd_runs=$(snmp_runs "$WORK/06-state/snmp-diagnostics/normal/runs.json"); then
+            for _sd_run in $_sd_runs; do
+              if ! snmp_directory "$_sd_root/normal/$_sd_run"; then
+                SNMP_STATUS=partial; snmp_note "normal/$_sd_run: directory unavailable or symlinked (withheld)."; continue
+              fi
+              for _sd_file in "$_sd_root/normal/$_sd_run"/device-*.zst; do
+                _sd_name=${_sd_file##*/}
+                printf '%s\n' "$_sd_name" | grep -Eq '^device-[0-9]{20}\.zst$' || continue
+                snmp_copy "$_sd_file" "normal/$_sd_run/$_sd_name" || :
+              done
+            done
+          else
+            SNMP_STATUS=partial; snmp_note "normal/runs.json: invalid index; normal device files withheld."
+          fi
+        else
+          SNMP_STATUS=partial; snmp_note "normal: directory or run index unavailable (device files withheld)."
+        fi
+      fi
+      if [ "$SNMP_FILES" -gt 0 ] && [ "$_sd_lifecycle_missing" = 1 ]; then
+        SNMP_STATUS=partial
+      fi
+      if [ "$SNMP_FILES" = "0" ] && [ "$SNMP_STATUS" = complete ]; then
+        SNMP_STATUS=unavailable; snmp_note "No completed SNMP diagnostic files found."
+      fi
+    fi
+  fi
+  snmp_note "Result: $SNMP_STATUS; complete files copied: $SNMP_FILES."
+  manifest_add 06-state/snmp-diagnostics-status.txt file generated "SNMP evidence collection status"
+}
+# --- end SNMP diagnostics ------------------------------------------------------
 
 # --- collectors ---------------------------------------------------------------
 # collect_cmd <rel-path> <title> <cmd...>
@@ -1213,6 +1342,7 @@ collect_cmd 05-logs/coredumps.txt "Recent coredump METADATA for netdata (not the
 # 06-state
 # =============================================================================
 info "collecting: state"
+collect_snmp_diagnostics
 # status file: agent writes to first writable of these; newest mtime wins (status-file-io.c)
 NEWEST_STATUS=""
 # shellcheck disable=SC3013  # -nt is supported by dash, ash/busybox, bash and FreeBSD sh
@@ -1502,7 +1632,9 @@ CRASH_HINT=""
   [ -n "$ERRCOUNT" ] && echo "error.log 'error' lines: $ERRCOUNT"
   [ "${DOCKER_LOGS_NEEDED:-0}" = "1" ] && echo "NOTE: agent log HISTORY is not in this bundle - it lives in 'docker logs' on the host (see 05-logs/LOGS-ARE-IN-DOCKER.txt)"
   echo
+  echo "SNMP diagnostics: $SNMP_STATUS ($SNMP_FILES raw files; UNSANITIZED when included)"
   echo "READ ORDER FOR TRIAGE:"
+  echo "  SNMP issues         -> 06-state/snmp-diagnostics-status.txt, 06-state/snmp-diagnostics/"
   echo "  crashes/won't start -> 06-state/status-file.json, 05-logs/, 01-system/kernel-messages.txt"
   echo "  collector issues    -> 04-config/go.d*, 05-logs/collector.log, 09-permissions/plugins-d.txt"
   echo "  streaming issues    -> 04-config/stream.conf, 07-runtime/node-instances.json, 01-system/clock-timesync.txt"
@@ -1515,21 +1647,27 @@ manifest_add summary.txt file generated "Human summary"
 cat > "$WORK/README.md" <<'EOF'
 # Netdata Support Bundle
 
-Generated by `netdata-support-bundle`. Contents are SANITIZED:
+Generated by `netdata-support-bundle`. Standard captures are SANITIZED:
 secrets (tokens, api keys, passwords) are redacted; by default IPs,
 MACs, emails and hostnames are replaced with stable pseudonyms (`ip-1`,
-`redacted-host`, `[EMAIL]`, `[MAC]`) - consistent across all files, so
+`redacted-host`, `[EMAIL]`, `[MAC]`) - consistent across standard captures, so
 cross-referencing still works. The pseudonym map stays on the user's machine,
 next to the tarball - it is NOT in this bundle.
 
-**One deliberate exception:** the **streaming API key** is kept VERBATIM in
+**Streaming-key exception:** the **streaming API key** is kept VERBATIM in
 `04-config/stream.conf` (both `api key` values and `[<API_KEY>]` section
 headers). It is the value support needs to tell whether a child and its parent
 agree, so it is not treated as a secret. If your threat model differs, remove or
 mask it in `04-config/stream.conf` before sending the bundle. Note the same key
 IS still redacted in `05-logs/access.log`, where it also appears.
 
-Collected files keep their original bytes: a byte-order mark, CRLF or CR line
+**Optional raw SNMP evidence:** `06-state/snmp-diagnostics/`, when included,
+is UNSANITIZED: no secret redaction or PII obfuscation. It preserves device
+responses, inventory and metric values. Share this bundle through a restricted
+support channel, never a public issue. See `06-state/snmp-diagnostics-status.txt` for
+missing files or copy failures; the directory is not one simultaneous snapshot.
+
+Collected text files keep their original bytes: a byte-order mark, CRLF or CR line
 endings and a missing final newline all survive redaction, so an encoding fault
 in a config file is still visible here.
 
@@ -1567,9 +1705,10 @@ manifest_add README.md file generated "Bundle documentation"
   echo "  \"tool_version\": \"$VERSION\","
   echo "  \"generated_utc\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
   echo "  \"runtime_seconds\": $(( $(now_s) - START_TS )),"
-  echo "  \"pii_obfuscated\": $([ "$OBFUSCATE" = "1" ] && echo true || echo false),"
-  echo "  \"secrets_redacted\": true,"
-  # the one documented exception to secrets_redacted (netdata/netdata#23448)
+  echo "  \"pii_obfuscated\": $([ "$OBFUSCATE" = "1" ] && [ "$SNMP_FILES" = "0" ] && echo true || echo false),"
+  echo "  \"secrets_redacted\": $([ "$SNMP_FILES" = "0" ] && echo true || echo false),"
+  echo "  \"snmp_diagnostics\": {\"requested\": $([ "$INCLUDE_SNMP" = "1" ] && echo true || echo false), \"status\": \"$SNMP_STATUS\", \"files\": $SNMP_FILES},"
+  # the standard-capture exception to secrets_redacted (netdata/netdata#23448)
   echo "  \"streaming_api_key_redacted\": false,"
   echo "  \"agent_running\": $([ -n "${NETDATA_PID:-}" ] && echo true || echo false),"
   echo "  \"agent_api_reachable\": $([ "$api_ok" = "1" ] && echo true || echo false),"

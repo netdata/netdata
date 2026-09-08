@@ -11,6 +11,8 @@ on:
       - 'packaging/installer/netdata-support-bundle'
       - 'packaging/installer/netdata-support-bundle.ps1'
       - 'packaging/installer/SUPPORT-BUNDLE.md'
+      - 'packaging/installer/tests/**'
+      - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
   pull_request:
     paths:
       - '.github/workflows/netdata-support-bundle.yml'
@@ -18,6 +20,8 @@ on:
       - 'packaging/installer/netdata-support-bundle'
       - 'packaging/installer/netdata-support-bundle.ps1'
       - 'packaging/installer/SUPPORT-BUNDLE.md'
+      - 'packaging/installer/tests/**'
+      - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
 
 permissions:
   contents: read
@@ -52,9 +56,11 @@ jobs:
           if [ "$TEST_SHELL" = busybox ]; then
             busybox sh -n packaging/installer/netdata-support-bundle
             busybox sh packaging/installer/netdata-support-bundle --selftest
+            SUPPORT_BUNDLE_TEST_SHELL="busybox sh" python3 packaging/installer/tests/test_snmp_diagnostics.py -v
           else
             "$TEST_SHELL" -n packaging/installer/netdata-support-bundle
             "$TEST_SHELL" packaging/installer/netdata-support-bundle --selftest
+            SUPPORT_BUNDLE_TEST_SHELL="$TEST_SHELL" python3 packaging/installer/tests/test_snmp_diagnostics.py -v
           fi
 
   posix-e2e:
@@ -75,9 +81,12 @@ jobs:
           printf '\357\273\277[stream]\r\n    enabled = yes\r\n    api key = 11111111-2222-3333-4444-555555555555\r\n    password = SENTINEL-E2E-STREAMPW\r\n[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]\r\n    enabled = yes' > /tmp/stream.conf
           sudo cp /tmp/stream.conf /etc/netdata/stream.conf
           sudo chmod 644 /etc/netdata/stream.conf
+          sudo install -d -m 755 /var/lib/netdata/snmp/diagnostics
+          sudo cp src/go/plugin/go.d/collector/snmp_topology/testdata/topology-diagnostic-archive-replay-v1.zst /var/lib/netdata/snmp/diagnostics/lifecycle.zst
+          sudo chmod 644 /var/lib/netdata/snmp/diagnostics/lifecycle.zst
           output=$(mktemp -d)
           extract=$(mktemp -d)
-          sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 -o "$output"
+          sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 --include-snmp-diagnostics -o "$output"
           bundle=$(find "$output" -maxdepth 1 \( -name '*.tar.gz' -o -name '*.tar.zst' \) -print -quit)
           test -n "$bundle"
           tar -xaf "$bundle" -C "$extract"
@@ -96,6 +105,8 @@ jobs:
           jq -e '.schema == "netdata-support-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
           jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
 
+          cmp /var/lib/netdata/snmp/diagnostics/lifecycle.zst "$root/06-state/snmp-diagnostics/lifecycle.zst"
+          jq -e '.snmp_diagnostics.files == 1 and .snmp_diagnostics.status == "complete" and .secrets_redacted == false and .pii_obfuscated == false' "$root/MANIFEST.json"
           test -s "$root/09-permissions/plugins-d.txt"
 
           # streaming api key kept verbatim, other stream.conf secrets redacted,
@@ -117,6 +128,7 @@ jobs:
           set -eu
           sh -n packaging/installer/netdata-support-bundle
           sh packaging/installer/netdata-support-bundle --selftest
+          python3 packaging/installer/tests/test_snmp_diagnostics.py -v
 
   powershell-core:
     name: PowerShell 7 sanitization
@@ -126,6 +138,10 @@ jobs:
       - name: Run adversarial self-test
         shell: pwsh
         run: ./packaging/installer/netdata-support-bundle.ps1 -SelfTest
+      - name: SNMP evidence fixtures
+        env:
+          SUPPORT_BUNDLE_TEST_SHELL: pwsh
+        run: python3 packaging/installer/tests/test_snmp_diagnostics.py -v
 
   windows-powershell:
     name: Windows PowerShell 5.1 sanitization
@@ -135,6 +151,10 @@ jobs:
       - name: Run adversarial self-test
         shell: powershell
         run: .\packaging\installer\netdata-support-bundle.ps1 -SelfTest
+      - name: SNMP evidence fixtures
+        env:
+          SUPPORT_BUNDLE_TEST_SHELL: powershell
+        run: python packaging/installer/tests/test_snmp_diagnostics.py -v
 
       - name: Build and validate a fixture bundle
         shell: powershell
@@ -154,8 +174,12 @@ jobs:
           [System.IO.File]::WriteAllBytes(
               (Join-Path $confDir 'stream.conf'),
               [byte[]](@(0xEF, 0xBB, 0xBF) + $utf8.GetBytes($streamText)))
+          $diagDir = 'C:\Program Files\Netdata\var\lib\netdata\snmp\diagnostics'
+          [System.IO.Directory]::CreateDirectory($diagDir) | Out-Null
+          $diagSource = (Resolve-Path 'src/go/plugin/go.d/collector/snmp_topology/testdata/topology-diagnostic-archive-replay-v1.zst').Path
+          Copy-Item $diagSource (Join-Path $diagDir 'lifecycle.zst')
           $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
-          .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1
+          .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1 -IncludeSnmpDiagnostics
           $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
           if (-not $zip) { throw 'bundle zip was not created' }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -178,6 +202,19 @@ jobs:
               if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
               $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
               if ($manifest.schema -ne 'netdata-support-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+
+              if ($manifest.snmp_diagnostics.files -ne 1 -or $manifest.snmp_diagnostics.status -ne 'complete' -or
+                  $manifest.secrets_redacted -or $manifest.pii_obfuscated) { throw 'raw SNMP manifest contract failed' }
+              $diagEntry = $archive.Entries | Where-Object { $_.FullName -match '06-state[\\/]snmp-diagnostics[\\/]lifecycle.zst$' } | Select-Object -First 1
+              if (-not $diagEntry) { throw 'SNMP evidence missing' }
+              $diagStream = $diagEntry.Open()
+              $diagMemory = New-Object System.IO.MemoryStream
+              try {
+                  $diagStream.CopyTo($diagMemory)
+                  if ([Convert]::ToBase64String($diagMemory.ToArray()) -cne [Convert]::ToBase64String([IO.File]::ReadAllBytes($diagSource))) {
+                      throw 'SNMP evidence bytes changed'
+                  }
+              } finally { $diagStream.Dispose(); $diagMemory.Dispose() }
 
               # streaming api key kept verbatim, other stream.conf secrets redacted,
               # and the source bytes (BOM + CRLF + no final newline) preserved

@@ -13,6 +13,7 @@
       },
       "charts": {
         "title": "Charts configuration",
+        "description": "Synthetic charts this test collector generates.",
         "type": [
           "object",
           "null"
@@ -68,6 +69,7 @@
       },
       "hidden_charts": {
         "title": "Hidden charts configuration",
+        "description": "Synthetic charts generated with the hidden flag, to exercise hidden-chart handling.",
         "type": [
           "object",
           "null"
@@ -127,9 +129,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "charts": {
       "type": {
         "ui:widget": "radio",

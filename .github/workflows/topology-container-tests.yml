@@ -41,6 +41,7 @@ env:
     cgroup-name-config-test
     cgroups-plugin-labels-test
     local-sockets-mnl-test
+    local-sockets-namespaces-test
     network-viewer-apps-lookup-client-test
     network-viewer-topology-containers-test
 

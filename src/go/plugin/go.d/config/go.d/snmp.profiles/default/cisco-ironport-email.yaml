@@ -15,20 +15,25 @@ metadata:
 
 metric_tags:
   - tag: ironport_cache_admin
-    OID: 1.3.6.1.4.1.15497.1.2.2.1.0
-    symbol: cacheAdmin
+    symbol:
+      OID: 1.3.6.1.4.1.15497.1.2.2.1.0
+      name: cacheAdmin
   - tag: ironport_cache_software
-    OID: 1.3.6.1.4.1.15497.1.2.2.2.0
-    symbol: cacheSoftware
+    symbol:
+      OID: 1.3.6.1.4.1.15497.1.2.2.2.0
+      name: cacheSoftware
   - tag: ironport_cache_version
-    OID: 1.3.6.1.4.1.15497.1.2.2.3.0
-    symbol: cacheVersion
+    symbol:
+      OID: 1.3.6.1.4.1.15497.1.2.2.3.0
+      name: cacheVersion
   - tag: ironport_license_expiration
-    OID: 1.3.6.1.4.1.15497.1.2.2.4.0
-    symbol: licenseExpiration
+    symbol:
+      OID: 1.3.6.1.4.1.15497.1.2.2.4.0
+      name: licenseExpiration
   - tag: ironport_http_ports
-    OID: 1.3.6.1.4.1.15497.1.2.2.5.0
-    symbol: httpPorts
+    symbol:
+      OID: 1.3.6.1.4.1.15497.1.2.2.5.0
+      name: httpPorts
 
 selector:
   - sysobjectid:

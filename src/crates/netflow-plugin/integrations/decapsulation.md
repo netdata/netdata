@@ -225,7 +225,11 @@ protocols:
 
 
 
-### Decap mode set but tunnels still show outer endpoints
+## Troubleshooting
+
+### Other Problems
+
+#### Decap mode set but tunnels still show outer endpoints
 
 The exporter is not shipping the L2 frame section. Plain NetFlow / IPFIX
 flow records (no IE 104 / IE 315) take the regular path and are unaffected
@@ -234,7 +238,7 @@ on NetFlow v9 or IE 315 on IPFIX. For sFlow, confirm the agent is sending
 `SampledHeader` records rather than only `SampledIPv4` / `SampledIPv6`.
 
 
-### Records disappear after enabling decap
+#### Records disappear after enabling decap
 
 When `decapsulation_mode` is set and a record arrives via the L2-section
 path with a payload that does not match the configured tunnel, the record
@@ -245,14 +249,14 @@ exporter mixes tunnel and non-tunnel traffic on the L2-section path, you
 will lose the non-tunnel records.
 
 
-### VXLAN on a non-default UDP port goes undetected
+#### VXLAN on a non-default UDP port goes undetected
 
 The VXLAN parser matches only UDP destination port 4789. VXLAN-GPE on 4790 and any
 vendor-custom port are not recognised and the record is dropped under
 `decapsulation_mode: vxlan`.
 
 
-### Frame section truncated, inner parsing fails
+#### Frame section truncated, inner parsing fails
 
 The exporter's clip / section size is shorter than the outer headers plus
 the inner L3/L4 needed to populate the 5-tuple. Increase the section size
@@ -260,7 +264,7 @@ the inner L3/L4 needed to populate the 5-tuple. Increase the section size
 headers. On Juniper inline-monitoring, the knob is `maximum-clip-length`.
 
 
-### VNI-based segmentation invisible
+#### VNI-based segmentation invisible
 
 Bytes 4-6 of the VXLAN header (the VNI) are not exposed as journal
 fields. If the inner Ethernet carries a VLAN tag, that VLAN reaches
@@ -269,7 +273,7 @@ No workaround inside the plugin; either VLAN-tag the inner traffic or
 filter at query time using the tunnel-endpoint pair before decap.
 
 
-### One mode at a time
+#### One mode at a time
 
 The plugin cannot decode VXLAN and SRv6 in the same instance. If exporter A
 ships VXLAN tenant traffic and exporter B ships SRv6 transit traffic, you

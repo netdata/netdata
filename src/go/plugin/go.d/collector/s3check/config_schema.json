@@ -26,23 +26,20 @@
         "properties": {
           "access_key_id": {
             "title": "Access key ID",
-            "description": "Access key ID.",
+            "description": "Access key ID of the static credentials.",
             "type": "string",
-            "minLength": 1,
-            "sensitive": true
+            "minLength": 1
           },
           "secret_access_key": {
             "title": "Secret access key",
-            "description": "Secret access key.",
+            "description": "Secret access key of the static credentials.",
             "type": "string",
-            "minLength": 1,
-            "sensitive": true
+            "minLength": 1
           },
           "session_token": {
             "title": "Session token",
             "description": "Session token for temporary credentials. Leave empty for long-lived keys.",
-            "type": "string",
-            "sensitive": true
+            "type": "string"
           }
         },
         "required": [
@@ -67,7 +64,7 @@
           },
           "region": {
             "title": "Region",
-            "description": "Signing region, for example `us-east-1`.",
+            "description": "Signing region, for example `us-east-1`. Required, also for non-AWS services.",
             "type": "string",
             "minLength": 1
           },
@@ -78,11 +75,12 @@
             "minLength": 1
           },
           "credentials": {
+            "description": "Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain.",
             "$ref": "#/definitions/credentials"
           },
           "assume_role": {
             "title": "Assume role",
-            "description": "Role to assume with this endpoint's base credentials.",
+            "description": "IAM role to assume with this endpoint's base credentials.",
             "type": [
               "object",
               "null"
@@ -97,8 +95,7 @@
               "external_id": {
                 "title": "External ID",
                 "description": "External ID expected by the role's trust policy, if any.",
-                "type": "string",
-                "sensitive": true
+                "type": "string"
               }
             },
             "required": [
@@ -107,13 +104,13 @@
           },
           "path_style": {
             "title": "Path-style addressing",
-            "description": "Put the bucket in the request path instead of the hostname.",
+            "description": "Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3.",
             "type": "boolean",
             "default": true
           },
           "timeout": {
             "title": "Request timeout",
-            "description": "Maximum duration of one request, for example `10s`. Up to `1m`.",
+            "description": "Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`.",
             "type": "string",
             "default": "10s",
             "minLength": 2
@@ -121,12 +118,11 @@
           "proxy_url": {
             "title": "Proxy URL",
             "description": "HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables.",
-            "type": "string",
-            "sensitive": true
+            "type": "string"
           },
           "tls_skip_verify": {
             "title": "Skip TLS verification",
-            "description": "Disable certificate and hostname verification. Insecure.",
+            "description": "Skip TLS certificate and hostname verification. Insecure.",
             "type": "boolean",
             "default": false
           },
@@ -146,8 +142,7 @@
             "title": "TLS client key",
             "description": "Absolute path to the client certificate key. Requires the client certificate.",
             "type": "string",
-            "pattern": "^$|^/",
-            "sensitive": true
+            "pattern": "^$|^/"
           }
         },
         "required": [
@@ -165,12 +160,12 @@
       },
       "lifecycle_mode": {
         "title": "Lifecycle configuration",
-        "description": "Endpoint and prefix for the lifecycle check of one S3 service.",
+        "description": "Settings of the `lifecycle` mode. Required when `mode` is `lifecycle`.",
         "type": "object",
         "properties": {
           "prefix": {
             "title": "Object prefix",
-            "description": "Key prefix for probe objects. Must end with `/`.",
+            "description": "Key prefix reserved for probe objects. Must end with `/`.",
             "type": "string",
             "default": "netdata-s3check/",
             "minLength": 2,
@@ -179,6 +174,7 @@
           },
           "source": {
             "title": "S3 connection",
+            "description": "The S3 endpoint to check.",
             "allOf": [
               {
                 "$ref": "#/definitions/connection"
@@ -192,12 +188,12 @@
       },
       "replication_mode": {
         "title": "Replication configuration",
-        "description": "Source, destination, and propagation objectives for one replication direction.",
+        "description": "Settings of the `aws_replication` mode. Required when `mode` is `aws_replication`.",
         "type": "object",
         "properties": {
           "prefix": {
             "title": "Object prefix",
-            "description": "Key prefix for probe objects. Must end with `/`.",
+            "description": "Key prefix reserved for probe objects. Must end with `/`.",
             "type": "string",
             "default": "netdata-s3check/",
             "minLength": 2,
@@ -206,6 +202,7 @@
           },
           "source": {
             "title": "Source connection",
+            "description": "Where probe objects are written and deleted.",
             "allOf": [
               {
                 "$ref": "#/definitions/connection"
@@ -214,6 +211,7 @@
           },
           "destination": {
             "title": "Destination connection",
+            "description": "Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects.",
             "allOf": [
               {
                 "$ref": "#/definitions/connection"
@@ -222,14 +220,14 @@
           },
           "write_objective": {
             "title": "Write visibility objective",
-            "description": "Healthy time for a new object to appear at the destination, for example `15m`.",
+            "description": "Healthy time for a new object to appear at the destination, for example `15m`. Exceeding it flags the objective chart only.",
             "type": "string",
             "default": "15m",
             "minLength": 2
           },
           "write_timeout": {
             "title": "Write visibility timeout",
-            "description": "Hard limit for a new object to appear at the destination, for example `30m`.",
+            "description": "Hard limit for a new object to appear at the destination, for example `30m`. Exceeding it fails the probe.",
             "type": "string",
             "default": "30m",
             "minLength": 2
@@ -243,7 +241,7 @@
           },
           "delete_timeout": {
             "title": "Delete visibility timeout",
-            "description": "Hard limit for the destination copy to disappear, for example `15m`.",
+            "description": "Hard limit for the destination copy to disappear, for example `15m`. Exceeding it fails the probe.",
             "type": "string",
             "default": "15m",
             "minLength": 2
@@ -258,21 +256,21 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Collection interval in seconds.",
+        "description": "Data collection interval, in seconds. Replication modes poll the destination once per interval.",
         "type": "integer",
         "minimum": 1,
         "default": 120
       },
       "autodetection_retry": {
         "title": "Detection retry",
-        "description": "Seconds between retries of the initial bucket check. Zero disables retries.",
+        "description": "How often to retry the initial bucket check when the job fails to start, in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
         "default": 0
       },
       "mode": {
         "title": "Mode",
-        "description": "Which check this job runs.",
+        "description": "Which check this job runs: `lifecycle`, `ceph_multisite`, or `aws_replication`.",
         "type": "string",
         "enum": [
           "lifecycle",
@@ -298,6 +296,7 @@
               },
               "mode_lifecycle": {
                 "title": "Lifecycle configuration",
+                "description": "Settings of the `lifecycle` mode. Required when `mode` is `lifecycle`.",
                 "allOf": [
                   {
                     "$ref": "#/definitions/lifecycle_mode"
@@ -331,6 +330,7 @@
               },
               "mode_ceph_multisite": {
                 "title": "Ceph multisite configuration",
+                "description": "Settings of the `ceph_multisite` mode. Required when `mode` is `ceph_multisite`.",
                 "allOf": [
                   {
                     "$ref": "#/definitions/replication_mode"
@@ -364,6 +364,7 @@
               },
               "mode_aws_replication": {
                 "title": "AWS replication configuration",
+                "description": "Settings of the `aws_replication` mode. Required when `mode` is `aws_replication`.",
                 "allOf": [
                   {
                     "$ref": "#/definitions/replication_mode"
@@ -397,9 +398,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -486,9 +484,6 @@
         },
         "credentials": {
           "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
-          "access_key_id": {
-            "ui:widget": "password"
-          },
           "secret_access_key": {
             "ui:widget": "password"
           },
@@ -497,17 +492,10 @@
           }
         },
         "assume_role": {
-          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
-          "external_id": {
-            "ui:widget": "password"
-          }
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
-          "ui:widget": "password"
-        },
-        "tls_key": {
-          "ui:widget": "password"
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
@@ -584,9 +572,6 @@
         },
         "credentials": {
           "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
-          "access_key_id": {
-            "ui:widget": "password"
-          },
           "secret_access_key": {
             "ui:widget": "password"
           },
@@ -595,17 +580,10 @@
           }
         },
         "assume_role": {
-          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
-          "external_id": {
-            "ui:widget": "password"
-          }
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
-          "ui:widget": "password"
-        },
-        "tls_key": {
-          "ui:widget": "password"
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
@@ -676,9 +654,6 @@
         },
         "credentials": {
           "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
-          "access_key_id": {
-            "ui:widget": "password"
-          },
           "secret_access_key": {
             "ui:widget": "password"
           },
@@ -687,17 +662,10 @@
           }
         },
         "assume_role": {
-          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
-          "external_id": {
-            "ui:widget": "password"
-          }
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
-          "ui:widget": "password"
-        },
-        "tls_key": {
-          "ui:widget": "password"
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `destination` chart label. Changing it does not affect the objects the collector owns."
@@ -786,9 +754,6 @@
         },
         "credentials": {
           "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
-          "access_key_id": {
-            "ui:widget": "password"
-          },
           "secret_access_key": {
             "ui:widget": "password"
           },
@@ -797,17 +762,10 @@
           }
         },
         "assume_role": {
-          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
-          "external_id": {
-            "ui:widget": "password"
-          }
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
-          "ui:widget": "password"
-        },
-        "tls_key": {
-          "ui:widget": "password"
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `source` chart label. Changing it does not affect the objects the collector owns."
@@ -878,9 +836,6 @@
         },
         "credentials": {
           "ui:help": "Leave empty to let the AWS SDK find credentials on the Agent host: environment variables, shared config and profiles, instance or task roles. Fill in both keys to use static credentials, preferably as go.d secret references such as `${env:NAME}`.",
-          "access_key_id": {
-            "ui:widget": "password"
-          },
           "secret_access_key": {
             "ui:widget": "password"
           },
@@ -889,17 +844,10 @@
           }
         },
         "assume_role": {
-          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings.",
-          "external_id": {
-            "ui:widget": "password"
-          }
+          "ui:help": "Optional second step: the base credentials call STS AssumeRole and the collector uses the returned temporary credentials for this endpoint only. The STS request uses this endpoint's region, timeout, proxy, and TLS settings."
         },
         "proxy_url": {
-          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent. Treated as a secret because proxy URLs may embed credentials.",
-          "ui:widget": "password"
-        },
-        "tls_key": {
-          "ui:widget": "password"
+          "ui:help": "Used for both S3 and STS AssumeRole traffic of this endpoint. Leave empty to honor the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment of the Agent."
         },
         "name": {
           "ui:help": "Shown as the `destination` chart label. Changing it does not affect the objects the collector owns."

@@ -9,17 +9,20 @@ import (
 )
 
 type tableWalkOutcome struct {
-	pdus map[string]gosnmp.SnmpPDU
-	err  error
+	sourceOperation uint64
+	pdus            map[string]gosnmp.SnmpPDU
+	err             error
 }
 
 type tableWalkPass struct {
+	execution  *AcquisitionExecutionReport
 	outcomes   map[string]tableWalkOutcome
 	walkedData map[string]map[string]gosnmp.SnmpPDU
 }
 
-func newTableWalkPass() *tableWalkPass {
+func newTableWalkPass(execution *AcquisitionExecutionReport) *tableWalkPass {
 	return &tableWalkPass{
+		execution:  execution,
 		outcomes:   make(map[string]tableWalkOutcome),
 		walkedData: make(map[string]map[string]gosnmp.SnmpPDU),
 	}
@@ -29,8 +32,9 @@ func walkTableWithStats(
 	tc *tableCollector,
 	oid string,
 	stats *ddsnmp.CollectionStats,
+	execution *AcquisitionExecutionReport,
 ) (map[string]gosnmp.SnmpPDU, error) {
-	pdus, err := tc.snmpWalk(oid, stats)
+	pdus, err := tc.snmpWalk(oid, stats, execution)
 	if err != nil {
 		stats.Errors.SNMP++
 		return pdus, err
@@ -49,8 +53,8 @@ func (p *tableWalkPass) walk(
 		return outcome
 	}
 
-	pdus, err := walkTableWithStats(tc, oid, stats)
-	outcome := tableWalkOutcome{pdus: pdus, err: err}
+	pdus, err := walkTableWithStats(tc, oid, stats, p.execution)
+	outcome := tableWalkOutcome{pdus: pdus, err: err, sourceOperation: sourceRecorder(tc.snmpClient).Cursor()}
 	p.outcomes[oid] = outcome
 	if err != nil {
 		return outcome

@@ -432,7 +432,9 @@ Once a job exists, the `snmp` collector takes over and starts collecting metrics
 
 ## Troubleshooting
 
-### No devices are discovered
+### Other Problems
+
+#### No devices are discovered
 
 Check the agent log for `discoverer=snmp` messages. Common causes:
 
@@ -442,12 +444,12 @@ Check the agent log for `discoverer=snmp` messages. Common causes:
 - A configured subnet exceeds the 512-IP cap and the discoverer rejected it at startup. Look for `subnet '...' exceeds maximum size of /23` in the log.
 
 
-### Wrong devices are matched by a rule
+#### Wrong devices are matched by a rule
 
 Rule order matters — see [How rules are evaluated](#how-rules-are-evaluated). Place vendor-specific or device-specific rules **before** the catch-all. If you need to suppress the catch-all for a subset of devices, follow the specific rule with a skip rule (no `config_template`) keyed on the same condition.
 
 
-### Generated collector jobs fail to start
+#### Generated collector jobs fail to start
 
 The discoverer creates jobs but does not run them — the `snmp` collector does. Check the `snmp` collector log and the rendered job YAML in the agent's debug output. Common causes:
 

@@ -6,6 +6,9 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -140,6 +143,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 					dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 					autoDetectionRetryToken{},
 					state.markStopped,
+					collectorapi.JobConfigFailure{Stage: "secret_restart", Reason: "dependent_stopped", CompletedAt: time.Now()},
 				)
 			},
 		},
@@ -237,6 +241,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 							},
 							pending,
 						),
+						jobConfigFailure(prepareErr, "construction"),
 					)
 				}
 				postimage := graphConfig(record, dyncfg.StatusRunning)

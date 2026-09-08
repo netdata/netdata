@@ -758,7 +758,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                     if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
                         XXH64_hash_t net_ns_inode_hash = XXH3_64bits(&net_ns_inode, sizeof(net_ns_inode));
                         SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, &net_ns_inode, true);
-                        simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, net_ns_inode);
+                        simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode_hash, net_ns_inode);
                     }
                 }
 
@@ -1712,7 +1712,13 @@ static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
     return EXIT_SUCCESS;
 }
 
-static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, struct pid_socket *ps) {
+typedef enum {
+    LOCAL_SOCKETS_NAMESPACE_CANDIDATE_UNAVAILABLE,
+    LOCAL_SOCKETS_NAMESPACE_COLLECTION_ATTEMPTED,
+} LOCAL_SOCKETS_NAMESPACE_CANDIDATE_RESULT;
+
+static inline LOCAL_SOCKETS_NAMESPACE_CANDIDATE_RESULT
+local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, struct pid_socket *ps) {
     char filename[1024];
     snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
 
@@ -1722,7 +1728,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         local_sockets_log(ls, "cannot open file '%s'", filename);
         if(ls->config.report)
             __atomic_add_fetch(&ls->stats.namespaces_absent, 1, __ATOMIC_RELAXED);
-        return false;
+        return LOCAL_SOCKETS_NAMESPACE_CANDIDATE_UNAVAILABLE;
     }
 
     struct stat statbuf;
@@ -1731,7 +1737,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         local_sockets_log(ls, "failed to get file statistics for '%s'", filename);
         if(ls->config.report)
             __atomic_add_fetch(&ls->stats.namespaces_absent, 1, __ATOMIC_RELAXED);
-        return false;
+        return LOCAL_SOCKETS_NAMESPACE_CANDIDATE_UNAVAILABLE;
     }
 
     if (statbuf.st_ino != ps->net_ns_inode) {
@@ -1739,7 +1745,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         local_sockets_log(ls, "pid %d is not in the wanted network namespace", ps->pid);
         if(ls->config.report)
             __atomic_add_fetch(&ls->stats.namespaces_invalid, 1, __ATOMIC_RELAXED);
-        return false;
+        return LOCAL_SOCKETS_NAMESPACE_CANDIDATE_UNAVAILABLE;
     }
 
     if(ls->spawn_server == NULL) {
@@ -1747,7 +1753,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         local_sockets_log(ls, "spawn server is not available");
         if(ls->config.report)
             __atomic_add_fetch(&ls->stats.namespaces_forks_failed, 1, __ATOMIC_RELAXED);
-        return false;
+        return LOCAL_SOCKETS_NAMESPACE_COLLECTION_ATTEMPTED;
     }
 
     struct local_sockets_ns_req req = {
@@ -1769,7 +1775,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         if(ls->config.report)
             __atomic_add_fetch(&ls->stats.namespaces_forks_failed, 1, __ATOMIC_RELAXED);
 
-        return false;
+        return LOCAL_SOCKETS_NAMESPACE_COLLECTION_ATTEMPTED;
     }
 
     size_t received = 0;
@@ -1828,7 +1834,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
     if(ls->config.report && received == 0)
         __atomic_add_fetch(&ls->stats.namespaces_forks_unresponsive, 1, __ATOMIC_RELAXED);
 
-    return received > 0;
+    return LOCAL_SOCKETS_NAMESPACE_COLLECTION_ATTEMPTED;
 }
 
 struct local_sockets_namespace_worker {
@@ -1853,10 +1859,12 @@ static inline void local_sockets_get_namespace_sockets_worker(void *arg) {
         // now we have a pid that has the same namespace inode
 
         spinlock_unlock(&ls->spinlock);
-        const bool worked = local_sockets_get_namespace_sockets_with_pid(ls, ps);
+        LOCAL_SOCKETS_NAMESPACE_CANDIDATE_RESULT result =
+            local_sockets_get_namespace_sockets_with_pid(ls, ps);
         spinlock_lock(&ls->spinlock);
 
-        if(worked)
+        // The open FD pins the namespace, so another socket record cannot improve this scan.
+        if(result == LOCAL_SOCKETS_NAMESPACE_COLLECTION_ATTEMPTED)
             break;
     }
 

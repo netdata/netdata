@@ -3,163 +3,143 @@
 package snmptopology
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+	"sync"
+	"sync/atomic"
 
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 )
 
-const topologyDiagnosticArchiveFailureLogKey = "snmp_topology:diagnostic-archive"
-
-func topologyDiagnosticArchivePath(varLibDir string) string {
-	return filepath.Join(varLibDir, "snmp-topology", "diagnostics", "netdata-snmp-topology-diagnostics.zst")
+type topologyDiagnosticProvider struct {
+	registry *topologyRegistry
+	aborted  *atomic.Pointer[topologydiag.AbortedSweep]
+	source   deviceLifecycleSource
+	mu       sync.Mutex
+	sequence uint64
+	history  []*topologyCheckpoint
 }
 
-func defaultTopologyDiagnosticArchivePath() string {
-	varLibDir := strings.TrimSpace(pluginconfig.VarLibDir())
-	if varLibDir == "" {
-		varLibDir = strings.TrimSpace(buildinfo.VarLibDir)
-	}
-	if varLibDir == "" {
-		varLibDir = buildinfo.DefaultVarLibDir
-	}
-	return topologyDiagnosticArchivePath(filepath.Clean(varLibDir))
+type topologyCheckpoint struct {
+	id  uint64
+	cut topologydiag.Cut
 }
 
-func publishTopologyDiagnosticArchiveFile(path string, diagnostics topologyDiagnostics) error {
-	return writeTopologyDiagnosticArchiveFile(path, diagnostics, replaceTopologyDiagnosticArchiveFile)
+func (c *topologyCheckpoint) ID() uint64 { return c.id }
+func (c *topologyCheckpoint) Capture() (snmpdiag.Snapshot, error) {
+	return topologydiag.NewSnapshot(c.cut)
 }
 
-func writeTopologyDiagnosticArchiveFile(
-	path string,
-	diagnostics topologyDiagnostics,
-	replace func(string, string) error,
-) error {
-	return writeTopologyDiagnosticArchiveFileWithClose(path, diagnostics, (*os.File).Close, replace)
+func (p *topologyDiagnosticProvider) Checkpoints() []snmpdiag.Checkpoint {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	result := make([]snmpdiag.Checkpoint, len(p.history))
+	for i, checkpoint := range p.history {
+		result[i] = checkpoint
+	}
+	return result
 }
 
-func writeTopologyDiagnosticArchiveFileWithClose(
-	path string,
-	diagnostics topologyDiagnostics,
-	closeFile func(*os.File) error,
-	replace func(string, string) error,
-) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create SNMP topology diagnostic archive directory: %w", err)
-	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("set SNMP topology diagnostic archive directory permissions: %w", err)
-	}
-
-	tempPath := path + ".tmp"
-	if err := os.Remove(tempPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove stale SNMP topology diagnostic archive temporary file: %w", err)
-	}
-
-	file, err := os.OpenFile(tempPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("create temporary SNMP topology diagnostic archive: %w", err)
-	}
-	keepTemp := true
-	defer func() {
-		if keepTemp {
-			_ = os.Remove(tempPath)
-		}
-	}()
-
-	if err := file.Chmod(0o600); err != nil {
-		_ = closeFile(file)
-		return fmt.Errorf("set temporary SNMP topology diagnostic archive permissions: %w", err)
-	}
-	if err := writeTopologyDiagnosticArchive(file, diagnostics); err != nil {
-		_ = closeFile(file)
-		return fmt.Errorf("write temporary SNMP topology diagnostic archive: %w", err)
-	}
-	if err := closeFile(file); err != nil {
-		return fmt.Errorf("close temporary SNMP topology diagnostic archive: %w", err)
-	}
-	if err := replace(tempPath, path); err != nil {
-		return fmt.Errorf("replace SNMP topology diagnostic archive: %w", err)
-	}
-	keepTemp = false
-	return nil
-}
-
-func replaceTopologyDiagnosticArchiveFile(from, to string) error {
-	return os.Rename(from, to)
-}
-
-func runTopologyDiagnosticArchivePublisher(
-	ctx context.Context,
-	ticks <-chan time.Time,
-	refreshes <-chan struct{},
-	publish func(requireMeaningful bool) bool,
-) {
-	if ctx.Err() != nil {
+func (c *Collector) recordDiagnosticCheckpoint() {
+	if c.diagnosticProvider == nil {
 		return
 	}
-	if publish(false) {
-		refreshes = nil
+	p := c.diagnosticProvider
+	cut := captureTopologyCut(p.registry, p.aborted.Load())
+	p.mu.Lock()
+	if cut.Topology == nil && cut.LastAborted == nil ||
+		len(p.history) > 0 && sameTopologyCheckpoint(p.history[len(p.history)-1].cut, cut) {
+		p.mu.Unlock()
+		return
 	}
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-refreshes:
-			if ctx.Err() != nil {
-				return
-			}
-			if publish(true) {
-				refreshes = nil
-			}
-		case <-ticks:
-			if ctx.Err() != nil {
-				return
-			}
-			if publish(false) {
-				refreshes = nil
-			}
-		}
+	cut.Lifecycle = captureCheckpointLifecycle(p.source)
+	p.sequence++
+	if len(p.history) == snmpdiag.CheckpointRetention {
+		copy(p.history, p.history[1:])
+		p.history = p.history[:len(p.history)-1]
+	}
+	p.history = append(p.history, &topologyCheckpoint{id: p.sequence, cut: cut})
+	p.mu.Unlock()
+	if c.diagnosticPublisher != nil {
+		c.diagnosticPublisher.TopologyUpdated(p)
 	}
 }
 
-func (c *Collector) diagnosticArchiveEvery() time.Duration {
-	return max(c.deviceCheckEvery(), c.refreshEvery())
-}
-
-func (c *Collector) runTopologyDiagnosticArchivePublisher(ctx context.Context, refreshes <-chan struct{}) {
-	ticker := time.NewTicker(c.diagnosticArchiveEvery())
-	defer ticker.Stop()
-	runTopologyDiagnosticArchivePublisher(ctx, ticker.C, refreshes, c.publishTopologyDiagnosticArchiveRecovering)
-}
-
-func (c *Collector) publishTopologyDiagnosticArchiveRecovering(requireMeaningful bool) (meaningful bool) {
+func captureCheckpointLifecycle(source deviceLifecycleSource) (result topologydiag.LifecycleCut) {
+	result = topologydiag.LifecycleCut{State: topologydiag.CaptureUnavailable, Reason: topologydiag.CaptureReasonProjectionError}
 	defer func() {
-		if recovered := recover(); recovered != nil {
-			meaningful = false
-			c.Limit(topologyDiagnosticArchiveFailureLogKey, 1, topologyRefreshWarningEvery).
-				Warningf("failed to publish SNMP topology diagnostic archive: panic: %v", recovered)
+		if recover() != nil {
+			result = topologydiag.LifecycleCut{State: topologydiag.CaptureUnavailable, Reason: topologydiag.CaptureReasonProjectionPanic}
 		}
 	}()
-	if c.publishDiagnosticArchiveFile == nil {
+	if source != nil {
+		result = topologydiag.LifecycleCut{State: topologydiag.CaptureAvailable, Cut: source.LifecycleCut()}
+	}
+	return result
+}
+
+// Compare only the fixed-size state and immutable evidence identities. Sweep
+// clocks, selection bookkeeping and prior removal annotations are not new evidence.
+func sameTopologyCheckpoint(a, b topologydiag.Cut) bool {
+	if a.ProducerScopeID != b.ProducerScopeID || a.LastAborted != b.LastAborted {
 		return false
 	}
-	diagnostics := c.acquireTopologyDiagnostics()
-	meaningful = len(diagnostics.lifecycle.cut.Entries) > 0
-	if requireMeaningful && !meaningful {
+	if a.Topology == nil || b.Topology == nil {
+		return a.Topology == b.Topology
+	}
+	x, y := a.Topology, b.Topology
+	if x.CaptureState != y.CaptureState || x.CaptureReason != y.CaptureReason || len(x.Devices) != len(y.Devices) {
 		return false
 	}
-	if err := c.publishDiagnosticArchiveFile(c.diagnosticArchivePath, diagnostics); err != nil {
-		c.Limit(topologyDiagnosticArchiveFailureLogKey, 1, topologyRefreshWarningEvery).
-			Warningf("failed to publish SNMP topology diagnostic archive: %v", err)
-		return false
+	for i, left := range x.Devices {
+		right := y.Devices[i]
+		left.Selected, right.Selected = false, false
+		if left != right {
+			return false
+		}
 	}
-	return meaningful
+	return true
+}
+
+type topologyJobConfigLifecycle struct{ publisher *snmpdiag.Publisher }
+
+type topologyConfigSnapshot struct {
+	id collectorapi.JobConfigIdentity
+}
+
+func (s topologyConfigSnapshot) Identity() collectorapi.JobConfigIdentity { return s.id }
+
+func (*topologyJobConfigLifecycle) Project(id collectorapi.JobConfigIdentity, _ map[string]any) collectorapi.JobConfigLifecycleSnapshot {
+	return topologyConfigSnapshot{id}
+}
+
+func (*topologyJobConfigLifecycle) Bind(collectorapi.JobConfigIdentity, collectorapi.RuntimeJob) {}
+
+func (*topologyJobConfigLifecycle) Capture(id collectorapi.JobConfigIdentity, _ collectorapi.RuntimeJob) collectorapi.JobConfigLifecycleSnapshot {
+	return topologyConfigSnapshot{id}
+}
+
+func (h *topologyJobConfigLifecycle) Reconcile(_ collectorapi.JobConfigIdentity, snapshot collectorapi.JobConfigLifecycleSnapshot, job collectorapi.RuntimeJob) {
+	if h.publisher == nil {
+		return
+	}
+	if job != nil {
+		if c, ok := job.Collector().(*Collector); ok {
+			h.publisher.SetTopology(snapshot.Identity().String(), c.diagnosticProvider)
+			return
+		}
+	}
+	h.publisher.SetTopology(snapshot.Identity().String(), nil)
+}
+
+func (h *topologyJobConfigLifecycle) Remove(id collectorapi.JobConfigIdentity) {
+	if h.publisher != nil {
+		h.publisher.RemoveTopology(id.String())
+	}
+}
+
+func (c *Collector) releaseDiagnosticProvider() {
+	if c.diagnosticPublisher != nil {
+		c.diagnosticPublisher.ReleaseTopology(c.diagnosticProvider)
+	}
 }

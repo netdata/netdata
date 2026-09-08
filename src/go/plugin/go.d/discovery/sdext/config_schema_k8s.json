@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "k8s": {
             "title": "Kubernetes",
+            "description": "Kubernetes discovery sources. Each entry selects a role (pod or service) and its namespace scope.",
             "type": "array",
             "minItems": 1,
             "items": {
@@ -77,7 +79,7 @@
       },
       "services": {
         "title": "Service rules",
-        "description": "- Match discovered Kubernetes resources and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a pod or service matches, a data collection job is created.",
+        "description": "Rules that turn discovered Kubernetes pods and services into data collection jobs.",
         "type": "array",
         "minItems": 1,
         "items": {
@@ -112,9 +114,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -164,7 +163,8 @@
           "ui:widget": "textarea",
           "ui:placeholder": "module: nginx\nname: {{.Namespace}}-{{.Name}}\nurl: http://{{.Address}}/stub_status"
         }
-      }
+      },
+      "ui:help": "- Match discovered Kubernetes resources and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a pod or service matches, a data collection job is created."
     }
   }
 }

@@ -104,7 +104,7 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 			si.Location = valueSanitizer.Replace(si.Location)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("OID %q: %w", pdu.Name, err)
+			return nil, WithFailure(fmt.Errorf("OID %q: %w", pdu.Name, err), "system_identity", "processing")
 		}
 	}
 
@@ -126,7 +126,11 @@ func sysInfoOIDs() []string {
 func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
 	maxOids := client.MaxOids()
 	if maxOids < 1 {
-		return nil, fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids)
+		return nil, WithFailure(
+			fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids),
+			"get",
+			"invalid_configuration",
+		)
 	}
 	version := client.Version()
 
@@ -146,10 +150,10 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids
 	for len(oids) > 0 {
 		packet, err := client.Get(oids)
 		if err != nil {
-			return nil, fmt.Errorf("get SNMP system scalars: %w", err)
+			return nil, WithFailure(fmt.Errorf("get SNMP system scalars: %w", err), "get", "")
 		}
 		if packet == nil {
-			return nil, fmt.Errorf("get SNMP system scalars: nil response")
+			return nil, WithFailure(fmt.Errorf("get SNMP system scalars: nil response"), "get", "nil_response")
 		}
 
 		switch packet.Error {
@@ -157,21 +161,21 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids
 			return packet.Variables, nil
 		case gosnmp.NoSuchName:
 			if version != gosnmp.Version1 {
-				return nil, fmt.Errorf(
+				return nil, WithPacketFailure(fmt.Errorf(
 					"get SNMP system scalars: unexpected response error %s for requested SNMP version %s (index %d)",
 					packet.Error,
 					version,
 					packet.ErrorIndex,
-				)
+				), "get", packet)
 			}
 			idx := int(packet.ErrorIndex)
 			if idx < 1 || idx > len(oids) {
-				return nil, fmt.Errorf(
+				return nil, WithPacketFailure(fmt.Errorf(
 					"get SNMP system scalars: response error %s with invalid error index %d for %d requested OIDs",
 					packet.Error,
 					packet.ErrorIndex,
 					len(oids),
-				)
+				), "get", packet)
 			}
 
 			next := make([]string, 0, len(oids)-1)
@@ -179,11 +183,11 @@ func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids
 			next = append(next, oids[idx:]...)
 			oids = next
 		default:
-			return nil, fmt.Errorf(
+			return nil, WithPacketFailure(fmt.Errorf(
 				"get SNMP system scalars: response error %s (index %d)",
 				packet.Error,
 				packet.ErrorIndex,
-			)
+			), "get", packet)
 		}
 	}
 
@@ -335,7 +339,16 @@ func enterpriseNumbersFileCandidates() []string {
 		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt"),
 	}
 	if _, file, _, ok := runtime.Caller(0); ok {
-		sourceCandidate := filepath.Join(filepath.Dir(file), "..", "..", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
+		sourceCandidate := filepath.Join(
+			filepath.Dir(file),
+			"..",
+			"..",
+			"config",
+			"go.d",
+			"snmp.profiles",
+			"metadata",
+			"iana-enterprise-numbers.txt",
+		)
 		candidates = append([]string{sourceCandidate}, candidates...)
 	}
 	return candidates

@@ -79,10 +79,12 @@
           "properties": {
             "name": {
               "title": "Name",
+              "description": "Device path, for example `/dev/sdc`.",
               "type": "string"
             },
             "type": {
               "title": "Type",
+              "description": "Device type passed to smartctl as `-d`, for example `sat` or `jmb39x-q,3`.",
               "type": "string"
             }
           }
@@ -91,9 +93,6 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [

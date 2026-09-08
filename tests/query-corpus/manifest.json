@@ -1152,5 +1152,89 @@
   {
     "name": "L8/cardinality-limit",
     "proves": "cardinality limiting keeps the top N-1 dimensions by absolute view sum and folds every remaining per-row value into one named remainder column"
+  },
+  {
+    "name": "W/limit-aliases",
+    "proves": "weights limit and cardinality_limit select the strongest physical dimensions with explicit cardinality_limit precedence"
+  },
+  {
+    "name": "W/limit-boundaries",
+    "proves": "weights omitted and zero caps preserve unlimited shape while exact and above-population caps report no truncation"
+  },
+  {
+    "name": "W/limit-invalid",
+    "proves": "weights HTTP endpoints reject malformed or overflowing supplied limits"
+  },
+  {
+    "name": "W/limit-ranking",
+    "proves": "limited weights retain the strongest entries and their complete-population raw or normalized score vectors; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled",
+    "components": [
+      "value/raw",
+      "value/null2zero",
+      "value/raw|anomaly-bit",
+      "value/null2zero|anomaly-bit",
+      "volume/raw",
+      "volume/null2zero",
+      "volume/raw|anomaly-bit",
+      "volume/null2zero|anomaly-bit",
+      "ks2/raw",
+      "ks2/null2zero",
+      "ks2/raw|anomaly-bit",
+      "ks2/null2zero|anomaly-bit",
+      "anomaly-rate/raw",
+      "anomaly-rate/null2zero",
+      "anomaly-rate/raw|anomaly-bit",
+      "anomaly-rate/null2zero|anomaly-bit"
+    ]
+  },
+  {
+    "name": "W/limit-summaries",
+    "proves": "limited weights preserve complete-query parent summary vectors and full correlated and examined counts; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled",
+    "components": [
+      "value/raw",
+      "value/null2zero",
+      "value/raw|anomaly-bit",
+      "value/null2zero|anomaly-bit",
+      "volume/raw",
+      "volume/null2zero",
+      "volume/raw|anomaly-bit",
+      "volume/null2zero|anomaly-bit",
+      "ks2/raw",
+      "ks2/null2zero",
+      "ks2/raw|anomaly-bit",
+      "ks2/null2zero|anomaly-bit",
+      "anomaly-rate/raw",
+      "anomaly-rate/null2zero",
+      "anomaly-rate/raw|anomaly-bit",
+      "anomaly-rate/null2zero|anomaly-bit"
+    ]
+  },
+  {
+    "name": "W/limit-legacy",
+    "proves": "legacy weights and metric_correlations formats honor result limits without changing full population counts"
+  },
+  {
+    "name": "W/limit-grouped",
+    "proves": "weights group limits select complete final group objects by the requested aggregate without changing their vectors"
+  },
+  {
+    "name": "W/limit-complete-groups",
+    "proves": "weights limits rank multi-dimension groups by the requested raw or normalized aggregate after complete aggregation"
+  },
+  {
+    "name": "W/limit-thousand",
+    "proves": "a weights cap of 1000 retains exactly the strongest 1000 of 1005 physical metrics while preserving complete parent means"
+  },
+  {
+    "name": "W/limit-hierarchy",
+    "proves": "weights limiting preserves complete shared ancestors and emits only dictionaries and ancestor rows reachable from retained metrics"
+  },
+  {
+    "name": "W/limit-node-ties",
+    "proves": "equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics"
+  },
+  {
+    "name": "W/limit-mcp",
+    "proves": "MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully"
   }
 ]

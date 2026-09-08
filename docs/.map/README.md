@@ -2,6 +2,9 @@
 
 Publishing documentation to [Learn](https://github.com/netdata/learn) involves a few key steps. Follow this guide carefully to avoid broken links or failed builds.
 
+Place in the documentation set: the runtime skill `.agents/skills/docs-learn-site-structure` cites sections of this
+file by heading anchor, so renaming or removing a heading here fails `.agents/sow/audit.sh` until that skill is updated.
+
 :warning: **Before You Begin**
 
 - If you plan to unpublish a file, see [Unpublishing Files](#unpublishing-files) first. It requires extra steps.

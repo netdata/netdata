@@ -215,12 +215,14 @@ jobs:
 
 ## Troubleshooting
 
-### Find the exact error
+### Other Problems
+
+#### Find the exact error
 
 Check the Netdata Agent logs when the collector starts or restarts. AWS resolver errors include messages such as `AWS_ACCESS_KEY_ID is not set`, `parsing SecretString as JSON`, or `key 'password' not found in SecretString JSON`.
 
 
-### AWS credentials are not found
+#### AWS credentials are not found
 
 Check the selected `auth_mode`.
 
@@ -229,7 +231,7 @@ Check the selected `auth_mode`.
 - For `imds`, make sure the EC2 instance profile is attached and IMDSv2 is reachable.
 
 
-### The Dynamic Configuration Test fails
+#### The Dynamic Configuration Test fails
 
 The Test action exercises only the configured credential source. It does not call AWS Secrets Manager or test a secret path.
 
@@ -240,11 +242,11 @@ The Test action exercises only the configured credential source. It does not cal
 A successful Test does not prove that AWS accepts the returned credentials or that they have permission to access a particular secret. Check the configured region, `secretsmanager:GetSecretValue`, and any required `kms:Decrypt` permission separately.
 
 
-### Access denied or wrong region
+#### Access denied or wrong region
 
 Confirm the configured `region` and make sure the AWS identity used by Netdata can read the referenced secret in that region.
 
 
-### JSON key lookup fails
+#### JSON key lookup fails
 
 If you use `secret-name#key`, the secret must be stored as a JSON `SecretString`, and the requested key must exist as a top-level field in that JSON object.

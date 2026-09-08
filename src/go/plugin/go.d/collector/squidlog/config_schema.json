@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Squid log collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -50,6 +51,7 @@
               },
               "csv_config": {
                 "title": "CSV parser configuration",
+                "description": "Settings of the CSV log parser, used when the log type is `csv`.",
                 "type": [
                   "object",
                   "null"
@@ -85,6 +87,7 @@
               },
               "regexp_config": {
                 "title": "Regular expression parser configuration",
+                "description": "Settings of the regular expression log parser, used when the log type is `regexp`.",
                 "type": [
                   "object",
                   "null"
@@ -113,6 +116,7 @@
               },
               "json_config": {
                 "title": "JSON parser configuration",
+                "description": "Settings of the JSON log parser, used when the log type is `json`.",
                 "type": [
                   "object",
                   "null"
@@ -140,6 +144,7 @@
               },
               "ltsv_config": {
                 "title": "LTSV parser configuration",
+                "description": "Settings of the LTSV log parser, used when the log type is `ltsv`.",
                 "type": [
                   "object",
                   "null"
@@ -177,9 +182,6 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "log_type": {
       "ui:widget": "radio",
       "ui:options": {

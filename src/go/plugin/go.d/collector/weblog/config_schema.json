@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Web server log collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -109,7 +110,7 @@
             },
             "patterns": {
               "title": "Patterns",
-              "description": "",
+              "description": "Patterns matched against the field value, in order. Each pattern becomes its own dimension and the first match wins.",
               "type": [
                 "array",
                 "null"
@@ -270,6 +271,7 @@
               },
               "csv_config": {
                 "title": "CSV parser configuration",
+                "description": "Settings of the CSV log parser, used when the log type is `csv`.",
                 "type": [
                   "object",
                   "null"
@@ -317,6 +319,7 @@
               },
               "regexp_config": {
                 "title": "Regular expression parser configuration",
+                "description": "Settings of the regular expression log parser, used when the log type is `regexp`.",
                 "type": [
                   "object",
                   "null"
@@ -345,6 +348,7 @@
               },
               "json_config": {
                 "title": "JSON parser configuration",
+                "description": "Settings of the JSON log parser, used when the log type is `json`.",
                 "type": [
                   "object",
                   "null"
@@ -372,6 +376,7 @@
               },
               "ltsv_config": {
                 "title": "LTSV parser configuration",
+                "description": "Settings of the LTSV log parser, used when the log type is `ltsv`.",
                 "type": [
                   "object",
                   "null"
@@ -409,14 +414,8 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "group_response_codes": {
       "ui:help": "When true, creates separate charts for each response code family (1xx, 2xx, 3xx, etc.), with individual response codes (200, 201, etc.) as dimensions within each family. When false, creates a single chart with all response codes as separate dimensions."
-    },
-    "fields_per_record": {
-      "ui:help": "If negative, no check is made and records may have a variable number of fields."
     },
     "log_type": {
       "ui:widget": "radio",
@@ -468,6 +467,11 @@
           ]
         }
       ]
+    },
+    "csv_config": {
+      "fields_per_record": {
+        "ui:help": "If negative, no check is made and records may have a variable number of fields."
+      }
     }
   }
 }
