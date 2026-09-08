@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -596,14 +597,23 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 	assert.Equal(t, 2, metadataCalls, "initial vnode acquisition must not seed metric preparation caches")
 	entries := deviceStore.Entries()
 	require.Len(t, entries, 1)
-	assert.Equal(t, "profile-vendor", entries[0].Info.VnodeLabels["vendor"])
-	assert.Equal(t, "operator-model", entries[0].Info.VnodeLabels["model"])
-	assert.Equal(t, "5", entries[0].Info.VnodeLabels["_node_stale_after_seconds"])
-	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
-	assert.Equal(t, "operator-model", entries[0].Info.Model)
-	assert.Equal(t, "unifi-ap", collr.Vnode.Hostname)
-	assert.NotEmpty(t, collr.Vnode.GUID)
-	assert.Equal(t, map[string]string{"model": "operator-model"}, collr.Vnode.Labels)
+	wantInfo := ddsnmp.DeviceConnectionInfo{
+		Hostname: "192.0.2.1", Port: 161, SNMPVersion: "2c", Community: "public",
+		MaxOIDs: 20, Timeout: 5, Retries: 1,
+		SysObjectID: sysObjectID, SysName: "unifi-ap", Vendor: "profile-vendor", Model: "operator-model",
+		VnodeGUID: "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121", VnodeHostname: "unifi-ap",
+		VnodeLabels: map[string]string{
+			"_vnode_type": "snmp", "_net_default_iface_ip": "192.0.2.1", "address": "192.0.2.1",
+			"sys_object_id": sysObjectID, "name": "unifi-ap", "description": "", "contact": "", "location": "",
+			"vendor": "profile-vendor", "model": "operator-model", "type": "Access Point", "_node_stale_after_seconds": "5",
+		},
+	}
+	assert.Equal(t, wantInfo, entries[0].Info)
+	wantConfigVnode := vnodes.VirtualNode{
+		GUID: "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121", Hostname: "unifi-ap",
+		Labels: map[string]string{"model": "operator-model"},
+	}
+	assert.Equal(t, wantConfigVnode, collr.Vnode)
 
 	collr.Collect(context.Background())
 	assert.Equal(t, 2, metadataCalls, "subsequent collections reuse preparation caches")
