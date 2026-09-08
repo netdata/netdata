@@ -555,34 +555,58 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 	assert.Zero(t, mockCollector.metadataCalls)
 }
 
-func TestCollector_SetupVnodeAndRegisterDeviceStateShareResolvedMetadata(t *testing.T) {
+func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
+	const sysObjectID = "1.3.6.1.4.1.41112"
+	const metadataOID = "1.3.6.1.4.1.41112.999.0"
+	handler := snmpmock.NewMockHandler(gomock.NewController(t))
+	handler.EXPECT().MaxOids().Return(20).AnyTimes()
+	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+	handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: sysObjectID},
+		{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("unifi-ap")},
+	}}, nil).Times(1)
+	metadataCalls := 0
+	handler.EXPECT().Get([]string{metadataOID}).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
+		metadataCalls++
+		return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+			{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("profile-vendor")},
+		}}, nil
+	}).Times(2)
+
 	deviceStore := ddsnmp.NewDeviceStore()
 	collr := New(deviceStore)
 	collr.Config = prepareV2Config()
-	collr.Vnode.Labels = map[string]string{
-		"model": "operator-model",
-	}
+	collr.CreateVnode = true
+	collr.VnodeDeviceDownThreshold = 3
+	collr.Vnode.Labels = map[string]string{"model": "operator-model"}
+	collr.snmpClient = handler
+	collr.snmpProfiles = []*ddsnmp.Profile{{SourceFile: "identity.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+		Selector: ddprofiledefinition.SelectorSpec{{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{Include: []string{sysObjectID}}}},
+		Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: map[string]ddprofiledefinition.MetadataField{
+			"vendor": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "vendor"}},
+			"model":  {Value: "profile-model"},
+		}}},
+	}}}
 
-	si := &snmputils.SysInfo{
-		SysObjectID: "1.3.6.1.4.1.41112",
-		Name:        "unifi-ap",
-		Vendor:      "static-vendor",
-		Model:       "static-model",
-	}
-	profileMetadata := map[string]ddsnmp.MetaTag{
-		"vendor": {Value: "profile-vendor", IsExactMatch: true},
-		"model":  {Value: "profile-model", IsExactMatch: true},
-	}
-
-	collr.vnode = collr.setupVnode(si, profileMetadata)
-	collr.registerDeviceState(si, nil)
-
+	require.NoError(t, collr.Check(context.Background()))
+	assert.Zero(t, metadataCalls, "Check only probes system identity and selects profiles")
+	assert.Nil(t, collr.vnode)
+	collr.Collect(context.Background())
+	require.True(t, collr.initialized)
+	assert.Equal(t, 2, metadataCalls, "initial vnode acquisition must not seed metric preparation caches")
 	entries := deviceStore.Entries()
 	require.Len(t, entries, 1)
 	assert.Equal(t, "profile-vendor", entries[0].Info.VnodeLabels["vendor"])
 	assert.Equal(t, "operator-model", entries[0].Info.VnodeLabels["model"])
+	assert.Equal(t, "5", entries[0].Info.VnodeLabels["_node_stale_after_seconds"])
 	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
 	assert.Equal(t, "operator-model", entries[0].Info.Model)
+	assert.Equal(t, "unifi-ap", collr.Vnode.Hostname)
+	assert.NotEmpty(t, collr.Vnode.GUID)
+	assert.Equal(t, map[string]string{"model": "operator-model"}, collr.Vnode.Labels)
+
+	collr.Collect(context.Background())
+	assert.Equal(t, 2, metadataCalls, "subsequent collections reuse preparation caches")
 }
 
 func TestCollector_Check(t *testing.T) {
