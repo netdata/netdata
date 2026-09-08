@@ -267,6 +267,7 @@ func (j *JobV2) CleanupRejected() {
 }
 
 func (j *JobV2) cleanup(emit bool) {
+	defer func() { j.releaseAllScopeOwners(); j.clearAllScopeStateAfterCleanup() }()
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
@@ -274,8 +275,6 @@ func (j *JobV2) cleanup(emit bool) {
 		j.module.Cleanup(context.Background())
 	}
 	if !emit || !collectorapi.ShouldObsoleteCharts() {
-		j.releaseAllScopeOwners()
-		j.clearAllScopeStateAfterCleanup()
 		return
 	}
 
@@ -313,8 +312,6 @@ func (j *JobV2) cleanup(emit bool) {
 		}
 		j.buf.Reset()
 	}
-	j.releaseAllScopeOwners()
-	j.clearAllScopeStateAfterCleanup()
 }
 
 // AutoDetectionManaged leaves failure cleanup with the Job Manager factory.
@@ -788,13 +785,7 @@ func (j *JobV2) commitScopeEmission(prepared *jobV2PreparedScopeEmission) {
 	}
 	state := prepared.scope
 	decision := prepared.decision
-	if len(prepared.plan.Actions) > 0 || decision.needEngineReload {
-		if state.host.owner != decision.owner {
-			state.host.owner.Release()
-		}
-		state.host.owner = decision.owner
-		state.host.ownerGUID = decision.targetHost.guid
-	}
+
 	state.host.commitSuccessfulEmission(prepared.plan, decision)
 	if !prepared.live && len(state.host.cleanupCharts) == 0 {
 		state.host.owner.Release()
@@ -846,10 +837,14 @@ func (j *JobV2) prepareScopeVnodeEmission(
 	}
 	if state.scopeKey == defaultHostScopeKey {
 		vnode := j.currentVnode()
+		labels := vnode.Labels
+		if vnode.StaleAfter != nil {
+			labels = vnode.HostLabels()
+		}
 		return j.prepareVnodeEmission(state, decision, netdataapi.HostInfo{
 			GUID:     vnode.GUID,
 			Hostname: vnode.Hostname,
-			Labels:   vnode.HostLabels(),
+			Labels:   labels,
 		})
 	}
 	return j.prepareVnodeEmission(state, decision, metrixHostScopeInfo(state.scope))

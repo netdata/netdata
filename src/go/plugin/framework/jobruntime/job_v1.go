@@ -291,27 +291,27 @@ func (j *Job) autoDetection(ctx context.Context) (err error) {
 	return nil
 }
 
-func (j *Job) refreshVnodeSnapshot() bool {
+func (j *Job) refreshVnodeSnapshot() {
 	if j.vnodeName == "" || j.vnodeLookup == nil {
-		return false
+		return
 	}
 	snapshot, ok := j.vnodeLookup(j.vnodeName)
 	if !ok {
-		return false
+		return
 	}
-	return j.applyVnodeSnapshot(snapshot)
+	j.applyVnodeSnapshot(snapshot)
 }
 
-func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
+func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	if snapshot.Vnode == nil {
-		return false
+		return
 	}
 	if snapshot.Revision != 0 {
 		j.vnodeMu.Lock()
 		stale := snapshot.Revision <= j.vnodeRevision
 		j.vnodeMu.Unlock()
 		if stale {
-			return false
+			return
 		}
 	}
 	next := snapshot.Vnode.Copy()
@@ -320,13 +320,9 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	defer j.vnodeMu.Unlock()
 
 	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
-		return false
+		return
 	}
-	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
-	createChart := false
-	if metadataChanged {
-		createChart = j.vnode.GUID != next.GUID
-	}
+
 	j.vnode = *next
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
@@ -334,7 +330,6 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
-	return createChart
 }
 
 // Tick Tick.
@@ -432,7 +427,7 @@ func (j *Job) Cleanup() {
 		for _, chart := range *j.charts {
 			if chart.IsCreated() {
 				if !selected {
-					j.api.HOST(j.vnode.GUID)
+					j.api.HOST(j.hostGUID)
 					selected = true
 				}
 				chart.MarkRemove()
@@ -516,14 +511,14 @@ func (j *Job) runOnce() {
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
 	j.prevRun = curTime
 
-	createChart := j.refreshVnodeSnapshot()
+	j.refreshVnodeSnapshot()
 	metrics := j.collect()
 
 	if j.panicked.Load() {
 		return
 	}
 
-	if j.processMetrics(metrics, curTime, sinceLastRun, createChart) {
+	if j.processMetrics(metrics, curTime, sinceLastRun) {
 		j.retries.Store(0)
 	} else {
 		j.retries.Add(1)
@@ -559,7 +554,7 @@ func (j *Job) collect() collectedMetrics {
 	return mx
 }
 
-func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int, createChart bool) bool {
+func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int) bool {
 
 	if j.vnodeName == "" && j.vnode.GUID == "" {
 		if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
@@ -568,6 +563,7 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 			j.vnodeMu.Unlock()
 		}
 	}
+	createChart := j.hostGUID != j.vnode.GUID
 	if err := j.prepareHostDefinition(); err != nil {
 		j.Warningf("prepare vnode host info failed: %v", err)
 		return false
@@ -646,29 +642,40 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 }
 
 func (j *Job) prepareHostDefinition() error {
-	if j.hostGUID != j.vnode.GUID {
+	owner := j.hostOwner
+	var definition *hostoutput.Definition
+	if j.vnode.GUID != "" {
+		if owner == nil || j.hostGUID != j.vnode.GUID {
+			owner = j.publication.NewOwner(j.vnode.GUID)
+		}
+		labels := j.vnode.Labels
+		if j.vnode.StaleAfter != nil {
+			labels = j.vnode.HostLabels()
+		}
+		var err error
+		definition, err = owner.Prepare(
+			netdataapi.HostInfo{
+				GUID:     j.vnode.GUID,
+				Hostname: j.vnode.Hostname,
+				Labels:   labels,
+			},
+		)
+		if err != nil {
+			if owner != j.hostOwner {
+				owner.Release()
+			}
+			return err
+		}
+	} else {
+		owner = nil
+	}
+	if owner != j.hostOwner {
 		j.hostOwner.Release()
-		j.hostOwner = nil
-		j.hostDefinition = nil
-		j.hostGUID = j.vnode.GUID
 	}
-	if j.vnode.GUID == "" {
-		return nil
-	}
-	if j.hostOwner == nil {
-		j.hostOwner = j.publication.NewOwner(j.vnode.GUID)
-	}
-	definition, err := j.hostOwner.Prepare(
-		netdataapi.HostInfo{
-			GUID:     j.vnode.GUID,
-			Hostname: j.vnode.Hostname,
-			Labels:   j.vnode.HostLabels(),
-		},
-	)
-	if err == nil {
-		j.hostDefinition = definition
-	}
-	return err
+	j.hostOwner = owner
+	j.hostGUID = j.vnode.GUID
+	j.hostDefinition = definition
+	return nil
 }
 
 func (j *Job) createChart(chart *collectorapi.Chart) {

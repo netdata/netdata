@@ -102,6 +102,11 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 		}
 		return
 	}
+	if s.owner != decision.owner {
+		s.owner.Release()
+	}
+	s.owner = decision.owner
+	s.ownerGUID = decision.targetHost.guid
 	s.engineHost = decision.targetHost
 	s.cleanupDefinition = decision.definition
 	if s.cleanupCharts == nil {

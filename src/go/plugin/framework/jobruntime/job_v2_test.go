@@ -2706,6 +2706,7 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 		Name:     "db",
 		Hostname: "node-host-a",
 		GUID:     "node-guid-a",
+		Labels:   map[string]string{"_node_stale_after_seconds": "300"},
 	}
 	job := newTestJobV2WithVnode(mod, &out, initial)
 	currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
@@ -2786,6 +2787,10 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 		},
 		requireDefaultScopeState(t, job).host.cleanupOwner,
 	)
+
+	job.Cleanup()
+	assert.Empty(t, out.String())
+	assert.Zero(t, job.publication.Len())
 }
 
 func TestJobV2CleanupDoesNotSuppressGlobalCleanupForDifferentStaleVnode(t *testing.T) {

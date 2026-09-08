@@ -111,7 +111,7 @@ Each virtual node is defined in a YAML file:
 |------------|----------|-------------------------------------------------|
 | `hostname` | Yes      | Display name shown in dashboards and Cloud      |
 | `guid`     | Yes      | UUID that uniquely identifies this virtual node |
-| `name`     | No       | Internal reference name                         |
+| `name`     | No       | Ignored for YAML definitions; `hostname` supplies the reference name |
 | `labels`   | No       | Key-value pairs for filtering and organization  |
 | `stale_after` | No | Host inactivity timeout as whole seconds or a duration such as `5m`. Zero disables the timeout. |
 
@@ -180,7 +180,7 @@ jobs:
     url: http://203.0.113.10:9182/metrics
 ```
 
-The `vnode` value must exactly match the vnode reference name. For YAML definitions, an omitted `name` defaults to `hostname`; for GUI definitions, use the name assigned when creating the vnode. If that name is not registered, the job fails to start.
+The `vnode` value must exactly match the vnode reference name. For YAML definitions, the reference name is always `hostname` and any explicit `name` is ignored; for GUI definitions, use the name assigned when creating the vnode. If that name is not registered, the job fails to start.
 
 Several jobs can reference the same vnode. Its configured hostname and host labels govern output to its GUID within that plugin process, including collector-generated scopes using the same GUID. Job labels remain chart labels. Removing an unreferenced configured vnode lets generated contributors resume using their own host metadata.
 

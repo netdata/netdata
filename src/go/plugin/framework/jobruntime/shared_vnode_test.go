@@ -277,3 +277,141 @@ func (o *hostProtocolOracle) apply(t *testing.T, wire string) {
 		}
 	}
 }
+
+func TestV2CleanupPanicReleasesPublicationOwners(t *testing.T) {
+	for name, tc := range map[string]struct{ explicit bool }{"default": {}, "explicit": {explicit: true}} {
+		t.Run(name, func(t *testing.T) {
+			store := metrix.NewCollectorStore()
+			module := &mockModuleV2{
+				store:    store,
+				template: chartTemplateV2(),
+				vnode: &vnodes.VirtualNode{
+					GUID:     sharedGUID,
+					Hostname: "device",
+				},
+				cleanupFunc: func(context.Context) { panic("cleanup failed") },
+			}
+			module.collectFunc = func(context.Context) error {
+				meter := store.Write().SnapshotMeter("apache")
+				if tc.explicit {
+					meter = meter.WithHostScope(
+						metrix.HostScope{
+							ScopeKey: "device",
+							GUID:     sharedGUID,
+							Hostname: "device",
+						},
+					)
+				}
+				meter.Gauge("workers_busy").Observe(1)
+				return nil
+			}
+			publisher := hostoutput.New()
+			var out bytes.Buffer
+			frames, err := lifecycle.NewFrameOwner(&out)
+			require.NoError(t, err)
+			job := NewJobV2(
+				JobV2Config{
+					PluginName:  "go.d",
+					Name:        "device",
+					ModuleName:  "test",
+					FullName:    "test_device",
+					Module:      module,
+					Publication: publisher,
+					Out: sharedFrameOutput{
+						owner: frames,
+					},
+				},
+			)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			job.runOnce()
+			require.Equal(t, 1, publisher.Len())
+			require.Panics(t, job.Cleanup)
+			assert.Zero(t, publisher.Len())
+		})
+	}
+}
+
+func TestV1PanickingHostSwitchKeepsChartTarget(t *testing.T) {
+	for name, tc := range map[string]struct{ cleanup bool }{"resume collection": {}, "cleanup after panic": {cleanup: true}} {
+		t.Run(name, func(t *testing.T) {
+			current := newSnapshotHolder(
+				VnodeSnapshot{
+					Vnode: &vnodes.VirtualNode{
+						Name:     "device",
+						Hostname: "old",
+						GUID:     sharedGUID,
+					},
+					Revision:         1,
+					MetadataRevision: 1,
+				},
+			)
+			fail := false
+			charts := collectorapi.Charts{
+				&collectorapi.Chart{
+					ID:    "work",
+					Title: "Work",
+					Units: "units",
+					Dims:  collectorapi.Dims{{ID: "value"}},
+				},
+			}
+			module := &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts { return &charts },
+				CollectFunc: func(context.Context) map[string]int64 {
+					if fail {
+						panic("collect failed")
+					}
+					return map[string]int64{"value": 1}
+				},
+			}
+			var out bytes.Buffer
+			frames, err := lifecycle.NewFrameOwner(&out)
+			require.NoError(t, err)
+			job := NewJob(
+				JobConfig{
+					PluginName: "go.d",
+					Name:       "device",
+					ModuleName: "test",
+					FullName:   "test_device",
+					Module:     module,
+					Out: sharedFrameOutput{
+						owner: frames,
+					},
+					Vnode:                 *current.snapshot().Vnode.Copy(),
+					VnodeName:             "device",
+					VnodeRevision:         1,
+					VnodeMetadataRevision: 1,
+					VnodeLookup:           current.lookup,
+				},
+			)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			job.runOnce()
+			oracle := newHostProtocolOracle()
+			oracle.apply(t, out.String())
+			out.Reset()
+			const next = "22222222-2222-2222-2222-222222222222"
+			current.set(
+				VnodeSnapshot{
+					Vnode: &vnodes.VirtualNode{
+						Name:     "device",
+						Hostname: "new",
+						GUID:     next,
+					},
+					Revision:         2,
+					MetadataRevision: 2,
+				},
+			)
+			fail = true
+			job.runOnce()
+			require.Empty(t, out.String())
+			if tc.cleanup {
+				job.Cleanup()
+				assert.Contains(t, out.String(), "HOST '"+sharedGUID+"'")
+				assert.NotContains(t, out.String(), next)
+			} else {
+				fail = false
+				job.runOnce()
+				oracle.apply(t, out.String())
+			}
+		})
+	}
+}
