@@ -10,41 +10,34 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func Test_validateEnrichMetadata_BitmaskMappingUnsupported(t *testing.T) {
-	metadata := MetadataConfig{
-		"device": {
-			Fields: map[string]MetadataField{
-				"description": {
-					Symbol: SymbolConfig{
-						OID:  "1.2.3",
-						Name: "deviceStatus",
-						Mapping: MappingConfig{
-							Mode: MappingModeBitmask,
-							Items: map[string]string{
-								"1": "internalError",
+func Test_validateEnrichMetadata(t *testing.T) {
+	tests := map[string]struct {
+		metadata        MetadataConfig
+		wantError       bool
+		wantErrContains string
+		wantMetadata    MetadataConfig
+	}{
+		"bitmask mapping unsupported": {metadata: MetadataConfig{
+			"device": {
+				Fields: map[string]MetadataField{
+					"description": {
+						Symbol: SymbolConfig{
+							OID:  "1.2.3",
+							Name: "deviceStatus",
+							Mapping: MappingConfig{
+								Mode: MappingModeBitmask,
+								Items: map[string]string{
+									"1": "internalError",
+								},
 							},
 						},
 					},
 				},
 			},
-		},
-	}
-
-	err := validateEnrichMetadata(metadata)
-
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "only supported for scalar/table metric symbols")
-	}
-}
-
-func Test_validateEnrichMetadata(t *testing.T) {
-	tests := map[string]struct {
-		metadata     MetadataConfig
-		wantError    bool
-		wantMetadata MetadataConfig
-	}{
+		}, wantError: true, wantErrContains: "only supported for scalar/table metric symbols"},
 		"both field symbol and value can be provided": {
 			wantError: false,
 			metadata: MetadataConfig{
@@ -189,10 +182,14 @@ func Test_validateEnrichMetadata(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			err := validateEnrichMetadata(tc.metadata)
 			if tc.wantError {
-				assert.Error(t, validateEnrichMetadata(tc.metadata))
+				require.Error(t, err)
+				if tc.wantErrContains != "" {
+					assert.ErrorContains(t, err, tc.wantErrContains)
+				}
 			} else {
-				assert.NoError(t, validateEnrichMetadata(tc.metadata))
+				require.NoError(t, err)
 			}
 			if tc.wantMetadata != nil {
 				assert.Equal(t, tc.wantMetadata, tc.metadata)
