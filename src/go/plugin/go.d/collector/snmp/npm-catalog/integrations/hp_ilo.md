@@ -128,7 +128,7 @@ There are no alerts configured by default for this integration.
 
 On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â€” interfaces, system, IP/TCP/UDP, host resources), this HP ILO profile adds the metrics below. Each is collected **only where the device exposes the matching OID** â€” inclusion means the profile requests it; availability depends on the device model and software.
 
-**65 metrics** in 20 groups; each row is a chart context usable in alerts.
+**64 metrics** in 20 groups; each row is a chart context usable in alerts.
 
 | Group | Metrics |
 |---|---|
@@ -139,7 +139,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Hardware / Fan | 2 |
 | Hardware / Memory | 4 |
 | Hardware / Power | 2 |
-| Hardware / PowerSupply | 4 |
+| Hardware / PowerSupply | 3 |
 | Hardware / Sensor | 2 |
 | Hardware / Server | 1 |
 | Hardware / Temperature | 2 |
@@ -211,7 +211,6 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_cpqHeFltTolPowerSupply` | `{present}` | per power_supply_index, chassis_num | Indicates the presence of a power supply |
 | `snmp.device_prof_cpqHeFltTolPowerSupplyCapacityMaximum` | `W` | per power_supply_index, chassis_num | Maximum capacity of the power supply in watts |
 | `snmp.device_prof_cpqHeFltTolPowerSupplyCapacityUsed` | `W` | per power_supply_index, chassis_num | Currently used capacity of the power supply in watts |
 | `snmp.device_prof_cpqHeFltTolPowerSupplyStatus` | `{status}` | per power_supply_index, chassis_num | Current status of the power supply |
@@ -324,6 +323,6 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 ### Other Problems
 
-#### Collect Live Data for Netdata Support
+#### Collect Diagnostics for Netdata Support
 
-For missing SNMP metrics or incomplete SNMP-derived topology, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to create a raw SNMP data archive that omits credentials and attach it to a restricted Freshdesk ticket.
+For SNMP metrics, BGP, licensing, or topology issues, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; share the bundle through a restricted Netdata Support ticket.
