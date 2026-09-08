@@ -78,7 +78,9 @@ BUFFER *mcp_params_parse_array_to_pattern(
     if (!json_object_object_get_ex(params, param_name, &array_obj) || !array_obj) {
         if (required && error) {
             buffer_flush(error);
-            buffer_sprintf(error, "Missing required parameter '%s'", param_name);
+            buffer_sprintf(error, "Missing required parameter '%s'.", param_name);
+            if (list_tool)
+                buffer_sprintf(error, " Use the '%s' tool to discover available values.", list_tool);
         }
         return NULL;  // Parameter not provided
     }
@@ -96,7 +98,9 @@ BUFFER *mcp_params_parse_array_to_pattern(
     if (required && json_object_array_length(array_obj) == 0) {
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "The '%s' parameter cannot be an empty array", param_name);
+            buffer_sprintf(error, "The '%s' parameter cannot be an empty array.", param_name);
+            if (list_tool)
+                buffer_sprintf(error, " Use the '%s' tool to discover available values.", list_tool);
         }
         return NULL;
     }
@@ -232,13 +236,16 @@ void mcp_schema_add_array_param(
     BUFFER *buffer,
     const char *param_name,
     const char *title,
-    const char *description
+    const char *description,
+    bool required
 ) {
     buffer_json_member_add_object(buffer, param_name);
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", title);
         buffer_json_member_add_string(buffer, "description", description);
+        if(required)
+            buffer_json_member_add_uint64(buffer, "minItems", 1);
         buffer_json_member_add_object(buffer, "items");
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_object_close(buffer); // items

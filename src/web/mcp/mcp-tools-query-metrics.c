@@ -58,7 +58,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Dimensions Filter",
         "Array of dimensions to include in the query.\n"
         "Examples: [\"read\", \"write\"] or [\"in\", \"out\"] or [\"used\", \"free\", \"cached\"]\n"
-        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover the available dimensions for a metric.");
+        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover the available dimensions for a metric.",
+        true);
 
     mcp_schema_add_labels_object(
         buffer, "Labels Filter",
@@ -75,7 +76,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "If no instances are specified, all instances of the metric are queried.\n"
         "Example: [\"instance1\", \"instance2\", \"instance3\"]\n."
         "IMPORTANT: when you have a choice, prefer to filter by labels instead of instances, because many monitored "
-        "components may change instance names over time.");
+        "components may change instance names over time.",
+        false);
 
     mcp_schema_add_array_param(
         buffer, "nodes",
@@ -83,7 +85,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Array of nodes to include in the query.\n"
         "If no nodes are specified, all nodes having data for the given metrics in the specified time-frame will be queried.\n"
         "Examples: [\"node1\", \"node2\", \"node3\"]\n"
-        "Use the '" MCP_TOOL_LIST_NODES "' tool to discover the available nodes.");
+        "Use the '" MCP_TOOL_LIST_NODES "' tool to discover the available nodes.",
+        false);
 
     // Add cardinality limit
     mcp_schema_add_cardinality_limit(buffer,
@@ -197,6 +200,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "- 'node': Groups by node. Example: for disks, it provides one metric per node, aggregating reads and writes across all its disks.\n"
             "- 'label': Groups by the given label key (use the parameter 'group_by_label' to set the key). Example: for disks, aggregate over key 'disk_type' to get an group all 'physical', 'virtual' and 'partition' separately.\n"
             "Multiple groupings can be combined. Example: '[\"dimension\", \"label\"]'.");
+        buffer_json_member_add_uint64(buffer, "minItems", 1);
         buffer_json_member_add_array(buffer, "default");
         buffer_json_add_array_item_string(buffer, "dimension");
         buffer_json_array_close(buffer);
@@ -318,7 +322,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     struct json_object *group_by_obj = NULL, *aggregation_obj = NULL, *dimensions_obj = NULL;
     
     if (!json_object_object_get_ex(params, "dimensions", &dimensions_obj) || !dimensions_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. Use the '" MCP_TOOL_LIST_METRICS "' to get the list of dimensions for this metric/context.");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to get the list of dimensions for this metric/context.");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -401,8 +405,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
-        buffer_strcat(mcpc->error, ". You must explicitly list every dimension you want to query. "
-                                   "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context.");
+        buffer_strcat(mcpc->error, " You must explicitly list every dimension you want to query.");
         return MCP_RC_BAD_REQUEST;
     }
     // Handle labels - expects a structured object only
@@ -493,8 +496,9 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     CLEAN_BUFFER *group_by_buffer = NULL;
     const char *group_by_str = NULL;
     
-    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
+        buffer_strcat(mcpc->error, " Valid values are: 'dimension', 'instance', 'node', 'label'.");
         return MCP_RC_BAD_REQUEST;
     }
     

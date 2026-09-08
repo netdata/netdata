@@ -33,11 +33,13 @@ BUFFER *mcp_params_parse_labels_object(
 );
 
 // Add array parameter schema (for nodes, instances, dimensions)
+// required: the runtime rejects an empty array, so the schema advertises minItems: 1
 void mcp_schema_add_array_param(
     BUFFER *buffer,
     const char *param_name,
     const char *title,
-    const char *description
+    const char *description,
+    bool required
 );
 
 // Add labels object parameter schema
