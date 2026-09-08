@@ -136,7 +136,7 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		)
 		errs = append(errs, validateEnrichBGPSignalValues(i, row, isTable))
 		errs = append(errs, validateBGPGroupKindCompatibility(i, row))
-		errs = append(errs, validateBGPFromReferences(i, row))
+		errs = append(errs, validateBGPSourceReferences(i, row))
 		errs = append(errs, validateBGPSignalDuplicates(i, row, seenSignals))
 
 		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("bgp[%d]", i), row.MetricTags, !isTable))
@@ -481,7 +481,7 @@ func validateBGPSignalDuplicates(rowIdx int, row *BGPConfig, seen map[bgpSignalV
 	return errors.Join(errs...)
 }
 
-func validateBGPFromReferences(rowIdx int, row *BGPConfig) error {
+func validateBGPSourceReferences(rowIdx int, row *BGPConfig) error {
 	if row.Table.OID == "" {
 		return nil
 	}
@@ -489,21 +489,22 @@ func validateBGPFromReferences(rowIdx int, row *BGPConfig) error {
 	var errs []error
 	tableOID := TrimBGPOID(row.Table.OID)
 	for _, ref := range collectBGPValueReferences(*row) {
-		if ref.value.From == "" {
-			continue
-		}
 		if ref.value.Table != "" {
 			continue
 		}
-		fromOID := TrimBGPOID(ref.value.From)
-		if !oidHasPrefix(fromOID, tableOID) {
+		sourceOID, sourceField := valueSourceOID(ref.value.Symbol.OID, ref.value.From, ref.value.OID)
+		if sourceOID == "" {
+			continue
+		}
+		if !oidHasPrefix(TrimBGPOID(sourceOID), tableOID) {
 			errs = append(
 				errs,
 				fmt.Errorf(
-					"bgp[%d].%s.from: OID %q is outside table %q",
+					"bgp[%d].%s.%s: OID %q is outside table %q",
 					rowIdx,
 					ref.path,
-					ref.value.From,
+					sourceField,
+					sourceOID,
 					row.Table.OID,
 				),
 			)

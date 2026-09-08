@@ -298,27 +298,44 @@ func TestValidateEnrichProfile_BitmaskKeys(t *testing.T) {
 }
 
 func TestValidateEnrichProfile_BGPSourceBounds(t *testing.T) {
-	for name, tc := range map[string]struct {
-		fields    string
-		wantError bool
+	for contextName, context := range map[string]struct {
+		tableField string
+		wantError  string
 	}{
-		"symbol outside wins":          {fields: `from: 1.2.3.1, symbol: {OID: 9.9.1, name: state}`, wantError: true},
-		"symbol inside wins":           {fields: `from: 9.9.1, symbol: {OID: 1.2.3.1, name: state}`},
-		"from inside wins over legacy": {fields: `from: 1.2.3.1, OID: 9.9.1, name: state`},
+		"implicit row table":       {wantError: "outside table"},
+		"explicit table reference": {tableField: "table: peers,", wantError: "outside referenced table"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			var profile ProfileDefinition
-			require.NoError(t, yaml.Unmarshal([]byte(`bgp:
+		t.Run(contextName, func(t *testing.T) {
+			for name, tc := range map[string]struct {
+				fields    string
+				wantError bool
+			}{
+				"symbol inside":                 {fields: `symbol: {OID: 1.2.3.1, name: state}`},
+				"symbol outside":                {fields: `symbol: {OID: 9.9.1, name: state}`, wantError: true},
+				"from inside":                   {fields: `from: 1.2.3.1`},
+				"from outside":                  {fields: `from: 9.9.1`, wantError: true},
+				"legacy inside":                 {fields: `OID: 1.2.3.1, name: state`},
+				"legacy outside":                {fields: `OID: 9.9.1, name: state`, wantError: true},
+				"symbol outside wins":           {fields: `from: 1.2.3.1, symbol: {OID: 9.9.1, name: state}`, wantError: true},
+				"symbol inside wins":            {fields: `from: 9.9.1, symbol: {OID: 1.2.3.1, name: state}`},
+				"from inside wins over legacy":  {fields: `from: 1.2.3.1, OID: 9.9.1, name: state`},
+				"from outside wins over legacy": {fields: `from: 9.9.1, OID: 1.2.3.1, name: state`, wantError: true},
+			} {
+				t.Run(name, func(t *testing.T) {
+					var profile ProfileDefinition
+					require.NoError(t, yaml.Unmarshal([]byte(`bgp:
  - kind: peer
    table: {OID: 1.2.3, name: peers}
    identity: {neighbor: {value: "192.0.2.1"}, remote_as: {value: "65001"}}
-   state: {table: peers, mapping: {1: idle, 2: connect, 3: active, 4: opensent, 5: openconfirm, 6: established}, `+tc.fields+`}
+   state: {`+context.tableField+` mapping: {1: idle, 2: connect, 3: active, 4: opensent, 5: openconfirm, 6: established}, `+tc.fields+`}
 `), &profile))
-			err := ValidateEnrichProfile(&profile)
-			if tc.wantError {
-				require.ErrorContains(t, err, "outside referenced table")
-			} else {
-				require.NoError(t, err)
+					err := ValidateEnrichProfile(&profile)
+					if tc.wantError {
+						require.ErrorContains(t, err, context.wantError)
+					} else {
+						require.NoError(t, err)
+					}
+				})
 			}
 		})
 	}
