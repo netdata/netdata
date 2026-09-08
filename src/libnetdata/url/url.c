@@ -253,11 +253,11 @@ url_is_request_complete_and_extract_payload(
     if (length < 4)
         return false;
 
-    // The caller rewinds the incremental cursor by 4 bytes so a "\r\n\r\n" split
-    // across two receives is still found, and the searches below subtract another
-    // 4. A previous receive of 4 to 7 bytes therefore leaves end at or before
-    // begin, which would put those searches before the buffer. Clamp so they
-    // always start inside it; larger cursors keep the incremental rescan.
+    // The caller rewinds the incremental cursor by up to 4 bytes.
+    // After a previous receive of 4 to 7 bytes, end is begin through begin + 3,
+    // so searches starting at end - 4 would start before the buffer.
+    // Clamp end to begin + 4 so those searches start at begin; larger cursors
+    // keep the incremental rescan.
     if (end < begin + 4)
         end = begin + 4;
 

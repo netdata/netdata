@@ -238,9 +238,9 @@ int web_client_request_size_unittest(void)
     freez(request);
     web_client_reuse_from_cache(w);
 
-    // The incremental cursor is rewound 4 bytes by the caller and the completeness
-    // searches subtract another 4, so a first receive of 4 to 7 bytes used to place
-    // them before the buffer and report an already-complete request as incomplete.
+    // A four-byte GET first receive used to trigger an early incomplete return
+    // on the next receive. GET splits at 5 to 7 bytes and DELETE/STREAM splits
+    // at 7 bytes instead made completeness searches start before the buffer.
     // Every accepted method must survive a two-receive split at those sizes. The
     // smallest first receive per method is its token length: shorter first receives
     // are rejected as an unsupported method before the cursor is ever used.
