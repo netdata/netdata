@@ -115,6 +115,12 @@ func (c *Collector) publishDeviceState(info ddsnmp.DeviceConnectionInfo) {
 		c.deviceLifecycleMu.Unlock()
 		return
 	}
+	if c.deviceLifecycleManaged {
+		writer := c.deviceWriter
+		c.deviceLifecycleMu.Unlock()
+		writer.UpdateDevice(info)
+		return
+	}
 	ownerKey := c.deviceLifecycleOwner
 	if ownerKey == "" {
 		ownerKey = fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)

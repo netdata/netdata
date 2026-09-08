@@ -13,7 +13,7 @@ the whole shape. The useful references are called out below by responsibility.
 
 Do the design work first. For a new collector, or a change to a public contract (config option, mode, metric meaning,
 ownership of state, Functions, vnodes), fill the collector design note from
-`.agents/skills/project-go-collector-design/SKILL.md` in the SOW gate before code; the items below are its short form.
+`.agents/skills/collectors-go-design/SKILL.md` in the SOW gate before code; the items below are its short form.
 
 1. Read the upstream API or protocol docs. Do not infer current behavior from memory or from generated SDK types alone.
 2. Check existing helper packages before implementing parser, HTTP, selector, command-execution, SQL, ping, log-reading,
@@ -67,7 +67,7 @@ Framework/API references:
 - `src/go/plugin/framework/chartengine/README.md`
 - `src/go/plugin/framework/functions/README.md`
 - `src/go/tools/functions-validation/README.md`
-- `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`
+- `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`
 - `.agents/skills/integrations-lifecycle/consistency.md`
 
 ## File Layout
@@ -87,7 +87,6 @@ src/go/plugin/go.d/collector/<name>/
 |-- charts.yaml           # V2 chart template
 |-- config_schema.json    # DYNCFG schema
 |-- metadata.yaml         # integration metadata source
-|-- taxonomy.yaml         # dashboard TOC placement source
 |-- integrations/         # generated integration page
 |-- README.md             # symlink to generated integration page
 |-- testdata/             # fixtures and config serialization files
@@ -180,7 +179,7 @@ config option MUST name the concrete operator decision it enables; "operators ma
 For SaaS/API credentials, examples SHOULD prefer secret indirection such as `${env:COLLECTOR_API_KEY}` or
 `${file:/run/secrets/collector_api_key}` instead of realistic-looking inline credentials. Schema fields that carry
 secrets MUST use `"ui:widget": "password"` (the only signal that redacts the UI's YAML preview); writing the schema
-file is covered by `.agents/skills/project-go-collector-design/config-schema.md`.
+file is covered by `.agents/skills/collectors-go-design/config-schema.md`.
 
 Selectors SHOULD use existing matcher packages such as `src/go/pkg/matcher` unless the upstream API forces a different
 grammar. Document the exact matching input, for example "site name when present, otherwise site ID."
@@ -246,7 +245,7 @@ Rules:
 - Route every metric for that remote entity through the same host scope.
 - Keep the default host scope empty unless the metric truly belongs to the agent/job host.
 
-Use `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md` for the framework contract.
+Use `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md` for the framework contract.
 
 ## Functions
 
@@ -284,7 +283,7 @@ Rules:
 - MUST validate topology payloads in tests with both `topologyv1.ValidateDecodedData` and
   `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`; see `src/go/plugin/go.d/collector/cato_networks/topology_test.go`
   `validateCatoTopologyV1Data` for the full marshal/decode/schema check shape;
-- follow `.agents/skills/project-create-topology/SKILL.md` for actor/link/table design.
+- follow `.agents/skills/topology-authoring/SKILL.md` for actor/link/table design.
 
 ## Repository Wiring
 
@@ -299,12 +298,12 @@ For a new collector `<name>`:
    contexts.
 7. If adding or changing service-discovery rules under `src/go/plugin/go.d/config/go.d/sd/` or `sdext`, update generated
    service-discovery documentation through the integrations lifecycle recipe.
-8. Generate `integrations/<slug>.md` and the README symlink from `metadata.yaml`. Single-integration collector
+8. Write `metadata.yaml` with `.agents/skills/collectors-metadata-yaml/SKILL.md` open (one contract per field),
+   then generate `integrations/<slug>.md` and the README symlink from it. Single-integration collector
    directories normally use the symlinked README. Multi-integration plugin directories may keep a hand-authored umbrella
    README; follow `.agents/skills/integrations-lifecycle/consistency.md`.
 
-Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands and
-taxonomy pipeline details.
+Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands.
 
 The PR description or design note MUST enumerate the relevant collector consistency artifacts and justify every artifact
 that did not need a matching change. Most of this is not CI-enforced; it must be reviewer-visible.
@@ -355,7 +354,7 @@ When the collector uses concurrency or Functions, also run:
 go test -race -count=1 ./plugin/go.d/collector/<name>/...
 ```
 
-When integration metadata, generated pages, taxonomy, or health alerts change, run the relevant integrations pipeline
+When integration metadata, generated pages, or health alerts change, run the relevant integrations pipeline
 checks from `.agents/skills/integrations-lifecycle/`.
 
 Do not claim full-project validation from a narrow collector command. State exactly what was run.

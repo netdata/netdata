@@ -283,6 +283,7 @@ func newRunGeneration(
 		lifecycle.RealClock{},
 		functions,
 		joinedRunFinalizer{
+			jobs:                dynCfgJobs,
 			functions:           functions,
 			secrets:             secretController,
 			metricsRegistration: metricsRegistration,
@@ -497,6 +498,7 @@ func (rmr *runMetricsRegistration) release() error {
 }
 
 type joinedRunFinalizer struct {
+	jobs                *joboutput.DynCfgJobController
 	functions           *FunctionAssembly
 	secrets             *secretadapter.Controller
 	metricsRegistration *runMetricsRegistration
@@ -506,6 +508,7 @@ func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64
 	if jrf.functions == nil || jrf.secrets == nil {
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
+	jrf.jobs.FinalizeJobConfigLifecycles()
 	return errors.Join(
 		jrf.metricsRegistration.release(),
 		jrf.functions.FinalizeRun(ctx, generation),

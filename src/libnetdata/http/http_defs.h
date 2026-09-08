@@ -28,6 +28,7 @@
 #define HTTP_RESP_METHOD_NOT_ALLOWED 405
 #define HTTP_RESP_CONFLICT 409
 #define HTTP_RESP_CONTENT_TOO_LONG 413
+#define HTTP_RESP_URI_TOO_LONG 414
 
 #define HTTP_RESP_UNAUTHORIZED                  401 // do not use 401 when responding to users - it is used by authenticating proxies
 #define HTTP_RESP_FORBIDDEN                     403 // not enough permissions to access this resource

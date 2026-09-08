@@ -95,6 +95,9 @@ void ml_host_new(RRDHOST *rh)
     host->anomaly_rate_rs = NULL;
 
     static std::atomic<size_t> times_called(0);
+    // Borrowed pointer into Cfg.workers[]. It is never invalidated: the worker
+    // queues are freed only by ml_workers_free(), long after every producer is
+    // gone. See the comment on ml_workers_free().
     host->queue = Cfg.workers[times_called++ % Cfg.num_worker_threads].queue;
 
     netdata_mutex_init(&host->mutex);
@@ -739,27 +742,48 @@ void ml_stop_threads()
     Cfg.detection_stop = true;
     Cfg.training_stop = true;
 
-    if (!Cfg.detection_thread)
-        return;
-
+    // Do NOT return early when Cfg.detection_thread is NULL. nd_thread_create()
+    // for the detection thread can fail while the training threads below were
+    // created fine; bailing out here would leave them running for the rest of
+    // the shutdown, and would leave ml_workers_free() freeing state still in use.
+    // nd_thread_join() returns ESRCH on NULL and does not log; calling it unconditionally here is safe.
     nd_thread_join(Cfg.detection_thread);
     Cfg.detection_thread = 0;
 
     // signal the worker queue of each thread
-    for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
+    for (size_t idx = 0; idx != Cfg.workers.size(); idx++) {
         ml_worker_t *worker = &Cfg.workers[idx];
         ml_queue_signal(worker->queue);
     }
 
     // join worker threads
-    for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
+    for (size_t idx = 0; idx != Cfg.workers.size(); idx++) {
         ml_worker_t *worker = &Cfg.workers[idx];
 
         nd_thread_join(worker->nd_thread);
     }
+}
 
-    // clear worker thread data
-    for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
+// Releases the per-worker resources allocated by ml_start_threads().
+//
+// This is NOT part of ml_stop_threads(). ml_stop_threads() runs at shutdown step
+// WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS, and the collector stop that
+// precedes it is time-bounded (see the 20s service_wait_exit() in
+// netdata_cleanup_and_exit()). A collector that misses that deadline keeps
+// running and can still create dimensions, reaching ml_queue_push() through
+// rrddim_insert_callback() -> ml_dimension_enqueue_create_model(). Destroying
+// worker->queue there left that producer locking a destroyed mutex (SIGABRT).
+//
+// The queues therefore outlive every producer on a normal shutdown, and are
+// released only from the FSANITIZE_ADDRESS teardown block in
+// netdata_cleanup_and_exit(), after rrdhost_free_all() has removed all producers.
+// Same reasoning as ml_fini(), which is likewise deferred to a later step.
+void ml_workers_free()
+{
+    if (!Cfg.enable_anomaly_detection)
+        return;
+
+    for (size_t idx = 0; idx != Cfg.workers.size(); idx++) {
         ml_worker_t *worker = &Cfg.workers[idx];
 
         delete[] worker->training_cns;

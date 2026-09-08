@@ -292,9 +292,13 @@ struct rrdhost {
                 // pulse_host_status() (relaxed atomic).
                 bool running_latched;
 
-                // last host-label version applied to this host's per-child charts; the pulse
-                // traversal (single thread) re-applies labels + hops only when it changes, i.e. on
-                // reconnect / mid-stream label push.
+                // last host-label version applied to this host's per-child streaming.in.* charts.
+                // Written and read only by the pulse thread (pulse_child_charts_update()), which
+                // re-applies the labels when the version differs. labels_applied distinguishes
+                // "version 0 and never applied" from "version 0 and applied": a host with no labels
+                // at all keeps version 0 forever, so the version compare alone would never label its
+                // charts. See pulse-parents.c for what this version does and does not detect.
+                bool labels_applied;
                 uint32_t labels_applied_version;
             } status;
         } rcv;

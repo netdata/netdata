@@ -5,9 +5,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.3375.2.1.7.5.2
       name: sysMultiHostCpuTable
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.27
+        metric_type: gauge
         name: cpu.usage # sysMultiHostCpuUsageRatio1m
         chart_meta:
           family: 'System/CPU/Usage'
@@ -20,9 +20,9 @@ metrics:
           name: sysMultiHostCpuId
 
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
+      metric_type: gauge
       name: memory.total
       chart_meta:
         family: 'System/Memory/TMM/Total'
@@ -30,9 +30,9 @@ metrics:
         unit: "By"
 
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
+      metric_type: gauge
       name: memory.used
       chart_meta:
         family: 'System/Memory/TMM/Used'

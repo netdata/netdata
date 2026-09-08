@@ -1,237 +1,126 @@
 # Collector consistency rule
 
-`<repo>/AGENTS.md` declares ("Collector Consistency
-Requirements") that any change touching a collector MUST land
-in one source PR with matching changes to all relevant authoritative artifacts:
+Any change touching a collector MUST land in one source PR with matching changes to every affected authoritative
+artifact (root `AGENTS.md`, "Collector Consistency"):
 
-1. **The code** -- the collector implementation files.
-2. **`metadata.yaml`** -- the integration page driver.
-3. **`taxonomy.yaml`** -- dashboard table-of-contents placement
-   for the collector's chart contexts.
-4. **`config_schema.json`** -- the dashboard's DYNCFG editor.
-5. **The stock `.conf`** -- what `/etc/netdata/<plugin>/...`
-   ships.
-6. **`health.d/*.conf`** -- alert definitions for the
-   collector's metrics.
-7. **The authoritative documentation source** -- usually
-   `metadata.yaml`; never a generated integration page or umbrella page.
+1. **The code**: the collector implementation files.
+2. **`metadata.yaml`**: the integration page driver (field content: `.agents/skills/collectors-metadata-yaml/`). A
+   sibling `taxonomy.yaml` is not part of this list ("The dormant collector taxonomy" below).
+3. **`config_schema.json`**: the dashboard's DynCfg editor (form rules:
+   `.agents/skills/collectors-go-design/config-schema.md`).
+4. **The stock `.conf`**: what `/etc/netdata/<plugin>/...` ships.
+5. **`health.d/*.conf`**: alert definitions for the collector's metrics.
+6. **The authoritative documentation source**: usually `metadata.yaml`; never a generated integration page or umbrella
+   page.
 
-The old "5-file" shorthand is stale. Treat the list above as
-the durable review checklist; a given PR may legitimately not
-touch every file, but it must explain why an affected artifact
-does not need a matching edit.
+A PR may legitimately not touch every file, but because most cross-artifact checks are not enforced by CI, its
+description MUST enumerate the relevant artifacts and justify each one left unchanged. Any SHOULD-level exception or
+escape hatch the implementation uses MUST be visible in the PR description or design note, not only in a code comment.
 
-Because most cross-artifact checks are not enforced by CI, collector PR
-descriptions MUST enumerate the relevant consistency artifacts and justify every
-artifact that did not need a matching change. Any SHOULD-level exception or
-escape hatch used by the implementation MUST be visible in the PR description
-or design note, not only in a code comment.
+Obvious cases: a unit change in code updates `metadata.yaml`; a new option updates the schema, the stock conf, and the
+docs; a new metric updates `metadata.yaml` and the README. Subtle ones: renaming a metric label changes the alert
+definition that refers to it; changing a default changes the stock conf example and the documented default value.
 
-The rule covers obvious cases (units change in code -> update
-metadata.yaml; new config option -> update schema, stock conf,
-and docs; new metric -> update metadata.yaml, taxonomy.yaml,
-and README.md)
-and subtle ones (renaming a metric label affects the alert
-definition that refers to it; changing a default affects the
-stock conf example and the documented default value).
+## Delivery boundary: source PR versus post-merge PR
 
-## What enforces this rule today
+This is the skill's one statement of the boundary; other skill files point here. `integrations/README.md` carries the
+short contributor-facing version.
 
-**Nothing automated, in most cases.** Specifically:
+- The source PR contains authoritative inputs (hand-authored `metadata.yaml`, ibm.d `contexts.yaml`/`config.go`/
+  `module.yaml`, SNMP profiles and the trap catalogue), generators, schemas, templates, workflows, tests, and maintainer
+  contracts.
+- Generated documentation is NOT in the source PR: per-integration `<dir>/integrations/<slug>.md`, generated `README.md`
+  files and symlinks, the umbrella pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md`, and
+  producer-generated metadata (ibm.d `metadata.yaml`, the NPM catalog `metadata.yaml`). After the source PR merges,
+  `.github/workflows/generate-integrations.yml` reruns the producers and generators and opens the `integrations-regen`
+  PR ("Regenerate integrations docs") with every derived change; a maintainer reviews and merges it. Name that delivery
+  route in the source PR description.
+- Exception, generated runtime outputs: ibm.d `contexts/zz_generated_contexts.go` (compilation) and `config_schema.json`
+  (the shipped configuration contract) MUST ship in the source PR with the `contexts.yaml` or `config.go` change that
+  produced them. Both workflows run `go generate` and fail on drift in those two files (step "Verify generated runtime
+  outputs"). `go generate` also writes through the module's `README.md` symlink into the generated integration page;
+  leave that page unstaged (`ibm-d.md`).
+- Validate locally with `gen_integrations.py`, `gen_docs_integrations.py --check`, and the unit tests
+  (`integrations/README.md` lists the commands and where the dependencies live). Do NOT regenerate the tracked pages as
+  a routine step: the regenerated pages add many changed lines to the PR and make review harder, and CI produces them
+  after merge anyway. When you do regenerate (to read a rendered page, or to check that a generator change converges on
+  a second run), undo every change to tracked generated files before committing.
+- `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
+  does NOT assert that regeneration leaves the checkout clean, so an uncommitted regeneration diff never fails a source
+  PR. Earlier guidance that described a clean generated diff as a PR gate was wrong.
+- Gitignored catalogs (`integrations/integrations.js`, `integrations/integrations.json`, `integrations/taxonomy.json`)
+  and the untracked NPM side report `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` are never
+  committed. Before opening the PR run:
 
-- **`gen_integrations.py`** validates each `metadata.yaml`
-  against its JSON Schema only. It does NOT cross-check
-  against `config_schema.json`, the stock `.conf`, or
-  `health.d/*.conf`.
-- **`gen_taxonomy.py`** validates committed collector
-  `taxonomy.yaml` files, cross-references literal owned contexts
-  and widget references against `metadata.yaml`, requires declared
-  dynamic selectors, and emits the gitignored
-  `integrations/taxonomy.json` artifact.
-- **`check_collector_taxonomy.py`** is wired into
-  `check-markdown.yml` for pull requests. It fails when a PR
-  touches a collector `taxonomy.yaml`, adds/removes it, or edits
-  a `metadata.yaml` metrics block without a matching
-  `taxonomy.yaml`. Non-metrics-only `metadata.yaml` edits such as
-  setup prose, overview text, categories, and troubleshooting do not
-  trigger touched-collector taxonomy coverage by themselves, although
-  the global taxonomy validation still runs.
-- **`integrations/check_collector_metadata.py`** is broken
-  (see `gotchas.md` for details). Its imports refer to symbols that no longer
-  exist in `gen_integrations.py`. ImportError on first run. NOT invoked from any
-  workflow.
-- **No CI workflow** runs a "verify metric names in
-  metadata.yaml exist in the collector code" check.
-- **No CI workflow** runs a "verify `health.d/*.conf` alert
-  metric names exist in the collector" check.
-- **`check-markdown.yml`** only validates that generated
-  markdown links resolve through Learn ingest -- not that
-  metadata.yaml is in sync with config/schema/stock-conf/README.
+  ```bash
+  git status --porcelain |
+    rg '^(\?\?| M|M |MM|A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
+  ```
 
-The one exception is **ibm.d modules**: their `metadata.yaml`,
-`README.md`, and `config_schema.json` are GENERATED by the
-ibm.d `docgen` tool from `contexts.yaml` + `config.go` +
-`module.yaml`, so those three files are consistent by
-construction. ibm.d does NOT generate the stock `.conf` or
-`health.d/<...>.conf`; those still need manual sync. See
-`ibm-d.md`.
+  The command MUST print nothing. If it names a catalog or the side report, remove the local artifact from the commit
+  (or delete the untracked report) rather than committing it.
+
+## The dormant collector taxonomy
+
+`taxonomy.yaml` files next to some `metadata.yaml` files, `integrations/gen_taxonomy.py`, `gen_taxonomy_seed.py`,
+`check_collector_taxonomy.py`, `integrations/taxonomy/`, the three `taxonomy_*.json` schemas, and
+`integrations/tests/test_taxonomy.py` are an early implementation of a collector dashboard taxonomy that is unused
+today, will change substantially, and is kept in the tree for that later work. No workflow runs any of it (removed
+2026-09-06). Do not author, extend, or seed `taxonomy.yaml` for a new collector; leave the existing files alone unless
+the redesign touches them; `metrics.dynamic_context_prefixes` and `metrics.dynamic_collect_plugins` in `metadata.yaml`
+are read only by this tooling.
+
+## What is enforced today
+
+- `gen_integrations.py` validates each `metadata.yaml` against its JSON Schema only (fatal on any warning).
+- `integrations/tests/test_collector_metadata.py` (both integration workflows): a collector named by a service-discovery
+  rule documents its auto-detection; prose fields contain no Markdown that breaks the Learn build.
+- `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
+  (`description-authoring.md`) resolve, validate, and are unique.
+- `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
+  between `config_schema.json` and `metadata.yaml`.
+- The ibm.d runtime-output drift gate ("Delivery boundary" above).
+- Not enforced anywhere: metric rows against the code, alert rows against `health.d/*.conf`, option names against the
+  schema for collectors that have not opted in, stock conf defaults against the schema. `check-markdown.yml` checks that
+  generated links resolve on Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is broken
+  and unused (`gotchas.md`). Until such checks exist, these are review-time checks.
+- ibm.d modules are the exception: docgen generates `metadata.yaml` and `config_schema.json` from `contexts.yaml`,
+  `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still need
+  manual sync (`ibm-d.md`).
 
 ## What reviewers should check
 
-When reviewing a PR that touches a collector, verify:
-
-1. **Code changes have matching `metadata.yaml` changes.** If
-   the diff adds a chart, dimension, label, or unit change in
-   the code, the corresponding entry must appear in
-   `metadata.yaml`. If a metric is renamed, both files must
-   change.
-
-2. **Chart-context changes have matching `taxonomy.yaml`
-   changes.** Structural `items:` entries that own contexts and
-   widget `contexts:` references must name real contexts in the
-   collector's `metadata.yaml`. Dynamic contexts must use
-   `type: selector` or selector objects with `context_prefix:` or
-   `collect_plugin:` and the corresponding
-   `metrics.dynamic_context_prefixes:` or
-   `metrics.dynamic_collect_plugins:` declaration.
-
-3. **Config changes propagate to all four config-related
-   files.**
-   - The Go struct field (in `config.go`).
-   - `config_schema.json` -- the field appears with the
-     correct type, default, validation.
-   - The stock `.conf` -- a representative example shows the
-     option.
-   - `metadata.yaml` -- the option appears under
-     `setup.configuration.options.list`.
-
-   The option's `group` and the DynCfg tab that shows it MUST
-   name the same thing. `metadata.yaml` `group` becomes the
-   doc's Group column; `config_schema.json`
-   `uiSchema.ui:options.tabs[].title` becomes the UI tab. When
-   the two vocabularies differ, an operator reading the doc
-   cannot find the option in the UI. Rules:
-   - Every `group` MUST equal a tab title, or take the
-     `Tab / Subgroup` form whose first segment is a tab title.
-     `Tab / Subgroup` exists because tabs can only group whole
-     top-level schema properties, so a doc group refining a
-     nested concern (query timing, tag filters) cannot be its
-     own tab.
-   - Every tab title MUST be named by at least one `group`, or
-     the doc can never point at that tab.
-   - Name the section after the config key the operator types,
-     so the doc column, the UI tab, and the YAML key read alike.
-   - List tabs in the order the doc lists the groups.
-   - Most collectors predate this rule and still disagree, so do
-     NOT copy grouping from a neighbouring collector; derive it
-     from that collector's own keys.
-   - The option `description` MUST be identical in both files;
-     the form's extra depth goes in `ui:help`, the doc's in
-     `detailed_description`. How to write the schema file is
-     `.agents/skills/project-go-collector-design/config-schema.md`.
-   - Once a tabbed collector's two artifacts agree, keep them
-     that way (a tabbed collector whose options or descriptions
-     you change MUST) by calling
-     `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`
-     from its tests. It checks per option that the tab listing
-     the option's root property is the first segment of its
-     group, that the schema declares the option with the same
-     description, that every tab is named by some group, and
-     that every visible top-level property is documented. The
-     call is opt-in because most collectors would fail it today;
-     `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the
-     worked examples.
-
-4. **Alert changes have matching `metadata.yaml.alerts`
-   entries.** If `health.d/<plugin>.conf` adds, removes, or
-   renames an alert, `metadata.yaml.modules.<m>.alerts[]` must
-   reflect the change.
-
-5. **README.md handling.** If the plugin directory has a
-   single integration, the README is a symlink to the
-   generated `integrations/<slug>.md` -- the symlink target
-   already updates when `metadata.yaml` updates. If the
-   plugin directory has multiple integrations, the README is
-   hand-written and must be updated by the author.
-   `agent_notification` is a special case: the README itself
-   is the generated artifact (no `integrations/` subdir).
-
-6. **Generated integration documentation has an explicit delivery route.** The
-   author MUST run the metadata pipeline locally for source validation and
-   leave committed generated pages unchanged in the source PR.
-   `generate-integrations.yml` opens the follow-up regeneration PR after the
-   source reaches `master`.
-
-   `check-markdown.yml` regenerates pages before Learn link validation but does
-   not assert a clean Git diff. Earlier guidance incorrectly claimed that an
-   uncommitted regeneration diff failed the source PR.
-
-7. **Umbrella pages.** If the diff added or removed a
-   collector, `src/collectors/COLLECTORS.md` should reflect
-   it. Same for `SECRETS.md` (secretstore changes) and
-   `SERVICE-DISCOVERY.md` (service-discovery changes). Validate all three
-   locally; the post-merge workflow commits their final generated output.
-
-8. **Generated artifacts are outputs, not source.** Files with
-   `DO NOT EDIT THIS FILE DIRECTLY` or `<!--startmeta ... message:
-   "DO NOT EDIT..." -->` banners must be regenerated from their source
-   artifacts. Do not hand-edit generated files to fix prose, links, setup text,
-   or metric descriptions.
-
-9. **Gitignored generated catalogs are absent from the PR.** Before opening the
-   PR, run:
-
-   ```bash
-   git status --porcelain |
-     rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
-   ```
-
-   The command MUST print no output. If it prints
-   `integrations/integrations.js`, `integrations/integrations.json`, or
-   `integrations/taxonomy.json`, remove the local generated artifact from the
-   commit/worktree state rather than committing it.
-
-## Why the policy is unenforced
-
-Investigation of the repo found that
-`integrations/check_collector_metadata.py` was apparently the
-first stab at automation; it appears to have bit-rotted
-without a CI hook to catch the rot. A proper enforcement
-pipeline would:
-
-- repair / rewrite `check_collector_metadata.py` (or replace
-  with a unit test under `tests/`);
-- wire it into `generate-integrations.yml` as a pre-flight
-  validator;
-- add a metric-name cross-reference check between
-  `metadata.yaml.alerts[].metric` and the alert
-  configurations under `health.d/`;
-- add a config-name cross-reference check between
-  `metadata.yaml.setup.configuration.options.list[].name`
-  and `config_schema.json` properties.
-
-Tracked as a followup SOW after `integrations-lifecycle` ships.
-For now, the consistency rule is a review-time policy.
+1. **Code changes have matching `metadata.yaml` changes.** A chart, dimension, label, or unit change in the code appears
+   in `metadata.yaml`; a renamed metric changes both files. Row content (rows mirror the code's context, title, unit,
+   type, and dimensions): `.agents/skills/collectors-metadata-yaml/metrics.md`.
+2. **Config changes propagate to all four config-related files**: the Go struct field (`config.go`),
+   `config_schema.json` (type, default, validation), the stock `.conf` (a representative example), and `metadata.yaml`
+   (`setup.configuration.options.list`). The option's `group` and the DynCfg tab MUST name the same thing and the option
+   `description` MUST be identical in both files. The rules (tab and group naming, the `Tab / Subgroup` form, order,
+   deriving groups from the collector's own keys, the opt-in `collecttest.AssertConfigSchemaMatchesMetadata` call) are
+   owned by `.agents/skills/collectors-go-design/config-schema.md` sections 3 and 8; the metadata side of a row by
+   `.agents/skills/collectors-metadata-yaml/setup.md`.
+3. **Alert changes have matching `metadata.yaml.alerts` entries.** An alert added, removed, or renamed in
+   `health.d/<plugin>.conf` changes `metadata.yaml.modules.<m>.alerts[]`. Row content (name, `on:` context, `info`
+   verbatim, link, `os`): `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`.
+4. **README handling.** A plugin directory with one integration has a README symlinked to the generated
+   `integrations/<slug>.md`, which follows `metadata.yaml`. A directory with several integrations has a hand-written
+   README the author updates. `agent_notification` is special: the README itself is the generated artifact (no
+   `integrations/` subdirectory).
+5. **Umbrella pages.** Adding or removing a collector, secret store, or discoverer changes
+   `src/collectors/COLLECTORS.md`, `SECRETS.md`, or `SERVICE-DISCOVERY.md` respectively; delivery boundary above.
+6. **Generated artifacts are outputs, not source.** Files with a `DO NOT EDIT THIS FILE DIRECTLY` or `<!--startmeta ...
+   message: "DO NOT EDIT..." -->` banner are regenerated from their sources, never hand-edited; so are the three
+   umbrella pages, which carry no banner (`pipeline.md`).
 
 ## Anti-patterns to flag in review
 
-- "I only changed the code; the docs can be a follow-up PR."
-  -> No for source artifacts. Metadata, schema, stock config, alerts, taxonomy,
-  and hand-written docs move with the behavior. Only generated integration
-  pages may use the documented automatic post-merge route.
-- "The integration page on Learn doesn't show my new option."
-  -> Verify that `metadata.yaml` changed and that the post-merge generated-
-  artifact PR completed.
-- "I edited `integrations/<slug>.md` directly to fix a
-  description." -> No. That file is generated. Edit
-  `metadata.yaml` and regenerate.
-- "I edited `metadata.yaml` for an ibm.d module." -> No. Edit
-  `contexts.yaml`, `config.go`, or `module.yaml` and run
-  `go generate`.
-- "I changed a default in the stock `.conf` only." -> Update
-  `config_schema.json` `default`, `metadata.yaml.setup.configuration.options.list[].default_value`,
-  and the authoritative documentation source in lockstep. Validate the
-  generated README locally; the post-merge generated-artifact PR commits it.
-- "I added a chart context but skipped `taxonomy.yaml` because
-  the dashboard will discover it." -> No. Add the context to a
-  placement or use a declared dynamic selector.
+- "I only changed the code; the docs can be a follow-up PR." No for source artifacts: metadata, schema, stock config,
+  alerts, and hand-written docs move with the behavior. Only generated pages use the post-merge route.
+- "The integration page on Learn doesn't show my new option." Verify `metadata.yaml` changed and the post-merge
+  regeneration PR completed.
+- "I edited `integrations/<slug>.md` to fix a description." No: it is generated. Edit `metadata.yaml` and regenerate.
+- "I edited `metadata.yaml` for an ibm.d module." No: edit `contexts.yaml`, `config.go`, or `module.yaml` and run `go
+  generate`.
+- "I changed a default in the stock `.conf` only." Update the `config_schema.json` `default`, the `metadata.yaml` option
+  `default_value`, and the authoritative documentation source in lockstep.

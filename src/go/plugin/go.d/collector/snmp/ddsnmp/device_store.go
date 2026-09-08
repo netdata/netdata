@@ -10,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // DeviceConnectionInfo holds SNMP connection parameters for a device.
@@ -67,6 +70,7 @@ type DeviceLifecycleInfo struct {
 	Hostname    string
 	Port        int
 	SNMPVersion string
+	Profiles    *ProfileContext
 }
 
 // DeviceLifecyclePhase identifies the last completed collector lifecycle call.
@@ -90,9 +94,12 @@ const (
 
 // DeviceLifecycleStatus describes the last completed lifecycle call.
 type DeviceLifecycleStatus struct {
-	Phase       DeviceLifecyclePhase
-	Outcome     DeviceLifecycleOutcome
-	CompletedAt time.Time
+	CollectionFailures CollectionFailures
+	PreparationFailure collectorapi.JobConfigFailure
+	Failure            snmputils.Failure
+	Phase              DeviceLifecyclePhase
+	Outcome            DeviceLifecycleOutcome
+	CompletedAt        time.Time
 }
 
 // DeviceLifecycleEntry is one current normal-SNMP job incarnation.
@@ -119,6 +126,7 @@ type deviceLifecycleRecord struct {
 // NewDeviceStore returns an empty SNMP device connection-state store.
 func NewDeviceStore() *DeviceStore {
 	return &DeviceStore{
+		changes:            make(chan struct{}, 1),
 		ownerRegistrations: make(map[string]DeviceRegistrationID),
 		devices:            make(map[DeviceRegistrationID]DeviceConnectionInfo),
 		lifecycles:         make(map[DeviceRegistrationID]deviceLifecycleRecord),
@@ -129,11 +137,14 @@ func NewDeviceStore() *DeviceStore {
 // DeviceStore holds SNMP device connection state shared between SNMP-family modules.
 type DeviceStore struct {
 	mu                 sync.RWMutex
+	changes            chan struct{}
+	writers            map[string]*DeviceWriter
 	ownerRegistrations map[string]DeviceRegistrationID
 	devices            map[DeviceRegistrationID]DeviceConnectionInfo
 	lifecycles         map[DeviceRegistrationID]deviceLifecycleRecord
 	byHostname         map[string]map[string]struct{}
 	lastRegistrationID DeviceRegistrationID
+	lifecycleRevision  uint64
 	lifecycleSequence  uint64
 }
 
@@ -149,6 +160,9 @@ func (s *DeviceStore) RegisterJob(ownerKey string, info DeviceLifecycleInfo) {
 		s.ownerRegistrations[ownerKey] = registrationID
 	}
 	record := s.lifecycles[registrationID]
+	if !exists || record.info != info {
+		s.notifyLifecycleChangedLocked()
+	}
 	record.info = info
 	s.lifecycles[registrationID] = record
 	s.lifecycleSequence++
@@ -162,6 +176,9 @@ func (s *DeviceStore) RecordJobLifecycle(ownerKey string, status DeviceLifecycle
 	s.mu.Lock()
 	if registrationID, ok := s.ownerRegistrations[ownerKey]; ok {
 		record := s.lifecycles[registrationID]
+		if !sameLifecycleStatus(record.lastCompleted, status) {
+			s.notifyLifecycleChangedLocked()
+		}
 		record.lastCompleted = status
 		s.lifecycles[registrationID] = record
 		s.lifecycleSequence++
@@ -201,15 +218,16 @@ func (s *DeviceStore) LifecycleCut() DeviceLifecycleCut {
 
 // ReplaceJob atomically removes a prior configuration incarnation, when
 // different, and publishes the current lifecycle plus any topology-ready state.
+// The returned writer replaces the prior runtime's update authority.
 func (s *DeviceStore) ReplaceJob(
 	previousOwnerKey string,
 	ownerKey string,
 	info DeviceLifecycleInfo,
 	status DeviceLifecycleStatus,
 	device *DeviceConnectionInfo,
-) {
+) *DeviceWriter {
 	if ownerKey == "" {
-		return
+		return nil
 	}
 	s.mu.Lock()
 	s.ensureMapsLocked()
@@ -234,7 +252,14 @@ func (s *DeviceStore) ReplaceJob(
 		s.addHostnameIndexLocked(ownerKey, cloned.Hostname)
 	}
 	s.lifecycleSequence++
+	s.notifyLifecycleChangedLocked()
+	writer := &DeviceWriter{store: s, owner: ownerKey}
+	if s.writers == nil {
+		s.writers = make(map[string]*DeviceWriter)
+	}
+	s.writers[ownerKey] = writer
 	s.mu.Unlock()
+	return writer
 }
 
 // Register adds or updates a device by its caller-owned lookup key. An update
@@ -242,7 +267,15 @@ func (s *DeviceStore) ReplaceJob(
 // Reference types are deep-copied to prevent data races with the caller.
 func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.registerLocked(ownerKey, info)
+}
+
+func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo) {
 	s.ensureMapsLocked()
+	priorID := s.ownerRegistrations[ownerKey]
+	priorInfo := s.lifecycles[priorID].info
+	_, wasReady := s.devices[priorID]
 	registrationID, exists := s.ownerRegistrations[ownerKey]
 	if exists {
 		s.removeHostnameIndexLocked(ownerKey, s.devices[registrationID].Hostname)
@@ -252,11 +285,15 @@ func (s *DeviceStore) Register(ownerKey string, info DeviceConnectionInfo) {
 	}
 	s.devices[registrationID] = cloneDeviceConnectionInfo(info)
 	record := s.lifecycles[registrationID]
+	profileContext := record.info.Profiles
 	record.info = lifecycleInfoFromDeviceConnection(info)
+	record.info.Profiles = profileContext
 	s.lifecycles[registrationID] = record
 	s.addHostnameIndexLocked(ownerKey, info.Hostname)
 	s.lifecycleSequence++
-	s.mu.Unlock()
+	if !wasReady || priorInfo != record.info {
+		s.notifyLifecycleChangedLocked()
+	}
 }
 
 // Unregister removes a complete job incarnation from the store.
@@ -264,6 +301,7 @@ func (s *DeviceStore) Unregister(ownerKey string) {
 	s.mu.Lock()
 	if _, ok := s.ownerRegistrations[ownerKey]; ok {
 		s.removeRegistrationLocked(ownerKey)
+		s.notifyLifecycleChangedLocked()
 		s.lifecycleSequence++
 	}
 	s.mu.Unlock()
@@ -280,6 +318,7 @@ func (s *DeviceStore) removeRegistrationLocked(ownerKey string) {
 	delete(s.devices, registrationID)
 	delete(s.lifecycles, registrationID)
 	delete(s.ownerRegistrations, ownerKey)
+	delete(s.writers, ownerKey)
 }
 
 // Entries returns a deterministic, deep-copied snapshot of all registered jobs.
@@ -442,4 +481,100 @@ func deviceHostnameIndexKey(hostname string) string {
 	}
 
 	return strings.ToLower(hostname)
+}
+
+// DeviceWriter is authority for one accepted runtime. Replacement/removal
+// revokes old writers even when the exact configuration identity is reused.
+type DeviceWriter struct {
+	store *DeviceStore
+	owner string
+}
+
+// RegistrationID is available only while this accepted runtime owns the job.
+func (w *DeviceWriter) RegistrationID() DeviceRegistrationID {
+	if w == nil {
+		return 0
+	}
+	s := w.store
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.writers[w.owner] != w {
+		return 0
+	}
+	return s.ownerRegistrations[w.owner]
+}
+
+func (w *DeviceWriter) UpdateDevice(info DeviceConnectionInfo) {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] == w {
+		s.registerLocked(w.owner, info)
+	}
+}
+
+func (w *DeviceWriter) RecordLifecycle(status DeviceLifecycleStatus) {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] != w {
+		return
+	}
+	id := s.ownerRegistrations[w.owner]
+	record := s.lifecycles[id]
+	if !sameLifecycleStatus(record.lastCompleted, status) {
+		s.notifyLifecycleChangedLocked()
+	}
+	record.lastCompleted = status
+	s.lifecycles[id] = record
+	s.lifecycleSequence++
+}
+
+func (s *DeviceStore) LifecycleChanges() <-chan struct{} { return s.changes }
+func (s *DeviceStore) LifecycleRevision() uint64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lifecycleRevision
+}
+func (s *DeviceStore) notifyLifecycleChangedLocked() {
+	s.lifecycleRevision++
+	select {
+	case s.changes <- struct{}{}:
+	default:
+	}
+}
+
+// RecordProfileContext updates only this accepted runtime's immutable evidence.
+func (w *DeviceWriter) RecordProfileContext(context *ProfileContext) {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] != w {
+		return
+	}
+	id := s.ownerRegistrations[w.owner]
+	record := s.lifecycles[id]
+	if record.info.Profiles != context {
+		s.notifyLifecycleChangedLocked()
+	}
+	record.info.Profiles = context
+	s.lifecycles[id] = record
+	s.lifecycleSequence++
+}
+
+// A status file is a capture-time snapshot, not a per-poll heartbeat. Successful
+// polls with only a newer completion time must not trigger a global serialization.
+func sameLifecycleStatus(a, b DeviceLifecycleStatus) bool {
+	a.CompletedAt, b.CompletedAt = time.Time{}, time.Time{}
+	a.PreparationFailure.CompletedAt, b.PreparationFailure.CompletedAt = time.Time{}, time.Time{}
+	return a == b
 }

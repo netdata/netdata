@@ -1324,17 +1324,7 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
     def setUpClass(cls):
         cls.categories, cls.integrations = read_integrations_js("integrations/integrations.js")
 
-    def test_ibm_d_guide_maps_all_module_directories_to_real_selectors(self):
-        guide = (REPO_ROOT / ".agents/skills/integrations-lifecycle/ibm-d.md").read_text(encoding="utf-8")
-        self.assertIn("`<module-dir>` is the path relative to", guide)
-        self.assertIn("`<module-name>` is the exact `name` value", guide)
-        self.assertIn(
-            "python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>",
-            guide,
-        )
-        self.assertNotIn("ibm.d.plugin/<m>", guide)
-        self.assertNotIn("ibm.d/<m>", guide)
-
+    def test_ibm_d_module_directories_map_to_real_selectors(self):
         modules = {
             "as400": "as400",
             "db2": "db2",

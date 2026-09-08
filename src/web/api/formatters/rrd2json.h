@@ -53,8 +53,8 @@ int rrdset2value_api_v1(
 // onewayalloc arena. Lets a caller that issues many back-to-back queries
 // (e.g. evaluating all alerts on one host) amortise the mmap/munmap cost
 // of owa create/destroy across the whole burst. The caller owns the owa's
-// lifetime; between calls they should invoke onewayalloc_reset() to reclaim
-// trailing pages and keep peak memory bounded. `owa` must be non-NULL.
+// lifetime; between calls they should invoke onewayalloc_reset() to reuse
+// query scratch. All pages are retained until destroy. `owa` must be non-NULL.
 int rrdset2value_api_v1_with_owa(
         ONEWAYALLOC *owa
         , RRDSET *st

@@ -26,8 +26,15 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		ctx = context.Background()
 	}
 
+	initializing := !c.initialized
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
+	}
+
+	if initializing && c.normal.recorder != nil {
+		for ordinal := uint64(1); ordinal <= c.normal.recorder.Cursor(); ordinal++ {
+			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
+		}
 	}
 
 	if c.PingOnly {
@@ -106,11 +113,12 @@ func (c *Collector) ensureInitialized() error {
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:      c.snmpClient,
-			Profiles:        c.snmpProfiles,
-			Log:             c.Logger,
-			SysObjectID:     si.SysObjectID,
-			DisableBulkWalk: c.disableBulkWalk,
+			SnmpClient:          c.snmpClient,
+			Profiles:            c.snmpProfiles,
+			Log:                 c.Logger,
+			SysObjectID:         si.SysObjectID,
+			DisableBulkWalk:     c.disableBulkWalk,
+			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile),
 		})
 	}
 
@@ -119,6 +127,7 @@ func (c *Collector) ensureInitialized() error {
 			c.vnode = c.setupVnode(si, nil)
 		} else {
 			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
+			c.captureCollectionFailures()
 			if err != nil {
 				return err
 			}
@@ -189,11 +198,11 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
-		return nil, fmt.Errorf("init: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
 
 	if err := snmpClient.Connect(); err != nil {
-		return nil, fmt.Errorf("connect: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
 
 	if snmpClient.Version() == gosnmp.Version1 {
@@ -208,9 +217,13 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	if c.adjMaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
 	} else {
-		ok, err := c.adjustMaxRepetitions(snmpClient)
+		probeClient := snmpClient
+		if c.normal != nil && c.normal.recorder != nil {
+			probeClient = c.normal.recorder.Wrap(snmpClient)
+		}
+		ok, err := c.adjustMaxRepetitions(probeClient)
 		if err != nil {
-			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
+			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
 		}
 		if !ok {
 			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")

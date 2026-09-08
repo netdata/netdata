@@ -9,6 +9,16 @@ It intentionally leaves two dependencies opaque: the journal file format (owned 
 wire parsing internals (owned by the gosnmp fork). This document covers how the collector drives them, not how they
 work inside.
 
+**Place in the documentation set.** This is the one maintained record of the collector's design and internals: the
+design invariants that are not visible in the code (why a limit has its value, which ownership rules the packages
+obey, what a writer or resolver contract forbids) live here and nowhere else, so a change to collector behavior
+updates this file in the same PR. The profile format is owned by the shipped
+`src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`; operator-facing behavior by
+`docs/npm/snmp-traps/`; and the authoring rules for profiles, the generator, and stock-pack regeneration by the
+project skill `.agents/skills/collectors-snmp-trap-profiles/SKILL.md`, which routes collector-code questions back
+here. The pre-implementation design proposals and decision records that once accompanied that skill were retired;
+rejected alternatives and phase history are in git history only.
+
 **Path convention.** Code references are relative to `src/go/plugin/go.d/collector/snmp_traps/`, except those starting
 with `src/go/`, which are repo-relative.
 
@@ -246,6 +256,15 @@ Two sharp edges:
    its content is dropped.
 7. Rate limit (last).
 
+The decode budget is five fixed constants (`listener.go`, `decode.go`), enforced per job and deliberately not
+configurable: 8192-byte datagram (RFC 3417 requires receivers to accept at least 484 bytes; 8 KiB covers verbose vendor
+traps with margin), 256 varbinds (about three times the largest trap seen in the design-time survey of public fixture
+corpora, around 80), nesting depth 8 (SNMPv3 messages need about 6 constructed levels), 128-byte encoded OID (a byte
+cap independent of RFC 2578's 128 sub-identifier limit; real trap and varbind OIDs encode to a few dozen bytes), and
+1024-byte OctetString (long enough for MIB strings, short enough to bound memory per packet; waived for SNMPv3, whose
+encrypted ScopedPDU is one large OctetString, see check 3 above). Exceeding any of them drops the packet and counts a
+`malformed_pdu` error.
+
 **SNMPv1 normalization.** v1 traps carry no `snmpTrapOID.0`; decode synthesizes one plus up to four more varbinds,
 prepended in fixed order, so downstream stages see one uniform shape:
 
@@ -283,7 +302,10 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
 (`rate = burst = per_source_pps`, default 1000), per job, capped at 10 000 tracked sources with idle sweep and
 oldest-eviction. Two modes: `drop` discards over-limit packets; **`sample` does not sample — it counts and passes
 everything**. Bucket GC runs from `Collect()` via `receiver.Sweep`, so the limiter's mutex is shared between listener
-goroutines and the collect cycle.
+goroutines and the collect cycle. Bucket mechanics, none of them configurable: a new bucket starts full, so a new or
+long-idle source may burst `per_source_pps` packets before limiting bites; a bucket idle for 10 minutes is swept, at
+most once per 5 minutes; when the 10 000 cap is hit the sweep runs immediately and then the oldest bucket is evicted
+before a new source is refused.
 
 **Undecodable packets are not silent.** A decode failure is classified (`malformed_pdu`, `auth_failures`,
 `usm_failures`, `unknown_engine_id`, `decode_failed` — by substring match on gosnmp error text, a deliberate coupling
@@ -374,7 +396,9 @@ imports neither). Order and precedence:
 4. **Reverse DNS** — only if `reverse_dns.enabled`. Strictly non-blocking: a cached positive hit annotates
    `TRAP_REVERSE_DNS`; anything else schedules a background lookup and moves on. PTR results never overwrite a known
    hostname — the resolver is shared with the other SNMP collectors (one instance per plugin process, 24 h positive /
-   5 min negative TTL, 10 000-entry cache).
+   5 min negative TTL, 10 000-entry cache). Trap jobs only borrow it: job init and cleanup must never create, close,
+   sweep, or clear it. The packet path does a cache-only `Lookup` and a non-blocking `Schedule`; an entry written while
+   the lookup is cold carries audit status `pending` and is never backfilled once the PTR answer arrives.
 
 Every stage records a structured audit (`TrapEnrichmentAudit`: per-lookup status, method, match count, reason,
 applied fields) that lands in the journal — enrichment is debuggable from the trap log itself, without reproducing.
@@ -413,9 +437,9 @@ because the other backend may still hold it.
 
 | Aspect | Behavior |
 | --- | --- |
-| Format | Pure-Go systemd journal *files* via `systemd-journal-sdk` — no journald, no sockets, works on any platform; a missing log root is a startup error, not a silent fallback |
+| Format | Pure-Go systemd journal *files* via `systemd-journal-sdk` — no journald, no sockets, works on any platform; a missing log root is a startup error, not a silent fallback (the SDK is opened with `LogOpenEager` and `LogIdentityStrict`; both are required). Writing files directly is what lets the entry carry the *device* as `_HOSTNAME`: journald (`sd_journal_sendv`) would stamp the agent host instead |
 | Location | `<log-dir>/traps/<job>/<machine-id>/*.journal` — the job name is a filesystem path segment (hence its strict charset) |
-| Writing | Async: bounded queue (10 000), one worker, per-entry append, **fsync batched on a 1 s ticker** — there is no flush-per-write and `Flush()` is unused in production |
+| Writing | Async: bounded queue (10 000), one worker owning the single reusable serializer (the only `AppendRaw` caller), per-entry append, **fsync batched on a 1 s ticker** — there is no flush-per-write and `Flush()` is unused in production |
 | Failure | **Sticky and terminal**: the first write/sync error stops the worker, subsequent writes fail fast, and only a job restart recovers. The terminal outcome is reported once, without double-counting per-entry failures |
 | Retention | `max_size` (default 10 GB), `max_duration`, `rotation_size`, `rotation_duration` — enforced by the SDK deleting archived files; no journald configuration is written |
 | Injection defense | Values containing newlines/control bytes/invalid UTF-8 are stored as journald binary fields, so `MESSAGE=real\nFAKE_FIELD=x` cannot be queried as `FAKE_FIELD` (CWE-117); the count of such fields is a telemetry gauge |
@@ -424,10 +448,24 @@ because the other backend may still hold it.
 preflighted at job start (connectivity Ready + an empty export within `request_timeout`), so an unreachable collector
 fails the job rather than dropping traps silently. The worker batches (`batch_size` 512 / `flush_interval` 200 ms);
 a failed batch is **retained and retried** on the next trigger while the full queue exerts backpressure
-(`ErrQueueFull`); entries are dropped only in the final close drain, always accounted. One log record per trap:
+(`ErrQueueFull`); entries are dropped only in the final close drain, always accounted. When OTLP is the only sink,
+that queue is the only buffer: a full queue or a close drain loses traps, so OTLP alone is not durable storage. One
+log record per trap:
 `Body` = message, semconv-style attributes (`snmp.trap.*`, `network.peer.*`, `netdata.*` — deliberately *not* the
 `TRAP_*` names), varbinds as one `snmp.varbinds` KVList reusing the same sensitive-varbind and duplicate-key rules as
-the journal.
+the journal. Severity follows the OpenTelemetry Logs Data Model, Appendix B (syslog mapping), so ordering survives
+but the eight slugs collapse into fewer ranges; the slug itself travels as `snmp.trap.severity` (`otlpSeverity`):
+
+| Slug | `severity_number` | `severity_text` |
+| --- | --- | --- |
+| `emerg` | 21 | FATAL |
+| `alert` | 19 | ERROR3 |
+| `crit` | 18 | ERROR2 |
+| `err` | 17 | ERROR |
+| `warning` | 13 | WARN |
+| `notice` (and unknown) | 10 | INFO2 |
+| `info` | 9 | INFO |
+| `debug` | 5 | DEBUG |
 
 The full journal field schema — the collector's public data contract — is in
 [The Journal Field Contract](#the-journal-field-contract).
@@ -459,14 +497,20 @@ rule names). Rules come from the profiles (Stage 3) and turn traps into time-ser
   series under that device's **vnode host scope** (its own node in the UI). Any ambiguity evidence (rejected source
   candidates, ambiguous registry match, vnode conflict) demotes the series to the job's node with an opaque
   `source_id` — a salted SHA-256 prefix, never a raw IP. Series labels are always
-  `job_name`/`source_id`/`source_kind` (+ `resource_class`/`resource_id` for resource-scoped rules).
+  `job_name`/`source_id`/`source_kind` (+ `resource_class`/`resource_id` for resource-scoped rules). The hash is
+  SHA-256 over `<salt>:<job>:<selected source address>` (the raw UDP peer `ip:port` only as the last resort),
+  truncated to 16 hex characters; the salt is the
+  host's machine-id from `internal/hostidentity` (a fixed string when none is available) and is never emitted
+  (`jobruntime.Job.sourceHashSalt`, `attribution.fallback`). It hides addresses, not identities: a small address
+  space can be enumerated, and a machine-id change renames every fallback `source_id`.
 - **Cardinality caps are fixed constants**, not config: 500 rules, 2000 sources, 512 resources per source, 50 000
   series per job, 2000 instances per chart (default). At a cap, only the *new* series is skipped
   (`overflow_dropped` counts it); existing series keep updating, and expiry releases cap slots. Overflow is
   deterministic because dispatch is sorted at compile time.
 - `Collect` snapshots under the runtime lock, then writes to the metrix store **outside** it; the chart template is
   generated once by merging the base `charts.yaml` with per-rule charts plus a diagnostics chart
-  (`rule_missed`, `extraction_failed`, `attribution_failed`, `overflow_dropped`, `source_transitions`).
+  (`rule_missed`, `extraction_failed`, `attribution_failed`, `overflow_dropped`, `source_transitions`), and
+  `ChartTemplateYAML()` serves exactly that compiled template — never a debug dump or a hand-maintained copy.
 
 ## Startup and Shutdown
 
@@ -619,7 +663,7 @@ and users' `journalctl` queries all depend on them. Serialization order is fixed
 | `TRAP_CATEGORY`, `TRAP_SEVERITY` | Closed-taxonomy classification (severity written verbatim) |
 | `TRAP_PDU_TYPE`, `TRAP_VERSION` | `trap`/`inform`, `v1`/`v2c`/`v3` |
 | `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER` | Selected source vs raw peer (`ip:port`) |
-| `TRAP_REVERSE_DNS`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS` | Enrichment results |
+| `TRAP_REVERSE_DNS`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS` | Enrichment results; each is omitted when empty, never written as an empty string (the OTLP attributes mirror this) |
 | `TRAP_ENRICHMENT` | JSON audit of every enrichment decision (statuses, reasons, applied fields) |
 
 **Dynamic families:**

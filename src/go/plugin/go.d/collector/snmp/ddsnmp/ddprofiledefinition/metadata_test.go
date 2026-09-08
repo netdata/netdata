@@ -10,89 +10,60 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func makeMetadata() MetadataConfig {
-	// This is not actually a valid config, since e.g. it has ExtractValue and
-	// MatchPattern both set; this is just to check that every field gets copied
-	// properly.
-	return MetadataConfig{
-		"device": MetadataResourceConfig{
-			Fields: map[string]MetadataField{
-				"name": {
-					Value:     "hey",
-					Consumers: ConsumerSet{ConsumerMetrics, ConsumerTopology},
-					Symbol: SymbolConfig{
-						OID:                  "1.2.3",
-						Name:                 "someSymbol",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-						MatchPattern:         ".*",
-						MatchPatternCompiled: regexp.MustCompile(".*"),
-						MatchValue:           "$1",
-						ScaleFactor:          100,
-						Format:               "mac_address",
-						ConstantValueOne:     true,
-						MetricType:           "gauge",
-					},
-				},
-			},
-			IDTags: []MetricTagConfig{
-				{
-					Tag:   "foo",
-					Index: 1,
-					Column: SymbolConfig{
-						Name:                 "bar",
-						OID:                  "1.2.3",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-					},
-					OID: "2.3.4",
-					Symbol: SymbolConfigCompat{
-						OID:                  "1.2.3",
-						Name:                 "someSymbol",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-					},
-					LookupSymbol: SymbolConfigCompat{
-						OID:                  "9.8.7",
-						Name:                 "lookupSymbol",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-					},
-					IndexTransform: []MetricIndexTransform{
-						{
-							Start: 1,
-							End:   5,
+func TestMetadataConfig_Clone(t *testing.T) {
+	tests := map[string]struct {
+		newMetadata func() MetadataConfig
+		mutate      func(MetadataConfig)
+	}{
+		"nil":   {newMetadata: func() MetadataConfig { return nil }},
+		"empty": {newMetadata: func() MetadataConfig { return MetadataConfig{} }},
+		"populated": {
+			// Clone fixtures exercise every field, regardless of schema validation rules.
+			newMetadata: func() MetadataConfig {
+				return MetadataConfig{
+					"device": MetadataResourceConfig{
+						Fields: map[string]MetadataField{
+							"name": {
+								Value:     "hey",
+								Consumers: ConsumerSet{ConsumerMetrics, ConsumerTopology},
+								Symbol: SymbolConfig{
+									OID:                  "1.2.3",
+									Name:                 "someSymbol",
+									ExtractValue:         ".*",
+									ExtractValueCompiled: regexp.MustCompile(".*"),
+									MatchPattern:         ".*",
+									MatchPatternCompiled: regexp.MustCompile(".*"),
+									MatchValue:           "$1",
+									ScaleFactor:          100,
+									Format:               "mac_address",
+									MetricType:           "gauge",
+								},
+							},
 						},
 					},
-					Mapping: NewExactMapping(map[string]string{
-						"1": "on",
-						"2": "off",
-					}),
-					Match:   ".*",
-					Pattern: regexp.MustCompile(".*"),
-					Tags: map[string]string{
-						"foo": "bar",
-					},
-					SymbolTag: "ok",
-				},
+				}
+			},
+			mutate: func(cloned MetadataConfig) {
+				delete(cloned["device"].Fields, "name")
+				cloned["device"].Fields["foo"] = MetadataField{
+					Value: "foo",
+				}
 			},
 		},
 	}
-}
-
-func TestCloneMetadata(t *testing.T) {
-	metadata := makeMetadata()
-	metaCopy := metadata.Clone()
-	assert.Equal(t, metadata, metaCopy)
-	// Modify the copy in place
-	metaCopy["interface"] = MetadataResourceConfig{}
-	metaCopy["device"].Fields["foo"] = MetadataField{
-		Value: "foo",
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			original, want := tc.newMetadata(), tc.newMetadata()
+			cloned := original.Clone()
+			require.Equal(t, want, cloned)
+			if tc.mutate != nil {
+				tc.mutate(cloned)
+				assert.NotEqual(t, want, cloned)
+			}
+			assert.Equal(t, want, original)
+		})
 	}
-	// Original has not changed
-	assert.Equal(t, makeMetadata(), metadata)
-	// New one is different
-	assert.NotEqual(t, metadata, metaCopy)
 }

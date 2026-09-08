@@ -923,7 +923,7 @@ func (pjc *preparedJobCandidate) run(
 	stageErr := factory.stageCandidateHandlers(&candidate)
 	factory = nil
 	if stageErr != nil {
-		failure := autoDetectionFailureFor(candidate, stageErr)
+		failure := autoDetectionFailureFor(candidate, withJobConfigFailure(stageErr, "functions", ""))
 		captureJobConfigLifecycle(&candidate)
 		failure.jobConfigLifecycle = candidate.jobConfigSnapshot
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
