@@ -294,3 +294,50 @@ func TestCollectExpiryNoRemovalAllocationEnvelope(t *testing.T) {
 		})
 	}
 }
+
+// A kind transition can change the family selected by autogen rules without
+// changing flattened identity. Rejection must release the previous discovery.
+func TestAutogenCacheRejectionClearsBindingAndRecovers(t *testing.T) {
+	e, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML(benchmarkAutogenRulesTemplate([]string{"latency"}), 1))
+	before := autogenCacheTestReader(t, func(m metrix.SnapshotMeter) { m.Counter("latency_count").ObserveTotal(8) })
+	after := autogenCacheTestReader(t, observeAutogenCacheHistogram)
+	var oldID, newID metrix.SeriesIdentity
+	before.ForEachSeriesIdentity(func(id metrix.SeriesIdentity, _ metrix.SeriesMeta, name string, _ metrix.LabelView, _ metrix.SampleValue) {
+		if name == "latency_count" {
+			oldID = id
+		}
+	})
+	after.ForEachSeriesIdentity(func(id metrix.SeriesIdentity, _ metrix.SeriesMeta, name string, _ metrix.LabelView, _ metrix.SampleValue) {
+		if name == "latency_count" {
+			newID = id
+		}
+	})
+	require.NotEmpty(t, oldID.ID)
+	require.Equal(t, oldID, newID)
+	initial, err := e.PreparePlan(before)
+	require.NoError(t, err)
+	require.NotEmpty(t, initial.Plan().Actions)
+	initialPlan := initial.Plan()
+	initial.Abort()
+	original, hit := e.state.routeCache.Lookup(oldID, 1, 1)
+	require.True(t, hit)
+	require.Len(t, original, 1)
+	for range 3 {
+		rejected, err := e.PreparePlan(after)
+		require.NoError(t, err)
+		require.Empty(t, rejected.Plan().Actions, "histogram family is denied")
+		rejected.Abort()
+		cached, hit := e.state.routeCache.Lookup(oldID, 1, 1)
+		require.True(t, hit)
+		require.Empty(t, cached, "obsolete scalar binding must be cleared after histogram family rejection")
+	}
+	recovered, err := e.PreparePlan(before)
+	require.NoError(t, err)
+	defer recovered.Abort()
+	require.Equal(t, initialPlan, recovered.Plan(), "empty discovery must allow an eligible source to recover")
+	cached, hit := e.state.routeCache.Lookup(oldID, 1, 1)
+	require.True(t, hit)
+	require.Len(t, cached, 1)
+}

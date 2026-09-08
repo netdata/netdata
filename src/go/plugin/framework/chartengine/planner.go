@@ -532,6 +532,10 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 		}
 		if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
 			routes = nil
+			// Release obsolete discovery even if autogen rebuilding is rejected.
+			if ctx.routeCacheEnabled {
+				ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, nil)
+			}
 		}
 		if len(routes) == 0 {
 			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
