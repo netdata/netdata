@@ -994,6 +994,15 @@ sidebar:
             - real-time
             - live exhibits
       - meta:
+          label: Infrastructure Knowledge
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/infrastructure-knowledge.md
+          description: Teach Netdata AI about your infrastructure, in a shared document or in conversation
+          keywords:
+            - infrastructure knowledge
+            - context
+            - memory
+            - infra.md
+      - meta:
           label: Insights
           edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md
         items:
