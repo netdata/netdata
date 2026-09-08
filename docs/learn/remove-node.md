@@ -187,7 +187,7 @@ You can decommission nodes to avoid getting notifications about them. This actio
 
 1. In Netdata Cloud, go to **Space Settings > Nodes** (click the ⚙️ cog icon below the spaces list)
 2. Multi-Select the nodes for which you want to toggle commissioning status or act on each node separately (⏻ / ↪)
-3. Verify your action by clicking on the modal that appears
+3. In the dialog that appears, click **Yes, continue** to verify the action
 
 ## Additional Resources
 
