@@ -273,8 +273,10 @@ When any raw files are included, aggregate `secrets_redacted` and
 `pii_obfuscated` are also false. Standard entries retain their own sanitization
 state. The `snmp_diagnostics` object records `requested`, `status`, and `files`;
 status is `not_requested`, `unavailable`, `partial`, or `complete`. Complete
-means all selected files copied successfully, not a simultaneous directory
-snapshot or proof that every device produced evidence.
+means all selected files copied successfully and lifecycle evidence was present;
+it is not a simultaneous directory snapshot or proof that every device produced
+evidence. If other files were copied but `lifecycle.zst` is missing, the result
+is `partial`. An empty store remains `unavailable`.
 
 Binary files are streamed whole through temporary staging names, then published
 only after a successful copy. Text tail limits do not apply and no new binary

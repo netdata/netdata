@@ -691,8 +691,12 @@ function Collect-SnmpDiagnostics {
             $script:SnmpStatus = 'partial'
             Add-SnmpNote 'Diagnostic directory unavailable or reparse point (withheld).'
         } else {
+            $lifecycleMissing = $false
             if (Test-Path -LiteralPath (Join-Path $root 'lifecycle.zst')) {
                 Save-SnmpFile (Join-Path $root 'lifecycle.zst') 'lifecycle.zst' | Out-Null
+            } else {
+                $lifecycleMissing = $true
+                Add-SnmpNote 'lifecycle.zst: missing'
             }
             if (Test-Path -LiteralPath (Join-Path $root 'topology')) {
                 Save-SnmpDirectoryFiles $root 'topology' '^checkpoint-[0-9]{20}\.zst$'
@@ -713,6 +717,9 @@ function Collect-SnmpDiagnostics {
                     $script:SnmpStatus = 'partial'
                     Add-SnmpNote 'normal: directory or run index unavailable (device files withheld).'
                 }
+            }
+            if ($script:SnmpFiles -gt 0 -and $lifecycleMissing) {
+                $script:SnmpStatus = 'partial'
             }
             if ($script:SnmpFiles -eq 0 -and $script:SnmpStatus -eq 'complete') {
                 $script:SnmpStatus = 'unavailable'

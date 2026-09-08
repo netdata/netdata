@@ -739,8 +739,12 @@ collect_snmp_diagnostics() {
       SNMP_STATUS=partial
       snmp_note "Diagnostic directory unavailable or symlinked (withheld)."
     else
+      _sd_lifecycle_missing=0
       if [ -e "$_sd_root/lifecycle.zst" ] || [ -h "$_sd_root/lifecycle.zst" ]; then
         snmp_copy "$_sd_root/lifecycle.zst" lifecycle.zst || :
+      else
+        _sd_lifecycle_missing=1
+        snmp_note "lifecycle.zst: missing"
       fi
       if [ -e "$_sd_root/topology" ] || [ -h "$_sd_root/topology" ]; then
         if snmp_directory "$_sd_root/topology"; then
@@ -772,6 +776,9 @@ collect_snmp_diagnostics() {
         else
           SNMP_STATUS=partial; snmp_note "normal: directory or run index unavailable (device files withheld)."
         fi
+      fi
+      if [ "$SNMP_FILES" -gt 0 ] && [ "$_sd_lifecycle_missing" = 1 ]; then
+        SNMP_STATUS=partial
       fi
       if [ "$SNMP_FILES" = "0" ] && [ "$SNMP_STATUS" = complete ]; then
         SNMP_STATUS=unavailable; snmp_note "No completed SNMP diagnostic files found."

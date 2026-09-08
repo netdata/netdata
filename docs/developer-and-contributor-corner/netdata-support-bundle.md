@@ -96,7 +96,7 @@ sudo netdata-support-bundle --include-snmp-diagnostics
 ```
 
 On Windows, add `-IncludeSnmpDiagnostics` to the PowerShell invocation. The same
-bundle now contains original SNMP evidence under `06-state/snmp-diagnostics/`.
+bundle includes available original SNMP evidence under `06-state/snmp-diagnostics/`.
 No extra SNMP requests are sent, and no Python or decompressor is required.
 
 **These files bypass sanitization and pseudonymization.** They may contain

@@ -7,6 +7,7 @@ runs complete installed-path bundles on POSIX and Windows.
 """
 import json
 import os
+import re
 import shlex
 import shutil
 from pathlib import Path
@@ -24,15 +25,33 @@ DEVICE = "device-00000000000000000007.zst"
 CHECKPOINT = "checkpoint-00000000000000000001.zst"
 
 
+def unique_marker(source, pattern, label):
+    matches = list(re.finditer(pattern, source, re.MULTILINE))
+    if len(matches) != 1:
+        raise ValueError(f"expected one complete {label} marker, found {len(matches)}")
+    return matches[0]
+
+
+def collection_sections(source, windows):
+    # Fail before writing any executable fixture if source boundaries drift.
+    environment = unique_marker(source, r"^# --- environment detection -+\n", "environment")
+    manifest = unique_marker(source, "^" + re.escape(
+        "# emit MANIFEST.json LAST so every file (incl. summary.txt and README.md) is indexed\n"
+    ), "manifest")
+    heading = "zip" if windows else "tarball"
+    archive = unique_marker(source, r"^# =+\n# " + heading + r"\n# =+\n", "archive section")
+    if not environment.end() < manifest.start() < manifest.end() < archive.start():
+        raise ValueError("environment, manifest and archive markers are out of order")
+    return source[:environment.start()], source[manifest.end():archive.start()], source[archive.end():]
+
+
 class SnmpDiagnosticsTests(unittest.TestCase):
     def collect(self, fixture, include=True, deadline=False):
         shell = os.environ.get("SUPPORT_BUNDLE_TEST_SHELL", "sh")
         windows = shell in ("powershell", "pwsh")
         script = INSTALLER / ("netdata-support-bundle.ps1" if windows else "netdata-support-bundle")
         source = script.read_text()
-        prefix = source.split("# --- environment detection", 1)[0]
-        manifest = source.split("# emit MANIFEST.json LAST", 1)[1].split("\n", 1)[1]
-        manifest = manifest.split("# =================================================================", 1)[0]
+        prefix, manifest, _ = collection_sections(source, windows)
         if windows:
             body = r'''
 $Work = Join-Path $env:SNMP_FIXTURE 'work'
@@ -158,7 +177,11 @@ NETDATA_PID=""; api_ok=0; IS_CONTAINER=0
         # Exercise the shipped packaging block. Update-mode ZIP writers allocate
         # at least the entire input; a create-mode writer only needs IO buffers.
         source = (INSTALLER / "netdata-support-bundle.ps1").read_text()
-        packaging = source.split("# zip\n", 1)[1].split("$MapPath =", 1)[0]
+        _, _, packaging = collection_sections(source, True)
+        map_start = unique_marker(packaging, "^" + re.escape(
+            '$MapPath = Join-Path $Output "$BundleName.pseudonym-map.tsv"\n'
+        ), "pseudonym map")
+        packaging = packaging[:map_start.start()]
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             work = root / "bundle"
@@ -189,6 +212,53 @@ $before = [GC]::GetTotalAllocatedBytes($true)
                 for name in archive.namelist():
                     self.assertEqual(archive.getinfo(name).file_size, size)
                 self.assertIsNone(archive.testzip())
+
+    def test_missing_lifecycle(self):
+        cases = {
+            "normal and topology": (True, True, "partial", 4),
+            "normal only": (True, False, "partial", 3),
+            "topology only": (False, True, "partial", 1),
+            "empty store": (False, False, "unavailable", 0),
+        }
+        for name, (normal, topology, status, count) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                diag = self.fixture(root)
+                (diag / "lifecycle.zst").unlink()
+                for section, keep in (("normal", normal), ("topology", topology)):
+                    if not keep:
+                        (diag / section).rename(root / section)
+                manifest = self.collect(root)
+                self.assertEqual(manifest["snmp_diagnostics"], {"requested": True, "status": status, "files": count})
+                self.assertIn("lifecycle.zst: missing", (root / "work/06-state/snmp-diagnostics-status.txt").read_text())
+                for entry in manifest["files"]:
+                    if entry["path"].startswith("06-state/snmp-diagnostics/"):
+                        rel = entry["path"].split("06-state/snmp-diagnostics/", 1)[1]
+                        self.assertEqual((root / "work" / entry["path"]).read_bytes(), (diag / rel).read_bytes())
+
+    def test_collection_section_boundaries(self):
+        # Mutate source only in memory: malformed extracts must never execute.
+        for windows in (False, True):
+            source = (INSTALLER / ("netdata-support-bundle.ps1" if windows else "netdata-support-bundle")).read_text()
+            environment = next(line for line in source.splitlines(True) if line.startswith("# --- environment detection"))
+            manifest = next(line for line in source.splitlines(True) if line.startswith("# emit MANIFEST.json LAST"))
+            heading = "zip" if windows else "tarball"
+            archive = re.search(r"(?m)^# =+\n# " + heading + r"\n# =+\n", source).group()
+            cases = {
+                "missing environment": source.replace(environment, ""),
+                "duplicate environment": source.replace(environment, environment * 2),
+                "incomplete environment": source.replace(environment, "# --- environment detection\n"),
+                "missing manifest": source.replace(manifest, ""),
+                "duplicate manifest": source.replace(manifest, manifest * 2),
+                "incomplete manifest": source.replace(manifest, "# emit MANIFEST.json LAST\n"),
+                "missing archive header": source.replace(archive, ""),
+                "duplicate archive header": source.replace(archive, archive * 2),
+                "incomplete archive header": source.replace(archive, "# " + heading + "\n"),
+                "wrong order": manifest + source.replace(manifest, ""),
+            }
+            for name, changed in cases.items():
+                with self.subTest(windows=windows, name=name), self.assertRaises(ValueError):
+                    collection_sections(changed, windows)
 
     def test_run_selection(self):
         for name, previous, remove_run, expected in (
