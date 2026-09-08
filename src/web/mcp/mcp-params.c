@@ -88,7 +88,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
     if (!json_object_is_type(array_obj, json_type_array)) {
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "%s must be an array of strings, not %s", 
+            buffer_sprintf(error, "The '%s' parameter must be an array of strings, not %s.",
                     param_name, json_type_to_name(json_object_get_type(array_obj)));
         }
         return NULL;
@@ -113,17 +113,13 @@ BUFFER *mcp_params_parse_array_to_pattern(
         if (error) {
             buffer_flush(error);
             if (allow_wildcards) {
-                buffer_strcat(error, "invalid array format");
+                buffer_sprintf(error, "The '%s' parameter has an invalid array format.", param_name);
             } else {
-                if (list_tool) {
-                    buffer_sprintf(error,
-                            "must contain exact values, not patterns. "
-                            "Wildcards are not supported. "
-                            "Use the '%s' tool to discover exact values.", list_tool);
-                } else {
-                    buffer_strcat(error,
-                            "must contain exact values, not patterns. Wildcards are not supported.");
-                }
+                buffer_sprintf(error,
+                        "The '%s' parameter must contain exact values, not patterns. "
+                        "Wildcards are not supported.", param_name);
+                if (list_tool)
+                    buffer_sprintf(error, " Use the '%s' tool to discover exact values.", list_tool);
             }
         }
         return NULL;
@@ -131,7 +127,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
         buffer_free(wb);
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "%s must be an array of strings", param_name);
+            buffer_sprintf(error, "The '%s' parameter must be an array of strings.", param_name);
         }
         return NULL;
     }
