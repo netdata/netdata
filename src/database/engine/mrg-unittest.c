@@ -112,8 +112,95 @@ static int mrg_unittest_expect_counter_sub(
     return 1;
 }
 
+struct write_full_unittest_state {
+    const int *results;
+    size_t results_count;
+    size_t calls;
+    size_t invocations;
+    int64_t offsets[4];
+    size_t lengths[4];
+};
+
+static int write_full_unittest_operation(uv_file file __maybe_unused, const uv_buf_t *iov, int64_t offset, void *data) {
+    struct write_full_unittest_state *state = data;
+    if(state->invocations < _countof(state->offsets)) {
+        state->offsets[state->invocations] = offset;
+        state->lengths[state->invocations] = iov->len;
+    }
+    state->invocations++;
+
+    if(state->calls >= state->results_count)
+        return UV_EIO;
+
+    return state->results[state->calls++];
+}
+
+static int rrdeng_write_full_unittest(void) {
+    char buffer[8] = { 0 };
+    uv_buf_t iov = uv_buf_init(buffer, sizeof(buffer));
+    size_t written = 0;
+    int errors = 0;
+
+    written = SIZE_MAX;
+    int ret = rrdeng_write_full(-1, NULL, 100, &written, write_full_unittest_operation, NULL, 1);
+    if(ret != UV_EINVAL || written != 0) {
+        fprintf(stderr, "DBENGINE: invalid NULL iov did not clear written bytes\n");
+        errors++;
+    }
+
+    uv_buf_t null_base_iov = { .base = NULL, .len = sizeof(buffer) };
+    written = SIZE_MAX;
+    ret = rrdeng_write_full(-1, &null_base_iov, 100, &written, write_full_unittest_operation, NULL, 1);
+    if(ret != UV_EINVAL || written != 0) {
+        fprintf(stderr, "DBENGINE: invalid NULL iov base did not clear written bytes\n");
+        errors++;
+    }
+
+    const int partial_then_complete[] = { 3, 5 };
+    struct write_full_unittest_state complete = { .results = partial_then_complete, .results_count = 2 };
+    ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &complete, 1);
+    if(ret != 0 || written != sizeof(buffer) || complete.calls != 2 ||
+       complete.offsets[0] != 100 || complete.lengths[0] != sizeof(buffer) ||
+       complete.offsets[1] != 103 || complete.lengths[1] != sizeof(buffer) - 3) {
+        fprintf(stderr, "DBENGINE: full write did not retry the unwritten suffix\n");
+        errors++;
+    }
+
+    const int partial_then_error[] = { 3, UV_EIO };
+    struct write_full_unittest_state failed = { .results = partial_then_error, .results_count = 2 };
+    written = 0;
+    ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &failed, 1);
+    if(ret != UV_EIO || written != 3 || failed.calls != 2) {
+        fprintf(stderr, "DBENGINE: partial write failure was not reported\n");
+        errors++;
+    }
+
+    const int zero_progress[] = { 0 };
+    struct write_full_unittest_state zero = { .results = zero_progress, .results_count = 1 };
+    written = 0;
+    ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &zero, 1);
+    if(ret != UV_EIO || written != 0 || zero.calls != 1) {
+        fprintf(stderr, "DBENGINE: zero-byte write was not reported as failure\n");
+        errors++;
+    }
+
+    static const int permanent_errors[] = { UV_ENOSPC, UV_EBADF, UV_EACCES, UV_EROFS, UV_EINVAL };
+    for(size_t i = 0; i < sizeof(permanent_errors) / sizeof(permanent_errors[0]); i++) {
+        struct write_full_unittest_state permanent = { .results = &permanent_errors[i], .results_count = 1 };
+        written = 0;
+        ret = rrdeng_write_full(-1, &iov, 100, &written, write_full_unittest_operation, &permanent, 3);
+        if(ret != permanent_errors[i] || written != 0 || permanent.invocations != 1) {
+            fprintf(stderr, "DBENGINE: permanent write error %d was retried or changed\n", permanent_errors[i]);
+            errors++;
+        }
+    }
+
+    return errors;
+}
+
 static int dbengine_accounting_helpers_unittest(void) {
     int errors = 0;
+    errors += rrdeng_write_full_unittest();
     struct rrdengine_instance ctx = {0};
     ctx.config.tier = 1;
 
@@ -128,6 +215,29 @@ static int dbengine_accounting_helpers_unittest(void) {
 
     errors += mrg_unittest_expect_counter_sub(&ctx, 9, 4, true, 5, "normal decrement");
     errors += mrg_unittest_expect_counter_sub(&ctx, 9, 0, true, 9, "zero decrement");
+
+    ctx_fileno_initialize_from_scan(&ctx, 5, 6); // orphan journal cleanup must reserve its higher filename
+    unsigned failed_fileno = ctx_next_fileno_reserve(&ctx);
+    unsigned retry_fileno = ctx_next_fileno_reserve(&ctx);
+    ctx_last_fileno_set(&ctx, retry_fileno);
+    if(failed_fileno != 7 || retry_fileno != 8 || ctx_last_fileno_get(&ctx) != retry_fileno) {
+        fprintf(stderr,
+                "DBENGINE METRIC: file-number reservation failed, expected failed/retry/last 7/8/8 got %u/%u/%u\n",
+                failed_fileno,
+                retry_fileno,
+                ctx_last_fileno_get(&ctx));
+        errors++;
+    }
+
+    ctx_fileno_initialize_from_scan(&ctx, 12, 12); // an invalid pair is queued for asynchronous deletion
+    ctx_last_fileno_set(&ctx, 0); // all scanned pairs were invalid, so no active pair remains
+    unsigned replacement_fileno = ctx_next_fileno_reserve(&ctx);
+    if(replacement_fileno != 13) {
+        fprintf(stderr,
+                "DBENGINE METRIC: all-invalid scan filename reservation failed, expected replacement 13 got %u\n",
+                replacement_fileno);
+        errors++;
+    }
 
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_unittest_expect_counter_sub(&ctx, 3, 9, false, 0, "underflow saturation");

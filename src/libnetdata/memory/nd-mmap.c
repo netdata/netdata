@@ -5,6 +5,58 @@
 size_t nd_mmap_count = 0;
 size_t nd_mmap_size = 0;
 
+// -------------------------------------------------------------------------
+// Windows mmap/munmap/madvise — UCRT64 has no sys/mman.h.
+// Anonymous mappings use VirtualAlloc; file-backed use CreateFileMapping.
+// munmap tries UnmapViewOfFile first (file-backed), then VirtualFree.
+// madvise is a no-op: Windows memory management is fully automatic.
+// -------------------------------------------------------------------------
+#if defined(OS_WINDOWS)
+
+void *mmap(void *addr __maybe_unused, size_t len, int prot, int flags,
+           int fd, off_t offset __maybe_unused) {
+    if (flags & MAP_ANONYMOUS) {
+        DWORD protect = (prot & PROT_WRITE) ? PAGE_READWRITE : PAGE_READONLY;
+        void *ptr = VirtualAlloc(NULL, len, MEM_COMMIT | MEM_RESERVE, protect);
+        return ptr ? ptr : MAP_FAILED;
+    }
+
+    HANDLE handle = (HANDLE)_get_osfhandle(fd);
+    if (handle == INVALID_HANDLE_VALUE)
+        return MAP_FAILED;
+
+    DWORD flProtect = (prot & PROT_WRITE) ? PAGE_READWRITE : PAGE_READONLY;
+    HANDLE mapHandle = CreateFileMapping(handle, NULL, flProtect, 0, 0, NULL);
+    if (!mapHandle)
+        return MAP_FAILED;
+
+    DWORD access;
+    if (!(prot & PROT_WRITE))
+        access = FILE_MAP_READ;
+    else if (flags & MAP_SHARED)
+        access = FILE_MAP_WRITE;
+    else
+        access = FILE_MAP_COPY;
+
+    void *ptr = MapViewOfFile(mapHandle, access, 0, 0, len);
+    CloseHandle(mapHandle);
+    return ptr ? ptr : MAP_FAILED;
+}
+
+int munmap(void *ptr, size_t len __maybe_unused) {
+    if (!UnmapViewOfFile(ptr))
+        if (!VirtualFree(ptr, 0, MEM_RELEASE))
+            return -1;
+    return 0;
+}
+
+int madvise(void *addr __maybe_unused, size_t len __maybe_unused,
+            int advice __maybe_unused) {
+    return 0;
+}
+
+#endif // OS_WINDOWS
+
 #if !defined(MADV_DONTFORK)
 #define MADV_DONTFORK 0
 #endif

@@ -168,6 +168,10 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
 // ----------------------------------------------------------------------------
 
+#if defined(OS_WINDOWS)
+// Drain and stop the WEL/ETW async writer thread during shutdown.
+void nd_log_stop_windows_async(void);
+#endif
 
 #define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
 

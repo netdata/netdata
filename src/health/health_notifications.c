@@ -446,12 +446,18 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         goto done;
     }
 
+    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.default_exec);
+    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.default_recipient);
+
+    if(!exec || !*exec) {
+        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' (no notification command configured)",
+                          ae_chart_id(ae), ae_name(ae));
+        goto done;
+    }
+
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "[%s]: Sending notification for alarm '%s.%s' status %s.",
            rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
-
-    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.default_exec);
-    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.default_recipient);
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 

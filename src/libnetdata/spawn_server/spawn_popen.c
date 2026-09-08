@@ -103,35 +103,173 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
     return pi;
 }
 
+#if defined(OS_WINDOWS)
+// The only script plugin we can run on Windows: it is the one with an
+// interpreter we know how to locate.
+#define NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN "python.d.plugin"
+
+static const char *windows_path_basename(const char *path) {
+    const char *base = path;
+
+    for(const char *p = path; *p ; p++)
+        if(*p == '/' || *p == '\\')
+            base = p + 1;
+
+    return base;
+}
+
+static bool windows_path_is_explicit(const char *path) {
+    return path && *path &&
+           (path[0] == '/' ||
+            (isalpha((uint8_t)path[0]) && path[1] == ':' && (path[2] == '/' || path[2] == '\\')) ||
+            (path[0] == '\\' && path[1] == '\\'));
+}
+
+static bool windows_path_is_native_executable(const char *path) {
+    const char *extension = strrchr(path, '.');
+    return extension && (!strcasecmp(extension, ".exe") || !strcasecmp(extension, ".com"));
+}
+
+static POPEN_INSTANCE *windows_run_direct_command(const char *cmd) {
+    size_t len = strnlen(cmd, PATH_MAX);
+    if(len >= PATH_MAX) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command too long");
+        return NULL;
+    }
+
+    char cmd_copy[len + 1];
+    memcpy(cmd_copy, cmd, len + 1);
+
+    char *words[100];
+    size_t num_words = quoted_strings_splitter_whitespace(cmd_copy, words, _countof(words));
+    char *program = get_word(words, num_words, 0);
+    if(!program || !windows_path_is_explicit(program) || !windows_path_is_native_executable(program)) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+               "SPAWN: skipping '%s' — Windows commands must name an explicit .exe or .com path",
+               cmd);
+        return NULL;
+    }
+
+    const char *argv[101];
+    for(size_t i = 0; i < num_words; i++)
+        argv[i] = get_word(words, num_words, i);
+    argv[num_words] = NULL;
+
+    return spawn_popen_run_argv(argv);
+}
+#endif
+
 POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
     if(!cmd || !*cmd) return NULL;
 
-//#if defined(OS_WINDOWS)
-//    if(strncmp(cmd, "exec ", 5) == 0) {
-//        size_t len = strlen(cmd);
-//        char cmd_copy[strlen(cmd) + 1];
-//        memcpy(cmd_copy, cmd, len + 1);
-//        char *words[100];
-//        size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
-//        char *exec = get_word(words, num_words, 0);
-//        char *prog = get_word(words, num_words, 1);
-//        if (strcmp(exec, "exec") == 0 &&
-//            prog &&
-//            strendswith(prog, ".plugin") &&
-//            !strendswith(prog, "charts.d.plugin") &&
-//            !strendswith(prog, "ioping.plugin")) {
-//            const char *argv[num_words - 1 + 1]; // remove exec, add terminator
-//
-//            size_t dst = 0;
-//            for (size_t i = 1; i < num_words; i++)
-//                argv[dst++] = get_word(words, num_words, i);
-//
-//            argv[dst] = NULL;
-//            return spawn_popen_run_argv(argv);
-//        }
-//    }
-//#endif
+#if defined(OS_WINDOWS)
+    // If the command starts with "exec ", strip it and exec the program
+    // directly. Native plugins on Windows carry a .plugin.exe suffix; script
+    // plugins are handled by finding their interpreter. Other commands are
+    // accepted below only as explicit native executable paths.
+    if(strncmp(cmd, "exec ", 5) == 0) {
+        // cmd is built by netdata internally (max ~16 KiB), but bound the
+        // scan so a malformed input cannot request an unbounded VLA.
+        size_t len = strnlen(cmd, PATH_MAX);
+        if (len >= PATH_MAX) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command too long");
+            return NULL;
+        }
+        char cmd_copy[len + 1];
+        memcpy(cmd_copy, cmd, len + 1);
+        char *words[100];
+        size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
+        char *exec = get_word(words, num_words, 0);
+        char *prog = get_word(words, num_words, 1);
+        if (strcmp(exec, "exec") == 0 && prog) {
+            if (strendswith(prog, ".plugin.exe")) {
+                // Native .exe plugin — exec directly, no shell needed.
+                const char *argv[num_words]; // remove exec, add NULL terminator
 
+                size_t dst = 0;
+                for (size_t i = 1; i < num_words; i++)
+                    argv[dst++] = get_word(words, num_words, i);
+
+                argv[dst] = NULL;
+                return spawn_popen_run_argv(argv);
+            }
+
+            if (strcmp(windows_path_basename(prog), NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN) == 0) {
+                // python.d.plugin — needs a Python interpreter.
+                // Parse args first: a -p<interpreter> option works even when Python is
+                // absent from PATH, matching the Linux bash wrapper that strips -p before
+                // exec'ing Python.  The PATH search (and its early-return guard) is only
+                // needed when no explicit interpreter was provided.
+                // Guarded by a spinlock: each plugin spawns in its own thread, so two
+                // concurrent calls could race on the unsearched→searched transition and
+                // one would read python_path before SearchPathA had written it.
+                static char python_path[MAX_PATH + 1];
+                static bool python_searched = false;
+                static SPINLOCK python_lock = SPINLOCK_INITIALIZER;
+
+                // words[0]="exec", words[1]=plugin_path; real args start at [2]
+                const char *interp_override = NULL;
+                size_t filt_count = 0;
+                const char *filt_args[num_words]; // worst case: all args fit
+
+                for (size_t i = 2; i < num_words; i++) {
+                    const char *w = get_word(words, num_words, i);
+                    if (w && w[0] == '-' && w[1] == 'p' && w[2] != '\0')
+                        interp_override = w + 2;
+                    else
+                        filt_args[filt_count++] = w;
+                }
+
+                const char *interp;
+                if (interp_override) {
+                    interp = interp_override;
+                } else {
+                    spinlock_lock(&python_lock);
+                    if (!python_searched) {
+                        if (SearchPathA(NULL, "python3.exe", NULL, MAX_PATH, python_path, NULL) == 0 &&
+                            SearchPathA(NULL, "python.exe",  NULL, MAX_PATH, python_path, NULL) == 0)
+                            python_path[0] = '\0';
+                        python_searched = true;
+                    }
+                    spinlock_unlock(&python_lock);
+                    if (!python_path[0]) {
+                        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                               "SPAWN: skipping '%s' — Python is not installed on this system", prog);
+                        return NULL;
+                    }
+                    interp = python_path;
+                }
+
+                nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+                       "SPAWN: python.d.plugin using interpreter '%s' (selected via %s)",
+                       interp, interp_override ? "-p option" : "PATH search");
+
+                // argv: [interpreter, plugin_path, filtered_args..., NULL]
+                const char *argv[2 + filt_count + 1];
+                argv[0] = interp;
+                argv[1] = prog;
+                for (size_t i = 0; i < filt_count; i++)
+                    argv[2 + i] = filt_args[i];
+                argv[2 + filt_count] = NULL;
+                return spawn_popen_run_argv(argv);
+            }
+
+            if (strendswith(prog, ".plugin")) {
+                // Any other script plugin: there is no interpreter contract for
+                // it on Windows (ioping.plugin is bash, not Python), so running
+                // it under the wrong interpreter would only produce noise.
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                       "SPAWN: skipping '%s' — only %s is supported as a script plugin on Windows",
+                       prog, NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN);
+                return NULL;
+            }
+        }
+    }
+#endif
+
+#if defined(OS_WINDOWS)
+    return windows_run_direct_command(strncmp(cmd, "exec ", 5) == 0 ? cmd + 5 : cmd);
+#else
     const char *argv[] = {
         "/bin/sh",
         "-c",
@@ -139,6 +277,7 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
         NULL
     };
     return spawn_popen_run_argv(argv);
+#endif
 }
 
 static int spawn_popen_status_rc(int status) {

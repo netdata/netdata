@@ -16,16 +16,25 @@ const char *inicfg_set(struct config *root, const char *section, const char *nam
     return string2str(opt->value);
 }
 
+#if defined(OS_WINDOWS)
+// Convert any path form to Windows-native with forward slashes (C:/...).
+// Handles MSYS/POSIX (/c/...), Windows-with-backslashes (C:\...), and already-native (C:/...).
+static char *normalize_to_native_path(const char *src) {
+    char *win = os_translate_msys_to_windows_path(src);
+    for (char *p = win; *p; p++)
+        if (*p == '\\') *p = '/';
+    return win;
+}
+#endif
+
 static STRING *reformat_path(STRING *value) {
 #if defined(OS_WINDOWS)
-    CLEAN_CHAR_P *converted = os_translate_windows_to_msys_path(string2str(value));
+    CLEAN_CHAR_P *converted = normalize_to_native_path(string2str(value));
     if(string_strcmp(value, converted) != 0) {
         string_freez(value);
         return string_strdupz(converted);
     }
-    // value unchanged: fall through and return as-is
 #else
-    // no-op on non-Windows: paths are always POSIX-style
     (void)value;
 #endif
 
@@ -71,9 +80,10 @@ static char *transform_log_path_setting(const char *setting, bool for_display) {
     if(log_setting_output_is_special(output))
         return strdupz(setting);
 
+    // Display uses backslash-form (C:\...); storage uses forward-slash native form (C:/...).
     CLEAN_CHAR_P *translated = for_display
         ? os_translate_msys_to_windows_path(output)
-        : os_translate_windows_to_msys_path(output);
+        : normalize_to_native_path(output);
     // os_translate_*_path() returns an allocated non-NULL string, using ""
     // for empty input, so no NULL fallback is needed here.
     size_t translated_len = strnlen(translated, CONFIG_MAX_VALUE + 1);
@@ -101,7 +111,9 @@ static bool windows_path_list_needs_reformat_p(const char *value) {
     if(!value || !*value)
         return false;
 
-    return strchr(value, ';') || strchr(value, '\\') || windows_native_path_p(value);
+    // Detect Windows indicators: semicolons, backslashes, native drive prefix, or MSYS form (/c/...).
+    return strchr(value, ';') || strchr(value, '\\') || windows_native_path_p(value) ||
+           (value[0] == '/' && isalpha((unsigned char)value[1]) && (value[2] == '/' || value[2] == '\0'));
 }
 
 static STRING *reformat_path_list(STRING *value) {
@@ -122,7 +134,7 @@ static STRING *reformat_path_list(STRING *value) {
 
         CLEAN_CHAR_P *segment = strndupz(segment_start, segment_len);
         char *trimmed = trim(segment);
-        CLEAN_CHAR_P *converted = os_translate_windows_to_msys_path(trimmed);
+        CLEAN_CHAR_P *converted = normalize_to_native_path(trimmed);
 
         if(!first)
             buffer_strcat(wb, ":");
@@ -154,7 +166,7 @@ static STRING *reformat_quoted_path_list(STRING *value) {
 
     BUFFER *wb = buffer_create(string_strlen(value) + 1, NULL);
     for(size_t i = 0; i < num_words; i++) {
-        CLEAN_CHAR_P *converted = os_translate_windows_to_msys_path(words[i]);
+        CLEAN_CHAR_P *converted = normalize_to_native_path(words[i]);
         if(i)
             buffer_strcat(wb, " ");
         buffer_sprintf(wb, "\"%s\"", converted);

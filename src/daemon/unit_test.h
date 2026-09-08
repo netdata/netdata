@@ -16,6 +16,7 @@ int unit_test_bitmaps(void);
 int stacktrace_unittest(void);
 #ifdef ENABLE_DBENGINE
 int test_dbengine(void);
+int dbengine_platform_unittest(void);
 void generate_dbengine_dataset(unsigned history_seconds);
 void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsigned QUERY_THREADS,
                                  unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB, unsigned DISK_SPACE_MB);

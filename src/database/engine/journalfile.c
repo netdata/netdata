@@ -7,7 +7,6 @@ time_t dbengine_journal_v2_unmount_time = 120;
 /* Careful to always call this before creating a new journal file */
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
-    uv_fs_t request;
     struct rrdengine_journalfile *journalfile = datafile->journalfile;
     uv_buf_t iov;
 
@@ -24,25 +23,20 @@ int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine
 
     iov = uv_buf_init(wal->buf, wal->buf_size);
 
-    int retries = 10;
-    int ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &request, journalfile->file, &iov, 1, (int64_t)journalfile_position, NULL);
-        uv_fs_req_cleanup(&request);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
-                break;
-            sleep_usec(300 * USEC_PER_MS);
-        }
+    size_t bytes_written;
+    int ret = rrdeng_write_full(journalfile->file, &iov, (int64_t)journalfile_position,
+                                &bytes_written, NULL, NULL, 10);
+
+    if (bytes_written) {
+        ctx_current_disk_space_increase(ctx, bytes_written);
+        journalfile_accounted_size_add(journalfile, bytes_written);
+        ctx_io_write_op_bytes(ctx, bytes_written);
     }
 
     if (unlikely(ret < 0)) {
         ctx_io_error(ctx);
         goto done;
     }
-
-    ctx_current_disk_space_increase(ctx, wal->buf_size);
-    ctx_io_write_op_bytes(ctx, wal->buf_size);
 
 done:
     wal_release(wal);
@@ -653,9 +647,7 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
     char path[RRDENG_PATH_MAX];
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    UNLINK_FILE(ctx, path, ret);
-    if (ret == 0)
-        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+    ret = rrdeng_file_deletion_schedule(ctx, path, 0, false);
 
     return ret;
 }
@@ -664,10 +656,10 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     int ret;
-    uv_fs_t req_v2 = { 0 };
-    uv_fs_t req_v1 = { 0 };
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
+    size_t journal_v1_bytes = journalfile_accounted_size_get(journalfile);
+    size_t journal_v2_bytes = journalfile_v2_data_size_get(journalfile);
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
@@ -680,28 +672,17 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     if(journalfile_v2_data_available(journalfile))
         journalfile_v2_data_unmap_permanently(journalfile);
 
-    // Now safe to delete the files - no threads are accessing them
+    // Now safe to schedule deletion; the queue owns copied paths and updates
+    // accounting only after the filesystem operation completes.
     uint8_t deleted = 0;
 
-    ret = uv_fs_unlink(NULL, &req_v2, path_v2, NULL);
+    ret = rrdeng_file_deletion_schedule(ctx, path_v2, journal_v2_bytes, false);
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V2;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v2);
 
-    ret = uv_fs_unlink(NULL, &req_v1, path, NULL);
+    ret = rrdeng_file_deletion_schedule(ctx, path, journal_v1_bytes, false);
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V1;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v1);
-
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 
     return deleted;
 }
@@ -709,7 +690,6 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     uv_file file;
     int ret, fd;
     struct rrdeng_jf_sb *superblock = NULL;
@@ -731,17 +711,8 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
-    int retries = 10;
-    ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
-        uv_fs_req_cleanup(&req);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
-                break;
-            sleep_usec(300 * USEC_PER_MS);
-        }
-    }
+    size_t bytes_written;
+    ret = rrdeng_write_full(file, &iov, 0, &bytes_written, NULL, NULL, 10);
 
     posix_memalign_freez(superblock);
 
@@ -755,6 +726,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 
     __atomic_add_fetch(&ctx->stats.journalfile_creations, 1, __ATOMIC_RELAXED);
     journalfile->unsafe.pos = sizeof(*superblock);
+    journalfile->unsafe.accounted_size = sizeof(*superblock);
     ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 
     return 0;
@@ -1366,11 +1338,29 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         journal_v1_file_size = (uint32_t)statbuf.st_size;
 
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path_v2));
+
+    // fileno is always numeric (parsed via sscanf %u from directory entries),
+    // so path_v2 is structurally guaranteed to be inside dbfiles_path.
+    // We keep the strnlen bound to detect a genuinely malformed dbfiles_path
+    // (empty or not null-terminated), but the strncmp prefix check is omitted:
+    // it adds no security benefit and silently returns 1 on any path mismatch
+    // (including Windows separator variants), which destroys the data/journal
+    // pair when combined with an absent v1 journal on modern installations.
+    const char *dbpath = datafile_ctx(datafile)->config.dbfiles_path;
+    size_t dbpath_len = strnlen(dbpath, sizeof(((struct rrdengine_instance *)0)->config.dbfiles_path));
+    if (dbpath_len == 0 ||
+        dbpath_len >= sizeof(((struct rrdengine_instance *)0)->config.dbfiles_path)) {
+        netdata_log_error("DBENGINE: dbfiles_path is empty or not null-terminated");
+        return 1;
+    }
+
     fd = open(path_v2, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        if (errno == ENOENT)
+        int open_errno = errno;
+        if (open_errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
+        errno = open_errno;
         netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
         return 1;
     }
@@ -1879,12 +1869,14 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     if(loaded_v2) {
         journalfile->unsafe.pos = file_size;
+        journalfile->unsafe.accounted_size = file_size;
         error = 0;
         goto cleanup;
     }
 
     file_size = ALIGN_BYTES_FLOOR(file_size);
     journalfile->unsafe.pos = file_size;
+    journalfile->unsafe.accounted_size = file_size;
     journalfile->file = file;
 
     ret = journalfile_check_superblock(file);

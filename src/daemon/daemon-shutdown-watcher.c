@@ -15,6 +15,12 @@ static ND_THREAD *watcher_thread;
 
 static BUFFER *steps_timings = NULL;
 
+static void (*shutdown_timeout_cb)(void) = NULL;
+
+void nd_register_shutdown_timeout_cb(void (*cb)(void)) {
+    __atomic_store_n(&shutdown_timeout_cb, cb, __ATOMIC_RELEASE);
+}
+
 NEVER_INLINE
 static void shutdown_timed_out(const char *step) {
     // keep this as a separate function, to have it logged like this in sentry
@@ -24,6 +30,9 @@ static void shutdown_timed_out(const char *step) {
     // 1. During shutdown timeout, the status file has already been saved with timeout info
     // 2. Sentry may crash trying to access potentially freed/corrupted strings from session_status
     // 3. The abort() below will trigger a signal that Sentry will catch anyway
+
+    void (*cb)(void) = __atomic_load_n(&shutdown_timeout_cb, __ATOMIC_ACQUIRE);
+    if (cb) cb();
 
     abort();
 }

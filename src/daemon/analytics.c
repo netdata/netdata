@@ -394,6 +394,11 @@ void analytics_collectors(void)
  */
 void analytics_alarms_notifications(void)
 {
+#if defined(OS_WINDOWS)
+    // alarm-notify.sh is a shell script and the package does not guarantee a
+    // shell. netdata_notification_methods keeps its "null" initial value.
+    return;
+#else
     char *script;
     script = mallocz(
         sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
@@ -439,6 +444,7 @@ void analytics_alarms_notifications(void)
     analytics_set_data_str(&analytics_data.netdata_notification_methods, (char *)buffer_tostring(b));
 
     buffer_free(b);
+#endif
 }
 
 static void analytics_get_install_type(struct rrdhost_system_info *system_info) {

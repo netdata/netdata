@@ -32,7 +32,6 @@ void rrdcontext_context_registry_destroy(void) {
     
     // Free the entire Judy array
     JudyLFreeArray(&context_registry_judyl, PJE0);
-    
     spinlock_unlock(&context_registry_spinlock);
 }
 
@@ -275,6 +274,5 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
     
     // Free the JudyL array (values were already freed in the loop above)
     JudyLFreeArray(&categories_judyl, PJE0);
-    
     spinlock_unlock(&context_registry_spinlock);
 }

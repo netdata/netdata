@@ -37,7 +37,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
                 ls->format = NDLF_JOURNAL;
 #if defined(OS_WINDOWS)
 #if defined(HAVE_ETW)
-            else if(strcmp(name, ETW_NAME) == 0)
+            else if(strcmp(name, ETW_NAME) == 0 || strcmp(name, WEL_NAME) == 0)
                 ls->format = NDLF_ETW;
 #endif
 #if defined(HAVE_WEL)
@@ -83,6 +83,15 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
                        nd_log_id2source(source), setting, name);
         }
     }
+
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
+    // UCRT builds replaced classic WEL with manifest-backed ETW. Preserve an
+    // existing Windows configuration by routing its legacy `wel` output to ETW.
+    if(strcmp(output, WEL_NAME) == 0) {
+        output = ETW_NAME;
+        ls->format = NDLF_ETW;
+    }
+#endif
 
     if(!output || !*output || strcmp(output, "none") == 0 || strcmp(output, "off") == 0) {
         ls->method = NDLM_DISABLED;

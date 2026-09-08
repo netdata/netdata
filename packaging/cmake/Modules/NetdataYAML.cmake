@@ -35,6 +35,9 @@ function(netdata_bundle_libyaml)
                 )
         endif()
 
+        # libyaml v0.2.5 declares cmake_minimum_required < 3.5; CMake 3.28+ treats that as an error.
+        set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
+
         FetchContent_MakeAvailable_NoInstall(yaml)
 endfunction()
 

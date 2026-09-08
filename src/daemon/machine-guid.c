@@ -378,6 +378,11 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
         return h;
 
     // Avoid a check-then-create race; mkdir() + EEXIST is sufficient.
+    // On Windows, an MSI upgrade may have removed the parent chain; rebuild it
+    // recursively so that the final mkdir below has a valid parent to land in.
+#if defined(OS_WINDOWS)
+    mkdir_recursive(pathname);
+#endif
     errno_clear();
     if (mkdir(pathname, 0775) != 0) {
         if (errno != EEXIST) {

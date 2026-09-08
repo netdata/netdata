@@ -151,10 +151,8 @@ struct nd_log {
     } syslog;
 
     struct {
-        bool etw; // when set use etw, otherwise wel
+        bool etw;
         bool initialized;
-        bool provider_enabled;  // track etw provider state
-        SPINLOCK provider_lock; // Protect etw provider state access
     } eventlog;
 
     struct {
@@ -188,6 +186,10 @@ struct log_field {
 extern __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_MAX];
 extern __thread size_t thread_log_stack_next;
 extern __thread struct log_field thread_log_fields[_NDF_MAX];
+bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry);
+ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source);
+bool nd_log_source_has_flood_protection(ND_LOG_SOURCES source);
+ND_LOG_SOURCES nd_log_resolve_source_with_flood_protection(ND_LOG_SOURCES source, bool *limit);
 
 // --------------------------------------------------------------------------------------------------------------------
 

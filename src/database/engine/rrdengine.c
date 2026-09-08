@@ -231,6 +231,131 @@ static inline void work_done(struct rrdeng_work *work_request) {
     aral_freez(rrdeng_main.work_cmd.ar, work_request);
 }
 
+struct rrdeng_file_deletion {
+    uv_work_t work;
+    struct rrdengine_instance *ctx;
+    struct rrdeng_file_deletion *next;
+    char path[RRDENG_PATH_MAX];
+    size_t bytes;
+    bool datafile;
+    int result;
+};
+
+static void rrdeng_file_deletion_worker(uv_work_t *work) {
+    struct rrdeng_file_deletion *deletion = work->data;
+    uv_fs_t request = { 0 };
+
+    deletion->result = uv_fs_unlink(NULL, &request, deletion->path, NULL);
+    uv_fs_req_cleanup(&request);
+}
+
+static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused);
+static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion);
+
+static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
+    int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
+                           rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
+    if (unlikely(rc)) {
+        deletion->result = rc;
+        rrdeng_file_deletion_finish(deletion);
+    }
+}
+
+static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
+    struct rrdengine_instance *ctx = deletion->ctx;
+
+    if (deletion->result == 0) {
+        if (deletion->datafile)
+            __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+
+        if (deletion->bytes)
+            ctx_current_disk_space_decrease(ctx, deletion->bytes);
+    }
+    else if (deletion->result != UV_ENOENT) {
+        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", deletion->path,
+                          uv_strerror(deletion->result));
+        ctx_fs_error(ctx);
+    }
+
+    if (deletion->bytes)
+        __atomic_sub_fetch(&ctx->atomic.pending_deletion_bytes, deletion->bytes, __ATOMIC_RELAXED);
+
+    spinlock_lock(&ctx->deletion.spinlock);
+    fatal_assert(__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED) != 0);
+    __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELAXED);
+    struct rrdeng_file_deletion *next = ctx->deletion.head;
+    if (next) {
+        ctx->deletion.head = next->next;
+        if (!ctx->deletion.head)
+            ctx->deletion.tail = NULL;
+    }
+    else
+        ctx->deletion.running = false;
+    spinlock_unlock(&ctx->deletion.spinlock);
+
+    freez(deletion);
+
+    if (next)
+        rrdeng_file_deletion_start(next);
+}
+
+static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused) {
+    rrdeng_file_deletion_finish(work->data);
+}
+
+int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile) {
+    if (unlikely(!ctx || !path || !*path))
+        return UV_EINVAL;
+
+    struct rrdeng_file_deletion *deletion = callocz(1, sizeof(*deletion));
+    deletion->work.data = deletion;
+    deletion->ctx = ctx;
+    deletion->bytes = bytes;
+    deletion->datafile = datafile;
+    strncpyz(deletion->path, path, sizeof(deletion->path) - 1);
+
+    if (bytes)
+        __atomic_add_fetch(&ctx->atomic.pending_deletion_bytes, bytes, __ATOMIC_RELAXED);
+
+    spinlock_lock(&ctx->deletion.spinlock);
+    if (ctx->deletion.tail)
+        ctx->deletion.tail->next = deletion;
+    else
+        ctx->deletion.head = deletion;
+    ctx->deletion.tail = deletion;
+    __atomic_add_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELAXED);
+
+    bool start = !ctx->deletion.running;
+    if (start) {
+        ctx->deletion.running = true;
+        ctx->deletion.head = deletion->next;
+        if (!ctx->deletion.head)
+            ctx->deletion.tail = NULL;
+    }
+    spinlock_unlock(&ctx->deletion.spinlock);
+
+    if (start)
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FILE_DELETE, deletion, NULL,
+                       STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    return 0;
+}
+
+void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx) {
+    bool logged = false;
+    while (__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED)) {
+        if (!logged) {
+            netdata_log_info("DBENGINE: tier %d: waiting for %zu queued file deletions...",
+                             ctx->config.tier,
+                             __atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED));
+            logged = true;
+        }
+        sleep_usec(10 * USEC_PER_MS);
+    }
+}
+
 static void work_standard_worker(uv_work_t *req) {
     __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
@@ -1114,22 +1239,52 @@ static bool extent_move_to_new_datafile(struct rrdengine_instance *ctx, struct e
     return true;
 }
 
-static int extent_write_to_datafile(struct rrdengine_datafile *datafile, uv_buf_t *iov, uint64_t pos) {
+static int rrdeng_uv_fs_write(uv_file file, const uv_buf_t *iov, int64_t offset, void *data __maybe_unused) {
     uv_fs_t request;
+    int ret = uv_fs_write(NULL, &request, file, iov, 1, offset, NULL);
+    uv_fs_req_cleanup(&request);
+    return ret;
+}
 
-    int retries = 10;
-    int ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &request, datafile->file, iov, 1, (int64_t)pos, NULL);
-        uv_fs_req_cleanup(&request);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+int rrdeng_write_full(uv_file file, const uv_buf_t *iov, int64_t offset, size_t *bytes_written,
+                      RRDENG_WRITE_OPERATION operation, void *operation_data, unsigned retries) {
+    if (!bytes_written)
+        return UV_EINVAL;
+
+    *bytes_written = 0;
+    if (!iov || !iov->base)
+        return UV_EINVAL;
+
+    if (!operation)
+        operation = rrdeng_uv_fs_write;
+
+    while (*bytes_written < iov->len) {
+        uv_buf_t remaining = uv_buf_init((char *)iov->base + *bytes_written, iov->len - *bytes_written);
+        int ret = UV_EIO;
+        unsigned attempts = retries;
+
+        while (attempts--) {
+            ret = operation(file, &remaining, offset + (int64_t)*bytes_written, operation_data);
+            if (ret >= 0 || ret == UV_ENOSPC || ret == UV_EBADF || ret == UV_EACCES || ret == UV_EROFS || ret == UV_EINVAL)
                 break;
             sleep_usec(300 * USEC_PER_MS);
         }
+
+        if (ret <= 0)
+            return ret ? ret : UV_EIO;
+
+        if ((size_t)ret > remaining.len)
+            return UV_EIO;
+
+        *bytes_written += (size_t)ret;
     }
 
-    return ret;
+    return 0;
+}
+
+static int extent_write_to_datafile(struct rrdengine_datafile *datafile, uv_buf_t *iov, uint64_t pos,
+                                    size_t *bytes_written) {
+    return rrdeng_write_full(datafile->file, iov, (int64_t)pos, bytes_written, NULL, NULL, 10);
 }
 
 static void *extent_write_tp_worker(
@@ -1151,11 +1306,15 @@ static void *extent_write_tp_worker(
         worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
         struct rrdengine_datafile *datafile = xt_io_descr->datafile;
 
-        ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos);
-        if (likely(ret >= 0)) {
-            ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
-            ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
+        size_t bytes_written;
+        ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos, &bytes_written);
+        if (bytes_written) {
+            ctx_current_disk_space_increase(ctx, bytes_written);
+            datafile_accounted_size_add(datafile, bytes_written);
+            ctx_io_write_op_bytes(ctx, bytes_written);
+        }
 
+        if (likely(ret >= 0)) {
             // journalfile_v1_extent_write() always releases the WAL
             ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
             xt_io_descr->wal = NULL;
@@ -1763,10 +1922,10 @@ void datafile_delete(
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
-    size_t deleted_bytes, journal_file_bytes, datafile_bytes;
-    uint8_t deleted_journal_files = 0;
+    size_t scheduled_bytes, journal_file_bytes, datafile_bytes;
+    uint8_t scheduled_journal_files = 0;
     uint8_t expected_journal_files = JOURNALFILE_DELETED_V1;
-    bool deleted_datafile = false;
+    bool scheduled_datafile = false;
     unsigned datafile_tier = datafile->tier;
     int ret;
 
@@ -1775,24 +1934,22 @@ void datafile_delete(
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     journal_file = datafile->journalfile;
-    datafile_bytes = datafile->pos;
-    journal_file_bytes = journalfile_current_size(journal_file);
+    datafile_bytes = datafile_accounted_size_get(datafile);
+    journal_file_bytes = journalfile_accounted_size_get(journal_file);
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
     if (journalfile_v2_data_available(journal_file))
         expected_journal_files |= JOURNALFILE_DELETED_V2;
-    deleted_bytes = 0;
+    scheduled_bytes = 0;
 
-    // This will delete journalfile_v2 and journalfile_v1 (returns bitmask of JOURNALFILE_DELETED_V1/V2)
-    deleted_journal_files = journalfile_destroy_unsafe(journal_file, datafile);
-    if (deleted_journal_files & JOURNALFILE_DELETED_V1)
-        deleted_bytes += journal_file_bytes;
-    if (deleted_journal_files & JOURNALFILE_DELETED_V2)
-        deleted_bytes += journal_v2_bytes;
-    // This will delete the datafile
-    ret = destroy_data_file_unsafe(datafile);
+    scheduled_journal_files = journalfile_destroy_unsafe(journal_file, datafile);
+    if (scheduled_journal_files & JOURNALFILE_DELETED_V1)
+        scheduled_bytes += journal_file_bytes;
+    if (scheduled_journal_files & JOURNALFILE_DELETED_V2)
+        scheduled_bytes += journal_v2_bytes;
+    ret = destroy_data_file_unsafe(datafile, true);
     if (!ret) {
-        deleted_datafile = true;
-        deleted_bytes += datafile_bytes;
+        scheduled_datafile = true;
+        scheduled_bytes += datafile_bytes;
     }
 
     cleanup_datafile_epdl_structures(datafile);
@@ -1803,21 +1960,20 @@ void datafile_delete(
     freez(journal_file);
     freez(datafile);
 
-    ctx_current_disk_space_decrease(ctx, deleted_bytes);
     char size_for_humans[128];
-    size_snprintf(size_for_humans, sizeof(size_for_humans), deleted_bytes, "B", false);
+    size_snprintf(size_for_humans, sizeof(size_for_humans), scheduled_bytes, "B", false);
 
-    bool del_ndf = deleted_datafile;
-    bool del_njf = deleted_journal_files & JOURNALFILE_DELETED_V1;
-    bool del_njfv2 = deleted_journal_files & JOURNALFILE_DELETED_V2;
+    bool del_ndf = scheduled_datafile;
+    bool del_njf = scheduled_journal_files & JOURNALFILE_DELETED_V1;
+    bool del_njfv2 = scheduled_journal_files & JOURNALFILE_DELETED_V2;
     bool exp_njf = expected_journal_files & JOURNALFILE_DELETED_V1;
     bool exp_njfv2 = expected_journal_files & JOURNALFILE_DELETED_V2;
 
     if (del_ndf && del_njf && del_njfv2)
-        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
+        netdata_log_info("DBENGINE: tier %u: scheduled deletion of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaiming %s after completion.",
                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf && del_njf && !exp_njfv2)
-        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
+        netdata_log_info("DBENGINE: tier %u: scheduled deletion of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaiming %s after completion.",
                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
@@ -1835,12 +1991,12 @@ void datafile_delete(
         if (exp_njfv2 && !del_njfv2) { buffer_strcat(failed, sep); buffer_strcat(failed, ".njfv2"); }
 
         if(buffer_strlen(failed))
-            netdata_log_error("DBENGINE: tier %u: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
-                              " - removed: %s, failed: %s, reclaimed %s.",
+            netdata_log_error("DBENGINE: tier %u: partial deletion scheduling of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+                              " - queued: %s, failed: %s, reclaiming %s after completion.",
                               tier, datafile_tier, fileno,
                               buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
         else
-            netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
+            netdata_log_info("DBENGINE: tier %u: scheduled deletion of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaiming %s after completion.",
                              tier, datafile_tier, fileno, buffer_tostring(removed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
@@ -2111,7 +2267,8 @@ uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
 /* return 0 on success */
 int init_rrd_files(struct rrdengine_instance *ctx)
 {
-    return init_data_files(ctx);
+    int ret = init_data_files(ctx);
+    return ret;
 }
 
 void finalize_rrd_files(struct rrdengine_instance *ctx)
@@ -2364,6 +2521,9 @@ uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_
     // We cant know the final v1/v2 journal size -- we let the current v1 size be part of the calculation by not
     // including it in the active_space
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) - active_space;
+    uint64_t pending_deletion_bytes = ctx_pending_deletion_bytes_get(ctx);
+    estimated_disk_space = estimated_disk_space > pending_deletion_bytes ?
+                                   estimated_disk_space - pending_deletion_bytes : 0;
 
     uint64_t database_space = get_total_database_space();
     uint64_t adjusted_database_space =  database_space * ctx->config.disk_percentage / 100 ;
@@ -2448,6 +2608,7 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
 
 static void dbengine_initialize_structures(void) {
     pgd_init_arals();
+
     pgc_and_mrg_initialize();
 
     pdc_init();
@@ -2602,6 +2763,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_EXTENT_WRITE,                             "extent write");
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
     worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
+    worker_register_job_name(RRDENG_OPCODE_FILE_DELETE,                              "file delete");
     worker_register_job_name(RRDENG_OPCODE_JOURNAL_INDEX,                            "journal index");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_MAIN,                               "flush init");
     worker_register_job_name(RRDENG_OPCODE_EVICT_MAIN,                               "evict init");
@@ -2768,6 +2930,11 @@ void dbengine_event_loop(void* arg) {
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate);
                     }
+                    break;
+                }
+
+                case RRDENG_OPCODE_FILE_DELETE: {
+                    rrdeng_file_deletion_start(cmd.data);
                     break;
                 }
 

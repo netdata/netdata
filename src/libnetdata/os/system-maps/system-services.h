@@ -4,7 +4,11 @@
 #define NETDATA_SYSTEM_SERVICES_H
 
 #include "libnetdata/libnetdata.h"
+#ifndef OS_WINDOWS
+// On Windows, netdb.h does not exist; winsock2.h/ws2tcpip.h (included by
+// libnetdata.h) already provide struct servent, getservbyport, etc.
 #include <netdb.h>
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for caching port and protocol to service name mappings

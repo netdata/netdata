@@ -2,7 +2,25 @@
 
 #include "nd_log-internals.h"
 
-#if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
+
+// Bounded wide-string length: like wcsnlen, but returns 0 (not maxlen) when the
+// string is not null-terminated within `maxlen`. Callers use the result for
+// (len + 1) * sizeof(wchar_t) buffer-size calculations and get a deterministic
+// 0 instead of an out-of-bounds read on a malformed input.
+//
+// IMPORTANT: `maxlen` is the caller's claim about the maximum number of wide
+// chars the string could contain, not the size of a `const wchar_t *` pointer.
+// Do NOT pass `_countof(ptr_to_string)` for a `const wchar_t *ptr` argument —
+// that evaluates to `sizeof(const wchar_t *) / sizeof(wchar_t)` (2 on 64-bit
+// Windows, 1 on 32-bit), which is the size of the POINTER, not the size of
+// the pointed-to string. Use a literal cap or `_countof(arr)` only when `arr`
+// is a true wide-char array.
+static inline size_t etw_wcslen_bounded(const wchar_t *s, size_t maxlen) {
+    if (!s) return 0;
+    size_t n = wcsnlen(s, maxlen);
+    return (n == maxlen) ? 0 : n;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id
@@ -77,89 +95,6 @@ static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PR
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-// Define provider names per source (only when not using ETW)
-static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                             // not used, linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,    //
-        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,      //
-        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,//
-        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,    //
-        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,    //
-        [NDLS_DEBUG]        = NULL,                             // used, linked to NDLS_DAEMON
-};
-
-bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
-    const wchar_t *replacement = L"\\wevt_netdata.dll";
-
-    // Find the last occurrence of '\\' to isolate the filename
-    wchar_t *lastBackslash = wcsrchr(str, L'\\');
-
-    if (lastBackslash != NULL) {
-        // Calculate new length after replacement
-        size_t newLen = (lastBackslash - str) + wcslen(replacement);
-
-        // Ensure new length does not exceed buffer size
-        if (newLen >= size)
-            return false; // Not enough space in the buffer
-
-        // Terminate the string at the last backslash
-        *lastBackslash = L'\0';
-
-        // Append the replacement filename
-        wcsncat(str, replacement, size - wcslen(str) - 1);
-
-        // Check if the new file exists
-        if (GetFileAttributesW(str) != INVALID_FILE_ATTRIBUTES)
-            return true; // The file exists
-        else
-            return false; // The file does not exist
-    }
-
-    return false; // No backslash found (likely invalid input)
-}
-
-static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
-    // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
-    wchar_t key[MAX_PATH];
-    if(!provider)
-        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls", channel);
-    else
-        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", channel, provider);
-
-    HKEY hRegKey;
-    DWORD disposition;
-    LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, key,
-                                  0, NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL, &hRegKey, &disposition);
-
-    if (result != ERROR_SUCCESS)
-        return false; // Could not create the registry key
-
-    // Check if MaxSize is already set
-    DWORD maxSize = 0;
-    DWORD size = sizeof(maxSize);
-    if (RegQueryValueExW(hRegKey, L"MaxSize", NULL, NULL, (LPBYTE)&maxSize, &size) != ERROR_SUCCESS) {
-        // MaxSize is not set, set it to the default value
-        RegSetValueExW(hRegKey, L"MaxSize", 0, REG_DWORD, (const BYTE*)&defaultMaxSize, sizeof(defaultMaxSize));
-    }
-
-    wchar_t modulePath[MAX_PATH];
-    if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) {
-        RegCloseKey(hRegKey);
-        return false;
-    }
-
-    if(wel_replace_program_with_wevt_netdata_dll(modulePath, _countof(modulePath))) {
-        RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
-                       (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
-
-        DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
-        RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
-    }
-
-    RegCloseKey(hRegKey);
-    return true;
-}
-
 #if defined(HAVE_ETW)
 static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
     // It turns out that the keyword varies per only per channel!
@@ -172,28 +107,17 @@ static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, 
     source->Keyword = ed->Keyword;
 }
 
-// Callback for provider enable/disable notifications
-static void NTAPI ProviderEnableCallback(
-        LPCGUID SourceId __maybe_unused,
-        ULONG IsEnabled,
-        UCHAR Level __maybe_unused,
-        ULONGLONG MatchAnyKeyword __maybe_unused,
-        ULONGLONG MatchAllKeyword __maybe_unused,
-        PEVENT_FILTER_DESCRIPTOR FilterData __maybe_unused,
-        PVOID CallbackContext __maybe_unused
-) {
-    spinlock_lock(&nd_log.eventlog.provider_lock);
-    nd_log.eventlog.provider_enabled = IsEnabled ? true : false;
-    spinlock_unlock(&nd_log.eventlog.provider_lock);
-}
-
 static bool etw_register_provider(void) {
-    spinlock_init(&nd_log.eventlog.provider_lock);
-    nd_log.eventlog.provider_enabled = false;
-
-    // Register the ETW provider
-    if (EventRegister(&NETDATA_ETW_PROVIDER_GUID, ProviderEnableCallback, NULL, &regHandle) != ERROR_SUCCESS)
+    // Manifest-based providers can write immediately after registration. An enable
+    // callback only reports trace-session changes and must not gate agent startup.
+    if(EventRegister(&NETDATA_ETW_PROVIDER_GUID, NULL, NULL, &regHandle) != ERROR_SUCCESS)
         return false;
+
+    // The event ID encodes the log source. The static source table starts at
+    // zero (NDLS_UNSET), so initialize the Windows-specific identity before
+    // any event can be queued.
+    for(size_t i = 0; i < _NDLS_MAX; i++)
+        nd_log.sources[i].source = i;
 
     etw_set_source_meta(&nd_log.sources[NDLS_DAEMON], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_COLLECTORS], CHANNEL_COLLECTORS, &ED_COLLECTORS_INFO_MESSAGE_ONLY);
@@ -203,25 +127,11 @@ static bool etw_register_provider(void) {
     etw_set_source_meta(&nd_log.sources[NDLS_UNSET], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_DEBUG], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
 
-    DWORD wait_start = GetTickCount();
-    while(true) {
-        spinlock_lock(&nd_log.eventlog.provider_lock);
-        bool enabled = nd_log.eventlog.provider_enabled;
-        spinlock_unlock(&nd_log.eventlog.provider_lock);
-
-        if(enabled)
-            return true;
-
-        // Timeout after 5 seconds
-        if(GetTickCount() - wait_start > 5000) {
-            EventUnregister(regHandle);
-            return false;
-        }
-
-        Sleep(10); // Short sleep between checks
-    }
+    return true;
 }
 #endif
+
+static void etw_queue_init(void);
 
 bool nd_log_init_windows(void) {
     if(nd_log.eventlog.initialized)
@@ -241,67 +151,13 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
-//    if(!nd_log.eventlog.etw && !wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, NULL, 50 * 1024 * 1024))
-//        return false;
-
-    // Loop through each source and add it to the registry
-    for(size_t i = 0; i < _NDLS_MAX; i++) {
-        nd_log.sources[i].source = i;
-
-        const wchar_t *sub_channel = wel_provider_per_source[i];
-
-        if(!sub_channel)
-            // we will map these to NDLS_DAEMON
-            continue;
-
-        DWORD defaultMaxSize = 0;
-        switch (i) {
-            case NDLS_ACLK:
-                defaultMaxSize = 5 * 1024 * 1024;
-                break;
-
-            case NDLS_HEALTH:
-                defaultMaxSize = 35 * 1024 * 1024;
-                break;
-
-            default:
-            case NDLS_ACCESS:
-            case NDLS_COLLECTORS:
-            case NDLS_DAEMON:
-                defaultMaxSize = 20 * 1024 * 1024;
-                break;
-        }
-
-        if(!nd_log.eventlog.etw) {
-            if(!wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, sub_channel, defaultMaxSize))
-                return false;
-
-            // when not using a manifest, each source is a provider
-            nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
-            if (!nd_log.sources[i].hEventLog)
-                return false;
-        }
-    }
-
-    if(!nd_log.eventlog.etw) {
-        // Map the unset ones to NDLS_DAEMON
-        for (size_t i = 0; i < _NDLS_MAX; i++) {
-            if (!nd_log.sources[i].hEventLog)
-                nd_log.sources[i].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
-        }
-    }
-
     nd_log.eventlog.initialized = true;
+    etw_queue_init();
     return true;
 }
 
 bool nd_log_init_etw(void) {
     nd_log.eventlog.etw = true;
-    return nd_log_init_windows();
-}
-
-bool nd_log_init_wel(void) {
-    nd_log.eventlog.etw = false;
     return nd_log_init_windows();
 }
 
@@ -315,6 +171,9 @@ bool nd_log_init_wel(void) {
 #define SMALL_WIDE_BUFFERS_SIZE 256
 #define MEDIUM_WIDE_BUFFERS_SIZE 2048
 #define BIG_WIDE_BUFFERS_SIZE 16384
+// Largest per-field wide-char buffer (incl. null terminator). Used by
+// etw_wcslen_bounded() to satisfy SonarQube S5813 at ETW write sites.
+#define NDF_FIELD_MAX_CHARS BIG_WIDE_BUFFERS_SIZE
 static wchar_t small_wide_buffers[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
 static wchar_t medium_wide_buffers[2][MEDIUM_WIDE_BUFFERS_SIZE];
 static wchar_t big_wide_buffers[2][BIG_WIDE_BUFFERS_SIZE];
@@ -323,12 +182,6 @@ static struct {
     size_t size;
     wchar_t *buf;
 } fields_buffers[_NDF_MAX] = { 0 };
-
-#if defined(HAVE_ETW)
-static EVENT_DATA_DESCRIPTOR etw_eventData[_NDF_MAX - 1];
-#endif
-
-static LPCWSTR wel_messages[_NDF_MAX - 1];
 
 __attribute__((constructor)) void wevents_initialize_buffers(void) {
     for(size_t i = 0; i < _NDF_MAX ;i++) {
@@ -343,9 +196,135 @@ __attribute__((constructor)) void wevents_initialize_buffers(void) {
     fields_buffers[NDF_REQUEST].size = BIG_WIDE_BUFFERS_SIZE;
     fields_buffers[NDF_MESSAGE].buf = big_wide_buffers[1];
     fields_buffers[NDF_MESSAGE].size = BIG_WIDE_BUFFERS_SIZE;
+}
 
-    for(size_t i = 1; i < _NDF_MAX ;i++)
-        wel_messages[i - 1] = fields_buffers[i].buf;
+// ----------------------------------------------------------------------------
+// Async ETW writer — decouples producers from EventWrite.
+//
+// The global wchar buffers (small/medium/big) are shared state. The old design held a
+// single spinlock across BOTH field generation AND EventWrite; if EventWrite blocked
+// (for example, a temporarily blocked Event Log service) every logging thread spun
+// indefinitely, blocking the main thread and the shutdown cleanup thread.
+//
+// New design:
+//   - etw_queue.mutex replaces the spinlock and covers only field generation + enqueue.
+//   - A single background thread (etw_async_writer) dequeues entries and calls EventWrite.
+//   - If EventWrite blocks, only the background thread stalls; producers enqueue and return.
+//   - When the queue is full the entry is dropped and the caller falls back to stderr.
+
+#define ETW_QUEUE_DEPTH 8
+
+struct etw_queue_entry {
+    DWORD           eventID;
+    USHORT          channelID;
+    UCHAR           level;
+    UCHAR           opcode;
+    USHORT          task;
+    ULONGLONG       keyword;
+    // Snapshots of the three global wchar buffer pools (copied under etw_queue.mutex)
+    wchar_t small[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
+    wchar_t medium[2][MEDIUM_WIDE_BUFFERS_SIZE];
+    wchar_t big[2][BIG_WIDE_BUFFERS_SIZE];
+};
+
+static struct {
+    struct etw_queue_entry  slots[ETW_QUEUE_DEPTH];
+    size_t                  head, tail, count;
+    bool                    stopped;
+    uint64_t                dropped;
+    netdata_mutex_t         mutex;
+    netdata_cond_t          not_empty;
+    HANDLE                  drain_ack;  // auto-reset; consumer sets it on exit
+    ND_THREAD              *thread;
+    bool                    initialized;
+} etw_queue;
+
+// Mirror the fields_buffers[] layout: return the right buffer from a queue entry.
+static inline const wchar_t *etw_entry_field(const struct etw_queue_entry *e, size_t i) {
+    if(i == NDF_NIDL_INSTANCE) return e->medium[0];
+    if(i == NDF_REQUEST)       return e->big[0];
+    if(i == NDF_MESSAGE)       return e->big[1];
+    return e->small[i];
+}
+
+static void etw_entry_process(struct etw_queue_entry *e) {
+    EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
+    for(size_t i = 1; i < _NDF_MAX; i++) {
+        const wchar_t *buf = etw_entry_field(e, i);
+        // Field buffers are fixed-size (small/medium/big) and always null-terminated
+        // when populated; the bounded helper is only here to satisfy SonarQube S5813
+        // and to return 0 on a malformed buffer rather than overread it.
+        EventDataDescCreate(&desc[i - 1], buf,
+                            (ULONG)((etw_wcslen_bounded(buf, NDF_FIELD_MAX_CHARS) + 1) * sizeof(WCHAR)));
+    }
+    EVENT_DESCRIPTOR ed = {
+        .Id      = e->eventID & EVENT_ID_CODE_MASK,
+        .Version = 0,
+        .Channel = (UCHAR)e->channelID,
+        .Level   = e->level,
+        .Opcode  = e->opcode,
+        .Task    = e->task,
+        .Keyword = e->keyword,
+    };
+    (void)EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
+}
+
+static void etw_async_writer(void *arg __maybe_unused) {
+
+    for(;;) {
+        netdata_mutex_lock(&etw_queue.mutex);
+
+        while(etw_queue.count == 0 && !etw_queue.stopped)
+            netdata_cond_wait(&etw_queue.not_empty, &etw_queue.mutex);
+
+        if(etw_queue.count == 0) {
+            // stopped and queue drained
+            netdata_mutex_unlock(&etw_queue.mutex);
+            break;
+        }
+
+        // Snapshot head without advancing. count stays > 0, so producers cannot
+        // wrap tail back to this slot while we process it outside the mutex.
+        size_t idx = etw_queue.head;
+        netdata_mutex_unlock(&etw_queue.mutex);
+
+        // EventWrite may block here — no lock held, producers unaffected.
+        etw_entry_process(&etw_queue.slots[idx]);
+
+        // Release the slot
+        netdata_mutex_lock(&etw_queue.mutex);
+        etw_queue.head = (etw_queue.head + 1) % ETW_QUEUE_DEPTH;
+        etw_queue.count--;
+        netdata_mutex_unlock(&etw_queue.mutex);
+    }
+
+    if(etw_queue.drain_ack)
+        SetEvent(etw_queue.drain_ack);
+}
+
+static void etw_queue_init(void) {
+    netdata_mutex_init(&etw_queue.mutex);
+    netdata_cond_init(&etw_queue.not_empty);
+    etw_queue.drain_ack = CreateEvent(NULL, FALSE, FALSE, NULL);
+    etw_queue.thread = nd_thread_create("ETW-ASYNC", NETDATA_THREAD_OPTION_DEFAULT,
+                                        etw_async_writer, NULL);
+    etw_queue.initialized = true;
+}
+
+void nd_log_stop_windows_async(void) {
+    if(!etw_queue.initialized)
+        return;
+
+    netdata_mutex_lock(&etw_queue.mutex);
+    etw_queue.stopped = true;
+    netdata_cond_signal(&etw_queue.not_empty);
+    netdata_mutex_unlock(&etw_queue.mutex);
+
+    // Wait up to 2 s for the async writer to drain remaining entries.
+    // If ETW is still blocked we time out and let the process terminate normally.
+    if(etw_queue.drain_ack)
+        WaitForSingleObject(etw_queue.drain_ack, 2000);
+
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -438,9 +417,8 @@ static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fie
         if (s && *s) {
             utf8_to_utf16(fields_buffers[i].buf, (int) fields_buffers[i].size, s, -1);
 
-            if(nd_log.eventlog.etw)
-                // UNBELIEVABLE! they do recursive parameter expansion in ETW...
-                etw_replace_percent_with_unicode(fields_buffers[i].buf, fields_buffers[i].size);
+            // ETW recursively expands percent-prefixed fields.
+            etw_replace_percent_with_unicode(fields_buffers[i].buf, fields_buffers[i].size);
         }
     }
 }
@@ -461,20 +439,21 @@ static bool has_user_role_permissions(struct log_field *fields, size_t fields_ma
 }
 
 static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    if (!nd_log.eventlog.initialized)
+    if (!nd_log.eventlog.initialized || !etw_queue.initialized)
         return false;
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     if (fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
 
-    DWORD wType = get_event_type_from_priority(priority);
-    (void) wType;
-
     CLEAN_BUFFER *tmp = NULL;
 
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    spinlock_lock(&spinlock);
+    // etw_queue.mutex replaces the old spinlock:
+    //   - protects field generation into the shared global wchar buffers
+    //   - protects queue head/tail/count while we claim a slot
+    //   - does NOT cover EventWrite (that runs in the async writer thread)
+    netdata_mutex_lock(&etw_queue.mutex);
+
     wevt_generate_all_fields_unsafe(fields, fields_max, &tmp);
 
     MESSAGE_ID messageID;
@@ -527,60 +506,36 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
 
     DWORD eventID = construct_event_id(source->source, priority, messageID);
 
-    // wType
-    //
-    // without a manifest => this determines the Level of the event
-    // with a manifest    => Level from the manifest is used (wType ignored)
-    //                       [however it is good to have, in case the manifest is not accessible somehow]
-    //
+    bool enqueued = false;
+    if(etw_queue.count < ETW_QUEUE_DEPTH) {
+        struct etw_queue_entry *e = &etw_queue.slots[etw_queue.tail];
+        etw_queue.tail = (etw_queue.tail + 1) % ETW_QUEUE_DEPTH;
+        etw_queue.count++;
+        enqueued = true;
 
-    // wCategory
-    //
-    // without a manifest => numeric Task values appear
-    // with a manifest    => Task from the manifest is used (wCategory ignored)
+        e->eventID    = eventID;
+        e->channelID  = source->channelID;
+        e->level      = get_level_from_priority(priority);
+        e->opcode     = source->Opcode;
+        e->task       = source->Task;
+        e->keyword    = source->Keyword;
+        // Snapshot the global buffers into the queue slot before releasing the mutex.
+        memcpy(e->small,  small_wide_buffers,  sizeof(small_wide_buffers));
+        memcpy(e->medium, medium_wide_buffers, sizeof(medium_wide_buffers));
+        memcpy(e->big,    big_wide_buffers,    sizeof(big_wide_buffers));
 
-    BOOL rc;
-#if defined(HAVE_ETW)
-    if (nd_log.eventlog.etw) {
-        // metadata based logging - ETW
-
-        for (size_t i = 1; i < _NDF_MAX; i++)
-            EventDataDescCreate(&etw_eventData[i - 1], fields_buffers[i].buf,
-                                (wcslen(fields_buffers[i].buf) + 1) * sizeof(WCHAR));
-
-        EVENT_DESCRIPTOR EventDesc = {
-                .Id = eventID & EVENT_ID_CODE_MASK, // ETW needs the raw event id
-                .Version = 0,
-                .Channel = source->channelID,
-                .Level = get_level_from_priority(priority),
-                .Opcode = source->Opcode,
-                .Task = source->Task,
-                .Keyword = source->Keyword,
-        };
-
-        rc = ERROR_SUCCESS == EventWrite(regHandle, &EventDesc, _NDF_MAX - 1, etw_eventData);
-
-    }
-    else
-#endif
-    {
-        // eventID based logging - WEL
-        rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, wel_messages, NULL);
+        netdata_cond_signal(&etw_queue.not_empty);
+    } else {
+        etw_queue.dropped++;
     }
 
-    spinlock_unlock(&spinlock);
+    netdata_mutex_unlock(&etw_queue.mutex);
 
-    return rc == TRUE;
+    return enqueued;
 }
 
 #if defined(HAVE_ETW)
 bool nd_logger_etw(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    return nd_logger_windows(source, fields, fields_max);
-}
-#endif
-
-#if defined(HAVE_WEL)
-bool nd_logger_wel(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
     return nd_logger_windows(source, fields, fields_max);
 }
 #endif
