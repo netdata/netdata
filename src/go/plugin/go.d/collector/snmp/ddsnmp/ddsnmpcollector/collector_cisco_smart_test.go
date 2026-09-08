@@ -188,7 +188,7 @@ func mustLoadCiscoSmartProfile(t *testing.T) *ddsnmp.Profile {
 		}
 		var matches bool
 		ddprofiledefinition.ForEachLicenseSignalValue(row, func(value ddprofiledefinition.LicenseValueConfig) {
-			oid := strings.TrimPrefix(ddprofiledefinition.LicenseValueSourceOID(value), ".")
+			oid := strings.TrimPrefix(value.SourceOID(), ".")
 			matches = matches || strings.HasPrefix(oid, prefix)
 		})
 		if matches {

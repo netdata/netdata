@@ -171,10 +171,15 @@ virtual_metrics: <calculated metrics>
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
 
 Profile metric tags must be objects, such as `{tag: interface, index: 1}`.
+Top-level `metric_tags` read scalar OIDs: they require `symbol.OID` and cannot
+use `table`, `index`, or `index_transform`. Legacy tag-level OIDs are normalized
+before these checks.
 Datadog string references such as `metric_tags: [ifName]` are unsupported and
 fail YAML decoding. The Datadog metric `options` object (`placement`,
 `metric_suffix`) is ignored; it does not extract flags or change metric names.
-Unknown object keys continue to be ignored by the profile loader.
+Unknown struct fields continue to be ignored by the profile loader, including
+fields on profiles, metrics, symbols, and metadata field definitions. Map entries
+such as metadata resource names and field names are validated and can be rejected.
 
 ### 1. selector
 
@@ -250,6 +255,10 @@ Metric override identity depends on metric type:
 | `_std-ups-mib.yaml` | Power and UPS metrics                     | UPS devices        |
 
 ### 3. metadata
+
+Each metadata field requires a static `value`, a `symbol`, or a non-empty `symbols` list.
+Every configured symbol requires both `OID` and `name`, even when a static value is also present.
+Ordinary device metadata permits static values alongside symbols; `sysobjectid_metadata` requires choosing one of those forms.
 
 The `metadata` section defines **device-level information** (not metric tags).
 
@@ -1440,6 +1449,11 @@ Use exactly one row-index selector per typed BGP value: `index`,
 `index_from_end`, or `index_transform`. Profile validation rejects typed BGP
 values that set more than one of these selectors.
 
+For typed BGP and licensing values, OID aliases resolve in this order:
+`symbol.OID`, then `from`, then legacy `OID`. Collection, table-boundary validation,
+and scalar inheritance identity use that same source. Prefer one source form per
+value; new profiles should use `symbol` objects or `from`.
+
 For typed BGP values, a non-empty `symbol.mapping` takes precedence over a value-level
 `mapping`. Validation checks the same effective mapping used during collection, including
 the canonical peer-state and AFI/SAFI values. Prefer one mapping location to avoid ambiguity.
@@ -1879,7 +1893,8 @@ In exact mode, the emitted dimension names come from the **string side** of the 
 - In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
 - If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
 - `mapping.mode: bitmask` works only for **metric values**, not for tags or metadata.
-- `mapping.mode: bitmask` keys must be `0` or a single power-of-two bit (`1`, `2`, `4`, `8`, ...).
+- `mapping.mode: bitmask` keys must be `0` or a single power-of-two bit from `1` through `9223372036854775808` (bits 0–63).
+- Bitmask values support unsigned 64-bit numeric, decimal-string, and hexadecimal inputs. The internal raw `int64` value retains the same bits, so a value with bit 63 set has a negative raw representation; decoded dimensions remain `0` or `1`.
 - `scale_factor` cannot be combined with `mapping.mode: bitmask`.
 - If multiple bit keys map to the same dimension, that dimension is active when any mapped bit is active.
 
@@ -2429,6 +2444,9 @@ that section; regular `metrics:` rows are not used as a licensing transport.
 
 ### Authoring contract
 
+For table licensing rows, every effective OID source must be inside `table.OID`,
+whether it is written as `symbol.OID`, `from`, or legacy `OID`.
+
 A licensing row describes one vendor license, entitlement, contract, or
 license pool. A row may be table-backed or scalar-backed:
 
@@ -2464,14 +2482,15 @@ licensing:
       OID: 1.3.6.1.4.1.2620.1.6.18.1
       name: licensingTable
     identity:
-      id:   { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2, name: licensingID }
-      name: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4, name: licensingBladeName }
+      id: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2, name: licensingID } }
+      name: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4, name: licensingBladeName } }
       component: { value: blade }
     descriptors:
       type: { value: subscription }
     state:
-      OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
-      name: licensingState
+      symbol:
+        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
+        name: licensingState
       mapping:
         valid: "0"
         "about-to-expire": "1"
@@ -2479,12 +2498,13 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
-          name: licensingExpirationDate
+          symbol:
+            OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
+            name: licensingExpirationDate
           sentinel: [timer_u32_max]
       usage:
-        used:     { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10, name: licensingUsedQuota }
-        capacity: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9,  name: licensingTotalQuota }
+        used: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10, name: licensingUsedQuota } }
+        capacity: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9, name: licensingTotalQuota } }
 ```
 
 Example scalar-backed row:

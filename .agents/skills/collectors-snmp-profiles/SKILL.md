@@ -44,7 +44,7 @@ in `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`; the developer workflow 
    underscore-prefixed generated names.
 11. For scalar licensing rows that combine multiple scalar signal OIDs into one
    license row, declare an explicit stable `id:`. For table licensing rows,
-   keep `from:` references inside the same table OID and derive
+   keep every effective OID source (`symbol.OID`, `from`, or legacy `OID`) inside the same table OID and derive
    `not-accessible` INDEX values from the row index.
 12. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
    vendor-specific raw metrics, `virtual_metrics`, or underscore-prefixed tag
@@ -80,6 +80,14 @@ A vendor profile MAY poll an object that the source MIB marks `not-accessible` o
   consumer path.
 
 Do not generalize a device deviation to related models or vendors without equivalent evidence.
+
+## Canonical Profile Syntax
+
+Stock profiles MUST use symbol objects for OID/name pairs, including metric tags and typed licensing/BGP values.
+Put metric type overrides on each affected `symbol` or `symbols` entry instead of the deprecated row-level `metric_type`.
+Legacy custom profile aliases remain supported; typed OID precedence is `symbol.OID`, then `from`, then legacy `OID`.
+Collection, boundary validation and inheritance identity use that same source. Prefer one OID source form per value.
+Metric and topology column rows require `table.OID`; `table.name` is optional for those rows.
 
 ## Index Rules
 

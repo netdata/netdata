@@ -37,50 +37,49 @@ func normalizeMetric(metric *MetricsConfig) {
 	metric.MetricType = ""
 }
 
+func validateMetricRowShape(path string, metric *MetricsConfig) error {
+	var errs []error
+	scalar := isSymbolConfigured(metric.Symbol)
+	if !scalar && !metric.IsColumn() {
+		errs = append(errs, fmt.Errorf("%s: either a table symbol or a scalar symbol must be provided", path))
+	}
+	if scalar && metric.IsColumn() {
+		errs = append(errs, fmt.Errorf("%s: table symbol and scalar symbol cannot be both provided", path))
+	}
+	if metric.IsColumn() && metric.Table.OID == "" {
+		errs = append(errs, fmt.Errorf("%s.table.OID: column symbols require a table OID", path))
+	}
+	return errors.Join(errs...)
+}
+
 func validateEnrichMetrics(metrics []MetricsConfig) error {
 	var errs []error
-
 	for i := range metrics {
-		metricConfig := &metrics[i]
-		if !metricConfig.IsScalar() && !metricConfig.IsColumn() {
+		metric := &metrics[i]
+		path := fmt.Sprintf("metrics[%d]", i)
+		errs = append(errs, validateMetricRowShape(path, metric))
+		if isSymbolConfigured(metric.Symbol) {
+			errs = append(errs, withValidationPath(path+".symbol", validateEnrichSymbol(&metric.Symbol, scalarSymbol)))
+		}
+		for j := range metric.Symbols {
 			errs = append(
 				errs,
-				fmt.Errorf("either a table symbol or a scalar symbol must be provided: %#v", metricConfig),
+				withValidationPath(
+					fmt.Sprintf("%s.symbols[%d]", path, j),
+					validateEnrichSymbol(&metric.Symbols[j], columnSymbol),
+				),
 			)
 		}
-		if metricConfig.IsScalar() && metricConfig.IsColumn() {
-			errs = append(errs, fmt.Errorf("table symbol and scalar symbol cannot be both provided: %#v", metricConfig))
+		if metric.IsColumn() && len(metric.MetricTags) == 0 {
+			errs = append(
+				errs,
+				fmt.Errorf(
+					"%s: column symbols require at least one discriminating metric tag (such as a row index) to distinguish table rows",
+					path,
+				),
+			)
 		}
-		if metricConfig.IsScalar() {
-			errs = append(errs, validateEnrichSymbol(&metricConfig.Symbol, scalarSymbol))
-			for j := range metricConfig.MetricTags {
-				metricTag := &metricConfig.MetricTags[j]
-				errs = append(errs, validateEnrichMetricTag(metricTag))
-				errs = append(errs, validateScalarMetricTag("", metricTag))
-			}
-		}
-		if metricConfig.IsColumn() {
-			for j := range metricConfig.Symbols {
-				errs = append(errs, validateEnrichSymbol(&metricConfig.Symbols[j], columnSymbol))
-			}
-			if len(metricConfig.MetricTags) == 0 {
-				errs = append(
-					errs,
-					fmt.Errorf(
-						"column symbols doesn't have a 'metric_tags' section (%+v), all its metrics will use the same tags; "+
-							"if the table has multiple rows, only one row will be submitted; "+
-							"please add at least one discriminating metric tag (such as a row index) "+
-							"to ensure metrics of all rows are submitted",
-						metricConfig.Symbols,
-					),
-				)
-			}
-			for i := range metricConfig.MetricTags {
-				metricTag := &metricConfig.MetricTags[i]
-				errs = append(errs, validateEnrichMetricTag(metricTag))
-			}
-		}
+		errs = append(errs, validateEnrichMetricTags(path, metric.MetricTags, !metric.IsColumn()))
 	}
-
 	return errors.Join(errs...)
 }

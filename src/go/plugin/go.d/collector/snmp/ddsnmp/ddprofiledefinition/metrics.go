@@ -39,7 +39,7 @@ type MetricsConfig struct {
 	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol"`
 
 	// Table the table OID
-	Table SymbolConfig `yaml:"table,omitempty" json:"table"`
+	Table SymbolConfig `yaml:"table,omitempty"   json:"table"`
 	// Table configs
 	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
 
@@ -47,9 +47,9 @@ type MetricsConfig struct {
 	MetricTags []MetricTagConfig       `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 
 	// DEPRECATED: Use .Symbol instead
-	OID string `yaml:"OID,omitempty" json:"OID,omitempty"`
+	OID string `yaml:"OID,omitempty"         json:"OID,omitempty"`
 	// DEPRECATED: Use .Symbol instead
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+	Name string `yaml:"name,omitempty"        json:"name,omitempty"`
 	// Deprecated: set the type on the symbol. This row default also applies to table columns.
 	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 }
@@ -85,18 +85,18 @@ func (s SymbolConfigCompat) Clone() SymbolConfigCompat {
 
 // SymbolConfig holds info for a single symbol/oid
 type SymbolConfig struct {
-	OID  string `yaml:"OID,omitempty" json:"OID,omitempty"`
+	OID  string `yaml:"OID,omitempty"  json:"OID,omitempty"`
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
 
 	ExtractValue         string         `yaml:"extract_value,omitempty" json:"extract_value,omitempty"`
-	ExtractValueCompiled *regexp.Regexp `yaml:"-" json:"-"`
+	ExtractValueCompiled *regexp.Regexp `yaml:"-"                       json:"-"`
 
 	MatchPattern         string         `yaml:"match_pattern,omitempty" json:"match_pattern,omitempty"`
-	MatchValue           string         `yaml:"match_value,omitempty" json:"match_value,omitempty"`
-	MatchPatternCompiled *regexp.Regexp `yaml:"-" json:"-"`
+	MatchValue           string         `yaml:"match_value,omitempty"   json:"match_value,omitempty"`
+	MatchPatternCompiled *regexp.Regexp `yaml:"-"                       json:"-"`
 
-	ScaleFactor      float64 `yaml:"scale_factor,omitempty" json:"scale_factor,omitempty"`
-	Format           string  `yaml:"format,omitempty" json:"format,omitempty"`
+	ScaleFactor      float64 `yaml:"scale_factor,omitempty"       json:"scale_factor,omitempty"`
+	Format           string  `yaml:"format,omitempty"             json:"format,omitempty"`
 	ConstantValueOne bool    `yaml:"constant_value_one,omitempty" json:"constant_value_one,omitempty"`
 
 	// MetricType overrides the type derived from the SNMP PDU.
@@ -105,9 +105,9 @@ type SymbolConfig struct {
 
 	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta"`
 
-	Mapping           MappingConfig      `yaml:"mapping,omitempty" json:"mapping"`
+	Mapping           MappingConfig      `yaml:"mapping,omitempty"   json:"mapping"`
 	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
-	TransformCompiled *template.Template `yaml:"-" json:"-"`
+	TransformCompiled *template.Template `yaml:"-"                   json:"-"`
 }
 
 // Clone creates a duplicate of this SymbolConfig
@@ -119,9 +119,9 @@ func (s SymbolConfig) Clone() SymbolConfig {
 
 type ChartMeta struct {
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-	Family      string `yaml:"family,omitempty" json:"family,omitempty"`
-	Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
-	Type        string `yaml:"type,omitempty" json:"type,omitempty"`
+	Family      string `yaml:"family,omitempty"      json:"family,omitempty"`
+	Unit        string `yaml:"unit,omitempty"        json:"unit,omitempty"`
+	Type        string `yaml:"type,omitempty"        json:"type,omitempty"`
 }
 
 // MetricTagConfig holds metric tag info
@@ -137,7 +137,7 @@ type MetricTagConfig struct {
 	Column SymbolConfig `yaml:"column,omitempty" json:"-"`
 
 	// DEPRECATED: use .Symbol instead
-	OID string `yaml:"OID,omitempty" json:"-"`
+	OID string `yaml:"OID,omitempty"    json:"-"`
 	// Symbol records the OID to read. Its Name supplies the tag name when Tag is empty.
 	// If a serialized Symbol is a string
 	// instead of an object, it will be treated like {name: <value>}; this use
@@ -152,12 +152,12 @@ type MetricTagConfig struct {
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
 	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
-	Mapping    MappingConfig `yaml:"mapping,omitempty" json:"mapping"`
+	Mapping    MappingConfig `yaml:"mapping,omitempty"     json:"mapping"`
 
 	// Regex
 	Match   string            `yaml:"match,omitempty" json:"-"`
-	Tags    map[string]string `yaml:"tags,omitempty" json:"-"`
-	Pattern *regexp.Regexp    `yaml:"-" json:"-"`
+	Tags    map[string]string `yaml:"tags,omitempty"  json:"-"`
+	Pattern *regexp.Regexp    `yaml:"-"               json:"-"`
 }
 
 // Clone duplicates this MetricTagConfig
@@ -174,7 +174,7 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 }
 
 type GlobalMetricTagConfig struct {
-	MetricTagConfig `yaml:",inline" json:",inline"`
+	MetricTagConfig `            yaml:",inline"             json:",inline"`
 	Consumers       ConsumerSet `yaml:"consumers,omitempty" json:"consumers,omitempty"`
 }
 
@@ -186,13 +186,34 @@ func (m GlobalMetricTagConfig) Clone() GlobalMetricTagConfig {
 }
 
 type StaticMetricTagConfig struct {
-	Tag   string `yaml:"tag" json:"tag"`
+	Tag   string `yaml:"tag"   json:"tag"`
 	Value string `yaml:"value" json:"value"`
 }
 
 // MetricIndexTransform holds configs for metric index transform
 type MetricIndexTransform struct {
-	Start     uint `yaml:"start" json:"start"`
-	End       uint `yaml:"end" json:"end"`
+	Start     uint `yaml:"start"                json:"start"`
+	End       uint `yaml:"end"                  json:"end"`
 	DropRight uint `yaml:"drop_right,omitempty" json:"drop_right,omitempty"`
+}
+
+// IsIndexTag reports whether a normalized tag reads the row index instead of a column.
+func (tagCfg MetricTagConfig) IsIndexTag() bool {
+	if tagCfg.Index != 0 {
+		return true
+	}
+
+	if tagCfg.Table != "" {
+		return false
+	}
+
+	if tagCfg.Symbol.OID != "" {
+		return false
+	}
+
+	return len(tagCfg.IndexTransform) > 0 ||
+		tagCfg.Symbol.Format != "" ||
+		tagCfg.Symbol.ExtractValue != "" ||
+		tagCfg.Symbol.MatchPattern != "" ||
+		tagCfg.Mapping.HasItems()
 }

@@ -31,6 +31,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbol: SymbolConfig{
 						OID:  "1.2",
 						Name: "abc",
@@ -52,6 +55,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			metrics: []MetricsConfig{
 				{},
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbol: SymbolConfig{
 						OID:  "1.2",
 						Name: "abc",
@@ -82,6 +88,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID: "1.2",
@@ -100,6 +109,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -125,6 +137,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -135,35 +150,13 @@ func Test_validateEnrichMetrics(t *testing.T) {
 				},
 			},
 		},
-		"table external metric column tag MIB error": {
-			wantError: true,
-			metrics: []MetricsConfig{
-				{
-					Symbols: []SymbolConfig{
-						{
-							OID:  "1.2",
-							Name: "abc",
-						},
-					},
-					MetricTags: []MetricTagConfig{
-						MetricTagConfig{
-							Symbol: SymbolConfigCompat{
-								OID: "1.2.3",
-							},
-						},
-						MetricTagConfig{
-							Symbol: SymbolConfigCompat{
-								Name: "abc",
-							},
-						},
-					},
-				},
-			},
-		},
 		"missing match tags": {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -186,6 +179,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -207,10 +203,13 @@ func Test_validateEnrichMetrics(t *testing.T) {
 				},
 			},
 		},
-		"match cannot compile regex 2": {
+		"index transform end precedes start": {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -246,6 +245,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 					},
 				},
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:          "1.2",
@@ -275,6 +277,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 					},
 				},
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:                  "1.2",
@@ -313,6 +318,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: false,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							Name:             "abc",
@@ -358,6 +366,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -380,6 +391,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: false,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							Name:       "abc",
@@ -415,6 +429,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							Name: "abc",
@@ -438,6 +455,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: false,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",
@@ -481,6 +501,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			wantError: true,
 			metrics: []MetricsConfig{
 				{
+					Table: SymbolConfig{
+						OID: "1.2",
+					},
 					Symbols: []SymbolConfig{
 						{
 							OID:  "1.2",

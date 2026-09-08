@@ -52,13 +52,7 @@ func validateEnrichMetadata(metadata MetadataConfig) error {
 					continue
 				}
 				field := res.Fields[fieldName]
-				errs = append(errs, validateConsumers(fmt.Sprintf("metadata.%s.fields.%s.consumers", resName, fieldName), field.Consumers))
-				for i := range field.Symbols {
-					errs = append(errs, validateEnrichSymbol(&field.Symbols[i], metadataSymbol))
-				}
-				if field.Symbol.OID != "" {
-					errs = append(errs, validateEnrichSymbol(&field.Symbol, metadataSymbol))
-				}
+				errs = append(errs, validateEnrichMetadataField(fmt.Sprintf("metadata.%s.fields.%s", resName, fieldName), &field))
 				res.Fields[fieldName] = field
 			}
 			metadata[resName] = res
@@ -107,38 +101,10 @@ func validateEnrichSysobjectIDMetadata(entries []SysobjectIDMetadataEntryConfig)
 				continue
 			}
 
-			// Validate the field must have either value or symbol(s)
-			if field.Value == "" && field.Symbol.OID == "" && len(field.Symbols) == 0 {
-				errs = append(
-					errs,
-					fmt.Errorf("sysobjectid_metadata[%d].%s: must have either value or symbol(s)", i, fieldName),
-				)
-			}
-			errs = append(
-				errs,
-				validateConsumers(fmt.Sprintf("sysobjectid_metadata[%d].%s.consumers", i, fieldName), field.Consumers),
-			)
-
-			// Can't have both value and symbols
-			if field.Value != "" && (field.Symbol.OID != "" || len(field.Symbols) > 0) {
-				errs = append(
-					errs,
-					fmt.Errorf("sysobjectid_metadata[%d].%s: cannot have both value and symbol(s)", i, fieldName),
-				)
-			}
-
-			// Validate symbols if present
-			for j := range field.Symbols {
-				if err := validateEnrichSymbol(&field.Symbols[j], metadataSymbol); err != nil {
-					errs = append(errs, fmt.Errorf("sysobjectid_metadata[%d].%s.symbols[%d]: %s", i, fieldName, j, err))
-				}
-			}
-
-			// Validate single symbol if present
-			if field.Symbol.OID != "" {
-				if err := validateEnrichSymbol(&field.Symbol, metadataSymbol); err != nil {
-					errs = append(errs, fmt.Errorf("sysobjectid_metadata[%d].%s.symbol: %s", i, fieldName, err))
-				}
+			path := fmt.Sprintf("sysobjectid_metadata[%d].%s", i, fieldName)
+			errs = append(errs, validateEnrichMetadataField(path, &field))
+			if field.Value != "" && (isSymbolConfigured(field.Symbol) || len(field.Symbols) > 0) {
+				errs = append(errs, fmt.Errorf("%s: cannot have both value and symbol(s)", path))
 			}
 
 			entry.Metadata[fieldName] = field
@@ -151,4 +117,25 @@ func validateEnrichSysobjectIDMetadata(entries []SysobjectIDMetadataEntryConfig)
 func isValidMetadataField(fieldName string) bool {
 	_, ok := validDeviceMetadataFields[fieldName]
 	return ok
+}
+
+func validateEnrichMetadataField(path string, field *MetadataField) error {
+	var errs []error
+	if field.Value == "" && !isSymbolConfigured(field.Symbol) && len(field.Symbols) == 0 {
+		errs = append(errs, fmt.Errorf("%s: must have either value or symbol(s)", path))
+	}
+	errs = append(errs, validateConsumers(path+".consumers", field.Consumers))
+	if isSymbolConfigured(field.Symbol) {
+		errs = append(errs, withValidationPath(path+".symbol", validateEnrichSymbol(&field.Symbol, metadataSymbol)))
+	}
+	for i := range field.Symbols {
+		errs = append(
+			errs,
+			withValidationPath(
+				fmt.Sprintf("%s.symbols[%d]", path, i),
+				validateEnrichSymbol(&field.Symbols[i], metadataSymbol),
+			),
+		)
+	}
+	return errors.Join(errs...)
 }

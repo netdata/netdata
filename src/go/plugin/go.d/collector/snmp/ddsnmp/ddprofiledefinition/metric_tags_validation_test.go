@@ -113,7 +113,7 @@ func Test_validateEnrichMetricTag(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := validateEnrichMetricTag(&tc.tag)
+			err := validateEnrichMetricTag("", &tc.tag, false)
 			if tc.wantError {
 				require.Error(t, err)
 				if tc.wantErrContains != "" {

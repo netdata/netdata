@@ -33,7 +33,7 @@ func normalizeBGP(rows []BGPConfig) {
 }
 
 func normalizeBGPValue(value *BGPValueConfig) {
-	if value.Symbol.Name == "" && value.Symbol.OID == "" && value.Name != "" && value.OID != "" {
+	if value.From == "" && value.Symbol.Name == "" && value.Symbol.OID == "" && value.Name != "" && value.OID != "" {
 		value.Symbol.Name = value.Name
 		value.Symbol.OID = value.OID
 		value.Name = ""
@@ -139,13 +139,7 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		errs = append(errs, validateBGPFromReferences(i, row))
 		errs = append(errs, validateBGPSignalDuplicates(i, row, seenSignals))
 
-		for j := range row.MetricTags {
-			errs = append(errs, validateEnrichMetricTag(&row.MetricTags[j]))
-			if !isTable {
-				metricTag := &row.MetricTags[j]
-				errs = append(errs, validateScalarMetricTag(fmt.Sprintf("bgp[%d].metric_tags[%d]", i, j), metricTag))
-			}
-		}
+		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("bgp[%d]", i), row.MetricTags, !isTable))
 	}
 
 	errs = append(errs, validateBGPTableReferences(rows))
@@ -331,7 +325,7 @@ func validateEnrichBGPValue(path string, value *BGPValueConfig, isTable bool) er
 			)
 		}
 	}
-	if value.Table != "" && bgpValueSymbolForValidation(*value).OID == "" {
+	if value.Table != "" && value.SourceOID() == "" {
 		errs = append(errs, fmt.Errorf("%s.table: table lookups require symbol.OID, OID, or from", path))
 	}
 	if value.LookupSymbol.OID != "" || value.LookupSymbol.Name != "" {
@@ -538,7 +532,7 @@ func validateBGPTableReferences(rows []BGPConfig) error {
 			if !ok {
 				continue
 			}
-			sourceOID := TrimBGPOID(BGPValueSourceOID(ref.value))
+			sourceOID := TrimBGPOID(ref.value.SourceOID())
 			if sourceOID != "" && !oidHasPrefix(sourceOID, refTableOID) {
 				errs = append(
 					errs,
@@ -613,7 +607,7 @@ func bgpRowHasSignalConfigs(row BGPConfig) bool {
 func collectBGPSignalSourceOIDs(row BGPConfig) map[string]struct{} {
 	oids := make(map[string]struct{})
 	ForEachBGPSignalValue(row, func(_ string, value BGPValueConfig) {
-		if oid := BGPValueSourceOID(value); oid != "" {
+		if oid := value.SourceOID(); oid != "" {
 			oids[TrimBGPOID(oid)] = struct{}{}
 		}
 	})
@@ -628,17 +622,4 @@ func bgpValueHasSource(value BGPValueConfig) bool {
 		value.Index != 0 ||
 		value.IndexFromEnd != 0 ||
 		len(value.IndexTransform) > 0
-}
-
-func bgpValueSymbolForValidation(value BGPValueConfig) SymbolConfig {
-	sym := value.Symbol
-	if sym.OID == "" {
-		switch {
-		case value.From != "":
-			sym.OID = value.From
-		case value.OID != "":
-			sym.OID = value.OID
-		}
-	}
-	return sym
 }

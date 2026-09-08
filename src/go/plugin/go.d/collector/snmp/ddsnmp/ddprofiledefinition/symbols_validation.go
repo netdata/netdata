@@ -8,6 +8,7 @@ package ddprofiledefinition
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -80,8 +81,8 @@ func validateMapping(mapping MappingConfig, context symbolContext) error {
 			errs = append(errs, errors.New("`mapping.mode: bitmask` is only supported for scalar/table metric symbols"))
 		}
 		for key, value := range mapping.Items {
-			bit, err := strconv.ParseInt(key, 10, 64)
-			if err != nil || bit < 0 || (bit != 0 && bit&(bit-1) != 0) {
+			bit, err := strconv.ParseUint(key, 10, 64)
+			if err != nil || (bit != 0 && bit&(bit-1) != 0) {
 				errs = append(
 					errs,
 					fmt.Errorf(
@@ -123,4 +124,16 @@ func compileSymbolPatterns(symbol *SymbolConfig) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// isSymbolConfigured distinguishes an absent symbol from an incomplete declaration.
+func isSymbolConfigured(symbol SymbolConfig) bool {
+	return !reflect.ValueOf(symbol).IsZero()
+}
+
+func withValidationPath(path string, err error) error {
+	if err == nil || path == "" {
+		return err
+	}
+	return fmt.Errorf("%s: %w", path, err)
 }

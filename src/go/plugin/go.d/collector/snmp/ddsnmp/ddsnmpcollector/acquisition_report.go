@@ -944,7 +944,7 @@ func firstBGPRouteOID(cfg ddprofiledefinition.BGPConfig) string {
 		}
 	}
 	forEachBGPValue(cfg, func(value ddprofiledefinition.BGPValueConfig) {
-		add(bgpValueSymbol(value).OID)
+		add(value.EffectiveSymbol().OID)
 	})
 	for _, tag := range cfg.MetricTags {
 		add(tag.Symbol.OID)

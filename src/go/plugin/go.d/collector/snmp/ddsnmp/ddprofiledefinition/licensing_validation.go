@@ -21,7 +21,7 @@ func normalizeLicensing(rows []LicensingConfig) {
 }
 
 func normalizeLicenseValue(value *LicenseValueConfig) {
-	if value.Symbol.Name == "" && value.Symbol.OID == "" && value.Name != "" && value.OID != "" {
+	if value.From == "" && value.Symbol.Name == "" && value.Symbol.OID == "" && value.Name != "" && value.OID != "" {
 		value.Symbol.Name = value.Name
 		value.Symbol.OID = value.OID
 		value.Name = ""
@@ -99,18 +99,9 @@ func validateEnrichLicensing(licensing []LicensingConfig) error {
 		)
 		errs = append(errs, validateEnrichLicenseState(i, &row.State, isTable))
 		errs = append(errs, validateEnrichLicenseSignals(i, &row.Signals, isTable))
-		errs = append(errs, validateLicenseFromReferences(i, row))
+		errs = append(errs, validateLicenseSourceReferences(i, row))
 		errs = append(errs, validateLicenseSignalDuplicates(i, row, seenSignals))
-		for j := range row.MetricTags {
-			errs = append(errs, validateEnrichMetricTag(&row.MetricTags[j]))
-			if !isTable {
-				metricTag := &row.MetricTags[j]
-				errs = append(
-					errs,
-					validateScalarMetricTag(fmt.Sprintf("licensing[%d].metric_tags[%d]", i, j), metricTag),
-				)
-			}
-		}
+		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("licensing[%d]", i), row.MetricTags, !isTable))
 	}
 
 	return errors.Join(errs...)
@@ -432,7 +423,7 @@ func validateLicenseSignalDuplicates(
 	return errors.Join(errs...)
 }
 
-func validateLicenseFromReferences(rowIdx int, row *LicensingConfig) error {
+func validateLicenseSourceReferences(rowIdx int, row *LicensingConfig) error {
 	if row.Table.OID == "" {
 		return nil
 	}
@@ -440,18 +431,19 @@ func validateLicenseFromReferences(rowIdx int, row *LicensingConfig) error {
 	var errs []error
 	tableOID := TrimLicenseOID(row.Table.OID)
 	for _, ref := range collectLicenseValueReferences(*row) {
-		if ref.value.From == "" {
+		sourceOID, sourceField := valueSourceOID(ref.value.Symbol.OID, ref.value.From, ref.value.OID)
+		if sourceOID == "" {
 			continue
 		}
-		fromOID := TrimLicenseOID(ref.value.From)
-		if !oidHasPrefix(fromOID, tableOID) {
+		if !oidHasPrefix(TrimLicenseOID(sourceOID), tableOID) {
 			errs = append(
 				errs,
 				fmt.Errorf(
-					"licensing[%d].%s.from: OID %q is outside table %q",
+					"licensing[%d].%s.%s: OID %q is outside table %q",
 					rowIdx,
 					ref.path,
-					ref.value.From,
+					sourceField,
+					sourceOID,
 					row.Table.OID,
 				),
 			)
@@ -510,7 +502,7 @@ func licenseRowHasSignalConfigs(row LicensingConfig) bool {
 func collectLicenseSignalSourceOIDs(row LicensingConfig) map[string]struct{} {
 	oids := make(map[string]struct{})
 	for _, sig := range collectLicenseSignalValues(row) {
-		if oid := LicenseValueSourceOID(sig.value); oid != "" {
+		if oid := sig.value.SourceOID(); oid != "" {
 			oids[TrimLicenseOID(oid)] = struct{}{}
 		}
 	}

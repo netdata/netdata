@@ -14,13 +14,16 @@ import (
 func validateEnrichGlobalMetricTags(metricTags []GlobalMetricTagConfig) error {
 	var errs []error
 	for i := range metricTags {
-		errs = append(errs, validateEnrichMetricTag(&metricTags[i].MetricTagConfig))
+		errs = append(
+			errs,
+			validateEnrichMetricTag(fmt.Sprintf("metric_tags[%d]", i), &metricTags[i].MetricTagConfig, true),
+		)
 		errs = append(errs, validateConsumers(fmt.Sprintf("metric_tags[%d].consumers", i), metricTags[i].Consumers))
 	}
 	return errors.Join(errs...)
 }
 
-func validateEnrichMetricTag(metricTag *MetricTagConfig) error {
+func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar bool) error {
 	var errs []error
 
 	if (metricTag.Column.OID != "" || metricTag.Column.Name != "") &&
@@ -62,9 +65,9 @@ func validateEnrichMetricTag(metricTag *MetricTagConfig) error {
 		metricTag.Symbol.OID = metricTag.OID
 		metricTag.OID = ""
 	}
-	if isRawIndexMetricTag(*metricTag) {
+	if metricTag.IsIndexTag() {
 		symbol := SymbolConfig(metricTag.Symbol)
-		if symbol.Name == "" && metricTag.Tag == "" {
+		if symbol.Name == "" && metricTag.Tag == "" && metricTag.Index == 0 {
 			errs = append(errs, errors.New("raw index metric tag requires `tag` or `symbol.name`"))
 		}
 		errs = append(errs, compileSymbolPatterns(&symbol))
@@ -118,29 +121,13 @@ func validateEnrichMetricTag(metricTag *MetricTagConfig) error {
 		}
 	}
 
-	return errors.Join(errs...)
+	if scalar {
+		errs = append(errs, validateScalarMetricTag(metricTag))
+	}
+	return withValidationPath(path, errors.Join(errs...))
 }
 
-func isRawIndexMetricTag(metricTag MetricTagConfig) bool {
-	if metricTag.Table != "" || metricTag.Symbol.OID != "" {
-		return false
-	}
-
-	if metricTag.Index != 0 {
-		return metricTag.Symbol.Format != "" ||
-			metricTag.Symbol.ExtractValue != "" ||
-			metricTag.Symbol.MatchPattern != "" ||
-			metricTag.Mapping.HasItems()
-	}
-
-	return len(metricTag.IndexTransform) > 0 ||
-		metricTag.Symbol.Format != "" ||
-		metricTag.Symbol.ExtractValue != "" ||
-		metricTag.Symbol.MatchPattern != "" ||
-		metricTag.Mapping.HasItems()
-}
-
-func validateScalarMetricTag(path string, tag *MetricTagConfig) error {
+func validateScalarMetricTag(tag *MetricTagConfig) error {
 	var errs []error
 	if tag.Table != "" {
 		errs = append(
@@ -160,10 +147,13 @@ func validateScalarMetricTag(path string, tag *MetricTagConfig) error {
 	if tag.Symbol.OID == "" {
 		errs = append(errs, fmt.Errorf("scalar metric_tags require `symbol.OID` (tag=%q)", tag.Tag))
 	}
-	if path != "" {
-		for i, err := range errs {
-			errs[i] = fmt.Errorf("%s: %w", path, err)
-		}
+	return errors.Join(errs...)
+}
+
+func validateEnrichMetricTags(path string, tags []MetricTagConfig, scalar bool) error {
+	var errs []error
+	for i := range tags {
+		errs = append(errs, validateEnrichMetricTag(fmt.Sprintf("%s.metric_tags[%d]", path, i), &tags[i], scalar))
 	}
 	return errors.Join(errs...)
 }

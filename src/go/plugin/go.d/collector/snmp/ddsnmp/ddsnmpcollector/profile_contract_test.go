@@ -219,7 +219,10 @@ func BenchmarkProfileTagProcessing(b *testing.B) {
 	for name, fields := range map[string]string{"plain": "", "mapping": "mapping: {1: up}\n", "extract": "  extract_value: 'value=([0-9]+)'\n", "combined": "  extract_value: 'value=([0-9]+)'\nmapping: {1: up}\n"} {
 		b.Run(name, func(b *testing.B) {
 			var tag ddprofiledefinition.GlobalMetricTagConfig
-			require.NoError(b, yaml.Unmarshal([]byte("tag: state\nsymbol:\n  OID: 1.2.3.0\n  name: state\n"+fields), &tag))
+			require.NoError(
+				b,
+				yaml.Unmarshal([]byte("tag: state\nsymbol:\n  OID: 1.2.3.0\n  name: state\n"+fields), &tag),
+			)
 			def := ddprofiledefinition.ProfileDefinition{
 				MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{tag},
 			}
@@ -274,6 +277,6 @@ func BenchmarkProfileBGPValueSymbol(b *testing.B) {
 	cfg := scalarBGPTestConfig().State.BGPValueConfig
 	b.ReportAllocs()
 	for b.Loop() {
-		bgpValueSymbol(cfg)
+		cfg.EffectiveSymbol()
 	}
 }
