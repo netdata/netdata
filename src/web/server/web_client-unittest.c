@@ -244,20 +244,25 @@ int web_client_request_size_unittest(void)
     // Every accepted method must survive a two-receive split at those sizes. The
     // smallest first receive per method is its token length: shorter first receives
     // are rejected as an unsupported method before the cursor is ever used.
+    // SPLIT_CASE carries each request's length from sizeof at compile time, so the
+    // loop never has to measure a string at runtime.
+#define SPLIT_CASE(request, smallest_first) {(request), sizeof(request) - 1, (smallest_first)}
     static const struct {
         const char *request;
+        size_t request_length;
         size_t smallest_first;
     } split_methods[] = {
-        {"GET /api/v1/info HTTP/1.1\r\nHost: x\r\n\r\n", 4},
-        {"PUT /api/v1/info HTTP/1.1\r\nContent-Length: 4\r\n\r\ntest", 4},
-        {"POST /api/v1/info HTTP/1.1\r\nContent-Length: 4\r\n\r\ntest", 5},
-        {"DELETE /api/v1/info HTTP/1.1\r\nHost: x\r\n\r\n", 7},
-        {"STREAM key=abc HTTP/1.1\r\nHost: x\r\n\r\n", 7},
-        {"OPTIONS /api/v1/info HTTP/1.1\r\nHost: x\r\n\r\n", 8},
+        SPLIT_CASE("GET /api/v1/info HTTP/1.1\r\nHost: x\r\n\r\n", 4),
+        SPLIT_CASE("PUT /api/v1/info HTTP/1.1\r\nContent-Length: 4\r\n\r\ntest", 4),
+        SPLIT_CASE("POST /api/v1/info HTTP/1.1\r\nContent-Length: 4\r\n\r\ntest", 5),
+        SPLIT_CASE("DELETE /api/v1/info HTTP/1.1\r\nHost: x\r\n\r\n", 7),
+        SPLIT_CASE("STREAM key=abc HTTP/1.1\r\nHost: x\r\n\r\n", 7),
+        SPLIT_CASE("OPTIONS /api/v1/info HTTP/1.1\r\nHost: x\r\n\r\n", 8),
     };
+#undef SPLIT_CASE
     for (size_t m = 0; m < sizeof(split_methods) / sizeof(split_methods[0]); m++) {
         const char *split_request = split_methods[m].request;
-        size_t split_request_length = strlen(split_request);
+        size_t split_request_length = split_methods[m].request_length;
 
         for (size_t first = split_methods[m].smallest_first; first <= 8; first++) {
             web_client_reuse_from_cache(w);
@@ -273,7 +278,7 @@ int web_client_request_size_unittest(void)
             WEB_CLIENT_TEST(
                 http_request_validate(w) == HTTP_VALIDATION_OK,
                 "'%.*s' split after %zu byte(s) did not validate once complete",
-                (int)split_methods[m].smallest_first,
+                (int)first,
                 split_request,
                 first);
         }
