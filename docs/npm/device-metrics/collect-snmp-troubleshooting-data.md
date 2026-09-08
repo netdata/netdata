@@ -10,224 +10,94 @@ endmeta-->
 
 # Collect SNMP troubleshooting data
 
-Use this collector when Netdata Support needs the raw SNMP data returned by one or more network devices. It is useful for
-investigating missing metrics, incomplete topology, profile matching, authentication failures, timeouts, and unsupported OIDs.
+For SNMP metrics, BGP, licensing, or topology problems, send Netdata Support a support bundle that includes the Agent's
+built-in SNMP diagnostics. There is no separate Python collector to download, and collecting the bundle sends no extra
+SNMP requests to your devices.
 
-The collector is a standalone troubleshooting tool. It does not inspect a running Netdata Agent, reproduce Netdata topology,
-scan networks, or change any device or Netdata configuration.
+## Create the bundle
 
-## What the collector does
+Run this on the Netdata Agent that polls the affected devices:
 
-The collector follows a simple, visible workflow:
-
-1. You select the affected nodes manually, from an existing Netdata `go.d/snmp.conf`, or both.
-2. It asks for any required settings or credentials that are not available from the configuration.
-3. It prints the exact nodes, SNMP versions, and protocol data it will request. No SNMP requests have been sent yet.
-4. It waits for approval.
-5. It prints progress while collecting bounded raw SNMP walks.
-6. It creates one private `.tar.gz` archive.
-7. It reports successful, partial, and failed protocol collections.
-
-The raw walks cover system identity, interfaces, bridge/STP/FDB, LLDP, LLDPv2, CDP, IP addresses and neighbors, OSPF,
-standard BGP, and common vendor BGP tables.
-
-SNMP credentials are stored in a private temporary Net-SNMP configuration, not in command-line arguments or the final archive.
-The temporary data is removed when the collector finishes or is interrupted.
-
-## Requirements
-
-Run the collector on a Linux system that can reach the affected devices. It requires:
-
-- Python 3.6 or later;
-- PyYAML when using a Netdata configuration file;
-- `snmpwalk` from the Net-SNMP command-line tools;
-- `curl` and `sha256sum` only when using the download procedure below.
-
-For example, the required packages are commonly named `python3-yaml` and `snmp` on Debian/Ubuntu, or `python3-pyyaml` and
-`net-snmp-utils` on RHEL-compatible systems.
-
-## Download the collector
-
-Download the reviewed collector into a private temporary directory and verify it before running it:
-
-```bash
-SNMP_DIAG_DIR="$(mktemp -d)"
-(
-  set -euo pipefail
-  chmod 700 "$SNMP_DIAG_DIR"
-  SNMP_DIAG_SHA256='d022249eefbcf4c65cd4433dc115d65343efa76a1317d9ac9388f5adb16b009f'
-  curl --fail --location --proto '=https' --tlsv1.2 \
-    --output "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" \
-    'https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/snmp/tools/collect-snmp-troubleshooting-data.py'
-  printf '%s  %s\n' "$SNMP_DIAG_SHA256" "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" | sha256sum --check -
-  chmod 700 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py"
-  python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" --help
-)
+```sh
+sudo netdata-support-bundle --include-snmp-diagnostics
 ```
 
-If checksum verification fails, do not run the file. Report the failure in the support ticket.
+For a static installation:
 
-Running the collector with `--help`, `-h`, or no parameters prints its complete usage without contacting any device:
-
-```bash
-python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py"
+```sh
+sudo /opt/netdata/usr/sbin/netdata-support-bundle --include-snmp-diagnostics
 ```
 
-## Select nodes from Netdata configuration
+On Windows, open PowerShell as Administrator:
 
-The collector checks these Netdata configuration roots in order:
-
-1. `/etc/netdata`
-2. `/opt/netdata/etc/netdata`
-
-The first root containing Netdata SNMP configuration wins. Within that root, the collector reads the standard static jobs file
-`go.d/snmp.conf` and SNMP service-discovery file `go.d/sd/snmp.conf` when they exist.
-
-List the available static jobs and discovery credential scopes without exposing credentials:
-
-```bash
-sudo python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" --list-configured
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-support-bundle.ps1" -IncludeSnmpDiagnostics
 ```
 
-Select only the affected jobs by repeating `--node`:
+For a container installation, run the command inside the container. See
+[Netdata Support Bundle](/docs/developer-and-contributor-corner/netdata-support-bundle.md) for output locations, container
+logs, and other bundle options.
 
-```bash
-sudo python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" \
-  --node 'core-switch' \
-  --node 'edge-router'
-```
+The command prints the path to one archive. Attach it to a restricted ticket in the
+[Netdata Support portal](https://support.netdata.cloud/support/home), along with the affected device, the symptom, and the
+time it occurred. Include any recent device configuration or firmware changes.
 
-You can also select a configured job by its exact address. If the same address belongs to multiple static jobs, use the job name
-so the collector knows which credentials to use.
+**SNMP evidence is unsanitized.** It can contain addresses, hostnames, interface descriptions, inventory, metric values,
+and arbitrary data returned by devices. Connection credentials are excluded from diagnostic records, but device-returned
+values are not scrubbed for secrets or personal information. Share this bundle privately, never in a public GitHub issue.
+The inclusion flag is required; ordinary support bundles omit SNMP diagnostic files.
 
-For SNMP service discovery, select the exact affected IP address. The collector reuses the credential assigned to the single
-configured range containing that address:
+## What the evidence contains
 
-```bash
-sudo python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" \
-  --node '192.0.2.10'
-```
+The Agent records evidence from its existing collection work:
 
-The collector does not read the discovery cache, enumerate a range, or scan a subnet. If an address belongs to multiple
-credential scopes, use manual configuration so the intended credentials are explicit.
+- Job lifecycle and preparation outcomes, including failures before a device becomes available for topology.
+- Per-device metric collection, emitted samples, profile selection context, structured failures, and source operations.
+- BGP and licensing results, including cache state and the source operations that produced retained values.
+- Topology acquisition evidence and retained historical checkpoints for offline reconstruction and inspection.
 
-Use a different static-jobs or SNMP-discovery configuration file when needed. An explicit path always wins and the collector
-stops if that file does not exist:
+This is passive evidence of what Netdata collected. It does not walk additional OIDs, probe unconfigured devices, or keep
+every poll forever. A protocol's absence can mean it was not selected by the device's profiles or has not been collected.
+Support may request a targeted additional check when the retained evidence cannot answer a question.
 
-```bash
-sudo python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" \
-  --netdata-snmp-config '/private/path/snmp.conf' \
-  --node 'core-switch'
-```
+## Timing and retained files
 
-Use `sudo` when the Netdata configuration or its credentials are protected. Alternatively, copy the configuration to a private,
-restricted location and provide its path explicitly.
+Files live under the Agent's state directory, in `snmp/diagnostics/`. This is normally
+`/var/lib/netdata/snmp/diagnostics/`, or `/opt/netdata/var/lib/netdata/snmp/diagnostics/` for static installations.
+The bundle copies them into `06-state/snmp-diagnostics/`:
 
-`--all-configured` selects every enabled static job in the chosen configuration. It never expands discovery ranges. Use it only
-when all static jobs are relevant:
+| File | Purpose and timing |
+|---|---|
+| `lifecycle.zst` | Independently updated job lifecycle status and whether topology is active. |
+| `topology/checkpoint-*.zst` | The last three meaningful topology checkpoints. Each is self-contained, including its own lifecycle cut. Topology refresh defaults to 30 minutes; file timestamps need not match device metric polls. |
+| `normal/runs.json` | Identifies the current and, when available, previous evidence-bearing go.d process run. |
+| `normal/<run-id>/device-*.zst` | One file per device containing its latest normal collection attempt, retained last failure, and associated metric, BGP, licensing, and source evidence. First evidence is eligible for prompt publication; subsequent writes are spaced five minutes apart per device. |
 
-```bash
-sudo python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" --all-configured
-```
+Normal evidence is updated in memory on each poll, so the next write captures the latest state without rewriting topology.
+Publication is asynchronous and best effort; busy or failing storage can delay it. Previous-run files preserve evidence
+across a restart until a later evidence-bearing run replaces them. Registration IDs are scoped to a run, so use run IDs
+and captured timestamps when comparing files.
 
-## Configure nodes manually
+The support bundle copies complete files without decompressing or modifying them. Files can change independently while
+it runs: the bundle is not a simultaneous snapshot of the whole directory. Check `06-state/snmp-diagnostics-status.txt`
+and `MANIFEST.json` for missing files, copy failures, or an incomplete result. A partial bundle can still be useful.
 
-A Netdata configuration is optional. Select a manual SNMPv1 or SNMPv2c node by address and assign a useful name with
-`NAME=ADDRESS`:
+## If diagnostic files are missing
 
-```bash
-python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" \
-  --node 'access-switch=192.0.2.10' \
-  --snmp-version 2c \
-  --port 161 \
-  --timeout 5 \
-  --retries 1
-```
-
-The collector requests the community with a hidden prompt. It never accepts communities or passphrases as command-line
-arguments, where other local users could see them.
-
-For SNMPv3, provide the non-secret protocol settings and enter the passphrases at the hidden prompts:
-
-```bash
-python3 "$SNMP_DIAG_DIR/collect-snmp-troubleshooting-data.py" \
-  --node 'edge-router=192.0.2.20' \
-  --snmp-version 3 \
-  --v3-user 'operator' \
-  --v3-level authPriv \
-  --v3-auth-proto sha256 \
-  --v3-priv-proto aes256 \
-  --v3-context 'routing-instance'
-```
-
-Omit `--v3-context` when the device uses the default SNMPv3 context.
-
-`NAME=ADDRESS` explicitly requests manual settings even when the address belongs to a configured discovery scope. Repeat
-`--node` to select several manual nodes that use the same command-line protocol settings. Run separate collections when manual
-nodes require different settings, or describe them as separate jobs in a private Netdata-format configuration file.
-
-When every selected node uses `NAME=ADDRESS`, the collector does not load automatically detected Netdata configuration. An
-explicit `--netdata-snmp-config` path is still loaded and validated.
-
-If a Netdata configuration value contains a canonical `${env:VARIABLE}` reference available to the collector, it is resolved
-using Netdata's trimmed-value behavior. Text such as `${TOKEN}` without a resolver scheme remains literal. For other unresolved
-active references, such as protected `${file:/path}` secrets, the collector prompts for the effective value instead of trying to
-reproduce Netdata's secret-resolution machinery.
-
-## Review and approve the plan
-
-Before sending any SNMP request, the collector prints:
-
-- each selected node name and address;
-- the SNMP port and version;
-- whether the settings came from manual input or a Netdata configuration;
-- every protocol data group it will collect.
-
-Review the plan and answer `y` or `yes` to proceed. Any other answer cancels collection without contacting a device.
-
-`--yes` accepts the printed plan non-interactively. Use it only after the same command and scope have already been reviewed.
-
-## Read and submit the result
-
-The collector prints every SNMP command before running it, followed by progress and a result for each node and protocol group.
-One of these statuses is recorded for each group:
-
-- `success`: every walk in the group completed;
-- `partial`: some data was collected, but a walk failed or its bounded output was truncated;
-- `failed`: no walk in the group completed.
-
-The final archive is named `netdata-snmp-data-<UTC timestamp>.tar.gz`. It contains:
-
-- `plan.txt`: the approved collection scope;
-- `collection-status.tsv`: per-node and per-protocol results;
-- `summary.txt`: successful, partial, and failed totals;
-- `devices/`: bounded raw SNMP output;
-- `manifest.sha256`: integrity hashes for the files in the archive;
-- `README.txt`: handling guidance.
-
-The process exit code is `0` when every protocol group succeeds, `2` when the archive contains partial or failed collections,
-`1` for a fatal setup error, `130` for Ctrl-C, `129` for `SIGHUP`, and `143` for `SIGTERM`. An exit code of `2` still produces
-useful diagnostic evidence.
-
-Attach the single `.tar.gz` archive to a restricted ticket in the
-[Netdata Support portal](https://support.netdata.cloud/support/home). Include what is missing or incorrect, when the problem was
-visible, and whether device configuration or firmware changed recently.
-
-Raw SNMP data can contain private hostnames, addresses, MAC addresses, interface descriptions, device identifiers, and other
-network inventory. Do not upload the archive to Slack, GitHub, email, a public ticket, or another public location.
-
-## If collection fails
-
-- **A required command is missing:** install the package named in the error and rerun the same command.
-- **The Netdata configuration is unreadable:** rerun with `sudo`, or pass a private readable copy with
-  `--netdata-snmp-config`.
-- **A configured secret reference cannot be resolved:** enter the effective value at the hidden prompt.
-- **Some walks fail or time out:** submit the archive. Failures are useful evidence and do not stop the remaining probes.
-- **Collection is interrupted:** rerun it. The collector removes private temporary data and does not keep an incomplete archive.
+- Check `06-state/snmp-diagnostics-status.txt`. `not_requested` means the inclusion flag was omitted; `unavailable`
+  means no completed evidence was found; `partial` means some requested evidence could not be copied.
+- Confirm that your Agent version includes built-in SNMP diagnostics. Downloading a newer bundle script alone cannot
+  create evidence that an older Agent never recorded.
+- Let the Agent collect the affected device and allow time for publication. Check the Agent logs for collection or
+  diagnostic publication failures.
+- Run go.d through the Agent service. Diagnostic file publication is disabled when any of go.d's standard streams is a
+  terminal; an interactive debug invocation does not produce fresh diagnostic files. Files from a previous daemon run may
+  still exist, so check their timestamps.
+- Use sufficient permissions to read the Agent's state directory. No Python, Net-SNMP tools, or local Zstandard decoder
+  is needed to include existing files in a bundle.
 
 ## Related documentation
 
 - [Troubleshooting SNMP device metrics](/docs/npm/device-metrics/troubleshooting.md)
 - [SNMP device configuration](/docs/npm/device-metrics/configuration.md)
 - [SNMP topology discovery methods](/docs/npm/topology/discovery-methods.md)
-- [Secrets Management](/src/collectors/SECRETS.md)
