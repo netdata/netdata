@@ -6,6 +6,8 @@ An alert tells you *what* changed. It rarely tells you *why*. That answer usuall
 
 This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata reaches out to your MCP servers**. To instead connect an AI assistant (Claude, Cursor, a CLI) to Netdata's own MCP server, see [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 
+MCP Connections bring in context from other systems. For the context only your team can provide — service tiers, known behaviours, ownership — see [Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md).
+
 ![MCP Connections settings](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-settings.png)
 
 ## Prerequisites
