@@ -527,6 +527,14 @@ func (c BGPValueConfig) IsSet() bool {
 		c.Mapping.Mode != ""
 }
 
+// EffectiveMapping applies the same symbol-first precedence during validation and collection.
+func (c BGPValueConfig) EffectiveMapping() MappingConfig {
+	if c.Symbol.Mapping.HasItems() {
+		return c.Symbol.Mapping
+	}
+	return c.Mapping
+}
+
 func (c BGPValueConfig) Clone() BGPValueConfig {
 	return BGPValueConfig{
 		Value:          c.Value,

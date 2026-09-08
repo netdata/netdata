@@ -1361,9 +1361,7 @@ func bgpValueSymbol(cfg ddprofiledefinition.BGPValueConfig) ddprofiledefinition.
 	if sym.Format == "" {
 		sym.Format = cfg.Format
 	}
-	if !sym.Mapping.HasItems() && cfg.Mapping.HasItems() {
-		sym.Mapping = cfg.Mapping
-	}
+	sym.Mapping = cfg.EffectiveMapping()
 	return sym
 }
 

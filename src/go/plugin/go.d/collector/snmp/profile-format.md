@@ -257,6 +257,10 @@ It is collected **once per device** and populates the device’s **host labels**
 
 It always follows the structure `metadata → device → fields`, where each field defines a single label.
 
+The optional top-level `sysobjectid_metadata` list defines device-specific metadata using
+entries with `sysobjectid` and `metadata` fields. Matching entries are collected even when
+`metadata.device` is absent, including when consumer scoping removes ordinary metadata.
+
 The Datadog `metadata.interface` resource is unsupported and fails profile
 validation. Legacy `id_tags` are ignored; use metric tags for per-row labels.
 
@@ -1436,6 +1440,10 @@ Use exactly one row-index selector per typed BGP value: `index`,
 `index_from_end`, or `index_transform`. Profile validation rejects typed BGP
 values that set more than one of these selectors.
 
+For typed BGP values, a non-empty `symbol.mapping` takes precedence over a value-level
+`mapping`. Validation checks the same effective mapping used during collection, including
+the canonical peer-state and AFI/SAFI values. Prefer one mapping location to avoid ambiguity.
+
 Typed BGP cross-table value fields can also use `lookup_symbol` with
 `table:` and `index_transform:`. This is needed when a BGP peer-family table is
 indexed by a compact peer ID, but peer identity fields such as neighbor and
@@ -1489,10 +1497,9 @@ selector-scoped device exception above.
 
 Tag transformations let you **modify or extract parts of SNMP values** to produce clear, human-readable tags.
 
-They work the same in **both** places:
-
-- `metadata` (e.g., device model, OS name), and
-- `metric_tags` (e.g., per-row interface labels).
+Metadata symbols and SNMP-value metric tags support formatting, extraction, replacement,
+and mapping. Global, same-table, and cross-table metric tags also support `match` + `tags`
+to emit multiple labels. Metadata fields do not support that multi-tag form.
 
 **Available Tag Transformations**:
 
@@ -1508,13 +1515,22 @@ They work the same in **both** places:
 
 | Rule                        | Description                                                                                                                                   |
 |-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Where**                   | Can be used inside `metadata.*.fields.*.symbols[]` and `metric_tags[]`.                                                                       |
-| **Order of application**    | 1️⃣ `match_pattern` + `match_value` **or** `extract_value` (whichever is present) → 2️⃣ `mapping` → 3️⃣ `match` + `tags` (if defined).        |
+| **Where**                   | Metadata transformations belong inside `symbol` or `symbols[]`. For metric tags, regex extraction/replacement and format belong inside `symbol`; mapping and `match` + `tags` belong on the tag. |
+| **Order of application**    | `format` → `extract_value` → `match_pattern` + `match_value` → `mapping` → `match` + `tags` (metric tags only). Every configured step runs on the preceding result. |
 | **No match behavior**       | • `extract_value`: keeps the original value.<br/>• `match_pattern`: skips the value (tag not emitted).<br/>• `match` + `tags`: emits no tags. |
-| **Multiple symbols**        | If multiple `symbols` are listed for the same tag, the **first non-empty result** is used.                                                    |
+| **Metadata fallback**        | For metadata `symbols`, an extraction mismatch tries the next symbol; the last symbol retains the original value on an extraction miss. The first non-empty result wins. |
 | **Mapping key consistency** | Keys in a `mapping` must all be the same type — all numeric or all string.                                                                    |
 | **Mapping modes**           | Tags and metadata support only exact-match mapping. Use `mapping.items`; `mapping.mode` is optional and defaults to exact.                    |
 | **Safety**                  | Keep regexes simple and, when possible, **anchor them** (e.g. `^pattern$`) to prevent unwanted matches.                                       |
+
+For example, extracting `1` from `value=1` and mapping `1` to `up` emits `up`.
+Combining transformations now applies the entire sequence; older releases selected only
+one operation for SNMP-value metric tags. Extraction without a match retains the input;
+replacement or final multi-tag matching without a match emits no tag.
+
+Raw index tags keep a different order: index selection → extraction → replacement →
+`symbol.format` → mapping. Their regex misses reject the tag because index parsing failed.
+They do not support the multi-tag `match` + `tags` form.
 
 **Quick Syntax Recap**:
 
@@ -1786,7 +1802,7 @@ These transformations are typically used to:
 
 | Rule                      | Description                                                                                                                                                                                                                                                                                                                                              |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
+| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata. |
 | **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
 | **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                             |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |

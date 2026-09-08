@@ -46,10 +46,7 @@ func (dc *deviceMetadataCollector) collectObserved(
 	}
 
 	resName := ddprofiledefinition.MetadataDeviceResource
-	cfg, ok := prof.Definition.Metadata[resName]
-	if !ok {
-		return nil, nil
-	}
+	cfg := prof.Definition.Metadata[resName]
 
 	meta := make(map[string]ddsnmp.MetaTag)
 

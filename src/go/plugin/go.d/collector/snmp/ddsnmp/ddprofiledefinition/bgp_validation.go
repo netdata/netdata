@@ -397,7 +397,7 @@ func validateEnrichBGPSymbol(path string, symbol *SymbolConfig) error {
 }
 
 func validateBGPPeerStateMapping(path string, state *BGPStateConfig) error {
-	mapping := effectiveBGPValueMapping(state.BGPValueConfig)
+	mapping := state.EffectiveMapping()
 	if !mapping.HasItems() {
 		if state.Partial {
 			return fmt.Errorf("%s.mapping: partial state mapping requires at least one RFC 4271 state", path)
@@ -448,19 +448,12 @@ func validateBGPEnumValues(path string, value BGPValueConfig, valid func(string)
 	if value.Value != "" && !valid(value.Value) {
 		errs = append(errs, fmt.Errorf("%s.value: invalid BGP %s %q", path, label, value.Value))
 	}
-	for raw, mapped := range effectiveBGPValueMapping(value).Items {
+	for raw, mapped := range value.EffectiveMapping().Items {
 		if !valid(mapped) {
 			errs = append(errs, fmt.Errorf("%s.mapping.items[%s]: invalid BGP %s %q", path, raw, label, mapped))
 		}
 	}
 	return errors.Join(errs...)
-}
-
-func effectiveBGPValueMapping(value BGPValueConfig) MappingConfig {
-	if value.Mapping.HasItems() || value.Mapping.Mode != "" {
-		return value.Mapping
-	}
-	return value.Symbol.Mapping
 }
 
 type bgpSignalValidationKey struct {

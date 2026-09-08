@@ -176,6 +176,8 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		return &prof, nil
 	}
 
+	prof.Definition.Normalize()
+
 	prof.extensionHierarchy = make([]*extensionInfo, 0, len(prof.Definition.Extends))
 	mergedBases := make([]*Profile, 0, len(prof.Definition.Extends))
 

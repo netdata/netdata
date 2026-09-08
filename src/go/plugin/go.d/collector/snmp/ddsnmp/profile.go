@@ -477,18 +477,14 @@ func (p *Profile) removeConstantMetrics() {
 		return
 	}
 
-	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		if m.IsScalar() && m.Symbol.ConstantValueOne {
-			return true
-		}
-
-		if m.IsColumn() {
-			m.Symbols = slices.DeleteFunc(m.Symbols, func(s ddprofiledefinition.SymbolConfig) bool {
-				return s.ConstantValueOne
-			})
-		}
-
-		return m.IsColumn() && len(m.Symbols) == 0
+	for i := range p.Definition.Metrics {
+		metric := &p.Definition.Metrics[i]
+		metric.Symbols = slices.DeleteFunc(metric.Symbols, func(symbol ddprofiledefinition.SymbolConfig) bool {
+			return symbol.ConstantValueOne
+		})
+	}
+	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(metric ddprofiledefinition.MetricsConfig) bool {
+		return metric.Symbol.ConstantValueOne || (!metric.IsScalar() && !metric.IsColumn())
 	})
 }
 

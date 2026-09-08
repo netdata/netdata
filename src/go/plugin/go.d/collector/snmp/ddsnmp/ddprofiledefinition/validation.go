@@ -9,10 +9,7 @@ import "errors"
 
 // ValidateEnrichProfile validates a profile and normalizes it.
 func ValidateEnrichProfile(p *ProfileDefinition) error {
-	normalizeMetrics(p.Metrics)
-	normalizeTopology(p.Topology)
-	normalizeLicensing(p.Licensing)
-	normalizeBGP(p.BGP)
+	p.Normalize()
 
 	errs := []error{
 		validateEnrichSelector(p),
