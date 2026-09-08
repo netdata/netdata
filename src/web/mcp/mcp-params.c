@@ -78,7 +78,9 @@ BUFFER *mcp_params_parse_array_to_pattern(
     if (!json_object_object_get_ex(params, param_name, &array_obj) || !array_obj) {
         if (required && error) {
             buffer_flush(error);
-            buffer_sprintf(error, "Missing required parameter '%s'", param_name);
+            buffer_sprintf(error, "Missing required parameter '%s'.", param_name);
+            if (list_tool)
+                buffer_sprintf(error, " Use the '%s' tool to discover available values.", list_tool);
         }
         return NULL;  // Parameter not provided
     }
@@ -86,7 +88,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
     if (!json_object_is_type(array_obj, json_type_array)) {
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "%s must be an array of strings, not %s", 
+            buffer_sprintf(error, "The '%s' parameter must be an array of strings, not %s.",
                     param_name, json_type_to_name(json_object_get_type(array_obj)));
         }
         return NULL;
@@ -96,7 +98,9 @@ BUFFER *mcp_params_parse_array_to_pattern(
     if (required && json_object_array_length(array_obj) == 0) {
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "The '%s' parameter cannot be an empty array", param_name);
+            buffer_sprintf(error, "The '%s' parameter cannot be an empty array.", param_name);
+            if (list_tool)
+                buffer_sprintf(error, " Use the '%s' tool to discover available values.", list_tool);
         }
         return NULL;
     }
@@ -108,26 +112,18 @@ BUFFER *mcp_params_parse_array_to_pattern(
         buffer_free(wb);
         if (error) {
             buffer_flush(error);
-            if (allow_wildcards) {
-                buffer_strcat(error, "invalid array format");
-            } else {
-                if (list_tool) {
-                    buffer_sprintf(error,
-                            "must contain exact values, not patterns. "
-                            "Wildcards are not supported. "
-                            "Use the '%s' tool to discover exact values.", list_tool);
-                } else {
-                    buffer_strcat(error,
-                            "must contain exact values, not patterns. Wildcards are not supported.");
-                }
-            }
+            buffer_sprintf(error,
+                    "The '%s' parameter must contain exact values, not patterns. "
+                    "Wildcards are not supported.", param_name);
+            if (list_tool)
+                buffer_sprintf(error, " Use the '%s' tool to discover exact values.", list_tool);
         }
         return NULL;
     } else if (result != 0) {
         buffer_free(wb);
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "%s must be an array of strings", param_name);
+            buffer_sprintf(error, "The '%s' parameter must be an array of strings.", param_name);
         }
         return NULL;
     }
@@ -232,13 +228,16 @@ void mcp_schema_add_array_param(
     BUFFER *buffer,
     const char *param_name,
     const char *title,
-    const char *description
+    const char *description,
+    bool required
 ) {
     buffer_json_member_add_object(buffer, param_name);
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", title);
         buffer_json_member_add_string(buffer, "description", description);
+        if (required)
+            buffer_json_member_add_uint64(buffer, "minItems", 1);
         buffer_json_member_add_object(buffer, "items");
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_object_close(buffer); // items
