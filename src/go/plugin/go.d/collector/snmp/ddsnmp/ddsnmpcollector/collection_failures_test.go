@@ -27,15 +27,27 @@ func TestCollectionFailuresObserveWarmPollAndRecovery(t *testing.T) {
 			SnmpClient: handler,
 			Log:        logger.New(),
 			Profiles: []*ddsnmp.Profile{{SourceFile: "device.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-				Metrics: []ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: scalarOID, Name: "sysUpTime"}}},
-				BGP:     []ddprofiledefinition.BGPConfig{scalarBGPTestConfig()},
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  scalarOID,
+						Name: "sysUpTime",
+					}},
+				},
+				BGP: []ddprofiledefinition.BGPConfig{scalarBGPTestConfig()},
 				Licensing: []ddprofiledefinition.LicensingConfig{
 					{
-						ID:       "license",
-						Identity: ddprofiledefinition.LicenseIdentityConfig{ID: ddprofiledefinition.LicenseValueConfig{Value: "license"}},
+						ID: "license",
+						Identity: ddprofiledefinition.LicenseIdentityConfig{
+							ID: ddprofiledefinition.LicenseValueConfig{
+								Value: "license",
+							},
+						},
 						State: ddprofiledefinition.LicenseStateConfig{
 							LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
-								Symbol: ddprofiledefinition.SymbolConfig{OID: licenseOID, Name: "state"},
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  licenseOID,
+									Name: "state",
+								},
 							},
 						},
 					},
@@ -46,7 +58,11 @@ func TestCollectionFailuresObserveWarmPollAndRecovery(t *testing.T) {
 	for cycle := 0; cycle < 3; cycle++ {
 		expectSNMPGet(handler, []string{scalarOID}, []gosnmp.SnmpPDU{createTimeTicksPDU(scalarOID, 123456)})
 		if cycle == 1 {
-			expectSNMPGet(handler, []string{licenseOID}, []gosnmp.SnmpPDU{createStringPDU(licenseOID, "SECRET malformed state")})
+			expectSNMPGet(
+				handler,
+				[]string{licenseOID},
+				[]gosnmp.SnmpPDU{createStringPDU(licenseOID, "SECRET malformed state")},
+			)
 			expectSNMPGetError(handler, bgpOIDs, gosnmp.ErrWrongDigest)
 		} else {
 			expectSNMPGet(handler, []string{licenseOID}, []gosnmp.SnmpPDU{createIntegerPDU(licenseOID, 0)})
@@ -87,8 +103,11 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 		want   ddsnmp.CollectionFailures
 	}{
 		"packet error preserves response and index": {
-			get:    true,
-			packet: &gosnmp.SnmpPacket{Error: gosnmp.NoSuchName, ErrorIndex: 2},
+			get: true,
+			packet: &gosnmp.SnmpPacket{
+				Error:      gosnmp.NoSuchName,
+				ErrorIndex: 2,
+			},
 			want: ddsnmp.CollectionFailures{
 				GET: ddsnmp.FailureCount{
 					Count: 1,
@@ -106,7 +125,13 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 			values: []gosnmp.SnmpPDU{{Name: "1.3.6.1", Type: gosnmp.Integer, Value: 1}},
 			err:    context.DeadlineExceeded,
 			want: ddsnmp.CollectionFailures{
-				WALK: ddsnmp.FailureCount{Count: 1, Last: snmputils.Failure{Operation: "walk", Reason: "deadline"}},
+				WALK: ddsnmp.FailureCount{
+					Count: 1,
+					Last: snmputils.Failure{
+						Operation: "walk",
+						Reason:    "deadline",
+					},
+				},
 			},
 		},
 	}
@@ -115,7 +140,10 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 			ctrl, handler := setupMockHandler(t)
 			defer ctrl.Finish()
 			var failures ddsnmp.CollectionFailures
-			client := &diagnosticClient{Handler: handler, failures: &failures}
+			client := &diagnosticClient{
+				Handler:  handler,
+				failures: &failures,
+			}
 			var err error
 			if tc.get {
 				handler.EXPECT().Get([]string{"1.3.6"}).Return(tc.packet, tc.err)
@@ -144,9 +172,18 @@ func TestReplacementClientKeepsFailureObservation(t *testing.T) {
 	defer ctrl.Finish()
 	profile := createTestProfile(
 		"scalar.yaml",
-		[]ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.3.0", Name: "uptime"}}},
+		[]ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.2.1.1.3.0",
+				Name: "uptime",
+			}},
+		},
 	)
-	c := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	c := New(Config{
+		SnmpClient: handler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+	})
 	c.SetSNMPClient(handler)
 	expectSNMPGetError(handler, []string{"1.3.6.1.2.1.1.3.0"}, gosnmp.ErrWrongDigest)
 	_, _ = c.Collect()
@@ -160,24 +197,39 @@ func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
 	const oid = "1.3.6.1.4.1.99999"
 	const first = oid + ".1.0"
 	const second = oid + ".2.0"
-	profile := &ddsnmp.Profile{SourceFile: "mixed.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-		Metadata: ddprofiledefinition.MetadataConfig{
-			"device": {
-				Fields: map[string]ddprofiledefinition.MetadataField{
-					"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: second, Name: "serial"}},
+	profile := &ddsnmp.Profile{
+		SourceFile: "mixed.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metadata: ddprofiledefinition.MetadataConfig{
+				"device": {
+					Fields: map[string]ddprofiledefinition.MetadataField{
+						"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  second,
+							Name: "serial",
+						}},
+					},
+				},
+			},
+			SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
+				{
+					SysobjectID: oid,
+					Metadata: map[string]ddprofiledefinition.MetadataField{
+						"model": {Symbol: ddprofiledefinition.SymbolConfig{
+							OID:    first,
+							Name:   "model",
+							Format: "uint32",
+						}},
+					},
 				},
 			},
 		},
-		SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
-			{
-				SysobjectID: oid,
-				Metadata: map[string]ddprofiledefinition.MetadataField{
-					"model": {Symbol: ddprofiledefinition.SymbolConfig{OID: first, Name: "model", Format: "uint32"}},
-				},
-			},
-		},
-	}}
-	c := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, SysObjectID: oid, Log: logger.New()})
+	}
+	c := New(Config{
+		SnmpClient:  handler,
+		Profiles:    []*ddsnmp.Profile{profile},
+		SysObjectID: oid,
+		Log:         logger.New(),
+	})
 	expectSNMPGet(handler, []string{first}, []gosnmp.SnmpPDU{createStringPDU(first, "invalid number")})
 	expectSNMPGetError(handler, []string{second}, gosnmp.ErrWrongDigest)
 	_, err := c.CollectDeviceMetadata()
@@ -218,7 +270,7 @@ func TestCollectionFailuresPreserveDependencyReasons(t *testing.T) {
 						},
 					},
 				},
-				MetricTags: ddprofiledefinition.MetricTagConfigList{{Tag: "if_name", Table: "ifXTable", Symbol: ddprofiledefinition.SymbolConfigCompat{
+				MetricTags: []ddprofiledefinition.MetricTagConfig{{Tag: "if_name", Table: "ifXTable", Symbol: ddprofiledefinition.SymbolConfigCompat{
 					OID:  "1.3.6.1.2.1.31.1.1.1.1",
 					Name: "ifName",
 				}}},

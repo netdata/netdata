@@ -170,6 +170,12 @@ virtual_metrics: <calculated metrics>
 | [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
 
+Profile metric tags must be objects, such as `{tag: interface, index: 1}`.
+Datadog string references such as `metric_tags: [ifName]` are unsupported and
+fail YAML decoding. The Datadog metric `options` object (`placement`,
+`metric_suffix`) is ignored; it does not extract flags or change metric names.
+Unknown object keys continue to be ignored by the profile loader.
+
 ### 1. selector
 
 You use the selector to:
@@ -250,6 +256,10 @@ The `metadata` section defines **device-level information** (not metric tags).
 It is collected **once per device** and populates the device’s **host labels** in Netdata (the “virtual node” labels shown on the device page).
 
 It always follows the structure `metadata → device → fields`, where each field defines a single label.
+
+The Datadog `metadata.interface` resource is unsupported and fails profile
+validation. Legacy `id_tags` are ignored; use metric tags for per-row labels.
+
 
 Each field can be:
 
@@ -844,6 +854,13 @@ The collector automatically detects the appropriate **metric type** (e.g., `gaug
 **Overriding the Metric Type**
 
 You can explicitly set a metric’s type using the `metric_type` field inside a symbol definition.
+
+The legacy metric-row `metric_type` also remains supported. For scalar rows it
+supplies the symbol's default type; for table rows it supplies the default for
+each column. An explicit `symbol.metric_type` or `symbols[].metric_type` takes
+precedence. With neither override, Netdata derives the type from the SNMP PDU.
+Prefer setting the type on each symbol in new profiles.
+
 
 ```yaml
 metrics:

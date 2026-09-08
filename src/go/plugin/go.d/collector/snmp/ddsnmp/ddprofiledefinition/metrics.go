@@ -12,7 +12,7 @@ import (
 	"text/template"
 )
 
-// ProfileMetricType metric type used to override default type of the metric
+// ProfileMetricType overrides the type inferred from an SNMP value.
 // By default metric type is derived from the type of the SNMP value, for example Counter32/64 -> rate.
 type ProfileMetricType string
 
@@ -20,26 +20,14 @@ const (
 	// ProfileMetricTypeGauge is used to create a gauge metric
 	ProfileMetricTypeGauge ProfileMetricType = "gauge"
 
-	// ProfileMetricTypeMonotonicCount is used to create a monotonic_count metric
+	// ProfileMetricTypeMonotonicCount displays the cumulative value without calculating a rate.
 	ProfileMetricTypeMonotonicCount ProfileMetricType = "monotonic_count"
 
-	// ProfileMetricTypeMonotonicCountAndRate is used to create a monotonic_count and rate metric
+	// ProfileMetricTypeMonotonicCountAndRate is a legacy spelling rendered as a cumulative value.
 	ProfileMetricTypeMonotonicCountAndRate ProfileMetricType = "monotonic_count_and_rate"
 
 	// ProfileMetricTypeRate is used to create a rate metric
 	ProfileMetricTypeRate ProfileMetricType = "rate"
-
-	// ProfileMetricTypeFlagStream is used to create metric based on a value that represent flags
-	// See details in https://github.com/DataDog/integrations-core/pull/7072
-	ProfileMetricTypeFlagStream ProfileMetricType = "flag_stream"
-
-	// ProfileMetricTypeCounter is DEPRECATED
-	// `counter` is deprecated in favour of `rate`
-	ProfileMetricTypeCounter ProfileMetricType = "counter"
-
-	// ProfileMetricTypePercent is DEPRECATED
-	// `percent` is deprecated in favour of `scale_factor`
-	ProfileMetricTypePercent ProfileMetricType = "percent"
 )
 
 // MetricsConfig holds configs for a metric
@@ -55,57 +43,39 @@ type MetricsConfig struct {
 	// Table configs
 	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
 
-	// `static_tags` is not exposed as json at the moment since we need to evaluate if we want to expose it via UI
 	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
-	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
-
-	Options MetricsConfigOption `yaml:"options,omitempty" json:"options"`
+	MetricTags []MetricTagConfig       `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 
 	// DEPRECATED: Use .Symbol instead
-	OID string `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
+	OID string `yaml:"OID,omitempty" json:"OID,omitempty"`
 	// DEPRECATED: Use .Symbol instead
-	Name string `yaml:"name,omitempty" json:"name,omitempty" jsonschema:"-"`
-	// DEPRECATED: use Symbol.MetricType instead.
-	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty" jsonschema:"-"`
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+	// Deprecated: set the type on the symbol. This row default also applies to table columns.
+	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 }
 
 // Clone duplicates this MetricsConfig
 func (m MetricsConfig) Clone() MetricsConfig {
-	return MetricsConfig{
-		MIB:        m.MIB,
-		Table:      m.Table.Clone(),
-		Symbol:     m.Symbol.Clone(),
-		Symbols:    cloneSlice(m.Symbols),
-		StaticTags: slices.Clone(m.StaticTags),
-		MetricTags: cloneSlice(m.MetricTags),
-		Options:    m.Options,
-
-		OID:        m.OID,
-		Name:       m.Name,
-		MetricType: m.MetricType,
-	}
+	m.Table = m.Table.Clone()
+	m.Symbol = m.Symbol.Clone()
+	m.Symbols = cloneSlice(m.Symbols)
+	m.StaticTags = slices.Clone(m.StaticTags)
+	m.MetricTags = cloneSlice(m.MetricTags)
+	return m
 }
 
-// IsColumn returns true if the metrics config define columns metrics
+// IsColumn reports whether the row defines table columns.
 func (m *MetricsConfig) IsColumn() bool {
 	return len(m.Symbols) > 0
 }
 
-// IsScalar returns true if the metrics config define scalar metrics
+// IsScalar reports whether the row defines a scalar symbol.
 func (m *MetricsConfig) IsScalar() bool {
 	return m.Symbol.OID != "" && m.Symbol.Name != ""
 }
 
-// SymbolConfigCompat is used to deserialize string field or SymbolConfig.
-// For OID/Name to Symbol harmonization:
-// When users declare metric tag like:
-//
-//	metric_tags:
-//	  - OID: 1.2.3
-//	    symbol: aSymbol
-//
-// this will lead to OID stored as MetricTagConfig.OID  and name stored as MetricTagConfig.Symbol.Name
-// When this happens, in validateEnrichMetricTags we harmonize by moving MetricTagConfig.OID to MetricTagConfig.Symbol.OID.
+// SymbolConfigCompat accepts a symbol object or a legacy symbol-name string.
+// validateEnrichMetricTag moves a legacy tag-level OID into this symbol.
 type SymbolConfigCompat SymbolConfig
 
 // Clone creates a duplicate of this SymbolConfigCompat
@@ -129,10 +99,8 @@ type SymbolConfig struct {
 	Format           string  `yaml:"format,omitempty" json:"format,omitempty"`
 	ConstantValueOne bool    `yaml:"constant_value_one,omitempty" json:"constant_value_one,omitempty"`
 
-	// `metric_type` is used for force the metric type
-	//   When empty, by default, the metric type is derived from SNMP OID value type.
-	//   Valid `metric_type` types: `gauge`, `rate`, `monotonic_count`, `monotonic_count_and_rate`
-	//   Deprecated types: `counter` (use `rate` instead), percent (use `scale_factor` instead)
+	// MetricType overrides the type derived from the SNMP PDU.
+	// Gauge and the monotonic-count spellings render absolute values; rate renders changes per second.
 	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 
 	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta"`
@@ -169,9 +137,9 @@ type MetricTagConfig struct {
 	Column SymbolConfig `yaml:"column,omitempty" json:"-"`
 
 	// DEPRECATED: use .Symbol instead
-	OID string `yaml:"OID,omitempty" json:"-"  jsonschema:"-"`
-	// Symbol records the OID to be parsed. Note that .Symbol.Name is ignored:
-	// set .Tag to specify the tag name. If a serialized Symbol is a string
+	OID string `yaml:"OID,omitempty" json:"-"`
+	// Symbol records the OID to read. Its Name supplies the tag name when Tag is empty.
+	// If a serialized Symbol is a string
 	// instead of an object, it will be treated like {name: <value>}; this use
 	// pattern is deprecated
 	Symbol SymbolConfigCompat `yaml:"symbol,omitempty" json:"symbol"`
@@ -187,12 +155,9 @@ type MetricTagConfig struct {
 	Mapping    MappingConfig `yaml:"mapping,omitempty" json:"mapping"`
 
 	// Regex
-	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead
 	Match   string            `yaml:"match,omitempty" json:"-"`
 	Tags    map[string]string `yaml:"tags,omitempty" json:"-"`
 	Pattern *regexp.Regexp    `yaml:"-" json:"-"`
-
-	SymbolTag string `yaml:"-" json:"-"`
 }
 
 // Clone duplicates this MetricTagConfig
@@ -225,25 +190,9 @@ type StaticMetricTagConfig struct {
 	Value string `yaml:"value" json:"value"`
 }
 
-func (s StaticMetricTagConfig) Clone() StaticMetricTagConfig {
-	return StaticMetricTagConfig{
-		Tag:   s.Tag,
-		Value: s.Value,
-	}
-}
-
-// MetricTagConfigList holds configs for a list of metric tags
-type MetricTagConfigList []MetricTagConfig
-
 // MetricIndexTransform holds configs for metric index transform
 type MetricIndexTransform struct {
 	Start     uint `yaml:"start" json:"start"`
 	End       uint `yaml:"end" json:"end"`
 	DropRight uint `yaml:"drop_right,omitempty" json:"drop_right,omitempty"`
-}
-
-// MetricsConfigOption holds config for metrics options
-type MetricsConfigOption struct {
-	Placement    uint   `yaml:"placement,omitempty" json:"placement,omitempty"`
-	MetricSuffix string `yaml:"metric_suffix,omitempty" json:"metric_suffix,omitempty"`
 }

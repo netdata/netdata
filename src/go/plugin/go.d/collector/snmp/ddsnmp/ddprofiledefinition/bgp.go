@@ -137,7 +137,7 @@ type BGPConfig struct {
 	Device      BGPDeviceCountsConfig    `yaml:"device_counts,omitempty" json:"device_counts"`
 
 	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
-	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
+	MetricTags []MetricTagConfig       `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 }
 
 func (c BGPConfig) Clone() BGPConfig {
@@ -227,7 +227,9 @@ type BGPAdminConfig struct {
 }
 
 func (c BGPAdminConfig) Clone() BGPAdminConfig {
-	return BGPAdminConfig{Enabled: c.Enabled.Clone()}
+	return BGPAdminConfig{
+		Enabled: c.Enabled.Clone(),
+	}
 }
 
 type BGPConnectionConfig struct {
@@ -375,7 +377,9 @@ type BGPGracefulRestartConfig struct {
 }
 
 func (c BGPGracefulRestartConfig) Clone() BGPGracefulRestartConfig {
-	return BGPGracefulRestartConfig{State: c.State.Clone()}
+	return BGPGracefulRestartConfig{
+		State: c.State.Clone(),
+	}
 }
 
 type BGPRoutesConfig struct {
@@ -496,8 +500,8 @@ type BGPValueConfig struct {
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
 	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol"`
-	OID    string       `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
-	Name   string       `yaml:"name,omitempty" json:"name,omitempty" jsonschema:"-"`
+	OID    string       `yaml:"OID,omitempty" json:"OID,omitempty"`
+	Name   string       `yaml:"name,omitempty" json:"name,omitempty"`
 
 	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol"`
 
@@ -540,81 +544,93 @@ func (c BGPValueConfig) Clone() BGPValueConfig {
 	}
 }
 
+// ForEachBGPSignalValue visits configured signals in schema order.
 func ForEachBGPSignalValue(row BGPConfig, add func(path string, value BGPValueConfig)) {
-	addValue := func(path string, value BGPValueConfig) {
-		if value.IsSet() {
-			add(path, value)
+	visitBGPSignalValues(&row, add, nil)
+}
+
+// visitBGPSignalValues owns the field order for normalization, validation, and collection.
+// A transform visits every field; a read visits only configured values. Separate callbacks
+// avoid copying unset values or writing them back during collection.
+func visitBGPSignalValues(
+	row *BGPConfig,
+	read func(string, BGPValueConfig),
+	transform func(string, BGPValueConfig) BGPValueConfig,
+) {
+	add := func(path string, value *BGPValueConfig) {
+		if transform != nil {
+			*value = transform(path, *value)
+		} else if value.IsSet() {
+			read(path, *value)
 		}
 	}
-	addState := func(path string, value BGPStateConfig) {
-		if value.BGPValueConfig.IsSet() {
-			add(path, value.BGPValueConfig)
-		}
+	addState := func(path string, value *BGPStateConfig) {
+		add(path, &value.BGPValueConfig)
 	}
-	addDirectional := func(prefix string, value BGPDirectionalConfig) {
-		addValue(prefix+".received", value.Received)
-		addValue(prefix+".sent", value.Sent)
+	addDirectional := func(prefix string, value *BGPDirectionalConfig) {
+		add(prefix+".received", &value.Received)
+		add(prefix+".sent", &value.Sent)
 	}
-	addTimerPair := func(prefix string, value BGPTimerPairConfig) {
-		addValue(prefix+".connect_retry", value.ConnectRetry)
-		addValue(prefix+".hold_time", value.HoldTime)
-		addValue(prefix+".keepalive_time", value.KeepaliveTime)
-		addValue(prefix+".min_as_origination_interval", value.MinASOriginationInterval)
-		addValue(prefix+".min_route_advertisement_interval", value.MinRouteAdvertisementInterval)
+	addTimerPair := func(prefix string, value *BGPTimerPairConfig) {
+		add(prefix+".connect_retry", &value.ConnectRetry)
+		add(prefix+".hold_time", &value.HoldTime)
+		add(prefix+".keepalive_time", &value.KeepaliveTime)
+		add(prefix+".min_as_origination_interval", &value.MinASOriginationInterval)
+		add(prefix+".min_route_advertisement_interval", &value.MinRouteAdvertisementInterval)
 	}
-	addNotification := func(prefix string, value BGPLastNotificationConfig) {
-		addValue(prefix+".code", value.Code)
-		addValue(prefix+".subcode", value.Subcode)
-		addValue(prefix+".reason", value.Reason)
+	addNotification := func(prefix string, value *BGPLastNotificationConfig) {
+		add(prefix+".code", &value.Code)
+		add(prefix+".subcode", &value.Subcode)
+		add(prefix+".reason", &value.Reason)
 	}
-	addRoutes := func(prefix string, value BGPRouteCountersConfig) {
-		addValue(prefix+".received", value.Received)
-		addValue(prefix+".accepted", value.Accepted)
-		addValue(prefix+".rejected", value.Rejected)
-		addValue(prefix+".active", value.Active)
-		addValue(prefix+".advertised", value.Advertised)
-		addValue(prefix+".suppressed", value.Suppressed)
-		addValue(prefix+".withdrawn", value.Withdrawn)
+	addRoutes := func(prefix string, value *BGPRouteCountersConfig) {
+		add(prefix+".received", &value.Received)
+		add(prefix+".accepted", &value.Accepted)
+		add(prefix+".rejected", &value.Rejected)
+		add(prefix+".active", &value.Active)
+		add(prefix+".advertised", &value.Advertised)
+		add(prefix+".suppressed", &value.Suppressed)
+		add(prefix+".withdrawn", &value.Withdrawn)
 	}
 
-	addValue("admin.enabled", row.Admin.Enabled)
-	addState("state", row.State)
-	addState("previous_state", row.Previous)
-	addValue("connection.established_uptime", row.Connection.EstablishedUptime)
-	addValue("connection.last_received_update_age", row.Connection.LastReceivedUpdateAge)
-	addDirectional("traffic.messages", row.Traffic.Messages)
-	addDirectional("traffic.updates", row.Traffic.Updates)
-	addDirectional("traffic.notifications", row.Traffic.Notifications)
-	addDirectional("traffic.route_refreshes", row.Traffic.RouteRefreshes)
-	addDirectional("traffic.opens", row.Traffic.Opens)
-	addDirectional("traffic.keepalives", row.Traffic.Keepalives)
-	addValue("transitions.established", row.Transitions.Established)
-	addValue("transitions.down", row.Transitions.Down)
-	addValue("transitions.up", row.Transitions.Up)
-	addValue("transitions.flaps", row.Transitions.Flaps)
-	addTimerPair("timers.negotiated", row.Timers.Negotiated)
-	addTimerPair("timers.configured", row.Timers.Configured)
-	addValue("last_error.code", row.LastError.Code)
-	addValue("last_error.subcode", row.LastError.Subcode)
-	addNotification("last_notifications.received", row.LastNotify.Received)
-	addNotification("last_notifications.sent", row.LastNotify.Sent)
-	addValue("reasons.last_down", row.Reasons.LastDown)
-	addValue("reasons.unavailability", row.Reasons.Unavailability)
-	addValue("graceful_restart.state", row.Restart.State)
-	addRoutes("routes.current", row.Routes.Current)
-	addRoutes("routes.total", row.Routes.Total)
-	addValue("route_limits.limit", row.RouteLimits.Limit)
-	addValue("route_limits.threshold", row.RouteLimits.Threshold)
-	addValue("route_limits.clear_threshold", row.RouteLimits.ClearThreshold)
-	addValue("device_counts.peers", row.Device.Peers)
-	addValue("device_counts.ibgp_peers", row.Device.InternalPeers)
-	addValue("device_counts.ebgp_peers", row.Device.ExternalPeers)
-	addValue("device_counts.states.idle", row.Device.States.Idle)
-	addValue("device_counts.states.connect", row.Device.States.Connect)
-	addValue("device_counts.states.active", row.Device.States.Active)
-	addValue("device_counts.states.opensent", row.Device.States.OpenSent)
-	addValue("device_counts.states.openconfirm", row.Device.States.OpenConfirm)
-	addValue("device_counts.states.established", row.Device.States.Established)
+	add("admin.enabled", &row.Admin.Enabled)
+	addState("state", &row.State)
+	addState("previous_state", &row.Previous)
+	add("connection.established_uptime", &row.Connection.EstablishedUptime)
+	add("connection.last_received_update_age", &row.Connection.LastReceivedUpdateAge)
+	addDirectional("traffic.messages", &row.Traffic.Messages)
+	addDirectional("traffic.updates", &row.Traffic.Updates)
+	addDirectional("traffic.notifications", &row.Traffic.Notifications)
+	addDirectional("traffic.route_refreshes", &row.Traffic.RouteRefreshes)
+	addDirectional("traffic.opens", &row.Traffic.Opens)
+	addDirectional("traffic.keepalives", &row.Traffic.Keepalives)
+	add("transitions.established", &row.Transitions.Established)
+	add("transitions.down", &row.Transitions.Down)
+	add("transitions.up", &row.Transitions.Up)
+	add("transitions.flaps", &row.Transitions.Flaps)
+	addTimerPair("timers.negotiated", &row.Timers.Negotiated)
+	addTimerPair("timers.configured", &row.Timers.Configured)
+	add("last_error.code", &row.LastError.Code)
+	add("last_error.subcode", &row.LastError.Subcode)
+	addNotification("last_notifications.received", &row.LastNotify.Received)
+	addNotification("last_notifications.sent", &row.LastNotify.Sent)
+	add("reasons.last_down", &row.Reasons.LastDown)
+	add("reasons.unavailability", &row.Reasons.Unavailability)
+	add("graceful_restart.state", &row.Restart.State)
+	addRoutes("routes.current", &row.Routes.Current)
+	addRoutes("routes.total", &row.Routes.Total)
+	add("route_limits.limit", &row.RouteLimits.Limit)
+	add("route_limits.threshold", &row.RouteLimits.Threshold)
+	add("route_limits.clear_threshold", &row.RouteLimits.ClearThreshold)
+	add("device_counts.peers", &row.Device.Peers)
+	add("device_counts.ibgp_peers", &row.Device.InternalPeers)
+	add("device_counts.ebgp_peers", &row.Device.ExternalPeers)
+	add("device_counts.states.idle", &row.Device.States.Idle)
+	add("device_counts.states.connect", &row.Device.States.Connect)
+	add("device_counts.states.active", &row.Device.States.Active)
+	add("device_counts.states.opensent", &row.Device.States.OpenSent)
+	add("device_counts.states.openconfirm", &row.Device.States.OpenConfirm)
+	add("device_counts.states.established", &row.Device.States.Established)
 }
 
 func BGPStructuralIdentity(row BGPConfig) string {

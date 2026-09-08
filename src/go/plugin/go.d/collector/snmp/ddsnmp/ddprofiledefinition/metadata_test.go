@@ -37,47 +37,6 @@ func makeMetadata() MetadataConfig {
 					},
 				},
 			},
-			IDTags: []MetricTagConfig{
-				{
-					Tag:   "foo",
-					Index: 1,
-					Column: SymbolConfig{
-						Name:                 "bar",
-						OID:                  "1.2.3",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-					},
-					OID: "2.3.4",
-					Symbol: SymbolConfigCompat{
-						OID:                  "1.2.3",
-						Name:                 "someSymbol",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-					},
-					LookupSymbol: SymbolConfigCompat{
-						OID:                  "9.8.7",
-						Name:                 "lookupSymbol",
-						ExtractValue:         ".*",
-						ExtractValueCompiled: regexp.MustCompile(".*"),
-					},
-					IndexTransform: []MetricIndexTransform{
-						{
-							Start: 1,
-							End:   5,
-						},
-					},
-					Mapping: NewExactMapping(map[string]string{
-						"1": "on",
-						"2": "off",
-					}),
-					Match:   ".*",
-					Pattern: regexp.MustCompile(".*"),
-					Tags: map[string]string{
-						"foo": "bar",
-					},
-					SymbolTag: "ok",
-				},
-			},
 		},
 	}
 }
@@ -87,7 +46,7 @@ func TestCloneMetadata(t *testing.T) {
 	metaCopy := metadata.Clone()
 	assert.Equal(t, metadata, metaCopy)
 	// Modify the copy in place
-	metaCopy["interface"] = MetadataResourceConfig{}
+	delete(metaCopy["device"].Fields, "name")
 	metaCopy["device"].Fields["foo"] = MetadataField{
 		Value: "foo",
 	}

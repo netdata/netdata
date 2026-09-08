@@ -71,8 +71,10 @@ func TestProfileDefinition_CloneTopologyAndConsumers(t *testing.T) {
 		},
 		MetricTags: []GlobalMetricTagConfig{
 			{
-				MetricTagConfig: MetricTagConfig{Tag: "vendor"},
-				Consumers:       ConsumerSet{ConsumerMetrics, ConsumerTopology},
+				MetricTagConfig: MetricTagConfig{
+					Tag: "vendor",
+				},
+				Consumers: ConsumerSet{ConsumerMetrics, ConsumerTopology},
 			},
 		},
 		Topology: []TopologyConfig{
@@ -86,7 +88,7 @@ func TestProfileDefinition_CloneTopologyAndConsumers(t *testing.T) {
 					Symbols: []SymbolConfig{
 						{OID: "1.0.8802.1.1.2.1.4.1.1.6", Name: "lldpRemPortIdSubtype"},
 					},
-					MetricTags: MetricTagConfigList{
+					MetricTags: []MetricTagConfig{
 						{
 							Tag: "lldp_rem_index",
 							IndexTransform: []MetricIndexTransform{
@@ -109,7 +111,11 @@ func TestProfileDefinition_CloneTopologyAndConsumers(t *testing.T) {
 	cloned.MetricTags[0].Consumers[0] = ConsumerTopology
 	cloned.Topology[0].MetricTags[0].IndexTransform[0].Start = 2
 
-	assert.Equal(t, ConsumerSet{ConsumerMetrics, ConsumerTopology}, profile.Metadata["device"].Fields["vendor"].Consumers)
+	assert.Equal(
+		t,
+		ConsumerSet{ConsumerMetrics, ConsumerTopology},
+		profile.Metadata["device"].Fields["vendor"].Consumers,
+	)
 	assert.Equal(t, ConsumerSet{ConsumerMetrics, ConsumerTopology}, profile.MetricTags[0].Consumers)
 	assert.Equal(t, uint(1), profile.Topology[0].MetricTags[0].IndexTransform[0].Start)
 }
@@ -132,7 +138,7 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 							Symbols: []SymbolConfig{
 								{OID: "1.0.8802.1.1.2.1.4.1.1.6", Name: "lldpRemPortIdSubtype"},
 							},
-							MetricTags: MetricTagConfigList{
+							MetricTags: []MetricTagConfig{
 								{Tag: "lldp_rem_index", Index: 1},
 							},
 						},
@@ -146,7 +152,10 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 					{
 						Kind: "typo",
 						MetricsConfig: MetricsConfig{
-							Symbol: SymbolConfig{OID: "1.2.3.0", Name: "topologyValue"},
+							Symbol: SymbolConfig{
+								OID:  "1.2.3.0",
+								Name: "topologyValue",
+							},
 						},
 					},
 				},
@@ -159,11 +168,12 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 					{
 						Kind: KindIfStatus,
 						MetricsConfig: MetricsConfig{
-							Options: MetricsConfigOption{Placement: 1},
 							Symbol: SymbolConfig{
-								OID:              "1.3.6.1.2.1.2.2.1.8.0",
-								Name:             "_topology_if_status",
-								ChartMeta:        ChartMeta{Description: "status"},
+								OID:  "1.3.6.1.2.1.2.2.1.8.0",
+								Name: "_topology_if_status",
+								ChartMeta: ChartMeta{
+									Description: "status",
+								},
 								MetricType:       ProfileMetricTypeGauge,
 								Mapping:          NewExactMapping(map[string]string{"1": "up"}),
 								Transform:        `{{ .Metric }}`,
@@ -176,7 +186,6 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 				},
 			},
 			wantErrContains: []string{
-				"topology[0]: options cannot be used in topology rows",
 				`topology[0]: symbol name "_topology_if_status" cannot be underscore-prefixed`,
 				"topology[0]: chart_meta cannot be used in topology rows",
 				"topology[0]: metric_type cannot be used in topology rows",
@@ -193,7 +202,10 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 					{
 						Kind: KindArpEntry,
 						MetricsConfig: MetricsConfig{
-							Table: SymbolConfig{OID: "1.3.6.1.2.1.4.35.1", Name: "ipNetToPhysicalTable"},
+							Table: SymbolConfig{
+								OID:  "1.3.6.1.2.1.4.35.1",
+								Name: "ipNetToPhysicalTable",
+							},
 							Symbols: []SymbolConfig{{
 								OID:          "1.3.6.1.2.1.4.35.1.4",
 								Name:         "ipNetToPhysicalPhysAddress",
@@ -201,7 +213,7 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 								MatchPattern: `^([0-9a-f]+)$`,
 								MatchValue:   "$1",
 							}},
-							MetricTags: MetricTagConfigList{{Tag: "row", Index: 1}},
+							MetricTags: []MetricTagConfig{{Tag: "row", Index: 1}},
 						},
 					},
 				},
@@ -217,13 +229,15 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 				Topology: []TopologyConfig{
 					{
 						Kind: KindIfStatus,
-						MetricsConfig: MetricsConfig{Symbol: SymbolConfig{
-							OID:          "1.3.6.1.4.1.99999.1.0",
-							Name:         "scalarTopologyState",
-							ExtractValue: `state=(\d+)`,
-							MatchPattern: `^(\d+)$`,
-							MatchValue:   "$1",
-						}},
+						MetricsConfig: MetricsConfig{
+							Symbol: SymbolConfig{
+								OID:          "1.3.6.1.4.1.99999.1.0",
+								Name:         "scalarTopologyState",
+								ExtractValue: `state=(\d+)`,
+								MatchPattern: `^(\d+)$`,
+								MatchValue:   "$1",
+							},
+						},
 					},
 				},
 			},
@@ -241,7 +255,7 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 							Symbols: []SymbolConfig{
 								{OID: "1.3.6.1.2.1.17.4.3.1.2", Name: "dot1dTpFdbPort"},
 							},
-							MetricTags: MetricTagConfigList{
+							MetricTags: []MetricTagConfig{
 								{
 									Tag:     "fdb_mac",
 									Index:   1,
@@ -272,8 +286,10 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 				},
 				MetricTags: []GlobalMetricTagConfig{
 					{
-						MetricTagConfig: MetricTagConfig{Tag: "vendor"},
-						Consumers:       ConsumerSet{ConsumerMetrics, ConsumerMetrics},
+						MetricTagConfig: MetricTagConfig{
+							Tag: "vendor",
+						},
+						Consumers: ConsumerSet{ConsumerMetrics, ConsumerMetrics},
 					},
 				},
 			},

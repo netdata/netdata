@@ -67,7 +67,10 @@ func (c *Catalog) Resolve(req ResolveRequest) (result *ResolvedProfileSet) {
 			req.SysObjectID == ""
 		for _, name := range req.ManualProfiles {
 			result.manualProfiles = append(result.manualProfiles, stripFileNameExt(name))
-			if !slices.ContainsFunc(available, func(p *Profile) bool { return stripFileNameExt(p.SourceFile) == stripFileNameExt(name) }) {
+			if !slices.ContainsFunc(
+				available,
+				func(p *Profile) bool { return stripFileNameExt(p.SourceFile) == stripFileNameExt(name) },
+			) {
 				result.missingManualProfiles = append(result.missingManualProfiles, stripFileNameExt(name))
 			}
 		}
@@ -75,7 +78,9 @@ func (c *Catalog) Resolve(req ResolveRequest) (result *ResolvedProfileSet) {
 
 	switch {
 	case req.ManualPolicy == ManualProfileOverride:
-		return &ResolvedProfileSet{profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles))}
+		return &ResolvedProfileSet{
+			profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles)),
+		}
 	case req.SysObjectID == "":
 		if len(req.ManualProfiles) == 0 {
 			log.Warning(
@@ -83,13 +88,17 @@ func (c *Catalog) Resolve(req ResolveRequest) (result *ResolvedProfileSet) {
 			)
 			return &ResolvedProfileSet{}
 		}
-		return &ResolvedProfileSet{profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles))}
+		return &ResolvedProfileSet{
+			profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles)),
+		}
 	default:
 		profiles := selectMatchedProfiles(available, req.SysObjectID, req.SysDescr)
 		if req.ManualPolicy == ManualProfileAugment {
 			profiles = appendMissingManualProfiles(profiles, req.ManualProfiles, available)
 		}
-		return &ResolvedProfileSet{profiles: finalizeResolvedProfiles(profiles)}
+		return &ResolvedProfileSet{
+			profiles: finalizeResolvedProfiles(profiles),
+		}
 	}
 }
 
@@ -136,7 +145,10 @@ func (r *ResolvedProfileSet) Project(consumer ProfileConsumer, consumers ...Prof
 	})
 }
 
-func (r *ResolvedProfileSet) project(project func(*Profile), keep func(*ddprofiledefinition.ProfileDefinition) bool) ProjectedView {
+func (r *ResolvedProfileSet) project(
+	project func(*Profile),
+	keep func(*ddprofiledefinition.ProfileDefinition) bool,
+) ProjectedView {
 	profiles := make([]*Profile, 0, len(r.profiles))
 	for _, prof := range r.profiles {
 		projected := prof.clone()
@@ -145,7 +157,9 @@ func (r *ResolvedProfileSet) project(project func(*Profile), keep func(*ddprofil
 			profiles = append(profiles, projected)
 		}
 	}
-	return ProjectedView{profiles: profiles}
+	return ProjectedView{
+		profiles: profiles,
+	}
 }
 
 func (v ProjectedView) Profiles() []*Profile {
@@ -165,12 +179,16 @@ func (v ProjectedView) FilterByKind(kinds map[ddprofiledefinition.TopologyKind]b
 			continue
 		}
 		prof.Definition.Metrics = nil
-		prof.Definition.Topology = slices.DeleteFunc(prof.Definition.Topology, func(topo ddprofiledefinition.TopologyConfig) bool {
-			return !kinds[topo.Kind]
-		})
+		prof.Definition.Topology = slices.DeleteFunc(
+			prof.Definition.Topology,
+			func(topo ddprofiledefinition.TopologyConfig) bool {
+				return !kinds[topo.Kind]
+			},
+		)
 	}
 	v.profiles = slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
-		return prof == nil || prof.Definition == nil || (len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0)
+		return prof == nil || prof.Definition == nil ||
+			(len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0)
 	})
 	return v
 }
@@ -247,27 +265,49 @@ func restoreBGPTopologyRowAnchor(row *ddprofiledefinition.BGPConfig, original dd
 		return
 	}
 	switch {
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Previous: original.Previous}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Previous: original.Previous,
+	}):
 		row.Previous = original.Previous
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Transitions: original.Transitions}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Transitions: original.Transitions,
+	}):
 		row.Transitions = original.Transitions
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Traffic: original.Traffic}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Traffic: original.Traffic,
+	}):
 		row.Traffic = original.Traffic
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Timers: original.Timers}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Timers: original.Timers,
+	}):
 		row.Timers = original.Timers
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{LastError: original.LastError}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		LastError: original.LastError,
+	}):
 		row.LastError = original.LastError
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{LastNotify: original.LastNotify}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		LastNotify: original.LastNotify,
+	}):
 		row.LastNotify = original.LastNotify
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Reasons: original.Reasons}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Reasons: original.Reasons,
+	}):
 		row.Reasons = original.Reasons
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Restart: original.Restart}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Restart: original.Restart,
+	}):
 		row.Restart = original.Restart
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Routes: original.Routes}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Routes: original.Routes,
+	}):
 		row.Routes = original.Routes
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{RouteLimits: original.RouteLimits}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		RouteLimits: original.RouteLimits,
+	}):
 		row.RouteLimits = original.RouteLimits
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Device: original.Device}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Device: original.Device,
+	}):
 		row.Device = original.Device
 	}
 }
@@ -399,7 +439,10 @@ func projectProfileForConsumers(prof *Profile, consumers []ProfileConsumer) {
 	}
 }
 
-func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileConsumer) ddprofiledefinition.MetadataConfig {
+func projectMetadata(
+	meta ddprofiledefinition.MetadataConfig,
+	consumer ProfileConsumer,
+) ddprofiledefinition.MetadataConfig {
 	if len(meta) == 0 {
 		return nil
 	}
@@ -411,13 +454,11 @@ func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileCo
 				fields[name] = field
 			}
 		}
-		idTags := projectMetricTagList(res.IDTags, consumer)
-		if len(fields) == 0 && len(idTags) == 0 {
+		if len(fields) == 0 {
 			continue
 		}
 		projected[resName] = ddprofiledefinition.MetadataResourceConfig{
 			Fields: fields,
-			IDTags: idTags,
 		}
 	}
 	if len(projected) == 0 {
@@ -426,7 +467,10 @@ func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileCo
 	return projected
 }
 
-func projectMetadataForConsumers(meta ddprofiledefinition.MetadataConfig, consumers []ProfileConsumer) ddprofiledefinition.MetadataConfig {
+func projectMetadataForConsumers(
+	meta ddprofiledefinition.MetadataConfig,
+	consumers []ProfileConsumer,
+) ddprofiledefinition.MetadataConfig {
 	if len(meta) == 0 {
 		return nil
 	}
@@ -438,13 +482,11 @@ func projectMetadataForConsumers(meta ddprofiledefinition.MetadataConfig, consum
 				fields[name] = field
 			}
 		}
-		idTags := projectMetricTagListForConsumers(res.IDTags, consumers)
-		if len(fields) == 0 && len(idTags) == 0 {
+		if len(fields) == 0 {
 			continue
 		}
 		projected[resName] = ddprofiledefinition.MetadataResourceConfig{
 			Fields: fields,
-			IDTags: idTags,
 		}
 	}
 	if len(projected) == 0 {
@@ -509,26 +551,6 @@ func projectSysobjectIDMetadataForConsumers(
 		return nil
 	}
 	return projected
-}
-
-func projectMetricTagList(tags []ddprofiledefinition.MetricTagConfig, consumer ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
-	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if consumer == ConsumerMetrics || consumer == ConsumerTopology || consumer == ConsumerBGP {
-		return tags
-	}
-	return nil
-}
-
-func projectMetricTagListForConsumers(
-	tags []ddprofiledefinition.MetricTagConfig,
-	consumers []ProfileConsumer,
-) []ddprofiledefinition.MetricTagConfig {
-	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if profileConsumersInclude(consumers, ConsumerMetrics) || profileConsumersInclude(consumers, ConsumerTopology) ||
-		profileConsumersInclude(consumers, ConsumerBGP) {
-		return tags
-	}
-	return nil
 }
 
 func projectGlobalMetricTags(

@@ -24,7 +24,7 @@ func TestCloneSymbolConfig(t *testing.T) {
 		ScaleFactor:          100,
 		Format:               "mac_address",
 		ConstantValueOne:     true,
-		MetricType:           ProfileMetricTypeCounter,
+		MetricType:           "counter",
 	}
 	s2 := s.Clone()
 	assert.Equal(t, s, s2)
@@ -46,7 +46,7 @@ func TestCloneSymbolConfigCompat(t *testing.T) {
 		ScaleFactor:          100,
 		Format:               "mac_address",
 		ConstantValueOne:     true,
-		MetricType:           ProfileMetricTypeCounter,
+		MetricType:           "counter",
 	}
 	s2 := s.Clone()
 	assert.Equal(t, s, s2)
@@ -83,12 +83,14 @@ func TestCloneMetricTagConfig(t *testing.T) {
 		Tags: map[string]string{
 			"foo": "$1",
 		},
-		SymbolTag: "baz",
 	}
 	c2 := c.Clone()
 	assert.Equal(t, c, c2)
 	c2.Tags["bar"] = "$2"
-	c2.IndexTransform = append(c2.IndexTransform, MetricIndexTransform{Start: 1, End: 3})
+	c2.IndexTransform = append(c2.IndexTransform, MetricIndexTransform{
+		Start: 1,
+		End:   3,
+	})
 	c2.Mapping.Items["3"] = "foo"
 	c2.Tag = "bar"
 	assert.NotEqual(t, c, c2)
@@ -123,7 +125,6 @@ func TestCloneMetricTagConfig(t *testing.T) {
 		Tags: map[string]string{
 			"foo": "$1",
 		},
-		SymbolTag: "baz",
 	})
 }
 
@@ -159,10 +160,6 @@ func TestCloneMetricsConfig(t *testing.T) {
 				},
 			},
 			MetricType: ProfileMetricTypeGauge,
-			Options: MetricsConfigOption{
-				Placement:    1,
-				MetricSuffix: ".foo",
-			},
 		}
 	}
 	conf := buildConf()
@@ -170,10 +167,11 @@ func TestCloneMetricsConfig(t *testing.T) {
 
 	conf2 := conf.Clone()
 	assert.Equal(t, conf, conf2)
-	conf2.StaticTags[0] = StaticMetricTagConfig{Tag: "bar", Value: "baz"}
+	conf2.StaticTags[0] = StaticMetricTagConfig{
+		Tag:   "bar",
+		Value: "baz",
+	}
 	conf2.MetricTags[0].IndexTransform = []MetricIndexTransform{{Start: 5, End: 7}}
-	conf2.Options.Placement = 2
-	conf2.Options.MetricSuffix = ".bar"
 	assert.Equal(t, unchanged, conf)
 	assert.NotEqual(t, conf, conf2)
 }

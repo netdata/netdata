@@ -35,7 +35,7 @@ func (p *ProfileDefinition) Clone() *ProfileDefinition {
 		SysObjectIDs:        slices.Clone(p.SysObjectIDs),
 		Selector:            p.Selector.Clone(),
 		Extends:             slices.Clone(p.Extends),
-		Metadata:            cloneMap(p.Metadata),
+		Metadata:            p.Metadata.Clone(),
 		SysobjectIDMetadata: cloneSlice(p.SysobjectIDMetadata),
 		MetricTags:          cloneSlice(p.MetricTags),
 		StaticTags:          slices.Clone(p.StaticTags),

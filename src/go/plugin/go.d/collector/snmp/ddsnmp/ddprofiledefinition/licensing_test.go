@@ -48,7 +48,11 @@ licensing:
 	assert.Equal(t, LicenseStatePolicySophos, profile.Licensing[0].State.Policy)
 	assert.Equal(t, "1.3.6.1.4.1.2604.5.1.5.1.2.0", profile.Licensing[0].Signals.Expiry.From)
 	assert.Equal(t, "text_date", profile.Licensing[0].Signals.Expiry.Format)
-	assert.Equal(t, []LicenseSentinelPolicy{LicenseSentinelTimerZeroOrNegative}, profile.Licensing[0].Signals.Expiry.Sentinel)
+	assert.Equal(
+		t,
+		[]LicenseSentinelPolicy{LicenseSentinelTimerZeroOrNegative},
+		profile.Licensing[0].Signals.Expiry.Sentinel,
+	)
 	require.Len(t, profile.MetricTags, 1)
 	assert.Equal(t, ConsumerSet{ConsumerLicensing}, profile.MetricTags[0].Consumers)
 }
@@ -60,7 +64,9 @@ func TestProfileDefinition_CloneLicensing(t *testing.T) {
 				OriginProfileID: "_vendor-licensing.yaml",
 				ID:              "row",
 				Identity: LicenseIdentityConfig{
-					ID: LicenseValueConfig{Value: "license-1"},
+					ID: LicenseValueConfig{
+						Value: "license-1",
+					},
 				},
 				State: LicenseStateConfig{
 					LicenseValueConfig: LicenseValueConfig{
@@ -82,7 +88,7 @@ func TestProfileDefinition_CloneLicensing(t *testing.T) {
 						},
 					},
 				},
-				MetricTags: MetricTagConfigList{
+				MetricTags: []MetricTagConfig{
 					{Tag: "license_component", IndexTransform: []MetricIndexTransform{{Start: 1}}},
 				},
 			},
@@ -113,14 +119,20 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 						ID: "scalar-group",
 						State: LicenseStateConfig{
 							LicenseValueConfig: LicenseValueConfig{
-								Symbol: SymbolConfig{OID: "1.2.3.0", Name: "licenseState"},
+								Symbol: SymbolConfig{
+									OID:  "1.2.3.0",
+									Name: "licenseState",
+								},
 							},
 							Policy: LicenseStatePolicyDefault,
 						},
 						Signals: LicenseSignalsConfig{
 							Expiry: LicenseTimerSignalsConfig{
 								LicenseValueConfig: LicenseValueConfig{
-									Symbol:   SymbolConfig{OID: "1.2.4.0", Name: "licenseExpiry"},
+									Symbol: SymbolConfig{
+										OID:  "1.2.4.0",
+										Name: "licenseExpiry",
+									},
 									Sentinel: []LicenseSentinelPolicy{LicenseSentinelTimerU32Max},
 								},
 							},
@@ -132,7 +144,9 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 		"invalid state policy": {
 			profile: ProfileDefinition{
 				Licensing: []LicensingConfig{
-					{State: LicenseStateConfig{Policy: LicenseStatePolicy("filename_gate")}},
+					{State: LicenseStateConfig{
+						Policy: LicenseStatePolicy("filename_gate"),
+					}},
 				},
 			},
 			wantErrContains: []string{`licensing[0].state.policy: invalid policy "filename_gate"`},
@@ -159,7 +173,9 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 					{
 						Signals: LicenseSignalsConfig{
 							Usage: LicenseUsageSignalsConfig{
-								Used: LicenseValueConfig{Kind: LicenseSignalKind("usage_typo")},
+								Used: LicenseValueConfig{
+									Kind: LicenseSignalKind("usage_typo"),
+								},
 							},
 						},
 					},
@@ -174,9 +190,11 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 						State: LicenseStateConfig{
 							LicenseValueConfig: LicenseValueConfig{
 								Symbol: SymbolConfig{
-									OID:              "1.2.3.0",
-									Name:             "_license_row",
-									ChartMeta:        ChartMeta{Description: "chart-only"},
+									OID:  "1.2.3.0",
+									Name: "_license_row",
+									ChartMeta: ChartMeta{
+										Description: "chart-only",
+									},
 									MetricType:       ProfileMetricTypeGauge,
 									Transform:        "{{ .Value }}",
 									ExtractValue:     `(\d+)`,
@@ -206,10 +224,17 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 			profile: ProfileDefinition{
 				Licensing: []LicensingConfig{
 					{
-						State: LicenseStateConfig{Policy: LicenseStatePolicyDefault},
+						State: LicenseStateConfig{
+							Policy: LicenseStatePolicyDefault,
+						},
 						Signals: LicenseSignalsConfig{
 							Expiry: LicenseTimerSignalsConfig{
-								LicenseValueConfig: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.4.0", Name: "licenseExpiry"}},
+								LicenseValueConfig: LicenseValueConfig{
+									Symbol: SymbolConfig{
+										OID:  "1.2.4.0",
+										Name: "licenseExpiry",
+									},
+								},
 							},
 						},
 					},
@@ -222,7 +247,9 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 				Licensing: []LicensingConfig{
 					{
 						State: LicenseStateConfig{
-							LicenseValueConfig: LicenseValueConfig{Value: "0"},
+							LicenseValueConfig: LicenseValueConfig{
+								Value: "0",
+							},
 						},
 					},
 				},
@@ -236,8 +263,18 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 						ID: "scalar-group",
 						Signals: LicenseSignalsConfig{
 							Expiry: LicenseTimerSignalsConfig{
-								Timestamp: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.4.0", Name: "licenseExpiry"}},
-								Remaining: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.5.0", Name: "licenseExpiryRemaining"}},
+								Timestamp: LicenseValueConfig{
+									Symbol: SymbolConfig{
+										OID:  "1.2.4.0",
+										Name: "licenseExpiry",
+									},
+								},
+								Remaining: LicenseValueConfig{
+									Symbol: SymbolConfig{
+										OID:  "1.2.5.0",
+										Name: "licenseExpiryRemaining",
+									},
+								},
 							},
 						},
 					},
@@ -252,8 +289,18 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 						ID: "scalar-group",
 						Signals: LicenseSignalsConfig{
 							Expiry: LicenseTimerSignalsConfig{
-								LicenseValueConfig: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.4.0", Name: "licenseExpiry"}},
-								Remaining:          LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.5.0", Name: "licenseExpiryRemaining"}},
+								LicenseValueConfig: LicenseValueConfig{
+									Symbol: SymbolConfig{
+										OID:  "1.2.4.0",
+										Name: "licenseExpiry",
+									},
+								},
+								Remaining: LicenseValueConfig{
+									Symbol: SymbolConfig{
+										OID:  "1.2.5.0",
+										Name: "licenseExpiryRemaining",
+									},
+								},
 							},
 						},
 					},
@@ -282,8 +329,11 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 					{
 						State: LicenseStateConfig{
 							LicenseValueConfig: LicenseValueConfig{
-								Symbol: SymbolConfig{OID: "1.2.3.0", Name: "licenseState"},
-								Kind:   LicenseSignalUsageUsed,
+								Symbol: SymbolConfig{
+									OID:  "1.2.3.0",
+									Name: "licenseState",
+								},
+								Kind: LicenseSignalUsageUsed,
 							},
 						},
 					},
@@ -297,7 +347,11 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 					{
 						State: LicenseStateConfig{
 							LicenseValueConfig: LicenseValueConfig{
-								Symbol: SymbolConfig{OID: "1.2.3.0", Name: "licenseState", Format: "spreadsheet_date"},
+								Symbol: SymbolConfig{
+									OID:    "1.2.3.0",
+									Name:   "licenseState",
+									Format: "spreadsheet_date",
+								},
 							},
 						},
 					},
@@ -310,10 +364,14 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 				Licensing: []LicensingConfig{
 					{
 						Identity: LicenseIdentityConfig{
-							ID: LicenseValueConfig{Value: "license-a"},
+							ID: LicenseValueConfig{
+								Value: "license-a",
+							},
 						},
 						Descriptors: LicenseDescriptorsConfig{
-							Type: LicenseValueConfig{Value: "subscription"},
+							Type: LicenseValueConfig{
+								Value: "subscription",
+							},
 						},
 					},
 				},
@@ -326,13 +384,19 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 					{
 						State: LicenseStateConfig{
 							LicenseValueConfig: LicenseValueConfig{
-								Symbol: SymbolConfig{OID: "1.2.3.0", Name: "licenseState"},
+								Symbol: SymbolConfig{
+									OID:  "1.2.3.0",
+									Name: "licenseState",
+								},
 							},
 						},
 						Signals: LicenseSignalsConfig{
 							Expiry: LicenseTimerSignalsConfig{
 								LicenseValueConfig: LicenseValueConfig{
-									Symbol: SymbolConfig{OID: "1.2.4.0", Name: "licenseExpiry"},
+									Symbol: SymbolConfig{
+										OID:  "1.2.4.0",
+										Name: "licenseExpiry",
+									},
 								},
 							},
 						},
@@ -346,21 +410,30 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 				Licensing: []LicensingConfig{
 					{
 						State: LicenseStateConfig{
-							LicenseValueConfig: LicenseValueConfig{Index: 1},
+							LicenseValueConfig: LicenseValueConfig{
+								Index: 1,
+							},
 						},
 					},
 				},
 			},
-			wantErrContains: []string{"licensing[0].state.index: scalar licensing values do not support `index` lookups"},
+			wantErrContains: []string{
+				"licensing[0].state.index: scalar licensing values do not support `index` lookups",
+			},
 		},
 		"forbids scalar metric tag index lookups": {
 			profile: ProfileDefinition{
 				Licensing: []LicensingConfig{
 					{
 						State: LicenseStateConfig{
-							LicenseValueConfig: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.3.0", Name: "licenseState"}},
+							LicenseValueConfig: LicenseValueConfig{
+								Symbol: SymbolConfig{
+									OID:  "1.2.3.0",
+									Name: "licenseState",
+								},
+							},
 						},
-						MetricTags: MetricTagConfigList{
+						MetricTags: []MetricTagConfig{
 							{Tag: "license_row", Index: 1},
 						},
 					},
@@ -372,9 +445,14 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 			profile: ProfileDefinition{
 				Licensing: []LicensingConfig{
 					{
-						Table: SymbolConfig{OID: "1.2.3", Name: "licenseTable"},
+						Table: SymbolConfig{
+							OID:  "1.2.3",
+							Name: "licenseTable",
+						},
 						State: LicenseStateConfig{
-							LicenseValueConfig: LicenseValueConfig{From: "1.2.4.1"},
+							LicenseValueConfig: LicenseValueConfig{
+								From: "1.2.4.1",
+							},
 						},
 					},
 				},
@@ -388,19 +466,31 @@ func TestValidateEnrichProfile_Licensing(t *testing.T) {
 						OriginProfileID: "_vendor-licensing.yaml",
 						ID:              "smart",
 						State: LicenseStateConfig{
-							LicenseValueConfig: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.3.0", Name: "licenseState"}},
+							LicenseValueConfig: LicenseValueConfig{
+								Symbol: SymbolConfig{
+									OID:  "1.2.3.0",
+									Name: "licenseState",
+								},
+							},
 						},
 					},
 					{
 						OriginProfileID: "_vendor-licensing.yaml",
 						ID:              "smart",
 						State: LicenseStateConfig{
-							LicenseValueConfig: LicenseValueConfig{Symbol: SymbolConfig{OID: "1.2.4.0", Name: "licenseState2"}},
+							LicenseValueConfig: LicenseValueConfig{
+								Symbol: SymbolConfig{
+									OID:  "1.2.4.0",
+									Name: "licenseState2",
+								},
+							},
 						},
 					},
 				},
 			},
-			wantErrContains: []string{`duplicate signal kind "state_severity" for structural identity "_vendor-licensing.yaml|scalar-group|smart"`},
+			wantErrContains: []string{
+				`duplicate signal kind "state_severity" for structural identity "_vendor-licensing.yaml|scalar-group|smart"`,
+			},
 		},
 		"allows format and mapping": {
 			profile: ProfileDefinition{

@@ -28,7 +28,9 @@ type MyMappingStruct struct {
 
 func Test_metricTagConfig_UnmarshalYAML(t *testing.T) {
 	myStruct := MetricsConfig{}
-	expected := MetricsConfig{MetricTags: []MetricTagConfig{{Index: 3}}}
+	expected := MetricsConfig{
+		MetricTags: []MetricTagConfig{{Index: 3}},
+	}
 
 	require.NoError(t, yaml.Unmarshal([]byte(`
 metric_tags:
@@ -39,20 +41,15 @@ metric_tags:
 }
 
 func Test_metricTagConfig_onlyTags(t *testing.T) {
-	myStruct := MetricsConfig{}
-	expected := MetricsConfig{MetricTags: []MetricTagConfig{{SymbolTag: "aaa"}}}
-
-	require.NoError(t, yaml.Unmarshal([]byte(`
-metric_tags:
-- aaa
-`), &myStruct))
-
-	assert.Equal(t, expected, myStruct)
+	var cfg MetricsConfig
+	require.Error(t, yaml.Unmarshal([]byte("metric_tags: [aaa]"), &cfg))
 }
 
 func TestStringArray_UnmarshalYAML_array(t *testing.T) {
 	myStruct := MyStringArray{}
-	expected := MyStringArray{SomeIDs: StringArray{"aaa", "bbb"}}
+	expected := MyStringArray{
+		SomeIDs: StringArray{"aaa", "bbb"},
+	}
 
 	require.NoError(t, yaml.Unmarshal([]byte(`
 my_field:
@@ -65,7 +62,9 @@ my_field:
 
 func TestStringArray_UnmarshalYAML_string(t *testing.T) {
 	myStruct := MyStringArray{}
-	expected := MyStringArray{SomeIDs: StringArray{"aaa"}}
+	expected := MyStringArray{
+		SomeIDs: StringArray{"aaa"},
+	}
 
 	require.NoError(t, yaml.Unmarshal([]byte(`
 my_field: aaa
@@ -76,7 +75,12 @@ my_field: aaa
 
 func TestSymbolConfig_UnmarshalYAML_symbolObject(t *testing.T) {
 	myStruct := MySymbolStruct{}
-	expected := MySymbolStruct{SymbolField: SymbolConfigCompat{OID: "1.2.3", Name: "aSymbol"}}
+	expected := MySymbolStruct{
+		SymbolField: SymbolConfigCompat{
+			OID:  "1.2.3",
+			Name: "aSymbol",
+		},
+	}
 
 	require.NoError(t, yaml.Unmarshal([]byte(`
 my_symbol_field:
@@ -89,7 +93,11 @@ my_symbol_field:
 
 func TestSymbolConfig_UnmarshalYAML_symbolString(t *testing.T) {
 	myStruct := MySymbolStruct{}
-	expected := MySymbolStruct{SymbolField: SymbolConfigCompat{Name: "aSymbol"}}
+	expected := MySymbolStruct{
+		SymbolField: SymbolConfigCompat{
+			Name: "aSymbol",
+		},
+	}
 
 	require.NoError(t, yaml.Unmarshal([]byte(`
 my_symbol_field: aSymbol
