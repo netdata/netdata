@@ -1,137 +1,28 @@
 # Recipe: delete (unpublish) a doc page
 
-The only recipe that requires **manual surgery** in the learn
-repo. Deletion does NOT auto-redirect -- without the manual
-step, the old URL serves a 404.
+The procedure is `docs/.map/README.md#unpublishing-files`. This recipe adds what the redirect gate expects
+(`../redirects.md`) and the order that keeps both repositories consistent.
 
-The canonical reference for this recipe is
-`<repo>/docs/.map/README.md:96-104`.
+1. Decide where the old URL should go: a replacement page, or nowhere (a retirement).
+2. In this repository, remove the node from `docs/.map/map.yaml` and delete or keep the source file as appropriate.
+   Search this repository's docs for links to the page and fix them; ingest reports the rest as broken links, and
+   `.github/workflows/check-markdown.yml` fails the PR on them.
+3. In `netdata/learn`, find the page's GitHub blob URL among the values of `LegacyLearnCorrelateLinksWithGHURLs.json`
+   and every key that points at it:
+   - replacement: set the value to the replacement page's GitHub blob URL (the URL of its source file). Any other
+     absolute URL, a `learn.netdata.cloud` one included, is never resolved through the map and fails the gate unless
+     a rule already covers the route;
+   - retirement: remove the entry, or record it under `legacy_catalogue_retirements` in `config/redirect-policy.json`
+     when the route must stay documented as retired;
+   - a one-off rule to an external destination goes in `static.toml`.
+   Run the learn ingest with `--local-repo netdata:<this checkout>` and commit the regenerated `netlify.toml` with the
+   catalogue change; a target that disagrees with the committed rule for the same route fails the merge
+   (`../redirects.md#what-one-run-does-main`).
+4. Order the two PRs by what CI checks: this repository's `check-markdown.yml` ingests with the still-unpatched
+   catalogue, so an unresolvable entry fails here with exit 3 until the learn change lands or the entry is covered.
+   Land the learn catalogue change first, or in the same window, when the deleted page has catalogue entries.
+5. After both deploy, request the old URL: the replacement, or the retirement's 404.
 
-## 1. Decide where deleted-link traffic should go
-
-Before deleting, decide one of:
-
-- **Redirect to a closest replacement page.** Best for SEO
-  and external link preservation. Pick a page whose content
-  largely replaces the deleted one.
-- **Drop the link entirely (404).** Acceptable for pages with
-  little inbound traffic that have no good replacement.
-
-You'll apply the decision in step 4.
-
-## 2. Delete the source file and remove the map.yaml node
-
-In this repo:
-
-1. Delete the source `.md` file.
-2. Open `<repo>/docs/.map/map.yaml` and remove the matching
-   node.
-3. Open the docs PR.
-
-After this PR merges, ingest's next run produces a "Ingest
-New Documentation" PR in the learn repo that DOES NOT
-auto-redirect the old URL (because the GH source URL no
-longer points to a real file, the `UpdateGHLinksBasedOnMap`
-step can't resolve it).
-
-## 3. Open the learn-repo manual-surgery PR
-
-Before the source deletion merges when that repository's PR CI
-runs Learn ingest after regenerating pages; otherwise, once the
-ingest PR is merged (or before if you want to bundle the surgery
-with the ingest PR):
-
-1. Open `${NETDATA_REPOS_DIR}/learn/LegacyLearnCorrelateLinksWithGHURLs.json`.
-2. Search for the GitHub blob/edit URL of the deleted file:
-   ```text
-   "https://github.com/netdata/netdata/blob/master/docs/<...>/<deleted-page>.md"
-   ```
-3. Find the entry. Apply your decision from step 1:
-   - **Redirect to replacement**: change the value to the
-     GitHub blob URL of the replacement source
-     (`https://github.com/netdata/netdata/blob/master/<replacement-source>.md`).
-     Ingest resolves that source through the live map to the
-     replacement's current Learn route.
-   - **Drop**: delete the entry from the JSON entirely.
-
-Save the file.
-
-Run Learn ingest with the intended source-repository state and commit the
-resulting `netlify.toml` change with the catalog change. The strict redirect
-gate rejects a catalog target that conflicts with the currently committed
-generated rule, so the pair must be consistent before the PR is mergeable.
-
-Alternative: if you want a one-off manual `[[redirects]]`
-rule (for example, to redirect to an entirely external
-domain), edit `${NETDATA_REPOS_DIR}/learn/static.toml` and
-add a hand-rolled entry under `# section: static`. This
-gets copied into `netlify.toml` on the next ingest.
-
-## 4. Open a learn-repo PR
-
-Title: `manual redirect surgery for deleted page <name>`. PR
-body explains what was deleted, where the redirect goes, and
-why.
-
-## 5. Merge and verify
-
-After Netlify deploys:
-
-```bash
-# If you redirected to replacement:
-curl -sI https://learn.netdata.cloud<old-path>
-# Expect: HTTP/2 301
-# Location: https://learn.netdata.cloud<replacement-path>
-
-# If you dropped:
-curl -sI https://learn.netdata.cloud<old-path>
-# Expect: HTTP/2 404
-```
-
-## Notes
-
-- **Daily link checker**: the daily
-  `${NETDATA_REPOS_DIR}/learn/.github/workflows/daily-learn-link-check.yml`
-  cron will start failing if it finds a `learn_link:`
-  pointing at the deleted page. To minimize noise, do step 3
-  promptly after step 2.
-
-- **Internal links from other Learn pages**: search
-  `${NETDATA_REPOS_DIR}/learn/docs/` and this repo's `<repo>/docs/`
-  for explicit links to the deleted page's URL and update them.
-  The link rewriter (step 12 of the ingest pipeline) will
-  flag broken internal links during ingest if you missed any.
-
-- **If you re-publish later**: the redirect entry can stay
-  in `LegacyLearnCorrelateLinksWithGHURLs.json`. The
-  `UpdateGHLinksBasedOnMap` step will re-resolve the GH URL
-  through the new map and route the old URL to the new
-  destination automatically. So if you later add a similar
-  page back, the old URL keeps working with no further
-  surgery.
-
-## Common mistakes
-
-- **Forgetting the manual JSON surgery.** Without it, the
-  deleted page's old URL serves a 404. External links break
-  silently for users.
-- **Using a full Learn URL as the catalog value.** The strict
-  legacy gate treats an absolute HTTP(S) value as an external
-  source. Use the replacement's GitHub blob URL so ingest can
-  resolve it through the live map.
-- **Editing `netlify.toml` directly.** Regenerated each
-  ingest. Edit `LegacyLearnCorrelateLinksWithGHURLs.json` as
-  the dynamic source of truth, run ingest, and commit its
-  generated `netlify.toml` result. Use `static.toml` only for
-  hand-curated static rules.
-- **Deleting a `part_of_learn: True` page.** That's a
-  hand-authored learn-repo page (currently only
-  `docs/ask-nedi.mdx`). Deleting it requires editing the
-  learn repo directly, NOT this repo's map.yaml. And the
-  home page redirects to it -- removing it breaks the site
-  root.
-- **Deleting an integration page.** Integration pages are
-  generated by the integrations pipeline. Don't delete the
-  generated `.md` directly. Edit the source `metadata.yaml`
-  to remove the integration (or change its category) -- see
-  the `integrations-lifecycle` skill.
+Do not delete `docs/ask-nedi.mdx` from the learn repository through this recipe; it is a `part_of_learn` page and the
+site root redirects to it (`../authoring-boundary.md`). Do not delete a generated integration page; retire it through
+its `metadata.yaml` and the integrations pipeline (`integrations-lifecycle`).

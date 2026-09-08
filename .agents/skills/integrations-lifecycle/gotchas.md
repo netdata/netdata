@@ -66,7 +66,7 @@ on Netlify. Learn's ingest escapes only a few patterns (bare `{`, the operators 
 `<details><summary>`); everything else passes this repository's CI and fails the next Learn deploy preview. The
 author-side rules are in `.agents/skills/collectors-metadata-yaml/SKILL.md` ("Safety Of The Markdown") and
 `integrations/tests/test_collector_metadata.py` checks collector metadata for them in both workflows; the MDX side is
-`docs-learn-site-structure/mdx-rules.md` and `pitfalls-and-gotchas.md`.
+`.agents/skills/docs-learn-site-structure/mdx-rules.md`.
 
 The incident that produced the rule (2026-05-07): the netflow-plugin metadata carried `description: Sets tenant=amazon,
 region=<aws-region>, role=<service-name>.` for the AWS IP Ranges card. Netdata CI, `gen_integrations.py`, and Learn

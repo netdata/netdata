@@ -44,9 +44,10 @@ evidence, never in the skill). A maintained design record and an abandoned one g
 - a Tier-1 list: claims that would cause wrong work today;
 - code facts the skill lacks; an authority check (every named authority exists and is hand-maintained); a keep list
   with its own stable ids (`K<n>`), mapped to inventory ids in the preservation map.
-- When an owner lives in another repository and its mirror is absent on the machine, its claims are UNVERIFIABLE and
-  whether to touch them at all is a numbered user decision in the options round; a verified out-of-repo fact is
-  labelled `owner/repo @ commit`.
+- When an owner lives in another repository and its mirror is absent on the machine, take the throwaway clone
+  `./SKILL.md#authoring-rules` allows (no approval needed) and give the pass its path, with the instruction to write
+  only `owner/repo @ commit` and repository-relative paths for what it settles. Only a claim no clone can settle is
+  UNVERIFIABLE, and only that reaches the options round as a numbered decision.
 
 Then re-verify every Tier-1 item yourself against the code before presenting anything.
 
@@ -56,7 +57,7 @@ Then re-verify every Tier-1 item yourself against the code before presenting any
   rejected with evidence; close the entry. Stores: GitHub issues (`gh issue list --search "<skill name>"`,
   `AGENTS.md#followup-discipline`), the local stores `.local/sow/` and `.local/audits/<subject>/followups.md`, past PR
   bot reviews (fetched as `repo-pr-reviews` describes), and a tree-wide grep for the skill's name (sibling skills carry
-  findings in prose).
+  findings in prose). A store the machine cannot reach (an unauthenticated `gh`) is recorded in the SOW as unsearched.
 - Owner search: the candidate owners and the generated-file check in `./SKILL.md#authoring-rules`; the Learn status of
   each candidate via `docs/.map/map.yaml` decides the marker paragraph
   (`.agents/skills/README.md#owner-section-citations`; repository instruction files such as the root `AGENTS.md` and

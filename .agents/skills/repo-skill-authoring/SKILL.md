@@ -60,9 +60,12 @@ Ownership and pointing:
 - Cite the repository path, never a bare filename; several documents in this tree share a basename. A one-segment
   path names a repository-root file. Inside a skill, cite a section of its own files as `./<file>.md#<anchor>`.
 - An owner outside this repository cannot be an anchor citation: read it from the local mirror (`repo-mirror-sources`)
-  and cite it as `owner/repo @ commit` (`AGENTS.md#open-source-reference-evidence`). A fact whose only owner is out of
-  repo stays in the skill, labelled with what verified it and when, or as unverifiable; never delete what you cannot
-  re-home.
+  and cite it as `owner/repo @ commit` (`AGENTS.md#open-source-reference-evidence`). When the mirror is absent, a
+  throwaway shallow clone of the owner's default branch outside the repository serves the same purpose; a checkout
+  found elsewhere on the machine is usable only when its worktree is clean (`git status --short` prints nothing) and
+  after comparing its commit with upstream (`git ls-remote`), since the commit is what the citation pins and a
+  modified checkout would be cited under a commit it does not match. A fact whose only owner is out of repo stays in
+  the skill, labelled with the verifying commit, or as unverifiable; never delete what you cannot re-home.
 - One owner per fact. When a fact moves into its owner, delete every copy in the same commit and record the owner
   section, not just the file.
 - A pointer row carries one clause naming the subject; copying the requirement text creates a second owner.

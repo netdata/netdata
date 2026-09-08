@@ -642,7 +642,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
     (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
 - Docs.
   - `docs-learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
-    `docs/.map/map.yaml`; why a Learn page looks the way it does; MDX escape rules; redirects; Netlify deploy
+    `docs/.map/map.yaml`, its schema and `validate_map_schema.py`; why a Learn page is missing or wrong; ingest exit
+    codes; MDX escape rules; redirects; the PR gate here (`check-markdown.yml`) and what runs after a docs PR merges
+    (`trigger-learn-update.yml`, then the learn `ingest.yml`); Netlify deploy
   - `docs-learn-pr-preview`: only when the user explicitly asks to build, preview, or validate `learn.netdata.cloud`
     locally from a PR or docs branch; loads `docs-learn-site-structure` first
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).

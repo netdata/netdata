@@ -1,124 +1,31 @@
-# Recipe: add a new doc page to Learn
+# Recipe: add a doc page
 
-Add a new published page on `learn.netdata.cloud` from the
-agent repo (this repo) or any of the 6 source repos.
+Procedure and fields: `docs/.map/README.md#steps-to-publish`. What this recipe adds is the order of operations and the
+checks that catch the silent failures.
 
-## 0. Read first
+1. Write the `.md` anywhere sensible in the source repository; the path has no routing effect
+   (`../mapping.md#the-join-key`). No frontmatter is needed; ingest replaces the leading HTML comment block, so a
+   hand-written `slug:` or `sidebar_position:` has no effect.
+2. Add the node to `docs/.map/map.yaml` under the intended parent with `label` and `edit_url`
+   (`docs/.map/README.md#meta-fields`); `description` and `keywords` are optional; `path` changes the directory
+   segment, never the page's own segment (`docs/.map/README.md#path-reconstruction`,
+   `../mapping.md#rows-ingest-reads-from-the-map`). Its position among siblings is its sidebar position
+   (`../sidebars.md`). The `edit_url` is the join key and has the exact shape
+   `https://github.com/netdata/<repo>/edit/<branch>/<repository-relative path with extension>`, with `<repo>` the
+   source repository (`netdata` for this one) and `<branch>` `master`, or `main` for `.github`.
+3. Predict the URL: `/docs/<learn_rel_path>/<label>` lowercased, spaces as `-`, after the sanitizer
+   (`../mapping.md#file-path-and-slug`). Check for a sibling that sanitizes to the same name.
+4. Write cross-references as repository-relative `.md` paths (`../mapping.md#links-between-pages`); keep MDX-hostile
+   text in inline code (`../mdx-rules.md`).
+5. Run `docs/.map/validate_map_schema.py` (`../mapping.md#what-is-checked-and-by-what`), then the local ingest
+   (`docs/.map/README.md#2-test-the-changes`), and confirm the page appears at the predicted path under learn `docs/`
+   with the expected frontmatter.
+6. Open one PR here with the page and the map change. `.github/workflows/check-markdown.yml` runs the real ingest
+   against the PR (`../pipeline.md#verification-before-merging-here`).
+7. After merge, `trigger-learn-update.yml` dispatches the learn ingest; a learn maintainer merges the ingest PR;
+   Netlify deploys (`../pipeline.md#when-ingest-runs`, `docs/.map/README.md#4-merge-the-learn-ingest-pr`).
+8. After deploy, request the predicted URL and confirm the page, its sidebar position, and its description.
 
-- `../SKILL.md` -- skill overview.
-- `../mapping.md` -- the map.yaml schema and URL computation.
-
-## 1. Create the source markdown
-
-Place the file under a reasonable location in the source repo.
-Path is largely cosmetic; what matters is the `map.yaml` row.
-
-For this repo, suggested locations:
-- `<repo>/docs/<existing-section>/<your-page>.md` for general
-  user-facing docs;
-- `<repo>/docs/developer-and-contributor-corner/<page>.md` for
-  developer notes;
-- `<repo>/docs/netdata-agent/<page>.md` for agent docs;
-- `<repo>/docs/dashboards-and-charts/<page>.md` for dashboard
-  docs.
-
-Author the markdown content normally. No special frontmatter
-required; ingest will inject what it needs.
-
-If you absolutely must pin a stable URL across renames, add
-`slug: /your/stable/path/here` at the very top of the file
-(before any HTML-comment metadata block) -- but this is rare
-and usually unnecessary because the auto-redirect mechanism
-handles renames.
-
-## 2. Add a node to map.yaml
-
-Open `<repo>/docs/.map/map.yaml` and add a row under the
-appropriate parent:
-
-```yaml
-- meta:
-    label: My New Page
-    edit_url: https://github.com/netdata/netdata/edit/master/docs/<section>/<your-page>.md
-    description: Optional one-line description for SEO.
-    keywords: [keyword1, keyword2]
-```
-
-The position of the row in the YAML determines the sidebar
-position within the parent (sibling-relative; ingest assigns
-`sidebar_position` in steps of 10 in traversal order).
-
-If you want a single-segment override of the URL slug
-(different from the label), add `path: <slug>` under the
-`meta` block.
-
-## 3. Test locally
-
-From the learn repo:
-
-```bash
-cd ${NETDATA_REPOS_DIR}/learn
-. venv/bin/activate    # if not already
-python3 ingest/ingest.py --local-repo netdata:<repo> \
-    --ignore-on-prem-repo --fail-links-netdata
-yarn start             # browse at http://localhost:3000
-```
-
-Check:
-- Your new page appears in the sidebar under the expected
-  parent.
-- The URL is what you expected
-  (`/docs/<learn_rel_path>/<sidebar_label>` lowercased).
-- Links from / to your page resolve.
-
-## 4. Open the docs PR in this repo
-
-Single PR with two commits (or one):
-1. The new `.md` file under `<repo>/docs/`.
-2. The map.yaml change adding the node.
-
-Reviewers check:
-- The map.yaml row has all required fields (`label`,
-  `edit_url`).
-- The `edit_url` matches the schema regex
-  (`^https://github\.com/netdata/<repo>/edit/<branch>/.+\.(md|mdx)$`).
-- The page is in a sensible parent in the tree.
-
-## 5. After merge
-
-`${NETDATA_REPOS_DIR}/learn/.github/workflows/ingest.yml`
-fires within 3 hours (or you can `workflow_dispatch` it
-immediately). Ingest opens an "Ingest New Documentation" PR
-in the learn repo. A learn-repo maintainer reviews and merges
-it. Netlify deploys within minutes.
-
-End-to-end timing: 0-3 hours of cron + manual review/merge +
-minutes of Netlify deploy.
-
-## 6. Verify on production
-
-After deploy, check:
-- `https://learn.netdata.cloud/docs/<your-rel-path>/<your-label>`
-  resolves.
-- The page renders correctly (no MDX errors).
-- Sidebar position is what you expected.
-- Page metadata (title, description, keywords) is populated
-  from your `meta` block.
-
-## Common mistakes
-
-- **Forgetting the map.yaml row.** The page won't be
-  published. There's no warning -- ingest silently skips
-  source files not in the map.
-- **Wrong `edit_url` format.** Schema validation fails the
-  whole ingest run with exit code 2. Check the regex.
-- **Source path implies the URL.** It does NOT. The URL is
-  computed from `meta.label` + `learn_rel_path`. Don't expect
-  the source filesystem path to influence routing.
-- **Hand-editing `${NETDATA_REPOS_DIR}/learn/docs/<page>.mdx`
-  directly.** Wiped on next ingest. Use `part_of_learn: True`
-  if you really need a hand-authored exception.
-- **Wrong source repo for the content.** If your content is
-  about Netdata Cloud On-Prem, edit
-  `${NETDATA_REPOS_DIR}/netdata-cloud-onprem/`, not this repo.
-  But the map.yaml row goes in THIS repo.
+Mistakes this catches: a missing node (no error, no page); an `edit_url` that does not match the schema pattern
+(exit 2); an `edit_url` that matches the pattern but not the file (no error, no page); content from another source
+repository whose node was forgotten here (`../authoring-boundary.md`).

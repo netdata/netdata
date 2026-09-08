@@ -39,11 +39,11 @@ a `data-collection.databases` category; a new alert channel is an `agent_notific
 7. **Learn** (`docs/.map/map.yaml`): a section holding an `integration_placeholder` node with an `integration_kind`. The
    kind is a fixed bucket name Learn's ingest knows, not the `learn_rel_path`; the existing values are `collectors`,
    `flows`, `exporters`, `agent_notifications`, `cloud_notifications`, `logs`, `authentication`, `secretstore`, and
-   `service_discovery` (keep their singular/plural style). Learn's ingest buckets pages by a fixed kind list
-   (`.agents/skills/docs-learn-site-structure/mapping.md`, "Integration placeholders"; the list quoted there predates
-   `flows` and `service_discovery`), so a new kind is a Learn-repo change too; `device` has no placeholder and attaches
-   through the NPM chapter nodes. Map authoring and companion hand-written pages: the `docs-learn-site-structure` skill
-   (`mapping.md`).
+   `service_discovery` (keep their singular/plural style). The allowed members are the `integration_kind` enum in
+   `docs/.map/map.schema.json`, and Learn's ingest buckets pages by source-path substrings per kind
+   (`.agents/skills/docs-learn-site-structure/mapping.md#rows-ingest-reads-from-the-map`), so a new kind is a schema
+   change here and a Learn-repo change; `device` has no placeholder and attaches through the NPM chapter nodes. Map
+   authoring and companion hand-written pages: `.agents/skills/docs-learn-site-structure/mapping.md`.
 8. **Downstream**: `netdata/website` renders cards from `integrations.json` automatically, but FAQ and solution pages
    that describe the old story may need edits, and a new top-level category or section shape needs the website build run
    or emulated with the Hugo version pinned in its `netlify.toml`. Cloud-frontend is data-driven, but its content tabs
@@ -68,6 +68,7 @@ this repository; website corrections go in their own PR there, and a new `integr
 
 Traced `learn_rel_path` per mode through `build_readme_from_integration` in `integrations/gen_docs_integrations.py`,
 read the `<!--startmeta` block of one generated page per type, listed the `integration_kind` values in
-`docs/.map/map.yaml`, read the fixed-kind bucketing in `docs-learn-site-structure/mapping.md`, and confirmed `deploy`
+`docs/.map/map.yaml`, read the placeholder bucketing in `.agents/skills/docs-learn-site-structure/mapping.md`, and
+confirmed `deploy`
 has no documentation mode in `descriptions.py`. The `flows` and `device` additions are the worked examples
 (`integrations/schemas/flows.json`, `device.json`, `FLOWS_SOURCES`, `DEVICE_SOURCES`).

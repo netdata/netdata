@@ -77,23 +77,30 @@ cd "${LEARN_COPY}"
   --fail-links-netdata
 ```
 
-Build with the Netlify-pinned runtime:
+Build with the command and runtime Netlify uses. Both are the `[build]` table of `static.toml` in the Learn checkout
+(`command`, and `NODE_VERSION`, `NPM_VERSION`, `NODE_OPTIONS` under `environment`); read them rather than pinning
+values here, because the pins move with the site:
 
 ```bash
-NODE_OPTIONS=--max_old_space_size=4096 \
-  npx -y -p node@22.14.0 -p yarn@1.22.22 yarn build
+sed -n '/^\[build\]/,/^$/p' "${LEARN_COPY}/static.toml"
+PUBLISH_DIR="$(sed -n '/^\[build\]/,/^$/{s/^ *publish *= *"\(.*\)"/\1/p;}' "${LEARN_COPY}/static.toml")"
+[ -n "${PUBLISH_DIR}" ] || { echo "no publish key in the [build] table of static.toml" >&2; exit 1; }
 ```
+
+Run the printed `command` inside `${LEARN_COPY}` with the printed `NODE_OPTIONS` exported and Node and npm matching
+`NODE_VERSION` and `NPM_VERSION` (for example through `npx -y -p node@<NODE_VERSION> -p npm@<NPM_VERSION> <command>`).
+The output lands in `${LEARN_COPY}/${PUBLISH_DIR}`.
 
 Serve the static build for inspection:
 
 ```bash
-python3 -m http.server 3030 --bind 127.0.0.1 --directory "${LEARN_COPY}/build"
+python3 -m http.server 3030 --bind 127.0.0.1 --directory "${LEARN_COPY}/${PUBLISH_DIR}"
 ```
 
 Or run it in the background with a PID file:
 
 ```bash
-python3 -m http.server 3030 --bind 127.0.0.1 --directory "${LEARN_COPY}/build" \
+python3 -m http.server 3030 --bind 127.0.0.1 --directory "${LEARN_COPY}/${PUBLISH_DIR}" \
   >"${PREVIEW_ROOT}/http.log" 2>&1 &
 echo "$!" > "${PREVIEW_ROOT}/http.pid"
 ```
