@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eou pipefail
+set -euo pipefail
 
 artifacts="$(realpath "${1}")"
 signing_key="${2:-}"
