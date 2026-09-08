@@ -318,17 +318,23 @@ func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testin
 	}
 	stage.mu.Lock()
 	mutation := stage.result.mutation
-	attempt := stage.attempt
 	identity := stage.identity
 	stage.mu.Unlock()
 	require.NotNil(t, mutation)
-	require.NotNil(t, attempt)
+	// The worker can publish readiness before the stage installs its attempt
+	// handle, but the authority registers ownership before starting the worker.
+	released, ok := attempts.ProcessAttemptReleased(identity)
+	require.True(t, ok)
 
 	// Simulate the Store rejecting final mutation release after ownership was
 	// handed to the stage.
 	require.NoError(t, mutation.Abort())
 	stage.Release()
-	<-attempt.Released()
+	select {
+	case <-released:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "Store operation did not release")
+	}
 
 	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
 	_, err = attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
