@@ -479,7 +479,7 @@ modules:
             - name: mount_point
               description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:', 'C:\\ClusterStorage\\Volume1')."
             - name: drive_type
-              description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
+              description: "Classification of the disk device (e.g., norootdir, removable, fixed, remote, cdrom, ramdisk)."
             - name: filesystem
               description: "File system format used on the volume (e.g., ntfs, refs, csvfs)."
             - name: rw_mode
