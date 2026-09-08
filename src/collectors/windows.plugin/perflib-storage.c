@@ -9,8 +9,6 @@
 #include "../common-contexts/common-contexts.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
-#define CONFIG_SECTION_PERFLIB_STORAGE "plugin:windows:PerflibStorage"
-
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
