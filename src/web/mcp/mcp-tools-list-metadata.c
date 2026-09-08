@@ -199,7 +199,8 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
                             "Each context must be an exact match - no wildcards or patterns allowed. "
                             "Use '" MCP_TOOL_LIST_METRICS "' to discover available contexts. "
                             "If not specified, alerts from all contexts are included. "
-                            "Examples: [\"system.cpu\", \"disk.space\"], [\"mysql.queries\", \"redis.memory\"]");
+                            "Examples: [\"system.cpu\", \"disk.space\"], [\"mysql.queries\", \"redis.memory\"]",
+                        config->params.metrics_required);
                 } else {
                     // For nodes/functions, metrics is a filter
                     mcp_schema_add_array_param(buffer, "metrics",
@@ -213,7 +214,8 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
                             "Each metric must be an exact match - no wildcards or patterns allowed. "
                             "Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics. "
                             "If not specified, all metrics are included. "
-                            "Examples: [\"system.cpu\", \"system.load\"], [\"disk.io\", \"disk.space\"]");
+                            "Examples: [\"system.cpu\", \"system.load\"], [\"disk.io\", \"disk.space\"]",
+                        config->params.metrics_required);
                 }
             } else {
                 // This is a metrics query
@@ -226,7 +228,8 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
                         "Array of specific metric names to filter. "
                         "Each metric must be an exact match - no wildcards or patterns allowed. "
                         "If not specified, all metrics are included. "
-                        "Examples: [\"system.cpu\", \"system.load\", \"system.ram\"]");
+                        "Examples: [\"system.cpu\", \"system.load\", \"system.ram\"]",
+                    config->params.metrics_required);
             }
         } else {
             // Use string pattern for metrics
@@ -295,7 +298,8 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
                     "Each node must be an exact match - no wildcards or patterns allowed. "
                     "Use '" MCP_TOOL_LIST_NODES "' to discover available nodes. "
                     "If not specified, all nodes are included. "
-                    "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]");
+                    "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]",
+                config->params.nodes_required);
         } else {
             // Use string pattern for nodes
             buffer_json_member_add_object(buffer, "nodes");
@@ -402,7 +406,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     if (config->params.has_metrics) {
         if (config->params.metrics_as_array) {
             // Parse metrics as an array
-            metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, false, MCP_TOOL_LIST_METRICS, mcpc->error);
+            metrics_buffer = mcp_params_parse_array_to_pattern(
+                params, "metrics", config->params.metrics_required, false, MCP_TOOL_LIST_METRICS, mcpc->error);
             if (buffer_strlen(mcpc->error) > 0) {
                 return MCP_RC_BAD_REQUEST;
             }
@@ -423,7 +428,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     if (config->params.has_nodes) {
         if (config->params.nodes_as_array) {
             // Parse nodes as array
-            nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, false, MCP_TOOL_LIST_NODES, mcpc->error);
+            nodes_buffer = mcp_params_parse_array_to_pattern(
+                params, "nodes", config->params.nodes_required, false, MCP_TOOL_LIST_NODES, mcpc->error);
             if (buffer_strlen(mcpc->error) > 0) {
                 return MCP_RC_BAD_REQUEST;
             }
@@ -440,12 +446,12 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     // Check required parameters
     if (config->params.metrics_required && !metrics_pattern) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'metrics'. Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics.");
-        return MCP_RC_ERROR;
+        return MCP_RC_BAD_REQUEST;
     }
     
     if (config->params.nodes_required && !nodes_pattern) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'nodes'. Use '" MCP_TOOL_LIST_NODES "' to discover available nodes.");
-        return MCP_RC_ERROR;
+        return MCP_RC_BAD_REQUEST;
     }
 
     // Extract time parameters (only if the tool supports them)
