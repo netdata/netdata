@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
@@ -25,7 +27,8 @@ var (
 type VNodeConfiguration struct {
 	mu sync.Mutex // guards records
 
-	records map[string]jobruntime.VnodeSnapshot // committed vnode snapshots by name
+	records     map[string]jobruntime.VnodeSnapshot // committed vnode snapshots by name
+	definitions map[string]*hostoutput.Definition
 }
 
 type PreparedVNode struct {
@@ -38,18 +41,20 @@ type ConfiguredVNode struct {
 }
 
 type preparedVNodeState struct {
-	mu       sync.Mutex               // guards consumed
-	consumed bool                     // the prepared edit has been committed or aborted
-	owner    *VNodeConfiguration      // the vnode configuration this edit belongs to
-	id       string                   // vnode name
-	expected uint64                   // revision the edit was prepared against (optimistic check)
-	next     jobruntime.VnodeSnapshot // the snapshot to commit
-	remove   bool                     // the edit removes the vnode
+	mu         sync.Mutex               // guards consumed
+	consumed   bool                     // the prepared edit has been committed or aborted
+	owner      *VNodeConfiguration      // the vnode configuration this edit belongs to
+	id         string                   // vnode name
+	expected   uint64                   // revision the edit was prepared against (optimistic check)
+	next       jobruntime.VnodeSnapshot // the snapshot to commit
+	remove     bool                     // the edit removes the vnode
+	definition *hostoutput.Definition
 }
 
 func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.VirtualNode) (*VNodeConfiguration, error) {
 	configuration := &VNodeConfiguration{
-		records: make(map[string]jobruntime.VnodeSnapshot),
+		records:     make(map[string]jobruntime.VnodeSnapshot),
+		definitions: make(map[string]*hostoutput.Definition),
 	}
 	ids := slices.Sorted(maps.Keys(initial))
 	for _, id := range ids {
@@ -84,6 +89,16 @@ func (vc *VNodeConfiguration) PrepareUpsert(
 		return PreparedVNode{}, errors.New("vnode configuration: invalid preparation")
 	}
 	nextVNode := vnode.Copy()
+	definition, err := hostoutput.NewDefinition(
+		netdataapi.HostInfo{
+			GUID:     nextVNode.GUID,
+			Hostname: nextVNode.Hostname,
+			Labels:   nextVNode.HostLabels(),
+		},
+	)
+	if err != nil {
+		return PreparedVNode{}, err
+	}
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
 	current := vc.records[id]
@@ -92,6 +107,9 @@ func (vc *VNodeConfiguration) PrepareUpsert(
 	}
 	if current.Vnode != nil && vnodeConfigurationEqual(current.Vnode, nextVNode) {
 		return PreparedVNode{}, ErrVNodeNoChange
+	}
+	if previous := vc.definitions[hostoutput.GUIDKey(nextVNode.GUID)]; previous.Equal(definition) {
+		definition = previous
 	}
 	metadataRevision := uint64(1)
 	if current.Vnode != nil {
@@ -104,9 +122,10 @@ func (vc *VNodeConfiguration) PrepareUpsert(
 		}
 	}
 	state := &preparedVNodeState{
-		owner:    vc,
-		id:       strings.Clone(id),
-		expected: expected,
+		definition: definition,
+		owner:      vc,
+		id:         strings.Clone(id),
+		expected:   expected,
 		next: jobruntime.VnodeSnapshot{
 			Vnode:            nextVNode,
 			Revision:         expected + 1,
@@ -161,11 +180,16 @@ func (pv PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
 		return jobruntime.VnodeSnapshot{}, ErrVNodeRevision
 	}
 	state.consumed = true
+	if current.Vnode != nil {
+		delete(configuration.definitions, hostoutput.GUIDKey(current.Vnode.GUID))
+	}
 	if state.remove {
 		delete(configuration.records, state.id)
 		return state.next.Copy(), nil
 	}
 	configuration.records[state.id] = state.next.Copy()
+	key := hostoutput.GUIDKey(state.next.Vnode.GUID)
+	configuration.definitions[key] = state.definition
 	return state.next.Copy(), nil
 }
 
@@ -193,6 +217,13 @@ func (vc *VNodeConfiguration) Lookup(id string) (jobruntime.VnodeSnapshot, bool)
 	return snapshot.Copy(), ok
 }
 
+// Definition returns immutable metadata for authority selection inside frame admission.
+func (vc *VNodeConfiguration) Definition(guid string) *hostoutput.Definition {
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	return vc.definitions[hostoutput.GUIDKey(guid)]
+}
+
 func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 	if vc == nil {
 		return nil
@@ -213,12 +244,13 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 }
 
 func vnodeConfigurationEqual(left, right *vnodes.VirtualNode) bool {
-	return left.Name == right.Name &&
+	return left.Equal(right) &&
 		left.Source == right.Source &&
 		left.SourceType == right.SourceType &&
 		vnodeMetadataEqual(left, right)
 }
 
 func vnodeMetadataEqual(left, right *vnodes.VirtualNode) bool {
-	return left.Hostname == right.Hostname && left.GUID == right.GUID && maps.Equal(left.Labels, right.Labels)
+	return left.Hostname == right.Hostname && left.GUID == right.GUID &&
+		maps.Equal(left.HostLabels(), right.HostLabels())
 }

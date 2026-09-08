@@ -258,10 +258,19 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 
 	plan := Plan{
 		Actions: []EngineAction{
-			chartengine.CreateChartAction{ChartTemplateID: "g0c0", ChartID: "svc_latency", Meta: meta},
+			chartengine.CreateChartAction{
+				ChartTemplateID: "g0c0",
+				ChartID:         "svc_latency",
+				Meta:            meta,
+			},
 			chartengine.CreateDimensionAction{
-				ChartID: "svc_latency", ChartMeta: meta, Name: "value",
-				Float: true, Algorithm: chartengine.AlgorithmAbsolute, Multiplier: 1, Divisor: 1,
+				ChartID:    "svc_latency",
+				ChartMeta:  meta,
+				Name:       "value",
+				Float:      true,
+				Algorithm:  chartengine.AlgorithmAbsolute,
+				Multiplier: 1,
+				Divisor:    1,
 			},
 			chartengine.UpdateChartAction{
 				ChartID: "svc_latency",
@@ -273,8 +282,12 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 	}
 
 	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
-		TypeID: "collector.job", UpdateEvery: 1, Plugin: "go.d.plugin", Module: "prometheus",
-		JobName: "job01", MSSinceLast: 1,
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "prometheus",
+		JobName:     "job01",
+		MSSinceLast: 1,
 	}))
 
 	out := buf.String()
@@ -481,14 +494,6 @@ func TestApplyPlanVnodeHostSelectionAndDefine(t *testing.T) {
 		Units:   "workers",
 		Type:    chartengine.ChartTypeLine,
 	}
-	info, err := PrepareHostInfo(netdataapi.HostInfo{
-		GUID:     "node-guid",
-		Hostname: "node-host",
-		Labels: map[string]string{
-			"region": "eu'\n",
-		},
-	})
-	require.NoError(t, err)
 
 	plan := Plan{
 		Actions: []EngineAction{
@@ -506,18 +511,12 @@ func TestApplyPlanVnodeHostSelectionAndDefine(t *testing.T) {
 		Module:      "apache",
 		JobName:     "job01",
 		HostScope: &HostScope{
-			GUID:   "node-guid",
-			Define: &info,
+			GUID: "node-guid",
 		},
 	}))
 
 	out := buf.String()
-	assert.Equal(t, `HOST_DEFINE 'node-guid' 'node-host'
-HOST_LABEL '_hostname' 'node-host'
-HOST_LABEL 'region' 'eu '
-HOST_DEFINE_END
-
-HOST 'node-guid'
+	assert.Equal(t, `HOST 'node-guid'
 
 CHART 'collector.job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '0' '1' '' 'go.d.plugin' 'apache'
 CLABEL '_collect_job' 'job01' '1'
@@ -536,45 +535,6 @@ func TestApplyPlanSkipsHostSelectionForEmptyPlans(t *testing.T) {
 		Module:      "runtime",
 		JobName:     "job01",
 	}))
-	assert.Equal(t, "", buf.String())
-}
-
-func TestApplyPlanRejectsMismatchedHostDefine(t *testing.T) {
-	var buf bytes.Buffer
-	api := netdataapi.New(&buf)
-
-	meta := chartengine.ChartMeta{
-		Title:   "Requests",
-		Family:  "Service",
-		Context: "requests",
-		Units:   "req/s",
-		Type:    chartengine.ChartTypeLine,
-	}
-	plan := Plan{
-		Actions: []EngineAction{
-			chartengine.CreateChartAction{
-				ChartID: "requests",
-				Meta:    meta,
-			},
-		},
-	}
-
-	err := ApplyPlan(api, plan, EmitEnv{
-		TypeID:      "collector.job",
-		UpdateEvery: 1,
-		Plugin:      "go.d.plugin",
-		Module:      "httpcheck",
-		JobName:     "job01",
-		HostScope: &HostScope{
-			GUID: "guid-a",
-			Define: &netdataapi.HostInfo{
-				GUID:     "guid-b",
-				Hostname: "node-host",
-			},
-		},
-	})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "does not match")
 	assert.Equal(t, "", buf.String())
 }
 
@@ -681,16 +641,48 @@ func TestNormalizeActionsOrderingDeterminism(t *testing.T) {
 	}{
 		"preserves update/remove order and groups create actions by chart id": {
 			actions: []EngineAction{
-				chartengine.UpdateChartAction{ChartID: "chart_b"},
-				chartengine.UpdateChartAction{ChartID: "chart_a"},
-				chartengine.RemoveDimensionAction{ChartID: "chart_b", Name: "dim_b", ChartMeta: meta},
-				chartengine.RemoveDimensionAction{ChartID: "chart_a", Name: "dim_a", ChartMeta: meta},
-				chartengine.RemoveChartAction{ChartID: "chart_b", Meta: meta},
-				chartengine.RemoveChartAction{ChartID: "chart_a", Meta: meta},
-				chartengine.CreateDimensionAction{ChartID: "chart_b", Name: "dim_b", ChartMeta: meta},
-				chartengine.CreateChartAction{ChartID: "chart_b", Meta: meta},
-				chartengine.CreateDimensionAction{ChartID: "chart_a", Name: "dim_a", ChartMeta: meta},
-				chartengine.CreateChartAction{ChartID: "chart_a", Meta: meta},
+				chartengine.UpdateChartAction{
+					ChartID: "chart_b",
+				},
+				chartengine.UpdateChartAction{
+					ChartID: "chart_a",
+				},
+				chartengine.RemoveDimensionAction{
+					ChartID:   "chart_b",
+					Name:      "dim_b",
+					ChartMeta: meta,
+				},
+				chartengine.RemoveDimensionAction{
+					ChartID:   "chart_a",
+					Name:      "dim_a",
+					ChartMeta: meta,
+				},
+				chartengine.RemoveChartAction{
+					ChartID: "chart_b",
+					Meta:    meta,
+				},
+				chartengine.RemoveChartAction{
+					ChartID: "chart_a",
+					Meta:    meta,
+				},
+				chartengine.CreateDimensionAction{
+					ChartID:   "chart_b",
+					Name:      "dim_b",
+					ChartMeta: meta,
+				},
+				chartengine.CreateChartAction{
+					ChartID: "chart_b",
+					Meta:    meta,
+				},
+				chartengine.CreateDimensionAction{
+					ChartID:   "chart_a",
+					Name:      "dim_a",
+					ChartMeta: meta,
+				},
+				chartengine.CreateChartAction{
+					ChartID: "chart_a",
+					Meta:    meta,
+				},
 			},
 		},
 	}

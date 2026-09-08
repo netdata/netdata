@@ -11,10 +11,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
@@ -30,10 +33,11 @@ func Load(dir string) map[string]*VirtualNode {
 }
 
 type VirtualNode struct {
-	Name     string            `yaml:"name" json:"name"`
-	Hostname string            `yaml:"hostname" json:"hostname"`
-	GUID     string            `yaml:"guid" json:"guid"`
-	Labels   map[string]string `yaml:"labels,omitempty" json:"labels"`
+	Name       string            `yaml:"name"                  json:"name"`
+	Hostname   string            `yaml:"hostname"              json:"hostname"`
+	GUID       string            `yaml:"guid"                  json:"guid"`
+	Labels     map[string]string `yaml:"labels,omitempty"      json:"labels"`
+	StaleAfter *confopt.Duration `yaml:"stale_after,omitempty" json:"stale_after,omitempty"`
 
 	Source     string `yaml:"-" json:"-"`
 	SourceType string `yaml:"-" json:"-"`
@@ -46,6 +50,11 @@ func (v *VirtualNode) Copy() *VirtualNode {
 
 	labels := make(map[string]string, len(v.Labels))
 	maps.Copy(labels, v.Labels)
+	var staleAfter *confopt.Duration
+	if v.StaleAfter != nil {
+		value := *v.StaleAfter
+		staleAfter = &value
+	}
 
 	return &VirtualNode{
 		Name:       v.Name,
@@ -54,6 +63,7 @@ func (v *VirtualNode) Copy() *VirtualNode {
 		Source:     v.Source,
 		SourceType: v.SourceType,
 		Labels:     labels,
+		StaleAfter: staleAfter,
 	}
 }
 
@@ -61,7 +71,29 @@ func (v *VirtualNode) Equal(vn *VirtualNode) bool {
 	return v.Name == vn.Name &&
 		v.Hostname == vn.Hostname &&
 		v.GUID == vn.GUID &&
+		staleAfterEqual(v.StaleAfter, vn.StaleAfter) &&
 		maps.Equal(v.Labels, vn.Labels)
+}
+
+func staleAfterEqual(a, b *confopt.Duration) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
+}
+
+// HostLabels materializes lifecycle configuration without changing the operator's labels.
+func (v *VirtualNode) HostLabels() map[string]string {
+	labels := maps.Clone(v.Labels)
+	if v.StaleAfter == nil {
+		return labels
+	}
+	if *v.StaleAfter == 0 {
+		delete(labels, "_node_stale_after_seconds")
+		return labels
+	}
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["_node_stale_after_seconds"] = strconv.FormatInt(int64(v.StaleAfter.Duration()/time.Second), 10)
+	return labels
 }
 
 func readConfDir(dir string) map[string]*VirtualNode {

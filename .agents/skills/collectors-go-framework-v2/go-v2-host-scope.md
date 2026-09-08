@@ -51,27 +51,22 @@ or virtual-node targets.
   scope with another flattened read.
 - Default-scope metrics continue to emit under the job-level vnode when one is
   configured, otherwise under the global host.
-- Explicit non-default scopes emit under their `metrix.HostScope` GUID and host
-  metadata.
+- Explicit non-default scopes emit under their `metrix.HostScope` GUID, subject to configured host authority.
 - Collection and `metrix.CommitCycleSuccess()` are still all-or-nothing.
 - Post-collect plan/apply/commit is per-scope partial success. A failed scope
-  rolls back its own registry changes and does not block unrelated scopes.
+  aborts its own publication changes and does not block unrelated scopes.
 - Disappeared scopes are retained and read with empty scoped readers until the
   per-scope chartengine emits lifecycle removals. After successful removal
-  emission, jobruntime releases scoped registry owners and destroys the scope
+  emission, jobruntime releases scoped publication owners and destroys the scope
   engine.
-- Job cleanup emits obsolete charts for each retained scope before releasing
-  registry owners.
+- Job cleanup releases publication owners after chart cleanup, subject to vnode staleness suppression.
 
-## Vnode Registry
+## Host Publication
 
-- V2 vnode definitions go through the shared `framework/vnoderegistry` registry.
-- Registry entries are keyed by host GUID and owner.
-- Metadata is update-on-change. A new normalized metadata value for an existing
-  GUID replaces retained metadata and causes another `HOST_DEFINE`.
-- Owner release removes an entry only after the last owner for that GUID leaves.
-- Job-level vnode owners and explicit scoped vnode owners use separate owner
-  namespaces.
+Publication and contributor lifetime contracts are owned by
+`src/go/plugin/framework/hostoutput/README.md#metadata-ownership` and
+`src/go/plugin/framework/hostoutput/README.md#lifetime-and-removal`; cleanup follows
+`src/go/plugin/framework/hostoutput/README.md#cleanup-and-staleness`.
 
 ## Chartengine Runtime Metrics
 

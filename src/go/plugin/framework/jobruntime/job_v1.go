@@ -17,8 +17,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -73,6 +73,7 @@ type JobConfig struct {
 	VnodeName               string
 	VnodeRevision           uint64
 	VnodeMetadataRevision   uint64
+	Publication             *hostoutput.Publisher
 	VnodeLookup             VnodeLookup
 	FunctionOnly            bool
 	LifecycleErrorSanitizer func(error) error
@@ -88,7 +89,11 @@ func NewJob(cfg JobConfig) *Job {
 		cfg.CleanupOut = cfg.Out
 	}
 
+	if cfg.Publication == nil {
+		cfg.Publication = hostoutput.New()
+	}
 	j := &Job{
+		publication:     cfg.Publication,
 		autoDetectEvery: cfg.AutoDetectEvery,
 		autoDetectTries: infTries,
 
@@ -168,7 +173,10 @@ type Job struct {
 	buf                  *bytes.Buffer
 	api                  *netdataapi.API
 
-	vnodeCreated bool
+	publication    *hostoutput.Publisher
+	hostOwner      *hostoutput.Owner
+	hostGUID       string
+	hostDefinition *hostoutput.Definition
 	// vnodeMu covers current vnode state while collection refreshes it.
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
@@ -317,7 +325,6 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
 	createChart := false
 	if metadataChanged {
-		j.vnodeCreated = false
 		createChart = j.vnode.GUID != next.GUID
 	}
 	j.vnode = *next
@@ -332,7 +339,15 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 
 // Tick Tick.
 func (j *Job) Tick(clock int) {
-	enqueueTickWithSkipLog(j.tick, clock, j.functionOnly, j.updateEvery, int(j.retries.Load()), &j.skipTracker, j.Logger)
+	enqueueTickWithSkipLog(
+		j.tick,
+		clock,
+		j.functionOnly,
+		j.updateEvery,
+		int(j.retries.Load()),
+		&j.skipTracker,
+		j.Logger,
+	)
 }
 
 // IsRunning returns true if the job's main loop is currently running.
@@ -405,33 +420,27 @@ func (j *Job) cleanupModule() {
 }
 
 func (j *Job) Cleanup() {
+	defer j.hostOwner.Release()
 	j.cleanupModule()
 	j.buf.Reset()
 	if !collectorapi.ShouldObsoleteCharts() {
 		return
 	}
 
-	// Netdata automatically obsoletes vnode charts when no updates are sent.
-	// For virtual nodes with a stale label, we must not send anything:
-	//   - Sending a HOST line would incorrectly mark the vnode as active.
-	isVnodeWithStaleConfig := j.vnode.Labels["_node_stale_after_seconds"] != ""
-
-	if !isVnodeWithStaleConfig {
-		if !j.vnodeCreated && j.vnode.GUID != "" {
-			j.sendVnodeHostInfo()
-			j.vnodeCreated = true
-		}
-		j.api.HOST(j.vnode.GUID)
-
-		if j.charts != nil {
-			for _, chart := range *j.charts {
-				if chart.IsCreated() {
-					chart.MarkRemove()
-					j.createChart(chart)
+	if j.charts != nil {
+		selected := false
+		for _, chart := range *j.charts {
+			if chart.IsCreated() {
+				if !selected {
+					j.api.HOST(j.vnode.GUID)
+					selected = true
 				}
+				chart.MarkRemove()
+				j.createChart(chart)
 			}
 		}
 	}
+	hostBytes := j.buf.Len()
 
 	j.api.HOST("")
 
@@ -445,7 +454,13 @@ func (j *Job) Cleanup() {
 	}
 
 	if j.buf.Len() > 0 {
-		if err := commitJobOutput(j.cleanupOut, j.buf.Bytes()); err != nil {
+		if _, err := commitHostOutput(j.cleanupOut, hostoutput.Request{
+			Owner:      j.hostOwner,
+			Definition: j.hostDefinition,
+			Payload:    j.buf.Bytes()[:hostBytes],
+			Tail:       j.buf.Bytes()[hostBytes:],
+			Cleanup:    true,
+		}, nil); err != nil {
 			j.Errorf("cleanup output failed: %v", err)
 		}
 	}
@@ -453,6 +468,7 @@ func (j *Job) Cleanup() {
 
 // CleanupRejected releases a constructed job without emitting cleanup output.
 func (j *Job) CleanupRejected() {
+	defer j.hostOwner.Release()
 	j.cleanupModule()
 	j.buf.Reset()
 }
@@ -500,19 +516,25 @@ func (j *Job) runOnce() {
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
 	j.prevRun = curTime
 
+	createChart := j.refreshVnodeSnapshot()
 	metrics := j.collect()
 
 	if j.panicked.Load() {
 		return
 	}
 
-	if j.processMetrics(metrics, curTime, sinceLastRun) {
+	if j.processMetrics(metrics, curTime, sinceLastRun, createChart) {
 		j.retries.Store(0)
 	} else {
 		j.retries.Add(1)
 	}
 
-	if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+	if _, err := commitHostOutput(j.out, hostoutput.Request{
+		Owner:      j.hostOwner,
+		Definition: j.hostDefinition,
+		Payload:    j.buf.Bytes(),
+	}, nil); err != nil {
+		poisonJobOutput(j.out, err)
 		j.Errorf("collection output failed: %v", err)
 	}
 	j.buf.Reset()
@@ -537,24 +559,18 @@ func (j *Job) collect() collectedMetrics {
 	return mx
 }
 
-func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int) bool {
-	var createChart bool
-	if j.module.VirtualNode() == nil {
-		createChart = j.refreshVnodeSnapshot()
-	}
+func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int, createChart bool) bool {
 
-	if !j.vnodeCreated {
-		if j.vnode.GUID == "" {
-			if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
-				j.vnodeMu.Lock()
-				j.vnode = *v
-				j.vnodeMu.Unlock()
-			}
+	if j.vnodeName == "" && j.vnode.GUID == "" {
+		if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
+			j.vnodeMu.Lock()
+			j.vnode = *v.Copy()
+			j.vnodeMu.Unlock()
 		}
-		if j.vnode.GUID != "" {
-			j.sendVnodeHostInfo()
-			j.vnodeCreated = true
-		}
+	}
+	if err := j.prepareHostDefinition(); err != nil {
+		j.Warningf("prepare vnode host info failed: %v", err)
+		return false
 	}
 
 	bufLenBeforeHost := j.buf.Len()
@@ -595,44 +611,64 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 	j.api.HOST("")
 
 	if !j.collectStatusChart.IsCreated() || createChart {
-		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
+		j.collectStatusChart.ID = fmt.Sprintf(
+			"%s_%s_data_collection_status",
+			cleanPluginName(j.pluginName),
+			j.FullName(),
+		)
 		j.createChart(j.collectStatusChart)
 	}
 
 	if !j.collectDurationChart.IsCreated() || createChart {
-		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
+		j.collectDurationChart.ID = fmt.Sprintf(
+			"%s_%s_data_collection_duration",
+			cleanPluginName(j.pluginName),
+			j.FullName(),
+		)
 		j.createChart(j.collectDurationChart)
 	}
 
-	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}
+	intMx := collectedMetrics{
+		intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)},
+	}
 	j.updateChart(j.collectStatusChart, intMx, sinceLastRun)
 
 	if updated == 0 {
 		return false
 	}
 
-	intMx = collectedMetrics{intMetrics: map[string]int64{"duration": elapsed}}
+	intMx = collectedMetrics{
+		intMetrics: map[string]int64{"duration": elapsed},
+	}
 	j.updateChart(j.collectDurationChart, intMx, sinceLastRun)
 
 	return true
 }
 
-func (j *Job) sendVnodeHostInfo() {
-	info, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
-		GUID:     j.vnode.GUID,
-		Hostname: j.vnode.Hostname,
-		Labels:   j.vnode.Labels,
-	})
-	if err != nil {
-		j.Warningf("prepare vnode host info failed: %v", err)
-		return
+func (j *Job) prepareHostDefinition() error {
+	if j.hostGUID != j.vnode.GUID {
+		j.hostOwner.Release()
+		j.hostOwner = nil
+		j.hostDefinition = nil
+		j.hostGUID = j.vnode.GUID
 	}
-
-	j.vnodeMu.Lock()
-	j.vnode.Hostname = info.Hostname
-	j.vnode.Labels = info.Labels
-	j.vnodeMu.Unlock()
-	j.api.HOSTINFO(info)
+	if j.vnode.GUID == "" {
+		return nil
+	}
+	if j.hostOwner == nil {
+		j.hostOwner = j.publication.NewOwner(j.vnode.GUID)
+	}
+	definition, err := j.hostOwner.Prepare(
+		netdataapi.HostInfo{
+			GUID:     j.vnode.GUID,
+			Hostname: j.vnode.Hostname,
+			Labels:   j.vnode.HostLabels(),
+		},
+	)
+	if err == nil {
+		j.hostDefinition = definition
+	}
+	return err
 }
 
 func (j *Job) createChart(chart *collectorapi.Chart) {

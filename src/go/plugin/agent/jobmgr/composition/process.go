@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 )
 
 type processControl struct {
@@ -63,7 +64,8 @@ type processCore struct {
 	config      processCoreConfig         // retained process configuration
 	diagnostics jobmgr.DiagnosticObserver // process-wide operational log sink
 
-	uids        *lifecycle.UIDLedger            // process-lifetime UID ledger
+	uids        *lifecycle.UIDLedger // process-lifetime UID ledger
+	publication *hostoutput.Publisher
 	frames      *lifecycle.FrameOwner           // the one process-lifetime frame writer
 	cleanupOut  *joboutput.CleanupOutputGate    // accepted-cleanup output until process finalization
 	ingress     *functionadapter.ProcessIngress // the one process-lifetime stdin reader
@@ -80,7 +82,6 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		config.Jobs.Defaults == nil ||
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
-		config.Jobs.Vnodes == nil ||
 		config.Diagnostics == nil ||
 		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid process construction")
@@ -110,6 +111,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		diagnostics: config.Diagnostics,
 		uids:        lifecycle.NewUIDLedger(),
 		frames:      frames,
+		publication: hostoutput.New(),
 		cleanupOut:  cleanupOut,
 		ingress:     ingress,
 		attempts:    attempts,
@@ -486,6 +488,7 @@ func (pc *processCore) newRun(
 		Diagnostics:     pc.diagnostics,
 		UIDs:            pc.uids,
 		Frames:          pc.frames,
+		Publication:     pc.publication,
 		CleanupOutput:   pc.cleanupOut,
 		Modules:         pc.config.Modules,
 		Jobs:            pc.config.Jobs,
