@@ -1518,6 +1518,8 @@ func TestFrameOwnerBuiltTransactionPreflight(t *testing.T) {
 			var output bytes.Buffer
 			owner, err := NewFrameOwner(&output)
 			require.NoError(t, err)
+			observer := &recordingRuntimeObserver{}
+			require.NoError(t, owner.BindRunNotifications(1, func() {}, func(error) {}, observer))
 			commits, aborts := 0, 0
 			tx := protocolTestTransaction{
 				commit: func() error { commits++; return nil },
@@ -1532,9 +1534,11 @@ func TestFrameOwnerBuiltTransactionPreflight(t *testing.T) {
 				require.Equal(t, []int{1, 0}, []int{commits, aborts})
 			}
 			require.Empty(t, output.String())
+			require.Zero(t, observer.counter(RuntimeCounterFramesCommitted))
 			require.False(t, owner.Census().Poisoned)
 			require.NoError(t, owner.CommitBorrowedProtocolFrame([]byte("next")))
 			require.Equal(t, "next", output.String())
+			require.EqualValues(t, 1, observer.counter(RuntimeCounterFramesCommitted))
 		})
 	}
 }

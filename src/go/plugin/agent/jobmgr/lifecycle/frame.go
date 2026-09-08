@@ -476,7 +476,7 @@ func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction
 		fo.poison(retainedFramePayload(payload, borrowed), err)
 		return err
 	}
-	fo.releaseFrame(true)
+	fo.releaseFrame(len(payload) != 0)
 	return nil
 }
 
