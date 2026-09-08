@@ -12,6 +12,7 @@
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
+    usec_t metadata_retry_after;
 
     UINT DriveType;
     DWORD SerialNumber;
@@ -103,6 +104,7 @@ static void logical_disk_cleanup(struct logical_disk *d)
     d->filesystem = NULL;
 
     d->collected_metadata = false;
+    d->metadata_retry_after = 0;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
     d->st_disk_space = NULL;
@@ -198,7 +200,6 @@ static netdata_mutex_t volume_space_mutex;
 static netdata_cond_t volume_space_cond;
 static DICTIONARY *volume_space_request = NULL;
 static DICTIONARY *volume_space_results = NULL;
-static bool volume_space_worker_busy = false;
 static bool volume_space_worker_stop = false;
 static ND_THREAD *volume_space_thread = NULL;
 static bool storage_initialized = false;
@@ -260,6 +261,7 @@ static void initialize(void)
 
 // Volumes and CSVs do not come and go often; rescanning every collection would be pure syscall cost.
 #define MOUNT_POINTS_REFRESH_EVERY_UT (60 * USEC_PER_SEC)
+#define METADATA_RETRY_EVERY_UT (60 * USEC_PER_SEC)
 
 // Canonical form of a mount path: no trailing backslash, so "C:\" and "C:" are the same instance.
 // path_size bounds the scan so a non-null-terminated buffer cannot run past the end of the array.
@@ -379,7 +381,6 @@ static void volume_space_worker(void *ptr __maybe_unused)
         netdata_mutex_lock(&volume_space_mutex);
         dictionary_destroy(volume_space_results);
         volume_space_results = results;
-        volume_space_worker_busy = false;
         netdata_cond_broadcast(&volume_space_cond);
         netdata_mutex_unlock(&volume_space_mutex);
     }
@@ -400,9 +401,11 @@ static void volume_space_submit(void)
     dfe_done(value);
 
     netdata_mutex_lock(&volume_space_mutex);
-    if (!volume_space_worker_stop && !volume_space_worker_busy && !volume_space_request) {
+    if (!volume_space_worker_stop) {
+        // Keep only the newest request while a slow query is in progress. The worker will pick it
+        // up after the current request completes, so a busy worker never causes a cycle to be lost.
+        dictionary_destroy(volume_space_request);
         volume_space_request = request;
-        volume_space_worker_busy = true;
         netdata_cond_signal(&volume_space_cond);
         request = NULL;
     }
@@ -620,8 +623,11 @@ static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
     }
 
     do {
-        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
-            (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            continue;
+
+        if ((fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+            fd.dwReserved0 != IO_REPARSE_TAG_MOUNT_POINT)
             continue;
 
         if (fd.cFileName[0] == L'.' &&
@@ -638,6 +644,17 @@ static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
         if (strlen(name) + sizeof(prefix) + 1 > sizeof(path))
             continue;
         snprintfz(path, sizeof(path), "%c:\\ClusterStorage\\%s", (char)windir[0], name);
+
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+            wchar_t mount_path[ND_MOUNT_PATH_MAX];
+            int mount_path_len = swprintf(
+                mount_path, _countof(mount_path), L"%c:\\ClusterStorage\\%ls\\", windir[0], fd.cFileName);
+            wchar_t volume_name[MAX_PATH + 1];
+            if (mount_path_len < 0 || (size_t)mount_path_len >= _countof(mount_path) ||
+                !GetVolumeNameForVolumeMountPointW(mount_path, volume_name, _countof(volume_name)))
+                continue;
+        }
+
         if (!logical_disk_is_excluded(path))
             dictionary_set(paths, path, NULL, 0);
 
@@ -768,6 +785,20 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
         *c = (char)tolower((uint8_t)*c);
 
     return string_strdupz(fileSystem);
+}
+
+static void logical_disk_collect_metadata(struct logical_disk *d, const char *name, usec_t now_ut)
+{
+    if (d->collected_metadata || (d->metadata_retry_after && now_ut < d->metadata_retry_after))
+        return;
+
+    d->filesystem = getFileSystemType(d, name);
+    if (d->filesystem) {
+        d->collected_metadata = true;
+        d->metadata_retry_after = 0;
+    } else {
+        d->metadata_retry_after = now_ut + METADATA_RETRY_EVERY_UT;
+    }
 }
 
 static const char *drive_type_to_str(UINT type)
@@ -917,11 +948,7 @@ static void logical_disk_collect_instance(
     struct logical_disk *d = dictionary_set(dict, resolved_name, NULL, sizeof(*d));
     d->last_collected = now_ut;
 
-    if (!d->collected_metadata) {
-        d->filesystem = getFileSystemType(d, resolved_name);
-        if (d->filesystem)
-            d->collected_metadata = true;
-    }
+    logical_disk_collect_metadata(d, resolved_name, now_ut);
 
     logical_disk_set_space(pDataBlock, pObjectType, pi, d, resolved_name);
 
@@ -982,6 +1009,22 @@ static bool logical_disk_collected_this_cycle(const struct logical_disk *d, usec
     return d && d->last_collected == now_ut;
 }
 
+static bool volume_space_results_complete(DICTIONARY *results)
+{
+    if (!results)
+        return false;
+
+    bool complete = true;
+    struct volume_space_result *result;
+    dfe_start_read(results, result)
+    {
+        if (!result->success)
+            complete = false;
+    }
+    dfe_done(result);
+    return complete;
+}
+
 // Volumes perflib does not list: Cluster Shared Volumes, and any volume mounted into a folder that
 // perflib skipped. Runs after the perflib pass, so volumes already collected this cycle are left
 // alone and never produce a second chart. Space queries are completed by the slow worker.
@@ -991,12 +1034,16 @@ static bool do_mount_points(int update_every, usec_t now_ut)
     if (!results)
         return false;
 
+    bool collected = volume_space_results_complete(results);
     struct volume_space_result *result;
     dfe_start_read(results, result)
     {
         const char *name = v_dfe.name;
 
-        if (!result->success || logical_disk_is_excluded(name) || !mount_points_contains(mountPoints, name))
+        if (!result->success)
+            continue;
+
+        if (logical_disk_is_excluded(name) || !mount_points_contains(mountPoints, name))
             continue;
 
         struct logical_disk *d = dictionary_get(logicalDisks, name);
@@ -1005,11 +1052,7 @@ static bool do_mount_points(int update_every, usec_t now_ut)
 
         d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
 
-        if (!d->collected_metadata) {
-            d->filesystem = getFileSystemType(d, name);
-            if (d->filesystem)
-                d->collected_metadata = true;
-        }
+        logical_disk_collect_metadata(d, name, now_ut);
 
         d->divisor = GIGA_FACTOR;
         d->percentDiskFree.current.Data = (ULONGLONG)result->free_bytes;
@@ -1020,11 +1063,11 @@ static bool do_mount_points(int update_every, usec_t now_ut)
     }
     dfe_done(result);
     dictionary_destroy(results);
-    return true;
+    return collected;
 }
 
-// Evict only after both producers completed successfully. A failed PerfLib or slow filesystem pass
-// leaves the last known instances intact instead of turning a transient failure into chart churn.
+// Evict only after the mount-point producer completed successfully. It covers every path-backed
+// volume, while a failed slow filesystem pass leaves the last known instances intact.
 static void logical_disk_evict_stale(usec_t now_ut)
 {
     struct logical_disk *d;
@@ -1239,8 +1282,8 @@ static int mount_points_unittest_expect(const char *what, bool condition)
 
 static bool volume_space_unittest_ok(const char *name __maybe_unused, uint64_t *total, uint64_t *free)
 {
-    *total = 8 * GIGA_FACTOR;
-    *free = 3 * GIGA_FACTOR;
+    *total = UINT64_C(8) * GIGA_FACTOR;
+    *free = UINT64_C(3) * GIGA_FACTOR;
     return true;
 }
 
@@ -1296,7 +1339,7 @@ static int storage_helpers_unittest_run(void)
     logical_disk_set_space_with_ops(NULL, NULL, NULL, &d, "C:", volume_space_unittest_ok);
     errors += mount_points_unittest_expect("Win32 byte values use the GiB divisor", d.divisor == GIGA_FACTOR);
     errors += mount_points_unittest_expect("Win32 byte values preserve free bytes",
-                                            d.percentDiskFree.current.Data == 3 * GIGA_FACTOR);
+                                            d.percentDiskFree.current.Data == UINT64_C(3) * GIGA_FACTOR);
 
     return errors;
 }
@@ -1376,6 +1419,34 @@ static int mount_points_unittest_run(void)
     return errors;
 }
 
+static int mount_points_query_failure_unittest_run(void)
+{
+    DICTIONARY *previous_paths = mountPoints;
+    DICTIONARY *previous_results = volume_space_results;
+    DICTIONARY *previous_disks = logicalDisks;
+    int errors = 0;
+
+    mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(mountPoints, "C:\\ClusterStorage\\Volume1", NULL, 0);
+    volume_space_results = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+    struct volume_space_result failed = { .success = false };
+    dictionary_set(volume_space_results, "C:\\ClusterStorage\\Volume1", &failed, sizeof(failed));
+    logicalDisks = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+
+    errors += mount_points_unittest_expect(
+        "a failed volume-space result makes mount-point collection fail",
+        !volume_space_results_complete(volume_space_results));
+
+    dictionary_destroy(mountPoints);
+    dictionary_destroy(logicalDisks);
+    mountPoints = previous_paths;
+    logicalDisks = previous_disks;
+    dictionary_destroy(volume_space_results);
+    volume_space_results = previous_results;
+    return errors;
+}
+
 int perflib_storage_unittest(void)
 {
     int errors = 0;
@@ -1383,6 +1454,7 @@ int perflib_storage_unittest(void)
     errors += storage_helpers_unittest_run();
     errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
+    errors += mount_points_query_failure_unittest_run();
     errors += mount_points_unittest_run();
 
     if (errors)
@@ -1729,18 +1801,19 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     // must happen before the perflib pass: it resolves perflib device names to mount paths
     mount_points_refresh(now_ut);
 
-    bool logical_collected = false;
     // A missing registry object is a transient collection failure; returning success keeps this
     // module enabled while the next cycle retries the query.
     if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(logical_id);
         if (pDataBlock)
-            logical_collected = do_logical_disk(pDataBlock, update_every, now_ut);
+            do_logical_disk(pDataBlock, update_every, now_ut);
     }
 
     volume_space_submit();
     bool mount_points_collected = do_mount_points(update_every, now_ut);
-    if (logical_collected && mount_points_collected)
+    // The mount-point producer covers every path-backed volume, including systems without a
+    // LogicalDisk PerfLib object. Its complete result is therefore sufficient for eviction.
+    if (mount_points_collected)
         logical_disk_evict_stale(now_ut);
 
     if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
