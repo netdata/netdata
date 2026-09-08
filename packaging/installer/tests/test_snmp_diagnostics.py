@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import zipfile
 
 INSTALLER = Path(__file__).resolve().parents[1]
 REPO = INSTALLER.parents[1]
@@ -151,6 +152,43 @@ NETDATA_PID=""; api_ok=0; IS_CONTAINER=0
             manifest = self.collect(root)
             self.assertEqual(manifest["snmp_diagnostics"], {"requested": True, "status": "partial", "files": 4})
             self.assertFalse(any(p.name.startswith("lifecycle.zst") for p in (root / "work").rglob("*")))
+
+    @unittest.skipUnless(os.environ.get("SUPPORT_BUNDLE_TEST_SHELL") == "pwsh", "PowerShell 7 allocation counters")
+    def test_zip_streams_evidence(self):
+        # Exercise the shipped packaging block. Update-mode ZIP writers allocate
+        # at least the entire input; a create-mode writer only needs IO buffers.
+        source = (INSTALLER / "netdata-support-bundle.ps1").read_text()
+        packaging = source.split("# zip\n", 1)[1].split("$MapPath =", 1)[0]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            work = root / "bundle"
+            work.mkdir()
+            size = 16 * 1024 * 1024
+            for n in range(4):
+                with (work / (str(n) + ".zst")).open("wb") as f:
+                    f.truncate(size)
+            script = root / "zip.ps1"
+            script.write_text(r"""
+$ErrorActionPreference = 'Stop'
+$Work = Join-Path $env:SNMP_FIXTURE 'bundle'
+$Staging = $env:SNMP_FIXTURE
+$Output = Join-Path $Staging 'output'
+$BundleName = 'bundle'
+$KeepStaging = $true
+function Show-Info($message) { Write-Output $message }
+$before = [GC]::GetTotalAllocatedBytes($true)
+""" + packaging + '\nWrite-Output ("ALLOCATED=" + ([GC]::GetTotalAllocatedBytes($true) - $before))\n')
+            result = subprocess.run(["pwsh", "-NoProfile", "-File", str(script)],
+                                    env=dict(os.environ, SNMP_FIXTURE=str(root)),
+                                    text=True, capture_output=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            allocated = int(next(line.split("=", 1)[1] for line in result.stdout.splitlines() if line.startswith("ALLOCATED=")))
+            self.assertLess(allocated, size * 4, "ZIP creation allocated the complete evidence payload")
+            with zipfile.ZipFile(root / "output/bundle.zip") as archive:
+                self.assertEqual(set(archive.namelist()), {"bundle/" + str(n) + ".zst" for n in range(4)})
+                for name in archive.namelist():
+                    self.assertEqual(archive.getinfo(name).file_size, size)
+                self.assertIsNone(archive.testzip())
 
     def test_run_selection(self):
         for name, previous, remove_run, expected in (

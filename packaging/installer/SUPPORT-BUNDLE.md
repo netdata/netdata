@@ -282,7 +282,9 @@ byte ceiling is imposed: staging and final archive space scale with the retained
 compressed evidence. The existing command timeout also applies to each binary
 copy (PowerShell checks between buffer operations); final packaging and blocking
 filesystem calls can exceed the collection deadline. Failed or timed-out copies
-are withheld rather than shipped truncated.
+are withheld rather than shipped truncated. Windows final ZIP creation uses
+streaming create mode, so packaging does not retain the complete evidence
+payload in memory.
 
 The Agent replaces individual files atomically and rotates them independently.
 A file can disappear between selection and opening; this produces a partial

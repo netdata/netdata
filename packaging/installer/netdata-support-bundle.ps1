@@ -1386,12 +1386,16 @@ $ZipPath = Join-Path $Output "$BundleName.zip"
 # build the zip inside the owner-only staging dir, then publish without
 # overwrite: Move-Item without -Force fails if the destination exists
 $StagingZip = Join-Path $Staging "$BundleName.zip"
-Compress-Archive -Path $Work -DestinationPath $StagingZip
 try {
+    # Create mode streams entries; Compress-Archive uses Update mode and buffers
+    # the complete evidence payload in memory until the archive is closed.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $Work, $StagingZip, [System.IO.Compression.CompressionLevel]::Optimal, $true)
     Move-Item -Path $StagingZip -Destination $ZipPath -ErrorAction Stop
 } catch {
     # Write-Error would be swallowed by $ErrorActionPreference='SilentlyContinue'
-    Show-Info "ERROR: could not publish $ZipPath ($_)"
+    Show-Info "ERROR: could not create or publish $ZipPath ($_)"
     if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force -ErrorAction SilentlyContinue }
     exit 1
 }

@@ -12,9 +12,9 @@
 #
 # Design contract:
 #   - Works with or without a running agent, with or without root (degrades gracefully).
-#   - Zero system impact: idle CPU/IO priority, per-command timeouts, global deadline,
+#   - Minimize system impact: idle CPU/IO priority, per-command timeouts, global deadline,
 #     size caps, strictly read-only outside its own staging dir.
-#   - Secrets are ALWAYS redacted (non-optional), except in streaming configuration:
+#   - Standard captures redact secrets, with a streaming configuration exception:
 #     the streaming API key in stream.conf is kept verbatim (it is what support
 #     needs to match a child against its parent - netdata/netdata#23448).
 #     PII (IPs, MACs, emails, hostnames) pseudonymized by default;
