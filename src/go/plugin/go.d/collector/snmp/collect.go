@@ -129,8 +129,11 @@ func (c *Collector) ensureInitialized() error {
 			}
 		}
 		identity, err := ddsnmp.AcquireDeviceIdentity(si, c.ddSnmpColl, ddsnmp.DeviceIdentityOptions{
-			Address: c.Hostname, GUID: c.Vnode.GUID, Hostname: c.Vnode.Hostname,
-			BaseLabels: baseLabels, Labels: c.Vnode.Labels,
+			Address:    c.Hostname,
+			GUID:       c.Vnode.GUID,
+			Hostname:   c.Vnode.Hostname,
+			BaseLabels: baseLabels,
+			Labels:     c.Vnode.Labels,
 		})
 		if c.ddSnmpColl != nil {
 			c.captureCollectionFailures()
@@ -141,7 +144,9 @@ func (c *Collector) ensureInitialized() error {
 		c.Vnode.GUID = identity.GUID
 		c.Vnode.Hostname = identity.Hostname
 		c.vnode = &vnodes.VirtualNode{
-			GUID: identity.GUID, Hostname: identity.Hostname, Labels: identity.Labels,
+			GUID:     identity.GUID,
+			Hostname: identity.Hostname,
+			Labels:   identity.Labels,
 		}
 	}
 

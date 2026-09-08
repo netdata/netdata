@@ -35,8 +35,15 @@ func TestAcquireDeviceIdentity(t *testing.T) {
 	}{
 		"configured identity and label precedence": {
 			sysInfo: snmputils.SysInfo{
-				SysObjectID: "1.3.6.1.4.1.9", Name: "router", Descr: "description", Contact: "contact", Location: "location",
-				Vendor: "system-vendor", Organization: "organization", Category: "Router", Model: "system-model",
+				SysObjectID:  "1.3.6.1.4.1.9",
+				Name:         "router",
+				Descr:        "description",
+				Contact:      "contact",
+				Location:     "location",
+				Vendor:       "system-vendor",
+				Organization: "organization",
+				Category:     "Router",
+				Model:        "system-model",
 			},
 			metadata: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "profile-vendor", IsExactMatch: true},
@@ -44,12 +51,15 @@ func TestAcquireDeviceIdentity(t *testing.T) {
 				"_node_stale_after_seconds": {Value: "90", IsExactMatch: true},
 			},
 			opts: ddsnmp.DeviceIdentityOptions{
-				Address: "192.0.2.1", GUID: "configured-guid", Hostname: "configured-host",
+				Address:    "192.0.2.1",
+				GUID:       "configured-guid",
+				Hostname:   "configured-host",
 				BaseLabels: map[string]string{"_node_stale_after_seconds": "30", "site": "athens"},
 				Labels:     map[string]string{"site": "london", "contact": "", "_vnode_type": "configured-type"},
 			},
 			want: &ddsnmp.DeviceIdentity{
-				GUID: "configured-guid", Hostname: "configured-host",
+				GUID:     "configured-guid",
+				Hostname: "configured-host",
 				Labels: map[string]string{
 					"_vnode_type": "configured-type", "_net_default_iface_ip": "192.0.2.1", "address": "192.0.2.1",
 					"sys_object_id": "1.3.6.1.4.1.9", "name": "router", "description": "description", "contact": "", "location": "location",
@@ -59,10 +69,16 @@ func TestAcquireDeviceIdentity(t *testing.T) {
 			},
 		},
 		"system name and organization fallbacks without metadata source": {
-			sysInfo: snmputils.SysInfo{Name: "router", Organization: "organization"},
-			opts:    ddsnmp.DeviceIdentityOptions{Address: "Router.Example."},
+			sysInfo: snmputils.SysInfo{
+				Name:         "router",
+				Organization: "organization",
+			},
+			opts: ddsnmp.DeviceIdentityOptions{
+				Address: "Router.Example.",
+			},
 			want: &ddsnmp.DeviceIdentity{
-				GUID: "a2a0c16c-1b12-5ba4-8814-d81a16f862c6", Hostname: "router",
+				GUID:     "a2a0c16c-1b12-5ba4-8814-d81a16f862c6",
+				Hostname: "router",
 				Labels: map[string]string{
 					"_vnode_type": "snmp", "_net_default_iface_ip": "Router.Example.", "address": "Router.Example.",
 					"sys_object_id": "", "name": "router", "description": "", "contact": "", "location": "", "vendor": "organization",
@@ -70,9 +86,12 @@ func TestAcquireDeviceIdentity(t *testing.T) {
 			},
 		},
 		"empty system fallback without metadata source": {
-			opts: ddsnmp.DeviceIdentityOptions{Address: "Router.Example."},
+			opts: ddsnmp.DeviceIdentityOptions{
+				Address: "Router.Example.",
+			},
 			want: &ddsnmp.DeviceIdentity{
-				GUID: "a2a0c16c-1b12-5ba4-8814-d81a16f862c6", Hostname: "snmp-device",
+				GUID:     "a2a0c16c-1b12-5ba4-8814-d81a16f862c6",
+				Hostname: "snmp-device",
 				Labels: map[string]string{
 					"_vnode_type": "snmp", "_net_default_iface_ip": "Router.Example.", "address": "Router.Example.",
 					"sys_object_id": "", "name": "", "description": "", "contact": "", "location": "",
@@ -147,29 +166,45 @@ func TestAcquireDeviceIdentityWithoutMetricsJob(t *testing.T) {
 	client.EXPECT().MaxOids().Return(20).AnyTimes()
 	client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 	gomock.InOrder(
-		client.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).Return(
-			&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9"},
-				{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
-			}}, nil),
-		client.EXPECT().Get([]string{metadataOID}).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-			{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("serial-123")},
-		}}, nil),
+		client.EXPECT().
+			Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
+			Return(
+				&gosnmp.SnmpPacket{
+					Variables: []gosnmp.SnmpPDU{
+						{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9"},
+						{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("router")},
+					},
+				}, nil),
+		client.EXPECT().Get([]string{metadataOID}).Return(&gosnmp.SnmpPacket{
+			Variables: []gosnmp.SnmpPDU{
+				{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("serial-123")},
+			},
+		}, nil),
 	)
 	si, err := snmputils.GetSysInfo(client)
 	require.NoError(t, err)
 	source := ddsnmpcollector.New(ddsnmpcollector.Config{
-		SnmpClient: client, Log: logger.New(), SysObjectID: si.SysObjectID,
+		SnmpClient:  client,
+		Log:         logger.New(),
+		SysObjectID: si.SysObjectID,
 		Profiles: []*ddsnmp.Profile{{SourceFile: "identity.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-			Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: map[string]ddprofiledefinition.MetadataField{
-				"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serial"}},
-			}}},
+			Metadata: ddprofiledefinition.MetadataConfig{
+				"device": {Fields: map[string]ddprofiledefinition.MetadataField{
+					"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  metadataOID,
+						Name: "serial",
+					}},
+				}},
+			},
 		}}},
 	})
-	identity, err := ddsnmp.AcquireDeviceIdentity(si, source, ddsnmp.DeviceIdentityOptions{Address: "192.0.2.1"})
+	identity, err := ddsnmp.AcquireDeviceIdentity(si, source, ddsnmp.DeviceIdentityOptions{
+		Address: "192.0.2.1",
+	})
 	require.NoError(t, err)
 	want := &ddsnmp.DeviceIdentity{
-		GUID: "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121", Hostname: "router",
+		GUID:     "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121",
+		Hostname: "router",
 		Labels: map[string]string{
 			"_vnode_type": "snmp", "_net_default_iface_ip": "192.0.2.1", "address": "192.0.2.1",
 			"sys_object_id": "1.3.6.1.4.1.9", "name": "router", "description": "", "contact": "", "location": "",

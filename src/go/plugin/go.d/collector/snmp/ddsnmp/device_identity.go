@@ -37,7 +37,11 @@ type DeviceIdentity struct {
 // AcquireDeviceIdentity acquires metadata once and combines it with system identity.
 // A nil source uses system identity alone. The caller owns transport, profile
 // selection, retries, and publication. Inputs are borrowed and are not modified.
-func AcquireDeviceIdentity(si *snmputils.SysInfo, source DeviceMetadataSource, opts DeviceIdentityOptions) (*DeviceIdentity, error) {
+func AcquireDeviceIdentity(
+	si *snmputils.SysInfo,
+	source DeviceMetadataSource,
+	opts DeviceIdentityOptions,
+) (*DeviceIdentity, error) {
 	if si == nil {
 		return nil, errors.New("SNMP system identity is required")
 	}
