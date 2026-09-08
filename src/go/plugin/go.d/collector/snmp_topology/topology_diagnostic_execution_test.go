@@ -70,9 +70,9 @@ func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologydia
 	handler := &executionTestHandler{walkPDUs: pdus}
 	observer := recorder.beginContext(0, "", "")
 	collector := ddsnmpcollector.New(ddsnmpcollector.Config{
-		SnmpClient:                 recorder.sourceClient(handler),
-		Log:                        logger.New(),
-		InitialAcquisitionObserver: observer,
+		SnmpClient:          recorder.sourceClient(handler),
+		Log:                 logger.New(),
+		AcquisitionObserver: observer,
 		Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
 				{MetricTagConfig: ddprofiledefinition.MetricTagConfig{

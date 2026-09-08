@@ -19,26 +19,31 @@ func TestBGPProcessingEvidenceFollowsCollection(t *testing.T) {
 		configure func(*ddprofiledefinition.BGPConfig)
 		want      ddsnmp.ProcessingEvent
 		rows      int
+		failed    bool
 	}{
 		"optional descriptor omission": {
+			failed: true,
 			configure: func(c *ddprofiledefinition.BGPConfig) {
 				c.Descriptors.Description.Symbol = ddprofiledefinition.SymbolConfig{OID: root + ".4", ExtractValueCompiled: regexp.MustCompile("^never(.)$")}
 			},
 			want: ddsnmp.ProcessingEvent{RowIndex: "42", Field: "descriptors.description", OID: root + ".4.42", Reason: "extract_mismatch"}, rows: 1,
 		},
 		"boolean conversion rejects row": {
+			failed: true,
 			configure: func(c *ddprofiledefinition.BGPConfig) {
 				c.Admin.Enabled = ddprofiledefinition.BGPValueConfig{Value: "invalid"}
 			},
 			want: ddsnmp.ProcessingEvent{RowIndex: "42", Field: "admin.enabled", Reason: "conversion"},
 		},
 		"raw enrichment omission preserves numeric value": {
+			failed: true,
 			configure: func(c *ddprofiledefinition.BGPConfig) {
 				c.Connection.EstablishedUptime.Symbol.ExtractValueCompiled = regexp.MustCompile("^never(.)$")
 			},
 			want: ddsnmp.ProcessingEvent{RowIndex: "42", Field: "connection.established_uptime", OID: root + ".4.42", Reason: "extract_mismatch", Stage: "raw_text"}, rows: 1,
 		},
 		"device state identifies exact field": {
+			failed: true,
 			configure: func(c *ddprofiledefinition.BGPConfig) {
 				c.Device.States.Idle = ddprofiledefinition.BGPValueConfig{Value: "invalid"}
 			},
@@ -63,11 +68,12 @@ func TestBGPProcessingEvidenceFollowsCollection(t *testing.T) {
 			handler := &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil }}
 			source := &SourceRecorder{}
 			var report AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
+			collector := New(Config{SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
 			results, err := collector.Collect()
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].BGPRows, tc.rows)
+			require.Equal(t, tc.failed, report.HasFailures())
 			require.Len(t, report.Routes, 1)
 			require.Contains(t, report.Routes[0].Processing, tc.want)
 			require.NoError(t, ddsnmp.ValidateProcessingEvents(report.Routes[0].Processing))
@@ -103,7 +109,7 @@ func TestCrossTableProcessingEvidenceFollowsCollection(t *testing.T) {
 			}}
 			source := &SourceRecorder{}
 			var report AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{profile}, InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
+			collector := New(Config{SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
 			results, err := collector.Collect()
 			require.NoError(t, err)
 			require.Len(t, results, 1)
@@ -119,6 +125,7 @@ func TestCrossTableProcessingEvidenceFollowsCollection(t *testing.T) {
 			require.Contains(t, route.Processing, ddsnmp.ProcessingEvent{RowIndex: "7", Field: metricTagDisplayName(primary.MetricTags[0]), OID: primary.MetricTags[0].Symbol.OID + ".7", Reason: tc.reason})
 			require.Len(t, route.Sources, 2)
 			require.Equal(t, dependency.Table.Name, primary.MetricTags[0].Table)
+			require.Equal(t, !tc.missing, report.HasFailures(), "absent dependency data differs from a failed transform")
 			require.Len(t, source.Finish(), 2)
 		})
 	}
@@ -194,7 +201,7 @@ func TestMetadataProcessingEvidenceUsesLogicalField(t *testing.T) {
 				SnmpClient: new(SourceRecorder).Wrap(handler),
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
-				InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+				AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 					report = r
 				}),
 			})

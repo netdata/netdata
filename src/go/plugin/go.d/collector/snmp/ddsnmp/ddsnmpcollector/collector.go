@@ -21,12 +21,12 @@ import (
 )
 
 type Config struct {
-	SnmpClient                 gosnmp.Handler
-	Profiles                   []*ddsnmp.Profile
-	Log                        *logger.Logger
-	SysObjectID                string
-	DisableBulkWalk            bool
-	InitialAcquisitionObserver AcquisitionObserver
+	SnmpClient          gosnmp.Handler
+	Profiles            []*ddsnmp.Profile
+	Log                 *logger.Logger
+	SysObjectID         string
+	DisableBulkWalk     bool
+	AcquisitionObserver AcquisitionObserver
 }
 
 func New(cfg Config) *Collector {
@@ -39,13 +39,13 @@ func New(cfg Config) *Collector {
 		tableIdentity:             buildTableIdentity(cfg.Profiles),
 	}
 
-	cfg.SnmpClient = &diagnosticClient{Handler: cfg.SnmpClient, failures: &coll.failures}
+	cfg.SnmpClient = &diagnosticClient{Handler: cfg.SnmpClient, failures: &coll.failures, negative: &coll.negative}
 
 	for _, prof := range cfg.Profiles {
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
-	if cfg.InitialAcquisitionObserver != nil {
-		coll.initialAcquisitionObserver = cfg.InitialAcquisitionObserver
+	if cfg.AcquisitionObserver != nil {
+		coll.acquisitionObserver = cfg.AcquisitionObserver
 	}
 
 	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
@@ -59,14 +59,15 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
-		failures                   ddsnmp.CollectionFailures
-		log                        *logger.Logger
-		profiles                   map[string]*profileState
-		missingOIDs                map[string]bool
-		regularScalarNamesScratch  map[string]struct{}
-		tableCache                 *tableCache
-		tableIdentity              *tableIdentity
-		initialAcquisitionObserver AcquisitionObserver
+		failures                  ddsnmp.CollectionFailures
+		log                       *logger.Logger
+		profiles                  map[string]*profileState
+		missingOIDs               map[string]bool
+		negative                  negativeEvidence
+		regularScalarNamesScratch map[string]struct{}
+		tableCache                *tableCache
+		tableIdentity             *tableIdentity
+		acquisitionObserver       AcquisitionObserver
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -76,10 +77,14 @@ type (
 	}
 	profileState struct {
 		profile     *ddsnmp.Profile
+		identity    *AcquisitionProfileIdentity
 		initialized bool
 		cache       struct {
-			globalTags     map[string]string
-			deviceMetadata map[string]ddsnmp.MetaTag
+			globalTags       map[string]string
+			deviceMetadata   map[string]ddsnmp.MetaTag
+			tagEvidence      *AcquisitionCacheInput
+			metadataEvidence *AcquisitionCacheInput
+			inputRoutes      []AcquisitionRouteReport
 		}
 	}
 	preparedProfileCollection struct {
@@ -119,9 +124,6 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	c.failures = ddsnmp.CollectionFailures{}
 	var prepared []*preparedProfileCollection
 	var errs []error
-	if c.initialAcquisitionObserver != nil {
-		defer c.releaseInitialAcquisition()
-	}
 
 	expired := c.tableCache.clearExpired()
 	if len(expired) > 0 {
@@ -141,10 +143,11 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 	session := newTableCollectionSession(c.tableCollector, c.tableIdentity)
 	for _, profile := range prepared {
-		profile.regularScope = session.addScope(
+		profile.regularScope = session.addObservedScope(
 			profile.state.profile,
 			tableSymbolModeValue,
 			&profile.metrics.Stats,
+			profile.acquisition.metricTableScope(),
 		)
 		profile.regularScope.execution = profile.acquisition.executionReport()
 		if profile.topologyProfile != nil {
@@ -179,6 +182,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 		if len(vmetrics) > 0 {
 			for i := range vmetrics {
 				vmetrics[i].Profile = profile.metrics
+				vmetrics[i].IsVirtual = true
 			}
 
 			profile.metrics.Metrics = append(profile.metrics.Metrics, vmetrics...)
@@ -215,7 +219,7 @@ func (c *Collector) observeAcquisitionProfile(
 		c.failures.Processing.BGP += p.BGP
 		c.failures.Processing.Licensing += p.Licensing
 	}
-	if c.initialAcquisitionObserver == nil || profile == nil || profile.acquisition == nil {
+	if c.acquisitionObserver == nil || profile == nil || profile.acquisition == nil {
 		return
 	}
 	profile.acquisition.syncTableRoutes()
@@ -223,11 +227,7 @@ func (c *Collector) observeAcquisitionProfile(
 	defer func() {
 		_ = recover()
 	}()
-	c.initialAcquisitionObserver.ObserveProfile(report, profile.metrics)
-}
-
-func (c *Collector) releaseInitialAcquisition() {
-	c.initialAcquisitionObserver = nil
+	c.acquisitionObserver.ObserveProfile(report, profile.metrics)
 }
 
 func (c *Collector) sortedProfileStates() []*profileState {
@@ -274,7 +274,7 @@ func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 }
 
 func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
-	snmpClient = &diagnosticClient{Handler: snmpClient, failures: &c.failures}
+	snmpClient = &diagnosticClient{Handler: snmpClient, failures: &c.failures, negative: &c.negative}
 	if c.globalTagsCollector != nil {
 		c.globalTagsCollector.snmpClient = snmpClient
 	}
@@ -295,9 +295,13 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 		state:   ps,
 		metrics: pm,
 	}
-	if c.initialAcquisitionObserver != nil {
+	if c.acquisitionObserver != nil {
+		if ps.identity == nil {
+			identity := buildAcquisitionProfileIdentity(ps.profile, ordinal)
+			ps.identity = &identity
+		}
 		prepared.acquisition = newAcquisitionProfileCollection(
-			buildAcquisitionProfileIdentity(ps.profile, ordinal),
+			*ps.identity,
 			ps.profile,
 			c.deviceMetadataCollector.sysobjectid,
 		)
@@ -308,7 +312,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 	}
 
 	now := time.Now()
-	scalarMetrics, err := c.scalarCollector.collect(ps.profile, &pm.Stats)
+	scalarMetrics, err := c.scalarCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition.metricScalarObserver())
 	pm.Stats.Timing.Scalar = time.Since(now)
 	if err != nil {
 		return prepared, err
@@ -360,18 +364,30 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 			}
 		}
 	}()
-	if !ps.initialized {
+	if ps.initialized {
+		prepared.acquisition.restoreInputRoutes(ps.cache.inputRoutes)
+	} else {
+		recorder := sourceRecorder(c.globalTagsCollector.snmpClient)
+		cursor := recorder.Cursor()
 		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
 		ps.cache.globalTags = globalTags
+		if recorder != nil {
+			ps.cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
+		}
+		cursor = recorder.Cursor()
 		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect device metadata: %w", err)
 		}
 		ps.cache.deviceMetadata = metadata
+		if recorder != nil {
+			ps.cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
+		}
 		ps.initialized = true
+		ps.cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
 	}
 	pm.Tags = maps.Clone(ps.cache.globalTags)
 	pm.DeviceMetadata = maps.Clone(ps.cache.deviceMetadata)
@@ -410,7 +426,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	pm := profile.metrics
 
 	now := time.Now()
-	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition.executionReport())
+	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition)
 	if err != nil {
 		c.log.Limit(licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("failed to collect licensing rows for profile %q: %v", ps.profile.SourceFile, err)

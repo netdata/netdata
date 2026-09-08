@@ -45,6 +45,13 @@ type ProcessService interface {
 	Run(context.Context)
 }
 
+// ProcessServiceFinalizer optionally saves pending state after Run has joined,
+// before jobs are retired. Finalize is called once with the process shutdown
+// budget. It must honor cancellation; the process stops waiting at the deadline.
+type ProcessServiceFinalizer interface {
+	Finalize(context.Context) error
+}
+
 type RuntimeService interface {
 	runtimecomp.Service
 	Start(pluginName string, output io.Writer)
@@ -303,13 +310,17 @@ func cloneSecretConfigs(configs []secretstore.Config) ([]secretstore.Config, err
 
 func (p *Process) startServices(ctx context.Context) func(context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	var completions []<-chan struct{}
+	type runningService struct {
+		service ProcessService
+		done    <-chan struct{}
+	}
+	var running []runningService
 	for _, service := range p.services {
 		if service == nil {
 			continue
 		}
 		done := make(chan struct{})
-		completions = append(completions, done)
+		running = append(running, runningService{service, done})
 		go func() {
 			defer close(done)
 			defer func() {
@@ -329,20 +340,64 @@ func (p *Process) startServices(ctx context.Context) func(context.Context) error
 	return func(shutdownCtx context.Context) error {
 		once.Do(func() {
 			cancel()
-			for _, done := range completions {
+			// Finalize independent services concurrently under the same budget.
+			// A stuck Run must never overlap its own finalizer.
+			var completions []<-chan error
+			for _, entry := range running {
+				result := make(chan error, 1)
+				completions = append(completions, result)
+				go func() { result <- finalizeProcessService(shutdownCtx, entry.service, entry.done) }()
+			}
+			for index, done := range completions {
 				select {
-				case <-done:
+				case err := <-done:
+					stopErr = errors.Join(stopErr, err)
 					continue
 				default:
 				}
 				select {
-				case <-done:
+				case err := <-done:
+					stopErr = errors.Join(stopErr, err)
 				case <-shutdownCtx.Done():
-					stopErr = fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err())
+					stopErr = errors.Join(stopErr, fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err()))
+					// Preserve completed failures without waiting beyond the shared budget.
+					for _, pending := range completions[index:] {
+						select {
+						case err := <-pending:
+							stopErr = errors.Join(stopErr, err)
+						default:
+						}
+					}
 					return
 				}
 			}
 		})
 		return stopErr
 	}
+}
+
+// A finalizer never overlaps its own Run; the caller bounds the wait even for
+// service code or filesystem operations that do not respond to cancellation.
+func finalizeProcessService(ctx context.Context, service ProcessService, done <-chan struct{}) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("process service finalization panicked: %v", recovered)
+		}
+	}()
+	select {
+	case <-done:
+	default:
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return fmt.Errorf("jobmgr composition: process services shutdown: %w", ctx.Err())
+		}
+	}
+	if finalizer, ok := service.(ProcessServiceFinalizer); ok {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return finalizer.Finalize(ctx)
+	}
+	return nil
 }

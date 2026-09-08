@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 
 	"github.com/klauspost/compress/zstd"
 )
@@ -36,21 +37,41 @@ func Write(w io.Writer, document Document) error {
 	if w == nil {
 		return errors.New("write SNMP diagnostic archive: nil writer")
 	}
+	encoder, err := newArchiveEncoder()
+	if err != nil {
+		return err
+	}
+	return encoder.write(w, document)
+}
+
+// One serial publisher reuses the compressor's workspace across device files.
+// Per-file construction would allocate megabytes on every device publication.
+type archiveEncoder struct{ encoder *zstd.Encoder }
+
+func newArchiveEncoder() (*archiveEncoder, error) {
 	encoder, err := zstd.NewWriter(
-		w,
+		nil,
 		zstd.WithEncoderLevel(zstd.SpeedDefault),
 		zstd.WithEncoderConcurrency(1),
 		zstd.WithEncoderCRC(true),
 	)
 	if err != nil {
-		return fmt.Errorf("create diagnostic zstd encoder: %w", err)
+		return nil, fmt.Errorf("create diagnostic zstd encoder: %w", err)
 	}
+	return &archiveEncoder{encoder: encoder}, nil
+}
+
+func (e *archiveEncoder) write(w io.Writer, document Document) error {
+	if w == nil {
+		return errors.New("write SNMP diagnostic archive: nil writer")
+	}
+	e.encoder.Reset(w)
 	encodeErr := jsonv2.MarshalWrite(
-		encoder,
+		e.encoder,
 		document,
 		jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.EscapeForHTML(false)),
 	)
-	closeErr := encoder.Close()
+	closeErr := e.encoder.Close()
 	return errors.Join(encodeErr, closeErr)
 }
 
@@ -111,11 +132,21 @@ func (d Document) ValidateEnvelope() error {
 		return fmt.Errorf("unsupported version %d", d.Version)
 	}
 	switch d.Kind {
+	case KindNormal:
+		if d.Normal == nil || !reflect.ValueOf(d.Snapshot).IsZero() || d.TopologyActive || d.Checkpoint != 0 {
+			return errors.New("invalid normal device document envelope")
+		}
 	case KindLifecycle:
+		if d.Normal != nil {
+			return errors.New("lifecycle document contains normal evidence")
+		}
 		if d.Snapshot.Topology != nil || d.Snapshot.LastAborted != nil || d.Snapshot.ProducerScopeID != "" || d.Checkpoint != 0 {
 			return errors.New("lifecycle document contains topology checkpoint data")
 		}
 	case KindTopology:
+		if d.Normal != nil {
+			return errors.New("topology document contains normal evidence")
+		}
 		if d.TopologyActive {
 			return errors.New("topology checkpoint contains current lifecycle status")
 		}

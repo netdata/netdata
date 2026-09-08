@@ -72,7 +72,7 @@ func TestSourceValuesPreserveDecodedData(t *testing.T) {
 			encoded, err := json.Marshal(evidence)
 			require.NoError(t, err)
 			require.NotContains(t, string(encoded), "never retain this")
-			var restored []ddsnmp.SourceOperation
+			var restored []*ddsnmp.SourceOperation
 			require.NoError(t, json.Unmarshal(encoded, &restored))
 			require.NoError(t, ddsnmp.ValidateSourceOperations(restored))
 			require.Equal(t, tc.want.Kind, restored[0].PDUs[0].Value.Kind)
@@ -125,7 +125,7 @@ func TestSourceEvidenceFollowsActualCollection(t *testing.T) {
 			}
 			source := &SourceRecorder{}
 			var reports []AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: tc.profile}}, Log: logger.New(), InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) })})
+			collector := New(Config{SnmpClient: source.Wrap(handler), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: tc.profile}}, Log: logger.New(), AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) })})
 			values, err := collector.Collect()
 			if tc.wantErr {
 				require.Error(t, err)
@@ -164,10 +164,10 @@ func TestSourceEvidenceFollowsActualCollection(t *testing.T) {
 	}
 }
 
-func testWalkSources(t *testing.T, collector *Collector, execution *AcquisitionExecutionReport) []ddsnmp.SourceOperation {
+func testWalkSources(t *testing.T, collector *Collector, execution *AcquisitionExecutionReport) []*ddsnmp.SourceOperation {
 	t.Helper()
 	require.NotNil(t, execution)
-	var result []ddsnmp.SourceOperation
+	var result []*ddsnmp.SourceOperation
 	for _, id := range execution.WalkOperations {
 		r := sourceRecorder(collector.tableCollector.snmpClient)
 		require.NotNil(t, r)
@@ -190,7 +190,7 @@ func TestSourceRecorderLifecycleAndClientReplacement(t *testing.T) {
 			}}
 			source := &SourceRecorder{}
 			client := source.Wrap(handler)
-			collector := New(Config{SnmpClient: client, Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, InitialAcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})})
+			collector := New(Config{SnmpClient: client, Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})})
 			if tc.replace {
 				collector.SetSNMPClient(client)
 			}
@@ -232,7 +232,7 @@ func BenchmarkCollectorSourceEvidence(b *testing.B) {
 						client = source.Wrap(client)
 						observer = AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})
 					}
-					collector := New(Config{SnmpClient: client, Log: log, Profiles: []*ddsnmp.Profile{profile}, InitialAcquisitionObserver: observer})
+					collector := New(Config{SnmpClient: client, Log: log, Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: observer})
 					results, err := collector.Collect()
 					if err != nil {
 						b.Fatal(err)

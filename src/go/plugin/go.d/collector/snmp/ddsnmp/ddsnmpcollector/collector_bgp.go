@@ -155,7 +155,7 @@ func (c *Collector) collectScalarBGPRows(
 			remainingOIDCount := len(oids)
 			currentMissingOIDCount := len(missingOIDs)
 			for _, oid := range oids {
-				if c.missingOIDs[oid] {
+				if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
 					remainingOIDCount--
 					currentMissingOIDCount++
 				}
@@ -1284,7 +1284,7 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 		sym := bgpValueSymbol(valueCfg)
 		if sym.OID != "" {
 			oid := trimOID(sym.OID)
-			if c.missingOIDs[oid] {
+			if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
 				missingOIDs = append(missingOIDs, oid)
 				return
 			}
@@ -1296,7 +1296,7 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 	for _, tagCfg := range cfg.MetricTags {
 		if tagCfg.Symbol.OID != "" {
 			oid := trimOID(tagCfg.Symbol.OID)
-			if c.missingOIDs[oid] {
+			if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
 				missingOIDs = append(missingOIDs, oid)
 				continue
 			}

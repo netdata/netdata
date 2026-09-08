@@ -268,7 +268,7 @@ func topologyAcquisitionReportShape(routes []ddsnmpcollector.AcquisitionRouteRep
 		logicalBytes += uint64(64 + len(route.RootOID))
 		records += uint64(len(route.Sources) + len(route.Processing))
 		for _, binding := range route.Sources {
-			logicalBytes += uint64(40 + len(binding.OID) + len(binding.Role))
+			logicalBytes += uint64(48 + len(binding.OID) + len(binding.Role))
 		}
 		for _, event := range route.Processing {
 			logicalBytes += uint64(80 + len(event.RowIndex) + len(event.Field) + len(event.OID) + len(event.Reason) + len(event.Stage))

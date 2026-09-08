@@ -5,6 +5,7 @@ package diagnostics
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -461,4 +462,36 @@ func TestPublisherNewSubmissionsDoNotStarveLifecycle(t *testing.T) {
 	p.flush(t.Context())
 	require.Equal(t, []string{KindLifecycle, KindTopology, KindLifecycle, KindTopology}, writes)
 	require.Equal(t, "failed", readFile(t, filepath.Join(p.directory, LifecycleFilename)).Snapshot.Lifecycle.Cut.Entries[0].LastCompleted.Outcome)
+}
+
+func TestAtomicFileCanceledBeforeWrite(t *testing.T) {
+	for name, tc := range map[string]struct{ existing bool }{
+		"absent directory":        {},
+		"existing temporary file": {existing: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "normal")
+			path := filepath.Join(dir, "runs.json")
+			if tc.existing {
+				require.NoError(t, os.Mkdir(dir, 0700))
+				require.NoError(t, os.WriteFile(path+".tmp", []byte("untouched"), 0600))
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			encoded := false
+			err := writeAtomicFile(ctx, path, (*os.File).Close, func(io.Writer) error {
+				encoded = true
+				return nil
+			}, os.Rename)
+			require.ErrorIs(t, err, context.Canceled)
+			require.False(t, encoded, "canceled writes must not encode")
+			if tc.existing {
+				data, err := os.ReadFile(path + ".tmp")
+				require.NoError(t, err)
+				require.Equal(t, "untouched", string(data))
+			} else {
+				require.NoDirExists(t, dir)
+			}
+		})
+	}
 }

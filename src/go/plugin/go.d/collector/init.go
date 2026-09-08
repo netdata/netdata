@@ -165,7 +165,7 @@ func NewRegistry(varLibDir string) (collectorapi.Registry, *snmpdiag.Publisher) 
 	})
 
 	publisher := snmpdiag.NewPublisher(deviceStore, varLibDir)
-	registry["snmp"] = snmp.Creator(deviceStore)
+	registry["snmp"] = snmp.Creator(deviceStore, publisher)
 	registry["snmp_topology"] = snmptopology.Creator(deviceStore, trapEnrichment, reverseDNS, publisher)
 	registry["snmp_traps"] = snmptraps.Creator(deviceStore, trapEnrichment, reverseDNS)
 	return registry, publisher

@@ -224,7 +224,7 @@ type diagnosticDeviceCaptureInspection struct {
 }
 
 type diagnosticContextAccounting struct {
-	Sources      []ddsnmp.SourceOperation      `json:"source_operations,omitempty"`
+	Sources      []*ddsnmp.SourceOperation     `json:"source_operations,omitempty"`
 	Interruption snmputils.Failure             `json:"interruption"`
 	Failures     ddsnmp.CollectionFailures     `json:"failures"`
 	Client       diagnosticPhaseStatus         `json:"client"`

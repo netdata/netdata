@@ -370,7 +370,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
-		InitialAcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+		AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
 			report = r
 		}),
 	})

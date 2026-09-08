@@ -79,7 +79,7 @@ type AcquisitionAttemptEvidence struct {
 }
 
 type AcquisitionContextEvidence struct {
-	Sources []ddsnmp.SourceOperation
+	Sources []*ddsnmp.SourceOperation
 
 	Interruption snmputils.Failure
 	Failures     ddsnmp.CollectionFailures

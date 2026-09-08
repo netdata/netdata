@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -24,7 +25,7 @@ import (
 var configSchema string
 
 // Creator constructs registration with explicit SNMP-family dependencies.
-func Creator(store *ddsnmp.DeviceStore) collectorapi.Creator {
+func Creator(store *ddsnmp.DeviceStore, publisher *diagnostics.Publisher) collectorapi.Creator {
 	if store == nil {
 		panic("snmp Creator requires a non-nil device store")
 	}
@@ -33,9 +34,9 @@ func Creator(store *ddsnmp.DeviceStore) collectorapi.Creator {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:             func() collectorapi.CollectorV1 { return New(store) },
+		Create:             func() collectorapi.CollectorV1 { c := New(store); c.diagnosticPublisher = publisher; return c },
 		Config:             func() any { return &Config{} },
-		JobConfigLifecycle: newSNMPJobConfigLifecycle(store),
+		JobConfigLifecycle: newSNMPJobConfigLifecycle(store, publisher),
 		SharedFunctions:    snmpMethods,
 		MethodHandler:      snmpFunctionHandler,
 	}
@@ -78,6 +79,7 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 	}
 	c := &Collector{
 		Config: defaultConfig(),
+		normal: &normalDiagnostics{},
 
 		charts:               &collectorapi.Charts{},
 		seenScalarMetrics:    make(map[string]bool),
@@ -105,7 +107,10 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 type (
 	Collector struct {
 		collectorapi.Base
-		Config `yaml:",inline" json:""`
+		normal              *normalDiagnostics
+		diagnosticPublisher *diagnostics.Publisher
+		normalWriter        *diagnostics.NormalWriter
+		Config              `yaml:",inline" json:""`
 
 		vnode *vnodes.VirtualNode
 
@@ -191,8 +196,11 @@ func (c *Collector) Init(context.Context) (err error) {
 }
 
 func (c *Collector) Check(ctx context.Context) (err error) {
+	c.beginNormalAttempt("check")
+	defer func() { c.finishNormalAttempt(err, nil) }()
 	defer func() {
 		if recovered := recover(); recovered != nil {
+			err = snmputils.WithFailureDetail(fmt.Errorf("SNMP check interrupted"), snmputils.Failure{Reason: "panic"})
 			c.recordDeviceLifecycle(
 				ddsnmp.DeviceLifecyclePhaseCheck,
 				ddsnmp.DeviceLifecycleOutcomeFailed,
@@ -208,6 +216,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 			return lifecycleFailureError(fmt.Errorf("failed to init and connect SNMP client: %v", err), err, "connect", "")
 		}
 		c.snmpClient = snmpClient
+		c.wrapNormalClient()
 	}
 
 	if err := c.ensureDeviceProfile(); err != nil {
@@ -228,17 +237,20 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	c.beginNormalAttempt("collect")
 	c.deviceLifecycleMu.Lock()
 	c.deviceCollectionFailures = ddsnmp.CollectionFailures{}
 	c.deviceLifecycleMu.Unlock()
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			c.recordDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed)
+			c.finishNormalAttempt(snmputils.WithFailureDetail(fmt.Errorf("SNMP collection interrupted"), snmputils.Failure{Reason: "panic"}), nil)
 			panic(recovered)
 		}
 	}()
 	mx, err := c.collect(ctx)
 	c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, err)
+	c.finishNormalAttempt(err, mx)
 	if err != nil {
 		c.Error(err)
 	}

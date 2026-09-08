@@ -6,14 +6,19 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // SourceOperation is one completed Handler call, including its internal retries.
-// Its one-based position in a context identifies it; wire packets and credentials
-// are deliberately not retained. WALK terminal details hidden by the Handler are unknown.
+// Ordinal identifies it within its acquisition context; ContextID qualifies that
+// identity across normal polls. Wire packets and credentials are not retained.
+// WALK terminal details hidden by the Handler are unknown.
 type SourceOperation struct {
+	ContextID     uint64            `json:"context_id,omitempty"`
+	Ordinal       uint64            `json:"ordinal"`
+	StartedAt     time.Time         `json:"started_at"`
 	Method        string            `json:"method"`
 	RequestedOIDs []string          `json:"requested_oids"`
 	ElapsedNanos  int64             `json:"elapsed_ns"`
@@ -41,6 +46,7 @@ type SourceValue struct {
 // SourceBinding records requested input, not a claim that it was processed.
 // Operation is one-based within the owning collection context.
 type SourceBinding struct {
+	ContextID uint64 `json:"context_id,omitempty"`
 	Operation uint64 `json:"operation"`
 	OID       string `json:"oid"`
 	Role      string `json:"role"`
@@ -57,8 +63,11 @@ type ProcessingEvent struct {
 	Reason   string `json:"reason"`
 }
 
-func ValidateSourceOperations(operations []SourceOperation) error {
+func ValidateSourceOperations(operations []*SourceOperation) error {
 	for i, op := range operations {
+		if op == nil {
+			return fmt.Errorf("operation %d: missing source operation", i+1)
+		}
 		if op.Method != "get" && op.Method != "walk" && op.Method != "bulk_walk" {
 			return fmt.Errorf("operation %d: invalid method", i+1)
 		}
@@ -107,7 +116,7 @@ func ValidateSourceOperations(operations []SourceOperation) error {
 
 // SourceRequestIndex is temporary import-validation state. Building it once per
 // context avoids rescanning a large GET batch for every consumer reference.
-func SourceRequestIndex(operations []SourceOperation) []map[string]struct{} {
+func SourceRequestIndex(operations []*SourceOperation) []map[string]struct{} {
 	index := make([]map[string]struct{}, len(operations))
 	for i, op := range operations {
 		index[i] = make(map[string]struct{}, len(op.RequestedOIDs))
@@ -130,6 +139,25 @@ func ValidateSourceBindings(bindings []SourceBinding, requests []map[string]stru
 	return nil
 }
 
+// IsFailure distinguishes failed processing from ordinary omitted input/output.
+// Rejection counts describe row acceptance and must not decide failure retention.
+func (e ProcessingEvent) IsFailure() bool {
+	failed, _ := processingReason(e.Reason)
+	return failed
+}
+
+// Validation and classification share the same closed reason vocabulary.
+func processingReason(reason string) (failed, valid bool) {
+	switch reason {
+	case "missing_input", "missing_dependency", "empty_date", "sentinel", "no_signals", "incomplete_identity":
+		return false, true
+	case "conversion", "pattern_mismatch", "extract_mismatch", "index_processing", "dependency_processing":
+		return true, true
+	default:
+		return true, false
+	}
+}
+
 func ValidateProcessingEvents(events []ProcessingEvent) error {
 	for _, event := range events {
 		if event.Stage != "" && event.Stage != "raw_text" {
@@ -138,9 +166,7 @@ func ValidateProcessingEvents(events []ProcessingEvent) error {
 		if event.Field == "" {
 			return fmt.Errorf("processing event has no field")
 		}
-		switch event.Reason {
-		case "missing_input", "missing_dependency", "conversion", "empty_date", "pattern_mismatch", "extract_mismatch", "index_processing", "dependency_processing", "no_signals", "incomplete_identity":
-		default:
+		if _, valid := processingReason(event.Reason); !valid {
 			return fmt.Errorf("invalid processing reason")
 		}
 	}
@@ -149,10 +175,10 @@ func ValidateProcessingEvents(events []ProcessingEvent) error {
 
 // SourceOperationsShape describes retained logical content, not heap usage or
 // encoded bytes. Physical operations are counted once, independently of consumers.
-func SourceOperationsShape(operations []SourceOperation) (records, logicalBytes uint64) {
+func SourceOperationsShape(operations []*SourceOperation) (records, logicalBytes uint64) {
 	for _, op := range operations {
 		records += uint64(1 + len(op.RequestedOIDs) + len(op.PDUs))
-		logicalBytes += uint64(64+len(op.Method)) + snmputils.FailureLogicalBytes
+		logicalBytes += uint64(104+len(op.Method)) + snmputils.FailureLogicalBytes
 		for _, oid := range op.RequestedOIDs {
 			logicalBytes += uint64(16 + len(oid))
 		}

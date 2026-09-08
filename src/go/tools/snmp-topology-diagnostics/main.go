@@ -38,10 +38,18 @@ type diagnosticArchive interface {
 	InspectLinkAt(snmptopology.DiagnosticQueryOptions, int) (snmptopology.DiagnosticLinkInspection, error)
 }
 
-type archiveOpener func(io.Reader, snmpdiag.ReadLimits) (diagnosticArchive, error)
+type openedArchive struct {
+	topology diagnosticArchive
+	normal   *snmpdiag.NormalDevice
+	producer snmpdiag.Producer
+}
+
+type archiveOpener func(io.Reader, snmpdiag.ReadLimits) (openedArchive, error)
 
 type commandOptions struct {
 	inputPath         string
+	normal            bool
+	previousRun       bool
 	checkpoint        uint64
 	maxCompressedSize string
 	maxDecodedSize    string
@@ -60,7 +68,7 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 	return runWithOpener(arguments, stdout, stderr, func(
 		reader io.Reader,
 		limits snmpdiag.ReadLimits,
-	) (diagnosticArchive, error) {
+	) (openedArchive, error) {
 		return openDiagnosticArchive(reader, limits)
 	})
 }
@@ -88,6 +96,10 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 	}
 
 	if operation == "list" {
+		if options.normal || options.previousRun || options.registrationID != 0 {
+			fmt.Fprintln(stderr, "error: list does not support --normal, --previous-run, or --registration-id")
+			return 1
+		}
 		info, err := os.Stat(options.inputPath)
 		if err != nil || !info.IsDir() || options.checkpoint != 0 {
 			fmt.Fprintln(stderr, "error: list requires a directory and does not select a checkpoint")
@@ -98,14 +110,23 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 			fmt.Fprintf(stderr, "error: list checkpoints: %v\n", err)
 			return 1
 		}
-		if err := jsonv2.MarshalWrite(stdout, entries, outputJSONOptions); err != nil {
+		normal, err := snmpdiag.ListNormalFiles(options.inputPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: list normal devices: %v\n", err)
+			return 1
+		}
+		listing := struct {
+			Topology []snmpdiag.CheckpointFile `json:"topology_checkpoints"`
+			Normal   []snmpdiag.NormalFile     `json:"normal_devices"`
+		}{entries, normal}
+		if err := jsonv2.MarshalWrite(stdout, listing, outputJSONOptions); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
 		fmt.Fprintln(stdout)
 		return 0
 	}
-	path, err := resolveInput(options.inputPath, options.checkpoint)
+	path, err := resolveCommandInput(options)
 	if err != nil {
 		fmt.Fprintf(stderr, "error: select input: %v\n", err)
 		return 1
@@ -152,6 +173,9 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		flags.PrintDefaults()
 	}
 	flags.StringVar(&options.inputPath, "input", "", "new-format diagnostic file or directory (latest topology checkpoint)")
+	flags.BoolVar(&options.normal, "normal", false, "select normal device evidence from a directory")
+	flags.BoolVar(&options.previousRun, "previous-run", false, "select the previous evidence-bearing normal run")
+	flags.Uint64Var(&options.registrationID, "registration-id", 0, "device registration ID")
 	flags.Uint64Var(&options.checkpoint, "checkpoint", 0, "checkpoint sequence to select from a directory")
 	flags.StringVar(
 		&options.maxCompressedSize,
@@ -169,8 +193,6 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		addQueryFlags(flags, &options.query)
 	}
 	switch operation {
-	case "inspect-device":
-		flags.Uint64Var(&options.registrationID, "registration-id", 0, "device registration ID")
 	case "inspect-link":
 		flags.IntVar(&options.linkIndex, "link-index", -1, "zero-based link index in this archive and query replay")
 		flags.StringVar(&options.link.SourceIdentity, "source-identity", "", "source actor identity key")
@@ -256,7 +278,11 @@ func addQueryFlags(flags *flag.FlagSet, options *snmptopology.DiagnosticQueryOpt
 	flags.StringVar(&options.Depth, "depth", options.Depth, "topology traversal depth or all")
 }
 
-func executeOperation(operation string, archive diagnosticArchive, options commandOptions) (any, error) {
+func executeOperation(operation string, opened openedArchive, options commandOptions) (any, error) {
+	if opened.normal != nil {
+		return executeNormalOperation(operation, opened, options)
+	}
+	archive := opened.topology
 	switch operation {
 	case "validate":
 		return snmptopology.DiagnosticValidation{Valid: true, Archive: archive.Identity()}, nil
@@ -317,12 +343,19 @@ func operationUsage(writer io.Writer, operation string) {
 	fmt.Fprintf(writer, "usage: snmp-topology-diagnostics %s --input PATH [options]\n", operation)
 }
 
-func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*snmptopology.DiagnosticArchive, error) {
+func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (openedArchive, error) {
 	document, err := snmpdiag.Read(r, limits)
 	if err != nil {
-		return nil, err
+		return openedArchive{}, err
 	}
-	return snmptopology.InspectDiagnosticDocument(document)
+	if document.Kind == snmpdiag.KindNormal {
+		if err := document.Normal.Validate(); err != nil {
+			return openedArchive{}, err
+		}
+		return openedArchive{normal: document.Normal, producer: document.Producer}, nil
+	}
+	archive, err := snmptopology.InspectDiagnosticDocument(document)
+	return openedArchive{topology: archive}, err
 }
 
 func resolveInput(input string, sequence uint64) (string, error) {

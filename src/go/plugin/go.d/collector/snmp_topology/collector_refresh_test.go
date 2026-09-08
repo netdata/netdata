@@ -507,9 +507,9 @@ func TestCollectorRefreshCapturesBorrowedProfileValuesThroughAcquisitionObserver
 		return []*ddsnmp.Profile{{}}
 	}
 	coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
-		require.NotNil(t, cfg.InitialAcquisitionObserver)
+		require.NotNil(t, cfg.AcquisitionObserver)
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-			cfg.InitialAcquisitionObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
+			cfg.AcquisitionObserver.ObserveProfile(ddsnmpcollector.AcquisitionProfileReport{
 				Identity: ddsnmpcollector.AcquisitionProfileIdentity{Ordinal: 0},
 				Outcome:  ddsnmpcollector.AcquisitionProfileOutcomeSuccess,
 				Routes: []ddsnmpcollector.AcquisitionRouteReport{{
@@ -1071,9 +1071,9 @@ func TestCollectorVLANContextsRecordDistinctSuccessAndFailureEvidence(t *testing
 		return client
 	}
 	coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
-		require.NotNil(t, cfg.InitialAcquisitionObserver)
+		require.NotNil(t, cfg.AcquisitionObserver)
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-			cfg.InitialAcquisitionObserver.ObserveProfile(acquisitionReportForMetrics(
+			cfg.AcquisitionObserver.ObserveProfile(acquisitionReportForMetrics(
 				0, ddsnmpcollector.AcquisitionProfileOutcomeSuccess, profileMetrics,
 			), profileMetrics)
 			return []*ddsnmp.ProfileMetrics{profileMetrics}, nil
@@ -2022,7 +2022,7 @@ func BenchmarkCollectorRefreshDueDeviceWithAcquisition(b *testing.B) {
 			)
 			coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 				return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
-					cfg.InitialAcquisitionObserver.ObserveProfile(report, metrics[0])
+					cfg.AcquisitionObserver.ObserveProfile(report, metrics[0])
 					return metrics, nil
 				})
 			}

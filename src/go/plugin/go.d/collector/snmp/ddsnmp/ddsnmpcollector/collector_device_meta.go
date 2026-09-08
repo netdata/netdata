@@ -128,7 +128,7 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 		case field.Value != "":
 			ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: field.Value, IsExactMatch: isExactMatch})
 		case field.Symbol.OID != "":
-			if !dc.missingOIDs[trimOID(field.Symbol.OID)] {
+			if !isMissingOID(dc.snmpClient, dc.missingOIDs, trimOID(field.Symbol.OID)) {
 				oids = append(oids, field.Symbol.OID)
 			} else {
 				stats.Errors.MissingOIDs++
@@ -138,7 +138,7 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 				if sym.OID == "" {
 					continue
 				}
-				if !dc.missingOIDs[trimOID(sym.OID)] {
+				if !isMissingOID(dc.snmpClient, dc.missingOIDs, trimOID(sym.OID)) {
 					oids = append(oids, sym.OID)
 				} else {
 					stats.Errors.MissingOIDs++

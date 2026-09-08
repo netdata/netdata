@@ -13,14 +13,15 @@ import (
 )
 
 type Document struct {
-	Format         string    `json:"format"`
-	Version        uint64    `json:"version"`
-	Producer       Producer  `json:"producer"`
-	Snapshot       Snapshot  `json:"snapshot"`
-	Kind           string    `json:"kind"`
-	PublishedAt    time.Time `json:"published_at"`
-	Checkpoint     uint64    `json:"checkpoint,omitempty"`
-	TopologyActive bool      `json:"topology_active,omitempty"`
+	Normal         *NormalDevice `json:"normal_device,omitempty"`
+	Format         string        `json:"format"`
+	Version        uint64        `json:"version"`
+	Producer       Producer      `json:"producer"`
+	Snapshot       Snapshot      `json:"snapshot"`
+	Kind           string        `json:"kind"`
+	PublishedAt    time.Time     `json:"published_at"`
+	Checkpoint     uint64        `json:"checkpoint,omitempty"`
+	TopologyActive bool          `json:"topology_active,omitempty"`
 }
 
 type Producer struct {
@@ -168,7 +169,7 @@ type Phase struct {
 }
 
 type ContextEvidence struct {
-	Sources      []ddsnmp.SourceOperation  `json:"source_operations,omitempty"`
+	Sources      []*ddsnmp.SourceOperation `json:"source_operations,omitempty"`
 	Interruption snmputils.Failure         `json:"interruption"`
 	Failures     ddsnmp.CollectionFailures `json:"failures"`
 	Ordinal      uint32                    `json:"ordinal"`

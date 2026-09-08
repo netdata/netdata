@@ -10,10 +10,12 @@ import (
 
 func TestValidateSourceEvidence(t *testing.T) {
 	for name, tc := range map[string]struct {
-		mutate  func(*SourceOperation, *SourceBinding, *ProcessingEvent)
-		invalid bool
+		mutate           func(*SourceOperation, *SourceBinding, *ProcessingEvent)
+		invalid          bool
+		missingOperation bool
 	}{
 		"valid partial response":  {},
+		"missing operation":       {missingOperation: true, invalid: true},
 		"unknown method":          {mutate: func(o *SourceOperation, _ *SourceBinding, _ *ProcessingEvent) { o.Method = "packet" }, invalid: true},
 		"negative elapsed":        {mutate: func(o *SourceOperation, _ *SourceBinding, _ *ProcessingEvent) { o.ElapsedNanos = -1 }, invalid: true},
 		"absent result with PDUs": {mutate: func(o *SourceOperation, _ *SourceBinding, _ *ProcessingEvent) { o.ResultPresent = false }, invalid: true},
@@ -38,7 +40,10 @@ func TestValidateSourceEvidence(t *testing.T) {
 			if tc.mutate != nil {
 				tc.mutate(&operation, &binding, &event)
 			}
-			operations := []SourceOperation{operation}
+			operations := []*SourceOperation{&operation}
+			if tc.missingOperation {
+				operations[0] = nil
+			}
 			err := ValidateSourceOperations(operations)
 			if err == nil {
 				err = ValidateSourceBindings([]SourceBinding{binding}, SourceRequestIndex(operations))

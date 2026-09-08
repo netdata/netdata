@@ -143,7 +143,7 @@ func (s *tableCollectionSession) addObservedScope(
 	prof *ddsnmp.Profile,
 	mode tableSymbolMode,
 	stats *ddsnmp.CollectionStats,
-	acquisition *acquisitionTopologyTableScope,
+	acquisition *acquisitionTableScope,
 ) *tableCollectionScope {
 	scope := &tableCollectionScope{
 		profileSource:  prof.SourceFile,
@@ -255,7 +255,7 @@ func (s *tableCollectionSession) buildRoutes() {
 				}
 			}
 
-			if s.collector.missingOIDs[trimOID(req.config.Table.OID)] {
+			if isMissingOID(s.collector.snmpClient, s.collector.missingOIDs, trimOID(req.config.Table.OID)) {
 				req.missing = true
 				req.scope.stats.Errors.MissingOIDs++
 				continue
@@ -383,6 +383,10 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 		}
 
 		started := time.Now()
+		observation := req.scope.acquisition[req]
+		if observation != nil {
+			observation.staging = true
+		}
 		req.candidateMetrics = s.collector.tryCollectFromCache(
 			req.config,
 			req.scope.profileSource,
@@ -390,6 +394,9 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 			&req.candidateStats,
 			req.scope.acquisition[req],
 		)
+		if observation != nil {
+			observation.staging = false
+		}
 		req.candidateStats.Timing.Table += time.Since(started)
 		if req.candidateMetrics == nil {
 			return req
@@ -548,17 +555,22 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			tablesSeen[req.route.oid] = true
 			// A current WALK is successful even when it is empty or auxiliary-only.
 			successful = true
+			var cacheEvidence *AcquisitionCacheInput
+			if req.cacheEligible && sourceRecorder(s.collector.snmpClient) != nil {
+				cacheEvidence = &AcquisitionCacheInput{Kind: "table", RootOID: req.route.oid, CreatedAt: time.Now().UTC(), Marker: len(req.config.Symbols) == 0, Sources: s.cacheSources(req)}
+			}
 			if len(req.config.Symbols) == 0 {
 				if acquisition != nil {
 					acquisition.processed = true
 					acquisition.values = req.route.acquisitionValuesWithin(req.config.Table.OID)
 				}
 				if req.cacheEligible && !req.sharesRouteCache {
-					s.collector.tableCache.cacheMarker(req.config)
+					s.collector.tableCache.cacheMarker(req.config, cacheEvidence)
 				}
 				continue
 			}
 			ctx := &tableProcessingContext{
+				cacheEvidence:  cacheEvidence,
 				config:         req.config,
 				pdus:           req.route.pdus,
 				walkedData:     s.freshData,
