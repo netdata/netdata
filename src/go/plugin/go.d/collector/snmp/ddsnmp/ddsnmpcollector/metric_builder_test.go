@@ -52,11 +52,14 @@ func TestMetricBuilder_WithStaticTagsKeepsExistingNonEmptyValues(t *testing.T) {
 }
 
 func TestBuildMultiValue_BitmaskZeroKeyMatchesOnlyZero(t *testing.T) {
-	mapping := ddprofiledefinition.NewBitmaskMapping(map[string]string{
-		"0": "noFaults",
-		"1": "warning",
-		"2": "failure",
-	})
+	mapping := ddprofiledefinition.MappingConfig{
+		Mode: ddprofiledefinition.MappingModeBitmask,
+		Items: map[string]string{
+			"0": "noFaults",
+			"1": "warning",
+			"2": "failure",
+		},
+	}
 
 	require.Equal(t, map[string]int64{
 		"noFaults": 1,
@@ -72,11 +75,14 @@ func TestBuildMultiValue_BitmaskZeroKeyMatchesOnlyZero(t *testing.T) {
 }
 
 func TestBuildMultiValue_BitmaskDuplicateDimsAreCombined(t *testing.T) {
-	mapping := ddprofiledefinition.NewBitmaskMapping(map[string]string{
-		"1": "fault",
-		"2": "fault",
-		"4": "present",
-	})
+	mapping := ddprofiledefinition.MappingConfig{
+		Mode: ddprofiledefinition.MappingModeBitmask,
+		Items: map[string]string{
+			"1": "fault",
+			"2": "fault",
+			"4": "present",
+		},
+	}
 
 	require.Equal(t, map[string]int64{
 		"fault":   1,

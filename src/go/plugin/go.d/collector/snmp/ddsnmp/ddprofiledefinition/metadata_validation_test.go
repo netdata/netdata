@@ -20,9 +20,12 @@ func Test_validateEnrichMetadata_BitmaskMappingUnsupported(t *testing.T) {
 					Symbol: SymbolConfig{
 						OID:  "1.2.3",
 						Name: "deviceStatus",
-						Mapping: NewBitmaskMapping(map[string]string{
-							"1": "internalError",
-						}),
+						Mapping: MappingConfig{
+							Mode: MappingModeBitmask,
+							Items: map[string]string{
+								"1": "internalError",
+							},
+						},
 					},
 				},
 			},

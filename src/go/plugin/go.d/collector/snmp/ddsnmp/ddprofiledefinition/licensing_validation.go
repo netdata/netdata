@@ -500,7 +500,11 @@ func collectLicenseValueReferences(row LicensingConfig) []licenseValueValidation
 }
 
 func licenseRowHasSignalConfigs(row LicensingConfig) bool {
-	return len(collectLicenseSignalValues(row)) > 0
+	var found bool
+	ForEachLicenseSignalValue(row, func(LicenseValueConfig) {
+		found = true
+	})
+	return found
 }
 
 func collectLicenseSignalSourceOIDs(row LicensingConfig) map[string]struct{} {

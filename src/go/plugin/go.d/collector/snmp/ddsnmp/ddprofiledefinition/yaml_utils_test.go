@@ -146,10 +146,13 @@ mapping:
 func TestMappingConfig_UnmarshalYAML_structuredBitmask(t *testing.T) {
 	myStruct := MyMappingStruct{}
 	expected := MyMappingStruct{
-		Mapping: NewBitmaskMapping(map[string]string{
-			"1":   "internalError",
-			"128": "processorPresent",
-		}),
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+			Items: map[string]string{
+				"1":   "internalError",
+				"128": "processorPresent",
+			},
+		},
 	}
 
 	yaml.Unmarshal([]byte(`

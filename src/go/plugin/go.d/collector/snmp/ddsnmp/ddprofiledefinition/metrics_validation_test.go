@@ -466,10 +466,13 @@ func Test_validateEnrichMetrics(t *testing.T) {
 					Symbol: SymbolConfig{
 						OID:  "1.2.3",
 						Name: "processorStatus",
-						Mapping: NewBitmaskMapping(map[string]string{
-							"1":   "internalError",
-							"128": "processorPresent",
-						}),
+						Mapping: MappingConfig{
+							Mode: MappingModeBitmask,
+							Items: map[string]string{
+								"1":   "internalError",
+								"128": "processorPresent",
+							},
+						},
 					},
 				},
 			},
@@ -491,9 +494,12 @@ func Test_validateEnrichMetrics(t *testing.T) {
 								OID:  "1.2",
 								Name: "abc",
 							},
-							Mapping: NewBitmaskMapping(map[string]string{
-								"1": "internalError",
-							}),
+							Mapping: MappingConfig{
+								Mode: MappingModeBitmask,
+								Items: map[string]string{
+									"1": "internalError",
+								},
+							},
 						},
 					},
 				},

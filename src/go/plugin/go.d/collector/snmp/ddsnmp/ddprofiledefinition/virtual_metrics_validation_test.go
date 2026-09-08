@@ -119,10 +119,13 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 					{
 						OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
 						Name: "processorDeviceStatusReading",
-						Mapping: NewBitmaskMapping(map[string]string{
-							"1":   "internalError",
-							"128": "processorPresent",
-						}),
+						Mapping: MappingConfig{
+							Mode: MappingModeBitmask,
+							Items: map[string]string{
+								"1":   "internalError",
+								"128": "processorPresent",
+							},
+						},
 					},
 				},
 				MetricTags: []MetricTagConfig{

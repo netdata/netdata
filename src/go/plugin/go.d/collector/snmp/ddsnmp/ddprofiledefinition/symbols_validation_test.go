@@ -15,9 +15,12 @@ func Test_validateEnrichSymbol_BitmaskMappingRequiresSingleBitKeys(t *testing.T)
 	sym := SymbolConfig{
 		OID:  "1.2.3",
 		Name: "processorStatus",
-		Mapping: NewBitmaskMapping(map[string]string{
-			"internal": "internalError",
-		}),
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+			Items: map[string]string{
+				"internal": "internalError",
+			},
+		},
 	}
 
 	err := validateEnrichSymbol(&sym, scalarSymbol)
@@ -31,9 +34,12 @@ func Test_validateEnrichSymbol_BitmaskMappingRejectsCompositeMasks(t *testing.T)
 	sym := SymbolConfig{
 		OID:  "1.2.3",
 		Name: "processorStatus",
-		Mapping: NewBitmaskMapping(map[string]string{
-			"3": "combinedFault",
-		}),
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+			Items: map[string]string{
+				"3": "combinedFault",
+			},
+		},
 	}
 
 	err := validateEnrichSymbol(&sym, scalarSymbol)
@@ -49,10 +55,13 @@ func Test_validateEnrichSymbol_BitmaskMappingRejectsScaleFactor(t *testing.T) {
 		OID:         "1.2.3",
 		Name:        "processorStatus",
 		ScaleFactor: 2,
-		Mapping: NewBitmaskMapping(map[string]string{
-			"1":   "internalError",
-			"128": "processorPresent",
-		}),
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+			Items: map[string]string{
+				"1":   "internalError",
+				"128": "processorPresent",
+			},
+		},
 	}
 
 	err := validateEnrichSymbol(&sym, scalarSymbol)
