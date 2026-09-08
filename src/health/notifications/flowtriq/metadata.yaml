@@ -1,0 +1,62 @@
+# yamllint disable rule:line-length
+---
+- id: "notify-flowtriq"
+  meta:
+    name: "Flowtriq"
+    link: "https://flowtriq.com/"
+    categories:
+      - notify.agent
+    icon_filename: "flowtriq.png"
+  keywords:
+    - Flowtriq
+    - DDoS
+    - traffic analytics
+  overview:
+    notification_description: |
+      [Flowtriq](https://flowtriq.com/) is a DDoS detection and traffic analytics platform.
+      You can send notifications to Flowtriq using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ""
+  setup:
+    prerequisites:
+      list:
+        - title: ""
+          description: |
+            - A Flowtriq account with a configured webhook endpoint
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: "health_alarm_notify.conf"
+      options:
+        description: "The following options can be defined for this notification"
+        folding:
+          title: "Config Options"
+          enabled: true
+        list:
+          - name: "SEND_FLOWTRIQ"
+            default_value: "YES"
+            description: "Set `SEND_FLOWTRIQ` to YES"
+            required: true
+          - name: "FLOWTRIQ_WEBHOOK_URL"
+            default_value: ""
+            description: "Set `FLOWTRIQ_WEBHOOK_URL` to your Flowtriq webhook endpoint URL."
+            required: true
+          - name: "FLOWTRIQ_API_KEY"
+            default_value: ""
+            description: "Set `FLOWTRIQ_API_KEY` to your Flowtriq API key. This is sent as an `X-API-Key` header for authentication."
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ""
+        list:
+          - name: "Basic Configuration"
+            folding:
+              enabled: false
+            description: ""
+            config: |
+              SEND_FLOWTRIQ="YES"
+              FLOWTRIQ_WEBHOOK_URL="https://app.flowtriq.com/api/webhooks/netdata"
+              FLOWTRIQ_API_KEY="your-api-key-here"
+  troubleshooting:
+    problems:
+      list: []
