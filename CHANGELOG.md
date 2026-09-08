@@ -246,6 +246,18 @@
 - Feat(go.d/snmp): publish diagnostics independently of topology collection ([#23791](https://github.com/netdata/netdata/issues/23791))
 - Fix(ibm.d/as400): clamp row counts before converting int64 to int ([#23783](https://github.com/netdata/netdata/issues/23783))
 - Chore(skills): slim collectors-prometheus-profiles and fix its authoring scripts ([#23792](https://github.com/netdata/netdata/issues/23792))
+- Fix obsolete chart reaper freeing referenced charts ([#23761](https://github.com/netdata/netdata/issues/23761))
+- Fix(macos): improve compatibility with older SDKs ([#23421](https://github.com/netdata/netdata/issues/23421))
+- Perf(pulse): cache per-child streaming chart references ([#23760](https://github.com/netdata/netdata/issues/23760))
+- Fix credential leakage in go.d/upsd command errors ([#23782](https://github.com/netdata/netdata/issues/23782))
+- Build(deps): bump github.com/moby/moby/api from 1.55.0 to 1.56.0 in /src/go ([#23795](https://github.com/netdata/netdata/issues/23795))
+- Build(deps): bump github.com/moby/moby/client from 0.5.1 to 0.6.0 in /src/go ([#23796](https://github.com/netdata/netdata/issues/23796))
+- Chore(skills): slim topology-authoring and audit owner-section anchors cited by skills ([#23793](https://github.com/netdata/netdata/issues/23793))
+- Feat(go.d/snmp): add profile context and failure details to diagnostics ([#23794](https://github.com/netdata/netdata/issues/23794))
+- Feat(go.d/snmp): capture topology source and processing diagnostics ([#23797](https://github.com/netdata/netdata/issues/23797))
+- Refactor(go.d/snmp_topology): isolate topology diagnostics ([#23798](https://github.com/netdata/netdata/issues/23798))
+- Chore(skills): add repo-skill-authoring ([#23799](https://github.com/netdata/netdata/issues/23799))
+- Feat(go.d/snmp): publish independent diagnostics and retain topology history ([#23800](https://github.com/netdata/netdata/issues/23800))
 
 ## [2.11.0] - 2026-08-12
 
