@@ -419,15 +419,15 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 	for _, transform := range transforms {
 		start, end := transform.Start, transform.End
 		if transform.DropRight > 0 {
-			if int(transform.DropRight) >= len(parts) {
+			if transform.DropRight >= uint(len(parts)) {
 				return ""
 			}
-			end = uint(len(parts) - int(transform.DropRight) - 1)
+			end = uint(len(parts)) - transform.DropRight - 1
 		} else if transform.Start > 0 && transform.End == 0 {
 			end = uint(len(parts) - 1)
 		}
 
-		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
+		if start >= uint(len(parts)) || end < start || end >= uint(len(parts)) {
 			return ""
 		}
 

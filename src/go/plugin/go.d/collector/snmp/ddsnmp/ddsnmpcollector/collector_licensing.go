@@ -32,7 +32,10 @@ type licenseValueContext struct {
 	pdus       map[string]gosnmp.SnmpPDU
 }
 
-func (c *Collector) collectLicenseRows(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.LicenseRow, error) {
+func (c *Collector) collectLicenseRows(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.LicenseRow, error) {
 	return c.collectLicenseRowsObserved(prof, stats, nil)
 }
 
@@ -198,7 +201,10 @@ func (c *Collector) collectTableLicenseRows(
 				rejectAcquisitionRoute(route)
 				stats.Errors.Processing.Licensing++
 				recordCollectionFailure(&c.failures.Licensing, err, "licensing", "processing")
-				errs = append(errs, fmt.Errorf("licensing table %q row %q: %w", licensingConfigDisplayName(cfg), rowIndex, err))
+				errs = append(
+					errs,
+					fmt.Errorf("licensing table %q row %q: %w", licensingConfigDisplayName(cfg), rowIndex, err),
+				)
 				continue
 			}
 			if ok {
@@ -242,7 +248,11 @@ func (c *Collector) buildScalarLicenseRow(
 	return c.buildScalarLicenseRowObserved(cfg, pdus, nil)
 }
 
-func (c *Collector) buildScalarLicenseRowObserved(cfg ddprofiledefinition.LicensingConfig, pdus map[string]gosnmp.SnmpPDU, route *AcquisitionRouteReport) (ddsnmp.LicenseRow, bool, error) {
+func (c *Collector) buildScalarLicenseRowObserved(
+	cfg ddprofiledefinition.LicensingConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	route *AcquisitionRouteReport,
+) (ddsnmp.LicenseRow, bool, error) {
 	rowKey := scalarLicenseRowKey(cfg)
 	row := ddsnmp.LicenseRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -251,7 +261,10 @@ func (c *Collector) buildScalarLicenseRowObserved(cfg ddprofiledefinition.Licens
 		Tags:            parseStaticTags(cfg.StaticTags),
 	}
 
-	licenseCtx := licenseValueContext{pdus: pdus, processing: processingFor(route, "")}
+	licenseCtx := licenseValueContext{
+		pdus:       pdus,
+		processing: processingFor(route, ""),
+	}
 	if err := c.populateLicenseRow(&row, cfg, licenseCtx); err != nil {
 		return ddsnmp.LicenseRow{}, false, err
 	}
@@ -261,7 +274,10 @@ func (c *Collector) buildScalarLicenseRowObserved(cfg ddprofiledefinition.Licens
 
 	if len(cfg.MetricTags) > 0 {
 		tags := make(map[string]string)
-		ta := tagAdder{tags: tags, processing: processingFor(route, "")}
+		ta := tagAdder{
+			tags:       tags,
+			processing: processingFor(route, ""),
+		}
 		for _, tagCfg := range cfg.MetricTags {
 			if tagCfg.Symbol.OID == "" {
 				continue
@@ -317,7 +333,11 @@ func (c *Collector) buildTableLicenseRow(
 	}
 	mergeStringMaps(row.Tags, rowData.tags)
 
-	licenseCtx := licenseValueContext{rowIndex: rowIndex, rowPDUs: rowPDUs, processing: processingFor(ctx.processingRoute, rowIndex)}
+	licenseCtx := licenseValueContext{
+		rowIndex:   rowIndex,
+		rowPDUs:    rowPDUs,
+		processing: processingFor(ctx.processingRoute, rowIndex),
+	}
 	if err := c.populateLicenseRow(&row, cfg, licenseCtx); err != nil {
 		return ddsnmp.LicenseRow{}, false, err
 	}
@@ -332,7 +352,11 @@ func (c *Collector) buildTableLicenseRow(
 	return row, true, nil
 }
 
-func (c *Collector) populateLicenseRow(row *ddsnmp.LicenseRow, cfg ddprofiledefinition.LicensingConfig, ctx licenseValueContext) error {
+func (c *Collector) populateLicenseRow(
+	row *ddsnmp.LicenseRow,
+	cfg ddprofiledefinition.LicensingConfig,
+	ctx licenseValueContext,
+) error {
 	var err error
 
 	if row.ID, err = c.licenseTextValue(cfg.Identity.ID, ctx); err != nil {
@@ -523,8 +547,11 @@ func (c *Collector) populateLicenseTimerRemaining(
 	return nil
 }
 
-func licenseTimerZeroDateAndTimePlaceholder(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (string, bool) {
-	sym := licenseValueSymbol(cfg)
+func licenseTimerZeroDateAndTimePlaceholder(
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+) (string, bool) {
+	sym := cfg.EffectiveSymbol()
 	if sym.Format != "snmp_dateandtime" || sym.OID == "" {
 		return "", false
 	}
@@ -536,7 +563,7 @@ func licenseTimerZeroDateAndTimePlaceholder(cfg ddprofiledefinition.LicenseValue
 }
 
 func licenseTimerSource(cfg ddprofiledefinition.LicenseValueConfig, fallback string) string {
-	if oid := trimOID(licenseValueSymbol(cfg).OID); oid != "" {
+	if oid := trimOID(cfg.EffectiveSymbol().OID); oid != "" {
 		return oid
 	}
 	return fallback
@@ -591,7 +618,7 @@ func (c *Collector) populateLicenseUsageValue(
 		return nil
 	}
 	if licenseValueRejectedBySentinel(value, cfg.Sentinel) {
-		ctx.record(cfg, licenseValueSymbol(cfg).OID, "sentinel")
+		ctx.record(cfg, cfg.EffectiveSymbol().OID, "sentinel")
 		return nil
 	}
 	*has = true
@@ -599,19 +626,25 @@ func (c *Collector) populateLicenseUsageValue(
 	return nil
 }
 
-func (c *Collector) licenseTextValue(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (string, error) {
+func (c *Collector) licenseTextValue(
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+) (string, error) {
 	value, ok, err := c.licenseRawTextValue(cfg, ctx)
 	if err != nil || !ok {
 		return "", err
 	}
-	sym := licenseValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if mapped, ok := sym.Mapping.Lookup(value); ok {
 		value = mapped
 	}
 	return value, nil
 }
 
-func (c *Collector) licenseRawTextValue(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (string, bool, error) {
+func (c *Collector) licenseRawTextValue(
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+) (string, bool, error) {
 	if !cfg.IsSet() {
 		return "", false, nil
 	}
@@ -623,7 +656,7 @@ func (c *Collector) licenseRawTextValue(cfg ddprofiledefinition.LicenseValueConf
 		return value, err == nil, err
 	}
 
-	sym := licenseValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if sym.OID == "" {
 		return "", false, nil
 	}
@@ -681,7 +714,7 @@ func (c *Collector) licenseNumericValue(
 		return value, "", true, nil
 	}
 
-	sym := licenseValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if sym.OID == "" {
 		return 0, "", false, nil
 	}
@@ -703,7 +736,10 @@ func (c *Collector) licenseNumericValue(
 	return value, trimOID(sym.OID), true, nil
 }
 
-func (c *Collector) licenseBoolValue(cfg ddprofiledefinition.LicenseValueConfig, ctx licenseValueContext) (bool, error) {
+func (c *Collector) licenseBoolValue(
+	cfg ddprofiledefinition.LicenseValueConfig,
+	ctx licenseValueContext,
+) (bool, error) {
 	value, err := c.licenseTextValue(cfg, ctx)
 	if err != nil || value == "" {
 		return false, err
@@ -720,7 +756,7 @@ func (c *Collector) licenseIndexValue(cfg ddprofiledefinition.LicenseValueConfig
 	if rowIndex == "" {
 		return "", nil
 	}
-	sym := licenseValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	tagCfg := ddprofiledefinition.MetricTagConfig{
 		Index:          cfg.Index,
 		IndexTransform: cfg.IndexTransform,
@@ -744,7 +780,7 @@ func (ctx licenseValueContext) lookupPDU(oid string) (gosnmp.SnmpPDU, bool) {
 func licensingConfigAsMetricsConfig(cfg ddprofiledefinition.LicensingConfig) ddprofiledefinition.MetricsConfig {
 	columns := make(map[string]ddprofiledefinition.SymbolConfig)
 	addColumn := func(valueCfg ddprofiledefinition.LicenseValueConfig) {
-		sym := licenseValueSymbol(valueCfg)
+		sym := valueCfg.EffectiveSymbol()
 		if sym.OID != "" {
 			columns[trimOID(sym.OID)] = sym
 		}
@@ -852,7 +888,7 @@ func (c *Collector) licensingScalarOIDs(cfg ddprofiledefinition.LicensingConfig)
 	oids := make(map[string]struct{})
 	var missingOIDs []string
 	addOID := func(valueCfg ddprofiledefinition.LicenseValueConfig) {
-		sym := licenseValueSymbol(valueCfg)
+		sym := valueCfg.EffectiveSymbol()
 		if sym.OID != "" {
 			oid := trimOID(sym.OID)
 			if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
@@ -905,35 +941,13 @@ func forEachLicenseValue(cfg ddprofiledefinition.LicensingConfig, fn func(ddprof
 	fn(cfg.Signals.Usage.Percent)
 }
 
-func forEachLicenseTimerValue(cfg ddprofiledefinition.LicenseTimerSignalsConfig, fn func(ddprofiledefinition.LicenseValueConfig)) {
+func forEachLicenseTimerValue(
+	cfg ddprofiledefinition.LicenseTimerSignalsConfig,
+	fn func(ddprofiledefinition.LicenseValueConfig),
+) {
 	fn(cfg.LicenseValueConfig)
 	fn(cfg.Timestamp)
 	fn(cfg.Remaining)
-}
-
-func licenseValueSymbol(cfg ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.SymbolConfig {
-	sym := cfg.Symbol
-	if sym.OID == "" {
-		switch {
-		case cfg.From != "":
-			sym.OID = cfg.From
-		case cfg.OID != "":
-			sym.OID = cfg.OID
-		}
-	}
-	if sym.Name == "" {
-		sym.Name = cfg.Name
-	}
-	if sym.Name == "" && sym.OID != "" {
-		sym.Name = "license:" + trimOID(sym.OID)
-	}
-	if sym.Format == "" {
-		sym.Format = cfg.Format
-	}
-	if !sym.Mapping.HasItems() && cfg.Mapping.HasItems() {
-		sym.Mapping = cfg.Mapping
-	}
-	return sym
 }
 
 func scalarLicenseRowKey(cfg ddprofiledefinition.LicensingConfig) string {
@@ -945,7 +959,7 @@ func scalarLicenseRowKey(cfg ddprofiledefinition.LicensingConfig) string {
 		if rowKey != "" {
 			return
 		}
-		if oid := licenseValueSymbol(valueCfg).OID; oid != "" {
+		if oid := valueCfg.EffectiveSymbol().OID; oid != "" {
 			rowKey = trimOID(oid)
 		}
 	})

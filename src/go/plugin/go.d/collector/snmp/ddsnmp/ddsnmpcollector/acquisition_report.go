@@ -196,7 +196,8 @@ func (o *acquisitionTableObservation) addValueReferences(rowOrdinal uint32, rowI
 	}
 	for valueOrdinal, metric := range metrics {
 		reference := AcquisitionValueReference{
-			RowIndex: rowIndex, Field: metric.Name,
+			RowIndex:     rowIndex,
+			Field:        metric.Name,
 			RouteOrdinal: o.routeOrdinal,
 			RowOrdinal:   rowOrdinal,
 			ValueOrdinal: uint32(valueOrdinal),
@@ -262,7 +263,8 @@ func (o *acquisitionScalarObserver) failUnfinished(class AcquisitionFailureClass
 	}
 	for i := range o.routeIndexes {
 		route := o.route(i)
-		if route == nil || route.Outcome != AcquisitionRouteOutcomeNotObserved || route.Source == AcquisitionRouteSourceNone {
+		if route == nil || route.Outcome != AcquisitionRouteOutcomeNotObserved ||
+			route.Source == AcquisitionRouteSourceNone {
 			continue
 		}
 		route.Outcome = AcquisitionRouteOutcomeFailed
@@ -279,7 +281,13 @@ func (o *acquisitionScalarObserver) rejected(index int) {
 func (o *acquisitionScalarObserver) value(index int, field string) {
 	if route := o.route(index); route != nil {
 		setAcquisitionScalarRouteValue(route)
-		o.collection.addMetricValueReference(route.Ordinal, AcquisitionValueReference{RouteOrdinal: route.Ordinal, Field: field})
+		o.collection.addMetricValueReference(
+			route.Ordinal,
+			AcquisitionValueReference{
+				RouteOrdinal: route.Ordinal,
+				Field:        field,
+			},
+		)
 	}
 }
 
@@ -322,7 +330,8 @@ func (o *acquisitionGlobalTagObserver) failUnfinished(class AcquisitionFailureCl
 	}
 	for i := range o.routeIndexes {
 		route := o.route(i)
-		if route == nil || route.Outcome != AcquisitionRouteOutcomeNotObserved || route.Source == AcquisitionRouteSourceNone {
+		if route == nil || route.Outcome != AcquisitionRouteOutcomeNotObserved ||
+			route.Source == AcquisitionRouteSourceNone {
 			continue
 		}
 		route.Outcome = AcquisitionRouteOutcomeFailed
@@ -375,7 +384,8 @@ func (o *acquisitionMetadataObserver) failUnfinished(class AcquisitionFailureCla
 	}
 	for _, binding := range o.routes {
 		route := o.collection.route(binding.routeIndex)
-		if route == nil || route.Outcome != AcquisitionRouteOutcomeNotObserved || route.Source == AcquisitionRouteSourceNone {
+		if route == nil || route.Outcome != AcquisitionRouteOutcomeNotObserved ||
+			route.Source == AcquisitionRouteSourceNone {
 			continue
 		}
 		route.Outcome = AcquisitionRouteOutcomeFailed
@@ -407,7 +417,8 @@ func (o *acquisitionMetadataObserver) route(fieldName string) *AcquisitionRouteR
 }
 
 func setAcquisitionScalarRouteValue(route *AcquisitionRouteReport) {
-	if route == nil || route.Outcome == AcquisitionRouteOutcomeMissing || route.Outcome == AcquisitionRouteOutcomeFailed {
+	if route == nil || route.Outcome == AcquisitionRouteOutcomeMissing ||
+		route.Outcome == AcquisitionRouteOutcomeFailed {
 		return
 	}
 	route.Values = 1
@@ -427,7 +438,8 @@ func setAcquisitionScalarRouteEmpty(route *AcquisitionRouteReport) {
 }
 
 func setAcquisitionScalarRouteRejected(route *AcquisitionRouteReport) {
-	if route == nil || route.Outcome == AcquisitionRouteOutcomeMissing || route.Outcome == AcquisitionRouteOutcomeFailed {
+	if route == nil || route.Outcome == AcquisitionRouteOutcomeMissing ||
+		route.Outcome == AcquisitionRouteOutcomeFailed {
 		return
 	}
 	route.Rejected++
@@ -475,7 +487,9 @@ func newAcquisitionProfileCollection(
 	profile *ddsnmp.Profile,
 	sysObjectID string,
 ) *acquisitionProfileCollection {
-	collection := &acquisitionProfileCollection{identity: identity}
+	collection := &acquisitionProfileCollection{
+		identity: identity,
+	}
 	if profile == nil || profile.Definition == nil {
 		return collection
 	}
@@ -484,7 +498,11 @@ func newAcquisitionProfileCollection(
 	for _, cfg := range def.Topology {
 		topologyMetrics = append(topologyMetrics, cfg.MetricsConfig)
 	}
-	collection.topologyScalarRoutes, collection.topologyTableRoutes = collection.addMetricRoutes(topologyMetrics, AcquisitionRouteKindTopologyScalar, AcquisitionRouteKindTopologyTable)
+	collection.topologyScalarRoutes, collection.topologyTableRoutes = collection.addMetricRoutes(
+		topologyMetrics,
+		AcquisitionRouteKindTopologyScalar,
+		AcquisitionRouteKindTopologyTable,
+	)
 
 	collection.bgpRoutes = make([]int, len(def.BGP))
 	for i := range collection.bgpRoutes {
@@ -500,7 +518,11 @@ func newAcquisitionProfileCollection(
 			collection.bgpRoutes[i] = collection.addRoute(AcquisitionRouteKindBGPTable, trimOID(cfg.Table.OID))
 		}
 	}
-	collection.metricScalarRoutes, collection.metricTableRoutes = collection.addMetricRoutes(def.Metrics, AcquisitionRouteKindMetricScalar, AcquisitionRouteKindMetricTable)
+	collection.metricScalarRoutes, collection.metricTableRoutes = collection.addMetricRoutes(
+		def.Metrics,
+		AcquisitionRouteKindMetricScalar,
+		AcquisitionRouteKindMetricTable,
+	)
 	for _, cfg := range def.Licensing {
 		kind, root := AcquisitionRouteKindLicenseTable, trimOID(cfg.Table.OID)
 		if root == "" {
@@ -922,7 +944,7 @@ func firstBGPRouteOID(cfg ddprofiledefinition.BGPConfig) string {
 		}
 	}
 	forEachBGPValue(cfg, func(value ddprofiledefinition.BGPValueConfig) {
-		add(bgpValueSymbol(value).OID)
+		add(value.EffectiveSymbol().OID)
 	})
 	for _, tag := range cfg.MetricTags {
 		add(tag.Symbol.OID)
@@ -931,7 +953,9 @@ func firstBGPRouteOID(cfg ddprofiledefinition.BGPConfig) string {
 }
 
 func acquisitionProfileRouteDigest(profile *ddsnmp.Profile) [32]byte {
-	d := routeDigestWriter{hash: sha256.New()}
+	d := routeDigestWriter{
+		hash: sha256.New(),
+	}
 	d.add("netdata.snmp-acquisition-profile.v1")
 	if profile == nil || profile.Definition == nil {
 		return d.sum()
@@ -1018,9 +1042,6 @@ func (d *routeDigestWriter) addMetadata(metadata ddprofiledefinition.MetadataCon
 		d.add(resource)
 		cfg := metadata[resource]
 		d.addMetadataFields(cfg.Fields)
-		for _, tag := range cfg.IDTags {
-			d.addMetricTag(tag)
-		}
 	}
 }
 

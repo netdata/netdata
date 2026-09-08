@@ -201,7 +201,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, m := range p.Definition.Metrics {
 		switch {
 		case m.IsScalar():
-			seenScalars[scalarMetricKey{name: m.Symbol.Name, oid: m.Symbol.OID}] = true
+			seenScalars[scalarMetricKey{
+				name: m.Symbol.Name,
+				oid:  m.Symbol.OID,
+			}] = true
 		case m.IsColumn():
 			seenTableOIDs[columnMetricTableIdentity(m.Table)] = m.Table.OID
 			for _, sym := range m.Symbols {
@@ -213,7 +216,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, bm := range base.Definition.Metrics {
 		switch {
 		case bm.IsScalar():
-			key := scalarMetricKey{name: bm.Symbol.Name, oid: bm.Symbol.OID}
+			key := scalarMetricKey{
+				name: bm.Symbol.Name,
+				oid:  bm.Symbol.OID,
+			}
 			if !seenScalars[key] {
 				p.Definition.Metrics = append(p.Definition.Metrics, bm)
 				seenScalars[key] = true
@@ -253,7 +259,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	}
 }
 
-func columnMetricSymbolKey(table ddprofiledefinition.SymbolConfig, sym ddprofiledefinition.SymbolConfig) columnMetricKey {
+func columnMetricSymbolKey(
+	table ddprofiledefinition.SymbolConfig,
+	sym ddprofiledefinition.SymbolConfig,
+) columnMetricKey {
 	return columnMetricKey{
 		table:      columnMetricTableIdentity(table),
 		symbolName: sym.Name,
@@ -280,7 +289,11 @@ func (p *Profile) mergeTopology(base *Profile) error {
 		}
 		switch {
 		case topo.IsScalar():
-			seenScalars[topologyScalarMetricKey{kind: topo.Kind, name: topo.Symbol.Name, oid: topo.Symbol.OID}] = true
+			seenScalars[topologyScalarMetricKey{
+				kind: topo.Kind,
+				name: topo.Symbol.Name,
+				oid:  topo.Symbol.OID,
+			}] = true
 		case topo.IsColumn():
 			seenTableOIDs[topologyColumnTableIdentity(topo.Kind, topo.Table)] = topo.Table.OID
 			for _, sym := range topo.Symbols {
@@ -295,7 +308,11 @@ func (p *Profile) mergeTopology(base *Profile) error {
 		}
 		switch {
 		case baseTopo.IsScalar():
-			key := topologyScalarMetricKey{kind: baseTopo.Kind, name: baseTopo.Symbol.Name, oid: baseTopo.Symbol.OID}
+			key := topologyScalarMetricKey{
+				kind: baseTopo.Kind,
+				name: baseTopo.Symbol.Name,
+				oid:  baseTopo.Symbol.OID,
+			}
 			if !seenScalars[key] {
 				p.Definition.Topology = append(p.Definition.Topology, baseTopo)
 				seenScalars[key] = true
@@ -360,11 +377,22 @@ func indexTopologyMergeConflicts(
 ) error {
 	switch {
 	case topo.IsScalar():
-		key := topologyScalarConflictKey{name: topo.Symbol.Name, oid: topo.Symbol.OID}
-		return indexTopologyKindConflict(fmt.Sprintf("scalar %q/%q", topo.Symbol.Name, topo.Symbol.OID), key, topo.Kind, scalarKinds)
+		key := topologyScalarConflictKey{
+			name: topo.Symbol.Name,
+			oid:  topo.Symbol.OID,
+		}
+		return indexTopologyKindConflict(
+			fmt.Sprintf("scalar %q/%q", topo.Symbol.Name, topo.Symbol.OID),
+			key,
+			topo.Kind,
+			scalarKinds,
+		)
 	case topo.IsColumn():
 		for _, sym := range topo.Symbols {
-			key := topologyColumnConflictKey{table: columnMetricTableIdentity(topo.Table), symbolName: sym.Name}
+			key := topologyColumnConflictKey{
+				table:      columnMetricTableIdentity(topo.Table),
+				symbolName: sym.Name,
+			}
 			if err := indexTopologyKindConflict(fmt.Sprintf("table %q symbol %q", columnMetricTableIdentity(topo.Table), sym.Name), key, topo.Kind, columnKinds); err != nil {
 				return err
 			}
@@ -413,8 +441,6 @@ func (p *Profile) mergeMetadata(base *Profile) {
 			targetRes = ddprofiledefinition.MetadataResourceConfig{}
 		}
 
-		targetRes.IDTags = append(targetRes.IDTags, baseRes.IDTags...)
-
 		if targetRes.Fields == nil && len(baseRes.Fields) > 0 {
 			targetRes.Fields = make(map[string]ddprofiledefinition.MetadataField, len(baseRes.Fields))
 		}
@@ -444,26 +470,6 @@ func (p *Profile) mergeMetadata(base *Profile) {
 
 func (p *Profile) validate() error {
 	return ddprofiledefinition.ValidateEnrichProfile(p.Definition)
-}
-
-func (p *Profile) removeConstantMetrics() {
-	if p.Definition == nil {
-		return
-	}
-
-	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		if m.IsScalar() && m.Symbol.ConstantValueOne {
-			return true
-		}
-
-		if m.IsColumn() {
-			m.Symbols = slices.DeleteFunc(m.Symbols, func(s ddprofiledefinition.SymbolConfig) bool {
-				return s.ConstantValueOne
-			})
-		}
-
-		return m.IsColumn() && len(m.Symbols) == 0
-	})
 }
 
 // sortProfilesBySpecificity sorts profiles by their match specificity.
@@ -525,7 +531,7 @@ func enrichProfile(prof *Profile) {
 	}
 }
 
-func enrichMetricTagMappingRefs(tags ddprofiledefinition.MetricTagConfigList) {
+func enrichMetricTagMappingRefs(tags []ddprofiledefinition.MetricTagConfig) {
 	for j := range tags {
 		tagCfg := &tags[j]
 
@@ -660,20 +666,11 @@ func deduplicateLicensingInProfile(prof *Profile, seenSignals map[string]bool) {
 func generateLicenseSignalKeys(row ddprofiledefinition.LicensingConfig) []string {
 	identity := ddprofiledefinition.LicenseStructuralIdentity(row)
 	var keys []string
-	add := func(value ddprofiledefinition.LicenseValueConfig) {
-		if value.IsSet() && value.Kind != "" {
+	ddprofiledefinition.ForEachLicenseSignalValue(row, func(value ddprofiledefinition.LicenseValueConfig) {
+		if value.Kind != "" {
 			keys = append(keys, strings.Join([]string{identity, string(value.Kind)}, "|"))
 		}
-	}
-	add(row.State.LicenseValueConfig)
-	addLicenseTimerSignalKeys(row.Signals.Expiry, add)
-	addLicenseTimerSignalKeys(row.Signals.Authorization, add)
-	addLicenseTimerSignalKeys(row.Signals.Certificate, add)
-	addLicenseTimerSignalKeys(row.Signals.Grace, add)
-	add(row.Signals.Usage.Used)
-	add(row.Signals.Usage.Capacity)
-	add(row.Signals.Usage.Available)
-	add(row.Signals.Usage.Percent)
+	})
 	return keys
 }
 
@@ -717,12 +714,6 @@ func generateBGPSignalKeys(row ddprofiledefinition.BGPConfig) []string {
 	return keys
 }
 
-func addLicenseTimerSignalKeys(cfg ddprofiledefinition.LicenseTimerSignalsConfig, add func(ddprofiledefinition.LicenseValueConfig)) {
-	add(cfg.LicenseValueConfig)
-	add(cfg.Timestamp)
-	add(cfg.Remaining)
-}
-
 func generateTopologyScalarMetricKey(topo ddprofiledefinition.TopologyConfig) string {
 	return strings.Join([]string{
 		"topology-scalar",
@@ -732,7 +723,10 @@ func generateTopologyScalarMetricKey(topo ddprofiledefinition.TopologyConfig) st
 	}, "|")
 }
 
-func generateTopologyColumnMetricKey(topo ddprofiledefinition.TopologyConfig, sym ddprofiledefinition.SymbolConfig) string {
+func generateTopologyColumnMetricKey(
+	topo ddprofiledefinition.TopologyConfig,
+	sym ddprofiledefinition.SymbolConfig,
+) string {
 	return strings.Join([]string{
 		"topology-table",
 		string(topo.Kind),

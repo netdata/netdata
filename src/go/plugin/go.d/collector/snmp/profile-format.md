@@ -170,6 +170,17 @@ virtual_metrics: <calculated metrics>
 | [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
 
+Profile metric tags must be objects, such as `{tag: interface, index: 1}`.
+Top-level `metric_tags` read scalar OIDs: they require `symbol.OID` and cannot
+use `table`, `index`, or `index_transform`. Legacy tag-level OIDs are normalized
+before these checks.
+Datadog string references such as `metric_tags: [ifName]` are unsupported and
+fail YAML decoding. The Datadog metric `options` object (`placement`,
+`metric_suffix`) is ignored; it does not extract flags or change metric names.
+Unknown struct fields continue to be ignored by the profile loader, including
+fields on profiles, metrics, symbols, and metadata field definitions. Map entries
+such as metadata resource names and field names are validated and can be rejected.
+
 ### 1. selector
 
 You use the selector to:
@@ -245,11 +256,23 @@ Metric override identity depends on metric type:
 
 ### 3. metadata
 
+Each metadata field requires a static `value`, a `symbol`, or a non-empty `symbols` list.
+Every configured symbol requires both `OID` and `name`, even when a static value is also present.
+Ordinary device metadata permits static values alongside symbols; `sysobjectid_metadata` requires choosing one of those forms.
+
 The `metadata` section defines **device-level information** (not metric tags).
 
 It is collected **once per device** and populates the device’s **host labels** in Netdata (the “virtual node” labels shown on the device page).
 
 It always follows the structure `metadata → device → fields`, where each field defines a single label.
+
+The optional top-level `sysobjectid_metadata` list defines device-specific metadata using
+entries with `sysobjectid` and `metadata` fields. Matching entries are collected even when
+`metadata.device` is absent, including when consumer scoping removes ordinary metadata.
+
+The Datadog `metadata.interface` resource is unsupported and fails profile
+validation. Legacy `id_tags` are ignored; use metric tags for per-row labels.
+
 
 Each field can be:
 
@@ -425,8 +448,7 @@ topology:
   allows OctetString columns such as an ARP physical address to anchor a row.
   Scalar topology symbols retain their ordinary value semantics.
 - Topology rows do not use chart/export-only fields such as `chart_meta`,
-  `metric_type`, `mapping`, `transform`, `scale_factor`, `format`, or
-  `constant_value_one` on the row value symbol.
+  `metric_type`, `mapping`, `transform`, `scale_factor`, or `format` on the row value symbol.
 - Table topology row symbols also reject `extract_value`, `match_pattern`, and
   `match_value` because structural presence mode intentionally ignores the
   anchor PDU value. These transformations remain valid for scalar topology
@@ -844,6 +866,16 @@ The collector automatically detects the appropriate **metric type** (e.g., `gaug
 **Overriding the Metric Type**
 
 You can explicitly set a metric’s type using the `metric_type` field inside a symbol definition.
+
+The legacy metric-row `metric_type` also remains supported. For scalar rows it
+supplies the symbol's default type; for table rows it supplies the default for
+each column. An explicit `symbol.metric_type` or `symbols[].metric_type` takes
+precedence. With neither override, Netdata derives the type from the SNMP PDU.
+Prefer setting the type on each symbol in new profiles.
+
+The retired `constant_value_one` field is ignored. Metric symbols still require an OID;
+this field neither generates a constant metric nor suppresses an OID-backed metric.
+
 
 ```yaml
 metrics:
@@ -1419,6 +1451,15 @@ Use exactly one row-index selector per typed BGP value: `index`,
 `index_from_end`, or `index_transform`. Profile validation rejects typed BGP
 values that set more than one of these selectors.
 
+For typed BGP and licensing values, OID aliases resolve in this order:
+`symbol.OID`, then `from`, then legacy `OID`. Collection, table-boundary validation,
+and scalar inheritance identity use that same source. Prefer one source form per
+value; new profiles should use `symbol` objects or `from`.
+
+For typed BGP values, a non-empty `symbol.mapping` takes precedence over a value-level
+`mapping`. Validation checks the same effective mapping used during collection, including
+the canonical peer-state and AFI/SAFI values. Prefer one mapping location to avoid ambiguity.
+
 Typed BGP cross-table value fields can also use `lookup_symbol` with
 `table:` and `index_transform:`. This is needed when a BGP peer-family table is
 indexed by a compact peer ID, but peer identity fields such as neighbor and
@@ -1472,10 +1513,9 @@ selector-scoped device exception above.
 
 Tag transformations let you **modify or extract parts of SNMP values** to produce clear, human-readable tags.
 
-They work the same in **both** places:
-
-- `metadata` (e.g., device model, OS name), and
-- `metric_tags` (e.g., per-row interface labels).
+Metadata symbols and SNMP-value metric tags support formatting, extraction, replacement,
+and mapping. Global, same-table, and cross-table metric tags also support `match` + `tags`
+to emit multiple labels. Metadata fields do not support that multi-tag form.
 
 **Available Tag Transformations**:
 
@@ -1491,13 +1531,22 @@ They work the same in **both** places:
 
 | Rule                        | Description                                                                                                                                   |
 |-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Where**                   | Can be used inside `metadata.*.fields.*.symbols[]` and `metric_tags[]`.                                                                       |
-| **Order of application**    | 1️⃣ `match_pattern` + `match_value` **or** `extract_value` (whichever is present) → 2️⃣ `mapping` → 3️⃣ `match` + `tags` (if defined).        |
+| **Where**                   | Metadata transformations belong inside `symbol` or `symbols[]`. For metric tags, regex extraction/replacement and format belong inside `symbol`; mapping and `match` + `tags` belong on the tag. |
+| **Order of application**    | `format` → `extract_value` → `match_pattern` + `match_value` → `mapping` → `match` + `tags` (metric tags only). Every configured step runs on the preceding result. |
 | **No match behavior**       | • `extract_value`: keeps the original value.<br/>• `match_pattern`: skips the value (tag not emitted).<br/>• `match` + `tags`: emits no tags. |
-| **Multiple symbols**        | If multiple `symbols` are listed for the same tag, the **first non-empty result** is used.                                                    |
+| **Metadata fallback**        | For metadata `symbols`, an extraction mismatch tries the next symbol; the last symbol retains the original value on an extraction miss. The first non-empty result wins. |
 | **Mapping key consistency** | Keys in a `mapping` must all be the same type — all numeric or all string.                                                                    |
 | **Mapping modes**           | Tags and metadata support only exact-match mapping. Use `mapping.items`; `mapping.mode` is optional and defaults to exact.                    |
 | **Safety**                  | Keep regexes simple and, when possible, **anchor them** (e.g. `^pattern$`) to prevent unwanted matches.                                       |
+
+For example, extracting `1` from `value=1` and mapping `1` to `up` emits `up`.
+Combining transformations now applies the entire sequence; older releases selected only
+one operation for SNMP-value metric tags. Extraction without a match retains the input;
+replacement or final multi-tag matching without a match emits no tag.
+
+Raw index tags keep a different order: index selection → extraction → replacement →
+`symbol.format` → mapping. Their regex misses reject the tag because index parsing failed.
+They do not support the multi-tag `match` + `tags` form.
 
 **Quick Syntax Recap**:
 
@@ -1769,7 +1818,7 @@ These transformations are typically used to:
 
 | Rule                      | Description                                                                                                                                                                                                                                                                                                                                              |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
+| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata. |
 | **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
 | **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                             |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
@@ -1846,7 +1895,8 @@ In exact mode, the emitted dimension names come from the **string side** of the 
 - In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
 - If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
 - `mapping.mode: bitmask` works only for **metric values**, not for tags or metadata.
-- `mapping.mode: bitmask` keys must be `0` or a single power-of-two bit (`1`, `2`, `4`, `8`, ...).
+- `mapping.mode: bitmask` keys must be `0` or a single power-of-two bit from `1` through `9223372036854775808` (bits 0–63).
+- Bitmask values support unsigned 64-bit numeric, decimal-string, and hexadecimal inputs. The internal raw `int64` value retains the same bits, so a value with bit 63 set has a negative raw representation; decoded dimensions remain `0` or `1`.
 - `scale_factor` cannot be combined with `mapping.mode: bitmask`.
 - If multiple bit keys map to the same dimension, that dimension is active when any mapped bit is active.
 
@@ -2396,6 +2446,9 @@ that section; regular `metrics:` rows are not used as a licensing transport.
 
 ### Authoring contract
 
+For table licensing rows, every effective OID source must be inside `table.OID`,
+whether it is written as `symbol.OID`, `from`, or legacy `OID`.
+
 A licensing row describes one vendor license, entitlement, contract, or
 license pool. A row may be table-backed or scalar-backed:
 
@@ -2431,14 +2484,15 @@ licensing:
       OID: 1.3.6.1.4.1.2620.1.6.18.1
       name: licensingTable
     identity:
-      id:   { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2, name: licensingID }
-      name: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4, name: licensingBladeName }
+      id: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2, name: licensingID } }
+      name: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4, name: licensingBladeName } }
       component: { value: blade }
     descriptors:
       type: { value: subscription }
     state:
-      OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
-      name: licensingState
+      symbol:
+        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
+        name: licensingState
       mapping:
         valid: "0"
         "about-to-expire": "1"
@@ -2446,12 +2500,13 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
-          name: licensingExpirationDate
+          symbol:
+            OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
+            name: licensingExpirationDate
           sentinel: [timer_u32_max]
       usage:
-        used:     { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10, name: licensingUsedQuota }
-        capacity: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9,  name: licensingTotalQuota }
+        used: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10, name: licensingUsedQuota } }
+        capacity: { symbol: { OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9, name: licensingTotalQuota } }
 ```
 
 Example scalar-backed row:
@@ -2469,9 +2524,10 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.14988.1.1.4.2.0
-          name: mtxrLicUpgrUntil
-          format: snmp_dateandtime
+          symbol:
+            OID: 1.3.6.1.4.1.14988.1.1.4.2.0
+            name: mtxrLicUpgrUntil
+            format: snmp_dateandtime
           sentinel: [timer_pre_1971]
 ```
 

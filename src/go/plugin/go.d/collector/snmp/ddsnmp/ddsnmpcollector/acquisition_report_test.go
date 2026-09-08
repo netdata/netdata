@@ -25,8 +25,11 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 		Definition: &ddprofiledefinition.ProfileDefinition{
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{{
 				MetricTagConfig: ddprofiledefinition.MetricTagConfig{
-					Tag:    "site",
-					Symbol: ddprofiledefinition.SymbolConfigCompat{OID: failedTagOID, Name: "site"},
+					Tag: "site",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID:  failedTagOID,
+						Name: "site",
+					},
 				},
 			}},
 		},
@@ -43,9 +46,14 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{succeeded, failed},
 		Log:        logger.New(),
-		AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, metrics *ddsnmp.ProfileMetrics) {
-			got = append(got, observation{report: report, hasMetrics: metrics != nil})
-		}),
+		AcquisitionObserver: AcquisitionObserverFunc(
+			func(report AcquisitionProfileReport, metrics *ddsnmp.ProfileMetrics) {
+				got = append(got, observation{
+					report:     report,
+					hasMetrics: metrics != nil,
+				})
+			},
+		),
 	})
 
 	metrics, err := collector.Collect()
@@ -90,14 +98,22 @@ func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
 		Definition: &ddprofiledefinition.ProfileDefinition{
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{{
 				MetricTagConfig: ddprofiledefinition.MetricTagConfig{
-					Tag:    "site",
-					Symbol: ddprofiledefinition.SymbolConfigCompat{OID: tagOID, Name: "site"},
+					Tag: "site",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID:  tagOID,
+						Name: "site",
+					},
 				},
 			}},
 			Metadata: ddprofiledefinition.MetadataConfig{
 				ddprofiledefinition.MetadataDeviceResource: {
 					Fields: map[string]ddprofiledefinition.MetadataField{
-						"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serialNumber"}},
+						"serial_number": {
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  metadataOID,
+								Name: "serialNumber",
+							},
+						},
 					},
 				},
 			},
@@ -160,14 +176,22 @@ func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepar
 		Definition: &ddprofiledefinition.ProfileDefinition{
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{{
 				MetricTagConfig: ddprofiledefinition.MetricTagConfig{
-					Tag:    "site",
-					Symbol: ddprofiledefinition.SymbolConfigCompat{OID: tagOID, Name: "site"},
+					Tag: "site",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID:  tagOID,
+						Name: "site",
+					},
 				},
 			}},
 			Metadata: ddprofiledefinition.MetadataConfig{
 				ddprofiledefinition.MetadataDeviceResource: {
 					Fields: map[string]ddprofiledefinition.MetadataField{
-						"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serialNumber"}},
+						"serial_number": {
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  metadataOID,
+								Name: "serialNumber",
+							},
+						},
 					},
 				},
 			},
@@ -203,7 +227,10 @@ func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
 		Definition: &ddprofiledefinition.ProfileDefinition{
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{{
 				MetricTagConfig: ddprofiledefinition.MetricTagConfig{
-					Symbol:  ddprofiledefinition.SymbolConfigCompat{OID: tagOID, Name: "sysName"},
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID:  tagOID,
+						Name: "sysName",
+					},
 					Pattern: mustCompileRegex(`(.*)-(.*)`),
 					Tags:    map[string]string{"site": "$1", "role": "$2"},
 				},
@@ -263,13 +290,18 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 
 		profile := &ddsnmp.Profile{
 			SourceFile: source,
-			Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-				Kind: ddsnmp.KindArpEntry,
-				MetricsConfig: ddprofiledefinition.MetricsConfig{
-					Table:   ddprofiledefinition.SymbolConfig{OID: oid, Name: "arpTable"},
-					Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "arpEntry"}},
-				},
-			}}},
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				Topology: []ddprofiledefinition.TopologyConfig{{
+					Kind: ddsnmp.KindArpEntry,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  oid,
+							Name: "arpTable",
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "arpEntry"}},
+					},
+				}},
+			},
 		}
 
 		var reports []AcquisitionProfileReport
@@ -277,9 +309,11 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				reports = append(reports, report)
-			}),
+			AcquisitionObserver: AcquisitionObserverFunc(
+				func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+					reports = append(reports, report)
+				},
+			),
 		})
 		_, err := collector.Collect()
 		require.NoError(t, err)
@@ -296,18 +330,26 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 }
 
 func TestAcquisitionProfileRouteDigestIncludesOrdinaryMetrics(t *testing.T) {
-	profile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
-		Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind: ddsnmp.KindArpEntry,
-			MetricsConfig: ddprofiledefinition.MetricsConfig{
-				Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3", Name: "topologyValue"},
-			},
-		}},
-	}}
+	profile := &ddsnmp.Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind: ddsnmp.KindArpEntry,
+				MetricsConfig: ddprofiledefinition.MetricsConfig{
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.4.1.99999.3",
+						Name: "topologyValue",
+					},
+				},
+			}},
+		},
+	}
 
 	want := acquisitionProfileRouteDigest(profile)
 	profile.Definition.Metrics = []ddprofiledefinition.MetricsConfig{{
-		Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.4", Name: "ordinaryValue"},
+		Symbol: ddprofiledefinition.SymbolConfig{
+			OID:  "1.3.6.1.4.1.99999.4",
+			Name: "ordinaryValue",
+		},
 	}}
 
 	assert.NotEqual(t, want, acquisitionProfileRouteDigest(profile))
@@ -320,10 +362,12 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 	dependency, source := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999.50")
 	profile := &ddsnmp.Profile{
 		SourceFile: "topology-dependency.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind:          ddsnmp.KindArpEntry,
-			MetricsConfig: source,
-		}}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind:          ddsnmp.KindArpEntry,
+				MetricsConfig: source,
+			}},
+		},
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 	var dependencyRouteOID string
@@ -383,10 +427,12 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 	})
 	profile := &ddsnmp.Profile{
 		SourceFile: "topology-dependency-counts.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind:          ddsnmp.KindArpEntry,
-			MetricsConfig: source,
-		}}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind:          ddsnmp.KindArpEntry,
+				MetricsConfig: source,
+			}},
+		},
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 
@@ -429,10 +475,12 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 	dependency, source := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999.57")
 	profile := &ddsnmp.Profile{
 		SourceFile: "dormant-topology-dependency.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind:          ddsnmp.KindArpEntry,
-			MetricsConfig: source,
-		}}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind:          ddsnmp.KindArpEntry,
+				MetricsConfig: source,
+			}},
+		},
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 	var dependencyRoot string
@@ -488,10 +536,12 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 	}})
 	topology := &ddsnmp.Profile{
 		SourceFile: "b-topology-dependency.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind:          ddsnmp.KindArpEntry,
-			MetricsConfig: source,
-		}}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind:          ddsnmp.KindArpEntry,
+				MetricsConfig: source,
+			}},
+		},
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(topology)
 
@@ -550,13 +600,19 @@ func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTa
 		SourceFile: "unprocessed-topology.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{
 			Metrics: []ddprofiledefinition.MetricsConfig{{
-				Table:   ddprofiledefinition.SymbolConfig{OID: regularTableOID, Name: "regularTable"},
+				Table: ddprofiledefinition.SymbolConfig{
+					OID:  regularTableOID,
+					Name: "regularTable",
+				},
 				Symbols: []ddprofiledefinition.SymbolConfig{{OID: regularTableOID + ".1", Name: "regularValue"}},
 			}},
 			Topology: []ddprofiledefinition.TopologyConfig{{
 				Kind: ddsnmp.KindArpEntry,
 				MetricsConfig: ddprofiledefinition.MetricsConfig{
-					Table:   ddprofiledefinition.SymbolConfig{OID: topologyTableOID, Name: "topologyTable"},
+					Table: ddprofiledefinition.SymbolConfig{
+						OID:  topologyTableOID,
+						Name: "topologyTable",
+					},
 					Symbols: []ddprofiledefinition.SymbolConfig{{OID: topologyTableOID + ".1", Name: "topologyValue"}},
 				},
 			}},
@@ -599,22 +655,30 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 	)
 	profile := &ddsnmp.Profile{
 		SourceFile: "value-references.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{
-			{
-				Kind: ddsnmp.KindArpEntry,
-				MetricsConfig: ddprofiledefinition.MetricsConfig{
-					Table:   ddprofiledefinition.SymbolConfig{OID: firstTableOID, Name: "firstTable"},
-					Symbols: []ddprofiledefinition.SymbolConfig{{OID: firstTableOID + ".1", Name: "firstValue"}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{
+				{
+					Kind: ddsnmp.KindArpEntry,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  firstTableOID,
+							Name: "firstTable",
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{{OID: firstTableOID + ".1", Name: "firstValue"}},
+					},
+				},
+				{
+					Kind: ddsnmp.KindFdbEntry,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  secondTableOID,
+							Name: "secondTable",
+						},
+						Symbols: []ddprofiledefinition.SymbolConfig{{OID: secondTableOID + ".1", Name: "secondValue"}},
+					},
 				},
 			},
-			{
-				Kind: ddsnmp.KindFdbEntry,
-				MetricsConfig: ddprofiledefinition.MetricsConfig{
-					Table:   ddprofiledefinition.SymbolConfig{OID: secondTableOID, Name: "secondTable"},
-					Symbols: []ddprofiledefinition.SymbolConfig{{OID: secondTableOID + ".1", Name: "secondValue"}},
-				},
-			},
-		}},
+		},
 	}
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, firstTableOID, []gosnmp.SnmpPDU{
 		createGauge32PDU(firstTableOID+".1.7", 1),
@@ -637,10 +701,28 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].TopologyMetrics, 2)
 	require.Len(t, report.TopologyValueReferences, 2)
-	assert.Equal(t, AcquisitionValueReference{RowIndex: "7", Field: "firstValue", RouteOrdinal: 0, RowOrdinal: 0, ValueOrdinal: 0},
-		report.TopologyValueReferences[0])
-	assert.Equal(t, AcquisitionValueReference{RowIndex: "9", Field: "secondValue", RouteOrdinal: 1, RowOrdinal: 0, ValueOrdinal: 0},
-		report.TopologyValueReferences[1])
+	assert.Equal(
+		t,
+		AcquisitionValueReference{
+			RowIndex:     "7",
+			Field:        "firstValue",
+			RouteOrdinal: 0,
+			RowOrdinal:   0,
+			ValueOrdinal: 0,
+		},
+		report.TopologyValueReferences[0],
+	)
+	assert.Equal(
+		t,
+		AcquisitionValueReference{
+			RowIndex:     "9",
+			Field:        "secondValue",
+			RouteOrdinal: 1,
+			RowOrdinal:   0,
+			ValueOrdinal: 0,
+		},
+		report.TopologyValueReferences[1],
+	)
 }
 
 func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSources(t *testing.T) {
@@ -649,10 +731,16 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 
 	const oid = "1.3.6.1.4.1.99999.80.0"
 	first := acquisitionTopologyTestProfile("a-current.yaml", ddprofiledefinition.MetricsConfig{
-		Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "currentMissing"},
+		Symbol: ddprofiledefinition.SymbolConfig{
+			OID:  oid,
+			Name: "currentMissing",
+		},
 	})
 	second := acquisitionTopologyTestProfile("b-inherited.yaml", ddprofiledefinition.MetricsConfig{
-		Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "inheritedMissing"},
+		Symbol: ddprofiledefinition.SymbolConfig{
+			OID:  oid,
+			Name: "inheritedMissing",
+		},
 	})
 	expectSNMPGet(mockHandler, []string{oid}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(oid)})
 
@@ -682,7 +770,10 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 
 		const oid = "1.3.6.1.4.1.99999.40.1.0"
 		profile := acquisitionTopologyTestProfile("topology-scalar.yaml", ddprofiledefinition.MetricsConfig{
-			Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "missingMetric"},
+			Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  oid,
+				Name: "missingMetric",
+			},
 		})
 		expectSNMPGet(mockHandler, []string{oid}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(oid)})
 
@@ -691,9 +782,11 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				report = value
-			}),
+			AcquisitionObserver: AcquisitionObserverFunc(
+				func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+					report = value
+				},
+			),
 		})
 		_, err := collector.Collect()
 		require.NoError(t, err)
@@ -716,9 +809,11 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 		})
 		profile := &ddsnmp.Profile{
 			SourceFile: "bgp-scalar.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{
-				scalarBGPTestConfig(),
-			}},
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{
+					scalarBGPTestConfig(),
+				},
+			},
 		}
 
 		var report AcquisitionProfileReport
@@ -726,9 +821,11 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
-			AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
-				report = value
-			}),
+			AcquisitionObserver: AcquisitionObserverFunc(
+				func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) {
+					report = value
+				},
+			),
 		})
 		_, err := collector.Collect()
 		require.NoError(t, err)
@@ -754,10 +851,12 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 
 	profile := &ddsnmp.Profile{
 		SourceFile: "bgp.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{
-			scalarBGPTestConfig(),
-			tableBGPTestConfig(),
-		}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{
+				scalarBGPTestConfig(),
+				tableBGPTestConfig(),
+			},
+		},
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
@@ -803,9 +902,11 @@ func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *test
 
 	profile := &ddsnmp.Profile{
 		SourceFile: "bgp-mixed-missing.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{
-			scalarBGPTestConfig(),
-		}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{
+				scalarBGPTestConfig(),
+			},
+		},
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
@@ -843,32 +944,44 @@ func TestAcquisitionProfileRouteDigestIncludesAllBGPValueSources(t *testing.T) {
 			base := scalarBGPTestConfig()
 			changed := base.Clone()
 			mutate(&changed)
-			baseProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
-				BGP: []ddprofiledefinition.BGPConfig{base},
-			}}
-			changedProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
-				BGP: []ddprofiledefinition.BGPConfig{changed},
-			}}
-			assert.NotEqual(t, acquisitionProfileRouteDigest(baseProfile), acquisitionProfileRouteDigest(changedProfile))
+			baseProfile := &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					BGP: []ddprofiledefinition.BGPConfig{base},
+				},
+			}
+			changedProfile := &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					BGP: []ddprofiledefinition.BGPConfig{changed},
+				},
+			}
+			assert.NotEqual(
+				t,
+				acquisitionProfileRouteDigest(baseProfile),
+				acquisitionProfileRouteDigest(changedProfile),
+			)
 		})
 	}
 
 	base := tableBGPTestConfig()
 	changed := base.Clone()
 	changed.Table.Name += "Changed"
-	baseProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
-		BGP: []ddprofiledefinition.BGPConfig{base},
-	}}
-	changedProfile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{
-		BGP: []ddprofiledefinition.BGPConfig{changed},
-	}}
+	baseProfile := &ddsnmp.Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{base},
+		},
+	}
+	changedProfile := &ddsnmp.Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{changed},
+		},
+	}
 	assert.NotEqual(t, acquisitionProfileRouteDigest(baseProfile), acquisitionProfileRouteDigest(changedProfile))
 }
 
 func TestFirstBGPRouteOIDDoesNotBulkAllocateBySourceCount(t *testing.T) {
 	const smallestOID = "1.3.6.1.2.1.1"
 	cfg := scalarBGPTestConfig()
-	cfg.MetricTags = make(ddprofiledefinition.MetricTagConfigList, 10_000)
+	cfg.MetricTags = make([]ddprofiledefinition.MetricTagConfig, 10_000)
 	for i := range cfg.MetricTags {
 		cfg.MetricTags[i].Symbol = ddprofiledefinition.SymbolConfigCompat{
 			OID:  "1.3.6.1.4.1.99999.100",
@@ -1037,10 +1150,12 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 	}
 	profile := &ddsnmp.Profile{
 		SourceFile: "bgp-value-references.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{
-			scalarBGPTestConfig(),
-			tableCfg,
-		}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{
+				scalarBGPTestConfig(),
+				tableCfg,
+			},
+		},
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
@@ -1075,9 +1190,11 @@ func acquisitionRoutesByKind(routes []AcquisitionRouteReport) map[AcquisitionRou
 func acquisitionTopologyTestProfile(source string, config ddprofiledefinition.MetricsConfig) *ddsnmp.Profile {
 	return &ddsnmp.Profile{
 		SourceFile: source,
-		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind:          ddsnmp.KindArpEntry,
-			MetricsConfig: config,
-		}}},
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind:          ddsnmp.KindArpEntry,
+				MetricsConfig: config,
+			}},
+		},
 	}
 }

@@ -88,13 +88,23 @@ func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, 
 		return err
 	}
 
-	switch {
-	case cfg.Mapping.HasItems():
-		if v, ok := cfg.Mapping.Lookup(val); ok {
-			val = v
+	if cfg.Symbol.ExtractValueCompiled != nil {
+		if sm := cfg.Symbol.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
+			val = sm[1]
 		}
-		ta.addTag(tagName, val)
-	case cfg.Pattern != nil:
+	}
+	if cfg.Symbol.MatchPatternCompiled != nil {
+		sm := cfg.Symbol.MatchPatternCompiled.FindStringSubmatch(val)
+		if len(sm) == 0 {
+			ta.processing.record(tagName, pdu.Name, "pattern_mismatch")
+			return nil
+		}
+		val = replaceSubmatches(cfg.Symbol.MatchValue, sm)
+	}
+	if mapped, ok := cfg.Mapping.Lookup(val); ok {
+		val = mapped
+	}
+	if cfg.Pattern != nil {
 		if sm := cfg.Pattern.FindStringSubmatch(val); len(sm) > 0 {
 			for name, tmpl := range cfg.Tags {
 				ta.addTag(name, replaceSubmatches(tmpl, sm))
@@ -102,19 +112,7 @@ func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, 
 		} else {
 			ta.processing.record(tagName, pdu.Name, "pattern_mismatch")
 		}
-	case cfg.Symbol.ExtractValueCompiled != nil:
-		if sm := cfg.Symbol.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
-			ta.addTag(tagName, sm[1])
-		} else {
-			ta.processing.record(tagName, pdu.Name, "extract_mismatch")
-		}
-	case cfg.Symbol.MatchPatternCompiled != nil:
-		if sm := cfg.Symbol.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
-			ta.addTag(tagName, replaceSubmatches(cfg.Symbol.MatchValue, sm))
-		} else {
-			ta.processing.record(tagName, pdu.Name, "pattern_mismatch")
-		}
-	default:
+	} else {
 		ta.addTag(tagName, val)
 	}
 

@@ -358,14 +358,20 @@ func (c *Collector) buildScalarBGPRow(
 		Tags:            parseStaticTags(cfg.StaticTags),
 	}
 
-	bgpCtx := bgpValueContext{pdus: pdus, processing: processingFor(route, rowKey)}
+	bgpCtx := bgpValueContext{
+		pdus:       pdus,
+		processing: processingFor(route, rowKey),
+	}
 	if err := c.populateBGPRow(&row, cfg, bgpCtx); err != nil {
 		return ddsnmp.BGPRow{}, false, err
 	}
 
 	if len(cfg.MetricTags) > 0 {
 		tags := make(map[string]string)
-		ta := tagAdder{tags: tags, processing: bgpCtx.processing}
+		ta := tagAdder{
+			tags:       tags,
+			processing: bgpCtx.processing,
+		}
 		for _, tagCfg := range cfg.MetricTags {
 			if tagCfg.Symbol.OID == "" {
 				continue
@@ -485,13 +491,28 @@ func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.B
 	if row.Identity.SubsequentAddressFamily, err = c.bgpSubsequentAddressFamilyValue(cfg.Identity.SubsequentAddressFamily.BGPValueConfig, ctx.forField("identity.subsequent_address_family")); err != nil {
 		return fmt.Errorf("identity.subsequent_address_family: %w", err)
 	}
-	row.Descriptors.LocalAddress = c.bgpOptionalTextValue(cfg.Descriptors.LocalAddress, ctx.forField("descriptors.local_address"))
+	row.Descriptors.LocalAddress = c.bgpOptionalTextValue(
+		cfg.Descriptors.LocalAddress,
+		ctx.forField("descriptors.local_address"),
+	)
 	row.Descriptors.LocalAS = c.bgpOptionalTextValue(cfg.Descriptors.LocalAS, ctx.forField("descriptors.local_as"))
-	row.Descriptors.LocalIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.LocalIdentifier, ctx.forField("descriptors.local_identifier"))
-	row.Descriptors.PeerIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.PeerIdentifier, ctx.forField("descriptors.peer_identifier"))
+	row.Descriptors.LocalIdentifier = c.bgpOptionalTextValue(
+		cfg.Descriptors.LocalIdentifier,
+		ctx.forField("descriptors.local_identifier"),
+	)
+	row.Descriptors.PeerIdentifier = c.bgpOptionalTextValue(
+		cfg.Descriptors.PeerIdentifier,
+		ctx.forField("descriptors.peer_identifier"),
+	)
 	row.Descriptors.PeerType = c.bgpOptionalTextValue(cfg.Descriptors.PeerType, ctx.forField("descriptors.peer_type"))
-	row.Descriptors.BGPVersion = c.bgpOptionalTextValue(cfg.Descriptors.BGPVersion, ctx.forField("descriptors.bgp_version"))
-	row.Descriptors.Description = c.bgpOptionalTextValue(cfg.Descriptors.Description, ctx.forField("descriptors.description"))
+	row.Descriptors.BGPVersion = c.bgpOptionalTextValue(
+		cfg.Descriptors.BGPVersion,
+		ctx.forField("descriptors.bgp_version"),
+	)
+	row.Descriptors.Description = c.bgpOptionalTextValue(
+		cfg.Descriptors.Description,
+		ctx.forField("descriptors.description"),
+	)
 
 	if err := c.populateBGPStateValue(&row.State, cfg.State, ctx.forField("state")); err != nil {
 		return fmt.Errorf("state: %w", err)
@@ -539,7 +560,11 @@ func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.B
 	return nil
 }
 
-func (c *Collector) populateBGPStateValue(dst *ddsnmp.BGPState, cfg ddprofiledefinition.BGPStateConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPStateValue(
+	dst *ddsnmp.BGPState,
+	cfg ddprofiledefinition.BGPStateConfig,
+	ctx bgpValueContext,
+) error {
 	if !cfg.IsSet() {
 		return nil
 	}
@@ -552,7 +577,7 @@ func (c *Collector) populateBGPStateValue(dst *ddsnmp.BGPState, cfg ddprofiledef
 		return nil
 	}
 	state := raw
-	if mapped, ok := bgpValueSymbol(cfg.BGPValueConfig).Mapping.Lookup(raw); ok {
+	if mapped, ok := cfg.BGPValueConfig.EffectiveSymbol().Mapping.Lookup(raw); ok {
 		state = mapped
 	}
 
@@ -565,7 +590,11 @@ func (c *Collector) populateBGPStateValue(dst *ddsnmp.BGPState, cfg ddprofiledef
 	return nil
 }
 
-func (c *Collector) populateBGPInt64(dst *ddsnmp.BGPInt64, cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPInt64(
+	dst *ddsnmp.BGPInt64,
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) error {
 	if !cfg.IsSet() {
 		return nil
 	}
@@ -588,7 +617,11 @@ func (c *Collector) populateBGPInt64(dst *ddsnmp.BGPInt64, cfg ddprofiledefiniti
 	return nil
 }
 
-func (c *Collector) populateBGPText(dst *ddsnmp.BGPText, cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPText(
+	dst *ddsnmp.BGPText,
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) error {
 	if !cfg.IsSet() {
 		return nil
 	}
@@ -600,7 +633,7 @@ func (c *Collector) populateBGPText(dst *ddsnmp.BGPText, cfg ddprofiledefinition
 		return nil
 	}
 	value := raw
-	if mapped, ok := bgpValueSymbol(cfg).Mapping.Lookup(raw); ok {
+	if mapped, ok := cfg.EffectiveSymbol().Mapping.Lookup(raw); ok {
 		value = mapped
 	}
 	*dst = ddsnmp.BGPText{
@@ -612,7 +645,11 @@ func (c *Collector) populateBGPText(dst *ddsnmp.BGPText, cfg ddprofiledefinition
 	return nil
 }
 
-func (c *Collector) populateBGPBool(dst *ddsnmp.BGPBool, cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPBool(
+	dst *ddsnmp.BGPBool,
+	cfg ddprofiledefinition.BGPValueConfig,
+	ctx bgpValueContext,
+) error {
 	if !cfg.IsSet() {
 		return nil
 	}
@@ -624,12 +661,12 @@ func (c *Collector) populateBGPBool(dst *ddsnmp.BGPBool, cfg ddprofiledefinition
 		return nil
 	}
 	text := strings.ToLower(strings.TrimSpace(raw))
-	if mapped, ok := bgpValueSymbol(cfg).Mapping.Lookup(raw); ok {
+	if mapped, ok := cfg.EffectiveSymbol().Mapping.Lookup(raw); ok {
 		text = strings.ToLower(strings.TrimSpace(mapped))
 	}
 	value, err := bgpParseBool(text)
 	if err != nil {
-		ctx.record(bgpValueSymbol(cfg), sourceOID, "conversion")
+		ctx.record(cfg.EffectiveSymbol(), sourceOID, "conversion")
 		return err
 	}
 	*dst = ddsnmp.BGPBool{
@@ -669,7 +706,11 @@ func (c *Collector) populateBGPDirectional(
 	return nil
 }
 
-func (c *Collector) populateBGPTraffic(dst *ddsnmp.BGPTraffic, cfg ddprofiledefinition.BGPTrafficConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPTraffic(
+	dst *ddsnmp.BGPTraffic,
+	cfg ddprofiledefinition.BGPTrafficConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPDirectional(&dst.Messages, cfg.Messages, ctx.forField("traffic.messages")); err != nil {
 		return fmt.Errorf("messages: %w", err)
 	}
@@ -711,7 +752,11 @@ func (c *Collector) populateBGPTransitions(
 	return nil
 }
 
-func (c *Collector) populateBGPTimers(dst *ddsnmp.BGPTimers, cfg ddprofiledefinition.BGPTimersConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPTimers(
+	dst *ddsnmp.BGPTimers,
+	cfg ddprofiledefinition.BGPTimersConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPTimerPair(&dst.Negotiated, cfg.Negotiated, ctx.forField("timers.negotiated")); err != nil {
 		return fmt.Errorf("negotiated: %w", err)
 	}
@@ -721,7 +766,11 @@ func (c *Collector) populateBGPTimers(dst *ddsnmp.BGPTimers, cfg ddprofiledefini
 	return nil
 }
 
-func (c *Collector) populateBGPTimerPair(dst *ddsnmp.BGPTimerPair, cfg ddprofiledefinition.BGPTimerPairConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPTimerPair(
+	dst *ddsnmp.BGPTimerPair,
+	cfg ddprofiledefinition.BGPTimerPairConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.ConnectRetry, cfg.ConnectRetry, ctx.forLeaf("connect_retry")); err != nil {
 		return fmt.Errorf("connect_retry: %w", err)
 	}
@@ -740,7 +789,11 @@ func (c *Collector) populateBGPTimerPair(dst *ddsnmp.BGPTimerPair, cfg ddprofile
 	return nil
 }
 
-func (c *Collector) populateBGPLastError(dst *ddsnmp.BGPLastError, cfg ddprofiledefinition.BGPLastErrorConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPLastError(
+	dst *ddsnmp.BGPLastError,
+	cfg ddprofiledefinition.BGPLastErrorConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPInt64(&dst.Code, cfg.Code, ctx.forField("last_error.code")); err != nil {
 		return fmt.Errorf("code: %w", err)
 	}
@@ -781,7 +834,11 @@ func (c *Collector) populateBGPLastNotification(
 	return nil
 }
 
-func (c *Collector) populateBGPReasons(dst *ddsnmp.BGPReasons, cfg ddprofiledefinition.BGPReasonsConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPReasons(
+	dst *ddsnmp.BGPReasons,
+	cfg ddprofiledefinition.BGPReasonsConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPText(&dst.LastDown, cfg.LastDown, ctx.forField("reasons.last_down")); err != nil {
 		return fmt.Errorf("last_down: %w", err)
 	}
@@ -791,7 +848,11 @@ func (c *Collector) populateBGPReasons(dst *ddsnmp.BGPReasons, cfg ddprofiledefi
 	return nil
 }
 
-func (c *Collector) populateBGPRoutes(dst *ddsnmp.BGPRoutes, cfg ddprofiledefinition.BGPRoutesConfig, ctx bgpValueContext) error {
+func (c *Collector) populateBGPRoutes(
+	dst *ddsnmp.BGPRoutes,
+	cfg ddprofiledefinition.BGPRoutesConfig,
+	ctx bgpValueContext,
+) error {
 	if err := c.populateBGPRouteCounters(&dst.Current, cfg.Current, ctx.forField("routes.current")); err != nil {
 		return fmt.Errorf("current: %w", err)
 	}
@@ -928,7 +989,7 @@ func (c *Collector) bgpTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgp
 	if err != nil || !ok {
 		return "", err
 	}
-	sym := bgpValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if mapped, ok := sym.Mapping.Lookup(value); ok {
 		value = mapped
 	}
@@ -939,8 +1000,14 @@ func (c *Collector) bgpOptionalTextValue(cfg ddprofiledefinition.BGPValueConfig,
 	ctx.requiredDependencyMissing = nil
 	value, err := c.bgpTextValue(cfg, ctx)
 	if err != nil {
-		sym := bgpValueSymbol(cfg)
-		c.log.Debugf("BGP optional descriptor %q on table %q row %q is unavailable: %v", sym.Name, ctx.tableName, ctx.rowIndex, err)
+		sym := cfg.EffectiveSymbol()
+		c.log.Debugf(
+			"BGP optional descriptor %q on table %q row %q is unavailable: %v",
+			sym.Name,
+			ctx.tableName,
+			ctx.rowIndex,
+			err,
+		)
 		// Descriptors enrich the row, but identity and signals already decide
 		// whether the row is usable. Some devices publish malformed descriptor
 		// placeholders, so keep the row and omit the descriptor.
@@ -981,7 +1048,7 @@ func (c *Collector) bgpRawTextValue(
 	if cfg.Value != "" {
 		return cfg.Value, "", true, nil
 	}
-	sym := bgpValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if sym.OID == "" && (cfg.Index != 0 || cfg.IndexFromEnd != 0 || len(cfg.IndexTransform) > 0) {
 		value, err := c.bgpIndexValue(cfg, ctx.rowIndex)
 		if err != nil {
@@ -1035,7 +1102,7 @@ func (c *Collector) bgpNumericValue(
 	if !cfg.IsSet() {
 		return 0, "", false, nil
 	}
-	sym := bgpValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if cfg.Value != "" || (sym.OID == "" && (cfg.Index != 0 || cfg.IndexFromEnd != 0 || len(cfg.IndexTransform) > 0)) {
 		text, _, ok, err := c.bgpRawTextValue(cfg, ctx)
 		if err != nil || !ok || text == "" {
@@ -1084,10 +1151,15 @@ func (c *Collector) lookupBGPValuePDU(
 		return pdu, sourceOID, ok, nil
 	}
 
-	refTableOID, err := c.tableCollector.rowProcessor.crossTableResolver.findReferencedTableOID(cfg.Table, ctx.crossTableCtx.tableNameToOID)
+	refTableOID, err := c.tableCollector.rowProcessor.crossTableResolver.findReferencedTableOID(
+		cfg.Table,
+		ctx.crossTableCtx.tableNameToOID,
+	)
 	if err != nil {
 		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
+			err: err,
+		}
 	}
 	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(
 		cfg.Table,
@@ -1096,12 +1168,19 @@ func (c *Collector) lookupBGPValuePDU(
 	)
 	if err != nil {
 		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
+			err: err,
+		}
 	}
-	lookupIndex, err := c.tableCollector.rowProcessor.crossTableResolver.transformIndex(ctx.rowIndex, cfg.IndexTransform)
+	lookupIndex, err := c.tableCollector.rowProcessor.crossTableResolver.transformIndex(
+		ctx.rowIndex,
+		cfg.IndexTransform,
+	)
 	if err != nil {
 		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
+			err: err,
+		}
 	}
 	tagCfg := ddprofiledefinition.MetricTagConfig{
 		Table:        cfg.Table,
@@ -1118,7 +1197,9 @@ func (c *Collector) lookupBGPValuePDU(
 		)
 		if err != nil {
 			ctx.record(sym, sourceOID, "dependency_processing")
-			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{err: err}
+			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
+				err: err,
+			}
 		}
 	}
 
@@ -1138,7 +1219,7 @@ func (c *Collector) bgpIndexValue(cfg ddprofiledefinition.BGPValueConfig, rowInd
 	if rowIndex == "" {
 		return "", nil
 	}
-	sym := bgpValueSymbol(cfg)
+	sym := cfg.EffectiveSymbol()
 	if cfg.IndexFromEnd != 0 {
 		rawValue, ok := c.tableCollector.rowProcessor.extractIndexPositionFromEnd(rowIndex, cfg.IndexFromEnd)
 		if !ok {
@@ -1163,7 +1244,7 @@ func (c *Collector) bgpIndexValue(cfg ddprofiledefinition.BGPValueConfig, rowInd
 func bgpConfigAsMetricsConfig(cfg ddprofiledefinition.BGPConfig) ddprofiledefinition.MetricsConfig {
 	columns := make(map[string]ddprofiledefinition.SymbolConfig)
 	addColumn := func(valueCfg ddprofiledefinition.BGPValueConfig) {
-		sym := bgpValueSymbol(valueCfg)
+		sym := valueCfg.EffectiveSymbol()
 		if sym.OID != "" {
 			columns[trimOID(sym.OID)] = sym
 		}
@@ -1233,7 +1314,7 @@ func bgpTableNameToOID(configs []ddprofiledefinition.BGPConfig) map[string]strin
 			if _, ok := tableNameToOID[valueCfg.Table]; ok {
 				return
 			}
-			if oid := bgpValueSymbol(valueCfg).OID; oid != "" {
+			if oid := valueCfg.EffectiveSymbol().OID; oid != "" {
 				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
 			}
 			if oid := ddprofiledefinition.SymbolConfig(valueCfg.LookupSymbol).OID; oid != "" {
@@ -1281,7 +1362,7 @@ func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, 
 	oids := make(map[string]struct{})
 	var missingOIDs []string
 	addOID := func(valueCfg ddprofiledefinition.BGPValueConfig) {
-		sym := bgpValueSymbol(valueCfg)
+		sym := valueCfg.EffectiveSymbol()
 		if sym.OID != "" {
 			oid := trimOID(sym.OID)
 			if isMissingOID(c.scalarCollector.snmpClient, c.missingOIDs, oid) {
@@ -1342,31 +1423,6 @@ func forEachBGPValuePath(
 	ddprofiledefinition.ForEachBGPSignalValue(cfg, add)
 }
 
-func bgpValueSymbol(cfg ddprofiledefinition.BGPValueConfig) ddprofiledefinition.SymbolConfig {
-	sym := cfg.Symbol
-	if sym.OID == "" {
-		switch {
-		case cfg.From != "":
-			sym.OID = cfg.From
-		case cfg.OID != "":
-			sym.OID = cfg.OID
-		}
-	}
-	if sym.Name == "" {
-		sym.Name = cfg.Name
-	}
-	if sym.Name == "" && sym.OID != "" {
-		sym.Name = "bgp:" + trimOID(sym.OID)
-	}
-	if sym.Format == "" {
-		sym.Format = cfg.Format
-	}
-	if !sym.Mapping.HasItems() && cfg.Mapping.HasItems() {
-		sym.Mapping = cfg.Mapping
-	}
-	return sym
-}
-
 func scalarBGPRowKey(cfg ddprofiledefinition.BGPConfig) string {
 	if cfg.ID != "" {
 		return cfg.ID
@@ -1376,7 +1432,7 @@ func scalarBGPRowKey(cfg ddprofiledefinition.BGPConfig) string {
 		if rowKey != "" {
 			return
 		}
-		if oid := bgpValueSymbol(valueCfg).OID; oid != "" {
+		if oid := valueCfg.EffectiveSymbol().OID; oid != "" {
 			rowKey = trimOID(oid)
 		}
 	})
@@ -1496,7 +1552,11 @@ func bgpScalarStructuralID(originProfileID string, kind ddprofiledefinition.BGPR
 	return lengthPrefixedKey(originProfileID, string(kind), "scalar", rowKey)
 }
 
-func bgpTableStructuralID(originProfileID string, kind ddprofiledefinition.BGPRowKind, configID, tableOID, rowKey string) string {
+func bgpTableStructuralID(
+	originProfileID string,
+	kind ddprofiledefinition.BGPRowKind,
+	configID, tableOID, rowKey string,
+) string {
 	return lengthPrefixedKey(originProfileID, string(kind), "table", configID, tableOID, rowKey)
 }
 

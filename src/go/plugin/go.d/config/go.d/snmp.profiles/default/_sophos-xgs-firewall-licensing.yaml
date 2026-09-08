@@ -18,8 +18,9 @@ licensing:
       impact:
         value: Sophos Base Firewall subscription state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.1.1.0
-      name: sfosBaseFWLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.1.1.0
+        name: sfosBaseFWLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -50,8 +51,9 @@ licensing:
       impact:
         value: Sophos Network Protection subscription state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.2.1.0
-      name: sfosNetProtectionLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.2.1.0
+        name: sfosNetProtectionLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -82,8 +84,9 @@ licensing:
       impact:
         value: Sophos Web Protection subscription state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.3.1.0
-      name: sfosWebProtectionLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.3.1.0
+        name: sfosWebProtectionLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -114,8 +117,9 @@ licensing:
       impact:
         value: Sophos Mail Protection subscription state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.4.1.0
-      name: sfosMailProtectionLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.4.1.0
+        name: sfosMailProtectionLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -146,8 +150,9 @@ licensing:
       impact:
         value: Sophos Web Server Protection subscription state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.5.1.0
-      name: sfosWebServerProtectionLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.5.1.0
+        name: sfosWebServerProtectionLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -178,8 +183,9 @@ licensing:
       impact:
         value: Sophos Sandstorm subscription state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.6.1.0
-      name: sfosSandstromLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.6.1.0
+        name: sfosSandstromLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -210,8 +216,9 @@ licensing:
       impact:
         value: Sophos Enhanced Support state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.7.1.0
-      name: sfosEnhancedSupportLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.7.1.0
+        name: sfosEnhancedSupportLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -242,8 +249,9 @@ licensing:
       impact:
         value: Sophos Enhanced Plus Support state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.8.1.0
-      name: sfosEnhancedPlusLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.8.1.0
+        name: sfosEnhancedPlusLicRegStatus
       policy: sophos
       mapping:
         "0": "0"
@@ -274,8 +282,9 @@ licensing:
       impact:
         value: Sophos Central Orchestration state and expiry on the device
     state:
-      OID: 1.3.6.1.4.1.2604.5.1.5.9.1.0
-      name: sfosCentralOrchestrationLicRegStatus
+      symbol:
+        OID: 1.3.6.1.4.1.2604.5.1.5.9.1.0
+        name: sfosCentralOrchestrationLicRegStatus
       policy: sophos
       mapping:
         "0": "0"

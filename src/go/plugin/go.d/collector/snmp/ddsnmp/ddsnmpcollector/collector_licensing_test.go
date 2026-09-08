@@ -40,12 +40,20 @@ func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
 					OriginProfileID: "_vendor-licensing.yaml",
 					ID:              "scalar-license-group",
 					Identity: ddprofiledefinition.LicenseIdentityConfig{
-						ID:   ddprofiledefinition.LicenseValueConfig{Value: "license-a"},
-						Name: ddprofiledefinition.LicenseValueConfig{Value: "License A"},
+						ID: ddprofiledefinition.LicenseValueConfig{
+							Value: "license-a",
+						},
+						Name: ddprofiledefinition.LicenseValueConfig{
+							Value: "License A",
+						},
 					},
 					Descriptors: ddprofiledefinition.LicenseDescriptorsConfig{
-						Type:      ddprofiledefinition.LicenseValueConfig{Value: "subscription"},
-						Perpetual: ddprofiledefinition.LicenseValueConfig{Value: "false"},
+						Type: ddprofiledefinition.LicenseValueConfig{
+							Value: "subscription",
+						},
+						Perpetual: ddprofiledefinition.LicenseValueConfig{
+							Value: "false",
+						},
 					},
 					State: ddprofiledefinition.LicenseStateConfig{
 						LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
@@ -62,13 +70,15 @@ func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
 					Signals: ddprofiledefinition.LicenseSignalsConfig{
 						Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
 							LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
-								From:     "1.3.6.1.4.1.99999.1.2.0",
-								Format:   "text_date",
-								Sentinel: []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerZeroOrNegative},
+								From:   "1.3.6.1.4.1.99999.1.2.0",
+								Format: "text_date",
+								Sentinel: []ddprofiledefinition.LicenseSentinelPolicy{
+									ddprofiledefinition.LicenseSentinelTimerZeroOrNegative,
+								},
 							},
 						},
 					},
-					MetricTags: ddprofiledefinition.MetricTagConfigList{
+					MetricTags: []ddprofiledefinition.MetricTagConfig{
 						{
 							Tag: "license_site",
 							Symbol: ddprofiledefinition.SymbolConfigCompat(ddprofiledefinition.SymbolConfig{
@@ -158,7 +168,9 @@ func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) 
 									OriginProfileID: "_vendor-licensing.yaml",
 									ID:              "bad-license-row",
 									Identity: ddprofiledefinition.LicenseIdentityConfig{
-										ID: ddprofiledefinition.LicenseValueConfig{Value: "bad-license-row"},
+										ID: ddprofiledefinition.LicenseValueConfig{
+											Value: "bad-license-row",
+										},
 									},
 									State: ddprofiledefinition.LicenseStateConfig{
 										LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
@@ -233,7 +245,9 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 									OriginProfileID: "_vendor-licensing.yaml",
 									ID:              "missing-license-row",
 									Identity: ddprofiledefinition.LicenseIdentityConfig{
-										ID: ddprofiledefinition.LicenseValueConfig{Value: "missing-license-row"},
+										ID: ddprofiledefinition.LicenseValueConfig{
+											Value: "missing-license-row",
+										},
 									},
 									State: ddprofiledefinition.LicenseStateConfig{
 										LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
@@ -333,7 +347,9 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 									OID:  "1.3.6.1.4.1.99999.2.4",
 									Name: "licenseExpiryRemaining",
 								},
-								Sentinel: []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerZeroOrNegative},
+								Sentinel: []ddprofiledefinition.LicenseSentinelPolicy{
+									ddprofiledefinition.LicenseSentinelTimerZeroOrNegative,
+								},
 							},
 						},
 						Usage: ddprofiledefinition.LicenseUsageSignalsConfig{
@@ -354,7 +370,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
 						{Tag: "license_vendor", Value: "test"},
 					},
-					MetricTags: ddprofiledefinition.MetricTagConfigList{
+					MetricTags: []ddprofiledefinition.MetricTagConfig{
 						{
 							Tag:   "license_feature",
 							Index: 1,
@@ -462,7 +478,9 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 						Name: "licenseIfTable",
 					},
 					Identity: ddprofiledefinition.LicenseIdentityConfig{
-						ID: ddprofiledefinition.LicenseValueConfig{Index: 1},
+						ID: ddprofiledefinition.LicenseValueConfig{
+							Index: 1,
+						},
 					},
 					State: ddprofiledefinition.LicenseStateConfig{
 						LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
@@ -473,7 +491,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 						},
 						Policy: ddprofiledefinition.LicenseStatePolicyDefault,
 					},
-					MetricTags: ddprofiledefinition.MetricTagConfigList{
+					MetricTags: []ddprofiledefinition.MetricTagConfig{
 						{
 							Tag:   "if_name",
 							Table: "ifXTable",
@@ -602,25 +620,35 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 			value: 0,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{Timestamp: value},
+					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
+						Timestamp: value,
+					},
 				}
 			},
 		},
 		"expiry timestamp u32 max": {
 			value: 4294967295,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
-				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerU32Max}
+				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{
+					ddprofiledefinition.LicenseSentinelTimerU32Max,
+				}
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{Timestamp: value},
+					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
+						Timestamp: value,
+					},
 				}
 			},
 		},
 		"expiry timestamp pre 1971": {
 			value: 1,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
-				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerPre1971}
+				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{
+					ddprofiledefinition.LicenseSentinelTimerPre1971,
+				}
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{Timestamp: value},
+					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
+						Timestamp: value,
+					},
 				}
 			},
 		},
@@ -628,34 +656,48 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 			value: 0,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{Remaining: value},
+					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
+						Remaining: value,
+					},
 				}
 			},
 		},
 		"expiry remaining u32 max": {
 			value: 4294967295,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
-				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerU32Max}
+				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{
+					ddprofiledefinition.LicenseSentinelTimerU32Max,
+				}
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{Remaining: value},
+					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
+						Remaining: value,
+					},
 				}
 			},
 		},
 		"expiry remaining pre 1971": {
 			value: 1,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
-				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerPre1971}
+				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{
+					ddprofiledefinition.LicenseSentinelTimerPre1971,
+				}
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{Remaining: value},
+					Expiry: ddprofiledefinition.LicenseTimerSignalsConfig{
+						Remaining: value,
+					},
 				}
 			},
 		},
 		"usage used pre 1971": {
 			value: 1,
 			signals: func(value ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig {
-				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerPre1971}
+				value.Sentinel = []ddprofiledefinition.LicenseSentinelPolicy{
+					ddprofiledefinition.LicenseSentinelTimerPre1971,
+				}
 				return ddprofiledefinition.LicenseSignalsConfig{
-					Usage: ddprofiledefinition.LicenseUsageSignalsConfig{Used: value},
+					Usage: ddprofiledefinition.LicenseUsageSignalsConfig{
+						Used: value,
+					},
 				}
 			},
 		},
@@ -678,7 +720,9 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 					OID:  "1.3.6.1.4.1.99999.4.1.0",
 					Name: "sentinelValue",
 				},
-				Sentinel: []ddprofiledefinition.LicenseSentinelPolicy{ddprofiledefinition.LicenseSentinelTimerZeroOrNegative},
+				Sentinel: []ddprofiledefinition.LicenseSentinelPolicy{
+					ddprofiledefinition.LicenseSentinelTimerZeroOrNegative,
+				},
 			}
 			profile := &ddsnmp.Profile{
 				SourceFile: "vendor-device.yaml",
@@ -688,7 +732,9 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 							OriginProfileID: "_vendor-licensing.yaml",
 							ID:              "sentinel-row",
 							Identity: ddprofiledefinition.LicenseIdentityConfig{
-								ID: ddprofiledefinition.LicenseValueConfig{Value: "sentinel-row"},
+								ID: ddprofiledefinition.LicenseValueConfig{
+									Value: "sentinel-row",
+								},
 							},
 							Signals: tc.signals(value),
 						},
