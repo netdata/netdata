@@ -253,9 +253,13 @@ url_is_request_complete_and_extract_payload(
     if (length < 4)
         return false;
 
-    // A prior four-byte "PUT " receive rewinds the incremental cursor to begin.
-    if (begin == end && strncmp(begin, "PUT ", 4) != 0)
-        return false;
+    // The caller rewinds the incremental cursor by 4 bytes so a "\r\n\r\n" split
+    // across two receives is still found, and the searches below subtract another
+    // 4. A previous receive of 4 to 7 bytes therefore leaves end at or before
+    // begin, which would put those searches before the buffer. Clamp so they
+    // always start inside it; larger cursors keep the incremental rescan.
+    if (end < begin + 4)
+        end = begin + 4;
 
     if(likely(strncmp(begin, "GET ", 4)) == 0) {
         return strstr(end - 4, "\r\n\r\n");
