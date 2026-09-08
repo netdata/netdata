@@ -400,6 +400,7 @@ static void nd_thread_exit(ND_THREAD *nti) {
     nd_thread_run_cleanup_callbacks();
     thread_cache_destroy();
     worker_unregister();
+    rcu_unregister_thread();
 
     spinlock_lock(&threads_globals.running.spinlock);
     if(nti->list == ND_THREAD_LIST_RUNNING) {
