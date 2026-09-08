@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -224,7 +225,13 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	assert.Equal(t, "mock sysDescr", entries[0].Info.SysDescr)
 	assert.Equal(t, "mock sysContact", entries[0].Info.SysContact)
 	assert.Equal(t, "mock sysLocation", entries[0].Info.SysLocation)
-	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeSuccess, true)
+	assertDeviceLifecycle(
+		t,
+		deviceStore,
+		ddsnmp.DeviceLifecyclePhaseCollect,
+		ddsnmp.DeviceLifecycleOutcomeSuccess,
+		true,
+	)
 
 	collr.Cleanup(context.Background())
 	require.Empty(t, deviceStore.Entries())
@@ -266,7 +273,9 @@ func TestCollectorManagedLifecycleSurvivesRejectedCleanupUntilReconcile(t *testi
 	store := ddsnmp.NewDeviceStore()
 	collr := New(store)
 	collr.Hostname = ""
-	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	job := snmpLifecycleTestRuntimeJob{
+		collector: collr,
+	}
 	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
@@ -320,9 +329,13 @@ func TestSNMPJobConfigLifecycleProjectsCredentialFreeBaseline(t *testing.T) {
 func TestCollectorRejectedManagedCandidateDoesNotRemoveIncumbentConnection(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
 	identity := collectorapi.JobConfigIdentity{1}
-	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{Hostname: "incumbent.example"})
+	store.Register(identity.String(), ddsnmp.DeviceConnectionInfo{
+		Hostname: "incumbent.example",
+	})
 	collr := New(store)
-	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	job := snmpLifecycleTestRuntimeJob{
+		collector: collr,
+	}
 	hook := Creator(store, nil).JobConfigLifecycle
 
 	hook.Bind(identity, job)
@@ -336,7 +349,9 @@ func TestCollectorManagedLifecycleSnapshotIsDetachedAtCapture(t *testing.T) {
 	store := ddsnmp.NewDeviceStore()
 	collr := New(store)
 	collr.Config = prepareV2Config()
-	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	job := snmpLifecycleTestRuntimeJob{
+		collector: collr,
+	}
 	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
@@ -404,7 +419,9 @@ func TestCollectorManagedConnectionCollectedBeforeReconcileIsPublishedAtReconcil
 	collr := New(store)
 	collr.Config = prepareV2Config()
 	collr.ManualProfiles = []string{"profile-a"}
-	job := snmpLifecycleTestRuntimeJob{collector: collr}
+	job := snmpLifecycleTestRuntimeJob{
+		collector: collr,
+	}
 	hook := Creator(store, nil).JobConfigLifecycle
 	identity := collectorapi.JobConfigIdentity{1}
 
@@ -460,7 +477,13 @@ func TestCollector_CheckFailureUpdatesLifecycleWithoutTopologyRegistration(t *te
 	require.Empty(t, deviceStore.Entries())
 
 	require.Nil(t, collr.Collect(context.Background()))
-	assertDeviceLifecycle(t, deviceStore, ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed, false)
+	assertDeviceLifecycle(
+		t,
+		deviceStore,
+		ddsnmp.DeviceLifecyclePhaseCollect,
+		ddsnmp.DeviceLifecycleOutcomeFailed,
+		false,
+	)
 	require.Empty(t, deviceStore.Entries())
 }
 
@@ -522,7 +545,9 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 			"model":  {Value: "profile-model", IsExactMatch: true},
 		},
 	}
-	mockCollector := &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{profileMetrics}}
+	mockCollector := &mockDdSnmpCollector{
+		pms: []*ddsnmp.ProfileMetrics{profileMetrics},
+	}
 
 	deviceStore := ddsnmp.NewDeviceStore()
 	collr := New(deviceStore)
@@ -543,8 +568,14 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 	assert.Equal(t, "profile-model", entries[0].Info.Model)
 	assert.Zero(t, mockCollector.metadataCalls, "normal collection metadata must be reused without a separate request")
 
-	profileMetrics.DeviceMetadata["vendor"] = ddsnmp.MetaTag{Value: "later-vendor", IsExactMatch: true}
-	profileMetrics.DeviceMetadata["model"] = ddsnmp.MetaTag{Value: "later-model", IsExactMatch: true}
+	profileMetrics.DeviceMetadata["vendor"] = ddsnmp.MetaTag{
+		Value:        "later-vendor",
+		IsExactMatch: true,
+	}
+	profileMetrics.DeviceMetadata["model"] = ddsnmp.MetaTag{
+		Value:        "later-model",
+		IsExactMatch: true,
+	}
 	require.NotNil(t, collr.Collect(context.Background()))
 
 	entries = deviceStore.Entries()
@@ -555,34 +586,92 @@ func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.
 	assert.Zero(t, mockCollector.metadataCalls)
 }
 
-func TestCollector_SetupVnodeAndRegisterDeviceStateShareResolvedMetadata(t *testing.T) {
+func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
+	const sysObjectID = "1.3.6.1.4.1.41112"
+	const metadataOID = "1.3.6.1.4.1.41112.999.0"
+	handler := snmpmock.NewMockHandler(gomock.NewController(t))
+	handler.EXPECT().MaxOids().Return(20).AnyTimes()
+	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+	handler.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
+		Variables: []gosnmp.SnmpPDU{
+			{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: sysObjectID},
+			{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("unifi-ap")},
+		},
+	}, nil).Times(1)
+	metadataCalls := 0
+	handler.EXPECT().Get([]string{metadataOID}).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
+		metadataCalls++
+		return &gosnmp.SnmpPacket{
+			Variables: []gosnmp.SnmpPDU{
+				{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("profile-vendor")},
+			},
+		}, nil
+	}).Times(2)
+
 	deviceStore := ddsnmp.NewDeviceStore()
 	collr := New(deviceStore)
 	collr.Config = prepareV2Config()
-	collr.Vnode.Labels = map[string]string{
-		"model": "operator-model",
+	collr.CreateVnode = true
+	collr.VnodeDeviceDownThreshold = 3
+	collr.Vnode.Labels = map[string]string{"model": "operator-model"}
+	collr.snmpClient = handler
+	collr.snmpProfiles = []*ddsnmp.Profile{
+		{SourceFile: "identity.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+			Selector: ddprofiledefinition.SelectorSpec{
+				{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+					Include: []string{sysObjectID},
+				}},
+			},
+			Metadata: ddprofiledefinition.MetadataConfig{
+				"device": {Fields: map[string]ddprofiledefinition.MetadataField{
+					"vendor": {Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  metadataOID,
+						Name: "vendor",
+					}},
+					"model": {Value: "profile-model"},
+				}},
+			},
+		}},
 	}
 
-	si := &snmputils.SysInfo{
-		SysObjectID: "1.3.6.1.4.1.41112",
-		Name:        "unifi-ap",
-		Vendor:      "static-vendor",
-		Model:       "static-model",
-	}
-	profileMetadata := map[string]ddsnmp.MetaTag{
-		"vendor": {Value: "profile-vendor", IsExactMatch: true},
-		"model":  {Value: "profile-model", IsExactMatch: true},
-	}
-
-	collr.vnode = collr.setupVnode(si, profileMetadata)
-	collr.registerDeviceState(si, nil)
-
+	require.NoError(t, collr.Check(context.Background()))
+	assert.Zero(t, metadataCalls, "Check only probes system identity and selects profiles")
+	assert.Nil(t, collr.vnode)
+	collr.Collect(context.Background())
+	require.True(t, collr.initialized)
+	assert.Equal(t, 2, metadataCalls, "initial vnode acquisition must not seed metric preparation caches")
 	entries := deviceStore.Entries()
 	require.Len(t, entries, 1)
-	assert.Equal(t, "profile-vendor", entries[0].Info.VnodeLabels["vendor"])
-	assert.Equal(t, "operator-model", entries[0].Info.VnodeLabels["model"])
-	assert.Equal(t, "profile-vendor", entries[0].Info.Vendor)
-	assert.Equal(t, "operator-model", entries[0].Info.Model)
+	wantInfo := ddsnmp.DeviceConnectionInfo{
+		Hostname:      "192.0.2.1",
+		Port:          161,
+		SNMPVersion:   "2c",
+		Community:     "public",
+		MaxOIDs:       20,
+		Timeout:       5,
+		Retries:       1,
+		SysObjectID:   sysObjectID,
+		SysName:       "unifi-ap",
+		Vendor:        "profile-vendor",
+		Model:         "operator-model",
+		VnodeGUID:     "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121",
+		VnodeHostname: "unifi-ap",
+		VnodeLabels: map[string]string{
+			"_vnode_type": "snmp", "_net_default_iface_ip": "192.0.2.1", "address": "192.0.2.1",
+			"sys_object_id": sysObjectID, "name": "unifi-ap", "description": "", "contact": "", "location": "",
+			"vendor": "profile-vendor", "model": "operator-model", "type": "Access Point", "_node_stale_after_seconds": "5",
+		},
+	}
+	assert.Equal(t, wantInfo, entries[0].Info)
+	wantConfigVnode := vnodes.VirtualNode{
+		GUID:     "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121",
+		Hostname: "unifi-ap",
+		Labels:   map[string]string{"model": "operator-model"},
+	}
+	assert.Equal(t, wantConfigVnode, collr.Vnode)
+
+	collr.Collect(context.Background())
+	assert.Equal(t, 2, metadataCalls, "subsequent collections reuse preparation caches")
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -612,23 +701,37 @@ func TestCollector_Check(t *testing.T) {
 				gomock.InOrder(
 					m.EXPECT().MaxOids().Return(2),
 					m.EXPECT().Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject}).Return(
-						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-							{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
-							{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
-						}},
+						&gosnmp.SnmpPacket{
+							Variables: []gosnmp.SnmpPDU{
+								{Name: snmputils.OidSysDescr, Value: []byte("mock sysDescr"), Type: gosnmp.OctetString},
+								{
+									Name:  snmputils.OidSysObject,
+									Value: ".1.3.6.1.4.1.14988.1",
+									Type:  gosnmp.ObjectIdentifier,
+								},
+							},
+						},
 						nil,
 					),
 					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
-						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-							{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
-							{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
-						}},
+						&gosnmp.SnmpPacket{
+							Variables: []gosnmp.SnmpPDU{
+								{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
+								{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
+							},
+						},
 						nil,
 					),
 					m.EXPECT().Get([]string{snmputils.OidSysLocation}).Return(
-						&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-							{Name: snmputils.OidSysLocation, Value: []byte("mock sysLocation"), Type: gosnmp.OctetString},
-						}},
+						&gosnmp.SnmpPacket{
+							Variables: []gosnmp.SnmpPDU{
+								{
+									Name:  snmputils.OidSysLocation,
+									Value: []byte("mock sysLocation"),
+									Type:  gosnmp.OctetString,
+								},
+							},
+						},
 						nil,
 					),
 				)
@@ -688,7 +791,9 @@ func TestCollector_Check(t *testing.T) {
 				c.CreateVnode = false
 				c.newSnmpClient = func() gosnmp.Handler { return m }
 				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
-					return &mockPingClient{sample: pingSuccessSample(c.Hostname)}, nil
+					return &mockPingClient{
+						sample: pingSuccessSample(c.Hostname),
+					}, nil
 				}
 				return c
 			},
@@ -706,7 +811,9 @@ func TestCollector_Check(t *testing.T) {
 				c.CreateVnode = false
 				c.newSnmpClient = func() gosnmp.Handler { return m }
 				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
-					return &mockPingClient{probeErr: errors.New("host unreachable")}, nil
+					return &mockPingClient{
+						probeErr: errors.New("host unreachable"),
+					}, nil
 				}
 				return c
 			},
@@ -725,7 +832,11 @@ func TestCollector_Check(t *testing.T) {
 				c.newSnmpClient = func() gosnmp.Handler { return m }
 				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
 					return &mockPingClient{
-						probeErr: &pinger.ProbeError{Host: c.Hostname, Stage: "run", Err: syscall.EPERM},
+						probeErr: &pinger.ProbeError{
+							Host:  c.Hostname,
+							Stage: "run",
+							Err:   syscall.EPERM,
+						},
 					}, nil
 				}
 				return c
@@ -813,7 +924,9 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			client := snmpmock.NewMockHandler(ctrl)
 			client.EXPECT().MaxOids().Return(20)
 			client.EXPECT().Version().Return(gosnmp.Version2c)
-			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, nil)
+			client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
+				Variables: tc.pdus,
+			}, nil)
 
 			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
@@ -853,9 +966,11 @@ func TestCollector_CheckRetainsIdentityForInitialization(t *testing.T) {
 	client := snmpmock.NewMockHandler(ctrl)
 	client.EXPECT().MaxOids().Return(20)
 	client.EXPECT().Version().Return(gosnmp.Version2c)
-	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-		{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
-	}}, nil).Times(1)
+	client.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
+		Variables: []gosnmp.SnmpPDU{
+			{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.14988.1"},
+		},
+	}, nil).Times(1)
 
 	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
@@ -907,7 +1022,9 @@ func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
-	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+	pingClient := &mockPingClient{
+		sample: pingSuccessSample("192.0.2.1"),
+	}
 
 	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
@@ -946,21 +1063,25 @@ func TestCollector_Collect(t *testing.T) {
 				collr.snmpProfiles = []*ddsnmp.Profile{{}} // non-empty to enable collectSNMP()
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
-						{
-							Source: "test",
-							Metrics: []ddsnmp.Metric{
-								{
-									Name:    "uptime",
-									IsTable: false,
-									Value:   123,
-									Unit:    "s",
-									Tags:    map[string]string{},
-									Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+					return &mockDdSnmpCollector{
+						pms: []*ddsnmp.ProfileMetrics{
+							{
+								Source: "test",
+								Metrics: []ddsnmp.Metric{
+									{
+										Name:    "uptime",
+										IsTable: false,
+										Value:   123,
+										Unit:    "s",
+										Tags:    map[string]string{},
+										Profile: &ddsnmp.ProfileMetrics{
+											Tags: map[string]string{},
+										},
+									},
 								},
 							},
 						},
-					}}
+					}
 				}
 				return collr
 			},
@@ -1008,24 +1129,28 @@ func TestCollector_Collect(t *testing.T) {
 				collr.snmpProfiles = []*ddsnmp.Profile{{}}
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
-						{
-							Source: "test",
-							Metrics: []ddsnmp.Metric{
-								{
-									Name:    "if_octets",
-									IsTable: true,
-									Unit:    "bit/s",
-									Tags:    map[string]string{"ifName": "eth0"},
-									Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
-									MultiValue: map[string]int64{
-										"in":  1,
-										"out": 2,
+					return &mockDdSnmpCollector{
+						pms: []*ddsnmp.ProfileMetrics{
+							{
+								Source: "test",
+								Metrics: []ddsnmp.Metric{
+									{
+										Name:    "if_octets",
+										IsTable: true,
+										Unit:    "bit/s",
+										Tags:    map[string]string{"ifName": "eth0"},
+										Profile: &ddsnmp.ProfileMetrics{
+											Tags: map[string]string{},
+										},
+										MultiValue: map[string]int64{
+											"in":  1,
+											"out": 2,
+										},
 									},
 								},
 							},
 						},
-					}}
+					}
 				}
 				return collr
 			},
@@ -1078,7 +1203,9 @@ func TestCollector_Collect(t *testing.T) {
 			collr.CreateVnode = false
 			collr.newSnmpClient = func() gosnmp.Handler { return m }
 			collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
-				return &mockPingClient{sample: pingSuccessSample(collr.Hostname)}, nil
+				return &mockPingClient{
+					sample: pingSuccessSample(collr.Hostname),
+				}, nil
 			}
 
 			return collr
@@ -1104,7 +1231,9 @@ func TestCollector_Collect(t *testing.T) {
 			collr.CreateVnode = false
 			collr.newSnmpClient = func() gosnmp.Handler { return m }
 			collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
-				return &mockPingClient{sample: pingNoReplySample(collr.Hostname)}, nil
+				return &mockPingClient{
+					sample: pingNoReplySample(collr.Hostname),
+				}, nil
 			}
 
 			return collr
@@ -1138,7 +1267,9 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
-	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+	pingClient := &mockPingClient{
+		sample: pingSuccessSample("192.0.2.1"),
+	}
 
 	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
@@ -1180,7 +1311,9 @@ func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
-	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+	pingClient := &mockPingClient{
+		sample: pingSuccessSample("192.0.2.1"),
+	}
 
 	collr := newTestSNMPCollector()
 	collr.Config = prepareV2Config()
@@ -1192,21 +1325,25 @@ func TestCollector_CollectMixedModeCollectsSNMPAndPingMetrics(t *testing.T) {
 		return pingClient, nil
 	}
 	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-		return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
-			{
-				Source: "test",
-				Metrics: []ddsnmp.Metric{
-					{
-						Name:    "uptime",
-						IsTable: false,
-						Value:   123,
-						Unit:    "s",
-						Tags:    map[string]string{},
-						Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+		return &mockDdSnmpCollector{
+			pms: []*ddsnmp.ProfileMetrics{
+				{
+					Source: "test",
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:    "uptime",
+							IsTable: false,
+							Value:   123,
+							Unit:    "s",
+							Tags:    map[string]string{},
+							Profile: &ddsnmp.ProfileMetrics{
+								Tags: map[string]string{},
+							},
+						},
 					},
 				},
 			},
-		}}
+		}
 	}
 
 	require.NoError(t, collr.Init(context.Background()))
@@ -1275,7 +1412,11 @@ func (m *mockPingClient) recordedProbe(ctx context.Context, host, method string)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.calls = append(m.calls, probeCall{host: host, method: method, ctx: ctx})
+	m.calls = append(m.calls, probeCall{
+		host:   host,
+		method: method,
+		ctx:    ctx,
+	})
 	if m.probeErr != nil {
 		return pinger.Sample{}, m.probeErr
 	}
@@ -1383,9 +1524,17 @@ func TestCollector_Collect_LicensingAggregation(t *testing.T) {
 				assert.EqualValues(t, 0, got[metricIDLicenseStateDegraded])
 				assert.EqualValues(t, 1, got[metricIDLicenseStateBroken])
 				assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
-				assert.GreaterOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64((48*time.Hour/time.Second)-5))
+				assert.GreaterOrEqual(
+					t,
+					got[metricIDLicenseAuthorizationRemainingTime],
+					int64((48*time.Hour/time.Second)-5),
+				)
 				assert.LessOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64(48*time.Hour/time.Second))
-				assert.GreaterOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64((72*time.Hour/time.Second)-5))
+				assert.GreaterOrEqual(
+					t,
+					got[metricIDLicenseCertificateRemainingTime],
+					int64((72*time.Hour/time.Second)-5),
+				)
 				assert.LessOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64(72*time.Hour/time.Second))
 				assert.NotContains(t, got, metricIDLicenseRemainingTime)
 				assert.NotContains(t, got, metricIDLicenseGraceRemainingTime)
@@ -1481,9 +1630,17 @@ func TestCollector_Collect_LicensingAggregation(t *testing.T) {
 				assert.EqualValues(t, 90, got[metricIDLicenseUsagePercent])
 				assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], int64((6*time.Hour/time.Second)-5))
 				assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], int64(6*time.Hour/time.Second))
-				assert.GreaterOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64((30*time.Hour/time.Second)-5))
+				assert.GreaterOrEqual(
+					t,
+					got[metricIDLicenseAuthorizationRemainingTime],
+					int64((30*time.Hour/time.Second)-5),
+				)
 				assert.LessOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64(30*time.Hour/time.Second))
-				assert.GreaterOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64((20*time.Hour/time.Second)-5))
+				assert.GreaterOrEqual(
+					t,
+					got[metricIDLicenseCertificateRemainingTime],
+					int64((20*time.Hour/time.Second)-5),
+				)
 				assert.LessOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64(20*time.Hour/time.Second))
 				assert.GreaterOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64((10*time.Hour/time.Second)-5))
 				assert.LessOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64(10*time.Hour/time.Second))
@@ -1512,7 +1669,9 @@ func TestCollector_Collect_LicensingAggregation(t *testing.T) {
 					Source:      tc.source,
 					LicenseRows: tc.rows(now),
 				}
-				return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{pm}}
+				return &mockDdSnmpCollector{
+					pms: []*ddsnmp.ProfileMetrics{pm},
+				}
 			}
 
 			require.NoError(t, collr.Init(context.Background()))
@@ -1628,13 +1787,15 @@ func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().MaxOids().Return(20).MinTimes(1)
-	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-		{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
-		{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
-	}}, nil).MinTimes(1)
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
+		Variables: []gosnmp.SnmpPDU{
+			{Name: snmputils.OidSysDescr, Value: []uint8("mock sysDescr"), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysObject, Value: ".1.3.6.1.4.1.14988.1", Type: gosnmp.ObjectIdentifier},
+			{Name: snmputils.OidSysContact, Value: []uint8("mock sysContact"), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
+		},
+	}, nil).MinTimes(1)
 }
 
 func sysInfoOIDsForTest() []string {
@@ -1689,7 +1850,9 @@ func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
 			var packet *gosnmp.SnmpPacket
 			if tc.getErr == nil {
 				packet = &gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")}},
+					Variables: []gosnmp.SnmpPDU{
+						{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("SECRET invalid number")},
+					},
 				}
 			}
 			handler.EXPECT().Get([]string{metadataOID}).Return(packet, tc.getErr).Times(2)
@@ -1699,14 +1862,26 @@ func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
 			collector.CreateVnode = true
 			collector.snmpClient = handler
 			fields := map[string]ddprofiledefinition.MetadataField{
-				"serial_number": {Symbol: ddprofiledefinition.SymbolConfig{OID: metadataOID, Name: "serial", Format: "uint32"}},
+				"serial_number": {
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:    metadataOID,
+						Name:   "serial",
+						Format: "uint32",
+					},
+				},
 			}
 			if tc.staticVendor {
-				fields["vendor"] = ddprofiledefinition.MetadataField{Value: "synthetic"}
+				fields["vendor"] = ddprofiledefinition.MetadataField{
+					Value: "synthetic",
+				}
 			}
-			collector.snmpProfiles = []*ddsnmp.Profile{{SourceFile: "metadata.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
-				Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: fields}},
-			}}}
+			collector.snmpProfiles = []*ddsnmp.Profile{
+				{SourceFile: "metadata.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": {Fields: fields},
+					},
+				}},
+			}
 			for range tc.attempts {
 				metrics := collector.Collect(context.Background())
 				status := collector.deviceLifecycleStatus

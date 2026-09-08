@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"syscall"
 
-	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
@@ -123,15 +121,32 @@ func (c *Collector) ensureInitialized() error {
 	}
 
 	if c.CreateVnode {
-		if c.ddSnmpColl == nil {
-			c.vnode = c.setupVnode(si, nil)
-		} else {
-			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
-			c.captureCollectionFailures()
-			if err != nil {
-				return err
+		var baseLabels map[string]string
+		if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
+			// Allow for collection and transmission delays.
+			baseLabels = map[string]string{
+				"_node_stale_after_seconds": strconv.Itoa(c.VnodeDeviceDownThreshold*c.UpdateEvery + 2),
 			}
-			c.vnode = c.setupVnode(si, deviceMeta)
+		}
+		identity, err := ddsnmp.AcquireDeviceIdentity(si, c.ddSnmpColl, ddsnmp.DeviceIdentityOptions{
+			Address:    c.Hostname,
+			GUID:       c.Vnode.GUID,
+			Hostname:   c.Vnode.Hostname,
+			BaseLabels: baseLabels,
+			Labels:     c.Vnode.Labels,
+		})
+		if c.ddSnmpColl != nil {
+			c.captureCollectionFailures()
+		}
+		if err != nil {
+			return err
+		}
+		c.Vnode.GUID = identity.GUID
+		c.Vnode.Hostname = identity.Hostname
+		c.vnode = &vnodes.VirtualNode{
+			GUID:     identity.GUID,
+			Hostname: identity.Hostname,
+			Labels:   identity.Labels,
 		}
 	}
 
@@ -145,56 +160,6 @@ func (c *Collector) ensureInitialized() error {
 	return nil
 }
 
-func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
-	if c.Vnode.GUID == "" {
-		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
-	}
-
-	hostnames := []string{
-		c.Vnode.Hostname,
-		si.Name,
-		"snmp-device",
-	}
-	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
-	c.Vnode.Hostname = hostnames[i]
-
-	labels := map[string]string{
-		"_vnode_type":           "snmp",
-		"_net_default_iface_ip": c.Hostname,
-		"address":               c.Hostname,
-	}
-
-	if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
-		// Add 2 seconds buffer to account for collection/transmission delays
-		v := c.VnodeDeviceDownThreshold*c.UpdateEvery + 2
-		labels["_node_stale_after_seconds"] = strconv.Itoa(v)
-	}
-
-	labels["sys_object_id"] = si.SysObjectID
-	labels["name"] = si.Name
-	labels["description"] = si.Descr
-	labels["contact"] = si.Contact
-	labels["location"] = si.Location
-	if si.Vendor != "" {
-		labels["vendor"] = si.Vendor
-	} else if si.Organization != "" {
-		labels["vendor"] = si.Organization
-	}
-	if si.Category != "" {
-		labels["type"] = si.Category
-	}
-	if si.Model != "" {
-		labels["model"] = si.Model
-	}
-
-	labels = ddsnmp.ResolveDeviceMetadata(labels, deviceMeta, c.Vnode.Labels)
-
-	return &vnodes.VirtualNode{
-		GUID:     c.Vnode.GUID,
-		Hostname: c.Vnode.Hostname,
-		Labels:   labels,
-	}
-}
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {

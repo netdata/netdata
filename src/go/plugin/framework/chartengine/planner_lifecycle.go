@@ -338,52 +338,70 @@ func enforceDimensionCapsWithObserver(
 	return removeDims
 }
 
-func collectExpiryRemovals(
-	currentSuccessSeq uint64,
-	state *materializedState,
-) ([]RemoveDimensionAction, []RemoveChartAction) {
+func collectExpiryRemovals(currentSuccessSeq uint64, state *materializedState) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if state == nil || len(state.charts) == 0 {
 		return nil, nil
 	}
-
-	chartIDs := make([]string, 0, len(state.charts))
-	for chartID := range state.charts {
-		chartIDs = append(chartIDs, chartID)
+	type expiryCandidate struct {
+		chartID     string
+		chart       *materializedChartState
+		dimensions  []string
+		removeChart bool
 	}
-	sort.Strings(chartIDs)
-
-	toRemoveChart := make(map[string]struct{})
-	for _, chartID := range chartIDs {
-		matChart := state.charts[chartID]
-		if shouldExpire(matChart.lastSeenSuccessSeq, currentSuccessSeq, matChart.lifecycle.ExpireAfterCycles) {
-			toRemoveChart[chartID] = struct{}{}
-		}
-	}
-
-	removeDims := make([]RemoveDimensionAction, 0)
-	for _, chartID := range chartIDs {
-		if _, removed := toRemoveChart[chartID]; removed {
+	var candidates []expiryCandidate
+	dimensionCount, chartCount := 0, 0
+	for chartID, chart := range state.charts {
+		if shouldExpire(chart.lastSeenSuccessSeq, currentSuccessSeq, chart.lifecycle.ExpireAfterCycles) {
+			candidates = append(candidates, expiryCandidate{
+				chartID:     chartID,
+				chart:       chart,
+				removeChart: true,
+			})
+			chartCount++
 			continue
 		}
-		matChart := state.charts[chartID]
-		expireAfter := matChart.lifecycle.Dimensions.ExpireAfterCycles
-		if expireAfter <= 0 || len(matChart.dimensions) == 0 {
+		expireAfter := chart.lifecycle.Dimensions.ExpireAfterCycles
+		if expireAfter <= 0 {
 			continue
 		}
-
-		dimNames := make([]string, 0, len(matChart.dimensions))
-		for name := range matChart.dimensions {
-			dimNames = append(dimNames, name)
-		}
-		sort.Strings(dimNames)
-		for _, name := range dimNames {
-			dim := matChart.dimensions[name]
-			if !shouldExpire(dim.lastSeenSuccessSeq, currentSuccessSeq, expireAfter) {
-				continue
+		var names []string
+		for name, dim := range chart.dimensions {
+			if shouldExpire(dim.lastSeenSuccessSeq, currentSuccessSeq, expireAfter) {
+				names = append(names, name)
 			}
+		}
+		if len(names) > 0 {
+			candidates = append(candidates, expiryCandidate{
+				chartID:    chartID,
+				chart:      chart,
+				dimensions: names,
+			})
+			dimensionCount += len(names)
+		}
+	}
+	// Order only expired identities, before constructing the larger wire actions.
+	// Exact output sizing also avoids repeated copies during mass expiry.
+	if len(candidates) > 1 {
+		sort.Slice(candidates, func(i, j int) bool { return candidates[i].chartID < candidates[j].chartID })
+	}
+	removeDims := make([]RemoveDimensionAction, 0, dimensionCount)
+	removeCharts := make([]RemoveChartAction, 0, chartCount)
+	for _, candidate := range candidates {
+		chartID, chart := candidate.chartID, candidate.chart
+		if candidate.removeChart {
+			removeCharts = append(removeCharts, RemoveChartAction{
+				ChartID: chartID,
+				Meta:    chart.meta,
+			})
+			delete(state.charts, chartID)
+			continue
+		}
+		sort.Strings(candidate.dimensions)
+		for _, name := range candidate.dimensions {
+			dim := chart.dimensions[name]
 			removeDims = append(removeDims, RemoveDimensionAction{
 				ChartID:    chartID,
-				ChartMeta:  matChart.meta,
+				ChartMeta:  chart.meta,
 				Name:       name,
 				Hidden:     dim.hidden,
 				Float:      dim.float,
@@ -391,24 +409,8 @@ func collectExpiryRemovals(
 				Multiplier: dim.multiplier,
 				Divisor:    dim.divisor,
 			})
-			matChart.removeDimension(name)
+			chart.removeDimension(name)
 		}
-	}
-
-	removeCharts := make([]RemoveChartAction, 0, len(toRemoveChart))
-	for _, chartID := range chartIDs {
-		if _, removed := toRemoveChart[chartID]; !removed {
-			continue
-		}
-		matChart := state.charts[chartID]
-		if matChart == nil {
-			continue
-		}
-		removeCharts = append(removeCharts, RemoveChartAction{
-			ChartID: chartID,
-			Meta:    matChart.meta,
-		})
-		delete(state.charts, chartID)
 	}
 	return removeDims, removeCharts
 }

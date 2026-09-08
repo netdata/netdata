@@ -697,6 +697,11 @@ copy; inspect before use and do not assume they are tracked project interfaces.
 - Prefer table-driven tests using `map[string]struct{}` keyed by case name when cases share setup and assertion
   shape. Map keys beat a `name` field in `[]struct{}`: names stay prominent and order-independent.
 - Use separate test functions only when setup or assertions differ materially.
+- Tests SHOULD compare a complete expected struct or map with the actual result instead of asserting individual
+  fields, so missing and unexpected values are checked.
+- Keep separate assertions for distinct behavior, such as errors, call counts, and input ownership.
+- Focused comparisons MAY be used when unrelated or nondeterministic fields make whole-value comparison
+  inappropriate.
 
 ### C Code
 
