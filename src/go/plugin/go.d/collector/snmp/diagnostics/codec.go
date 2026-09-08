@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 
 	"github.com/klauspost/compress/zstd"
 )
@@ -33,6 +34,9 @@ func DefaultReadLimits() ReadLimits { return ReadLimits{128 << 20, 512 << 20} }
 
 // Write encodes one complete document. The caller owns its immutable snapshot.
 func Write(w io.Writer, document Document) error {
+	if w == nil {
+		return errors.New("write SNMP diagnostic archive: nil writer")
+	}
 	encoder, err := newArchiveEncoder()
 	if err != nil {
 		return err
@@ -129,7 +133,7 @@ func (d Document) ValidateEnvelope() error {
 	}
 	switch d.Kind {
 	case KindNormal:
-		if d.Normal == nil || d.Snapshot.Topology != nil || d.Snapshot.LastAborted != nil || d.TopologyActive || d.Checkpoint != 0 {
+		if d.Normal == nil || !reflect.ValueOf(d.Snapshot).IsZero() || d.TopologyActive || d.Checkpoint != 0 {
 			return errors.New("invalid normal device document envelope")
 		}
 	case KindLifecycle:

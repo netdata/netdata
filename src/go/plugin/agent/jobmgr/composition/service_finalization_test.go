@@ -8,6 +8,7 @@ import (
 	"io"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -139,6 +140,58 @@ func TestProcessServiceFinalization(t *testing.T) {
 			case tc.stop != "cancel":
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestProcessServiceFinalizationRetainsReadyErrors(t *testing.T) {
+	for name, tc := range map[string]struct{ blockRun bool }{
+		"earlier Run stalls":       {blockRun: true},
+		"earlier finalizer stalls": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				reader, writer := io.Pipe()
+				defer reader.Close()
+				defer writer.Close()
+				release := make(chan struct{})
+				defer close(release)
+				stalled := &finalizingTestService{started: make(chan struct{}), joined: make(chan struct{}), finalize: func(context.Context) error {
+					<-release
+					return nil
+				}}
+				if tc.blockRun {
+					stalled.runRelease = release
+				}
+				injected := errors.New("independent finalization failure")
+				failed := &finalizingTestService{started: make(chan struct{}), joined: make(chan struct{}), finalize: func(context.Context) error {
+					return injected
+				}}
+				config := testProductionProcessConfig(reader, io.Discard)
+				config.ShutdownTimeout = time.Second
+				config.Services = []ProcessService{stalled, failed}
+				process, err := NewProcess(config)
+				require.NoError(t, err)
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				done := make(chan error, 1)
+				go func() { done <- process.Run(ctx) }()
+				<-stalled.started
+				<-failed.started
+				cancel()
+				synctest.Wait()
+				// All runnable finalizers finish before advancing the shared deadline.
+				require.EqualValues(t, 1, failed.calls.Load())
+				time.Sleep(config.ShutdownTimeout)
+				synctest.Wait()
+				select {
+				case err := <-done:
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.ErrorIs(t, err, injected)
+				default:
+					t.Fatal("process exceeded its shutdown budget")
+				}
+			})
 		})
 	}
 }

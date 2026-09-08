@@ -14,10 +14,10 @@ import (
 // AcquisitionNegativeCause explains a permanent missing-OID entry without
 // retaining unrelated values from the GET that established it.
 type AcquisitionNegativeCause struct {
-	ContextID  uint64
-	Operation  uint64
-	ObservedAt time.Time
-	PDU        ddsnmp.SourcePDU
+	ContextID  uint64           `json:"context_id"`
+	Operation  uint64           `json:"operation"`
+	ObservedAt time.Time        `json:"observed_at"`
+	PDU        ddsnmp.SourcePDU `json:"pdu"`
 }
 
 type negativeEvidence struct {

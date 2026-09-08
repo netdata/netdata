@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -244,6 +246,42 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			files, err = diagnostics.ListNormalFiles(directory)
 			require.NoError(t, err)
 			assert.Len(t, files, 1, "shutdown retirement preserves the last published file")
+		})
+	}
+}
+
+func TestNormalMetricSampleOrder(t *testing.T) {
+	for name, tc := range map[string]struct{ table bool }{
+		"scalar": {}, "table": {table: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := New(ddsnmp.NewDeviceStore())
+			c.sysInfo = &snmputils.SysInfo{Name: "switch"}
+			c.beginNormalAttempt("collect")
+			metric := ddsnmp.Metric{
+				Profile: &ddsnmp.ProfileMetrics{Source: "states.yaml"}, Name: "state", IsTable: tc.table, Table: "states", Tags: map[string]string{"index": "1"},
+				MultiValue: make(map[string]int64),
+			}
+			for i := range 16 {
+				metric.MultiValue[fmt.Sprintf("state%02d", i)] = int64(i)
+			}
+			samples := make(map[string]int64)
+			metrics := []ddsnmp.Metric{metric}
+			c.collectProfileScalarMetrics(samples, metrics)
+			c.collectProfileTableMetrics(samples, metrics)
+			require.Len(t, c.normal.current.document.Metrics, 1)
+			decision := c.normal.current.document.Metrics[0]
+			require.Len(t, decision.SampleIDs, len(metric.MultiValue))
+			require.True(t, slices.IsSorted(decision.SampleIDs), "%v", decision.SampleIDs)
+			require.Len(t, samples, len(metric.MultiValue))
+			for key, value := range metric.MultiValue {
+				id := metricIDFromName(metric.Name, key)
+				if tc.table {
+					id = metricIDFromKey(tableMetricKey(metric), key)
+				}
+				require.Contains(t, decision.SampleIDs, id)
+				require.Equal(t, value, samples[id])
+			}
 		})
 	}
 }

@@ -3,6 +3,7 @@
 package diagnostics
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -47,4 +48,27 @@ func TestNormalSourceValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalNegativeCauseJSON(t *testing.T) {
+	cause := ddsnmpcollector.AcquisitionNegativeCause{
+		ContextID: 1, Operation: 2, ObservedAt: time.Unix(1, 0).UTC(), PDU: ddsnmp.SourcePDU{OID: "1.2.3"},
+	}
+	attempt := NormalAttempt{NegativeCauses: []ddsnmpcollector.AcquisitionNegativeCause{cause}}
+	encoded, err := json.Marshal(attempt)
+	require.NoError(t, err)
+	var decoded struct {
+		NegativeCauses []map[string]json.RawMessage `json:"negative_causes"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	require.Len(t, decoded.NegativeCauses, 1)
+	require.Len(t, decoded.NegativeCauses[0], 4)
+	for name, tc := range map[string]struct{ key string }{
+		"context": {"context_id"}, "operation": {"operation"}, "timestamp": {"observed_at"}, "pdu": {"pdu"},
+	} {
+		t.Run(name, func(t *testing.T) { require.Contains(t, decoded.NegativeCauses[0], tc.key) })
+	}
+	var restored NormalAttempt
+	require.NoError(t, json.Unmarshal(encoded, &restored))
+	require.Equal(t, attempt, restored)
 }

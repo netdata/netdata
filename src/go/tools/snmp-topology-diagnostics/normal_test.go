@@ -44,17 +44,21 @@ func TestNormalCommands(t *testing.T) {
 		want string
 		code int
 	}{
-		"list both runs":        {[]string{"list", "--input", root}, `"previous": true`, 0},
-		"direct summary":        {[]string{"summary", "--input", currentPath}, "current.example", 0},
-		"directory summary":     {[]string{"summary", "--input", root, "--normal", "--registration-id", "7"}, "current.example", 0},
-		"previous run":          {[]string{"summary", "--input", root, "--normal", "--previous-run", "--registration-id", "7"}, "previous.example", 0},
-		"validate":              {[]string{"validate", "--input", currentPath}, `"valid": true`, 0},
-		"inspect":               {[]string{"inspect-device", "--input", currentPath, "--registration-id", "7"}, `"sample": 42`, 0},
-		"wrong device":          {[]string{"inspect-device", "--input", currentPath, "--registration-id", "8"}, "contains device 7", 1},
-		"unretained device":     {[]string{"summary", "--input", root, "--normal", "--registration-id", "8"}, "not retained", 1},
-		"no normal replay":      {[]string{"replay", "--input", currentPath}, "requires topology evidence", 1},
-		"missing selection":     {[]string{"summary", "--input", root, "--normal"}, "requires --registration-id", 1},
-		"conflicting selection": {[]string{"summary", "--input", root, "--normal", "--registration-id", "7", "--checkpoint", "1"}, "cannot select a topology checkpoint", 1},
+		"list rejects normal":             {[]string{"list", "--input", root, "--normal"}, "does not support", 1},
+		"list rejects previous run":       {[]string{"list", "--input", root, "--previous-run"}, "does not support", 1},
+		"list rejects registration":       {[]string{"list", "--input", root, "--registration-id", "7"}, "does not support", 1},
+		"list rejects combined selectors": {[]string{"list", "--input", root, "--normal", "--previous-run", "--registration-id", "7"}, "does not support", 1},
+		"list both runs":                  {[]string{"list", "--input", root}, `"previous": true`, 0},
+		"direct summary":                  {[]string{"summary", "--input", currentPath}, "current.example", 0},
+		"directory summary":               {[]string{"summary", "--input", root, "--normal", "--registration-id", "7"}, "current.example", 0},
+		"previous run":                    {[]string{"summary", "--input", root, "--normal", "--previous-run", "--registration-id", "7"}, "previous.example", 0},
+		"validate":                        {[]string{"validate", "--input", currentPath}, `"valid": true`, 0},
+		"inspect":                         {[]string{"inspect-device", "--input", currentPath, "--registration-id", "7"}, `"sample": 42`, 0},
+		"wrong device":                    {[]string{"inspect-device", "--input", currentPath, "--registration-id", "8"}, "contains device 7", 1},
+		"unretained device":               {[]string{"summary", "--input", root, "--normal", "--registration-id", "8"}, "not retained", 1},
+		"no normal replay":                {[]string{"replay", "--input", currentPath}, "requires topology evidence", 1},
+		"missing selection":               {[]string{"summary", "--input", root, "--normal"}, "requires --registration-id", 1},
+		"conflicting selection":           {[]string{"summary", "--input", root, "--normal", "--registration-id", "7", "--checkpoint", "1"}, "cannot select a topology checkpoint", 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var out, errors bytes.Buffer

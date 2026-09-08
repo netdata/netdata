@@ -96,6 +96,10 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 	}
 
 	if operation == "list" {
+		if options.normal || options.previousRun || options.registrationID != 0 {
+			fmt.Fprintln(stderr, "error: list does not support --normal, --previous-run, or --registration-id")
+			return 1
+		}
 		info, err := os.Stat(options.inputPath)
 		if err != nil || !info.IsDir() || options.checkpoint != 0 {
 			fmt.Fprintln(stderr, "error: list requires a directory and does not select a checkpoint")

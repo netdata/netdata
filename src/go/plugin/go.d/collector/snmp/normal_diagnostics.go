@@ -171,6 +171,7 @@ func (c *Collector) normalDeviceInput() diagnostics.DeviceInput {
 
 func (c *Collector) recordNormalMetric(metric ddsnmp.Metric, action string, ids []string) {
 	if c.normal != nil && c.normal.current != nil {
+		slices.Sort(ids)
 		c.normal.current.document.Metrics = append(c.normal.current.document.Metrics, diagnostics.NormalMetricDecision{Metric: normalMetric(metric), Action: action, SampleIDs: ids})
 	}
 }

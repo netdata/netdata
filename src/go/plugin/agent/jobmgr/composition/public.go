@@ -348,7 +348,7 @@ func (p *Process) startServices(ctx context.Context) func(context.Context) error
 				completions = append(completions, result)
 				go func() { result <- finalizeProcessService(shutdownCtx, entry.service, entry.done) }()
 			}
-			for _, done := range completions {
+			for index, done := range completions {
 				select {
 				case err := <-done:
 					stopErr = errors.Join(stopErr, err)
@@ -360,6 +360,14 @@ func (p *Process) startServices(ctx context.Context) func(context.Context) error
 					stopErr = errors.Join(stopErr, err)
 				case <-shutdownCtx.Done():
 					stopErr = errors.Join(stopErr, fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err()))
+					// Preserve completed failures without waiting beyond the shared budget.
+					for _, pending := range completions[index:] {
+						select {
+						case err := <-pending:
+							stopErr = errors.Join(stopErr, err)
+						default:
+						}
+					}
 					return
 				}
 			}

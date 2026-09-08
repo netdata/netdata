@@ -338,13 +338,13 @@ func writeArchiveFileWithEncoder(
 	replace func(string, string) error,
 	encode func(io.Writer, Document) error,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	return writeAtomicFile(ctx, path, closeFile, func(w io.Writer) error { return encode(w, document) }, replace)
 }
 
 func writeAtomicFile(ctx context.Context, path string, closeFile func(*os.File) error, encode func(io.Writer) error, replace func(string, string) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
