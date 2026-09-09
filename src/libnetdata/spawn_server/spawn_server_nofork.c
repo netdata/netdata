@@ -444,11 +444,12 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
             _exit(EXIT_FAILURE);
         }
 
-        // The disposition alone is not enough: netdata BLOCKS SIGPIPE as well
-        // (signals_block_all_except_deadly() unblocks only the deadly signals), fork() inherits the
-        // mask, and previous_mask carries that block. A blocked SIGPIPE makes write() return EPIPE
-        // with the signal left pending, so the child would survive a closed pipe exactly as if the
-        // disposition were still SIG_IGN. Restore the inherited mask minus SIGPIPE.
+        // The disposition alone is not enough: SIGPIPE is also BLOCKED here. The block is ours, not
+        // inherited - spawn_server_event_loop() calls signals_block_all() and unblocks only SIGTERM
+        // and SIGCHLD, so previous_mask always carries SIGPIPE blocked, whatever the daemon's mask
+        // was. A blocked SIGPIPE makes write() return EPIPE with the signal left pending, so the
+        // child would survive a closed pipe exactly as if the disposition were still SIG_IGN.
+        // Restore the inherited mask minus SIGPIPE.
         sigset_t child_mask = previous_mask;
         sigdelset(&child_mask, SIGPIPE);
 
@@ -1631,7 +1632,9 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     NETDATA_SSL ssl = { 0 };
     int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
     if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
-        // the child is still running; the caller decides whether to keep waiting or kill it
+        // Nothing was observed - the poll expired, or the wait was cancelled before observing
+        // anything at all. Usually the child is still running, but this is not proof of it; see the
+        // RUNNING note on spawn_server_exec_timedwait() in spawn_server.h.
         return SPAWN_TIMEDWAIT_RUNNING;
 
     if(rc == 2 /* error on the socket */) {
@@ -1692,6 +1695,12 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return rc;
 }
 
+// NOTE on pid safety: every kill below can in principle hit a recycled pid. Our spawn server reaps
+// the child and only then writes the status report, and it writes none at all if the pid is not in
+// its request list - so "no report yet" (SPAWN_TIMEDWAIT_RUNNING) does not mean the pid is still
+// ours. The pre-kill grace makes this worse by discarding its poll result and signalling regardless.
+// Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
+// process that reaps is the one that signals; until then this is a known, accepted race.
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
@@ -1702,7 +1711,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
     }
 
-    // kill the child, if it is still running
+    // we still have a pid recorded for this child - not a liveness check (see the note above)
     if(instance->child_pid) {
         if(kill(instance->child_pid, SIGTERM) != 0)
             spawn_server_log_kill_failure(instance, SIGTERM);
@@ -1710,9 +1719,8 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // wait a bounded grace for the child to exit after SIGTERM. NOTE: timeout_ms is already
         // consumed above as the pre-kill grace (voluntary exit before SIGTERM); the post-SIGTERM
         // grace uses the fixed default so the caller's grace is not applied twice.
-        // No PID-reuse race on the RUNNING path: the spawn server reaps the child and only then
-        // sends the status report that makes timedwait return EXITED, so a RUNNING result means
-        // the child has not been reaped yet and its PID is still held.
+        // EXITED here is authoritative (the server reaps before it reports); RUNNING is not - see
+        // the pid-safety note above this function.
         int status;
         if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
             return status;
