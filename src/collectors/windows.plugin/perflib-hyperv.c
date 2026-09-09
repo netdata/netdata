@@ -40,10 +40,33 @@ static void get_and_sanitize_instance_value(
 
 #define SETP_DIM_VALUE(st, field)                                                                                      \
     do {                                                                                                               \
-        rrddim_set_by_pointer(p->st, p->rd_##field, (collected_number)p->field.current.Data);                          \
+        if (p->field.updated)                                                                                          \
+            rrddim_set_by_pointer(p->st, p->rd_##field, (collected_number)p->field.current.Data);                    \
+    } while (0)
+
+#define HYPERV_MISSING_CYCLES 12
+
+#define HYPERV_MARK_SEEN(p, item)                                                                                       \
+    do {                                                                                                               \
+        (p)->last_seen = (item)->generation;                                                                            \
+        (p)->missing_cycles = 0;                                                                                        \
+    } while (0)
+
+#define HYPERV_OBSOLETE_CHART(st)                                                                                       \
+    do {                                                                                                               \
+        if (st)                                                                                                        \
+            rrdset_is_obsolete___safe_from_collector_thread(st);                                                     \
+        (st) = NULL;                                                                                                  \
     } while (0)
 
 typedef bool (*perf_func_collect)(PERF_DATA_BLOCK *pDataBlock, int update_every, void *data);
+
+struct hyperv_instance_state {
+    bool collected_metadata;
+    bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
+};
 
 typedef struct {
     const char *registry_name;
@@ -51,11 +74,15 @@ typedef struct {
     dict_cb_insert_t dict_insert_cb;
     size_t dict_size;
     DICTIONARY *instance;
+    uint32_t generation;
+    void (*cleanup)(void *value);
 } hyperv_perf_item;
 
 struct hypervisor_memory {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_pressure;
     RRDSET *st_pressure_limits;
@@ -110,6 +137,8 @@ void dict_hyperv_memory_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
 struct hypervisor_partition {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_vm_vid_physical_pages_allocated;
     RRDSET *st_vm_vid_preferred_numa_node;
@@ -155,6 +184,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
             pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
         struct hypervisor_memory *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        HYPERV_MARK_SEEN(p, item);
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -344,6 +374,8 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
+        HYPERV_MARK_SEEN(p, item);
+
         GET_INSTANCE_COUNTER(PhysicalPagesAllocated);
         GET_INSTANCE_COUNTER(PreferredNUMANodeIndex);
         GET_INSTANCE_COUNTER(RemotePhysicalPages);
@@ -486,6 +518,8 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
 struct hypervisor_root_partition {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_device_space_pages;
     RRDSET *st_gpa_space_pages;
@@ -614,6 +648,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             continue;
 
         struct hypervisor_root_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        HYPERV_MARK_SEEN(p, item);
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -991,6 +1026,8 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 struct hypervisor_storage_device {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_operations;
     DEFINE_RD(ReadCount);
@@ -1084,6 +1121,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             continue;
 
         struct hypervisor_storage_device *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        HYPERV_MARK_SEEN(p, item);
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -1322,6 +1360,8 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
 struct hypervisor_switch {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_total_bytes;
     DEFINE_RD(BytesSec);
@@ -1458,6 +1498,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
             continue;
 
         struct hypervisor_switch *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        HYPERV_MARK_SEEN(p, item);
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -1812,6 +1853,8 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 struct hypervisor_network_adapter {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_dropped_packets;
     DEFINE_RD(DroppedPacketsOutgoingSec);
@@ -1915,6 +1958,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
             continue;
 
         struct hypervisor_network_adapter *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        HYPERV_MARK_SEEN(p, item);
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -2133,6 +2177,8 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 struct hypervisor_processor {
     bool collected_metadata;
     bool charts_created;
+    uint32_t last_seen;
+    uint8_t missing_cycles;
 
     RRDSET *st_HypervisorProcessor;
 
@@ -2196,6 +2242,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
             *vm = '\0';
 
         struct hypervisor_processor *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
+        HYPERV_MARK_SEEN(p, item);
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
@@ -2255,10 +2302,14 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
             rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
-        p->GuestRunTime_total += (collected_number)p->GuestRunTime.current.Data;
-        p->HypervisorRunTime_total += (collected_number)p->HypervisorRunTime.current.Data;
-        p->RemoteRunTime_total += (collected_number)p->RemoteRunTime.current.Data;
-        p->TotalRunTime_total += (collected_number)p->TotalRunTime.current.Data;
+        if (p->GuestRunTime.updated)
+            p->GuestRunTime_total += (collected_number)p->GuestRunTime.current.Data;
+        if (p->HypervisorRunTime.updated)
+            p->HypervisorRunTime_total += (collected_number)p->HypervisorRunTime.current.Data;
+        if (p->RemoteRunTime.updated)
+            p->RemoteRunTime_total += (collected_number)p->RemoteRunTime.current.Data;
+        if (p->TotalRunTime.updated)
+            p->TotalRunTime_total += (collected_number)p->TotalRunTime.current.Data;
     }
 
     {
@@ -2288,16 +2339,103 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
     return true;
 }
 
+#define HYPERV_CLEANUP_CHARTS(name, type, ...)                                                                          \
+    static void hyperv_cleanup_##name(void *value)                                                                      \
+    {                                                                                                                   \
+        type *p = value;                                                                                                \
+        __VA_ARGS__                                                                                                    \
+    }
+
+HYPERV_CLEANUP_CHARTS(
+    memory,
+    struct hypervisor_memory,
+    HYPERV_OBSOLETE_CHART(p->st_pressure); HYPERV_OBSOLETE_CHART(p->st_pressure_limits);
+    HYPERV_OBSOLETE_CHART(p->st_vm_memory_physical); HYPERV_OBSOLETE_CHART(p->st_vm_memory_physical_guest_visible);
+    HYPERV_OBSOLETE_CHART(p->st_vm_memory_operations); HYPERV_OBSOLETE_CHART(p->st_vm_memory_added_removed);)
+
+HYPERV_CLEANUP_CHARTS(
+    partition,
+    struct hypervisor_partition,
+    HYPERV_OBSOLETE_CHART(p->st_vm_vid_physical_pages_allocated); HYPERV_OBSOLETE_CHART(p->st_vm_vid_preferred_numa_node);
+    HYPERV_OBSOLETE_CHART(p->st_vm_vid_remote_physical_pages);)
+
+HYPERV_CLEANUP_CHARTS(
+    root_partition,
+    struct hypervisor_root_partition,
+    HYPERV_OBSOLETE_CHART(p->st_device_space_pages); HYPERV_OBSOLETE_CHART(p->st_gpa_space_pages);
+    HYPERV_OBSOLETE_CHART(p->st_gpa_space_modifications); HYPERV_OBSOLETE_CHART(p->st_attached_devices);
+    HYPERV_OBSOLETE_CHART(p->st_deposited_pages); HYPERV_OBSOLETE_CHART(p->st_DeviceDMAErrors);
+    HYPERV_OBSOLETE_CHART(p->st_DeviceInterruptErrors); HYPERV_OBSOLETE_CHART(p->st_DeviceInterruptMappings);
+    HYPERV_OBSOLETE_CHART(p->st_DeviceInterruptThrottleEvents); HYPERV_OBSOLETE_CHART(p->st_GPAPages);
+    HYPERV_OBSOLETE_CHART(p->st_IOTLBFlushCost); HYPERV_OBSOLETE_CHART(p->st_IOTLBFlushesSec);
+    HYPERV_OBSOLETE_CHART(p->st_AddressSpaces); HYPERV_OBSOLETE_CHART(p->st_RecommendedVirtualTLBSize);
+    HYPERV_OBSOLETE_CHART(p->st_SkippedTimerTicks); HYPERV_OBSOLETE_CHART(p->st_VirtualTLBPages);
+    HYPERV_OBSOLETE_CHART(p->st_VirtualTLBFlushEntriesSec);)
+
+HYPERV_CLEANUP_CHARTS(
+    storage_device,
+    struct hypervisor_storage_device,
+    HYPERV_OBSOLETE_CHART(p->st_operations); HYPERV_OBSOLETE_CHART(p->st_bytes); HYPERV_OBSOLETE_CHART(p->st_errors);
+    HYPERV_OBSOLETE_CHART(p->st_queue_length); HYPERV_OBSOLETE_CHART(p->st_latency); HYPERV_OBSOLETE_CHART(p->st_throughput);
+    HYPERV_OBSOLETE_CHART(p->st_normalized_throughput); HYPERV_OBSOLETE_CHART(p->st_io_quota_replenishment_rate);)
+
+HYPERV_CLEANUP_CHARTS(
+    switch,
+    struct hypervisor_switch,
+    HYPERV_OBSOLETE_CHART(p->st_total_bytes); HYPERV_OBSOLETE_CHART(p->st_bytes); HYPERV_OBSOLETE_CHART(p->st_total_packets);
+    HYPERV_OBSOLETE_CHART(p->st_packets); HYPERV_OBSOLETE_CHART(p->st_directed_packets); HYPERV_OBSOLETE_CHART(p->st_broadcast_packets);
+    HYPERV_OBSOLETE_CHART(p->st_multicast_packets); HYPERV_OBSOLETE_CHART(p->st_dropped_packets); HYPERV_OBSOLETE_CHART(p->st_ext_dropped_packets);
+    HYPERV_OBSOLETE_CHART(p->st_flooded); HYPERV_OBSOLETE_CHART(p->st_learned_mac); HYPERV_OBSOLETE_CHART(p->st_purged_mac);
+    HYPERV_OBSOLETE_CHART(p->st_send_channel_moves); HYPERV_OBSOLETE_CHART(p->st_vmq_moves);)
+
+HYPERV_CLEANUP_CHARTS(
+    network_adapter,
+    struct hypervisor_network_adapter,
+    HYPERV_OBSOLETE_CHART(p->st_dropped_packets); HYPERV_OBSOLETE_CHART(p->st_send_receive_packets);
+    HYPERV_OBSOLETE_CHART(p->st_send_receive_bytes); HYPERV_OBSOLETE_CHART(p->st_IPsecoffloadBytes);
+    HYPERV_OBSOLETE_CHART(p->st_DirectedPackets); HYPERV_OBSOLETE_CHART(p->st_BroadcastPackets); HYPERV_OBSOLETE_CHART(p->st_MulticastPackets);)
+
+HYPERV_CLEANUP_CHARTS(
+    processor,
+    struct hypervisor_processor,
+    HYPERV_OBSOLETE_CHART(p->st_HypervisorProcessor); HYPERV_OBSOLETE_CHART(p->st_HypervisorProcessorTotal);)
+
+static void hyperv_reconcile_instances(hyperv_perf_item *item)
+{
+    if (!item->instance || !item->cleanup)
+        return;
+
+    void *value;
+    dfe_start_write(item->instance, value)
+    {
+        struct hyperv_instance_state state;
+        memcpy(&state, value, sizeof(state));
+        if (state.last_seen != item->generation && ++state.missing_cycles >= HYPERV_MISSING_CYCLES) {
+            item->cleanup(value);
+            dictionary_del(item->instance, p_dfe.name);
+        }
+        else if (state.missing_cycles != 0) {
+            memcpy((char *)value + offsetof(struct hyperv_instance_state, missing_cycles),
+                   &state.missing_cycles,
+                   sizeof(state.missing_cycles));
+        }
+    }
+    dfe_done(value);
+    dictionary_garbage_collect(item->instance);
+}
+
 hyperv_perf_item hyperv_perf_list[] = {
     {.registry_name = "Hyper-V Dynamic Memory VM",
      .function_collect = do_hyperv_memory,
      .dict_insert_cb = dict_hyperv_memory_insert_cb,
-     .dict_size = sizeof(struct hypervisor_memory)},
+     .dict_size = sizeof(struct hypervisor_memory),
+     .cleanup = hyperv_cleanup_memory},
 
     {.registry_name = "Hyper-V VM Vid Partition",
      .function_collect = do_hyperv_vid_partition,
      .dict_insert_cb = dict_hyperv_partition_insert_cb,
-     .dict_size = sizeof(struct hypervisor_partition)},
+     .dict_size = sizeof(struct hypervisor_partition),
+     .cleanup = hyperv_cleanup_partition},
 
     {
         .registry_name = "Hyper-V Virtual Machine Health Summary",
@@ -2309,33 +2447,41 @@ hyperv_perf_item hyperv_perf_list[] = {
         .function_collect = do_hyperv_root_partition,
         .dict_insert_cb = dict_hyperv_root_partition_insert_cb,
         .dict_size = sizeof(struct hypervisor_root_partition),
+        .cleanup = hyperv_cleanup_root_partition,
     },
 
     {.registry_name = "Hyper-V Virtual Storage Device",
      .function_collect = do_hyperv_storage_device,
      .dict_insert_cb = dict_hyperv_storage_device_insert_cb,
-     .dict_size = sizeof(struct hypervisor_storage_device)},
+     .dict_size = sizeof(struct hypervisor_storage_device),
+     .cleanup = hyperv_cleanup_storage_device},
 
     {.registry_name = "Hyper-V Virtual Switch",
      .function_collect = do_hyperv_switch,
      .dict_insert_cb = dict_hyperv_switch_insert_cb,
-     .dict_size = sizeof(struct hypervisor_switch)},
+     .dict_size = sizeof(struct hypervisor_switch),
+     .cleanup = hyperv_cleanup_switch},
 
     {.registry_name = "Hyper-V Virtual Network Adapter",
      .function_collect = do_hyperv_network_adapter,
      .dict_insert_cb = dict_hyperv_network_adapter_insert_cb,
-     .dict_size = sizeof(struct hypervisor_network_adapter)},
+     .dict_size = sizeof(struct hypervisor_network_adapter),
+     .cleanup = hyperv_cleanup_network_adapter},
 
     {.registry_name = "Hyper-V Hypervisor Virtual Processor",
      .function_collect = do_hyperv_processor,
      .dict_insert_cb = dict_hyperv_processor_insert_cb,
-     .dict_size = sizeof(struct hypervisor_processor)},
+     .dict_size = sizeof(struct hypervisor_processor),
+     .cleanup = hyperv_cleanup_processor},
 
     {.registry_name = NULL, .function_collect = NULL}};
 
 int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
+    static uint32_t generation = 0;
+
+    generation++;
 
     if (unlikely(!initialized)) {
         for (int i = 0; hyperv_perf_list[i].registry_name != NULL; i++) {
@@ -2359,7 +2505,10 @@ int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused)
         if (!pDataBlock)
             continue;
 
-        hyperv_perf_list[i].function_collect(pDataBlock, update_every, &hyperv_perf_list[i]);
+        hyperv_perf_item *item = &hyperv_perf_list[i];
+        item->generation = generation;
+        if (item->function_collect(pDataBlock, update_every, item))
+            hyperv_reconcile_instances(item);
     }
     return 0;
 }

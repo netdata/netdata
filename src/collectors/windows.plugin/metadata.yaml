@@ -2286,7 +2286,7 @@ modules:
                 - name: read
                 - name: write
             - name: hyperv.vm_storage_device_operations
-              description: VM storage device IOPS"
+              description: VM storage device IOPS
               unit: "operations/s"
               chart_type: line
               dimensions:
