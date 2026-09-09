@@ -446,96 +446,86 @@ func TestApplyPlanRejectsEmptyTypeID(t *testing.T) {
 	}
 }
 
-func TestApplyPlanDefaultGlobalHostSelection(t *testing.T) {
-	var buf bytes.Buffer
-	api := netdataapi.New(&buf)
-
-	meta := chartengine.ChartMeta{
+func TestApplyPlanHostSelection(t *testing.T) {
+	requests := chartengine.ChartMeta{
 		Title:   "Requests",
 		Family:  "Service",
 		Context: "requests",
 		Units:   "req/s",
 		Type:    chartengine.ChartTypeLine,
 	}
-	plan := Plan{
-		Actions: []EngineAction{
-			chartengine.CreateChartAction{
-				ChartID: "requests",
-				Meta:    meta,
-			},
-		},
-	}
-
-	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
-		TypeID:      "collector.job",
-		UpdateEvery: 1,
-		Plugin:      "go.d.plugin",
-		Module:      "httpcheck",
-		JobName:     "job01",
-	}))
-
-	out := buf.String()
-	assert.Equal(t, `HOST ''
-
-CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line' '0' '1' '' 'go.d.plugin' 'httpcheck'
-CLABEL '_collect_job' 'job01' '1'
-CLABEL_COMMIT
-`, out)
-}
-
-func TestApplyPlanVnodeHostSelectionAndDefine(t *testing.T) {
-	var buf bytes.Buffer
-	api := netdataapi.New(&buf)
-
-	meta := chartengine.ChartMeta{
+	workers := chartengine.ChartMeta{
 		Title:   "Workers Busy",
 		Family:  "Workers",
 		Context: "workers_busy",
 		Units:   "workers",
 		Type:    chartengine.ChartTypeLine,
 	}
+	for name, tc := range map[string]struct {
+		actions []EngineAction
+		module  string
+		host    *HostScope
+		want    string
+	}{
+		"global creation": {
+			actions: []EngineAction{chartengine.CreateChartAction{
+				ChartID: "requests",
+				Meta:    requests,
+			}},
+			module: "httpcheck",
+			want: `HOST ''
 
-	plan := Plan{
-		Actions: []EngineAction{
-			chartengine.CreateChartAction{
+CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line' '0' '1' '' 'go.d.plugin' 'httpcheck'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+`,
+		},
+		"vnode creation": {
+			actions: []EngineAction{chartengine.CreateChartAction{
 				ChartID: "workers_busy",
-				Meta:    meta,
+				Meta:    workers,
+			}},
+			module: "apache",
+			host: &HostScope{
+				GUID: "node-guid",
 			},
-		},
-	}
-
-	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
-		TypeID:      "collector.job",
-		UpdateEvery: 1,
-		Plugin:      "go.d.plugin",
-		Module:      "apache",
-		JobName:     "job01",
-		HostScope: &HostScope{
-			GUID: "node-guid",
-		},
-	}))
-
-	out := buf.String()
-	assert.Equal(t, `HOST 'node-guid'
+			want: `HOST 'node-guid'
 
 CHART 'collector.job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '0' '1' '' 'go.d.plugin' 'apache'
 CLABEL '_collect_job' 'job01' '1'
 CLABEL_COMMIT
-`, out)
-}
+`,
+		},
+		"empty plan": {module: "runtime"},
+		"remove-only batch": {
+			actions: []EngineAction{chartengine.RemoveChartAction{
+				ChartID: "requests",
+				Meta:    requests,
+			}},
+			module: "httpcheck",
+			want: `HOST ''
 
-func TestApplyPlanSkipsHostSelectionForEmptyPlans(t *testing.T) {
-	var buf bytes.Buffer
-	api := netdataapi.New(&buf)
-
-	require.NoError(t, ApplyPlan(api, Plan{}, EmitEnv{
-		TypeID:      "collector.job",
-		UpdateEvery: 1,
-		Plugin:      "go.d.plugin",
-		Module:      "runtime",
-		JobName:     "job01",
-	}))
-	assert.Equal(t, "", buf.String())
+CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line' '0' '1' 'obsolete' 'go.d.plugin' 'httpcheck'
+`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			api := netdataapi.New(&buf)
+			err := ApplyPlan(api, Plan{
+				Actions: tc.actions,
+			}, EmitEnv{
+				TypeID:      "collector.job",
+				UpdateEvery: 1,
+				Plugin:      "go.d.plugin",
+				Module:      tc.module,
+				JobName:     "job01",
+				HostScope:   tc.host,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, buf.String())
+		})
+	}
 }
 
 func TestPrepareHostInfoScenarios(t *testing.T) {
@@ -589,41 +579,6 @@ func TestPrepareHostInfoScenarios(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
-}
-
-func TestApplyPlanRemoveOnlyBatchStillSelectsHost(t *testing.T) {
-	var buf bytes.Buffer
-	api := netdataapi.New(&buf)
-
-	meta := chartengine.ChartMeta{
-		Title:   "Requests",
-		Family:  "Service",
-		Context: "requests",
-		Units:   "req/s",
-		Type:    chartengine.ChartTypeLine,
-	}
-	plan := Plan{
-		Actions: []EngineAction{
-			chartengine.RemoveChartAction{
-				ChartID: "requests",
-				Meta:    meta,
-			},
-		},
-	}
-
-	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
-		TypeID:      "collector.job",
-		UpdateEvery: 1,
-		Plugin:      "go.d.plugin",
-		Module:      "httpcheck",
-		JobName:     "job01",
-	}))
-
-	out := buf.String()
-	assert.Equal(t, `HOST ''
-
-CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line' '0' '1' 'obsolete' 'go.d.plugin' 'httpcheck'
-`, out)
 }
 
 func TestNormalizeActionsOrderingDeterminism(t *testing.T) {

@@ -233,14 +233,17 @@ func TestV1CommittedChartInventory(t *testing.T) {
 }
 
 func TestV1IgnoredDefinitionHasNoPublishedHost(t *testing.T) {
-	for name, id := range map[string]string{"oversized ID": strings.Repeat("x", NetdataChartIDMaxLength), "oversized qualified ID": strings.Repeat("x", NetdataChartIDMaxLength-len("test_device"))} {
+	for name, tc := range map[string]struct{ id string }{
+		"oversized ID":           {id: strings.Repeat("x", NetdataChartIDMaxLength)},
+		"oversized qualified ID": {id: strings.Repeat("x", NetdataChartIDMaxLength-len("test_device"))},
+	} {
 		t.Run(name, func(t *testing.T) {
 			var wire bytes.Buffer
 			frames, err := lifecycle.NewFrameOwner(&wire)
 			require.NoError(t, err)
 			charts := collectorapi.Charts{
 				&collectorapi.Chart{
-					ID:    id,
+					ID:    tc.id,
 					Title: "ignored",
 					Units: "units",
 					Dims:  collectorapi.Dims{{ID: "value"}},

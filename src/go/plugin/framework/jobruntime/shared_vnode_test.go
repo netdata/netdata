@@ -114,7 +114,11 @@ func newSharedContributor(
 }
 
 func TestQuietContributorAcrossConfiguredAuthority(t *testing.T) {
-	for name, kind := range map[string]string{"V1": "v1", "V2 default": "v2", "V2 explicit": "scope"} {
+	for name, tc := range map[string]struct{ kind string }{
+		"V1":          {kind: "v1"},
+		"V2 default":  {kind: "v2"},
+		"V2 explicit": {kind: "scope"},
+	} {
 		t.Run(name, func(t *testing.T) {
 			var out bytes.Buffer
 			frames, err := lifecycle.NewFrameOwner(&out)
@@ -123,7 +127,7 @@ func TestQuietContributorAcrossConfiguredAuthority(t *testing.T) {
 			writer := sharedFrameOutput{
 				owner: frames,
 			}
-			runA, cleanupA := newSharedContributor(t, kind, "generated", publisher, writer)
+			runA, cleanupA := newSharedContributor(t, tc.kind, "generated", publisher, writer)
 			runB, cleanupB := newSharedContributor(t, "v2", "peer", publisher, writer)
 			runA()
 			oracle := newHostProtocolOracle()
@@ -158,7 +162,7 @@ func TestQuietContributorAcrossConfiguredAuthority(t *testing.T) {
 }
 
 func TestBufferedScopeUsesCurrentAuthority(t *testing.T) {
-	for name, explicit := range map[string]bool{"default": false, "explicit": true} {
+	for name, tc := range map[string]struct{ explicit bool }{"default": {}, "explicit": {explicit: true}} {
 		t.Run(name, func(t *testing.T) {
 			var out bytes.Buffer
 			frames, err := lifecycle.NewFrameOwner(&out)
@@ -178,7 +182,7 @@ func TestBufferedScopeUsesCurrentAuthority(t *testing.T) {
 			}
 			module.collectFunc = func(context.Context) error {
 				meter := store.Write().SnapshotMeter("apache")
-				if explicit {
+				if tc.explicit {
 					meter = meter.WithHostScope(
 						metrix.HostScope{
 							ScopeKey: "resource",

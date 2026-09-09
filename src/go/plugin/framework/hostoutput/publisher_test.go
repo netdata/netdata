@@ -119,13 +119,13 @@ func TestCleanupAuthority(t *testing.T) {
 }
 
 func TestAbortedPublication(t *testing.T) {
-	for name, initial := range map[string]bool{"first publication": false, "existing quiet owner": true} {
+	for name, tc := range map[string]struct{ initial bool }{"first publication": {}, "existing quiet owner": {initial: true}} {
 		t.Run(name, func(t *testing.T) {
 			p := New()
 			o := p.NewOwner("node")
 			defer o.Release()
 			d := definition(t, "node", "generated", nil)
-			if initial {
+			if tc.initial {
 				emit(t, o, d, false)
 			}
 			configured := definition(t, "node", "configured", nil)
@@ -175,14 +175,22 @@ func TestGeneratedConflictsRemainStableAndBounded(t *testing.T) {
 
 func TestGUIDAliasesShareAuthority(t *testing.T) {
 	const guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	p := New()
-	configured := definition(t, guid, "configured", nil)
-	p.Bind(func(key string) *Definition { require.Equal(t, guid, key); return configured })
-	for _, alias := range []string{guid, "AAAAAAAABBBBCCCCDDDDEEEEEEEEEEEE"} {
-		o := p.NewOwner(alias)
-		d := definition(t, alias, "generated", nil)
-		wire, _ := emit(t, o, d, false)
-		assert.Contains(t, wire, "HOST_DEFINE '"+guid+"' 'configured'")
-		o.Release()
+	for name, tc := range map[string]struct{ alias string }{
+		"canonical":         {alias: guid},
+		"uppercase compact": {alias: "AAAAAAAABBBBCCCCDDDDEEEEEEEEEEEE"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := New()
+			configured := definition(t, guid, "configured", nil)
+			p.Bind(func(key string) *Definition {
+				require.Equal(t, guid, key)
+				return configured
+			})
+			owner := p.NewOwner(tc.alias)
+			d := definition(t, tc.alias, "generated", nil)
+			wire, _ := emit(t, owner, d, false)
+			assert.Contains(t, wire, "HOST_DEFINE '"+guid+"' 'configured'")
+			owner.Release()
+		})
 	}
 }

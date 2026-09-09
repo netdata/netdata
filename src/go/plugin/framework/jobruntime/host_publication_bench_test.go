@@ -86,7 +86,7 @@ func (w v1BenchmarkFrameWriter) CommitBuiltJobOutput(build func() ([]byte, error
 // Timing is a workstation trend, not a CI threshold.
 func BenchmarkV1ChartInventory(b *testing.B) {
 	for _, count := range []int{1, 64, 512} {
-		for name, changed := range map[string]bool{"steady": false, "one_definition": true} {
+		for name, tc := range map[string]struct{ changed bool }{"steady": {}, "one_definition": {changed: true}} {
 			b.Run(fmt.Sprintf("%d/%s", count, name), func(b *testing.B) {
 				charts := make(collectorapi.Charts, 0, count)
 				mx := make(map[string]int64, count)
@@ -134,7 +134,7 @@ func BenchmarkV1ChartInventory(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for b.Loop() {
-					if changed {
+					if tc.changed {
 						charts[count/2].MarkNotCreated()
 					}
 					job.runOnce()

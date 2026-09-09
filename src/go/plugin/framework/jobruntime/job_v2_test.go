@@ -1883,121 +1883,6 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				assert.Equal(t, 1, registry.OwnerCount("node-guid"))
 			},
 		},
-		"guid change releases superseded owner": {
-			run: func(t *testing.T) {
-				registry := hostoutput.New()
-				store := metrix.NewCollectorStore()
-				current := 1.0
-				mod := &mockModuleV2{
-					store:    store,
-					template: chartTemplateV2(),
-					collectFunc: func(context.Context) error {
-						store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(current)
-						return nil
-					},
-				}
-
-				var out bytes.Buffer
-				initial := vnodes.VirtualNode{
-					Name:     "db",
-					Hostname: "node-host-a",
-					GUID:     "node-guid-a",
-				}
-				job := NewJobV2(JobV2Config{
-					PluginName:  pluginName,
-					Name:        jobName,
-					ModuleName:  modName,
-					FullName:    modName + "_" + jobName,
-					Module:      mod,
-					Out:         &out,
-					UpdateEvery: 1,
-					Publication: registry,
-					Vnode:       initial,
-				})
-				currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
-					Vnode:            &initial,
-					Revision:         1,
-					MetadataRevision: 1,
-				})
-				require.NoError(t, job.AutoDetectionManaged(context.Background()))
-
-				job.runOnce()
-				assert.Equal(t, 1, registry.OwnerCount("node-guid-a"))
-
-				out.Reset()
-				current = 2
-				currentVnode.set(VnodeSnapshot{
-					Vnode: &vnodes.VirtualNode{
-						Name:     "db",
-						Hostname: "node-host-b",
-						GUID:     "node-guid-b",
-					},
-					Revision:         2,
-					MetadataRevision: 2,
-				})
-				job.runOnce()
-
-				assert.Empty(t, registry.OwnerCount("node-guid-a"))
-				assert.Equal(t, 1, registry.OwnerCount("node-guid-b"))
-			},
-		},
-		"vnode to global switch releases superseded owner": {
-			run: func(t *testing.T) {
-				registry := hostoutput.New()
-				store := metrix.NewCollectorStore()
-				current := 1.0
-				mod := &mockModuleV2{
-					store:    store,
-					template: chartTemplateV2(),
-					collectFunc: func(context.Context) error {
-						store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(current)
-						return nil
-					},
-				}
-
-				var out bytes.Buffer
-				initial := vnodes.VirtualNode{
-					Name:     "db",
-					Hostname: "node-host",
-					GUID:     "node-guid",
-				}
-				job := NewJobV2(JobV2Config{
-					PluginName:  pluginName,
-					Name:        jobName,
-					ModuleName:  modName,
-					FullName:    modName + "_" + jobName,
-					Module:      mod,
-					Out:         &out,
-					UpdateEvery: 1,
-					Publication: registry,
-					Vnode:       initial,
-				})
-				currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
-					Vnode:            &initial,
-					Revision:         1,
-					MetadataRevision: 1,
-				})
-				require.NoError(t, job.AutoDetectionManaged(context.Background()))
-
-				job.runOnce()
-				require.Equal(t, 1, registry.OwnerCount("node-guid"))
-
-				out.Reset()
-				current = 2
-				currentVnode.set(VnodeSnapshot{
-					Vnode: &vnodes.VirtualNode{
-						Name: "db",
-					},
-					Revision:         2,
-					MetadataRevision: 2,
-				})
-				job.runOnce()
-
-				assert.Empty(t, registry.OwnerCount("node-guid"))
-				assert.Contains(t, out.String(), `HOST ''`)
-				assert.Contains(t, out.String(), "SET 'busy' = 2")
-			},
-		},
 		"cleanup emits obsoletes before releasing owner": {
 			run: func(t *testing.T) {
 				registry := hostoutput.New()
@@ -2577,114 +2462,189 @@ func assertContainsInOrder(t *testing.T, s string, parts ...string) {
 	}
 }
 
-func TestJobV2CleanupUsesLastSuccessfulHostAfterFailedHostSwitch(t *testing.T) {
-	store := metrix.NewCollectorStore()
-	current := 1.0
-	failCollect := false
-	mod := &mockModuleV2{
-		store:    store,
-		template: chartTemplateV2(),
-		collectFunc: func(context.Context) error {
-			if failCollect {
-				return errors.New("collect failed")
+func TestJobV2HostSwitchReleasesSupersededOwner(t *testing.T) {
+	for name, tc := range map[string]struct {
+		next       vnodes.VirtualNode
+		wantOwners map[string]int
+		wantHost   string
+	}{
+		"vnode to vnode": {
+			next: vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-b",
+				GUID:     "node-guid-b",
+			},
+			wantOwners: map[string]int{"node-guid-a": 0, "node-guid-b": 1},
+			wantHost:   "HOST 'node-guid-b'",
+		},
+		"vnode to global": {
+			next: vnodes.VirtualNode{
+				Name: "db",
+			},
+			wantOwners: map[string]int{"node-guid-a": 0, "node-guid-b": 0},
+			wantHost:   "HOST ''",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			publisher := hostoutput.New()
+			store := metrix.NewCollectorStore()
+			current := 1.0
+			mod := &mockModuleV2{
+				store:    store,
+				template: chartTemplateV2(),
+				collectFunc: func(context.Context) error {
+					store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(current)
+					return nil
+				},
 			}
-			store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(current)
-			return nil
-		},
+			var out bytes.Buffer
+			initial := vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-a",
+				GUID:     "node-guid-a",
+			}
+			job := NewJobV2(
+				JobV2Config{
+					PluginName:  pluginName,
+					Name:        jobName,
+					ModuleName:  modName,
+					FullName:    modName + "_" + jobName,
+					Module:      mod,
+					Out:         &out,
+					UpdateEvery: 1,
+					Publication: publisher,
+					Vnode:       initial,
+				},
+			)
+			currentVnode := bindJobV2VnodeLookup(
+				job,
+				"db",
+				VnodeSnapshot{
+					Vnode:            &initial,
+					Revision:         1,
+					MetadataRevision: 1,
+				},
+			)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			job.runOnce()
+			require.Equal(t, 1, publisher.OwnerCount(initial.GUID))
+			out.Reset()
+			current = 2
+			currentVnode.set(VnodeSnapshot{
+				Vnode:            &tc.next,
+				Revision:         2,
+				MetadataRevision: 2,
+			})
+			job.runOnce()
+			assert.Equal(
+				t,
+				tc.wantOwners,
+				map[string]int{
+					"node-guid-a": publisher.OwnerCount("node-guid-a"),
+					"node-guid-b": publisher.OwnerCount("node-guid-b"),
+				},
+			)
+			assert.Contains(t, out.String(), tc.wantHost)
+			assert.Contains(t, out.String(), "SET 'busy' = 2")
+		})
 	}
-
-	var out bytes.Buffer
-	initial := vnodes.VirtualNode{
-		Name:     "db",
-		Hostname: "node-host-a",
-		GUID:     "node-guid-a",
-	}
-	job := newTestJobV2WithVnode(mod, &out, initial)
-	currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
-		Vnode:            &initial,
-		Revision:         1,
-		MetadataRevision: 1,
-	})
-	require.NoError(t, job.AutoDetectionManaged(context.Background()))
-
-	job.runOnce()
-	out.Reset()
-
-	failCollect = true
-	currentVnode.set(VnodeSnapshot{
-		Vnode: &vnodes.VirtualNode{
-			Name:     "db",
-			Hostname: "node-host-b",
-			GUID:     "node-guid-b",
-		},
-		Revision:         2,
-		MetadataRevision: 2,
-	})
-	job.runOnce()
-	assert.Equal(t, "", out.String())
-
-	job.Cleanup()
-
-	wire := out.String()
-	assert.Contains(t, wire, fmt.Sprintf(`HOST 'node-guid-a'
-
-CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' 'obsolete' 'plugin' 'module'`, chartengine.Priority))
-	assert.NotContains(t, wire, "HOST 'node-guid-b'")
-	assert.Empty(t, job.scopeStates)
 }
 
-func TestJobV2CleanupUsesLastSuccessfulVnodeForStaleSuppressionAfterFailedHostSwitch(t *testing.T) {
-	store := metrix.NewCollectorStore()
-	failCollect := false
-	mod := &mockModuleV2{
-		store:    store,
-		template: chartTemplateV2(),
-		collectFunc: func(context.Context) error {
-			if failCollect {
-				return errors.New("collect failed")
+func TestJobV2CleanupAfterFailedHostSwitch(t *testing.T) {
+	for name, tc := range map[string]struct {
+		initial     vnodes.VirtualNode
+		next        vnodes.VirtualNode
+		wantCleanup string
+	}{
+		"vnode to vnode": {
+			initial: vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-a",
+				GUID:     "node-guid-a",
+			},
+			next: vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-b",
+				GUID:     "node-guid-b",
+			},
+			wantCleanup: fmt.Sprintf(`HOST 'node-guid-a'
+
+CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' 'obsolete' 'plugin' 'module'`, chartengine.Priority),
+		},
+		"stale vnode retains cleanup suppression": {
+			initial: vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-a",
+				GUID:     "node-guid-a",
+				Labels:   map[string]string{"_node_stale_after_seconds": "60"},
+			},
+			next: vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-b",
+				GUID:     "node-guid-b",
+			},
+		},
+		"global cleanup is not suppressed by new stale vnode": {
+			initial: vnodes.VirtualNode{
+				Name: "db",
+			},
+			next: vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "node-host-b",
+				GUID:     "node-guid-b",
+				Labels:   map[string]string{"_node_stale_after_seconds": "60"},
+			},
+			wantCleanup: fmt.Sprintf(`HOST ''
+
+CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' 'obsolete' 'plugin' 'module'`, chartengine.Priority),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := metrix.NewCollectorStore()
+			failCollect := false
+			mod := &mockModuleV2{
+				store:    store,
+				template: chartTemplateV2(),
+				collectFunc: func(context.Context) error {
+					if failCollect {
+						return errors.New("collect failed")
+					}
+					store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
+					return nil
+				},
 			}
-			store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
-			return nil
-		},
+			var out bytes.Buffer
+			job := newTestJobV2WithVnode(mod, &out, tc.initial)
+			currentVnode := bindJobV2VnodeLookup(
+				job,
+				"db",
+				VnodeSnapshot{
+					Vnode:            &tc.initial,
+					Revision:         1,
+					MetadataRevision: 1,
+				},
+			)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			job.runOnce()
+			out.Reset()
+			failCollect = true
+			currentVnode.set(VnodeSnapshot{
+				Vnode:            &tc.next,
+				Revision:         2,
+				MetadataRevision: 2,
+			})
+			job.runOnce()
+			require.Empty(t, out.String())
+			job.Cleanup()
+			if tc.wantCleanup == "" {
+				assert.Empty(t, out.String())
+			} else {
+				assert.Contains(t, out.String(), tc.wantCleanup)
+			}
+			assert.NotContains(t, out.String(), "HOST '"+tc.next.GUID+"'")
+			assert.Empty(t, job.scopeStates)
+		})
 	}
-
-	var out bytes.Buffer
-	initial := vnodes.VirtualNode{
-		Name:     "db",
-		Hostname: "node-host-a",
-		GUID:     "node-guid-a",
-		Labels: map[string]string{
-			"_node_stale_after_seconds": "60",
-		},
-	}
-	job := newTestJobV2WithVnode(mod, &out, initial)
-	currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
-		Vnode:            &initial,
-		Revision:         1,
-		MetadataRevision: 1,
-	})
-	require.NoError(t, job.AutoDetectionManaged(context.Background()))
-
-	job.runOnce()
-	out.Reset()
-
-	failCollect = true
-	currentVnode.set(VnodeSnapshot{
-		Vnode: &vnodes.VirtualNode{
-			Name:     "db",
-			Hostname: "node-host-b",
-			GUID:     "node-guid-b",
-		},
-		Revision:         2,
-		MetadataRevision: 2,
-	})
-	job.runOnce()
-	require.Empty(t, out.String())
-
-	job.Cleanup()
-
-	assert.Empty(t, out.String())
-	assert.Empty(t, job.scopeStates)
 }
 
 func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
@@ -2791,60 +2751,6 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 	job.Cleanup()
 	assert.Empty(t, out.String())
 	assert.Zero(t, job.publication.Len())
-}
-
-func TestJobV2CleanupDoesNotSuppressGlobalCleanupForDifferentStaleVnode(t *testing.T) {
-	store := metrix.NewCollectorStore()
-	failCollect := false
-	mod := &mockModuleV2{
-		store:    store,
-		template: chartTemplateV2(),
-		collectFunc: func(context.Context) error {
-			if failCollect {
-				return errors.New("collect failed")
-			}
-			store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
-			return nil
-		},
-	}
-
-	var out bytes.Buffer
-	job := newTestJobV2(mod, &out)
-	currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
-		Vnode: &vnodes.VirtualNode{
-			Name: "db",
-		},
-		Revision:         1,
-		MetadataRevision: 1,
-	})
-	require.NoError(t, job.AutoDetectionManaged(context.Background()))
-
-	job.runOnce()
-	out.Reset()
-
-	failCollect = true
-	currentVnode.set(VnodeSnapshot{
-		Vnode: &vnodes.VirtualNode{
-			Name:     "db",
-			Hostname: "node-host-b",
-			GUID:     "node-guid-b",
-			Labels: map[string]string{
-				"_node_stale_after_seconds": "60",
-			},
-		},
-		Revision:         2,
-		MetadataRevision: 2,
-	})
-	job.runOnce()
-	assert.Equal(t, "", out.String())
-
-	job.Cleanup()
-
-	wire := out.String()
-	assert.Contains(t, wire, fmt.Sprintf(`HOST ''
-
-CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' 'obsolete' 'plugin' 'module'`, chartengine.Priority))
-	assert.NotContains(t, wire, "HOST 'node-guid-b'")
 }
 
 func TestJobV2CleanupUsesPreModuleCleanupSnapshotForStaleSuppression(t *testing.T) {
