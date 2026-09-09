@@ -212,8 +212,7 @@
                                       "auth_password": {
                                         "title": "Authentication password",
                                         "description": "SNMPv3 authentication passphrase; at least eight bytes.",
-                                        "type": "string",
-                                        "minLength": 8
+                                        "type": "string"
                                       }
                                     },
                                     "required": [
@@ -242,8 +241,7 @@
                                       "auth_password": {
                                         "title": "Authentication password",
                                         "description": "SNMPv3 authentication passphrase; at least eight bytes.",
-                                        "type": "string",
-                                        "minLength": 8
+                                        "type": "string"
                                       },
                                       "priv_protocol": {
                                         "title": "Privacy protocol",
@@ -262,8 +260,7 @@
                                       "priv_password": {
                                         "title": "Privacy password",
                                         "description": "SNMPv3 encryption passphrase; at least eight bytes.",
-                                        "type": "string",
-                                        "minLength": 8
+                                        "type": "string"
                                       }
                                     },
                                     "required": [

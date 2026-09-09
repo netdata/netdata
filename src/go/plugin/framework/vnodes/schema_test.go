@@ -31,6 +31,21 @@ func TestVnodeSchemaModesAndCredentials(t *testing.T) {
 		require.NoError(t, json.Unmarshal(raw, &form))
 		require.NoError(t, schema.Validate(form), "authored get must be editable in its schema")
 	})
+	for _, level := range []string{"authNoPriv", "authPriv"} {
+		t.Run("multibyte password/"+level, func(t *testing.T) {
+			c := Config{VirtualNode: VirtualNode{Name: "router", SourceType: "user"}, Mode: "snmp", ModeSNMP: &SNMPConfig{
+				Address: "device",
+				Config:  snmpauth.Config{Version: "3", Credentials3: &snmpauth.USM{Username: "fixture", SecurityLevel: level, AuthPassword: "éééé", PrivPassword: "éééé"}},
+			}}
+			c.NormalizeCredentials()
+			require.NoError(t, c.Validate())
+			raw, err := json.Marshal(c)
+			require.NoError(t, err)
+			var form any
+			require.NoError(t, json.Unmarshal(raw, &form))
+			require.NoError(t, schema.Validate(form), "valid byte-length passwords must remain editable")
+		})
+	}
 	for _, tc := range []struct {
 		config string
 		valid  bool
