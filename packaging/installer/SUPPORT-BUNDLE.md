@@ -45,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\n
 ```
 
 Both scripts implement the same bundle contract: same directory layout, same
-`MANIFEST.json` schema (`netdata-support-bundle/v1`), same sanitization rules.
+`MANIFEST.json` schema (`netdata-support-bundle/v2`), same sanitization rules.
 **If you change one script, mirror the change in the other and update this
 document.**
 
@@ -201,7 +201,7 @@ proxy, so diagnostic data cannot leave the host through a forced proxy.
 
 | item | why |
 |---|---|
-| listening sockets (netdata-related) | "dashboard unreachable" and port-conflict tickets |
+| `netdata-sockets.txt` (all visible, platform-supported sockets owned by the Netdata process tree) | dashboard reachability, port conflicts, stuck connections, and plugin networking tickets; TCP states are retained, while UDP and Unix-domain records use their native state representation; unavailable socket classes are reported rather than inferred |
 | DNS config, proxy env/config (sanitized) | claiming-behind-proxy is a recurring theme; DNS misconfiguration breaks cloud connectivity |
 | Netdata Cloud reachability (TCP plus certificate-validating HTTPS/TLS probe; no bundle data sent) | separates network problems from agent problems in one step |
 
@@ -488,11 +488,11 @@ by these scripts.
 
 ## Bundle format contract
 
-- Schema id: `netdata-support-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
+- Schema id: `netdata-support-bundle/v2` (in `MANIFEST.json`). Bump the suffix on
   breaking layout changes; downstream ticket tooling may parse it. The
   `09-permissions/` section and the top-level `streaming_api_key_redacted` flag
-  were added in tool version 1.1.0 and are purely additive, so the schema id is
-  unchanged.
+  were added in tool version 1.1.0 and are purely additive. Version 2 replaces
+  the listener-only network path with the process-tree socket inventory.
 - Command captures are `.txt` files starting with a
   `# netdata-support-bundle v<version> | command: ... | captured: <utc>` header; on POSIX
   they also end with an `# exit: N | duration: Ns` trailer. PowerShell command

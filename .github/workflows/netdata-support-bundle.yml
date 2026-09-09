@@ -97,12 +97,14 @@ jobs:
             exit 1
           fi
           test -s "$root/08-network/resolv-conf.txt"
+          test -s "$root/08-network/netdata-sockets.txt"
+          test ! -e "$root/08-network/listening-sockets.txt"
           grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
           if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
             echo 'planted secret survived in bundle' >&2
             exit 1
           fi
-          jq -e '.schema == "netdata-support-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
+          jq -e '.schema == "netdata-support-bundle/v2" and (.files | length > 0)' "$root/MANIFEST.json"
           jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
 
           cmp /var/lib/netdata/snmp/diagnostics/lifecycle.zst "$root/06-state/snmp-diagnostics/lifecycle.zst"
@@ -201,7 +203,9 @@ jobs:
               } finally { $manifestStream.Dispose() }
               if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
               $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
-              if ($manifest.schema -ne 'netdata-support-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+              if ($manifest.schema -ne 'netdata-support-bundle/v2' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+              $socketEntry = $archive.Entries | Where-Object { $_.FullName -match '08-network[\\/]netdata-sockets[.]txt$' } | Select-Object -First 1
+              if (-not $socketEntry) { throw 'Netdata socket inventory missing' }
 
               if ($manifest.snmp_diagnostics.files -ne 1 -or $manifest.snmp_diagnostics.status -ne 'complete' -or
                   $manifest.secrets_redacted -or $manifest.pii_obfuscated) { throw 'raw SNMP manifest contract failed' }
