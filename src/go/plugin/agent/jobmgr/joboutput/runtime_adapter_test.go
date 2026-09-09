@@ -52,7 +52,10 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		},
 	)
 	require.NoError(t, owner.Promote(t.Context()))
-	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
+	identity := lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 1,
+	}
 	attached, err := newProcessManagedJob(
 		JobVariantV1,
 		job,
@@ -156,7 +159,10 @@ func TestProcessOwnedJobAttachmentPreservesTargetRetirementAfterCandidateFinaliz
 	_, err = newProcessManagedJob(
 		JobVariantV1,
 		job,
-		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         job.FullName(),
+			Generation: 1,
+		},
 		newTestScheduler(t),
 		candidate.CollectorCleanup,
 		owner,
@@ -189,6 +195,66 @@ func TestStagedJobPromotionDoesNotStartAfterCallerCancellation(t *testing.T) {
 
 	require.ErrorIs(t, err, context.Canceled)
 	require.Zero(t, attempts.calls.Load())
+}
+
+func TestBuiltOutputRejectsNilTransaction(t *testing.T) {
+	tests := map[string]struct {
+		commit  func(*testing.T, *lifecycle.FrameOwner, func() ([]byte, error)) error
+		wantErr string
+	}{
+		"frame writer without owner": {
+			commit: func(_ *testing.T, _ *lifecycle.FrameOwner, build func() ([]byte, error)) error {
+				return (FrameWriter{}).CommitBuiltJobOutput(build, nil)
+			},
+			wantErr: "job output: invalid FrameOwner transaction",
+		},
+		"frame writer with owner": {
+			commit: func(_ *testing.T, owner *lifecycle.FrameOwner, build func() ([]byte, error)) error {
+				return (FrameWriter{
+					Owner: owner,
+				}).CommitBuiltJobOutput(build, nil)
+			},
+			wantErr: "job output: invalid FrameOwner transaction",
+		},
+		"nil cleanup gate": {
+			commit: func(_ *testing.T, _ *lifecycle.FrameOwner, build func() ([]byte, error)) error {
+				return (*CleanupOutputGate)(nil).CommitBuiltJobOutput(build, nil)
+			},
+			wantErr: "job output: invalid cleanup output transaction",
+		},
+		"open cleanup gate": {
+			commit: func(t *testing.T, owner *lifecycle.FrameOwner, build func() ([]byte, error)) error {
+				gate, err := NewCleanupOutputGate(owner)
+				require.NoError(t, err)
+				return gate.CommitBuiltJobOutput(build, nil)
+			},
+			wantErr: "job output: invalid cleanup output transaction",
+		},
+		"fenced cleanup gate": {
+			commit: func(t *testing.T, owner *lifecycle.FrameOwner, build func() ([]byte, error)) error {
+				gate, err := NewCleanupOutputGate(owner)
+				require.NoError(t, err)
+				gate.Fence()
+				return gate.CommitBuiltJobOutput(build, nil)
+			},
+			wantErr: "job output: invalid cleanup output transaction",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			owner, err := lifecycle.NewFrameOwner(&output)
+			require.NoError(t, err)
+			build := func() ([]byte, error) {
+				t.Fatal("nil transaction must be rejected before building output")
+				return nil, nil
+			}
+			var commitErr error
+			require.NotPanics(t, func() { commitErr = tc.commit(t, owner, build) })
+			assert.EqualError(t, commitErr, tc.wantErr)
+			assert.Empty(t, output.String())
+		})
+	}
 }
 
 func TestFrameWriterWholeCommit(t *testing.T) {
@@ -312,7 +378,9 @@ func TestGenerationOutputGateAbortsLateTransactionWithoutPoisoningFrameOwner(t *
 
 	err = gate.CommitJobOutput(
 		[]byte("late transaction\n"),
-		&recordingFrameState{events: &events},
+		&recordingFrameState{
+			events: &events,
+		},
 	)
 	require.ErrorIs(t, err, errGenerationOutputFenced)
 	require.Equal(t, []string{"abort"}, events)
@@ -388,7 +456,9 @@ func TestGenerationOutputGateRevokesTransactionAdmissionsBeforeDrain(t *testing.
 	go func() {
 		admittedDone <- gate.CommitJobOutput(
 			[]byte("admitted transaction\n"),
-			&recordingFrameState{events: &admittedEvents},
+			&recordingFrameState{
+				events: &admittedEvents,
+			},
 		)
 	}()
 	requireTestSignal(t, writeEntered, "initial transaction did not acquire its write lease")
@@ -406,7 +476,9 @@ func TestGenerationOutputGateRevokesTransactionAdmissionsBeforeDrain(t *testing.
 	go func() {
 		lateDone <- gate.CommitJobOutput(
 			[]byte("late transaction\n"),
-			&recordingFrameState{events: &lateEvents},
+			&recordingFrameState{
+				events: &lateEvents,
+			},
 		)
 	}()
 	select {

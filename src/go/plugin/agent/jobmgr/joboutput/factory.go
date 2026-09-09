@@ -68,7 +68,7 @@ type FactoryConfig struct {
 	CleanupOutput   *CleanupOutputGate                            // process-lifetime accepted-cleanup output
 	ConfigModules   *ConfigModuleFactory                          // resolved config application and short-lived probes
 	Runtime         runtimecomp.Service                           // V2 runtime service dependency
-	Publication     *hostoutput.Publisher                         // vnode registry for V2 jobs
+	Publication     *hostoutput.Publisher                         // shared host metadata publisher for V1 and V2 jobs
 	Vnode           func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
 	HandlerStager   JobHandlerStager                              // run-detached Function-handler staging
 	HandlerAttacher JobHandlerAttacher                            // run-owned Function publication attachment

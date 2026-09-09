@@ -13,6 +13,8 @@ import (
 func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) bool {
 	j := tx.job
 	createCharts := j.hostGUID != tx.guid
+	// pluginsd_validate_machine_guid in src/plugins.d/pluginsd_parser.c canonicalizes
+	// HOST and HOST_DEFINE alike, so compact UUIDs select the same host here.
 	j.api.HOST(tx.guid)
 	hostHeader := j.buf.Len()
 	elapsed := int64(durationTo(time.Since(tx.started), time.Millisecond))

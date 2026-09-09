@@ -17,6 +17,8 @@ import (
 type jobV1ChartInventory map[string]netdataapi.ChartOpts
 
 func (inventory jobV1ChartInventory) record(opts netdataapi.ChartOpts, obsolete bool) {
+	// Match CHART's wire identity: pluginsd_chart in src/plugins.d/pluginsd_parser.c
+	// splits this token at its first dot; pairs yielding the same token are one chart.
 	key := opts.TypeID + "." + opts.ID
 	if obsolete {
 		delete(inventory, key)
@@ -110,7 +112,8 @@ func (j *Job) prepareEmission(started time.Time) (*jobV1Emission, error) {
 func (tx *jobV1Emission) record(change *jobV1ChartChange) {
 	c := change.chart
 	if change.definition != nil || change.pruneDims || change.created != c.IsCreated() || change.updated != c.IsUpdated() ||
-		change.ignored != c.IsIgnored() || change.retries != c.Retries ||
+		change.ignored != c.IsIgnored() ||
+		change.retries != c.Retries ||
 		change.priority != c.Priority ||
 		change.typeID != c.CachedType() ||
 		c.IDSep && change.id != c.CachedID() {

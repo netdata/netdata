@@ -99,8 +99,7 @@ See [VM Templates](/docs/learn/vm-templates.md) for how to avoid this when cloni
 Each virtual node is defined in a YAML file:
 
 ```yaml
-- name: my-remote-server
-  hostname: remote-server.example.com
+- hostname: remote-server.example.com
   guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
   labels:
     environment: production
@@ -176,7 +175,7 @@ Defining a vnode is step 1. The vnode becomes active when a collector job refere
 ```yaml
 jobs:
   - name: win_server1
-    vnode: win_server1
+    vnode: remote-server.example.com
     url: http://203.0.113.10:9182/metrics
 ```
 
@@ -467,8 +466,7 @@ cat /etc/netdata/vnodes/*
 Each file contains a `guid` field that uniquely identifies the vnode:
 
 ```yaml
-- name: my-remote-server
-  hostname: remote-server.example.com
+- hostname: remote-server.example.com
   guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 

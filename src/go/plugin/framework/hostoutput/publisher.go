@@ -232,6 +232,8 @@ func (t *Publication) Build() ([]byte, error) {
 	h.owners[r.Owner] = struct{}{}
 	define := !r.Owner.observed.Equal(r.Definition)
 	if t.configured {
+		// VNodeConfiguration.Definition returns cached immutable definitions and reuses
+		// equal pointers, keeping this change check constant-time under frame admission.
 		define = h.configured != selected
 	} else if h.configured != nil {
 		define = true

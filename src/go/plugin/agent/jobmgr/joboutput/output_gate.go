@@ -193,6 +193,9 @@ func (cog *CleanupOutputGate) CommitBuiltJobOutput(
 	build func() ([]byte, error),
 	transaction jobruntime.OutputStateTransaction,
 ) error {
+	if transaction == nil {
+		return errors.New("job output: invalid cleanup output transaction")
+	}
 	if cog == nil {
 		return errors.Join(errCleanupOutputFenced, transaction.Abort())
 	}

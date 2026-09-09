@@ -136,11 +136,7 @@ func TestHostPublicationDrainsBeforeGenerationFence(t *testing.T) {
 	<-entered
 	gate.RevokeAdmissions()
 	go func() { gate.Fence(); close(finished) }()
-	select {
-	case <-finished:
-		t.Fatal("fence returned during admitted write")
-	default:
-	}
+	requireGenerationGateDrainQueued(t, gate, finished)
 	close(release)
 	require.NoError(t, <-result)
 	<-finished
