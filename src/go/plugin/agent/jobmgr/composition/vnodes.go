@@ -701,6 +701,7 @@ func vnodeJobName(value string) string {
 }
 
 func normalizeVNode(vnode *vnodes.Config, name string, source string) {
+	vnode.NormalizeCredentials()
 	vnode.Name = name
 	if !vnode.IsSNMP() && vnode.Hostname == "" {
 		vnode.Hostname = name

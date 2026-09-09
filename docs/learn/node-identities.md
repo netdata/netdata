@@ -164,10 +164,13 @@ For SNMPv3, replace `credentials` with `credentials3` and set `version: "3"`:
 
 The version choices are `"1"`, `2c` (default), and `"3"`. SNMPv3 supports `noAuthNoPriv`, `authNoPriv`, and
 `authPriv` (default). Authentication defaults to `sha512`; privacy defaults to `aes192c`. Passwords must contain at
-least eight bytes. Omit authentication fields for `noAuthNoPriv`, privacy fields for `authNoPriv`, and the entire
-inactive credential block. Optional `credentials3.context_name` selects an SNMP context. These new field names
+least eight bytes. Inactive credentials are discarded before validation and retention by go.d: authentication and privacy fields
+for `noAuthNoPriv`, privacy fields for `authNoPriv`, and the credential block for the unselected version. This applies
+to both files and forms; switching back requires entering the discarded credentials again. Active credentials remain
+strictly validated. Optional `credentials3.context_name` selects an SNMP context. These new field names
 apply to vnode acquisition; existing collector and discovery credential names are unchanged. Use literal credentials;
-secret references are not supported in vnode acquisition yet.
+secret references are not supported in vnode acquisition yet. This does not rewrite source files or scrub the Agent's
+saved copy of the originally submitted DynCfg payload.
 
 A usable `sysObjectID`, `sysName`, or `sysDescr` lets attached jobs start. Failed profile enrichment retries while
 keeping usable system identity. Acquisition retries every 10 seconds after failure and refreshes complete metadata

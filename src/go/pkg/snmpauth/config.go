@@ -39,6 +39,28 @@ func (c Config) Copy() Config {
 	}
 	return c
 }
+
+// Normalized returns owned credentials for the selected version and security level.
+// Forms can retain hidden fields when an operator switches a nested section.
+func (c Config) Normalized() Config {
+	c = c.Copy()
+	switch c.Version {
+	case "", "1", "2c":
+		c.Credentials3 = nil
+	case "3":
+		c.Credentials = nil
+		if u := c.Credentials3; u != nil {
+			switch u.SecurityLevel {
+			case "noAuthNoPriv":
+				u.AuthProtocol, u.AuthPassword = "", ""
+				u.PrivProtocol, u.PrivPassword = "", ""
+			case "authNoPriv":
+				u.PrivProtocol, u.PrivPassword = "", ""
+			}
+		}
+	}
+	return c
+}
 func (c Config) ContextName() string {
 	if c.Version == "3" && c.Credentials3 != nil {
 		return c.Credentials3.ContextName
@@ -49,11 +71,9 @@ func (c Config) Validate() error { return c.Apply(&gosnmp.GoSNMP{}) }
 
 // Apply validates before installing credentials. Errors name fields, never values.
 func (c Config) Apply(client *gosnmp.GoSNMP) error {
+	c = c.Normalized()
 	switch c.Version {
 	case "", "2c", "1":
-		if c.Credentials3 != nil {
-			return fmt.Errorf("credentials3 requires version 3")
-		}
 		if c.Credentials == nil || c.Credentials.Community == "" {
 			return fmt.Errorf("credentials.community is required")
 		}
@@ -66,9 +86,6 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 	case "3":
 	default:
 		return fmt.Errorf("version must be 1, 2c or 3")
-	}
-	if c.Credentials != nil {
-		return fmt.Errorf("credentials cannot be used with version 3")
 	}
 	if c.Credentials3 == nil || c.Credentials3.Username == "" {
 		return fmt.Errorf("credentials3.username is required")
@@ -93,8 +110,6 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 		if len(u.AuthPassword) < 8 {
 			return fmt.Errorf("credentials3.auth_password must contain at least 8 bytes")
 		}
-	} else if u.AuthProtocol != "" || u.AuthPassword != "" {
-		return fmt.Errorf("authentication fields require an authenticated security_level")
 	}
 	if flags == gosnmp.AuthPriv {
 		if u.PrivProtocol == "" {
@@ -107,8 +122,6 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 		if len(u.PrivPassword) < 8 {
 			return fmt.Errorf("credentials3.priv_password must contain at least 8 bytes")
 		}
-	} else if u.PrivProtocol != "" || u.PrivPassword != "" {
-		return fmt.Errorf("privacy fields require authPriv security_level")
 	}
 	client.Version = gosnmp.Version3
 	client.MsgFlags = flags

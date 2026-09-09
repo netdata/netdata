@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,58 @@ type acquisitionAttempt struct {
 	reply    chan acquisitionReply
 	canceled chan struct{}
 }
+
+func TestCredentialFormTransitionsDiscardInactiveFields(t *testing.T) {
+	jobs := testRunJobServices(t)
+	acquirer := controlledAcquirer{attempts: make(chan acquisitionAttempt, 8)}
+	jobs.SNMPVnodeAcquirer = acquirer
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	generation, err := newTestRunGeneration(t, runGenerationConfig{Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t)})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(context.Background()))
+	t.Cleanup(func() {
+		generation.Stop()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		require.NoError(t, generation.Wait(ctx))
+	})
+	var current acquisitionAttempt
+	for i, tc := range []struct{ auth, absent string }{
+		{`"version":"2c","credentials":{"community":"fixture"},"credentials3":{"username":"hidden"}`, "credentials3"},
+		{`"version":"3","credentials":{"community":"hidden"},"credentials3":{"username":"fixture","security_level":"authPriv","auth_password":"test-auth","priv_password":"test-priv"}`, "community"},
+		{`"version":"3","credentials3":{"username":"fixture","security_level":"authNoPriv","auth_password":"test-auth","priv_password":"hidden-priv","priv_protocol":"aes"}`, "priv_password"},
+		{`"version":"3","credentials3":{"username":"fixture","security_level":"noAuthNoPriv","auth_password":"hidden-auth","auth_protocol":"sha","priv_password":"hidden-priv"}`, "auth_password"},
+	} {
+		uid := fmt.Sprintf("transition-%d", i)
+		args := []string{"go.d:vnode:router", "update"}
+		if i == 0 {
+			args = []string{"go.d:vnode", "add", "router"}
+		}
+		payload := `{"mode":"snmp","mode_snmp":{"address":"device",` + tc.auth + `}}`
+		require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{UID: uid, Route: "config", Source: lifecycle.SourceFunction, Args: args, HasPayload: true, Payload: []byte(payload), ContentType: "application/json", CallerSource: "user=test"}))
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" ")
+		require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN "+uid+" 202 application/json")
+		if i > 0 {
+			select {
+			case <-current.canceled:
+			case <-time.After(time.Second):
+				t.Fatal("active credential edit did not cancel previous acquisition")
+			}
+		}
+		current = nextAcquisition(t, acquirer)
+		raw, err := json.Marshal(current.config)
+		require.NoError(t, err)
+		require.NotContains(t, string(raw), tc.absent)
+		require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{UID: uid + "-get", Route: "config", Source: lifecycle.SourceFunction, Args: []string{"go.d:vnode:router", "get"}}))
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+"-get 200 application/json")
+		_, body, ok := strings.Cut(output.String(), "FUNCTION_RESULT_BEGIN "+uid+"-get 200 application/json")
+		require.True(t, ok)
+		require.NotContains(t, body, tc.absent, "get must omit inactive credentials from stored configuration")
+	}
+}
+
 type acquisitionReply struct {
 	metadata *vnodes.Metadata
 	err      error

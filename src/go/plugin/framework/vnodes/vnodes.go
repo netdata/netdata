@@ -166,6 +166,7 @@ func readConfDir(dir string, snmpSupported bool) map[string]*Config {
 			} else {
 				v.SourceType = "user"
 			}
+			v.NormalizeCredentials()
 			err := v.Validate()
 			guidKey := v.IdentityGUID()
 			if err == nil {

@@ -73,6 +73,7 @@ func (c SNMPConfig) Copy() SNMPConfig {
 }
 func (c SNMPConfig) Defaults() SNMPConfig {
 	c = c.Copy()
+	c.Config = c.Config.Normalized()
 	if c.Version == "" {
 		c.Version = "2c"
 	}
@@ -89,6 +90,13 @@ func (c SNMPConfig) Defaults() SNMPConfig {
 	return c
 }
 func (c *Config) IsSNMP() bool { return c != nil && c.Mode == "snmp" }
+
+// NormalizeCredentials removes inactive secrets before authored input is retained.
+func (c *Config) NormalizeCredentials() {
+	if c.IsSNMP() && c.ModeSNMP != nil {
+		c.ModeSNMP.Config = c.ModeSNMP.Config.Normalized()
+	}
+}
 func (c *Config) IdentityGUID() string {
 	if c.GUID != "" || !c.IsSNMP() || c.ModeSNMP == nil {
 		return c.GUID

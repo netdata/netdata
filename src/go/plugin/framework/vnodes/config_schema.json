@@ -385,7 +385,7 @@
           "ui:widget": "password"
         }
       },
-      "ui:help": "When changing protocol or security level, remove credentials that no longer apply. Inactive credential fields are rejected."
+      "ui:help": "Changing protocol or security level discards credentials that no longer apply. Switching back requires entering those credentials again."
     }
   }
 }

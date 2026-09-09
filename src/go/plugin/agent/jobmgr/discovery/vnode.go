@@ -97,6 +97,7 @@ func (vc *VNodeConfiguration) PrepareUpsert(id string, expected uint64, config *
 		return PreparedVNode{}, ErrVNodeRevision
 	}
 	next := &vnodeRecord{config: config.Copy()}
+	next.config.NormalizeCredentials()
 	if current != nil {
 		if reflect.DeepEqual(current.config, next.config) {
 			return PreparedVNode{}, ErrVNodeNoChange

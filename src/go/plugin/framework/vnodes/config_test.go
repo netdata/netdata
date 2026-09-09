@@ -4,10 +4,13 @@ package vnodes
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/netdata/netdata/go/plugins/pkg/snmpauth"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
@@ -76,6 +79,8 @@ func TestModeAwareUpdate(t *testing.T) {
 	next.Labels = map[string]string{"site": "new"}
 	require.NoError(t, c.ValidateUpdate(next))
 	require.True(t, c.SameAcquisition(next))
+	next.ModeSNMP.Credentials3 = &snmpauth.USM{Username: "inactive"}
+	require.True(t, c.SameAcquisition(next), "inactive credentials must not restart acquisition")
 	next.ModeSNMP.Credentials.Community = "new"
 	require.NoError(t, c.ValidateUpdate(next))
 	require.False(t, c.SameAcquisition(next))
@@ -87,6 +92,29 @@ func TestModeAwareUpdate(t *testing.T) {
 	next = &Config{VirtualNode: VirtualNode{Name: "router", Hostname: "router", GUID: uuid.NewString()}}
 	require.Error(t, c.ValidateUpdate(next))
 	require.Error(t, next.ValidateUpdate(&c))
+}
+
+func TestFileLoadDiscardsInactiveCredentials(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "vnodes.yaml"), []byte(`- name: router
+  mode: snmp
+  mode_snmp:
+    address: device
+    version: "3"
+    credentials:
+      community: inactive-community
+    credentials3:
+      username: fixture
+      security_level: noAuthNoPriv
+      auth_password: inactive-auth
+      priv_password: inactive-priv
+`), 0600))
+	loaded := Load(dir, true)
+	require.Contains(t, loaded, "router")
+	raw, err := json.Marshal(loaded["router"])
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), "inactive")
+	require.NoError(t, loaded["router"].Validate())
 }
 func TestSNMPNameRequired(t *testing.T) {
 	var c Config

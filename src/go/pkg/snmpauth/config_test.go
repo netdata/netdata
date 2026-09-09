@@ -44,18 +44,52 @@ func TestApply(t *testing.T) {
 func TestInvalidAuthIsNotSilentlyDowngraded(t *testing.T) {
 	cases := []Config{
 		{Version: "invalid-secret"}, {},
-		{Credentials: &Community{Community: "secret"}, Credentials3: &USM{}},
-		{Version: "3", Credentials: &Community{Community: "secret"}, Credentials3: &USM{Username: "user"}},
+		{Credentials3: &USM{Username: "inactive"}},
 		{Version: "3", Credentials3: &USM{Username: "user", SecurityLevel: "invalid-secret"}},
 		{Version: "3", Credentials3: &USM{Username: "user", SecurityLevel: "authNoPriv", AuthProtocol: "invalid-secret", AuthPassword: "test-secret"}},
 		{Version: "3", Credentials3: &USM{Username: "user", SecurityLevel: "authPriv", AuthPassword: "short", PrivPassword: "test-secret"}},
-		{Version: "3", Credentials3: &USM{Username: "user", SecurityLevel: "noAuthNoPriv", AuthPassword: "test-secret"}},
-		{Version: "3", Credentials3: &USM{Username: "user", SecurityLevel: "authNoPriv", AuthPassword: "test-secret", PrivPassword: "test-secret"}},
+		{Version: "3", Credentials3: &USM{Username: "user", SecurityLevel: "authPriv", AuthPassword: "test-secret", PrivPassword: "short"}},
 	}
 	for _, c := range cases {
 		err := c.Validate()
 		require.Error(t, err)
 		require.NotContains(t, err.Error(), "secret")
+	}
+}
+
+func TestNormalizeInactiveCredentials(t *testing.T) {
+	for _, version := range []string{"", "1", "2c", "3", "invalid"} {
+		for _, level := range []string{"", "authPriv", "authNoPriv", "noAuthNoPriv", "invalid"} {
+			t.Run(version+"/"+level, func(t *testing.T) {
+				input := Config{Version: version, Credentials: &Community{Community: "fixture"}, Credentials3: &USM{Username: "fixture", SecurityLevel: level, AuthPassword: "test-auth", PrivPassword: "test-priv", ContextName: "context"}}
+				original := input.Copy()
+				got := input.Normalized()
+				require.Equal(t, original, input, "normalizing must not mutate caller-owned credentials")
+				require.Equal(t, got, got.Normalized())
+				if version == "invalid" || version == "3" && level == "invalid" {
+					require.Error(t, got.Validate())
+					return
+				}
+				client := &gosnmp.GoSNMP{}
+				require.NoError(t, input.Apply(client))
+				if version != "3" {
+					require.Nil(t, got.Credentials3)
+					require.Equal(t, "fixture", client.Community)
+					return
+				}
+				require.Nil(t, got.Credentials)
+				require.Equal(t, "context", got.ContextName())
+				usm := client.SecurityParameters.(*gosnmp.UsmSecurityParameters)
+				if level == "noAuthNoPriv" {
+					require.Empty(t, got.Credentials3.AuthPassword)
+					require.Empty(t, usm.AuthenticationPassphrase)
+				}
+				if level == "authNoPriv" || level == "noAuthNoPriv" {
+					require.Empty(t, got.Credentials3.PrivPassword)
+					require.Empty(t, usm.PrivacyPassphrase)
+				}
+			})
+		}
 	}
 }
 func TestCopyOwnsCredentials(t *testing.T) {
