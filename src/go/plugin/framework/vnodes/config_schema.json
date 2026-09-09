@@ -4,6 +4,16 @@
     "title": "Virtual Node configuration.",
     "type": "object",
     "properties": {
+      "stale_after": {
+        "title": "Stale after",
+        "description": "Collection inactivity timeout for the whole virtual node, in seconds. Zero disables the timeout; omission preserves existing label configuration.",
+        "type": [
+          "integer",
+          "null"
+        ],
+        "minimum": 0,
+        "maximum": 4294967295
+      },
       "hostname": {
         "title": "Hostname",
         "description": "The hostname that identifies this virtual node in the Netdata UI and API. Must be unique within your monitoring environment. Leave empty to use the job name.",
@@ -39,6 +49,10 @@
     },
     "labels": {
       "ui:help": "Labels can be used for filtering and grouping in the Netdata UI. Common labels include environment, region, service, team, etc."
+    },
+    "stale_after": {
+      "ui:placeholder": "300",
+      "ui:help": "In YAML, durations such as `5m` are also accepted. An explicit value overrides `_node_stale_after_seconds` in the host labels."
     }
   }
 }

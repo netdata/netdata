@@ -258,6 +258,18 @@
 - Refactor(go.d/snmp_topology): isolate topology diagnostics ([#23798](https://github.com/netdata/netdata/issues/23798))
 - Chore(skills): add repo-skill-authoring ([#23799](https://github.com/netdata/netdata/issues/23799))
 - Feat(go.d/snmp): publish independent diagnostics and retain topology history ([#23800](https://github.com/netdata/netdata/issues/23800))
+- Chore(skills): slim docs-learn-site-structure to verified Learn pipeline facts ([#23805](https://github.com/netdata/netdata/issues/23805))
+- Fix(spawn): reset SIGPIPE in spawned children ([#23751](https://github.com/netdata/netdata/issues/23751))
+- Feat(go.d/snmp): add recurring per-device diagnostics ([#23806](https://github.com/netdata/netdata/issues/23806))
+- Chore(go.d/snmp): clean up SNMP profile definitions ([#23807](https://github.com/netdata/netdata/issues/23807))
+- Feat(snmp): integrate diagnostics with support bundles ([#23808](https://github.com/netdata/netdata/issues/23808))
+- Regenerate integrations docs ([#23811](https://github.com/netdata/netdata/issues/23811))
+- Support HTTP requests up to 1 MiB ([#23744](https://github.com/netdata/netdata/issues/23744))
+- Docs(netdata-ai): add Infrastructure Knowledge page ([#23810](https://github.com/netdata/netdata/issues/23810))
+- Perf(go.d/chartengine): cache autogen routes and optimize expiry ([#23814](https://github.com/netdata/netdata/issues/23814))
+- Fix(mcp): advertise minItems on required array parameters ([#23809](https://github.com/netdata/netdata/issues/23809))
+- Test(go.d): fix staged secret mutation quarantine test flake ([#23816](https://github.com/netdata/netdata/issues/23816))
+- Refactor(go.d/snmp): extract reusable device identity acquisition ([#23817](https://github.com/netdata/netdata/issues/23817))
 
 ## [2.11.0] - 2026-08-12
 

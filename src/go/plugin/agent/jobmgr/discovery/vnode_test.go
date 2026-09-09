@@ -5,6 +5,10 @@ package discovery
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
@@ -167,5 +171,82 @@ func testVNode(hostname, source string) *vnodes.VirtualNode {
 		Source:     source,
 		SourceType: "test",
 		Labels:     map[string]string{"site": "original"},
+	}
+}
+
+func TestVNodeDefinitionIndex(t *testing.T) {
+	for name, tc := range map[string]struct{ sourceOnly, abort, move, remove, disable bool }{
+		"source-only reuses definition":        {sourceOnly: true},
+		"abort preserves authority":            {abort: true},
+		"GUID reassignment moves authority":    {move: true},
+		"remove and re-add":                    {remove: true},
+		"explicit zero removes legacy timeout": {disable: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := newTestVNodeConfiguration(t)
+			initial := testVNode("host", "source")
+			initial.GUID = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+			initial.Labels["_node_stale_after_seconds"] = "300"
+			first := commitVNode(t, c, "node", 0, initial)
+			old := c.Definition("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+			require.NotNil(t, old)
+			next := initial.Copy()
+			if tc.sourceOnly {
+				next.Source = "other"
+			} else {
+				next.Hostname = "updated"
+			}
+			if tc.move {
+				next.GUID = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
+			}
+			if tc.disable {
+				zero := confopt.Duration(0)
+				next.StaleAfter = &zero
+			}
+			prepared, err := c.PrepareUpsert("node", first.Revision, next)
+			require.NoError(t, err)
+			assert.Same(t, old, c.Definition(initial.GUID))
+			if tc.abort {
+				require.NoError(t, prepared.Abort())
+				assert.Same(t, old, c.Definition(initial.GUID))
+				return
+			}
+			if tc.remove {
+				require.NoError(t, prepared.Abort())
+				removal, err := c.PrepareRemove("node", first.Revision)
+				require.NoError(t, err)
+				_, err = removal.Commit()
+				require.NoError(t, err)
+				assert.Nil(t, c.Definition(initial.GUID))
+				prepared, err = c.PrepareUpsert("node", 0, next)
+				require.NoError(t, err)
+			}
+			snapshot, err := prepared.Commit()
+			require.NoError(t, err)
+			definition := c.Definition(next.GUID)
+			require.NotNil(t, definition)
+			wantGUID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			if tc.move {
+				wantGUID = next.GUID
+				assert.Nil(t, c.Definition(initial.GUID))
+			}
+			wantLabels := next.HostLabels()
+			wantLabels["_hostname"] = next.Hostname
+			assert.Equal(
+				t,
+				netdataapi.HostInfo{
+					GUID:     wantGUID,
+					Hostname: next.Hostname,
+					Labels:   wantLabels,
+				},
+				definition.Info(),
+			)
+			if tc.sourceOnly {
+				assert.Same(t, old, definition)
+				assert.Equal(t, first.MetadataRevision, snapshot.MetadataRevision)
+			} else if !tc.remove {
+				assert.Equal(t, first.MetadataRevision+1, snapshot.MetadataRevision)
+			}
+		})
 	}
 }

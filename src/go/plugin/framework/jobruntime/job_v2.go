@@ -21,9 +21,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -45,7 +45,7 @@ type JobV2Config struct {
 	VnodeRevision           uint64
 	VnodeMetadataRevision   uint64
 	VnodeLookup             VnodeLookup
-	VnodeRegistry           *vnoderegistry.Registry
+	Publication             *hostoutput.Publisher
 	FunctionOnly            bool
 	RuntimeService          runtimecomp.Service
 	LifecycleErrorSanitizer func(error) error
@@ -56,9 +56,9 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	if cfg.UpdateEvery <= 0 {
 		cfg.UpdateEvery = 1
 	}
-	registry := cfg.VnodeRegistry
-	if registry == nil {
-		registry = vnoderegistry.New()
+	publisher := cfg.Publication
+	if publisher == nil {
+		publisher = hostoutput.New()
 	}
 
 	j := &JobV2{
@@ -83,7 +83,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		vnodeRevision:           cfg.VnodeRevision,
 		vnodeMetadataRevision:   cfg.VnodeMetadataRevision,
 		vnodeLookup:             cfg.VnodeLookup,
-		vnodeRegistry:           registry,
+		publication:             publisher,
 		runtimeService:          cfg.RuntimeService,
 		lifecycleErrorSanitizer: cfg.LifecycleErrorSanitizer,
 	}
@@ -103,9 +103,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 			moduleLog = moduleLog.WithMessageSanitizer(sanitize)
 		}
 		j.module.GetBase().Logger = moduleLog
-		if vnode := j.module.VirtualNode(); vnode != nil {
-			*vnode = *cfg.Vnode.Copy()
-		}
+		j.supplyConfiguredVnode()
 	}
 	return j
 }
@@ -152,7 +150,7 @@ type JobV2 struct {
 	vnodeMetadataRevision uint64
 	vnodeLookup           VnodeLookup
 
-	vnodeRegistry *vnoderegistry.Registry
+	publication *hostoutput.Publisher
 
 	ctxMu     sync.RWMutex
 	runCtx    context.Context
@@ -192,6 +190,9 @@ func (prepared *jobV2PreparedScopeEmission) Commit() error {
 }
 
 func (prepared *jobV2PreparedScopeEmission) Abort() error {
+	if prepared.decision.owner != nil && prepared.decision.owner != prepared.scope.host.owner {
+		prepared.decision.owner.Release()
+	}
 	prepared.attempt.Abort()
 	return nil
 }
@@ -229,22 +230,6 @@ func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	if snapshot.Vnode == nil {
 		return
 	}
-	if j.module != nil && j.module.VirtualNode() != nil {
-		advanced := false
-		j.vnodeMu.Lock()
-		if snapshot.Revision != 0 && snapshot.Revision > j.vnodeRevision {
-			j.vnodeRevision = snapshot.Revision
-			if snapshot.MetadataRevision != 0 {
-				j.vnodeMetadataRevision = snapshot.MetadataRevision
-			}
-			advanced = true
-		}
-		j.vnodeMu.Unlock()
-		if advanced {
-			j.Debugf("ignoring vnode update for module-owned vnode")
-		}
-		return
-	}
 
 	if snapshot.Revision != 0 {
 		j.vnodeMu.Lock()
@@ -256,7 +241,6 @@ func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	}
 	next := snapshot.Vnode.Copy()
 
-	var metadataChanged bool
 	j.vnodeMu.Lock()
 	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
 		j.vnodeMu.Unlock()
@@ -266,18 +250,11 @@ func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
 	}
-	metadataChanged = snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
 	j.vnodeMu.Unlock()
-	if metadataChanged {
-		// Registry owner release is intentionally tied to the next successful
-		// emission or cleanup, so obsolete emission can still select the old host.
-		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
-			state.host.invalidateDefine()
-		}
-	}
+	j.supplyConfiguredVnode()
 }
 
 func (j *JobV2) Cleanup() {
@@ -290,6 +267,7 @@ func (j *JobV2) CleanupRejected() {
 }
 
 func (j *JobV2) cleanup(emit bool) {
+	defer func() { j.releaseAllScopeOwners(); j.clearAllScopeStateAfterCleanup() }()
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
@@ -297,13 +275,11 @@ func (j *JobV2) cleanup(emit bool) {
 		j.module.Cleanup(context.Background())
 	}
 	if !emit || !collectorapi.ShouldObsoleteCharts() {
-		j.releaseAllScopeRegistryOwners()
-		j.clearAllScopeStateAfterCleanup()
 		return
 	}
 
 	for _, snapshot := range snapshots {
-		if snapshot.staleVnodeSuppressed || len(snapshot.charts) == 0 {
+		if len(snapshot.charts) == 0 {
 			continue
 		}
 
@@ -316,7 +292,9 @@ func (j *JobV2) cleanup(emit bool) {
 			JobLabels:   j.labels,
 		}
 		if snapshot.host.isVnode() {
-			env.HostScope = &chartemit.HostScope{GUID: snapshot.host.guid}
+			env.HostScope = &chartemit.HostScope{
+				GUID: snapshot.host.guid,
+			}
 		}
 		j.buf.Reset()
 		if err := chartemit.ApplyPlan(j.api, buildJobV2CleanupPlan(snapshot.charts), env); err != nil {
@@ -324,13 +302,16 @@ func (j *JobV2) cleanup(emit bool) {
 			j.buf.Reset()
 			continue
 		}
-		if err := commitJobOutput(j.cleanupOut, j.buf.Bytes()); err != nil {
+		if _, err := commitHostOutput(j.cleanupOut, hostoutput.Request{
+			Owner:      snapshot.owner,
+			Definition: snapshot.definition,
+			Payload:    j.buf.Bytes(),
+			Cleanup:    true,
+		}, nil); err != nil {
 			j.Warningf("cleanup output failed for host scope %q: %v", snapshot.scopeKey, err)
 		}
 		j.buf.Reset()
 	}
-	j.releaseAllScopeRegistryOwners()
-	j.clearAllScopeStateAfterCleanup()
 }
 
 // AutoDetectionManaged leaves failure cleanup with the Job Manager factory.
@@ -488,7 +469,15 @@ func (j *JobV2) Stop() {
 }
 
 func (j *JobV2) Tick(clock int) {
-	enqueueTickWithSkipLog(j.tick, clock, j.functionOnly, j.updateEvery, int(j.retries.Load()), &j.skipTracker, j.Logger)
+	enqueueTickWithSkipLog(
+		j.tick,
+		clock,
+		j.functionOnly,
+		j.updateEvery,
+		int(j.retries.Load()),
+		&j.skipTracker,
+		j.Logger,
+	)
 }
 
 func (j *JobV2) shouldCollect(clock int) bool {
@@ -673,15 +662,23 @@ func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
 	var finalErr error
 	for index := range prepared.scopes {
 		scope := &prepared.scopes[index]
-		if err := commitJobOutputTransaction(
+		publication, err := commitHostOutput(
 			j.out,
-			scope.output,
+			hostoutput.Request{
+				Owner:      scope.decision.owner,
+				Definition: scope.decision.definition,
+				Payload:    scope.output,
+			},
 			scope,
-		); err != nil {
+		)
+		if err != nil {
 			failures++
 			finalErr = errors.Join(finalErr, err)
 			j.Warningf("finalize emission for host scope %q failed: %v", scope.scope.scopeKey, err)
 			continue
+		}
+		if publication.Conflict != nil {
+			j.Warningf("conflicting vnode metadata for guid %q", scope.decision.targetHost.guid)
 		}
 		j.commitScopeEmission(scope)
 		successes++
@@ -698,9 +695,15 @@ func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
 	return nil
 }
 
-func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLastRun int) (prepared jobV2PreparedScopeEmission, ok bool) {
+func (j *JobV2) prepareScopeEmission(
+	scope metrix.HostScope,
+	live bool,
+	sinceLastRun int,
+) (prepared jobV2PreparedScopeEmission, ok bool) {
 	var attempt chartengine.PlanAttempt
 	var decision jobV2EmissionDecision
+	var state *jobV2ScopeState
+	var err error
 	defer func() {
 		if r := recover(); r != nil {
 			attempt.Abort()
@@ -708,12 +711,15 @@ func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLas
 			panic(r)
 		}
 		if !ok {
+			if decision.owner != nil && (state == nil || decision.owner != state.host.owner) {
+				decision.owner.Release()
+			}
 			attempt.Abort()
 			j.buf.Reset()
 		}
 	}()
 
-	state, err := j.ensureScopeState(scope)
+	state, err = j.ensureScopeState(scope)
 	if err != nil {
 		j.Warningf("prepare host scope %q failed: %v", scope.ScopeKey, err)
 		return jobV2PreparedScopeEmission{}, false
@@ -740,7 +746,9 @@ func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLas
 		}
 	}
 
-	attempt, err = state.engine.PreparePlan(j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)))
+	attempt, err = state.engine.PreparePlan(
+		j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)),
+	)
 	if err != nil {
 		j.Warningf("build plan for host scope %q failed: %v", state.scopeKey, err)
 		return jobV2PreparedScopeEmission{}, false
@@ -777,41 +785,17 @@ func (j *JobV2) commitScopeEmission(prepared *jobV2PreparedScopeEmission) {
 	}
 	state := prepared.scope
 	decision := prepared.decision
-	if decision.registryOwner != "" && decision.observeRegistry {
-		result, err := j.vnodeRegistry.Register(decision.registryOwner, decision.defineInfo)
-		if err != nil {
-			j.Warningf("record vnode registry for host scope %q failed: %v", state.scopeKey, err)
-			decision.registryOwner = ""
-		} else if result.MetadataConflict && result.ConflictFirstSeen {
-			j.Warningf(
-				"conflicting vnode metadata for guid %q: hostname %q differs from %q",
-				result.Info.GUID,
-				result.Info.Hostname,
-				result.Conflicting.Hostname,
-			)
-		}
-	}
-	if state.scopeKey == defaultHostScopeKey || decision.registryOwner != "" {
-		keep := make(map[vnoderegistry.Owner]struct{}, 1)
-		if decision.registryOwner != "" {
-			keep[decision.registryOwner] = struct{}{}
-		}
-		state.host.releaseSupersededRegistryOwnersExcept(
-			j.vnodeRegistry,
-			keep,
-			j.vnodeRegistryOwnerNamespacePrefix(state.scopeKey),
-		)
-	}
+
 	state.host.commitSuccessfulEmission(prepared.plan, decision)
 	if !prepared.live && len(state.host.cleanupCharts) == 0 {
-		state.host.releaseRegistryOwners(j.vnodeRegistry)
+		state.host.owner.Release()
 		delete(j.scopeStates, state.scopeKey)
 	}
 }
 
 func (j *JobV2) abortPreparedEmission(prepared jobV2PreparedEmission) {
 	for _, scope := range prepared.scopes {
-		scope.attempt.Abort()
+		scope.Abort()
 	}
 }
 
@@ -830,7 +814,7 @@ func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) charte
 }
 
 func (j *JobV2) currentVnode() vnodes.VirtualNode {
-	if j.module != nil {
+	if j.module != nil && j.vnodeName == "" {
 		if vnode := j.module.VirtualNode(); vnode != nil {
 			return *vnode.Copy()
 		}
@@ -840,7 +824,11 @@ func (j *JobV2) currentVnode() vnodes.VirtualNode {
 	return *j.vnode.Copy()
 }
 
-func (j *JobV2) prepareScopeVnodeEmission(state *jobV2ScopeState, decision *jobV2EmissionDecision, plan chartengine.Plan) error {
+func (j *JobV2) prepareScopeVnodeEmission(
+	state *jobV2ScopeState,
+	decision *jobV2EmissionDecision,
+	plan chartengine.Plan,
+) error {
 	if decision == nil || !decision.targetHost.isVnode() || len(plan.Actions) == 0 {
 		return nil
 	}
@@ -849,69 +837,46 @@ func (j *JobV2) prepareScopeVnodeEmission(state *jobV2ScopeState, decision *jobV
 	}
 	if state.scopeKey == defaultHostScopeKey {
 		vnode := j.currentVnode()
-		return j.prepareVnodeEmission(state, decision, j.vnodeRegistryOwner(decision.targetHost), netdataapi.HostInfo{
+		labels := vnode.Labels
+		if vnode.StaleAfter != nil {
+			labels = vnode.HostLabels()
+		}
+		return j.prepareVnodeEmission(state, decision, netdataapi.HostInfo{
 			GUID:     vnode.GUID,
 			Hostname: vnode.Hostname,
-			Labels:   vnode.Labels,
+			Labels:   labels,
 		})
 	}
-	return j.prepareVnodeEmission(state, decision, j.vnodeRegistryScopedOwner(state.scopeKey, state.scope.GUID), metrixHostScopeInfo(state.scope))
+	return j.prepareVnodeEmission(state, decision, metrixHostScopeInfo(state.scope))
 }
 
-func (j *JobV2) prepareVnodeEmission(state *jobV2ScopeState, decision *jobV2EmissionDecision, owner vnoderegistry.Owner, info netdataapi.HostInfo) error {
-	preparedInfo, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
-		GUID:     info.GUID,
-		Hostname: info.Hostname,
-		Labels:   maps.Clone(info.Labels),
-	})
+func (j *JobV2) prepareVnodeEmission(
+	state *jobV2ScopeState,
+	decision *jobV2EmissionDecision,
+	info netdataapi.HostInfo,
+) error {
+	owner := state.host.owner
+	if owner == nil || state.host.ownerGUID != info.GUID {
+		owner = j.publication.NewOwner(info.GUID)
+	}
+	definition, err := owner.Prepare(info)
 	if err != nil {
+		if owner != state.host.owner {
+			owner.Release()
+		}
 		return err
 	}
-
-	scope := &chartemit.HostScope{GUID: decision.targetHost.guid}
-	if state.host.needsDefinition(decision.targetHost, preparedInfo) {
-		scope.Define = &preparedInfo
-		decision.observeRegistry = true
-	}
-	decision.hostScope = scope
-	decision.defineInfo = preparedInfo
-	decision.registryOwner = owner
-	if !state.host.tracksRegistryOwner(owner, decision.targetHost.guid) {
-		decision.observeRegistry = true
-	}
+	decision.owner = owner
+	decision.definition = definition
 	return nil
 }
 
-const vnodeRegistryOwnerSeparator = "\xff"
-
-func (j *JobV2) vnodeRegistryOwnerPrefix() string {
-	// Keep the separator outside valid metrix scope keys and GUIDs so owner
-	// strings remain unambiguous without allocating a structured key.
-	return j.fullName + vnodeRegistryOwnerSeparator
-}
-
-func (j *JobV2) vnodeRegistryJobOwnerPrefix() string {
-	// Keep job-level vnode owners separate from future per-scope owners.
-	return j.vnodeRegistryOwnerPrefix() + "job" + vnodeRegistryOwnerSeparator
-}
-
-func (j *JobV2) vnodeRegistryScopedOwnerPrefix(scopeKey string) string {
-	return j.vnodeRegistryOwnerPrefix() + "scope" + vnodeRegistryOwnerSeparator + scopeKey + vnodeRegistryOwnerSeparator
-}
-
-func (j *JobV2) vnodeRegistryOwnerNamespacePrefix(scopeKey string) string {
-	if scopeKey == defaultHostScopeKey {
-		return j.vnodeRegistryJobOwnerPrefix()
+func (j *JobV2) supplyConfiguredVnode() {
+	if consumer, ok := j.module.(collectorapi.ConfiguredVnodeConsumer); ok {
+		snapshot := j.vnode.Copy()
+		snapshot.Labels = snapshot.HostLabels()
+		consumer.SetConfiguredVnode(*snapshot)
 	}
-	return j.vnodeRegistryScopedOwnerPrefix(scopeKey)
-}
-
-func (j *JobV2) vnodeRegistryOwner(target jobV2HostRef) vnoderegistry.Owner {
-	return vnoderegistry.Owner(j.vnodeRegistryJobOwnerPrefix() + target.guid)
-}
-
-func (j *JobV2) vnodeRegistryScopedOwner(scopeKey, guid string) vnoderegistry.Owner {
-	return vnoderegistry.Owner(j.vnodeRegistryScopedOwnerPrefix(scopeKey) + guid)
 }
 
 func (j *JobV2) disableAutoDetection() {

@@ -22,7 +22,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
 )
@@ -170,7 +169,6 @@ func NewProcess(config Config) (*Process, error) {
 			Resolver:      resolver,
 			StoreCreators: creatorCatalog,
 			Runtime:       config.Runtime,
-			Vnodes:        vnoderegistry.New(),
 			InitialVnodes: initialVnodes,
 		},
 		Secrets: runSecretServices{
@@ -359,7 +357,10 @@ func (p *Process) startServices(ctx context.Context) func(context.Context) error
 				case err := <-done:
 					stopErr = errors.Join(stopErr, err)
 				case <-shutdownCtx.Done():
-					stopErr = errors.Join(stopErr, fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err()))
+					stopErr = errors.Join(
+						stopErr,
+						fmt.Errorf("jobmgr composition: process services shutdown: %w", shutdownCtx.Err()),
+					)
 					// Preserve completed failures without waiting beyond the shared budget.
 					for _, pending := range completions[index:] {
 						select {

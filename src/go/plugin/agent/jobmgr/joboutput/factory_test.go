@@ -19,8 +19,8 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
 )
@@ -94,7 +94,10 @@ func TestFactoryDecodesJobNameAndIgnoresUnknownCollectorFields(t *testing.T) {
 		context.Background(),
 		factory,
 		config,
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
 		permit,
 	)
 	require.NoError(t, err)
@@ -157,7 +160,9 @@ func TestFactoryStagesFunctionsAfterManagedProbe(t *testing.T) {
 			hooks := factoryTestHooks{
 				prepare: func(RuntimeJob) (StagedHandlerLifecycle, error) {
 					state.events = append(state.events, "stage")
-					return &factoryTestHandlers{state: state}, nil
+					return &factoryTestHandlers{
+						state: state,
+					}, nil
 				},
 			}
 			factory, _ := newFactoryTestHarness(t, create(state), hooks)
@@ -283,7 +288,9 @@ func TestFactoryDoesNotStageFunctionsAfterFailedManagedProbe(t *testing.T) {
 			hooks := factoryTestHooks{
 				prepare: func(RuntimeJob) (StagedHandlerLifecycle, error) {
 					state.events = append(state.events, "stage")
-					return &factoryTestHandlers{state: state}, nil
+					return &factoryTestHandlers{
+						state: state,
+					}, nil
 				},
 			}
 			factory, _ := newFactoryTestHarness(t, test.create(state), hooks)
@@ -441,14 +448,19 @@ func TestFactoryCandidateCleanupPanicQuarantinesIdentity(t *testing.T) {
 
 	attempts, ok := factory.config.Attempts.(*containment.Authority)
 	require.True(t, ok)
-	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+	require.Equal(t, containment.Census{
+		Quarantined: 1,
+	}, attempts.Census())
 	stage, err := factory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	defer stage.Release()
 	stage.Start()
 	<-stage.Ready()
 	_, _, err = factory.prepareCandidate(
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 2},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 2,
+		},
 		lifecycle.LongLivedPermit{},
 		stage,
 	)
@@ -471,8 +483,13 @@ func TestFactoryCanonicalizesTypedNilLifecycleResults(t *testing.T) {
 
 	attached, err := callAttachHandlers(
 		hooks,
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
-		&factoryTestHandlers{state: &factoryTestState{}},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
+		&factoryTestHandlers{
+			state: &factoryTestState{},
+		},
 	)
 	require.ErrorIs(t, err, attachErr)
 	require.True(t, attached == nil)
@@ -910,7 +927,10 @@ func TestFactoryCandidateWaitYieldsGraphClaimForWholeMaterialization(t *testing.
 
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 	prepared, failure, err := factory.prepareCandidate(
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
 		permit,
 		stage,
 	)
@@ -1081,14 +1101,19 @@ func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 		Admitted: 1,
 	}, attempts.Census())
 
-	secondFactory.config.Attempts = busySupersessionAuthority{ProcessAttemptAuthority: attempts}
+	secondFactory.config.Attempts = busySupersessionAuthority{
+		ProcessAttemptAuthority: attempts,
+	}
 	second, err := secondFactory.newCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	require.Equal(t, first.identity.Key, second.identity.Key)
 	second.Start()
 	<-second.Ready()
 	_, failure, err := secondFactory.prepareCandidate(
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
 		lifecycle.LongLivedPermit{},
 		second,
 	)
@@ -1140,7 +1165,10 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	<-firstStage.Ready()
 	firstPermit, firstTasks := issueTestJobPermit(t, "module_job", 1)
 	firstPrepared, failure, err := firstFactory.prepareCandidate(
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
 		firstPermit,
 		firstStage,
 	)
@@ -1159,7 +1187,10 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	<-secondStage.Ready()
 	secondPermit, secondTasks := issueTestJobPermit(t, "module_job", 2)
 	secondPrepared, failure, err := secondFactory.prepareCandidate(
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 2},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 2,
+		},
 		secondPermit,
 		secondStage,
 	)
@@ -1297,7 +1328,11 @@ func TestFactoryCandidatePropagatesCallerCancellation(t *testing.T) {
 			},
 			permit,
 		)
-		result <- candidateResult{prepared: prepared, failure: failure, err: err}
+		result <- candidateResult{
+			prepared: prepared,
+			failure:  failure,
+			err:      err,
+		}
 	}()
 	<-entered
 	cancel(cancellation)
@@ -1710,7 +1745,7 @@ func newFactoryTestHarness(
 		Frames:          frames,
 		CleanupOutput:   cleanupOutput,
 		ConfigModules:   configModules,
-		Vnodes:          vnoderegistry.New(),
+		Publication:     hostoutput.New(),
 		HandlerStager:   hooks,
 		HandlerAttacher: hooks,
 		Scheduler:       newTestScheduler(t),
