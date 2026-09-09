@@ -79,10 +79,6 @@ static bool ksm_supported_by_kernel(void) {
 }
 #else
 int enable_ksm = 0;
-
-static bool ksm_supported_by_kernel(void) {
-    return false;
-}
 #endif
 
 static int memory_file_open(const char *filename, size_t size) {
@@ -248,15 +244,20 @@ void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bo
     // no   - never offer memory to ksm
     // auto - offer it only when the kernel supports it (default)
     // yes  - always offer it, even if the probe says it is unsupported
+    // on platforms without MADV_MERGEABLE there is nothing to resolve:
+    // enable_ksm is a compile-time CONFIG_BOOLEAN_NO and the option is not
+    // parsed, so the first case always wins and the probe does not exist.
     if(ksm) {
         switch(enable_ksm) {
             case CONFIG_BOOLEAN_NO:
                 ksm = 0;
                 break;
 
+#if defined(MADV_MERGEABLE)
             case CONFIG_BOOLEAN_AUTO:
                 ksm = ksm_supported_by_kernel() ? 1 : 0;
                 break;
+#endif
 
             default:
                 break;
