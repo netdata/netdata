@@ -326,9 +326,15 @@ void pgd_init_arals(void) {
             // 0 saw no merging at all.
             // PGD descriptors and gorilla_writer_t are mutable structures that
             // never merge; marking them would only cost scanner time and
-            // copy-on-write faults. Both are smaller than every page data size
-            // class, so they always get pools of their own and are excluded
-            // here by size.
+            // copy-on-write faults, so their size classes are excluded here.
+            // These two classes are also where the smallest pages loaded from
+            // disk end up, since the lookup rounds up: up to 24 bytes of data
+            // (1 point of a tier > 0 page) lands in the sizeof(PGD) class and
+            // up to 32 bytes (2 points) in the sizeof(gorilla_writer_t) one.
+            // They lose nothing by not being offered: in the sizeof(PGD) class
+            // every from-disk page allocates a descriptor next to its data from
+            // the same pool, and each descriptor holds a unique data pointer,
+            // so no base page there can ever be identical to another.
             if(aral_sizes[slot] != sizeof(PGD) && aral_sizes[slot] != sizeof(gorilla_writer_t))
                 aral_enable_ksm(arals[arals_slot(slot, partition)]);
         }
